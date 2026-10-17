@@ -7,6 +7,7 @@ import {
   SendOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import WorkflowTaskInfoCard from './WorkflowTaskInfoCard.jsx'
@@ -64,7 +65,7 @@ import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
 import WorkflowTaskHandlingChain from './WorkflowTaskHandlingChain.jsx'
 import WorkflowTaskEventTrail from './WorkflowTaskEventTrail.jsx'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 const { TextArea } = Input
 
 export const TASK_ACTION_META = Object.freeze({
@@ -873,11 +874,7 @@ export default function WorkflowTaskActionDrawer({
                     <strong>
                       {canChooseActions ? '选择处理方式' : '当前只能查看任务'}
                     </strong>
-                    <span>
-                      {canChooseActions
-                        ? '选择本次操作，再核对处理内容。'
-                        : readonlyReason || '当前账号不能直接处理该任务。'}
-                    </span>
+
                   </div>
                   {canChooseActions ? (
                     <div
@@ -928,7 +925,6 @@ export default function WorkflowTaskActionDrawer({
                             </span>
                             <span>
                               <strong>{meta.title}</strong>
-                              <small>{TASK_ACTION_DESCRIPTIONS[mode]}</small>
                             </span>
                           </button>
                         )
@@ -940,8 +936,7 @@ export default function WorkflowTaskActionDrawer({
                   <section className="erp-task-action-drawer__action-panel">
                     <div className="erp-task-action-drawer__action-head">
                       <div>
-                        <span>当前操作</span>
-                        <strong>{actionMeta.title}</strong>
+                        <BusinessHelpLabel label={actionMeta.title} description={`${TASK_ACTION_DESCRIPTIONS[actionMode]} ${getTaskActionDescription(actionMode)}`} />
                       </div>
                       <Tag
                         color={actionMeta.requireReason ? 'orange' : 'green'}
@@ -953,11 +948,6 @@ export default function WorkflowTaskActionDrawer({
                           : '确认即可'}
                       </Tag>
                     </div>
-                    {actionMeta.requireReason ? (
-                      <Paragraph className="erp-task-action-drawer__action-copy">
-                        {getTaskActionDescription(actionMode)}
-                      </Paragraph>
-                    ) : null}
                     {actionMode === 'assign' ? (
                       <div className="erp-task-action-drawer__assignment">
                         <label htmlFor="erp-task-assignment-target">

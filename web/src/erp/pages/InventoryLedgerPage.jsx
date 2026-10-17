@@ -1745,6 +1745,7 @@ export default function InventoryLedgerPage() {
       </Card>
       {columnOrderModal}
       <BusinessDetailsModal
+        descriptionInHelp
         columns={visibleColumns}
         description="当前弹窗只用于库存查询和追溯，不会修改库存、批次状态、预留或变动记录。"
         open={Boolean(detailRecord)}

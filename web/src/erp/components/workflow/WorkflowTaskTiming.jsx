@@ -9,8 +9,9 @@ export default function WorkflowTaskTiming({
   compact = false,
   events = [],
   includeKeys,
+  showDueRisk = true,
 }) {
-  const rows = getWorkflowTaskTiming(task, { detail, events }).filter((row) => !includeKeys || includeKeys.includes(row.key))
+  const rows = getWorkflowTaskTiming(task, { detail, events, showDueRisk }).filter((row) => !includeKeys || includeKeys.includes(row.key))
   if (!rows.length) return null
   return (
     <div

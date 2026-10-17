@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { AutoComplete, Form, Input, InputNumber, Select, Switch } from 'antd'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
 import { renderProductOption } from './ProductIdentity.jsx'
@@ -633,10 +634,12 @@ export function MasterDataFormFields({
       {type === 'suppliers' ? (
         <>
           <BusinessFormSection title="结算与发票">
+            <Form.Item className="erp-business-action-form__field erp-business-action-form__field--full">
+              <span>付款默认值仅用于新建订单；已保存订单的付款条件保持不变。</span>
+            </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              extra="仅作为新建采购订单的默认值，订单保存后不再随档案变化。"
-              label="默认付款方式"
+              label={<BusinessHelpLabel label="默认付款方式" description="仅作为新建采购订单的默认值，订单保存后不再随档案变化。" />}
               name="default_payment_method"
             >
               <Input
@@ -648,8 +651,7 @@ export function MasterDataFormFields({
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              extra="仅作为新建采购或委外订单的默认值；订单保存后不会随供应商档案变化。"
-              label="默认付款周期（天）"
+              label={<BusinessHelpLabel label="默认付款周期（天）" description="仅作为新建采购或委外订单的默认值；订单保存后不会随供应商档案变化。" />}
               name="default_payment_term_days"
               rules={[
                 { required: true, message: '请填写默认付款周期' },
@@ -664,8 +666,7 @@ export function MasterDataFormFields({
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              extra="历史资料可不设置；新建采购订单时会带出本项。"
-              label="默认是否需要发票"
+              label={<BusinessHelpLabel label="默认是否需要发票" description="历史资料可不设置；新建采购订单时会带出本项。" />}
               name="default_invoice_required"
             >
               <Select
@@ -702,8 +703,7 @@ export function MasterDataFormFields({
           <BusinessFormSection title="加工能力">
             <Form.Item
               className="erp-business-action-form__field erp-business-action-form__field--full"
-              extra="记录该加工厂声明可承接的工序，用于资料查询；具体订单仍需逐行选择工序。"
-              label="可加工工序"
+              label={<BusinessHelpLabel label="可加工工序" description="记录该加工厂声明可承接的工序，用于资料查询；具体订单仍需逐行选择工序。" />}
               name="process_ids"
             >
               <Select

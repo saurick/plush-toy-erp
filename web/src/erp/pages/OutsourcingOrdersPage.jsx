@@ -1021,6 +1021,7 @@ export default function OutsourcingOrdersPage() {
       )}
 
       <BusinessDetailsModal
+        descriptionInHelp
         columns={detailColumns}
         description="查看加工合同摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={

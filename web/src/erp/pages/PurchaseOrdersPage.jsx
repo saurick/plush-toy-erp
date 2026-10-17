@@ -1539,6 +1539,7 @@ export default function PurchaseOrdersPage() {
       </BusinessViewSurface>
 
       <BusinessDetailsModal
+        descriptionInHelp
         columns={dataColumns}
         description="查看采购订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={

@@ -152,7 +152,7 @@
   overflow-wrap: anywhere;
 }
 
-.workflow-task-event-trail__item-head span {
+.workflow-task-event-trail__item-head > span {
   flex: 0 0 auto;
   padding: 2px 7px;
   border-radius: 999px;
@@ -253,7 +253,7 @@
     gap: 4px;
   }
 
-  .workflow-task-event-trail__item-head span {
+  .workflow-task-event-trail__item-head > span {
     width: fit-content;
   }
 }
@@ -364,3 +364,11 @@
 .workflow-task-event-trail--collapsible:has(details:not([open])) .workflow-task-event-trail__head {
   margin-bottom: 0;
 }
+
+.workflow-task-event-trail__audit { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; max-width: min(360px, calc(100vw - 64px)); margin: 0; }
+.workflow-task-event-trail__audit dt { color: var(--erp-text-muted); }
+.workflow-task-event-trail__audit dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.workflow-task-event-trail__audit-trigger.ant-btn { min-height: 32px; padding: 4px 8px; color: var(--erp-text-muted); }
+.workflow-task-event-trail--mobile .workflow-task-event-trail__audit-trigger.ant-btn { min-width: 44px; min-height: 44px; }
+@media (max-width: 640px) { .workflow-task-event-trail__item-head { display: flex; align-items: center; } }
+@media (pointer: coarse) { .workflow-task-event-trail__audit-trigger.ant-btn { min-width: 44px; min-height: 44px; } }

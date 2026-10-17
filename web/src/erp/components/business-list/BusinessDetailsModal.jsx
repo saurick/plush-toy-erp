@@ -6,6 +6,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 import BusinessFormModal from './BusinessFormModal.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import BusinessDetailsPagination, {
   BUSINESS_DETAILS_PAGE_SIZE,
 } from './BusinessDetailsPagination.jsx'
@@ -149,6 +150,7 @@ export default function BusinessDetailsModal({
   extraActions,
   columns = [],
   description,
+  descriptionInHelp = false,
   lineItems,
   onClose,
   open,
@@ -164,7 +166,7 @@ export default function BusinessDetailsModal({
   return (
     <BusinessFormModal
       className="erp-business-details-modal"
-      description={description}
+      description={descriptionInHelp ? undefined : description}
       destroyOnHidden
       footer={
         <>
@@ -184,7 +186,7 @@ export default function BusinessDetailsModal({
         </>
       }
       open={open}
-      title={title}
+      title={descriptionInHelp ? <BusinessHelpLabel label={title} description={description} /> : title}
       width={width}
       onCancel={onClose}
     >

@@ -1,3 +1,5 @@
+import { createInformationDensityExtras } from './informationDensityExtras.mjs'
+import { createInformationDensityScenarios } from './informationDensityScenarios.mjs'
 import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
 import { createPageHeaderScenarios } from './pageHeaderScenarios.mjs'
 import { createTaskCalendarScenarios } from './taskCalendarScenarios.mjs'
@@ -598,6 +600,8 @@ export function createStyleL1Scenarios(deps) {
     ...createTaskCurrentFocusScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskDetailVariantScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskFusedFlowScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createInformationDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createInformationDensityExtras({ ...deps, customerRuntimeEffectiveSession }),
     ...createDashboardTaskScenarios({
       expectText,
       expectHeading,

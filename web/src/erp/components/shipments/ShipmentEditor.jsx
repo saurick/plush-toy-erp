@@ -12,6 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -232,7 +233,7 @@ function ShipmentFormFields({
         <DeliveryAddressFields
           form={form}
           disabled={disabled}
-          extra="从销售订单带出后可按本次出货调整；保存后固定为本单收货信息。"
+          extra={<BusinessHelpLabel label="保存后固定为本单收货信息。" description="从销售订单带出后可按本次出货调整。" />}
         />
       </BusinessFormSection>
       <BusinessFormSection title="运输与费用">

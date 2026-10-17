@@ -193,6 +193,11 @@ export function getWorkflowTaskSourceTypeLabel(
   return TASK_SOURCE_TITLE_MAP.get(normalizedSourceType) || fallback
 }
 
+export function formatWorkflowTaskListSource(task = {}) {
+  const source = formatWorkflowTaskSource(task)
+  return source === '任务记录' && (task.payload?.simulated_only === true || task.source_type === 'simulated-manual-acceptance-task-batch') ? '模拟任务' : source
+}
+
 export function getWorkflowTaskSourceNo(task = {}) {
   if (
     task?.payload?.simulated_only === true ||

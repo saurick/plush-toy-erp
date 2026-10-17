@@ -118,7 +118,7 @@ export function getWorkflowTaskBlockedAt(task = {}, events = []) {
 
 export function getWorkflowTaskTiming(
   task = {},
-  { detail = false, events = [], nowMs = Date.now() } = {}
+  { detail = false, events = [], nowMs = Date.now(), showDueRisk = true } = {}
 ) {
   const ended = isTerminalWorkflowTask(task)
   const rows = []
@@ -162,7 +162,7 @@ export function getWorkflowTaskTiming(
             ? 'warning'
             : 'neutral',
       suffix:
-        status === 'overdue'
+        !showDueRisk ? '' : status === 'overdue'
           ? ' · 已超时'
           : status === 'due_soon'
             ? ' · 即将到期'

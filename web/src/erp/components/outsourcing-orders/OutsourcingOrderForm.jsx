@@ -235,8 +235,7 @@ export default function OutsourcingOrderForm({
         <Form.Item
           className="erp-business-action-form__field"
           name="source_order_no"
-          label="整单来源订单号"
-          extra="整份合同共用的来源，可不填；各行产品订单编号在明细中填写。"
+          label={<BusinessHelpLabel label="整单来源订单号" description="整份合同共用的来源，可不填；各行产品订单编号在明细中填写。" />}
         >
           <Input maxLength={128} placeholder="整份合同共用时填写" />
         </Form.Item>
@@ -250,7 +249,7 @@ export default function OutsourcingOrderForm({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          extra="保存后冻结为本单付款条件，不随加工厂档案后续调整。"
+          extra="保存后固定为本单付款条件，不随加工厂档案调整。"
           name="payment_term_days"
           label="付款周期（天）"
           rules={[

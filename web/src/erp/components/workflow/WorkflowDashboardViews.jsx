@@ -1,6 +1,7 @@
 import React from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { formatWorkflowTaskListSource } from '../../utils/dashboardTaskDisplay.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { buildWorkflowTaskResponsibilityItems } from '../../utils/workflowTaskEventPresentation.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -292,11 +293,8 @@ export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenT
             width: '27%',
             render: (_, task) => (
               <div className="erp-workbench-task-cell">
-                <WorkflowTaskSource task={task} />
-                <span className="erp-task-board-card-meta">
-                  {task.discovery?.path}
-                </span>
-                <WorkflowTaskTiming task={task} />
+                <WorkflowTaskSource task={task} label={formatWorkflowTaskListSource(task)} />
+                <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={!getWorkflowTaskStatusRiskTags(task).some((tag) => tag.key === 'overdue' || tag.key === 'due_soon')} />
               </div>
             ),
           },

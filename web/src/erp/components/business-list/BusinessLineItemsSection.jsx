@@ -20,6 +20,7 @@ export default function BusinessLineItemsSection({
   footerProps,
   name = 'items',
   renderBeforeHeader,
+  headerActions,
   renderRow,
   title,
 }) {
@@ -40,7 +41,9 @@ export default function BusinessLineItemsSection({
                 title={title}
                 description={description}
                 {...normalizedFooterProps}
-              />
+              >
+                {headerActions ?? normalizedFooterProps?.children}
+              </BusinessLineItemsHeader>
               {fields.length === 0 ? (
                 <BusinessLineItemsEmpty>{emptyDescription}</BusinessLineItemsEmpty>
               ) : (

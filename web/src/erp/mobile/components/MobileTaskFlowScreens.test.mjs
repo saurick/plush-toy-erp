@@ -331,7 +331,8 @@ test('mobile detail shares current responsibility and keeps feedback in the rece
   assert.doesNotMatch(detailScreenSource, /resolveMobileTaskCompletionFeedback/u)
   assert.doesNotMatch(detailScreenSource, />\s*完成反馈\s*</u)
   assert.match(detailScreenSource, /WorkflowTaskInfoCard/u)
-  assert.match(infoCardSource, />\s*业务信息\s*</u)
+  assert.match(infoCardSource, /aria-label="业务信息"/u)
+  assert.match(infoCardSource, /\{businessInfo\}/u)
 })
 
 test('mobile task detail loads formal process position without QA-only banners', () => {
@@ -359,7 +360,6 @@ test('mobile task detail loads current-task records for every task and keeps the
   assert.match(taskEventTrailSource, /workflow-task-event-trail__actor-name/u)
   assert.match(taskEventTrailSource, /workflow-task-event-trail__actor-role/u)
   assert.match(taskEventTrailSource, /workflow-task-event-trail__meta-time/u)
-  assert.match(taskEventTrailSource, /workflow-task-event-trail__meta-version/u)
   assert.doesNotMatch(taskEventTrailSource, /完整审批链/u)
   assert.match(detailScreenSource, /taskEventsTruncated/u)
   assert.match(detailScreenSource, /truncated=\{taskEventsTruncated\}/u)

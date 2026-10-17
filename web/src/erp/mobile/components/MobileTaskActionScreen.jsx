@@ -4,6 +4,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import { BusinessHelpLabel } from '../../components/help/BusinessContextHelp.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import {
   MOBILE_TASK_ACTION_ACCESS_STATES,
@@ -405,11 +406,6 @@ function MobileWorkflowTaskActionScreen({
         />
         <span className="mobile-task-action-choice__copy">
           <strong>{label}</strong>
-          <small>
-            {approvalTask && option.key === 'done'
-              ? '核对后确认通过，记录审批意见。'
-              : option.description}
-          </small>
         </span>
       </label>
     )
@@ -574,7 +570,7 @@ function MobileWorkflowTaskActionScreen({
               {effectiveAction ? (
                 <div className="mobile-task-action-field">
                   <label htmlFor={`${fieldID}-reason`}>
-                    {resolveReasonLabel(effectiveAction, approvalTask)}
+                    <BusinessHelpLabel label={resolveReasonLabel(effectiveAction, approvalTask)} description={approvalTask && effectiveAction === 'done' ? '核对后确认通过，记录审批意见。' : visibleActions.find((option) => option.key === effectiveAction)?.description} />
                     {reasonRequired ? (
                       <span
                         className="mobile-task-action-required"

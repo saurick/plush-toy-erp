@@ -1896,6 +1896,7 @@ export default function QualityInspectionsPage() {
       />
 
       <BusinessDetailsModal
+        descriptionInHelp
         columns={visibleDataColumns}
         description="查看当前质检单的来源、批次、检验状态和判定结果；如需提交、判定或取消，请使用列表上方的当前操作区。"
         open={Boolean(detailInspection)}

@@ -158,7 +158,7 @@ test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且
   const componentSource = read(
     'web/src/erp/components/help/BusinessContextHelp.jsx'
   )
-  assert.match(componentSource, /trigger=\{\['hover', 'click'\]\}/u)
+  assert.match(componentSource, /trigger=\{description \? 'click' : \['hover', 'click'\]\}/u)
   assert.match(componentSource, /onFocus=/u)
   assert.match(componentSource, /aria-label=\{`查看\$\{label\}说明`\}/u)
   assert.match(componentSource, /focusTriggerAfterClose/u)

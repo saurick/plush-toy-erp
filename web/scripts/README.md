@@ -112,6 +112,8 @@ pnpm preview:yoyoosun
 
 `test/statusOwnershipFixture.mjs` 为状态归属测试提供彼此不同的领域状态值。测试通过 Node 原生模块解析 hook 替换这一依赖，直接导入生产模块文件，并在测试结束后解除 hook；不改写或执行重组后的生产源码。
 
+`information-density-desktop`、`information-density-mobile-390`、`information-density-mobile-320` 和 `information-density-business-desktop` 使用相同隔离样例核对任务来源、责任与截止、记录、办理返回及详情/表单展示，并输出带区域名称的截图。该组不写真实业务数据；前后比较应使用固定源码快照、同一场景和相同视口/DPR，帮助展开与错误状态分别核对。
+
 `global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
 
 `dev-page-docs-desktop-light` 与 `inventory-visible-copy-desktop` 另在实际页面逐帧检查选中后不被旧 URL 拉回、指示条不反向、页签条持续挂载及位置和尺寸稳定，并覆盖深链、刷新和前进后退。库存窄屏切换由 `inventory-compact-header-dark-mobile` 覆盖；业务记录查询 hook 的同名测试检查有效与未启用视图及来源参数保留。这些检查使用模拟接口，不写业务数据。

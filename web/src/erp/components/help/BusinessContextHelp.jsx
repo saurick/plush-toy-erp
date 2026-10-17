@@ -186,19 +186,19 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
   )
 }
 
-export function BusinessHelpLabel({ label, pageKey = '', itemKey = '' }) {
+export function BusinessHelpLabel({ label, pageKey = '', itemKey = '', description = '' }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef(null)
   const contentRef = useRef(null)
   const item = getBusinessHelpItem(pageKey, itemKey)
-  if (!item) return label
+  if (!item && !description) return label
 
   return (
     <span className="erp-business-help-label">
       <span>{label}</span>
       <Popover
         destroyOnHidden
-        trigger={['hover', 'click']}
+        trigger={description ? 'click' : ['hover', 'click']}
         open={open}
         onOpenChange={(nextOpen) => {
           if (
@@ -233,7 +233,7 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '' }) {
               }
             }}
           >
-            <ExplanationDetails item={item} pageKey={pageKey} />
+            {description ? <p>{description}</p> : <ExplanationDetails item={item} pageKey={pageKey} />}
           </div>
         }
       >
@@ -255,6 +255,13 @@ export function BusinessHelpLabel({ label, pageKey = '', itemKey = '' }) {
             }
           }}
           onClick={(event) => event.stopPropagation()}
+          onKeyDownCapture={(event) => {
+            if (open && event.key === 'Escape') {
+              event.preventDefault()
+              event.stopPropagation()
+              setOpen(false)
+            }
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.stopPropagation()

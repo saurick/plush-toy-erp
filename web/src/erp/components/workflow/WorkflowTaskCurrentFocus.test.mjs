@@ -2,6 +2,7 @@ import { act, createElement } from 'react'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { installTestDOM, registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs'
+import { formatWorkflowTaskEventTime } from '../../utils/workflowTaskEventPresentation.mjs'
 
 async function mount(t, name, props) {
   const dom = installTestDOM()
@@ -84,6 +85,72 @@ test('processing records expand after a successful read, retain manual collapse 
   await render({ ...props, state: 'loading' })
   assert.equal(container.querySelector('details'), null)
   assert.match(container.querySelector('[role="status"]').textContent, /正在加载/u)
+})
+
+test('processing record details retain exact audit evidence on desktop and mobile', async (t) => {
+  const event = {
+    id: 9,
+    event_type: 'created',
+    created_at: 1800000000,
+    task_version: 4,
+    actor_display_name: '林工',
+    actor_role_key: 'engineering',
+  }
+  const props = {
+    task: { id: 1 },
+    events: [event],
+    showResponsibility: false,
+  }
+  const { container, render } = await mount(t, 'WorkflowTaskEventTrail', props)
+  for (const variant of ['desktop', 'mobile']) {
+    await render({ ...props, variant }, variant)
+    const record = container.querySelector('.workflow-task-event-trail__item')
+    assert.match(record.textContent, /任务已创建.*林工.*工程/u)
+    assert.doesNotMatch(record.textContent, /版本 4/u)
+    assert.equal(document.querySelector('.workflow-task-event-trail__audit'), null)
+    const detail = record.querySelector(
+      'button[aria-label="查看任务已创建记录详情"]'
+    )
+    assert.ok(detail)
+    await act(async () => detail.click())
+    const evidence = document.querySelector('.workflow-task-event-trail__audit')
+    assert.ok(evidence)
+    assert.deepEqual(
+      [...evidence.querySelectorAll('dt')].map((item) => item.textContent),
+      ['记录分类', '精确时间', '任务版本']
+    )
+    assert.deepEqual(
+      [...evidence.querySelectorAll('dd')].map((item) => item.textContent),
+      ['进度', formatWorkflowTaskEventTime(event.created_at), '版本 4']
+    )
+  }
+})
+
+test('processing record details keep missing audit evidence explicit without inventing a version', async (t) => {
+  const { container } = await mount(t, 'WorkflowTaskEventTrail', {
+    task: { id: 1 },
+    events: [{ id: 9, event_type: 'created' }],
+    showResponsibility: false,
+  })
+  assert.match(
+    container.querySelector('.workflow-task-event-trail__meta-time').textContent,
+    /时间未记录/u
+  )
+  await act(async () =>
+    container
+      .querySelector('button[aria-label="查看任务已创建记录详情"]')
+      .click()
+  )
+  const evidence = document.querySelector('.workflow-task-event-trail__audit')
+  assert.ok(evidence)
+  assert.deepEqual(
+    [...evidence.querySelectorAll('dt')].map((item) => item.textContent),
+    ['记录分类', '精确时间']
+  )
+  assert.deepEqual(
+    [...evidence.querySelectorAll('dd')].map((item) => item.textContent),
+    ['进度', '时间未记录']
+  )
 })
 
 test('shared current summary keeps cause, responsibility and lifecycle time without pending labels for ended tasks', async (t) => {

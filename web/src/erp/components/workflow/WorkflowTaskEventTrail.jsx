@@ -1,8 +1,37 @@
 import React from 'react'
 import { DownOutlined, HistoryOutlined } from '@ant-design/icons'
-import { Empty } from 'antd'
+import { Button, Empty, Popover } from 'antd'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
 import './workflowTaskEventTrail.css'
+
+function WorkflowEventAuditDetails({ item }) {
+  const [open, setOpen] = React.useState(false)
+  const trigger = React.useRef(null)
+  const closeOnEscape = (event) => {
+    if (!open || event.key !== 'Escape') return
+    event.preventDefault()
+    event.stopPropagation()
+    setOpen(false)
+    trigger.current?.focus({ preventScroll: true })
+  }
+  return (
+    <Popover
+      trigger="click"
+      placement="topRight"
+      open={open}
+      onOpenChange={setOpen}
+      content={(
+        <dl className="workflow-task-event-trail__audit">
+          <dt>记录分类</dt><dd>{item.categoryLabel}</dd>
+          <dt>精确时间</dt><dd>{item.timeLabel}</dd>
+          {item.versionLabel ? <><dt>任务版本</dt><dd>{item.versionLabel}</dd></> : null}
+        </dl>
+      )}
+    >
+      <Button ref={trigger} type="text" size="small" className="workflow-task-event-trail__audit-trigger" aria-label={`查看${item.label}记录详情`} aria-expanded={open} onKeyDown={closeOnEscape}>详情</Button>
+    </Popover>
+  )
+}
 
 export default function WorkflowTaskEventTrail({
   approvalTask = false,
@@ -98,7 +127,7 @@ export default function WorkflowTaskEventTrail({
                 <div className="workflow-task-event-trail__content">
                   <div className="workflow-task-event-trail__item-head">
                     <strong>{item.label}</strong>
-                    <span>{item.categoryLabel}</span>
+                    <WorkflowEventAuditDetails item={item} />
                   </div>
                   <p className="workflow-task-event-trail__meta">
                     {item.actorName ? (
@@ -119,17 +148,9 @@ export default function WorkflowTaskEventTrail({
                     )}{' '}
                     ·{' '}
                     <span className="workflow-task-event-trail__meta-time">
-                      {item.timeLabel}
+                      {item.timeLabel.replace(/:\d{2}$/u, '')}
                     </span>
-                    {item.versionLabel ? (
-                      <>
-                        {' '}
-                        ·{' '}
-                        <span className="workflow-task-event-trail__meta-version">
-                          {item.versionLabel}
-                        </span>
-                      </>
-                    ) : null}
+
                   </p>
                   {item.transitionLabel ? (
                     <p className="workflow-task-event-trail__transition">

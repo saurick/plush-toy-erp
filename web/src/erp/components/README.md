@@ -42,6 +42,12 @@
 - 合同条款共用 `print/ContractClauseTools.jsx`，支持分组增删、名称编辑与排序，以及组内条目操作；分组名称的左侧和纸面入口写入同一份有序草稿。明细和工程行共用 `PrintWorkspaceTools.jsx` 的调序与清空工具。结构操作只修改窗口草稿，清空保留条目，删除才移除条目；空组标题及编号规则见[打印字段与编辑清单](../../../../docs/打印模板字段与编辑行为清单.md#条目编辑)。工具和留白导航不进入纸面输出。
 - Workflow 组件只消费 `explain_action_access`、`explain_task_assignment` 和受控 action API；不能重新直连 raw workflow 写入口或把 task done 当成 Fact posted。
 
+## 展示说明的按需查看
+
+`BusinessHelpLabel` 优先读取原有岗位帮助条目，也可用 `description` 承载当前组件已有的补充说明；后者点击打开并保持可读，Escape 关闭帮助，不能触发外层表单返回。业务详情只有显式设置 `descriptionInHelp` 才将通用查看教程移到标题帮助，默认继续显示原说明，权限与业务后果不自动隐藏。采购明细通过 `BusinessLineItemsSection.headerActions` 复用现有标题操作区；原手工添加、页脚统计和其他调用方的标题内容保持原合同。
+
+任务卡保留来源、实际办理人、岗位、截止和异常原因，分类与进入岗位时间从 `WorkflowTaskInfoCard` 的任务信息查看；本任务记录默认展开，单条详情保留分类、精确时间与版本。该层只调整呈现，不改变查询、权限、校验、提交和事实边界。
+
 ## 修改后验证
 
 按影响面选择最小命令：

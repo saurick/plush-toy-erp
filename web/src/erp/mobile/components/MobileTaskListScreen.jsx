@@ -19,7 +19,7 @@ import {
 } from '@ant-design/icons'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS, taskListFilterRequest } from '../../utils/workflowTaskListFilters.mjs'
-import { getWorkflowTaskSourceTypeLabel } from '../../utils/dashboardTaskDisplay.mjs'
+import { formatWorkflowTaskListSource, getWorkflowTaskSourceTypeLabel } from '../../utils/dashboardTaskDisplay.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -54,6 +54,7 @@ import {
   MOBILE_MAIN_TAB_KEYS,
   MOBILE_MESSAGE_TAB_KEYS,
   MOBILE_TASK_FILTER_KEYS,
+  getMobileRoleLabel,
   getTaskQueueTone,
   getTaskSeverityView,
   resolveTaskBusinessChip,
@@ -77,19 +78,14 @@ const MOBILE_MAIN_TAB_ITEMS = [
 function renderTaskSourceSummary(task) {
   const assignee = task.discovery?.assignee_name || '岗位待领取'
   return (
-    <>
-      <span className="mobile-task-source-summary__heading">
-        <span className="mobile-task-source-summary__source">
-          <WorkflowTaskSource task={task} copyable={false} />
-        </span>
-        <span className="mobile-task-source-summary__assignee" aria-label={`办理人：${assignee}`}>
-          {assignee}
-        </span>
+    <span className="mobile-task-source-summary__heading">
+      <span className="mobile-task-source-summary__source">
+        <WorkflowTaskSource task={task} label={formatWorkflowTaskListSource(task)} copyable={false} />
       </span>
-      {task.discovery?.path ? (
-        <span className="workflow-task-discovery__summary">{task.discovery.path}</span>
-      ) : null}
-    </>
+      <span className="mobile-task-source-summary__assignee" aria-label={`办理人：${assignee}`}>
+        {assignee}{task.owner_role_key ? `（${getMobileRoleLabel(task.owner_role_key)}）` : ''}
+      </span>
+    </span>
   )
 }
 
@@ -442,7 +438,7 @@ export default function MobileTaskListScreen({
         </div>
         <div className="mobile-task-list-row__footer min-w-0">
           <div className="mobile-task-list-row__context text-sm leading-5 text-slate-500">
-            <WorkflowTaskTiming task={task} />
+            <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={task.task_status_key === WorkflowTaskStatus.BLOCKED || severity.label !== '超时'} />
             {businessLabel &&
             businessLabel !== resolveMobileTaskStatusLabel(task) ? (
               <span>{businessLabel}</span>
@@ -648,7 +644,7 @@ export default function MobileTaskListScreen({
         </div>
         <div className="mobile-task-list-row__footer min-w-0">
           <div className="mobile-task-list-row__context text-sm leading-5 text-slate-500">
-            <WorkflowTaskTiming task={task} />
+            <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
           </div>
         </div>
       </WorkflowTaskCard>
@@ -783,7 +779,7 @@ export default function MobileTaskListScreen({
                   </div>
                 ) : null}
                 <div className="mt-2">
-                  <WorkflowTaskTiming task={task} />
+                  <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
                 </div>
               </WorkflowTaskCard>
             )
@@ -833,7 +829,7 @@ export default function MobileTaskListScreen({
                   </span>
                 </span>
                 <div className="mt-2">
-                  <WorkflowTaskTiming task={task} />
+                  <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
                 </div>
               </WorkflowTaskCard>
             )

@@ -1963,6 +1963,7 @@ export default function SalesOrdersPage() {
       </BusinessViewSurface>
 
       <BusinessDetailsModal
+        descriptionInHelp
         columns={orderDataColumns}
         description="查看订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={

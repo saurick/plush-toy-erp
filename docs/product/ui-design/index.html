@@ -3194,6 +3194,9 @@
     .task-focus-resources { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
     .task-focus-content .task-history-summary { border-top:1px solid var(--line); }
     .task-history-summary { margin-top:14px; }
+    .task-information > summary, .task-record-detail > summary { min-height:44px; align-content:center; cursor:pointer; color:var(--text-2); }
+    .task-information { border-top:1px solid var(--line); margin-top:10px; }
+    .task-record-detail { margin-top:4px; }
     .task-history-summary > summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 12px; min-height:44px; padding:8px 0; cursor:pointer; }
     .task-history-heading { display:flex; align-items:center; flex-wrap:wrap; gap:8px; min-width:0; }
     .task-history-count { color:var(--text-2); font-size:12px; white-space:nowrap; }
@@ -15846,7 +15849,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         <div class="rm-card-head">${renderTaskHeading(task, task.object)}<span class="badge ${task.badge}">${task.state}</span></div>
         <div class="rm-card-source">${icon('sales')}<span>${task.source}</span></div>
         ${task.reason ? `<div class="rm-card-reason">阻塞原因：${task.reason}</div>` : ''}
-        <div class="rm-card-source">${escapeHTML(demoTaskPath(task))}</div><div class="rm-card-foot"><span>${task.role} · ${escapeHTML(demoAssignee(task))}</span><span>·</span><span>${task.deadline}</span></div>
+        <div class="rm-card-foot"><span>${task.role} · ${escapeHTML(demoAssignee(task))}</span><span>·</span><span>${task.deadline}</span></div>
       </button>`;
     }
 
@@ -16037,7 +16040,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
             ${task.reason ? `<div class="rm-callout danger"><strong>阻塞原因</strong><br>${task.reason}</div>` : ''}
             ${accessNote}
           </section>
-          <section class="rm-section"><h3>业务信息</h3><dl class="rm-facts">${task.facts.map(([label,value]) => `<div class="rm-fact"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></section>
+          <section class="rm-section"><h3>业务信息</h3><dl class="rm-facts">${task.facts.filter(([label])=>label!=='进入岗位').map(([label,value]) => `<div class="rm-fact"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl><details class="task-information"><summary>任务信息</summary><p>${escapeHTML(demoTaskPath(task))}</p><dl class="rm-facts">${task.facts.filter(([label])=>label==='进入岗位').map(([label,value]) => `<div class="rm-fact"><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></details></section>
           ${task.sourceSummary?`<section class="rm-section">${renderTaskSourceSummary(task)}</section>`:''}
           ${task.handling?renderFulfillmentChain(task):''}
 
@@ -16070,7 +16073,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderMobileTaskProcess(task) {
       const actions = taskActions({...task,actions:task.access === 'urge' ? ['urge'] : task.actions});
-      const choice=action=>`<button class="rm-choice ${state.mobileAction===action?'active':''}" data-action="mobile-action-choice" data-value="${action}"><span class="rm-radio"></span><span><strong>${resolveMobileActionLabel(action,task)}</strong><small>${resolveMobileActionDescription(action,task)}</small></span></button>`;
+      const choice=action=>`<button class="rm-choice ${state.mobileAction===action?'active':''}" data-action="mobile-action-choice" data-value="${action}"><span class="rm-radio"></span><span><strong>${resolveMobileActionLabel(action,task)}</strong></span></button>`;
       const selected = actions.includes(state.mobileAction) ? state.mobileAction : actions[0];
       state.mobileAction = selected;
       const [fieldLabel, placeholder] = resolveMobileActionField(selected, task);
@@ -16084,7 +16087,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
             ${task.access === 'urge'
               ? `<div class="rm-action-summary"><strong>催办</strong><div style="margin-top:4px;font-size:12px">任务仍由责任岗位处理，本次只记录催办原因。</div></div>`
               : `<div class="rm-choice-list">${actions.map(choice).join('')}</div>`}
-            <div class="rm-mobile-field ${state.mobileError ? 'error' : ''}"><label>${fieldLabel} <span style="color:var(--danger)">*</span></label><textarea id="mobile-reason" placeholder="${placeholder}">${escapeHTML(state.mobileReason)}</textarea>${state.mobileError ? `<span class="rm-error">${state.mobileError}</span>` : ''}</div>
+            <div class="rm-mobile-field ${state.mobileError ? 'error' : ''}"><label>${fieldLabel} <span style="color:var(--danger)">*</span></label><details class="task-information"><summary>填写说明</summary><p>${resolveMobileActionDescription(selected,task)}</p></details><textarea id="mobile-reason" placeholder="${placeholder}">${escapeHTML(state.mobileReason)}</textarea>${state.mobileError ? `<span class="rm-error">${state.mobileError}</span>` : ''}</div>
           </section>
         </main>
         <footer class="rm-action-bar"><button class="btn primary" data-action="mobile-submit">确认${actionLabel}</button></footer>
@@ -17308,7 +17311,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderTaskRecordHistory(task,mobile=false) {
       const records=task.history||[];
-      return `<details class="task-history-summary" open><summary><span class="task-history-heading"><span>本任务处理记录</span><span class="task-history-count">${records.length} 条</span></span><span class="task-history-toggle" aria-hidden="true">${icon('chevron')}</span></summary><div class="${mobile?'rm-timeline':'timeline'}" style="margin-top:12px">${records.map(([label,time])=>`<div class="${mobile?'rm-timeline-item':'timeline-item'}"><strong>${escapeHTML(label)}</strong><small>${escapeHTML(time)}</small></div>`).join('')||'<div class="empty">暂无本任务处理记录</div>'}</div></details>`;
+      return `<details class="task-history-summary" open><summary><span class="task-history-heading"><span>本任务处理记录</span><span class="task-history-count">${records.length} 条</span></span><span class="task-history-toggle" aria-hidden="true">${icon('chevron')}</span></summary><div class="${mobile?'rm-timeline':'timeline'}" style="margin-top:12px">${records.map(([label,time])=>`<div class="${mobile?'rm-timeline-item':'timeline-item'}"><strong>${escapeHTML(label)}</strong><small>${escapeHTML(String(time).replace(/:\d{2}$/u,''))}</small><details class="task-record-detail"><summary>详情</summary><small>${escapeHTML(time)}</small></details></div>`).join('')||'<div class="empty">暂无本任务处理记录</div>'}</div></details>`;
     }
 
     function renderTaskStep(task) {
@@ -17321,14 +17324,14 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
             <dl class="task-fused-meta"><div><dt>负责岗位</dt><dd>${task.role}</dd></div><div><dt>处理截止</dt><dd>${task.deadline||'未设置截止'}</dd></div></dl>
             ${task.reason?`<div class="rm-callout danger" style="margin-top:13px"><strong>阻塞原因</strong><div>${escapeHTML(task.reason)}</div><p>请联系 ${escapeHTML(task.role)}，确认卡点和恢复条件。</p></div>`:''}
           </section>
-          <section class="detail-section"><h3>业务信息</h3><dl class="detail-grid"><dt>进入岗位</dt><dd>${task.time}</dd></dl>${task.manualFollowup?`<h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>`:''}${renderTaskSourceSummary(task)}</section>
+          <section class="detail-section"><details class="task-information"><summary>任务信息</summary><dl class="detail-grid"><dt>分类路径</dt><dd>${escapeHTML(demoTaskPath(task))}</dd><dt>进入岗位</dt><dd>${task.time}</dd></dl></details>${task.manualFollowup?`<h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>`:''}${renderTaskSourceSummary(task)}</section>
           <section class="detail-section"><div class="task-focus-flow"><span>本任务处理进度</span>${source?`<button class="text-btn" data-action="open-source-tracking" data-page="${task.sourcePage}" data-id="${source.id}">查看订单全流程 ${icon('right')}</button>`:''}</div>${task.sourceAction?`<p>${task.sourceAction}，在来源业务中提交并查看结果。</p>`:''}</section>
           <section class="detail-section">${renderTaskRecordHistory(task)}</section>
         </div>`;
       }
       if (state.taskStep === 2) {
         const actions = taskActions(task);
-        const choice = key => `<button class="action-choice ${state.taskAction===key?'active':''}" aria-pressed="${state.taskAction===key}" data-action="task-choice" data-value="${key}"><strong>${taskActionLabel(task,key)}</strong><span>${{complete:'记录本岗处理结果。',block:'说明当前卡点。',reject:'说明退回原因及需要补充的内容。',resume:'说明卡点如何解除。',assign:'转给同岗位的接收人，或交回岗位处理。',urge:'记录催办原因，不改变任务状态。'}[key]}</span></button>`;
+        const choice = key => `<button class="action-choice ${state.taskAction===key?'active':''}" aria-pressed="${state.taskAction===key}" data-action="task-choice" data-value="${key}"><strong>${taskActionLabel(task,key)}</strong></button>`;
         return `<section class="detail-section"><h3>选择处理方式</h3><div class="action-choice-grid">${actions.map(choice).join('')}</div></section>`;
       }
       const required = taskActionRequiresReason(task,state.taskAction);
