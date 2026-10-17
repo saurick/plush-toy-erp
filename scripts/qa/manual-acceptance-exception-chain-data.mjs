@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import {
+  numeric20Scale6AggregateUnits,
+  numeric20Scale6Units,
+} from "../../web/src/erp/utils/numeric20Scale6.mjs";
 
 import { manualAcceptanceBusinessNo } from "./manual-acceptance-source-driven-facts.mjs";
 
@@ -522,6 +526,14 @@ export async function ensurePurchaseDispositionChain({
       (row) => row.id === inspection.purchase_receipt_item_id,
     );
     requireRecord(line, "rejected purchase source line");
+    const quantityUnits = numeric20Scale6Units(line.quantity);
+    assert.ok(
+      typeof line.quantity === "string" &&
+        quantityUnits !== null &&
+        numeric20Scale6AggregateUnits(line.quantity) === quantityUnits &&
+        BigInt(quantityUnits) > 0n,
+      "rejected purchase source quantity must be a positive exact decimal",
+    );
     const dispositionNo = businessNo(plan, "CGCZ", index + 1);
     const type = index === 2 ? "REPLACE" : "RETURN_TO_VENDOR";
     let record = exact(
@@ -570,10 +582,14 @@ export async function ensurePurchaseDispositionChain({
       record = (
         await call(
           rpc,
-          "purchase",
+          type === "REPLACE" ? "warehouse" : "purchase",
           "purchase",
           "post_purchase_rejection_disposition",
-          { id: record.id, expected_version: record.version },
+          {
+            id: record.id,
+            expected_version: record.version,
+            ...(type === "REPLACE" ? { counted_quantity: line.quantity } : {}),
+          },
         )
       ).purchase_rejection_disposition;
     }
@@ -599,6 +615,39 @@ export async function ensurePurchaseDispositionChain({
     records.push(record);
     if (type === "REPLACE") {
       assert.ok(record.replacement_receipt_id > 0);
+      const readReplacement = async () => {
+        const receipt = (
+          await call(rpc, "warehouse", "purchase", "get_purchase_receipt", {
+            id: record.replacement_receipt_id,
+          })
+        ).purchase_receipt;
+        match(
+          receipt,
+          {
+            id: record.replacement_receipt_id,
+            supplier_id: source.supplier_id,
+          },
+          "replacement receipt",
+        );
+        assert.equal(
+          receipt.items?.length,
+          1,
+          "replacement must retain one exact source line",
+        );
+        match(
+          receipt.items[0],
+          {
+            purchase_order_item_id: line.purchase_order_item_id,
+            material_id: line.material_id,
+            unit_id: line.unit_id,
+            warehouse_id: line.warehouse_id,
+            quantity: record.quantity,
+          },
+          "replacement receipt line",
+        );
+        return receipt;
+      };
+      let replacement = await readReplacement();
       const qualities = await list(
         rpc,
         "quality",
@@ -608,15 +657,21 @@ export async function ensurePurchaseDispositionChain({
         { purchase_receipt_id: record.replacement_receipt_id },
       );
       assert.ok(qualities.length > 0, "replacement IQC is missing");
-      for (const quality of qualities)
+      for (const quality of qualities) {
+        match(
+          quality,
+          {
+            source_type: "PURCHASE_RECEIPT",
+            inspection_type: "INCOMING",
+            purchase_receipt_id: replacement.id,
+            purchase_receipt_item_id: replacement.items[0].id,
+          },
+          "replacement incoming inspection",
+        );
         replacementInspections.push(
           await decideQuality(rpc, quality, "PASS", apply),
         );
-      let replacement = (
-        await call(rpc, "warehouse", "purchase", "get_purchase_receipt", {
-          id: record.replacement_receipt_id,
-        })
-      ).purchase_receipt;
+      }
       if (replacement.status === "DRAFT" && apply) {
         replacement = (
           await call(rpc, "warehouse", "purchase", "post_purchase_receipt", {
@@ -624,6 +679,7 @@ export async function ensurePurchaseDispositionChain({
           })
         ).purchase_receipt;
       }
+      replacement = await readReplacement();
       assert.equal(replacement.status, "POSTED");
       replacementReceipts.push(replacement);
     }

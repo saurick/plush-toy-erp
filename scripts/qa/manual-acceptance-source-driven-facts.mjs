@@ -125,6 +125,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
   "purchase.post_purchase_rejection_disposition": Object.freeze([
     "id",
     "expected_version",
+    "counted_quantity",
   ]),
   "purchase.cancel_purchase_rejection_disposition": Object.freeze([
     "id",
