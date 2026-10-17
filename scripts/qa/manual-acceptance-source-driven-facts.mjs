@@ -33,6 +33,19 @@ const PRODUCTION_ROUTE_OPERATIONS = Object.freeze([
   "HANDWORK",
   "PACKAGING",
 ]);
+const PRODUCTION_WIP_PLANNING_ACTIONS = new Set([
+  "ASSIGN_EXECUTION",
+  "SPLIT_BATCH",
+  "CANCEL_BATCH",
+]);
+const PRODUCTION_WIP_ACTIONS = new Set([
+  ...PRODUCTION_WIP_PLANNING_ACTIONS,
+  "START_OPERATION",
+  "COMPLETE_OPERATION",
+  "RECEIVE_OUTSOURCING_RETURN",
+  "TRANSFER_TO_NEXT_OPERATION",
+  "CONFIRM_PACKAGING_MATERIAL",
+]);
 const DECIMAL_SCALE = 6;
 const DECIMAL_FACTOR = 10n ** BigInt(DECIMAL_SCALE);
 const POSITIVE_DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/u;
@@ -2197,7 +2210,15 @@ function exactNormalProductionWIPBatch(
   return matches[0];
 }
 
-async function executeProductionWIPAction(rpc, params, operationCode) {
+export async function executeProductionWIPAction(rpc, params, operationCode) {
+  if (
+    !PRODUCTION_WIP_ACTIONS.has(params?.action) ||
+    !PRODUCTION_ROUTE_OPERATIONS.includes(operationCode)
+  ) {
+    throw new SourceDrivenFactError(
+      "unsupported production WIP action or operation",
+    );
+  }
   const warehouseAction =
     params.action === "RECEIVE_OUTSOURCING_RETURN" ||
     operationCode === "PACKAGING" ||
@@ -2205,8 +2226,9 @@ async function executeProductionWIPAction(rpc, params, operationCode) {
       params.action === "TRANSFER_TO_NEXT_OPERATION") ||
     (operationCode === "FABRIC_PROCESSING" &&
       params.action === "START_OPERATION");
-  const actor =
-    params.action === "CONFIRM_PACKAGING_MATERIAL"
+  const actor = PRODUCTION_WIP_PLANNING_ACTIONS.has(params.action)
+    ? "production"
+    : params.action === "CONFIRM_PACKAGING_MATERIAL"
       ? "sales"
       : warehouseAction
         ? "warehouse"

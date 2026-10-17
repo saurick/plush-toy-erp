@@ -7,6 +7,7 @@ import {
   SourceDrivenFactError,
   applySourceDrivenFactPlan,
   buildSourceDrivenFactPlan,
+  executeProductionWIPAction,
   manualAcceptanceBusinessNo,
   manualAcceptanceRPCParams,
   preflightSourceDrivenFactPlan,
@@ -1010,7 +1011,7 @@ test("phase-scoped apply executes the formal production chain and returns exact 
       "production",
       "warehouse",
       "sales",
-      "warehouse",
+      "production",
       "warehouse",
       "warehouse",
     ],
@@ -1030,6 +1031,104 @@ test("phase-scoped apply executes the formal production chain and returns exact 
     ).length,
     5,
   );
+});
+
+test("registered WIP planning actions keep their production actor across operations and reject unknown commands without RPC", async () => {
+  const requests = [];
+  const rpc = async (request) => {
+    requests.push(request);
+    return {};
+  };
+  for (const action of ["ASSIGN_EXECUTION", "SPLIT_BATCH", "CANCEL_BATCH"]) {
+    for (const operation of [
+      "FABRIC_PROCESSING",
+      "SEWING",
+      "HANDWORK",
+      "PACKAGING",
+    ]) {
+      const params = {
+        action,
+        production_order_id: 1,
+        production_wip_batch_id: 2,
+        expected_version: 3,
+        idempotency_key: "record-actor",
+      };
+      await executeProductionWIPAction(rpc, params, operation);
+      assert.deepEqual(requests.at(-1), {
+        domain: "production_wip",
+        method: "execute_production_wip_action",
+        params,
+        actor: "production",
+      });
+    }
+  }
+  const count = requests.length;
+  await assert.rejects(
+    () => executeProductionWIPAction(rpc, { action: "UNKNOWN" }, "PACKAGING"),
+    /unsupported production WIP/u,
+  );
+  await assert.rejects(
+    () =>
+      executeProductionWIPAction(rpc, { action: "START_OPERATION" }, "UNKNOWN"),
+    /unsupported production WIP/u,
+  );
+  assert.equal(requests.length, count);
+});
+
+test("the full WIP walker records production planning before warehouse packaging execution", async () => {
+  const plan = buildSourceDrivenFactPlan(sourceReport(), {
+    enabledPhases: ["production"],
+  });
+  const { calls, rpc } = createRPC();
+  await applySourceDrivenFactPlan(plan, {
+    rpc,
+    confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+  });
+  const aggregate = await rpc({
+    domain: "production_wip",
+    method: "get_production_wip",
+    params: { production_order_id: 600 },
+  });
+  const operations = new Map(
+    aggregate.production_order_operations.map((operation) => [
+      operation.id,
+      operation.operation_code,
+    ]),
+  );
+  const batches = new Map(
+    aggregate.production_wip_batches.map((batch) => [
+      batch.id,
+      operations.get(batch.production_order_operation_id),
+    ]),
+  );
+  const actions = calls
+    .filter((call) => call.method === "execute_production_wip_action")
+    .map((call) => [
+      call.params.action === "CONFIRM_PACKAGING_MATERIAL"
+        ? "PACKAGING"
+        : batches.get(call.params.production_wip_batch_id),
+      call.params.action,
+      call.actor,
+    ]);
+  assert.deepEqual(actions, [
+    ["FABRIC_PROCESSING", "ASSIGN_EXECUTION", "production"],
+    ["FABRIC_PROCESSING", "START_OPERATION", "warehouse"],
+    ["FABRIC_PROCESSING", "RECEIVE_OUTSOURCING_RETURN", "warehouse"],
+    ["FABRIC_PROCESSING", "TRANSFER_TO_NEXT_OPERATION", "production"],
+    ["SEWING", "ASSIGN_EXECUTION", "production"],
+    ["SEWING", "START_OPERATION", "production"],
+    ["SEWING", "COMPLETE_OPERATION", "production"],
+    ["SEWING", "TRANSFER_TO_NEXT_OPERATION", "production"],
+    ["HANDWORK", "ASSIGN_EXECUTION", "production"],
+    ["HANDWORK", "START_OPERATION", "production"],
+    ["HANDWORK", "COMPLETE_OPERATION", "production"],
+    ["HANDWORK", "TRANSFER_TO_NEXT_OPERATION", "warehouse"],
+    ["PACKAGING", "CONFIRM_PACKAGING_MATERIAL", "sales"],
+    ["PACKAGING", "ASSIGN_EXECUTION", "production"],
+    ["PACKAGING", "START_OPERATION", "warehouse"],
+    ["PACKAGING", "COMPLETE_OPERATION", "warehouse"],
+  ]);
 });
 
 test("the customer-inspection route executes its frozen fourth gate and preserves the completion and packaging sequence", async () => {
