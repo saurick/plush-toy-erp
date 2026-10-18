@@ -184,6 +184,25 @@
 .workflow-task-calendar-switch {
   margin-bottom: 12px;
 }
+
+@media (width > 760px) {
+  .workflow-task-calendar:not(.workflow-task-calendar--mobile) .workflow-task-calendar__heading {
+    position: sticky;
+    /* 抵消滚动容器的内边距，避免任务片段露在摘要上方。 */
+    top: calc(-1 * var(--erp-page-padding));
+    z-index: 2;
+    padding-block: 8px;
+    background: var(--erp-surface-bg);
+  }
+}
+
+@media (width > 760px) and (height >= 720px) {
+  .workflow-task-calendar:not(.workflow-task-calendar--mobile) .workflow-task-calendar__month {
+    position: sticky;
+    top: 12px;
+  }
+}
+
 .mobile-task-calendar-switch {
   margin: 0 12px 12px;
 }

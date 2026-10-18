@@ -3172,6 +3172,8 @@
     .task-calendar-demo-buckets { display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line); }
     .task-calendar-demo-items { display:grid;gap:10px;min-width:0; }
     .task-calendar-demo-items > strong { font-size:16px; }
+    @media(min-width:761px){.task-calendar-demo:not(.task-calendar-demo--mobile) .task-calendar-demo-items > strong{position:sticky;top:0;z-index:2;padding-block:8px;background:var(--surface);}}
+    @media(min-width:761px) and (min-height:720px){.task-calendar-demo:not(.task-calendar-demo--mobile) .task-calendar-demo-month{position:sticky;top:12px;}}
     .task-calendar-demo-items > .table-wrap { min-width:0; max-width:100%; overflow:auto; }
     .task-calendar-demo--mobile { grid-template-columns:minmax(0,1fr);padding:12px; }
     .task-calendar-demo--mobile .task-calendar-demo-month { padding:12px 8px; }
