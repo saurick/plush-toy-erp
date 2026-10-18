@@ -110,6 +110,8 @@ pnpm preview:yoyoosun
 
 `test/reactRuntime.mjs` 为 Node 组件与 hook 行为测试提供 JSX 加载和可恢复的 DOM 环境。`createReactTestHarness(t)` 统一管理 React root、当前事件循环的刷新及测试后的卸载和环境恢复；完整页面布局、焦点几何和浏览器交互由对应 Style L1 场景验证。这些 helper 不进入产品运行时。
 
+happy-dom 的文本框 computed style 会将 `none` / `hidden` 边框宽度保留为 `initial`。DOM helper 仅在读取文本框计算样式时将这两种边框宽度解析为浏览器的 `0px`，保留作者样式和可见边框，避免自动高度计算得到 `NaN`；回归由 `test/reactRuntime.test.mjs` 守住。此适配不模拟排版尺寸，上游修正 CSSOM 后可随回归移除。
+
 `test/statusOwnershipFixture.mjs` 为状态归属测试提供彼此不同的领域状态值。测试通过 Node 原生模块解析 hook 替换这一依赖，直接导入生产模块文件，并在测试结束后解除 hook；不改写或执行重组后的生产源码。
 
 `information-density-desktop`、`information-density-mobile-390`、`information-density-mobile-320` 和 `information-density-business-desktop` 使用相同隔离样例核对任务来源、责任与截止、记录、办理返回及详情/表单展示，并输出带区域名称的截图。该组不写真实业务数据；前后比较应使用固定源码快照、同一场景和相同视口/DPR，帮助展开与错误状态分别核对。

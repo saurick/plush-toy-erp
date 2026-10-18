@@ -86,6 +86,29 @@ function installTestDOM() {
   const runtimeWindow = new Window({
     url: 'http://127.0.0.1/erp/business-dashboard',
   })
+  const nativeGetComputedStyle = runtimeWindow.getComputedStyle.bind(runtimeWindow)
+  runtimeWindow.getComputedStyle = (element, ...args) => {
+    const style = nativeGetComputedStyle(element, ...args)
+    if (element.tagName !== 'TEXTAREA') return style
+    // happy-dom leaves border:none widths as "initial"; browsers compute 0px.
+    // Keep textarea autosizing arithmetic valid without changing authored CSS.
+    const getPropertyValue = (name) => {
+      const border = /^border-(top|right|bottom|left)-width$/u.exec(name)
+      if (border && ['none', 'hidden'].includes(style.getPropertyValue(`border-${border[1]}-style`))) {
+        return '0px'
+      }
+      return style.getPropertyValue(name)
+    }
+    return new Proxy(style, {
+      get(target, property) {
+        if (property === 'getPropertyValue') return getPropertyValue
+        const border = typeof property === 'string' && /^border(Top|Right|Bottom|Left)Width$/u.exec(property)
+        if (border) return getPropertyValue(`border-${border[1].toLowerCase()}-width`)
+        const value = Reflect.get(target, property, target)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+  }
   const globals = {
     window: runtimeWindow,
     document: runtimeWindow.document,
