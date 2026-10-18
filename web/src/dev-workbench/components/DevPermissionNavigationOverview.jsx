@@ -34,19 +34,7 @@ export default function DevPermissionNavigationOverview({
 }) {
   const unavailable = model?.state === PERMISSION_NAVIGATION_STATE.UNAVAILABLE
   const blocked = model?.state === PERMISSION_NAVIGATION_STATE.BLOCKED
-  const groups = [
-    {
-      key: 'work',
-      title: '工作中心',
-      items: model?.dashboardItems || [],
-    },
-    {
-      key: 'primary',
-      title: '常用工作',
-      items: model?.primaryItems || [],
-    },
-    ...(model?.secondarySections || []),
-  ].filter((group) => group.items.length > 0)
+  const groups = model?.sections || []
 
   return (
     <section
@@ -69,10 +57,20 @@ export default function DevPermissionNavigationOverview({
         </div>
         <Space wrap size={[6, 6]}>
           <Tag color={unavailable || blocked ? 'orange' : 'blue'}>
-            {unavailable ? '待核对' : blocked ? '访问受限' : model?.projectionOnly ? '岗位参考' : '完整导航'}
+            {unavailable
+              ? '待核对'
+              : blocked
+                ? '访问受限'
+                : model?.projectionOnly
+                  ? '岗位参考'
+                  : '完整导航'}
           </Tag>
           {model?.modeLabel ? (
-            <Tag color={unavailable || blocked ? 'orange' : modeTagColor(model?.mode)}>
+            <Tag
+              color={
+                unavailable || blocked ? 'orange' : modeTagColor(model?.mode)
+              }
+            >
               {model.modeLabel}
             </Tag>
           ) : null}
@@ -94,11 +92,14 @@ export default function DevPermissionNavigationOverview({
             <div>
               <Text strong>{model?.contextLabel}</Text>
               <Text type="secondary">
-                {model?.effectivePageCount || 0} 个{model?.projectionOnly ? '岗位合并参考页面' : '最终可进入页面'}
+                {model?.effectivePageCount || 0} 个
+                {model?.projectionOnly ? '岗位合并参考页面' : '获准页面'}
+                {' · '}
+                {model?.totalItemCount || 0} 个侧栏入口
               </Text>
             </div>
             <Text type="secondary">
-              菜单位置只影响查找顺序，不增加页面或操作权限。
+              同一业务模块合并为一个入口；历史记录与帮助中心为登录后入口。
             </Text>
           </div>
 

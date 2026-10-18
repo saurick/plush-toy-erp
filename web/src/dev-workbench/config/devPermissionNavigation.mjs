@@ -5,9 +5,13 @@ import {
 import {
   ROLE_NAVIGATION_MODES,
   buildRoleGuidedNavigation,
-  buildRoleGuidedNavigationPreview,
   normalizeRoleNavigationSettings,
 } from '../../erp/config/roleGuidedNavigation.mjs'
+import {
+  getActiveCustomerMenuConfig,
+  getCustomerNavigationPresentation,
+  getSidebarNavigationSections,
+} from '../../erp/config/customerMenuConfig.mjs'
 import {
   getPermissionCenterRoleKey,
   getPermissionCenterRoleName,
@@ -17,7 +21,11 @@ import {
   getPermissionRelationshipContext,
 } from './devPermissionRelationshipGraph.mjs'
 import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
-import { projectRoleGuidedModuleNavigation } from '../../erp/utils/businessModuleGroups.mjs'
+import {
+  groupSidebarNavigationSections,
+  projectBusinessModuleSections,
+  projectRoleGuidedModuleNavigation,
+} from '../../erp/utils/businessModuleGroups.mjs'
 
 export const PERMISSION_NAVIGATION_STATE = Object.freeze({
   READY: 'ready',
@@ -44,11 +52,14 @@ function accessForRole(accessByRoleKey = {}, roleKey = '') {
   return accessByRoleKey?.[roleKey] || null
 }
 
-function getCurrentNavigationSections(navigationSections) {
+function getCurrentNavigationSections(navigationSections, customerMenuConfig) {
   if (Array.isArray(navigationSections)) {
     return navigationSections
   }
-  return [...getNavigationSections(), ...getAuthenticatedNavigationSections()]
+  return [
+    ...getNavigationSections(customerMenuConfig),
+    ...getAuthenticatedNavigationSections(),
+  ]
 }
 
 function getEffectivePathSet(accesses = []) {
@@ -87,34 +98,52 @@ function normalizeMenuItem(item = {}, order = 0) {
   }
 }
 
-function normalizePlacement(placement = {}) {
-  const dashboardItems = normalizeList(placement?.dashboardItems).map(
-    (item, index) => normalizeMenuItem(item, index + 1)
+function normalizePlacement(menuSections = []) {
+  const sections = normalizeList(menuSections).map((section, sectionIndex) => ({
+    key:
+      normalizeText(section?.key) || `menu-section-${String(sectionIndex + 1)}`,
+    title: normalizeText(section?.title) || '其他功能',
+    items: normalizeList(section?.items).map((item, index) =>
+      normalizeMenuItem(item, index + 1)
+    ),
+  }))
+  return {
+    sections,
+    totalItemCount: sections.reduce(
+      (total, section) => total + section.items.length,
+      0
+    ),
+  }
+}
+
+function buildMenuSections({
+  navigationSections,
+  effectivePaths,
+  roles,
+  presentation,
+}) {
+  const visibleSections = getSidebarNavigationSections(
+    filterNavigationSections(navigationSections, effectivePaths)
   )
-  const primaryItems = normalizeList(placement?.primaryItems).map(
-    (item, index) => normalizeMenuItem(item, index + 1)
-  )
-  let secondaryOrder = 0
-  const secondarySections = normalizeList(placement?.secondarySections).map(
-    (section, sectionIndex) => ({
-      key:
-        normalizeText(section?.key) ||
-        `menu-section-${String(sectionIndex + 1)}`,
-      title: normalizeText(section?.title) || '其他功能',
-      items: normalizeList(section?.items).map((item) => {
-        secondaryOrder += 1
-        return normalizeMenuItem(item, secondaryOrder)
-      }),
+  if (presentation !== 'role_guided') {
+    return groupSidebarNavigationSections(
+      projectBusinessModuleSections(visibleSections)
+    )
+  }
+  const placement = projectRoleGuidedModuleNavigation(
+    buildRoleGuidedNavigation({
+      visibleSections,
+      adminProfile: {
+        roles,
+        effective_session: { roles: roles.map(getPermissionCenterRoleKey) },
+      },
     })
   )
-  return {
-    dashboardItems,
-    primaryItems,
-    secondarySections,
-    secondaryItemCount: secondaryOrder,
-    totalItemCount:
-      dashboardItems.length + primaryItems.length + secondaryOrder,
-  }
+  return [
+    { key: 'work', title: '工作中心', items: placement.dashboardItems },
+    { key: 'primary', title: '常用工作', items: placement.primaryItems },
+    ...placement.secondarySections,
+  ].filter((section) => section.items.length > 0)
 }
 
 function unavailableModel({
@@ -130,10 +159,7 @@ function unavailableModel({
     message,
     notice: '',
     effectivePageCount: 0,
-    dashboardItems: [],
-    primaryItems: [],
-    secondarySections: [],
-    secondaryItemCount: 0,
+    sections: [],
     totalItemCount: 0,
   }
 }
@@ -163,7 +189,12 @@ function readyModel({
   }
 }
 
-function buildRoleNavigationModel({ accessByRoleKey, navigationSections, context }) {
+function buildRoleNavigationModel({
+  accessByRoleKey,
+  navigationSections,
+  presentation,
+  context,
+}) {
   const role = context.roles[0]
   if (!role) {
     return unavailableModel({ message: '请选择要查看的岗位。' })
@@ -174,7 +205,7 @@ function buildRoleNavigationModel({ accessByRoleKey, navigationSections, context
   const access = accessForRole(accessByRoleKey, roleKey)
   if (context.blocked) {
     return readyModel({
-      placement: {},
+      placement: [],
       contextLabel: roleName,
       blocked: true,
       modeLabel: '岗位已停用',
@@ -192,28 +223,33 @@ function buildRoleNavigationModel({ accessByRoleKey, navigationSections, context
 
   const settings = normalizeRoleNavigationSettings(role)
   const effectivePaths = getEffectivePathSet([access])
-  const placement = buildRoleGuidedNavigationPreview({
+  const placement = buildMenuSections({
     navigationSections,
-    effectiveAccess: access,
-    roleKey,
-    navigationMode: settings.mode,
-    primaryMenuPaths: settings.primaryMenuPaths,
-    secondaryMenuPaths: settings.secondaryMenuPaths,
+    effectivePaths,
+    roles: [role],
+    presentation,
   })
   return readyModel({
     placement,
     contextLabel: roleName,
-    mode: settings.mode,
+    mode: presentation === 'role_guided' ? settings.mode : 'sectioned',
     modeLabel:
-      settings.mode === ROLE_NAVIGATION_MODES.CUSTOM
-        ? '自定义布局'
-        : '系统推荐',
+      presentation !== 'role_guided'
+        ? '按业务模块'
+        : settings.mode === ROLE_NAVIGATION_MODES.CUSTOM
+          ? '自定义布局'
+          : '系统推荐',
     effectivePageCount: effectivePaths.size,
     projectionOnly: context.projectionOnly,
   })
 }
 
-function buildAccountNavigationModel({ accessByRoleKey, navigationSections, context }) {
+function buildAccountNavigationModel({
+  accessByRoleKey,
+  navigationSections,
+  presentation,
+  context,
+}) {
   const { account } = context
   if (!account) {
     return unavailableModel({ message: '请选择要查看的员工账号。' })
@@ -231,7 +267,7 @@ function buildAccountNavigationModel({ accessByRoleKey, navigationSections, cont
 
   if (context.blocked) {
     return readyModel({
-      placement: {},
+      placement: [],
       contextLabel,
       blocked: true,
       modeLabel: '当前不可使用',
@@ -259,20 +295,12 @@ function buildAccountNavigationModel({ accessByRoleKey, navigationSections, cont
     accessForRole(accessByRoleKey, roleKey)
   )
   const effectivePaths = getEffectivePathSet(accesses)
-  const visibleSections = filterNavigationSections(
+  const placement = buildMenuSections({
     navigationSections,
-    effectivePaths
-  )
-  const placement = projectRoleGuidedModuleNavigation(
-    buildRoleGuidedNavigation({
-      visibleSections,
-      adminProfile: {
-        is_super_admin: false,
-        roles: selectedRoles,
-        effective_session: { roles: roleKeys },
-      },
-    })
-  )
+    effectivePaths,
+    roles: selectedRoles,
+    presentation,
+  })
   const singleRoleSettings =
     selectedRoles.length === 1
       ? normalizeRoleNavigationSettings(selectedRoles[0])
@@ -280,13 +308,18 @@ function buildAccountNavigationModel({ accessByRoleKey, navigationSections, cont
   return readyModel({
     placement,
     contextLabel,
-    mode: singleRoleSettings?.mode || 'merged',
+    mode:
+      presentation !== 'role_guided'
+        ? 'sectioned'
+        : singleRoleSettings?.mode || 'merged',
     modeLabel:
       selectedRoles.length > 1
         ? `多岗位合并（${selectedRoles.length}）`
-        : singleRoleSettings?.mode === ROLE_NAVIGATION_MODES.CUSTOM
-          ? '自定义布局'
-          : '系统推荐',
+        : presentation !== 'role_guided'
+          ? '按业务模块'
+          : singleRoleSettings?.mode === ROLE_NAVIGATION_MODES.CUSTOM
+            ? '自定义布局'
+            : '系统推荐',
     notice: context.projectionOnly
       ? '以下是各岗位菜单的合并参考；跨岗位组合后的实际菜单须以该账号登录会话为准。'
       : '',
@@ -302,9 +335,13 @@ export function buildPermissionRelationshipNavigationModel({
   roles = [],
   accessByRoleKey = {},
   navigationSections = null,
+  customerMenuConfig = getActiveCustomerMenuConfig(),
 } = {}) {
-  const currentNavigationSections =
-    getCurrentNavigationSections(navigationSections)
+  const currentNavigationSections = getCurrentNavigationSections(
+    navigationSections,
+    customerMenuConfig
+  )
+  const presentation = getCustomerNavigationPresentation(customerMenuConfig)
   const context = getPermissionRelationshipContext({
     viewMode,
     targetKey,
@@ -316,12 +353,14 @@ export function buildPermissionRelationshipNavigationModel({
     return buildAccountNavigationModel({
       accessByRoleKey,
       navigationSections: currentNavigationSections,
+      presentation,
       context,
     })
   }
   return buildRoleNavigationModel({
     accessByRoleKey,
     navigationSections: currentNavigationSections,
+    presentation,
     context,
   })
 }

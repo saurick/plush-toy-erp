@@ -26,7 +26,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
     ]),
   }),
   desktopMenu: Object.freeze({
-    presentation: "role_guided",
+    presentation: "sectioned",
     hiddenItemKeys: Object.freeze([]),
     routeOnlyItemKeys: Object.freeze([
       "production-scheduling",

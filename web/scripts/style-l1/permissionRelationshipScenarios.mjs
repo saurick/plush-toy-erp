@@ -62,6 +62,42 @@ export function createPermissionRelationshipScenarios({
   let readCount = 0
   return [
     {
+      name: 'permission-relationship-current-navigation-desktop',
+      path: '/__dev/permission-relationships?target=sales&tab=menu',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        const fixture = permissionRelationshipFixture()
+        fixture.approval_settings = { items: [] }
+        const paths = [
+          '/erp/dashboard', '/erp/task-board',
+          '/erp/master/partners/customers', '/erp/master/partners/suppliers', '/erp/master/products',
+          '/erp/sales/project-orders/sales-orders', '/erp/production/quality-inspections',
+          '/erp/warehouse/inventory', '/erp/production/orders', '/erp/production/exceptions',
+          '/erp/warehouse/shipments', '/erp/print-center',
+        ]
+        fixture.roles[0].navigation_mode = 'custom'
+        fixture.roles[0].primary_menu_paths = ['/erp/warehouse/shipments']
+        fixture.access_by_role_key.sales.pages = paths.map((path) => ({ key: path, path, effective: true, rbac_granted: true }))
+        await page.route(`**${DEV_PERMISSION_RELATIONSHIPS_API}`, (route) => route.fulfill({ json: fixture }))
+      },
+      verify: async (page) => {
+        const navigation = page.getByRole('region', { name: '实际侧栏 / 可用菜单' })
+        await navigation.getByText('按业务模块', { exact: true }).waitFor()
+        const headings = await navigation.locator('.erp-permission-navigation__group-head strong').allTextContents()
+        assert.deepEqual(headings, ['工作中心', '业务模块', '工具与查询', '系统与帮助'])
+        assert.equal(await navigation.getByText('常用工作', { exact: true }).count(), 0)
+        assert.equal(await navigation.getByText('自定义布局', { exact: true }).count(), 0)
+        await navigation.getByText('12 个获准页面 · 11 个侧栏入口', { exact: true }).waitFor()
+        assert.equal(await navigation.locator('.erp-permission-navigation__items li').count(), 11)
+        assert.deepEqual(await navigation.locator('.erp-permission-navigation__items').nth(1).locator('li > span:last-child').allTextContents(), ['基础资料', '销售管理', '生产管理', '库存管理', '质检管理', '出货管理'])
+        for (const group of await navigation.locator('.erp-permission-navigation__group').all()) {
+          assert.equal(await group.locator('.erp-permission-navigation__order').first().innerText(), '1')
+        }
+        await assertNoHorizontalOverflow(page, '当前权限关系菜单投影')
+      },
+    },
+    {
       name: 'permission-relationship-consistency-desktop',
       path: '/__dev/permission-relationships?target=sales&tab=details',
       viewport: { width: 1920, height: 1080 },

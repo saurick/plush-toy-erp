@@ -17,6 +17,8 @@
 
 - `menuConfig.mjs`：永绅前端品牌和桌面菜单配置源。部署时把经过审查的 `customer-config.example.js` 发布为静态根路径 `customer-config.js`，并只复制 `public-assets/` 到 `/customer-assets/yoyoosun/`。菜单隐藏不是安全边界，后端仍以 RBAC、active revision、模块状态和业务 usecase 校验为准。
 
+  当前桌面采用 `sectioned`，按工作中心、业务模块、工具与查询、系统与帮助展示，不生成“常用工作”分组。权限关系的菜单预览复用同一展示配置、侧栏过滤和模块合并；已保存的岗位推荐或自定义排列不会在此模式下改变侧栏。
+
 - `customer-config.example.js`：永绅 yoyoosun 前端部署注入示例。默认产品 Web 包只带中性的 `web/public/customer-config.js` 占位，不能把本示例复制进 Product Core 默认产物。
 
 - `public-assets/`：唯一允许复制到公开前端产物的客户静态资源。桌面端使用蓝色“永”字 favicon（`brand.faviconHref`），手机端使用青绿色“永”字 favicon（`brand.mobileFaviconHref`）；登录页随“电脑版 / 手机版”选择即时切换。未配置手机端图标时沿用 `brand.faviconHref`；打印工作区继续使用模板专属图标。

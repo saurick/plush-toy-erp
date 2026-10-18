@@ -9,7 +9,7 @@ export const yoyoosunMenuConfig = Object.freeze({
     mobileFaviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun-mobile.svg",
   },
   desktopMenu: {
-    presentation: "role_guided",
+    presentation: "sectioned",
     hiddenItemKeys: [],
     routeOnlyItemKeys: ["production-scheduling", "production-exceptions"],
     sections: [

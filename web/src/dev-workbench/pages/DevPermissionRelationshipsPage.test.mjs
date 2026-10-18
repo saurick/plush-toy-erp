@@ -51,11 +51,16 @@ test('dev permission relationship page remains valid JSX', async () => {
 test('dev permission relationship page reads existing truth sources without writing RBAC', () => {
   assert.match(source, /useSearchParams/u)
   assert.match(source, /readPermissionRelationshipSnapshot/u)
-  assert.doesNotMatch(source, /adminRpc|JsonRpc|AUTH_SCOPE|admin-login|getApprovalSettings/u)
+  assert.doesNotMatch(
+    source,
+    /adminRpc|JsonRpc|AUTH_SCOPE|admin-login|getApprovalSettings/u
+  )
   assert.match(source, /buildPermissionRelationshipNavigationModel/u)
   assert.match(source, /buildPermissionRelationshipEvidence/u)
   assert.match(navigationSource, /getNavigationSections/u)
-  assert.match(navigationSource, /buildRoleGuidedNavigationPreview/u)
+  assert.match(navigationSource, /getCustomerNavigationPresentation/u)
+  assert.match(navigationSource, /getSidebarNavigationSections/u)
+  assert.match(navigationSource, /groupSidebarNavigationSections/u)
   assert.match(navigationSource, /buildRoleGuidedNavigation/u)
   assert.doesNotMatch(
     source + navigationSource + navigationComponentSource,
@@ -95,7 +100,9 @@ test('permission graph loads on the dev page and hides technical source on rende
   assert.doesNotMatch(source, /scrollIntoView|PERMISSION_RELATIONSHIP_FOCUS/u)
   assert.match(navigationComponentSource, /实际侧栏 \/ 可用菜单/u)
   assert.match(navigationComponentSource, /不会随“功能范围”筛选缩小/u)
-  assert.match(navigationComponentSource, /菜单位置只影响查找顺序/u)
+  assert.match(navigationComponentSource, /model\?\.sections/u)
+  assert.match(navigationComponentSource, /个侧栏入口/u)
+  assert.match(navigationComponentSource, /同一业务模块合并为一个入口/u)
   assert.match(source, /erp-dev-workspace-page/u)
   assert.match(source, /权限关系/u)
   assert.match(source, /href="\/erp\/system\/permissions"/u)

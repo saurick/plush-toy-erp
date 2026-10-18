@@ -5,6 +5,13 @@ import {
   PERMISSION_NAVIGATION_STATE,
   buildPermissionRelationshipNavigationModel,
 } from './devPermissionNavigation.mjs'
+import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
+
+const guidedMenuConfig = { desktopMenu: { presentation: 'role_guided' } }
+const groupItems = (model, key) =>
+  model.sections.find((section) => section.key === key)?.items || []
+const otherSections = (model) =>
+  model.sections.filter((section) => !['work', 'primary'].includes(section.key))
 
 const navigationSections = [
   {
@@ -13,6 +20,7 @@ const navigationSections = [
     items: [
       {
         key: 'global-dashboard',
+        sidebarArea: 'work',
         label: '工作台',
         path: '/erp/dashboard',
       },
@@ -72,6 +80,7 @@ const navigationSections = [
     items: [
       {
         key: 'help-center',
+        sidebarArea: 'system',
         label: '帮助中心',
         path: '/erp/help-center',
         access: 'authenticated',
@@ -124,13 +133,14 @@ const accessByRoleKey = {
   },
 }
 
-test('role menu projection shows complete recommended navigation without inventing entries', () => {
+test('explicit role-guided presentation shows complete recommended navigation', () => {
   const model = buildPermissionRelationshipNavigationModel({
     viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
     targetKey: 'sales',
     roles,
     accessByRoleKey,
     navigationSections,
+    customerMenuConfig: guidedMenuConfig,
   })
 
   assert.equal(model.state, PERMISSION_NAVIGATION_STATE.READY)
@@ -138,21 +148,21 @@ test('role menu projection shows complete recommended navigation without inventi
   assert.equal(model.contextLabel, '业务')
   assert.equal(model.effectivePageCount, 5)
   assert.deepEqual(
-    model.dashboardItems.map((item) => item.label),
+    groupItems(model, 'work').map((item) => item.label),
     ['工作台']
   )
   assert.deepEqual(
-    model.primaryItems.map((item) => item.label),
+    groupItems(model, 'primary').map((item) => item.label),
     ['基础资料', '销售管理', '出货管理']
   )
   assert.deepEqual(
-    model.secondarySections.map((section) => [
+    otherSections(model).map((section) => [
       section.title,
       section.items.map((item) => item.label),
     ]),
     [
       ['业务模块', ['库存管理']],
-      ['工具与查询', ['帮助中心']],
+      ['系统与帮助', ['帮助中心']],
     ]
   )
   assert.equal(model.totalItemCount, 6)
@@ -177,15 +187,16 @@ test('role menu projection preserves a saved custom layout and appends remaining
     roles: [customSalesRole],
     accessByRoleKey,
     navigationSections,
+    customerMenuConfig: guidedMenuConfig,
   })
 
   assert.equal(model.modeLabel, '自定义布局')
   assert.deepEqual(
-    model.primaryItems.map((item) => item.label),
+    groupItems(model, 'primary').map((item) => item.label),
     ['库存管理', '销售管理']
   )
   assert.deepEqual(
-    model.secondarySections.flatMap((section) =>
+    otherSections(model).flatMap((section) =>
       section.items.map((item) => item.label)
     ),
     ['基础资料', '出货管理', '帮助中心']
@@ -194,6 +205,7 @@ test('role menu projection preserves a saved custom layout and appends remaining
 
 test('employee menu projection merges multiple active roles once', () => {
   const model = buildPermissionRelationshipNavigationModel({
+    customerMenuConfig: guidedMenuConfig,
     viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
     targetKey: '20',
     accounts: [
@@ -219,15 +231,16 @@ test('employee menu projection merges multiple active roles once', () => {
   assert.match(model.notice, /合并参考/u)
   assert.equal(model.effectivePageCount, 7)
   assert.deepEqual(
-    model.primaryItems.map((item) => item.label),
+    groupItems(model, 'primary').map((item) => item.label),
     ['基础资料', '财务管理', '销售管理', '出货管理', '库存管理']
   )
   assert.equal(
-    model.primaryItems.filter((item) => item.label === '出货管理').length,
+    groupItems(model, 'primary').filter((item) => item.label === '出货管理')
+      .length,
     1
   )
   assert.deepEqual(
-    model.secondarySections.at(-1).items.map((item) => item.label),
+    model.sections.at(-1).items.map((item) => item.label),
     ['帮助中心']
   )
 })
@@ -287,12 +300,13 @@ test('super administrator menu is not fabricated from ordinary role settings', (
 })
 
 test('inactive account has no usable menu even if its roles are still granted', () => {
-  const model = buildPermissionRelationshipNavigationModel({ viewMode: 'account',
-targetKey: '2',
+  const model = buildPermissionRelationshipNavigationModel({
+    viewMode: 'account',
+    targetKey: '2',
     accounts: [{ id: 2, account_status: 'suspended', roles }],
-roles,
-accessByRoleKey,
-navigationSections,
+    roles,
+    accessByRoleKey,
+    navigationSections,
   })
   assert.equal(model.state, PERMISSION_NAVIGATION_STATE.BLOCKED)
   assert.equal(model.effectivePageCount, 0)
@@ -300,24 +314,220 @@ navigationSections,
 })
 
 test('disabled role cannot contribute menus or block an enabled peer with a non-final explanation', () => {
-  const model = buildPermissionRelationshipNavigationModel({ viewMode: 'account',
-targetKey: '2',
+  const model = buildPermissionRelationshipNavigationModel({
+    viewMode: 'account',
+    targetKey: '2',
     accounts: [{ id: 2, account_status: 'active', roles }],
     roles: [roles[0], { ...roles[1], disabled: true }],
-    accessByRoleKey: { ...accessByRoleKey, finance: { ...accessByRoleKey.finance, is_final: false } },
-navigationSections,
+    accessByRoleKey: {
+      ...accessByRoleKey,
+      finance: { ...accessByRoleKey.finance, is_final: false },
+    },
+    navigationSections,
   })
   assert.equal(model.state, PERMISSION_NAVIGATION_STATE.READY)
   assert.equal(model.effectivePageCount, 5)
-  assert.ok(!model.primaryItems.some((item) => item.label === '财务管理'))
+  assert.ok(
+    !model.sections
+      .flatMap((section) => section.items)
+      .some((item) => item.label === '财务管理')
+  )
 })
 
 test('a role version mismatch prevents a saved layout from being paired with stale access', () => {
-  const model = buildPermissionRelationshipNavigationModel({ targetKey: 'sales',
+  const model = buildPermissionRelationshipNavigationModel({
+    targetKey: 'sales',
     roles: [{ ...roles[0], version: 2 }],
-accessByRoleKey: { sales: { ...accessByRoleKey.sales, role_version: 1 } },
-navigationSections,
+    accessByRoleKey: { sales: { ...accessByRoleKey.sales, role_version: 1 } },
+    navigationSections,
   })
   assert.equal(model.state, PERMISSION_NAVIGATION_STATE.UNAVAILABLE)
   assert.equal(model.totalItemCount, 0)
+})
+
+test('default sectioned presentation ignores saved role layout and uses current sidebar groups', () => {
+  const model = buildPermissionRelationshipNavigationModel({
+    targetKey: 'sales',
+    roles: [
+      {
+        ...roles[0],
+        navigation_mode: 'custom',
+        primary_menu_paths: ['/erp/warehouse/inventory'],
+      },
+    ],
+    accessByRoleKey,
+    navigationSections,
+    customerMenuConfig: null,
+  })
+
+  assert.equal(model.mode, 'sectioned')
+  assert.equal(model.modeLabel, '按业务模块')
+  assert.deepEqual(
+    model.sections.map((section) => [
+      section.title,
+      section.items.map((item) => item.label),
+    ]),
+    [
+      ['工作中心', ['工作台']],
+      ['业务模块', ['基础资料', '销售管理', '出货管理', '库存管理']],
+      ['系统与帮助', ['帮助中心']],
+    ]
+  )
+  assert.equal(model.effectivePageCount, 5)
+  assert.equal(model.totalItemCount, 6)
+  for (const section of model.sections) {
+    assert.deepEqual(
+      section.items.map((item) => item.order),
+      section.items.map((_, index) => index + 1)
+    )
+  }
+})
+
+test('sectioned employee projection merges authorized modules without restoring common-work groups', () => {
+  const model = buildPermissionRelationshipNavigationModel({
+    viewMode: 'account',
+    targetKey: '20',
+    accounts: [{ id: 20, account_status: 'active', roles }],
+    roles,
+    accessByRoleKey,
+    navigationSections,
+    customerMenuConfig: null,
+  })
+
+  assert.equal(model.state, PERMISSION_NAVIGATION_STATE.READY)
+  assert.equal(model.projectionOnly, true)
+  assert.equal(model.mode, 'sectioned')
+  assert.deepEqual(
+    groupItems(model, 'business').map((item) => item.label),
+    ['基础资料', '销售管理', '出货管理', '库存管理', '财务管理']
+  )
+  assert.equal(
+    model.sections.some((section) => section.title === '常用工作'),
+    false
+  )
+  assert.equal(model.effectivePageCount, 7)
+  assert.equal(model.totalItemCount, 7)
+})
+
+test('route-only pages remain in access counts but never create sidebar entries or default targets', () => {
+  const productionNavigation = [
+    {
+      title: '生产管理',
+      items: [
+        {
+          key: 'production-exceptions',
+          label: '异常处理',
+          path: '/erp/production/exceptions',
+          sidebarVisible: false,
+        },
+        {
+          key: 'production-progress',
+          label: '生产记录',
+          path: '/erp/production/progress',
+        },
+      ],
+    },
+  ]
+  for (const customerMenuConfig of [null, guidedMenuConfig]) {
+    const input = {
+      targetKey: 'sales',
+      roles,
+      customerMenuConfig,
+      navigationSections: productionNavigation,
+      accessByRoleKey: {
+        sales: {
+          role_key: 'sales',
+          is_final: true,
+          pages: [
+            { path: '/erp/production/exceptions', effective: true },
+            { path: '/erp/production/progress', effective: true },
+          ],
+        },
+      },
+    }
+    const model = buildPermissionRelationshipNavigationModel(input)
+    assert.equal(model.effectivePageCount, 2)
+    assert.equal(model.totalItemCount, 1)
+    assert.deepEqual(
+      model.sections.flatMap((section) =>
+        section.items.map((item) => item.path)
+      ),
+      ['/erp/production/progress']
+    )
+    const hiddenOnly = buildPermissionRelationshipNavigationModel({
+      ...input,
+      navigationSections: [
+        {
+          ...productionNavigation[0],
+          items: productionNavigation[0].items.slice(0, 1),
+        },
+      ],
+    })
+    assert.equal(hiddenOnly.totalItemCount, 0)
+  }
+})
+
+test('current customer configuration projects four sidebar areas and keeps page counts distinct', () => {
+  const paths = [
+    '/erp/dashboard',
+    '/erp/task-board',
+    '/erp/master/partners/customers',
+    '/erp/master/partners/suppliers',
+    '/erp/master/products',
+    '/erp/sales/project-orders/sales-orders',
+    '/erp/production/quality-inspections',
+    '/erp/warehouse/inventory',
+    '/erp/production/orders',
+    '/erp/production/exceptions',
+    '/erp/warehouse/shipments',
+    '/erp/print-center',
+  ]
+  const input = {
+    targetKey: 'sales',
+    roles,
+    customerMenuConfig: yoyoosunMenuConfig,
+    accessByRoleKey: {
+      sales: {
+        role_key: 'sales',
+        is_final: true,
+        pages: paths.map((path) => ({ path, effective: true })),
+      },
+    },
+  }
+  const model = buildPermissionRelationshipNavigationModel(input)
+  assert.equal(model.mode, 'sectioned')
+  assert.equal(model.modeLabel, '按业务模块')
+  assert.deepEqual(
+    model.sections.map((section) => section.title),
+    ['工作中心', '业务模块', '工具与查询', '系统与帮助']
+  )
+  assert.deepEqual(
+    groupItems(model, 'business').map((item) => item.label),
+    ['基础资料', '销售管理', '生产管理', '库存管理', '质检管理', '出货管理']
+  )
+  assert.equal(model.effectivePageCount, 12)
+  assert.equal(model.totalItemCount, 11)
+  assert.deepEqual(
+    groupItems(model, 'tools').map((item) => item.label),
+    ['模板打印中心', '历史记录中心']
+  )
+
+  const hiddenSales = buildPermissionRelationshipNavigationModel({
+    ...input,
+    customerMenuConfig: {
+      ...yoyoosunMenuConfig,
+      desktopMenu: {
+        ...yoyoosunMenuConfig.desktopMenu,
+        hiddenItemKeys: ['sales-orders'],
+      },
+    },
+  })
+  assert.equal(
+    groupItems(hiddenSales, 'business').some(
+      (item) => item.label === '销售管理'
+    ),
+    false
+  )
+  assert.equal(hiddenSales.effectivePageCount, 12)
+  assert.equal(hiddenSales.totalItemCount, 10)
 })

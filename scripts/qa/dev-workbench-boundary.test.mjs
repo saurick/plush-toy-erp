@@ -321,6 +321,7 @@ const allowedERPImportsByFile = new Map([
     new Set([
       "config/seedData.mjs",
       "config/roleGuidedNavigation.mjs",
+      "config/customerMenuConfig.mjs",
       "utils/businessModuleGroups.mjs",
     ]),
   ],

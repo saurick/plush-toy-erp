@@ -382,7 +382,7 @@ test("customer-config-runtime-manifest: accepts registered subsets and rejects u
 
 test("customer-config-runtime-manifest: visible menu pages and module states compile from bounded catalogs", () => {
   const manifest = buildRuntimeManifest();
-  assert.equal(yoyoosunMenuConfig.desktopMenu.presentation, "role_guided");
+  assert.equal(yoyoosunMenuConfig.desktopMenu.presentation, "sectioned");
   const hidden = new Set(yoyoosunMenuConfig.desktopMenu.hiddenItemKeys);
   const visibleMenuKeys = yoyoosunMenuConfig.desktopMenu.sections
     .flatMap((section) => section.items)
