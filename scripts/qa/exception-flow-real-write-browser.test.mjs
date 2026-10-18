@@ -211,12 +211,18 @@ test("exception task identity reads every task page before asserting source/node
 
 function taskTablePage(
   task,
-  { rowCount = 1, entryCount = 1, actionCount = 1, confirmCount = 1 } = {},
+  {
+    rowCount = 1,
+    entryCount = 1,
+    actionCount = 1,
+    confirmCount = 1,
+    confirmText = "确认完成",
+  } = {},
 ) {
   const events = [];
   const visible = new Set();
   const isTransitionControl = (key) =>
-    ["处理完成", "审批通过", "确认完成", "确认通过"].includes(key);
+    ["处理完成", "审批通过", "confirm"].includes(key);
   const actualCount = (key) =>
     key === "row"
       ? rowCount
@@ -224,7 +230,7 @@ function taskTablePage(
         ? entryCount
         : key === "处理完成" || key === "审批通过"
           ? actionCount
-          : key === "确认完成" || key === "确认通过"
+          : key === "confirm"
             ? confirmCount
             : 1;
   const control = (key) => ({
@@ -243,6 +249,7 @@ function taskTablePage(
     fill: async (value) => events.push(`fill:${key}:${value}`),
     press: async (value) => events.push(`press:${key}:${value}`),
     click: async () => events.push(`click:${key}`),
+    innerText: async () => confirmText,
     last() {
       return this;
     },
@@ -254,9 +261,16 @@ function taskTablePage(
       if (role === "radio") return control("radio");
       assert.equal(role, "button");
       assert.equal(options.exact, true);
+      assert.ok(
+        !["确认完成", "确认通过"].includes(options.name),
+        "decorative send icon participates in the accessible button name",
+      );
       return control(options.name);
     },
     locator: (selector) => {
+      if (selector === ".erp-task-action-drawer__footer-primary button") {
+        return control("confirm");
+      }
       assert.equal(selector, "textarea");
       return control("reason");
     },
@@ -292,7 +306,9 @@ test("exception task browser action clicks the exact table row detail entry and 
     const fixture = readyTaskFixture(
       approval ? "inventory_adjustment_approval" : "finance_payment_execution",
     );
-    const ui = taskTablePage(fixture.task);
+    const ui = taskTablePage(fixture.task, {
+      confirmText: approval ? "确认通过" : "确认完成",
+    });
     await actOnExceptionFlowTaskPage(ui.page, fixture.task, {
       actionTitle: approval ? "审批通过" : "处理完成",
       confirmLabel: approval ? "确认通过" : "确认完成",
@@ -303,12 +319,10 @@ test("exception task browser action clicks the exact table row detail entry and 
     assert.ok(ui.events.includes("click:entry"));
     assert.ok(ui.events.includes("click:选择处理方式"));
     assert.ok(ui.events.includes("click:核对并确认"));
-    assert.ok(
-      ui.events.includes(approval ? "click:确认通过" : "click:确认完成"),
-    );
+    assert.ok(ui.events.includes("click:confirm"));
     for (const key of [
       approval ? "审批通过" : "处理完成",
-      approval ? "确认通过" : "确认完成",
+      "confirm",
     ]) {
       assert.ok(
         ui.events.indexOf(`visible:${key}`) < ui.events.indexOf(`count:${key}`),
@@ -338,7 +352,7 @@ test("exception task browser action refuses duplicate rows, detail entries and c
       }),
       /unique/u,
     );
-    assert.ok(!ui.events.includes("click:确认完成"));
+    assert.ok(!ui.events.includes("click:confirm"));
   }
 });
 
@@ -354,8 +368,22 @@ test("exception task browser action stops before submission when a transition co
       }),
       /not visible/u,
     );
-    assert.ok(!ui.events.includes("click:确认完成"));
+    assert.ok(!ui.events.includes("click:confirm"));
   }
+});
+
+test("exception task browser action rejects a unique confirmation with the wrong visible label", async () => {
+  const { task } = readyTaskFixture();
+  const ui = taskTablePage(task, { confirmText: "确认取消" });
+  await assert.rejects(
+    actOnExceptionFlowTaskPage(ui.page, task, {
+      actionTitle: "处理完成",
+      confirmLabel: "确认完成",
+      successMessage: "任务已处理完成",
+    }),
+    /confirmation label/u,
+  );
+  assert.ok(!ui.events.includes("click:confirm"));
 });
 
 test("runtime identity verification rejects a browser proxy connected to another database", async () => {

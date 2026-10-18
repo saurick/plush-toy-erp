@@ -731,15 +731,19 @@ export async function actOnExceptionFlowTaskPage(
   await action.click();
   if (reason) await drawer.locator("textarea").fill(reason);
   await drawer.getByRole("button", { name: "核对并确认", exact: true }).click();
-  const confirmButton = drawer.getByRole("button", {
-    name: confirmLabel,
-    exact: true,
-  });
+  const confirmButton = drawer.locator(
+    ".erp-task-action-drawer__footer-primary button",
+  );
   await confirmButton.waitFor({ state: "visible" });
   assert.equal(
     await confirmButton.count(),
     1,
     "exception task confirmation must be unique",
+  );
+  assert.equal(
+    (await confirmButton.innerText()).trim(),
+    confirmLabel,
+    "exception task confirmation label drifted",
   );
   await confirmButton.click();
   await waitMessage(page, successMessage);
