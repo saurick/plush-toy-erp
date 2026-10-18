@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { ERP_DARK_PALETTE } from './erpThemePalette.mjs'
+import { theme } from 'antd'
+import { ERP_ACCENTS } from './erpAppearance.mjs'
+import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from './erpThemePalette.mjs'
 
 const themeCSS = readFileSync(
   new URL('../../erp/styles/app/theme-overrides.css', import.meta.url),
@@ -78,6 +80,28 @@ test('dark palette is neutral black with readable layered surfaces', () => {
     contrast(ERP_DARK_PALETTE.textMuted, ERP_DARK_PALETTE.surface) >= 4.5,
     '次要文字与内容面需要可读对比度'
   )
+})
+
+test('Ant Design primary buttons and links retain contrast in default, hover and active states', () => {
+  for (const isDark of [false, true]) {
+    for (const [name, accent] of Object.entries(ERP_ACCENTS)) {
+      const tokens = theme.getDesignToken({
+        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        token: {
+          ...getERPSurfaceTokens(isDark),
+          ...getERPAccentTokens(isDark, accent),
+        },
+      })
+      const onPrimary = isDark ? ERP_DARK_PALETTE.onAccent : accent.onPrimary
+      const surface = isDark ? ERP_DARK_PALETTE.surface : '#ffffff'
+      for (const key of ['colorPrimary', 'colorPrimaryHover', 'colorPrimaryActive']) {
+        assert.ok(contrast(onPrimary, tokens[key]) >= 4.5, `${name}/${isDark}/${key}: primary button text`)
+      }
+      for (const key of ['colorLink', 'colorLinkHover', 'colorLinkActive']) {
+        assert.ok(contrast(tokens[key], surface) >= 4.5, `${name}/${isDark}/${key}: link text`)
+      }
+    }
+  }
 })
 
 test('runtime CSS and interaction design share the black dark palette', () => {

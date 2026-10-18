@@ -137,13 +137,14 @@ export function isTailwindFormsResetBorderColor(color) {
 
 export function isAcceptedFocusBorder(metrics) {
   if (metrics.skipBorderColor) return true
-  if (metrics.allowTransparentBorder) {
-    return (
-      isBluePrimaryColor(metrics.borderColor) ||
-      isTransparentFocusColor(metrics.borderColor)
-    )
-  }
-  return isBluePrimaryColor(metrics.borderColor)
+  if (metrics.allowTransparentBorder && isTransparentFocusColor(metrics.borderColor)) return true
+  const actual = parseRgb(metrics.borderColor)
+  const expected = parseRgb(metrics.expectedFocusBorder)
+  return Boolean(
+    actual && expected &&
+      actual.slice(0, 3).every((channel, index) => Math.abs(channel - expected[index]) <= 1) &&
+      Math.abs(actual[3] - expected[3]) < 0.01
+  )
 }
 
 export function isTransparentFocusColor(color) {

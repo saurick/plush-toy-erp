@@ -112,7 +112,7 @@
   max-width: 100%;
 }
 .erp-appearance-settings--mobile .erp-appearance-swatches {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
 }
 .erp-appearance-settings--mobile .erp-appearance-swatches button {

@@ -70,3 +70,22 @@ func TestAdminERPAppearancePatchPreservesUnchangedFields(t *testing.T) {
 		t.Fatal("empty patch accepted")
 	}
 }
+
+func TestAdminERPAppearanceNewAccentsPreserveAccountPreferences(t *testing.T) {
+	current := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "grid"}
+	for _, accent := range []string{"teal", "mauve"} {
+		t.Run(accent, func(t *testing.T) {
+			patch := AdminERPAppearancePatch{Accent: &accent}
+			if err := patch.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			want := AdminERPAppearance{ThemeMode: "dark", Accent: accent, Density: "compact", TableLines: "grid"}
+			if got := NormalizeAdminERPPreferences(AdminERPPreferences{Appearance: patch.Apply(current)}).Appearance; got != want {
+				t.Fatalf("accent preference was lost or changed other appearance fields: %+v", got)
+			}
+		})
+	}
+	if got := NormalizeAdminERPAppearance(AdminERPAppearance{}).Accent; got != "blue" {
+		t.Fatalf("default accent changed: %q", got)
+	}
+}

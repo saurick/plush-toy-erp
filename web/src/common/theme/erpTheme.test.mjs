@@ -182,6 +182,10 @@ test('appearance: rapid edits serialize changed fields and preserve independentl
     })
     assert.equal(runtime.theme.themeMode, 'dark')
     assert.equal(runtime.theme.appearance.accent, 'green')
+    assert.equal(
+      document.documentElement.style.getPropertyValue('--erp-accent-hover'),
+      '#b3c699'
+    )
     await settle(() =>
       runtime.requests[1].reply({
         theme_mode: 'dark',
@@ -290,18 +294,22 @@ test('appearance: a fresh browser cache restores server defaults and saved choic
     'plush_erp_appearance',
     JSON.stringify({ accent: 'orange', density: 'compact' })
   )
-  signIn(1, { theme_mode: 'light', accent: 'green', density: 'standard' })
+  signIn(1, { theme_mode: 'light', accent: 'teal', density: 'standard' })
   const runtime = await mount()
   try {
     assert.equal(runtime.theme.themeMode, 'light')
     assert.deepEqual(runtime.theme.appearance, {
-      accent: 'green',
+      accent: 'teal',
       density: 'standard',
       tableLines: 'simple',
     })
+    assert.equal(
+      document.documentElement.style.getPropertyValue('--erp-accent'),
+      '#257f7c'
+    )
     await settle(() => runtime.theme.setThemeMode('system'))
     await settle(() =>
-      runtime.requests[0].reply({ ...defaults, accent: 'green' })
+      runtime.requests[0].reply({ ...defaults, accent: 'teal' })
     )
     assert.equal(
       getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences').appearance.theme_mode,

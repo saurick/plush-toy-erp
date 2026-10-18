@@ -12,6 +12,20 @@ export const ERP_DARK_PALETTE = Object.freeze({
   onAccent: '#050607',
 })
 
+export function getERPAccentTokens(isDark, accent) {
+  const primary = isDark ? accent.dark : accent.primary
+  const hover = isDark ? accent.darkHover : accent.hover
+  const strong = isDark ? accent.dark : accent.strong
+  return {
+    colorPrimary: primary,
+    colorPrimaryHover: hover,
+    colorPrimaryActive: strong,
+    colorLink: strong,
+    colorLinkHover: hover,
+    colorLinkActive: strong,
+  }
+}
+
 // Surface tokens must follow the selected theme even inside an isolated preview.
 export function getERPSurfaceTokens(isDark) {
   return {

@@ -237,7 +237,10 @@ export function ERPThemeProvider({ children }) {
     root.dataset.erpTableLines = appearance.tableLines
     root.style.setProperty('--erp-accent', accent.primary)
     root.style.setProperty('--erp-accent-strong', accent.strong)
-    root.style.setProperty('--erp-accent-hover', accent.hover)
+    root.style.setProperty(
+      '--erp-accent-hover',
+      effectiveTheme === ERP_THEME_MODE.DARK ? accent.darkHover : accent.hover
+    )
     root.style.setProperty('--erp-accent-dark', accent.dark)
     root.style.setProperty(
       '--erp-on-accent',

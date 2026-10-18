@@ -94,13 +94,13 @@ export function createPrintWorkspaceThemeScenario({
                   )
                 },
                 { mode, accent, primary, onPrimary }
-              ).catch(async error => {
+              ).catch(async (error) => {
                 const actual = await page.evaluate(() => {
                   const root = document.documentElement
                   const button = document.querySelector('.erp-print-shell__button--primary')
                   return { theme: root.dataset.erpTheme, accent: root.dataset.erpAccent, background: button && getComputedStyle(button).backgroundColor, color: button && getComputedStyle(button).color }
                 })
-                throw new Error(`${error.message}; expected=${JSON.stringify({mode,accent,primary,onPrimary})}; actual=${JSON.stringify(actual)}`)
+                throw new Error(`${error.message}; expected=${JSON.stringify({ mode, accent, primary, onPrimary })}; actual=${JSON.stringify(actual)}`)
               })
               const metrics = await page.evaluate(() => {
                 const style = (selector) => {
@@ -204,9 +204,16 @@ export function createPrintWorkspaceThemeScenario({
             ctx.fillRect(0, 0, 1, 1)
             return [...ctx.getImageData(0, 0, 1, 1).data]
           })
-          assert(
-            selection[0] > selection[1] && selection[2] > selection[0],
-            `${template.key} 选中行使用紫色主题浅底: ${selection}`
+          const accentChannels = ERP_ACCENTS.purple.primary
+            .match(/[\da-f]{2}/gi)
+            .map((channel) => Number.parseInt(channel, 16))
+          const expectedSelection = [
+            ...accentChannels.map((channel) => Math.round(channel * 0.1 + 255 * 0.9)),
+            255,
+          ]
+          assert.ok(
+            selection.every((channel, index) => Math.abs(channel - expectedSelection[index]) <= 1),
+            `${template.key} 选中行使用灰紫主题浅底: ${selection}`
           )
           await page
             .getByRole('button', { name: '返回编辑', exact: true })
@@ -228,9 +235,10 @@ export function createPrintWorkspaceThemeScenario({
             }
           })
           assert.equal(focus.style, 'dashed', `${template.key} 保留编辑虚线`)
-          assert(
-            focus.color[0] > focus.color[1] && focus.color[2] > focus.color[0],
-            `${template.key} 编辑焦点跟随紫色主题: ${focus.color}`
+          const expectedFocus = [...accentChannels, Math.round(255 * 0.82)]
+          assert.ok(
+            focus.color.every((channel, index) => Math.abs(channel - expectedFocus[index]) <= 1),
+            `${template.key} 编辑焦点跟随灰紫主题: ${focus.color}`
           )
 
           await page.emulateMedia({ media: 'print' })
@@ -272,7 +280,11 @@ export function createPrintWorkspaceThemeScenario({
             })
           }
         }
-        assert.equal(reports.length, 60, '五种模板必须覆盖六种主色和明暗模式')
+        assert.equal(
+          reports.length,
+          5 * Object.keys(ERP_ACCENTS).length * 2,
+          '五种模板必须覆盖所有主题色和明暗模式'
+        )
         await writeFile(
           path.join(outputDir, 'print-theme-sync.json'),
           JSON.stringify(reports, null, 2)

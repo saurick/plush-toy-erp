@@ -31,8 +31,8 @@ export function mobileAppearanceScenario({
       )
       assert.equal(
         await settings.getByRole('button').count(),
-        6,
-        '六种颜色直接可选'
+        Object.keys(ERP_ACCENTS).length,
+        '所有主题色直接可选'
       )
       for (const [mode, label] of [
         ['light', '浅色'],
@@ -104,7 +104,7 @@ export function mobileAppearanceScenario({
       )
       assert.equal(
         await settings
-          .getByRole('button', { name: '紫色', exact: true })
+          .getByRole('button', { name: ERP_ACCENTS.purple.label, exact: true })
           .getAttribute('aria-pressed'),
         'true'
       )
@@ -117,19 +117,32 @@ export function mobileAppearanceScenario({
           colors: [
             ...node.querySelectorAll('.erp-appearance-swatches button'),
           ].map((button) => button.getBoundingClientRect().toJSON()),
+          labels: [
+            ...node.querySelectorAll('.erp-appearance-swatches button span'),
+          ].map((label) => ({
+            width: label.clientWidth,
+            scroll: label.scrollWidth,
+          })),
         }))
         assert.ok(metric.scroll <= metric.width + 1, JSON.stringify(metric))
         assert.ok(
           metric.colors.every(
             (button) =>
-              button.height >= 44 && button.left >= 0 && button.right <= width
+              button.height >= 44 &&
+              button.width >= 44 &&
+              button.left >= 0 &&
+              button.right <= width
           ),
           JSON.stringify(metric)
         )
         assert.equal(
           new Set(metric.colors.map((button) => button.y)).size,
-          1,
-          '六种主题色保持同一行'
+          2,
+          '主题色分两行保留触控尺寸'
+        )
+        assert.ok(
+          metric.labels.every((label) => label.scroll <= label.width + 1),
+          `主题色名称完整显示: ${JSON.stringify(metric.labels)}`
         )
       }
       await page.setViewportSize({ width: 390, height: 844 })
@@ -210,7 +223,7 @@ export function mobileAppearanceScenario({
         )
         assert.equal(
           await dialog
-            .getByRole('button', { name: '紫色', exact: true })
+            .getByRole('button', { name: ERP_ACCENTS.purple.label, exact: true })
             .getAttribute('aria-pressed'),
           'true'
         )

@@ -20,7 +20,7 @@ import {
   useERPWorkspace,
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
-import { ERP_DARK_PALETTE, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
+import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import '@/common/components/empty/empty-state.css'
 
@@ -145,9 +145,8 @@ function ThemedApp() {
           },
         },
         token: {
-          colorPrimary: isDark ? accent.dark : accent.primary,
+          ...getERPAccentTokens(isDark, accent),
           colorInfo: isDark ? '#75b9ff' : '#3275c7',
-          colorLink: isDark ? accent.dark : accent.strong,
           borderRadius: 8,
           fontSize: isPhoneViewport ? 16 : 14,
           fontSizeSM: isPhoneViewport || isDevWorkbenchRoute ? 14 : 12,

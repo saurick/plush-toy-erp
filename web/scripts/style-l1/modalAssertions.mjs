@@ -1,5 +1,6 @@
-import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 import assert from 'node:assert/strict'
+import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import {
   assertNoUnconfiguredFocusStyle,
   isAcceptedFocusBorder,
@@ -82,21 +83,24 @@ export async function assertBusinessModalViewport(
     body.scrollWidth <= body.clientWidth + 1,
     `${label}: horizontal scroll stays inside the table ${JSON.stringify(body)}`
   )
-  if (header)
+  if (header) {
     assert.ok(
       header.top >= 0 && header.bottom <= body.top + 1,
       `${label}: header remains visible`
     )
-  if (footer)
+  }
+  if (footer) {
     assert.ok(
       footer.top >= body.bottom - 1 && footer.bottom <= viewport.height,
       `${label}: footer remains visible`
     )
-  if (scrollable)
+  }
+  if (scrollable) {
     assert.ok(
       body.scrollHeight > body.clientHeight + 10,
       `${label}: long content scrolls inside the body`
     )
+  }
   console.log(`[modal-layout] ${label}: ${JSON.stringify(metrics)}`)
   return metrics
 }
@@ -597,7 +601,7 @@ async function assertVisibleModalInputFocusStyle(
     } else {
       await locator.focus()
     }
-    await page.waitForTimeout(80)
+    await waitForFiniteAnimations(page)
     const metrics = await locator.evaluate((node, label) => {
       const sourceStyle = window.getComputedStyle(node)
       const focusedControl =
@@ -614,6 +618,7 @@ async function assertVisibleModalInputFocusStyle(
         tagName: focusedControl.tagName,
         className: String(focusedControl.className || ''),
         borderColor: style.borderColor,
+        expectedFocusBorder: getComputedStyle(document.documentElement).getPropertyValue('--erp-primary').trim(),
         boxShadow: style.boxShadow,
         sourceBorderColor: sourceStyle.borderColor,
         sourceBoxShadow: sourceStyle.boxShadow,
@@ -639,7 +644,7 @@ async function assertVisibleModalInputFocusStyle(
   checked.forEach((metrics) => {
     assert(
       isAcceptedFocusBorder(metrics),
-      `${scenarioName} ${metrics.label} focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
+      `${scenarioName} ${metrics.label} focus 边框未统一到当前主题色: ${JSON.stringify(metrics)}`
     )
     assertNoUnconfiguredFocusStyle(metrics, scenarioName)
   })

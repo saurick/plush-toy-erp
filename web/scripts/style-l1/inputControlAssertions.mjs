@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import {
   assertNoUnconfiguredFocusStyle,
   isAcceptedFocusBorder,
-  isBluePrimaryColor,
 } from './colorAssertions.mjs'
 
 function assertAffixInputMetric(metric, scenarioName) {
@@ -612,6 +611,7 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
           ? Number(containerRect.right.toFixed(1))
           : null,
         borderColor: focusStyle.borderColor,
+        expectedFocusBorder: getComputedStyle(document.documentElement).getPropertyValue('--erp-primary').trim(),
         boxShadow: focusStyle.boxShadow,
         outlineStyle: focusStyle.outlineStyle,
         outlineWidth: focusStyle.outlineWidth,
@@ -668,7 +668,10 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
       if (seenOwners.has(owner)) continue
       seenOwners.add(owner)
       node.focus({ preventScroll: true })
-      await new Promise((resolve) => window.setTimeout(resolve, 180))
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      await Promise.all(owner.getAnimations()
+        .filter((animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => {})))
       if (
         document.activeElement !== node &&
         document.activeElement !== owner &&
@@ -747,18 +750,11 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         scenarioName
       )
     }
-    if (item.theme === 'dark') {
-      assert(
-        isBluePrimaryColor(item.borderColor),
-        `${scenarioName} 暗色输入控件 focus 边框未统一到暗色主题色: ${JSON.stringify(item)}`
-      )
-    } else {
-      assert(
-        isAcceptedFocusBorder(item),
-        `${scenarioName} 输入控件 focus 边框未统一到主题色: ${JSON.stringify(item)}`
-      )
-      assertNoUnconfiguredFocusStyle(item, scenarioName)
-    }
+    assert(
+      isAcceptedFocusBorder(item),
+      `${scenarioName} 输入控件 focus 边框未统一到当前主题色: ${JSON.stringify(item)}`
+    )
+    assertNoUnconfiguredFocusStyle(item, scenarioName)
   })
 }
 

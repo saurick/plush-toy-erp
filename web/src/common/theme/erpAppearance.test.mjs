@@ -10,6 +10,7 @@ import appearanceContract from '../../../../server/internal/biz/admin_erp_appear
 
 test('appearance palette covers every allowed account accent', () => {
   assert.deepEqual(Object.keys(ERP_ACCENTS), appearanceContract.accents)
+  assert.equal(appearanceContract.defaults.accent, 'blue')
 })
 
 test('appearance recovers from stale or unavailable storage without losing valid preferences', () => {
@@ -76,6 +77,10 @@ test('every accent supplies readable primary button text and link colors', () =>
       contrast(accent.onPrimary, accent.primary) >= 4.5,
       `${name}: primary button`
     )
+    assert.ok(
+      contrast(accent.onPrimary, accent.hover) >= 4.5,
+      `${name}: hovered primary button`
+    )
     assert.ok(contrast(accent.strong, '#ffffff') >= 4.5, `${name}: light link`)
     assert.ok(
       contrast(accent.dark, ERP_DARK_PALETTE.surface) >= 4.5,
@@ -84,6 +89,10 @@ test('every accent supplies readable primary button text and link colors', () =>
     assert.ok(
       contrast(ERP_DARK_PALETTE.onAccent, accent.dark) >= 4.5,
       `${name}: dark primary button`
+    )
+    assert.ok(
+      contrast(ERP_DARK_PALETTE.onAccent, accent.darkHover) >= 4.5,
+      `${name}: hovered dark primary button`
     )
   }
 })

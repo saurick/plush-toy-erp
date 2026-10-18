@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
+import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertReadableOnBackground } from './colorAssertions.mjs'
 
 async function waitForSavedAppearance(page, expected) {
   await page.waitForFunction((expected) => {
@@ -151,7 +153,7 @@ export function createAccountAppearanceScenarios({
             heldSave: desktopSave,
             outputFile: `${outputDir}/account-appearance-save-layout-${width}.json`,
             steps: [
-              ['绿色', { accent: 'green' }],
+              [ERP_ACCENTS.teal.label, { accent: 'teal' }],
               ['暗色', { theme_mode: 'dark' }],
               ['紧凑', { density: 'compact' }],
               ['网格', { tableLines: 'grid' }],
@@ -192,7 +194,7 @@ export function createAccountAppearanceScenarios({
             heldSave: mobileSave,
             outputFile: `${outputDir}/account-appearance-mobile-save-layout-${width}.json`,
             steps: [
-              ['绿色', { accent: 'green' }],
+              [ERP_ACCENTS.green.label, { accent: 'green' }],
               ['暗色', { theme_mode: 'dark' }],
               ['蓝色', { accent: 'blue' }],
               ['浅色', { theme_mode: 'light' }],
@@ -213,7 +215,34 @@ export function createAccountAppearanceScenarios({
           .getByRole('button', { name: '外观与密度', exact: true })
           .click()
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
-        await dialog.getByRole('button', { name: '紫色', exact: true }).click()
+        const primary = dialog.locator('.ant-modal-footer .ant-btn-primary')
+        const primaryPaints = []
+        for (const [mode, label] of [['light', '浅色'], ['dark', '暗色']]) {
+          await dialog.getByText(label, { exact: true }).click()
+          for (const [accent, palette] of Object.entries(ERP_ACCENTS)) {
+            await dialog.getByRole('button', { name: palette.label, exact: true }).click()
+            await waitForSavedAppearance(page, { theme_mode: mode, accent })
+            await waitForFiniteAnimations(page)
+            const normal = await primary.evaluate((node) => {
+              const css = getComputedStyle(node)
+              return { color: css.color, background: css.backgroundColor }
+            })
+            assertReadableOnBackground(normal.color, normal.background, `${mode}/${accent} 标准主按钮`)
+            await primary.hover()
+            await waitForFiniteAnimations(page)
+            const hover = await primary.evaluate((node) => {
+              const css = getComputedStyle(node)
+              return { color: css.color, background: css.backgroundColor }
+            })
+            assertReadableOnBackground(hover.color, hover.background, `${mode}/${accent} 悬停主按钮`)
+            primaryPaints.push({ mode, accent, normal, hover })
+          }
+        }
+        await page.mouse.move(0, 0)
+        await writeFile(`${outputDir}/account-appearance-primary-paints.json`, JSON.stringify(primaryPaints, null, 2))
+        await dialog
+          .getByRole('button', { name: ERP_ACCENTS.purple.label, exact: true })
+          .click()
         await dialog.getByText('暗色', { exact: true }).click()
         await dialog.getByText('紧凑', { exact: true }).click()
         await dialog.getByText('网格', { exact: true }).click()
@@ -241,6 +270,9 @@ export function createAccountAppearanceScenarios({
         assert.equal(metrics.root.erpTheme, 'dark')
         await page.screenshot({
           path: `${outputDir}/account-appearance-desktop-settings.png`,
+        })
+        await dialog.screenshot({
+          path: `${outputDir}/account-appearance-desktop-settings-detail.png`,
         })
         await writeFile(
           `${outputDir}/account-appearance-desktop-metrics.json`,
@@ -317,13 +349,15 @@ export function createAccountAppearanceScenarios({
           .getByRole('button', { name: '外观与密度', exact: true })
           .click()
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
-        await dialog.getByRole('button', { name: '绿色', exact: true }).click()
+        await dialog
+          .getByRole('button', { name: ERP_ACCENTS.teal.label, exact: true })
+          .click()
         await dialog
           .getByText('外观设置未保存到账号，请重试。', { exact: true })
           .waitFor()
         assert.equal(
           await dialog
-            .getByRole('button', { name: '绿色', exact: true })
+            .getByRole('button', { name: ERP_ACCENTS.teal.label, exact: true })
             .getAttribute('aria-pressed'),
           'true'
         )
@@ -335,7 +369,7 @@ export function createAccountAppearanceScenarios({
           true
         )
         await dialog.getByRole('button', { name: '重试', exact: true }).click()
-        await waitForSavedAppearance(page, { accent: 'green' })
+        await waitForSavedAppearance(page, { accent: 'teal' })
         assert.equal(
           await dialog
             .getByRole('button', { name: '重试', exact: true })
@@ -374,7 +408,7 @@ export function createAccountAppearanceScenarios({
         await page.getByTestId('mobile-role-nav-mine').click()
         const settings = page.locator('.mobile-task-display-settings')
         await settings
-          .getByRole('button', { name: '黄色', exact: true })
+          .getByRole('button', { name: ERP_ACCENTS.yellow.label, exact: true })
           .click()
         await settings.getByText('跟系统', { exact: true }).click()
         await waitForSavedAppearance(page, {
@@ -397,7 +431,7 @@ export function createAccountAppearanceScenarios({
         })
         assert.equal(
           await settings
-            .getByRole('button', { name: '黄色', exact: true })
+            .getByRole('button', { name: ERP_ACCENTS.yellow.label, exact: true })
             .getAttribute('aria-pressed'),
           'true'
         )

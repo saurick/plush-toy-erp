@@ -1,6 +1,6 @@
 {
   "theme_modes": ["system", "light", "dark"],
-  "accents": ["blue", "green", "yellow", "pink", "orange", "purple"],
+  "accents": ["blue", "green", "teal", "yellow", "pink", "mauve", "orange", "purple"],
   "densities": ["standard", "compact"],
   "table_lines": ["simple", "grid"],
   "defaults": { "theme_mode": "system", "accent": "blue", "density": "standard", "tableLines": "simple" }

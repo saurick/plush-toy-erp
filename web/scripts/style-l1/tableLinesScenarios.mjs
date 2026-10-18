@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
+import { assertReadableOnBackground } from './colorAssertions.mjs'
 
 async function selectSegment(dialog, name, label) {
   const control = dialog.getByRole('radiogroup', { name })
@@ -292,7 +294,7 @@ export function createTableLinesScenarios(deps) {
           const dialog = page.getByRole('dialog', { name: '外观与密度' })
           await selectSegment(dialog, '主题模式', label)
           await dialog
-            .getByRole('button', { name: '粉色', exact: true })
+            .getByRole('button', { name: ERP_ACCENTS.pink.label, exact: true })
             .click()
           await dialog
             .locator('.ant-modal-footer')
@@ -301,6 +303,14 @@ export function createTableLinesScenarios(deps) {
           await dialog.waitFor({ state: 'hidden' })
           await waitForFiniteAnimations(page)
           assertGrid(await measure(table))
+          const primary = page.locator('.erp-business-list-toolbar__primary-action.ant-btn-primary').first()
+          await primary.hover()
+          await waitForFiniteAnimations(page)
+          const paint = await primary.evaluate((node) => {
+            const css = getComputedStyle(node)
+            return { color: css.color, background: css.backgroundColor }
+          })
+          assertReadableOnBackground(paint.color, paint.background, `${label} 业务主按钮悬停文字`)
           await page.screenshot({
             path: path.join(
               outputDir,

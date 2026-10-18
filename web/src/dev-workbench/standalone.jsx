@@ -11,7 +11,7 @@ import { AppAlertProvider } from '@/common/components/modal/AppAlertProvider'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
 import ScrollEdges from '@/common/components/scroll/ScrollEdges'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
-import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
+import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
 import DevWorkbenchRoutes from './DevWorkbenchRoutes.jsx'
 
@@ -23,9 +23,14 @@ function StandaloneWorkbenchTheme() {
       button={{ autoInsertSpace: false }}
       theme={{
         algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        components: {
+          Button: {
+            primaryColor: isDark ? ERP_DARK_PALETTE.onAccent : accent.onPrimary,
+          },
+        },
         token: {
           ...getERPSurfaceTokens(isDark),
-          colorPrimary: isDark ? accent.dark : accent.primary,
+          ...getERPAccentTokens(isDark, accent),
           fontSize: 14,
           fontSizeSM: 14,
           controlHeight: 34,
