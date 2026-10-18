@@ -384,6 +384,54 @@ func TestAdminManageRepoERPColumnOrdersPreserveOtherModules(t *testing.T) {
 	}
 }
 
+func TestAdminManageRepoERPAppearanceDefaultsAndSavedChoices(t *testing.T) {
+	fx := newAdminManageAtomicFixture(t)
+	wantDefault := biz.AdminERPAppearance{ThemeMode: "system", Accent: "blue", Density: "compact", TableLines: "grid"}
+	created, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
+		OperatorID: fx.operator.ID,
+		Admin: &biz.AdminCreate{
+			DisplayName: "外观测试员工", Username: "appearance_created", PasswordHash: "created-hash", RoleKeys: []string{biz.SalesRoleKey},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ERPPreferences.Appearance != wantDefault {
+		t.Fatalf("new account did not receive compact grid defaults: %+v", created.ERPPreferences.Appearance)
+	}
+	if raw := fx.client.AdminUser.GetX(fx.ctx, created.ID).ErpPreferences; raw != "{}" {
+		t.Fatalf("new account should have no saved personal choices: %s", raw)
+	}
+	for _, appearance := range []biz.AdminERPAppearance{
+		wantDefault,
+		{ThemeMode: "system", Accent: "blue", Density: "standard", TableLines: "simple"},
+	} {
+		patch := biz.AdminERPAppearancePatch{
+			ThemeMode: &appearance.ThemeMode, Accent: &appearance.Accent, Density: &appearance.Density, TableLines: &appearance.TableLines,
+		}
+		if err := fx.repo.UpdateAdminERPAppearance(fx.ctx, fx.target.ID, patch); err != nil {
+			t.Fatal(err)
+		}
+		if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", []string{"name"}, []string{"status"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", nil, []string{}); err != nil {
+			t.Fatal(err)
+		}
+		raw := fx.client.AdminUser.GetX(fx.ctx, fx.target.ID).ErpPreferences
+		var saved biz.AdminERPPreferences
+		if err := json.Unmarshal([]byte(raw), &saved); err != nil {
+			t.Fatal(err)
+		}
+		if saved.Appearance != appearance || decodeAdminERPPreferences(raw).Appearance != appearance {
+			t.Fatalf("saving or resetting columns lost explicit appearance %+v: %s", appearance, raw)
+		}
+	}
+	if got := decodeAdminERPPreferences(fx.client.AdminUser.GetX(fx.ctx, created.ID).ErpPreferences).Appearance; got != wantDefault {
+		t.Fatalf("another account inherited saved personal choices: %+v", got)
+	}
+}
+
 func TestAdminManageRepoERPAppearancePreservesColumnsAndAccountIsolation(t *testing.T) {
 	fx := newAdminManageAtomicFixture(t)
 	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", []string{"name", "status"}, []string{"status"}); err != nil {
@@ -453,7 +501,7 @@ func TestAdminManagePostgresERPPreferencesConcurrentGroups(t *testing.T) {
 		}
 	}
 	stored := decodeAdminERPPreferences(client.AdminUser.GetX(ctx, account.ID).ErpPreferences)
-	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "system", Accent: "purple", Density: "compact", TableLines: "simple"}) ||
+	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "system", Accent: "purple", Density: "compact", TableLines: "grid"}) ||
 		len(stored.ColumnOrders["customers"]) != 1 || len(stored.ColumnOrders["suppliers"]) != 1 ||
 		len(stored.HiddenColumns["customers"]) != 1 || len(stored.HiddenColumns["suppliers"]) != 1 {
 		t.Fatalf("concurrent preference writes lost a group or field: %+v", stored)

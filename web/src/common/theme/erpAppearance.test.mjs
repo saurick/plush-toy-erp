@@ -22,8 +22,8 @@ test('appearance recovers from stale or unavailable storage without losing valid
   ]) {
     assert.deepEqual(normalizeERPAppearance(value), {
       accent: 'blue',
-      density: 'standard',
-      tableLines: 'simple',
+      density: 'compact',
+      tableLines: 'grid',
     })
   }
   for (const storage of [
@@ -37,15 +37,15 @@ test('appearance recovers from stale or unavailable storage without losing valid
   ]) {
     assert.deepEqual(readERPAppearance(storage), {
       accent: 'blue',
-      density: 'standard',
-      tableLines: 'simple',
+      density: 'compact',
+      tableLines: 'grid',
     })
   }
   assert.deepEqual(
     readERPAppearance({
       getItem: () => '{"accent":"purple","density":"compact"}',
     }),
-    { accent: 'purple', density: 'compact', tableLines: 'simple' }
+    { accent: 'purple', density: 'compact', tableLines: 'grid' }
   )
   assert.deepEqual(
     readERPAppearance({
@@ -56,8 +56,26 @@ test('appearance recovers from stale or unavailable storage without losing valid
   )
   assert.deepEqual(
     normalizeERPAppearance({ accent: 'green', tableLines: false }),
-    { accent: 'green', density: 'standard', tableLines: 'simple' }
+    { accent: 'green', density: 'compact', tableLines: 'grid' }
   )
+})
+
+test('appearance keeps saved density and line choices when product defaults change', () => {
+  for (const density of ['standard', 'compact']) {
+    for (const tableLines of ['simple', 'grid']) {
+      const saved = { accent: 'purple', density, tableLines }
+      assert.deepEqual(normalizeERPAppearance(saved), saved)
+      assert.deepEqual(
+        readERPAppearance({ getItem: () => JSON.stringify(saved) }),
+        saved
+      )
+    }
+  }
+  assert.deepEqual(normalizeERPAppearance({ density: 'standard' }), {
+    accent: 'blue',
+    density: 'standard',
+    tableLines: 'grid',
+  })
 })
 
 test('every accent supplies readable primary button text and link colors', () => {

@@ -38,6 +38,27 @@ func TestNormalizeAdminERPPreferencesDropsEmptyOrders(t *testing.T) {
 	}
 }
 
+func TestAdminERPAppearanceDefaultsPreserveSavedChoices(t *testing.T) {
+	want := AdminERPAppearance{ThemeMode: "system", Accent: "blue", Density: "compact", TableLines: "grid"}
+	if got := NormalizeAdminERPPreferences(AdminERPPreferences{}).Appearance; got != want {
+		t.Fatalf("account without saved preferences = %+v, want %+v", got, want)
+	}
+	for _, density := range []string{"standard", "compact"} {
+		for _, lines := range []string{"simple", "grid"} {
+			t.Run(density+"/"+lines, func(t *testing.T) {
+				saved := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: density, TableLines: lines}
+				if got := NormalizeAdminERPAppearance(saved); got != saved {
+					t.Fatalf("saved appearance changed: got %+v, want %+v", got, saved)
+				}
+			})
+		}
+	}
+	partial := AdminERPAppearance{ThemeMode: "light", Accent: "teal", Density: "standard"}
+	if got := NormalizeAdminERPAppearance(partial); got != (AdminERPAppearance{ThemeMode: "light", Accent: "teal", Density: "standard", TableLines: "grid"}) {
+		t.Fatalf("only missing fields should receive defaults: %+v", got)
+	}
+}
+
 func TestAdminERPAppearancePatchPreservesUnchangedFields(t *testing.T) {
 	current := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "grid"}
 	green := "green"

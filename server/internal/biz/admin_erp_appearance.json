@@ -3,5 +3,5 @@
   "accents": ["blue", "green", "teal", "yellow", "pink", "mauve", "orange", "purple"],
   "densities": ["standard", "compact"],
   "table_lines": ["simple", "grid"],
-  "defaults": { "theme_mode": "system", "accent": "blue", "density": "standard", "tableLines": "simple" }
+  "defaults": { "theme_mode": "system", "accent": "blue", "density": "compact", "tableLines": "grid" }
 }

@@ -129,9 +129,71 @@ export function createAccountAppearanceScenarios({
   const desktopSave = holdAppearanceSaves()
   const mobileSave = holdAppearanceSaves()
   return [
+    ...[
+      {
+        name: 'account-appearance-defaults',
+        saved: {},
+        expected: { density: 'compact', tableLines: 'grid', rowHeight: 42 },
+      },
+      {
+        name: 'account-appearance-saved-standard',
+        saved: {
+          appearance: {
+            theme_mode: 'system',
+            accent: 'blue',
+            density: 'standard',
+            tableLines: 'simple',
+          },
+        },
+        expected: { density: 'standard', tableLines: 'simple', rowHeight: 52 },
+      },
+    ].map(({ name, saved, expected }) => ({
+      ...desktop,
+      name,
+      path: '/erp/master/partners/customers',
+      adminProfile: { erp_preferences: saved },
+      verify: async (page) => {
+        for (let load = 0; load < 2; load += 1) {
+          if (load) await page.reload()
+          await page.waitForFunction(
+            ({ density, tableLines }) =>
+              document.documentElement.dataset.erpDensity === density &&
+              document.documentElement.dataset.erpTableLines === tableLines,
+            expected
+          )
+          const row = page
+            .locator('.app-table .ant-table-tbody > .ant-table-row')
+            .first()
+          await row.waitFor({ state: 'visible' })
+          const metrics = await row.evaluate((node) => ({
+            height: node.getBoundingClientRect().height,
+            divider: getComputedStyle(node.querySelectorAll('td')[1]).boxShadow,
+          }))
+          assert.ok(
+            Math.abs(metrics.height - expected.rowHeight) <= 1,
+            JSON.stringify(metrics)
+          )
+          assert.equal(
+            metrics.divider !== 'none',
+            expected.tableLines === 'grid',
+            JSON.stringify(metrics)
+          )
+        }
+      },
+    })),
     {
       ...desktop,
       name: 'account-appearance-save-layout',
+      adminProfile: {
+        erp_preferences: {
+          appearance: {
+            theme_mode: 'light',
+            accent: 'blue',
+            density: 'standard',
+            tableLines: 'simple',
+          },
+        },
+      },
       beforeNavigate: desktopSave.beforeNavigate,
       verify: async (page) => {
         await page

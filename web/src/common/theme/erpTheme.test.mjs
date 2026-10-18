@@ -27,13 +27,13 @@ after(() => {
   dom.restore()
 })
 
-const defaults = {
+const savedAppearance = {
   theme_mode: 'system',
   accent: 'blue',
   density: 'standard',
   tableLines: 'simple',
 }
-const profile = (id, appearance = defaults) => ({
+const profile = (id, appearance = savedAppearance) => ({
   user_id: id,
   username: `user-${id}`,
   erp_preferences: {
@@ -43,7 +43,7 @@ const profile = (id, appearance = defaults) => ({
   },
 })
 
-function signIn(id, appearance = defaults) {
+function signIn(id, appearance = savedAppearance) {
   persistAuth({
     ...profile(id, appearance),
     access_token: createMockAdminSessionToken({ userID: id }),
@@ -113,6 +113,40 @@ const settle = async (fn) =>
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
 
+test('appearance: unsaved accounts use compact grid and saved accounts retain standard simple', async () => {
+  localStorage.clear()
+  const runtime = await mount()
+  try {
+    const newDefault = {
+      accent: 'blue',
+      density: 'compact',
+      tableLines: 'grid',
+    }
+    assert.deepEqual(runtime.theme.appearance, newDefault)
+    await settle(() => signIn(1, {}))
+    assert.deepEqual(runtime.theme.appearance, newDefault)
+    assert.equal(document.documentElement.dataset.erpDensity, 'compact')
+    assert.equal(document.documentElement.dataset.erpTableLines, 'grid')
+    await settle(() => signIn(2, savedAppearance))
+    assert.deepEqual(runtime.theme.appearance, {
+      accent: 'blue',
+      density: 'standard',
+      tableLines: 'simple',
+    })
+    assert.equal(document.documentElement.dataset.erpDensity, 'standard')
+    assert.equal(document.documentElement.dataset.erpTableLines, 'simple')
+    assert.equal(
+      runtime.requests.length,
+      0,
+      'reading defaults cannot write account preferences'
+    )
+    await settle(() => logout())
+    assert.deepEqual(runtime.theme.appearance, newDefault)
+  } finally {
+    await runtime.close()
+  }
+})
+
 test('appearance: guest preferences remain local; login loads the account and logout restores the guest', async () => {
   localStorage.clear()
   localStorage.setItem('plush_erp_theme_mode', 'light')
@@ -126,7 +160,7 @@ test('appearance: guest preferences remain local; login loads the account and lo
       })
     )
     assert.equal(runtime.requests.length, 0)
-    await settle(() => signIn(1, { ...defaults, accent: 'purple' }))
+    await settle(() => signIn(1, { ...savedAppearance, accent: 'purple' }))
     assert.deepEqual(runtime.theme.appearance, {
       accent: 'purple',
       density: 'standard',
@@ -172,7 +206,7 @@ test('appearance: rapid edits serialize changed fields and preserve independentl
       )
     )
     await settle(() =>
-      runtime.requests[0].reply({ ...defaults, density: 'compact' })
+      runtime.requests[0].reply({ ...savedAppearance, density: 'compact' })
     )
     assert.equal(runtime.requests.length, 2)
     assert.deepEqual(runtime.requests[1].params, {
@@ -247,7 +281,7 @@ test('appearance: failed saves remain visible and retry only after a user action
     await settle(() => runtime.theme.retryAppearanceSave())
     assert.equal(runtime.requests.length, 2)
     await settle(() =>
-      runtime.requests[1].reply({ ...defaults, accent: 'purple' })
+      runtime.requests[1].reply({ ...savedAppearance, accent: 'purple' })
     )
     assert.equal(runtime.theme.appearanceSaveError, '')
     assert.equal(
@@ -267,10 +301,10 @@ test('appearance: a late response from a previous session cannot change another 
     await settle(() => runtime.theme.setAppearance({ accent: 'purple' }))
     await settle(() => {
       logout()
-      signIn(2, { ...defaults, accent: 'yellow' })
+      signIn(2, { ...savedAppearance, accent: 'yellow' })
     })
     await settle(() =>
-      runtime.requests[0].reply({ ...defaults, accent: 'purple' })
+      runtime.requests[0].reply({ ...savedAppearance, accent: 'purple' })
     )
     assert.equal(runtime.theme.appearance.accent, 'yellow')
     assert.equal(
@@ -301,7 +335,7 @@ test('appearance: a fresh browser cache restores server defaults and saved choic
     assert.deepEqual(runtime.theme.appearance, {
       accent: 'teal',
       density: 'standard',
-      tableLines: 'simple',
+      tableLines: 'grid',
     })
     assert.equal(
       document.documentElement.style.getPropertyValue('--erp-accent'),
@@ -309,7 +343,7 @@ test('appearance: a fresh browser cache restores server defaults and saved choic
     )
     await settle(() => runtime.theme.setThemeMode('system'))
     await settle(() =>
-      runtime.requests[0].reply({ ...defaults, accent: 'teal' })
+      runtime.requests[0].reply({ ...savedAppearance, accent: 'teal' })
     )
     assert.equal(
       getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences').appearance.theme_mode,

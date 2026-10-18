@@ -1816,10 +1816,7 @@ func decodeAdminERPPreferences(raw string) biz.AdminERPPreferences {
 
 func encodeAdminERPPreferences(preferences biz.AdminERPPreferences) string {
 	normalized := biz.NormalizeAdminERPPreferences(preferences)
-	if len(normalized.ColumnOrders) == 0 && len(normalized.HiddenColumns) == 0 &&
-		normalized.Appearance == biz.NormalizeAdminERPAppearance(biz.AdminERPAppearance{}) {
-		return "{}"
-	}
+	// 显式保存的选择即使等于默认值也保留，避免后续默认值变化改写个人外观。
 	encoded, err := json.Marshal(normalized)
 	if err != nil {
 		return "{}"
