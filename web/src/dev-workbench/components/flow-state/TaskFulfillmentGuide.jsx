@@ -8,7 +8,7 @@ import { fulfillmentExceptionPath, fulfillmentRoleOptions, fulfillmentStepMatche
 import './taskFulfillmentGuide.css'
 import FulfillmentSubflow from './FulfillmentSubflow.jsx'
 import FulfillmentChainCanvas from './FulfillmentChainCanvas.jsx'
-import { buildFulfillmentExceptionDirectory, getFulfillmentStageContext, getFulfillmentStageCopy, getFulfillmentSubstepCopy, getFulfillmentSupplement } from '../../config/devFulfillmentPresentation.mjs'
+import { buildFulfillmentExceptionDirectory, getFulfillmentStageContext, getFulfillmentSubstepCopy, getFulfillmentSupplement } from '../../config/devFulfillmentPresentation.mjs'
 
 function ApprovalDetails({ approval }) {
   return (
@@ -209,11 +209,9 @@ export default function TaskFulfillmentGuide({
       ) : null}
       </div>
       <p className="erp-dev-fulfillment-guide__owner">{role === 'all' ? `办理岗位：${current.role}` : currentDuties.length ? `${currentRoleLabel}负责：${currentDuties.map(getFulfillmentSubstepCopy).join('、')}` : fulfillmentStepMatchesRole(current, role) ? `办理岗位：${current.role}` : `本环节未登记${currentRoleLabel}职责，保留交接上下文。`}</p>
-      {context ? (
+      {context?.related.length ? (
         <div className="erp-dev-fulfillment-guide__stage-context">
-          {context.previous ? <span>前一段 <Button size="small" onClick={() => selectStage(context.previous.stage)}>{steps.indexOf(context.previous) + 1} {getFulfillmentStageCopy(context.previous).label}</Button></span> : null}
-          {context.next ? <span>后一段 <Button size="small" onClick={() => selectStage(context.next.stage)}>{steps.indexOf(context.next) + 1} {getFulfillmentStageCopy(context.next).label}</Button></span> : null}
-          {context.related.length ? <span className="erp-dev-fulfillment-guide__related">按约定关联 {context.related.map(({ step, label }) => <Button size="small" key={step.stage} title={step.label} onClick={() => selectStage(step.stage)}>{steps.indexOf(step) + 1} {label}</Button>)}</span> : null}
+          <span className="erp-dev-fulfillment-guide__related">按约定关联 {context.related.map(({ step, label }) => <Button size="small" key={step.stage} title={step.label} onClick={() => selectStage(step.stage)}>{steps.indexOf(step) + 1} {label}</Button>)}</span>
         </div>
     ) : null}
       {current.subflow ? <FulfillmentSubflow step={current} role={role} searchParams={searchParams} setSearchParams={setSearchParams} onOpenException={(substep, guideKey) => { const related = currentExceptions.find((item) => item.key === guideKey); if (related) openException(related, substep) }} /> : null}
