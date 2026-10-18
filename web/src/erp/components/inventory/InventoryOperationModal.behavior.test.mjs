@@ -32,11 +32,18 @@ test('inventory count validates unit precision and allows an explicit zero count
   await ui.fill('业务原因', '月末核对')
   await ui.fill('实盘数量', '1.5')
   await ui.click(ui.button('生成盘点作业'))
+  // Validation state settles before Ant Design's debounced field feedback.
+  await t.waitFor(async () => {
+    await ui.flush()
+    assert.match(
+      ui.field('实盘数量').closest('.ant-form-item').textContent,
+      /当前单位只允许整数数量/u
+    )
+  })
   assert.equal(ui.submissions.length, 0)
-  assert.match(document.body.textContent, /当前单位只允许整数数量/u)
   await ui.fill('实盘数量', '0')
   await ui.click(ui.button('生成盘点作业'))
-  assert.equal(ui.submissions.length, 1)
+  await t.waitFor(() => assert.equal(ui.submissions.length, 1))
   assert.equal(ui.submissions[0].items[0].counted_quantity, '0')
   assert.equal(ui.submissions[0].reason, '月末核对')
   assert.equal(ui.submissions[0].items[0].subject_id, undefined)
