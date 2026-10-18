@@ -6,8 +6,9 @@ import {
   registerJSXTestLoader,
 } from '../../../scripts/test/reactRuntime.mjs'
 
-const wait = (duration) =>
-  new Promise((resolve) => globalThis.setTimeout(resolve, duration))
+const SEARCH_DELAY_MS = 20
+const advanceTime = (t, duration) =>
+  act(async () => t.mock.timers.tick(duration))
 
 test('live search debounces typing, submits Enter and clear immediately, and respects composition', async (t) => {
   const dom = installTestDOM()
@@ -16,6 +17,7 @@ test('live search debounces typing, submits Enter and clear immediately, and res
     import('react-dom/client'),
     import('./useLiveSearch.js'),
   ])
+  t.mock.timers.enable({ apis: ['setTimeout'] })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -25,7 +27,7 @@ test('live search debounces typing, submits Enter and clear immediately, and res
   function Harness({ value }) {
     controls = useLiveSearch({
       value,
-      delay: 20,
+      delay: SEARCH_DELAY_MS,
       onSearch: (keyword) => searches.push(keyword),
     })
     return null
@@ -43,12 +45,19 @@ test('live search debounces typing, submits Enter and clear immediately, and res
       currentTarget: { value: '毛绒' },
       nativeEvent: { isComposing: false },
     })
+  })
+  await advanceTime(t, SEARCH_DELAY_MS - 1)
+  assert.deepEqual(searches, [])
+  await act(async () => {
     controls.onChange({
       currentTarget: { value: '毛绒熊' },
       nativeEvent: { isComposing: false },
     })
-    await wait(30)
   })
+  assert.deepEqual(searches, [])
+  await advanceTime(t, SEARCH_DELAY_MS - 1)
+  assert.deepEqual(searches, [])
+  await advanceTime(t, 1)
   assert.deepEqual(searches, ['毛绒熊'])
 
   await act(async () => {
@@ -60,16 +69,23 @@ test('live search debounces typing, submits Enter and clear immediately, and res
       currentTarget: { value: '立即查询' },
       nativeEvent: { isComposing: false },
     })
-    await wait(30)
   })
+  assert.deepEqual(searches, ['毛绒熊', '立即查询'])
+  await advanceTime(t, SEARCH_DELAY_MS)
   assert.deepEqual(searches, ['毛绒熊', '立即查询'])
 
   await act(async () => {
+    controls.onChange({
+      currentTarget: { value: '待清空' },
+      nativeEvent: { isComposing: false },
+    })
     controls.onChange({
       currentTarget: { value: '' },
       nativeEvent: { isComposing: false },
     })
   })
+  assert.deepEqual(searches, ['毛绒熊', '立即查询', ''])
+  await advanceTime(t, SEARCH_DELAY_MS)
   assert.deepEqual(searches, ['毛绒熊', '立即查询', ''])
 
   await act(async () => {
@@ -78,13 +94,15 @@ test('live search debounces typing, submits Enter and clear immediately, and res
       currentTarget: { value: '中' },
       nativeEvent: { isComposing: true },
     })
-    await wait(30)
   })
+  await advanceTime(t, SEARCH_DELAY_MS)
   assert.deepEqual(searches, ['毛绒熊', '立即查询', ''])
   await act(async () => {
     controls.onCompositionEnd({ currentTarget: { value: '中文' } })
-    await wait(30)
   })
+  await advanceTime(t, SEARCH_DELAY_MS - 1)
+  assert.deepEqual(searches, ['毛绒熊', '立即查询', ''])
+  await advanceTime(t, 1)
   assert.deepEqual(searches, ['毛绒熊', '立即查询', '', '中文'])
 })
 
@@ -95,6 +113,7 @@ test('live search cancels a pending draft when the committed value changes exter
     import('react-dom/client'),
     import('./useLiveSearch.js'),
   ])
+  t.mock.timers.enable({ apis: ['setTimeout'] })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -104,7 +123,7 @@ test('live search cancels a pending draft when the committed value changes exter
   function Harness({ value }) {
     controls = useLiveSearch({
       value,
-      delay: 20,
+      delay: SEARCH_DELAY_MS,
       onSearch: (keyword) => searches.push(keyword),
     })
     return null
@@ -123,12 +142,12 @@ test('live search cancels a pending draft when the committed value changes exter
       nativeEvent: { isComposing: false },
     })
   })
+  await advanceTime(t, SEARCH_DELAY_MS - 1)
+  assert.deepEqual(searches, [])
   await act(async () => {
     root.render(createElement(Harness, { value: '恢复值' }))
   })
-  await act(async () => {
-    await wait(30)
-  })
+  await advanceTime(t, SEARCH_DELAY_MS)
   assert.equal(controls.value, '恢复值')
   assert.deepEqual(searches, [])
 })
@@ -140,6 +159,7 @@ test('live search preserves newer typing when the parent acknowledges an earlier
     import('react-dom/client'),
     import('./useLiveSearch.js'),
   ])
+  t.mock.timers.enable({ apis: ['setTimeout'] })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
@@ -149,7 +169,7 @@ test('live search preserves newer typing when the parent acknowledges an earlier
   function Harness({ value }) {
     controls = useLiveSearch({
       value,
-      delay: 20,
+      delay: SEARCH_DELAY_MS,
       onSearch: (keyword) => searches.push(keyword),
     })
     return null
@@ -167,8 +187,8 @@ test('live search preserves newer typing when the parent acknowledges an earlier
       currentTarget: { value: '订单' },
       nativeEvent: { isComposing: false },
     })
-    await wait(30)
   })
+  await advanceTime(t, SEARCH_DELAY_MS)
   assert.deepEqual(searches, ['订单'])
 
   await act(async () => {
@@ -177,13 +197,13 @@ test('live search preserves newer typing when the parent acknowledges an earlier
       nativeEvent: { isComposing: false },
     })
   })
+  await advanceTime(t, SEARCH_DELAY_MS - 1)
+  assert.deepEqual(searches, ['订单'])
   await act(async () => {
     root.render(createElement(Harness, { value: '订单' }))
   })
   assert.equal(controls.value, '订单二')
-  await act(async () => {
-    await wait(30)
-  })
+  await advanceTime(t, 1)
   assert.deepEqual(searches, ['订单', '订单二'])
 })
 
@@ -193,13 +213,14 @@ test('explicit reset clears pending typing even when the applied value stays emp
   const [{ createRoot }, { default: useLiveSearch }] = await Promise.all([
     import('react-dom/client'), import('./useLiveSearch.js'),
   ])
+  t.mock.timers.enable({ apis: ['setTimeout'] })
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   const searches = []
   let controls
   function Harness({ resetKey = 0 }) {
-    controls = useLiveSearch({ value: '', resetKey, delay: 20, onSearch: (keyword) => searches.push(keyword) })
+    controls = useLiveSearch({ value: '', resetKey, delay: SEARCH_DELAY_MS, onSearch: (keyword) => searches.push(keyword) })
     return null
   }
   t.after(async () => {
@@ -209,8 +230,10 @@ test('explicit reset clears pending typing even when the applied value stays emp
   })
   await act(async () => root.render(createElement(Harness)))
   await act(async () => controls.onChange({ currentTarget: { value: '待提交' }, nativeEvent: {} }))
+  await advanceTime(t, SEARCH_DELAY_MS - 1)
+  assert.deepEqual(searches, [])
   await act(async () => root.render(createElement(Harness, { resetKey: 1 })))
-  await act(async () => { await wait(30) })
+  await advanceTime(t, SEARCH_DELAY_MS)
   assert.equal(controls.value, '')
   assert.deepEqual(searches, [])
 })
