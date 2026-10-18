@@ -8,11 +8,9 @@ import React, {
 } from 'react'
 import {
   CheckCircleOutlined,
-  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
-  SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Popconfirm, Space } from 'antd'
@@ -38,7 +36,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
@@ -1059,17 +1057,12 @@ export default function MasterDataPage({ type }) {
         }
         actions={
           <Space wrap>
-            <ToolbarButton
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              disabled={loading || exporting || total === 0}
-              onClick={exportRecords}
-            >
-              导出筛选结果
-            </ToolbarButton>
-            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
-              列设置
-            </ToolbarButton>
+            <BusinessListToolbarActions
+              onExport={exportRecords}
+              exportDisabled={loading || exporting || total === 0}
+              exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+              onOpenColumnOrder={openColumnOrder}
+            />
           </Space>
         }
         primaryAction={
@@ -1112,6 +1105,7 @@ export default function MasterDataPage({ type }) {
                 icon={<EditOutlined />}
                 disabled={!selectedRecord || saving}
                 onClick={() => openEditRecord(selectedRecord)}
+                data-business-action-role="edit"
               >
                 编辑{entityLabel}
               </Button>
@@ -1130,6 +1124,7 @@ export default function MasterDataPage({ type }) {
                 icon={<EyeOutlined />}
                 disabled={!selectedRecord || saving}
                 onClick={() => setDetailRecord(selectedRecord)}
+                data-business-action-role="view"
               >
                 查看{entityLabel}
               </Button>
@@ -1156,6 +1151,7 @@ export default function MasterDataPage({ type }) {
                 <Button
                   size="small"
                   className="erp-business-module-status-action"
+                  data-business-action-role="secondary"
                   disabled={!selectedRecord || saving}
                   icon={
                     selectedRecord?.is_active === false ? (

@@ -391,3 +391,13 @@ test('窄屏动作排序：状态和 loading 只改变禁用态，不改变固�
     [1, 0]
   )
 })
+
+test('辅助动作留在更多操作，不因外部操作位有空余而抢占主路径', () => {
+  const actions = [
+    { index: 0, actionable: true, enabled: true, score: 100, overflow: true },
+    { index: 1, actionable: true, enabled: false, score: 80 },
+    { index: 2, actionable: true, enabled: true, score: 60 },
+  ]
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, 4), [1, 2])
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, 0), [])
+})

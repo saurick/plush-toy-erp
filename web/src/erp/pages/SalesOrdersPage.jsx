@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DownOutlined,
-  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   LinkOutlined,
   PlusOutlined,
-  SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Space } from 'antd'
 import {
@@ -46,7 +44,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
@@ -1663,20 +1661,12 @@ export default function SalesOrdersPage() {
                   onSaved={loadOrders}
                 />
               ) : null}
-              <ToolbarButton
-                icon={<DownloadOutlined />}
-                loading={exporting}
-                disabled={loading || exporting || total === 0}
-                onClick={exportOrders}
-              >
-                导出
-              </ToolbarButton>
-              <ToolbarButton
-                icon={<SettingOutlined />}
-                onClick={openColumnOrder}
-              >
-                列设置
-              </ToolbarButton>
+              <BusinessListToolbarActions
+                onExport={exportOrders}
+                exportDisabled={loading || exporting || total === 0}
+                exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+                onOpenColumnOrder={openColumnOrder}
+              />
             </Space>
           ) : null
         }
@@ -1730,6 +1720,7 @@ export default function SalesOrdersPage() {
             >
               <Button
                 data-business-action-key="engineering"
+                data-business-action-role="action"
                 size="small"
                 disabled={
                   !selectedOrder ||
@@ -1750,6 +1741,7 @@ export default function SalesOrdersPage() {
           ) ? (
             <Button
               data-business-action-key="engineering-material"
+              data-business-action-role="action"
               size="small"
               disabled={!selectedOrder || saving}
               onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
@@ -1787,6 +1779,7 @@ export default function SalesOrdersPage() {
               >
                 <Button
                   data-business-action-key="related-records"
+                  data-business-action-role="related"
                   size="small"
                   icon={<LinkOutlined />}
                   disabled={relatedActionAvailability.disabled}
@@ -1804,6 +1797,7 @@ export default function SalesOrdersPage() {
           >
             <Button
               data-business-action-key="view-details"
+              data-business-action-role="view"
               size="small"
               icon={<EyeOutlined />}
               disabled={!selectedOrder || saving}
@@ -1830,6 +1824,7 @@ export default function SalesOrdersPage() {
             >
               <Button
                 data-business-action-key="edit"
+                data-business-action-role="edit"
                 size="small"
                 icon={<EditOutlined />}
                 loading={itemLoading}
@@ -1866,6 +1861,7 @@ export default function SalesOrdersPage() {
             >
               <Button
                 data-business-action-key="reserve-stock"
+                data-business-action-role="action"
                 size="small"
                 disabled={
                   !selectedOrder ||

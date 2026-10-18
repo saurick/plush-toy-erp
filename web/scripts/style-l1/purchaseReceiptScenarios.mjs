@@ -70,11 +70,13 @@ export function createPurchaseReceiptScenarios(deps) {
       0,
       `${scenarioName} 入库草稿应从采购订单生成，入库列表不应展示页面级新建按钮`
     )
+    const tools = page.getByRole('button', { name: '表格工具', exact: true })
+    await tools.click()
     const exportButton = page
-      .getByRole('button', { name: '导出筛选结果' })
+      .getByRole('menuitem', { name: /导出筛选结果/u })
       .first()
     const columnOrderButton = page
-      .getByRole('button', { name: '列设置' })
+      .getByRole('menuitem', { name: /列设置/u })
       .first()
     assert.equal(
       await exportButton.isDisabled(),
@@ -86,6 +88,7 @@ export function createPurchaseReceiptScenarios(deps) {
       false,
       `${scenarioName} 入库数据列应允许安全调整列顺序`
     )
+    await tools.press('Escape')
   }
 
   const assertPurchaseReceiptDateRangeSegmentedControl = async (

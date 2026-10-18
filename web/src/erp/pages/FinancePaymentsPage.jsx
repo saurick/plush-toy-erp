@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { Button } from 'antd'
+import { Alert, Button } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
@@ -130,6 +130,7 @@ export default function FinancePaymentsPage() {
 
   const {
     currentPayment,
+    paymentRecovery,
     currentCredit,
     setCurrentCredit,
     payments,
@@ -339,6 +340,10 @@ export default function FinancePaymentsPage() {
     }),
   }
 
+  const retryPaymentRecovery = async () => {
+    setLoading(true)
+    try { await recoverPayment(paymentRecovery.id) } finally { setLoading(false) }
+  }
   return (
     <BusinessPageLayout className="erp-finance-payments-page">
       <PageHeaderCard
@@ -454,6 +459,7 @@ export default function FinancePaymentsPage() {
               >
                 <Button
                   data-business-action-key="payment-details"
+                  data-business-action-role="view"
                   disabled={!currentPayment}
                   onClick={() => setPaymentDetail(currentPayment)}
                 >
@@ -482,6 +488,7 @@ export default function FinancePaymentsPage() {
                     }
                     className="erp-business-module-status-action"
                     data-business-action-key="payment-allocation"
+                    data-business-action-role="primary"
                     disabled={paymentActionAvailability.allocation.disabled}
                     onClick={() =>
                       currentPayment?.status ===
@@ -549,6 +556,7 @@ export default function FinancePaymentsPage() {
                 >
                   <Button
                     data-business-action-key="payment-approval"
+                    data-business-action-role="primary"
                     type="primary"
                     disabled={paymentActionAvailability.approval.disabled}
                     onClick={ensurePaymentApprovalProcess}
@@ -568,6 +576,7 @@ export default function FinancePaymentsPage() {
                   <Button
                     danger
                     data-business-action-key="payment-cancel"
+                    data-business-action-role="danger"
                     disabled={paymentActionAvailability.cancel.disabled}
                     onClick={openCancel}
                   >
@@ -587,6 +596,7 @@ export default function FinancePaymentsPage() {
                     danger
                     className="erp-business-module-status-action"
                     data-business-action-key="payment-reverse"
+                    data-business-action-role="danger"
                     disabled={paymentActionAvailability.reverse.disabled}
                     onClick={() => {
                       if (paymentActionAvailability.reverse.disabled) return
@@ -625,6 +635,7 @@ export default function FinancePaymentsPage() {
               >
                 <Button
                   data-business-action-key="payment-reload"
+                  data-business-action-role="recovery"
                   disabled={!currentPayment || loading}
                   onClick={() => recoverPayment(currentPayment?.id)}
                 >
@@ -633,6 +644,15 @@ export default function FinancePaymentsPage() {
               </BusinessActionTooltip>
             </SelectionActionBar>
           </BusinessOperationPanel>
+          {paymentRecovery && (!currentPayment || currentPayment.id === paymentRecovery.id) ? (
+            <Alert
+              type="error"
+              showIcon
+              message="尚未核对收付款最新结果"
+              description={paymentRecovery.message}
+              action={<Button loading={loading} onClick={retryPaymentRecovery}>重新读取</Button>}
+            />
+          ) : null}
           <BusinessDataTable
             rowKey="id"
             loading={tableLoading.payments}

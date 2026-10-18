@@ -19,3 +19,6 @@ export default function WorkflowSourceProgressButton({ sourceType, sourceID, pro
     </Button>
   )
 }
+
+WorkflowSourceProgressButton.selectionActionRole = 'related'
+WorkflowSourceProgressButton.selectionActionVisible = ({ profile }) => hasActionPermission(profile, PermissionCode.WORKFLOW_TASK_READ)

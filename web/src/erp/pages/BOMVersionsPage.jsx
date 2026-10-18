@@ -2,12 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CopyOutlined,
-  DownloadOutlined,
   EditOutlined,
   InboxOutlined,
   PlusOutlined,
   PrinterOutlined,
-  SettingOutlined,
   UnorderedListOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
@@ -62,7 +60,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
@@ -1301,17 +1299,12 @@ export default function BOMVersionsPage() {
                 />
               </>
             ) : null}
-            <ToolbarButton
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              disabled={loading || exporting || total === 0}
-              onClick={exportVersions}
-            >
-              导出筛选结果
-            </ToolbarButton>
-            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
-              列设置
-            </ToolbarButton>
+            <BusinessListToolbarActions
+              onExport={exportVersions}
+              exportDisabled={loading || exporting || total === 0}
+              exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+              onOpenColumnOrder={openColumnOrder}
+            />
           </Space>
         }
         primaryAction={
@@ -1348,6 +1341,7 @@ export default function BOMVersionsPage() {
           >
             <Button
               data-business-action-key="view"
+              data-business-action-role="view"
               size="small"
               icon={<InboxOutlined />}
               disabled={selectedRowKeys.length !== 1}
@@ -1377,6 +1371,7 @@ export default function BOMVersionsPage() {
             >
               <Button
                 data-business-action-key="edit"
+                data-business-action-role="edit"
                 type="primary"
                 size="small"
                 icon={<EditOutlined />}
@@ -1406,6 +1401,7 @@ export default function BOMVersionsPage() {
               size="small"
               icon={<UnorderedListOutlined />}
               data-business-action-key="related-tasks"
+              data-business-action-role="related"
               disabled={
                 selectedRowKeys.length !== 1 || !activeActionVersion || saving
               }
@@ -1437,6 +1433,7 @@ export default function BOMVersionsPage() {
             >
               <Button
                 data-business-action-key="copy"
+                data-business-action-role="secondary"
                 size="small"
                 icon={<CopyOutlined />}
                 disabled={
@@ -1474,6 +1471,7 @@ export default function BOMVersionsPage() {
                 >
                   <Button
                     data-business-action-key={`print-${templateKey}`}
+                    data-business-action-role="secondary"
                     size="small"
                     icon={<PrinterOutlined />}
                     disabled={
@@ -1517,6 +1515,7 @@ export default function BOMVersionsPage() {
               >
                 <Button
                   data-business-action-key="activate"
+                  data-business-action-role="action"
                   size="small"
                   icon={<CheckCircleOutlined />}
                   disabled={
@@ -1561,6 +1560,7 @@ export default function BOMVersionsPage() {
               >
                 <Button
                   data-business-action-key="archive"
+                  data-business-action-role="secondary"
                   size="small"
                   icon={<InboxOutlined />}
                   disabled={

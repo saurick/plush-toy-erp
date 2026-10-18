@@ -230,7 +230,7 @@ test('production exception tabs keep column order controls without exposing data
   assert.match(businessListToolbarActions, /showExport = true/u)
   assert.match(
     businessListToolbarActions,
-    /\{showExport \? \([\s\S]*导出筛选结果[\s\S]*\) : null\}/u
+    /\.\.\.\(showExport \? \[\{[\s\S]*?key:\s*'export'[\s\S]*?导出筛选结果[\s\S]*?onClick:\s*onExport[\s\S]*?\}\] : \[\]\)/u
   )
   assert.match(
     productionExceptionPanel,

@@ -82,6 +82,7 @@ import { resolveReadableWorkflowSourceNo } from '../utils/workflowDocumentRefs.m
 import {
   canWorkflowTaskStatusRunAction,
   getWorkflowTaskActionPermission,
+  isWorkflowApprovalTask,
   isWorkflowProcessDecisionTask,
 } from '../utils/workflowTaskActionContract.mjs'
 import {
@@ -540,7 +541,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     async (task, { processDecision = null, reason = '' } = {}) => {
       const requiresDecision = isWorkflowProcessDecisionTask(task)
       const normalizedReason = String(reason || '').trim()
-      if (requiresDecision && !normalizedReason) {
+      if (isWorkflowApprovalTask(task) && !normalizedReason) {
         message.warning('请先填写审批意见')
         return false
       }
@@ -1192,6 +1193,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               size="small"
               icon={<EyeOutlined />}
               data-business-action-key="workflow-task-details"
+              data-business-action-role="view"
               disabled={!selectedTask}
               onClick={() => setDetailTask(selectedTask)}
             >
@@ -1215,7 +1217,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               }
               disabledReason={workflowActionDisabledReason(
                 'complete',
-                isWorkflowProcessDecisionTask(selectedTask)
+                isWorkflowApprovalTask(selectedTask)
                   ? '审批通过'
                   : '完成任务'
               )}
@@ -1226,6 +1228,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 className="erp-business-module-status-action"
                 icon={<CheckCircleOutlined />}
                 data-business-action-key="workflow-task-complete"
+                data-business-action-role="primary"
                 loading={taskActionLoadingID === selectedTask?.id}
                 disabled={
                   !canCompleteSelected ||
@@ -1233,12 +1236,12 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                   urgingTaskID > 0
                 }
                 onClick={() =>
-                  isWorkflowProcessDecisionTask(selectedTask)
+                  isWorkflowApprovalTask(selectedTask)
                     ? openTaskReasonModal('complete')
                     : completeWorkflowTask(selectedTask)
                 }
               >
-                {isWorkflowProcessDecisionTask(selectedTask)
+                {isWorkflowApprovalTask(selectedTask)
                   ? '审批通过'
                   : '完成任务'}
               </Button>
@@ -1265,6 +1268,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 className="erp-business-module-status-action"
                 icon={<ExclamationCircleOutlined />}
                 data-business-action-key="workflow-task-block"
+                data-business-action-role="danger"
                 disabled={
                   !canBlockSelected ||
                   taskActionLoadingID > 0 ||
@@ -1302,6 +1306,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 className="erp-business-module-status-action"
                 icon={<ExclamationCircleOutlined />}
                 data-business-action-key="workflow-task-reject"
+                data-business-action-role="danger"
                 disabled={
                   !canRejectSelected ||
                   taskActionLoadingID > 0 ||
@@ -1339,6 +1344,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 className="erp-business-module-status-action"
                 icon={<RedoOutlined />}
                 data-business-action-key="workflow-task-resume"
+                data-business-action-role="primary"
                 disabled={
                   !canResumeSelected ||
                   taskActionLoadingID > 0 ||
@@ -1369,6 +1375,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 size="small"
                 icon={<SendOutlined />}
                 data-business-action-key="workflow-task-urge"
+                data-business-action-role="secondary"
                 loading={urgingTaskID === selectedTask?.id}
                 disabled={
                   !canUrgeSelected ||
@@ -1394,6 +1401,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             disabledReason="请先选择一条任务"
             buttonProps={{
               'data-business-action-key': 'workflow-task-attachments',
+              'data-business-action-role': 'secondary',
             }}
           />
         </SelectionActionBar>

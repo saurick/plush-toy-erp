@@ -1,3 +1,7 @@
+import assert from 'node:assert/strict'
+import path from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertAntdModalCentered } from './modalAssertions.mjs'
 import {
@@ -6,9 +10,6 @@ import {
   assertTextAbsent,
   assertButtonDisabled,
 } from './pageAssertions.mjs'
-import assert from 'node:assert/strict'
-import path from 'node:path'
-import { setTimeout as delay } from 'node:timers/promises'
 
 export function createBusinessListAssertions({ outputDir }) {
   async function assertOrderLifecycleActionsConsolidated(
@@ -141,7 +142,7 @@ export function createBusinessListAssertions({ outputDir }) {
   ) {
     const metrics = await page.evaluate(() => {
       const rectOf = (selector, root = document) => {
-        const element = root.querySelector(selector)
+        const element = typeof selector === 'string' ? root.querySelector(selector) : selector
         if (!(element instanceof HTMLElement)) return null
         const rect = element.getBoundingClientRect()
         const style = window.getComputedStyle(element)
@@ -162,12 +163,12 @@ export function createBusinessListAssertions({ outputDir }) {
         }
       }
       const actionBar = document.querySelector(
-        '.erp-business-module-current-action'
+        '.erp-business-module-current-action:not([hidden])'
       )
       const actionBarMetrics =
         actionBar instanceof HTMLElement
           ? {
-              ...rectOf('.erp-business-module-current-action'),
+              ...rectOf(actionBar),
               hasEmptyClass: actionBar.classList.contains(
                 'erp-business-selection-action-bar--empty'
               ),
@@ -197,9 +198,21 @@ export function createBusinessListAssertions({ outputDir }) {
           ? rectOf('.erp-business-selection-action-bar__actions', actionBar)
           : null,
         tableCard: rectOf('.erp-business-module-table-card'),
+        selectable: Boolean(document.querySelector('.erp-business-module-table-card .ant-table-tbody .ant-table-selection-column input:not(:disabled)')),
       }
     })
 
+    if (expectedMode === 'empty') {
+      if (metrics.selectable) {
+        assert(metrics.actionBar?.hasEmptyClass && !metrics.actionBar.hasActiveClass, `${scenarioName} 未选择时保留常驻操作栏`)
+        assert.match(metrics.actionBar.text, /选中记录后显示可用操作/u)
+        assert.equal(metrics.actions, null, `${scenarioName} 未选择时不列出具体按钮`)
+      } else {
+        assert.equal(metrics.actionBar, null, `${scenarioName} 无可选记录时不留操作占位`)
+      }
+      assert(metrics.tableCard, `${scenarioName} 未选择时仍保留表格`)
+      return
+    }
     assert(
       metrics.actionBar,
       `${scenarioName} 缺少业务选中操作条: ${JSON.stringify(metrics)}`
@@ -221,12 +234,6 @@ export function createBusinessListAssertions({ outputDir }) {
         `${scenarioName} 桌面当前操作行左右区域应上下居中对齐: ${JSON.stringify(metrics)}`
       )
     }
-    if (expectedMode === 'empty')
-      assert.equal(
-        metrics.tag?.text,
-        '请选择一条记录',
-        `${scenarioName} 未选中时应提示先选择记录`
-      )
     assert(
       metrics.actionBar.scrollWidth <= metrics.actionBar.clientWidth + 2,
       `${scenarioName} 选中操作条出现横向溢出: ${JSON.stringify(metrics)}`
@@ -288,7 +295,7 @@ export function createBusinessListAssertions({ outputDir }) {
     const metrics = await page.evaluate(
       ({ expectedEmptyText, previousText }) => {
         const actionBar = document.querySelector(
-          '.erp-business-module-current-action'
+          '.erp-business-module-current-action:not([hidden])'
         )
         const tableCard = document.querySelector(
           '.erp-business-module-table-card'
@@ -338,8 +345,8 @@ export function createBusinessListAssertions({ outputDir }) {
       `${scenarioName} 搜索空结果时不应保留数据行: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.actionHasEmptyClass && !metrics.actionHasActiveClass,
-      `${scenarioName} 搜索空结果后当前操作条应回到未选中态: ${JSON.stringify(metrics)}`
+      !metrics.actionText && !metrics.actionHasActiveClass,
+      `${scenarioName} 搜索空结果后应收起记录操作条: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.staleTextInAction,
@@ -487,16 +494,14 @@ export function createBusinessListAssertions({ outputDir }) {
       storageKey,
       targetLabel: headerMenuTargetLabel,
     })
-    const primaryToolbarActions = page
-      .locator('.erp-business-operation-panel__actions')
-      .first()
-    await primaryToolbarActions
-      .getByRole('button', { name: /列顺序|列设置/ })
-      .click()
+    await openBusinessTableTool(page, '列设置')
     const dialog = page.locator('.erp-business-action-modal--columns:visible')
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     await assertAntdModalCentered(page, dialog, 'business-column-order-modal')
-    await expectText(page, '点击完成保存到当前账号')
+    assert.match(
+      await dialog.locator('.erp-business-action-modal__title small').innerText(),
+      /仅对当前账号生效/u
+    )
     await dialog.screenshot({
       path: path.resolve(outputDir, 'business-column-order-modal.png'),
     })
@@ -602,9 +607,7 @@ export function createBusinessListAssertions({ outputDir }) {
     }, storageKey)
     assert.equal(storedOrder, null, '列设置应只保存账号偏好，不使用跨账号的本地兜底')
 
-    await primaryToolbarActions
-      .getByRole('button', { name: /列顺序|列设置/ })
-      .click()
+    await openBusinessTableTool(page, '列设置')
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     const persistedDialogBoundaryLabels = await page.evaluate(() => {
       return {
@@ -632,9 +635,7 @@ export function createBusinessListAssertions({ outputDir }) {
     }, storageKey)
     await page.reload({ waitUntil: 'networkidle' })
     await expectHeading(page, heading)
-    await primaryToolbarActions
-      .getByRole('button', { name: /列顺序|列设置/ })
-      .click()
+    await openBusinessTableTool(page, '列设置')
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     await assertAntdModalCentered(
       page,
@@ -696,7 +697,7 @@ export function createBusinessListAssertions({ outputDir }) {
       expectedFirstLabel,
       `列设置未找到可移动目标列: ${JSON.stringify({ targetLabel, headerLabelsBefore })}`
     )
-    await page.getByRole('button', { name: /列设置$/u }).click()
+    await openBusinessTableTool(page, '列设置')
     const dialog = page.getByRole('dialog', { name: /^列设置/u })
     await dialog
       .getByRole('button', {
@@ -1323,8 +1324,8 @@ export function createBusinessListAssertions({ outputDir }) {
     const metrics = await page.evaluate(() => {
       const read = (node) => {
         if (!node) return null
-        const box = node.getBoundingClientRect(),
-          style = getComputedStyle(node)
+        const box = node.getBoundingClientRect()
+        const style = getComputedStyle(node)
         return {
           width: box.width,
           height: box.height,

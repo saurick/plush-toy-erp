@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
   PrinterOutlined,
-  SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Space } from 'antd'
 import { useOutletContext } from 'react-router-dom'
@@ -42,7 +40,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
@@ -797,20 +795,12 @@ export default function OutsourcingOrdersPage() {
             }
             actions={
               <Space wrap>
-                <ToolbarButton
-                  icon={<DownloadOutlined />}
-                  loading={exporting}
-                  disabled={loading || exporting || total === 0}
-                  onClick={exportOrders}
-                >
-                  导出筛选结果
-                </ToolbarButton>
-                <ToolbarButton
-                  icon={<SettingOutlined />}
-                  onClick={openColumnOrder}
-                >
-                  列设置
-                </ToolbarButton>
+                <BusinessListToolbarActions
+                  onExport={exportOrders}
+                  exportDisabled={loading || exporting || total === 0}
+                  exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+                  onOpenColumnOrder={openColumnOrder}
+                />
               </Space>
             }
             primaryAction={
@@ -874,6 +864,7 @@ export default function OutsourcingOrdersPage() {
                 >
                   <Button
                     data-business-action-key="outsourcing-edit"
+                    data-business-action-role="edit"
                     size="small"
                     icon={<EditOutlined />}
                     loading={itemsLoading}
@@ -898,6 +889,7 @@ export default function OutsourcingOrdersPage() {
               >
                 <Button
                   data-business-action-key="outsourcing-details"
+                  data-business-action-role="view"
                   size="small"
                   icon={<EyeOutlined />}
                   disabled={!selectedRow || itemsLoading}
@@ -915,6 +907,7 @@ export default function OutsourcingOrdersPage() {
                 >
                   <Button
                     data-business-action-key="related-outsourcing-facts"
+                    data-business-action-role="related"
                     size="small"
                     disabled={relatedOutsourcingFactsAvailability.disabled}
                     loading={returnRecordsLoading}
@@ -943,6 +936,7 @@ export default function OutsourcingOrdersPage() {
               >
                 <Button
                   data-business-action-key="processing-contract-print"
+                  data-business-action-role="secondary"
                   size="small"
                   icon={<PrinterOutlined />}
                   disabled={!selectedRow || printingAction !== ''}
@@ -962,6 +956,7 @@ export default function OutsourcingOrdersPage() {
               >
                 <Button
                   data-business-action-key="work-instruction-print"
+                  data-business-action-role="secondary"
                   size="small"
                   icon={<PrinterOutlined />}
                   disabled={!selectedRow || printingAction !== ''}

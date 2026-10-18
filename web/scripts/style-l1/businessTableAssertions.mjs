@@ -219,15 +219,21 @@ async function assertBusinessMainTableInitialSelectionEmpty(
     const selectedRows = dataRows.filter((row) =>
       row.classList.contains('ant-table-row-selected')
     )
-    const actionBar = document.querySelector(
-      '.erp-business-module-current-action'
-    )
+    const actionBars = Array.from(
+      document.querySelectorAll('.erp-business-module-current-action')
+    ).filter((node) => node.checkVisibility())
+    const actionBar = actionBars[0]
     return {
       hasTable: Boolean(tableCard),
       dataRowCount: dataRows.length,
       checkedInputCount: checkedInputs.length,
       checkedWrapperCount: checkedWrappers.length,
       selectedRowCount: selectedRows.length,
+      actionBarCount: actionBars.length,
+      actionButtonCount: actionBars.reduce(
+        (count, node) => count + node.querySelectorAll('button').length,
+        0
+      ),
       actionText: actionBar?.textContent?.replace(/\s+/g, ' ').trim() || '',
       actionHasEmptyClass:
         actionBar?.classList.contains(
@@ -260,9 +266,30 @@ async function assertBusinessMainTableInitialSelectionEmpty(
     `${scenarioName} 初始进入不应默认高亮业务记录: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.actionHasEmptyClass && !metrics.actionHasActiveClass,
-    `${scenarioName} 初始当前操作区应为空选择态: ${JSON.stringify(metrics)}`
+    metrics.actionBarCount <= 1,
+    `${scenarioName} 初始不应重复展示操作栏: ${JSON.stringify(metrics)}`
   )
+  assert.equal(
+    metrics.actionHasActiveClass,
+    false,
+    `${scenarioName} 初始操作栏不应处于选中态: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.actionButtonCount,
+    0,
+    `${scenarioName} 初始不应展示记录操作按钮: ${JSON.stringify(metrics)}`
+  )
+  if (metrics.actionBarCount > 0) {
+    assert(
+      metrics.actionHasEmptyClass,
+      `${scenarioName} 初始操作栏应为空选择态: ${JSON.stringify(metrics)}`
+    )
+    assert.match(
+      metrics.actionText,
+      /选中记录后显示可用操作/u,
+      `${scenarioName} 初始操作栏应说明先选记录再操作`
+    )
+  }
 }
 
 async function assertBusinessMainTableSortableColumns(
@@ -346,7 +373,7 @@ async function assertBusinessMainTableSortableColumns(
         )
       : []
     const currentAction = document.querySelector(
-      '.erp-business-module-current-action'
+      '.erp-business-module-current-action:not([hidden])'
     )
     return {
       headers,

@@ -3,7 +3,7 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 
 export function createBusinessFormalAssertions(deps) {
-  const { assert, expectButton, expectNoButton, expectText } = deps
+  const { assert, expectNoButton, expectText } = deps
   const compactVisibleText = (value) =>
     String(value || '').replace(/[\s\p{Cf}]+/gu, '')
 
@@ -321,15 +321,13 @@ export function createBusinessFormalAssertions(deps) {
       columnOrderDisabled = false,
     }
   ) => {
-    const labels = exportVisible ? ['导出筛选结果', '列设置'] : ['列设置']
-    for (const label of labels) {
-      await expectButton(page, label)
-    }
+    const tools = page.getByRole('button', { name: '表格工具', exact: true })
+    await tools.click()
     const exportButton = page
-      .getByRole('button', { name: '导出筛选结果' })
+      .getByRole('menuitem', { name: /导出筛选结果/u })
       .first()
     const columnOrderButton = page
-      .getByRole('button', { name: '列设置' })
+      .getByRole('menuitem', { name: /列设置/u })
       .first()
     if (exportVisible) {
       assert.equal(
@@ -338,7 +336,7 @@ export function createBusinessFormalAssertions(deps) {
         `${scenarioName} 导出筛选结果按钮禁用态不符合当前页面能力边界`
       )
     } else {
-      await expectNoButton(page, '导出筛选结果')
+      assert.equal(await exportButton.count(), 0)
     }
     assert.equal(
       await columnOrderButton.isDisabled(),
@@ -352,6 +350,7 @@ export function createBusinessFormalAssertions(deps) {
       await exportButton.locator('xpath=..').hover()
       await expectText(page, exportTooltip)
     }
+    await tools.press('Escape')
     await assertCurrentOperationBarCompact(page, { scenarioName })
   }
 
@@ -497,7 +496,7 @@ export function createBusinessFormalAssertions(deps) {
     const metrics = await page.evaluate(
       ({ expectedEmptyText, previousText }) => {
         const actionBar = document.querySelector(
-          '.erp-business-module-current-action'
+          '.erp-business-module-current-action:not([hidden])'
         )
         const tableCard = document.querySelector(
           '.erp-business-module-table-card'
@@ -543,7 +542,7 @@ export function createBusinessFormalAssertions(deps) {
       `${scenarioName} 空结果时不应保留数据行: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.actionHasEmptyClass && !metrics.actionHasActiveClass,
+      !metrics.actionText && !metrics.actionHasActiveClass,
       `${scenarioName} 空结果后当前操作条应回到未选中态: ${JSON.stringify(metrics)}`
     )
     assert.equal(
@@ -601,7 +600,9 @@ export function createBusinessFormalAssertions(deps) {
         }
       })
     })
-    assert(metrics.length > 0, `${scenarioName} 应存在当前操作条`)
+    if (metrics.length === 0) {
+      assert.equal(await page.locator('.ant-table-row-selected').count(), 0, `${scenarioName} 已选择时应存在当前操作条`)
+    }
     for (const metric of metrics) {
       assert.equal(
         metric.hintCount,

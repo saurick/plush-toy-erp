@@ -40,6 +40,7 @@ export default function useFinancePaymentRecords({
   beginLatestRequest,
 }) {
   const [currentPayment, setCurrentPayment] = useState(null)
+  const [paymentRecovery, setPaymentRecovery] = useState(null)
 
   const [currentCredit, setCurrentCredit] = useState(null)
 
@@ -124,8 +125,10 @@ export default function useFinancePaymentRecords({
           throw new Error('收付款回执不完整')
         }
         rememberPayment(payment)
+        setPaymentRecovery((current) => current?.id === Number(id) ? null : current)
         return payment
       } catch (error) {
+        setPaymentRecovery({ id: Number(id), message: getActionErrorMessage(error, '读取收付款最新结果') })
         if (!quiet) {
           message.error(getActionErrorMessage(error, '恢复收付款记录'))
         }
@@ -355,6 +358,7 @@ export default function useFinancePaymentRecords({
   }, [currentPayment, financeFacts])
 
   return {
+    paymentRecovery,
     currentPayment,
     currentCredit,
     setCurrentCredit,

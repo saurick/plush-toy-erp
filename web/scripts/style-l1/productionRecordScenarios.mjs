@@ -1,3 +1,4 @@
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createProductionRecordScenarios(deps) {
@@ -282,7 +283,7 @@ export function createProductionRecordScenarios(deps) {
           'business-production-exceptions-decisions-tab',
           '异常处理'
         )
-        await page.getByRole('button', { name: /列设置/u }).click()
+        await openBusinessTableTool(page, '列设置')
         const decisionColumnOrderDialog = page.getByRole('dialog', {
           name: '列设置',
         })
@@ -310,7 +311,7 @@ export function createProductionRecordScenarios(deps) {
           'business-production-exceptions-tasks-tab',
           '待审批'
         )
-        await page.getByRole('button', { name: /列设置/u }).click()
+        await openBusinessTableTool(page, '列设置')
         const taskColumnOrderDialog = page.getByRole('dialog', {
           name: '列设置',
         })

@@ -665,7 +665,7 @@ export default function ProductionExceptionDecisionPanel({
             selectionLabel="生产异常处置申请"
             onClear={() => setSelectedID(null)}
           />
-          <Button size="small" disabled={!selectedRecord} onClick={() => setDetailID(selectedID)}>查看异常详情</Button>
+          <Button size="small" data-business-action-role="view" disabled={!selectedRecord} onClick={() => setDetailID(selectedID)}>查看异常详情</Button>
           <WorkflowSourceProgressButton sourceType="production_exception_decision" sourceID={selectedRecord?.id} profile={adminProfile} disabled={loading} />
           {actionAvailability.approval.visible ? (
             <BusinessActionTooltip
@@ -677,6 +677,7 @@ export default function ProductionExceptionDecisionPanel({
                 className="erp-action-button"
                 size="small"
                 data-business-action-key="production-exception-approval"
+                data-business-action-role="action"
                 disabled={actionAvailability.approval.disabled}
                 onClick={() => ensureApprovalProcess(selectedRecord)}
               >
@@ -695,6 +696,7 @@ export default function ProductionExceptionDecisionPanel({
                 size="small"
                 type="primary"
                 data-business-action-key="production-exception-decide"
+                data-business-action-role="primary"
                 onClick={() => navigate('/erp/task-board')}
                 disabled={actionAvailability.decide.disabled}
               >
@@ -713,6 +715,7 @@ export default function ProductionExceptionDecisionPanel({
                 size="small"
                 danger
                 data-business-action-key="production-exception-withdraw"
+                data-business-action-role="danger"
                 disabled={actionAvailability.withdraw.disabled}
                 onClick={() => openCancellation(selectedRecord)}
               >
@@ -729,6 +732,7 @@ export default function ProductionExceptionDecisionPanel({
                 size="small"
                 type="primary"
                 data-business-action-key="production-exception-execute"
+                data-business-action-role="primary"
                 disabled={actionAvailability.execute.disabled}
                 onClick={beginExecution}
               >
@@ -747,6 +751,7 @@ export default function ProductionExceptionDecisionPanel({
                 size="small"
                 danger
                 data-business-action-key="production-exception-reverse"
+                data-business-action-role="danger"
                 disabled={actionAvailability.reverse.disabled}
                 onClick={() =>
                   setAction({
@@ -774,6 +779,7 @@ export default function ProductionExceptionDecisionPanel({
                 size="small"
                 danger
                 data-business-action-key="production-exception-revoke-quota"
+                data-business-action-role="danger"
                 disabled={actionAvailability.revokeQuota.disabled}
                 onClick={() =>
                   setAction({

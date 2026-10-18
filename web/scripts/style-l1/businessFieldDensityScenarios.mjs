@@ -1,3 +1,5 @@
+import { openBusinessTableTool } from './businessTableTools.mjs'
+
 const headerSelector =
   '.erp-business-data-table-card .ant-table-thead:not([aria-hidden="true"]) .erp-module-column-header-text'
 
@@ -158,7 +160,7 @@ export function createBusinessFieldDensityScenarios(deps) {
           await assertHeaders(page, entry)
           const [download] = await Promise.all([
             page.waitForEvent('download'),
-            page.getByRole('button', { name: /导出/u }).click(),
+            openBusinessTableTool(page, '导出筛选结果'),
           ])
           const csv = await downloadedText(download)
           for (const label of entry.optional)
@@ -194,7 +196,7 @@ export function createBusinessFieldDensityScenarios(deps) {
         await editor.waitFor({ state: 'hidden' })
 
         const openColumns = async () => {
-          await page.getByRole('button', { name: /列设置$/u }).click()
+          await openBusinessTableTool(page, '列设置')
           return page.getByRole('dialog', { name: /^列设置/u })
         }
         let panel = await openColumns()

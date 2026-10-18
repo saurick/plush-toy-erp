@@ -38,7 +38,7 @@ async function installRoute(page) {
         json: { jsonrpc: '2.0', id, result: styleRpcResult(data) },
       })
     if (method === 'get_sales_order' && Number(params.id) === 47)
-      return fulfill({ sales_order: rows[46] })
+      { return fulfill({ sales_order: rows[46] }) }
     if (method === 'list_sales_orders' && params.include_status_counts) {
       page.statusCountRequests.push({ method, params })
       if (params.keyword === '慢查询') await delay(650)
@@ -65,7 +65,7 @@ async function installRoute(page) {
       )
       const counts = {}
       for (const row of counted)
-        counts[row.lifecycle_status] = (counts[row.lifecycle_status] || 0) + 1
+        { counts[row.lifecycle_status] = (counts[row.lifecycle_status] || 0) + 1 }
       const filtered = counted.filter(
         (row) =>
           !params.lifecycle_status ||
@@ -87,199 +87,136 @@ async function installRoute(page) {
   })
 }
 
-export function createBusinessStatusCountsScenarios({
-  assert,
-  customerRuntimeEffectiveSession,
-  gotoScenarioPath,
-  assertNoHorizontalOverflow,
-  outputDir,
-  path,
-}) {
-  const group = (page) =>
-    page.getByRole('group', { name: '销售订单状态', exact: true })
-  const ready = async (page, total) => {
-    const button = group(page).getByRole('button', {
-      name: `不限状态，共 ${total} 条`,
-      exact: true,
-    })
-    await button.waitFor()
-    await page.waitForFunction(
-      () =>
-        document
-          .querySelector('[aria-label="销售订单状态"]')
-          ?.getAttribute('aria-busy') === 'false'
-    )
-    return button
+export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEffectiveSession, gotoScenarioPath, assertNoHorizontalOverflow, outputDir, path }) {
+  const group = (page, label = '销售订单状态') => page.getByRole('group', { name: label, exact: true })
+  const countText = (text, count) => `${text} ${count.toLocaleString('zh-CN')}`
+  const ready = async (page, total, label = '销售订单状态') => {
+    const filter = group(page, label)
+    await filter.waitFor()
+    await page.waitForFunction((name) => [...document.querySelectorAll('[role="group"]')].some((el) => el.getAttribute('aria-label') === name && el.getAttribute('aria-busy') === 'false'), label)
+    const combo = filter.getByRole('combobox')
+    if (await combo.count()) {
+      const summary = filter.locator('.ant-select-selection-item')
+      if ((await summary.textContent()) !== countText('不限状态', total)) {
+        await filter.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: new RegExp(`^${countText('不限状态', total)}$`, 'u') }).waitFor()
+        await combo.press('Escape')
+      }
+      return combo
+    }
+    const all = filter.getByRole('button', { name: `不限状态，共 ${total} 条`, exact: true })
+    await all.waitFor()
+    return all
   }
-  const shared = {
-    path: salesPath,
-    auth: 'admin',
-    effectiveSession: customerRuntimeEffectiveSession,
-    beforeNavigate: installRoute,
+  const assertCounts = async (page, label, entries) => {
+    const filter = group(page, label)
+    const combo = filter.getByRole('combobox')
+    if (await combo.count()) {
+      await filter.locator('.ant-select-selector').click()
+      for (const [text, count] of entries) await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: new RegExp(`^${countText(text, count)}$`, 'u') }).waitFor()
+      await combo.press('Escape')
+    } else {
+      for (const [text, count] of entries) await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).waitFor()
+    }
   }
+  const choose = async (page, label, text, count) => {
+    const filter = group(page, label)
+    const combo = filter.getByRole('combobox')
+    if (await combo.count()) {
+      await filter.locator('.ant-select-selector').click()
+      await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: new RegExp(`^${countText(text, count)}$`, 'u') }).click()
+    } else await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).click()
+  }
+  const shared = { path: salesPath, auth: 'admin', effectiveSession: customerRuntimeEffectiveSession, beforeNavigate: installRoute }
   return [
     {
       name: 'business-status-counts-design',
-      path: '/__dev/ui-design',
-      viewport: { width: 1440, height: 900 },
+path: '/__dev/ui-design',
+viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame
-          .getByRole('button', { name: '销售管理', exact: true })
-          .click()
-        const filter = frame.getByRole('group', {
-          name: '状态筛选',
-          exact: true,
-        })
-        await filter.getByRole('button', { name: /^已生效/u }).waitFor()
-        assert.equal(
-          await filter
-            .getByRole('button', { name: /工程中|生产中|已阻塞/u })
-            .count(),
-          0
-        )
-        const counts = await filter.locator('b').allTextContents()
-        assert.equal(
-          Number(counts[0]),
-          counts.slice(1).reduce((sum, value) => sum + Number(value), 0)
-        )
-        await filter.getByRole('button', { name: /^草稿/u }).click()
-        assert.deepEqual(await filter.locator('b').allTextContents(), counts)
+        await frame.getByRole('button', { name: '销售管理', exact: true }).click()
+        const filter = frame.getByRole('combobox', { name: '状态筛选', exact: true })
+        await filter.waitFor()
+        const labels = () => filter.locator('option').allTextContents()
+        const before = await labels()
+        assert(before.some((text) => text.startsWith('已生效 ')))
+        assert(!before.some((text) => /工程中|生产中|已阻塞/u.test(text)))
+        const counts = before.map((text) => Number(text.match(/(\d+)$/u)?.[1]))
+        assert.equal(counts[0], counts.slice(1).reduce((sum, value) => sum + value, 0))
+        await filter.selectOption('draft')
+        assert.deepEqual(await labels(), before)
         await frame.locator('#list-search').fill('SO-20260925-001')
-        await filter.getByRole('button', { name: /^不限状态1$/u }).waitFor()
-        await filter.getByRole('button', { name: /^已生效1$/u }).waitFor()
-        await filter.getByRole('button', { name: /^草稿0$/u }).waitFor()
+        await filter.locator('option').filter({ hasText: /^不限状态 1$/u }).waitFor({ state: 'attached' })
+        assert((await labels()).includes('已生效 1'))
+        assert((await labels()).includes('草稿 0'))
         await assertNoHorizontalOverflow(page, 'business-status-counts-design')
       },
     },
     {
       ...shared,
-      name: 'business-status-counts-query',
-      viewport: { width: 1440, height: 900 },
+name: 'business-status-counts-query',
+viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await ready(page, 45)
-        assert.equal(
-          await page.locator('.ant-table-tbody tr[data-row-key]').count(),
-          20
-        )
-        await group(page)
-          .getByRole('button', { name: '已生效，共 0 条' })
-          .waitFor()
+        assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), 20)
+        await assertCounts(page, '销售订单状态', [['已生效', 0]])
         await page.locator('.ant-pagination-item-2').click()
-        await page
-          .locator('.ant-table-tbody')
-          .getByText('SO-COUNT-021', { exact: true })
-          .waitFor()
+        await page.locator('.ant-table-tbody').getByText('SO-COUNT-021', { exact: true }).waitFor()
         await ready(page, 45)
-        await group(page)
-          .getByRole('button', { name: '已提交，共 3 条' })
-          .click()
-        await page
-          .locator('.ant-table-tbody')
-          .getByText('SO-COUNT-043', { exact: true })
-          .waitFor()
+        await choose(page, '销售订单状态', '已提交', 3)
+        await page.locator('.ant-table-tbody').getByText('SO-COUNT-043', { exact: true }).waitFor()
         await ready(page, 45)
-        assert.equal(
-          await page.locator('.ant-table-tbody tr[data-row-key]').count(),
-          3
-        )
-        assert.equal(
-          page.statusCountRequests.at(-1).params.offset,
-          0,
-          '切换状态返回第一页'
-        )
-        assert.equal(
-          await group(page)
-            .getByRole('button', { name: '已提交，共 3 条' })
-            .getAttribute('aria-pressed'),
-          'true'
-        )
-        await group(page)
-          .getByRole('button', { name: '草稿，共 42 条' })
-          .focus()
-        await page.keyboard.press('Enter')
-        await page
-          .locator('.ant-table-tbody')
-          .getByText('SO-COUNT-001', { exact: true })
-          .waitFor()
+        assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), 3)
+        assert.equal(page.statusCountRequests.at(-1).params.offset, 0, '切换状态返回第一页')
+        assert.equal(await group(page).locator('.ant-select-selection-item').textContent(), '已提交 3')
+        const combo = group(page).getByRole('combobox')
+        await combo.press('ArrowDown')
+        await combo.press('ArrowUp')
+        await combo.press('Enter')
+        await page.locator('.ant-table-tbody').getByText('SO-COUNT-001', { exact: true }).waitFor()
         await ready(page, 45)
-        const search = page
-          .locator('.erp-business-operation-panel__search input')
-          .first()
+        const search = page.locator('.erp-business-operation-panel__search input').first()
         await search.fill('指定')
         await ready(page, 2)
-        await group(page)
-          .getByRole('button', { name: '草稿，共 1 条' })
-          .waitFor()
-        await group(page)
-          .getByRole('button', { name: '已提交，共 1 条' })
-          .waitFor()
+        await assertCounts(page, '销售订单状态', [['草稿', 1], ['已提交', 1]])
         await search.fill('慢查询')
-        await group(page)
-          .getByRole('button', { name: '不限状态，数量暂不可用' })
-          .waitFor()
+        await group(page).locator('.ant-select-selection-item').filter({ hasText: /—/u }).waitFor()
         await search.fill('指定')
         await ready(page, 2)
         await delay(750)
         await ready(page, 2)
         await search.fill('读取失败')
         await page.locator('.ant-message-error').waitFor()
-        await group(page)
-          .getByRole('button', { name: '不限状态，数量暂不可用' })
-          .waitFor()
+        await group(page).locator('.ant-select-selection-item').filter({ hasText: /—/u }).waitFor()
         await search.fill('')
         await ready(page, 45)
         await search.blur()
         await page.locator('.ant-message-error').waitFor({ state: 'hidden' })
-        await page.screenshot({
-          path: path.join(outputDir, 'business-status-counts-desktop.png'),
-        })
+        await page.screenshot({ path: path.join(outputDir, 'business-status-counts-desktop.png') })
         await assertNoHorizontalOverflow(page, 'business-status-counts-query')
-        await gotoScenarioPath(page, `${salesPath}?scope=history`, {
-          waitUntil: 'domcontentloaded',
-        })
+        await gotoScenarioPath(page, `${salesPath}?scope=history`, { waitUntil: 'domcontentloaded' })
         await ready(page, 2)
-        await group(page)
-          .getByRole('button', { name: '已关闭，共 2 条' })
-          .waitFor()
-        assert.equal(
-          await group(page).getByRole('button', { name: /^草稿/u }).count(),
-          0
-        )
-        await gotoScenarioPath(
-          page,
-          `${salesPath}?scope=all&sales_order_id=47`,
-          { waitUntil: 'domcontentloaded' }
-        )
+        await assertCounts(page, '销售订单状态', [['已关闭', 2]])
+        assert.equal(await group(page).getByRole('button', { name: /^草稿/u }).count(), 0)
+        await gotoScenarioPath(page, `${salesPath}?scope=all&sales_order_id=47`, { waitUntil: 'domcontentloaded' })
         const exact = await ready(page, 1)
-        assert(
-          await exact.isDisabled(),
-          '关联单据范围内不能误用全库统计或改变状态条件'
-        )
-        await group(page)
-          .getByRole('button', { name: '已关闭，共 1 条' })
-          .waitFor()
+        assert(await exact.isDisabled(), '关联单据范围内不能误用全库统计或改变状态条件')
+        assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), 1)
+        await page.locator('.ant-table-tbody').getByText('已关闭', { exact: true }).waitFor()
       },
     },
     {
       ...shared,
-      name: 'business-status-counts-pages',
-      viewport: { width: 1440, height: 900 },
+name: 'business-status-counts-pages',
+viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await ready(page, 45)
         const cases = [
           ['/erp/purchase/accessories', '采购订单状态', 'list_purchase_orders'],
-          [
-            '/erp/purchase/processing-contracts',
-            '委外订单状态',
-            'list_outsourcing_orders',
-          ],
+          ['/erp/purchase/processing-contracts', '委外订单状态', 'list_outsourcing_orders'],
           ['/erp/production/orders', '生产订单状态', 'list_production_orders'],
-          [
-            '/erp/production/quality-inspections',
-            '质检状态',
-            'list_quality_inspections',
-          ],
+          ['/erp/production/quality-inspections', '质检状态', 'list_quality_inspections'],
           ['/erp/warehouse/shipments', '出货单状态', 'list_shipments'],
           ['/erp/finance/payments', '收付款状态', 'list_finance_payments'],
           ['/erp/finance/receivables', '单据状态', 'list_finance_facts'],
@@ -289,69 +226,32 @@ export function createBusinessStatusCountsScenarios({
         ]
         for (const [url, label, method] of cases) {
           await gotoScenarioPath(page, url, { waitUntil: 'domcontentloaded' })
-          const filter = page.getByRole('group', { name: label, exact: true })
-          await filter.getByRole('button', { name: '不限状态，共 0 条' }).waitFor()
-          assert(
-            await filter
-              .locator('..')
-              .evaluate((el) =>
-                el.classList.contains('erp-business-operation-panel__quick')
-              ),
-            `${url} 状态应直接可见`
-          )
-          assert(
-            page.statusCountRequests.some(
-              (request) => request.method === method
-            ),
-            `${url} 必须请求后端统计`
-          )
+          await ready(page, 0, label)
+          const filter = group(page, label)
+          assert(await filter.locator('..').evaluate((el) => el.classList.contains('erp-business-operation-panel__quick')), `${url} 状态应直接可见`)
+          assert(page.statusCountRequests.some((request) => request.method === method), `${url} 必须请求后端统计`)
           if (label === '单据状态') {
-            assert.equal(
-              await filter
-                .getByRole('button', {
-                  name: /^已发货|^生效中|^已释放|^已消耗/u,
-                })
-                .count(),
-              0,
-              '财务只能使用财务状态'
-            )
+            const combo = filter.getByRole('combobox')
+            if (await combo.count()) {
+              await filter.locator('.ant-select-selector').click()
+              assert.equal(await page.locator('.ant-select-dropdown:visible').getByText(/^已发货|^生效中|^已释放|^已消耗/u).count(), 0, '财务只能使用财务状态')
+              await combo.press('Escape')
+            }
           }
           if (label === '质检状态') {
-            await page
-              .locator('.erp-business-operation-panel')
-              .getByRole('button', { name: 'filter 筛选', exact: true })
-              .click()
-            const panel = page.getByRole('dialog', {
-              name: '筛选条件',
-              exact: true,
-            })
-            const types = panel.getByRole('group', { name: '检验类型', exact: true })
-            for (const [type, rpc] of [
-              ['委外回货', 'list_outsourcing_return_quality_inspections'],
-              ['成品检验', 'list_finished_goods_quality_inspections'],
-              ['生产分段质检', 'list_production_stage_quality_inspections'],
-            ]) {
-              const response = page.waitForResponse(
-                (res) => res.request().postDataJSON()?.method === rpc
-              )
-              await types
-                .getByRole('button', { name: type, exact: true })
-                .click()
+            await page.locator('.erp-business-operation-panel').getByRole('button', { name: '筛选', exact: true }).click()
+            const types = page.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('group', { name: '检验类型', exact: true })
+            for (const [type, rpc] of [['委外回货', 'list_outsourcing_return_quality_inspections'], ['成品检验', 'list_finished_goods_quality_inspections'], ['生产分段质检', 'list_production_stage_quality_inspections']]) {
+              const response = page.waitForResponse((res) => res.request().postDataJSON()?.method === rpc)
+              await types.getByRole('button', { name: type, exact: true }).click()
               await response
-              await filter
-                .getByRole('button', { name: '不限状态，共 0 条' })
-                .waitFor()
+              await ready(page, 0, label)
             }
             await page.keyboard.press('Escape')
           }
           if (label === '收付款状态') {
-            await page
-              .getByRole('tab', { name: '红冲记录', exact: true })
-              .click()
-            await page
-              .getByRole('group', { name: '红冲状态', exact: true })
-              .getByRole('button', { name: '不限状态，共 0 条' })
-              .waitFor()
+            await page.getByRole('tab', { name: '红冲记录', exact: true }).click()
+            await ready(page, 0, '红冲状态')
           }
           await assertNoHorizontalOverflow(page, url)
         }
@@ -359,82 +259,32 @@ export function createBusinessStatusCountsScenarios({
     },
     {
       ...shared,
-      name: 'business-status-counts-dark-narrow',
-      themeMode: 'dark',
-      viewport: { width: 760, height: 900 },
+name: 'business-status-counts-dark-narrow',
+themeMode: 'dark',
+viewport: { width: 760, height: 900 },
       verify: async (page) => {
         await ready(page, 45)
-        const metrics = await group(page).evaluate((el) => ({
-          width: el.getBoundingClientRect().width,
-          overflow: el.scrollWidth > el.clientWidth,
-          buttons: [...el.querySelectorAll('button')].map((button) => {
-            const box = button.getBoundingClientRect()
-            return { left: box.left, right: box.right, height: box.height }
-          }),
-        }))
-        assert(metrics.width > 0 && !metrics.overflow, JSON.stringify(metrics))
-        assert(
-          metrics.buttons.every(
-            (button) =>
-              button.left >= 0 && button.right <= 760 && button.height >= 28
-          ),
-          JSON.stringify(metrics)
-        )
-        await group(page)
-          .getByRole('button', { name: '已提交，共 3 条' })
-          .click()
+        const metrics = await group(page).evaluate((el) => ({ width: el.getBoundingClientRect().width, overflow: el.scrollWidth > el.clientWidth, height: el.getBoundingClientRect().height }))
+        assert(metrics.width > 0 && metrics.height >= 28 && !metrics.overflow, JSON.stringify(metrics))
+        await choose(page, '销售订单状态', '已提交', 3)
         await ready(page, 45)
-        await page.screenshot({
-          path: path.join(outputDir, 'business-status-counts-dark-narrow.png'),
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'business-status-counts-dark-narrow'
-        )
+        await page.screenshot({ path: path.join(outputDir, 'business-status-counts-dark-narrow.png') })
+        await assertNoHorizontalOverflow(page, 'business-status-counts-dark-narrow')
         await page.route('**/rpc/operational_fact', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
-          if (
-            method !== 'list_finance_payments' ||
-            !params.include_status_counts
-          )
-            return route.fallback()
-          return route.fulfill({
-            json: {
-              jsonrpc: '2.0',
-              id,
-              result: styleRpcResult({
-                payments: [],
-                total: 0,
-                status_counts: { APPROVED: 1234567890 },
-              }),
-            },
-          })
+          if (method !== 'list_finance_payments' || !params.include_status_counts) return route.fallback()
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ payments: [], total: 0, status_counts: { APPROVED: 1234567890 } }) } })
         })
-        await gotoScenarioPath(page, '/erp/finance/payments', {
-          waitUntil: 'domcontentloaded',
-        })
-        const paymentFilter = page.getByRole('group', {
-          name: '收付款状态',
-          exact: true,
-        })
-        await paymentFilter
-          .getByRole('button', { name: '已批准待核销，共 1234567890 条' })
-          .waitFor()
-        assert(
-          !(await paymentFilter.evaluate(
-            (element) => element.scrollWidth > element.clientWidth
-          ))
-        )
-        await assertNoHorizontalOverflow(
-          page,
-          'business-status-counts-wide-numbers'
-        )
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'business-status-counts-finance-narrow.png'
-          ),
-        })
+        await gotoScenarioPath(page, '/erp/finance/payments', { waitUntil: 'domcontentloaded' })
+        await ready(page, 1234567890, '收付款状态')
+        await assertCounts(page, '收付款状态', [['已批准待核销', 1234567890]])
+        await choose(page, '收付款状态', '已批准待核销', 1234567890)
+        await ready(page, 1234567890, '收付款状态')
+        assert(!(await group(page, '收付款状态').evaluate((el) => el.scrollWidth > el.clientWidth)))
+        const summary = group(page, '收付款状态').locator('.ant-select-selection-item')
+        assert(await summary.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), '长状态和完整数量不应被省略')
+        await assertNoHorizontalOverflow(page, 'business-status-counts-wide-numbers')
+        await page.screenshot({ path: path.join(outputDir, 'business-status-counts-finance-narrow.png') })
       },
     },
   ]

@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { useOutletContext } from 'react-router-dom'
 
 import {
@@ -74,6 +75,17 @@ const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
 const PHONE_SELECTION_ACTION_LIMIT = 1
 const TABLET_SELECTION_ACTION_LIMIT = 2
 const DESKTOP_SELECTION_ACTION_LIMIT = 4
+const SELECTION_ACTION_PRIORITIES = {
+  primary: 100,
+  edit: 80,
+  view: 60,
+  action: 40,
+  related: 30,
+  secondary: 20,
+  danger: 10,
+  recovery: 0,
+}
+const OVERFLOW_ACTION_ROLES = new Set(['related', 'secondary', 'danger', 'recovery'])
 
 function resolveInitialSelectionActionScreens(token) {
   const matchMedia = globalThis.window?.matchMedia?.bind(globalThis.window)
@@ -97,7 +109,10 @@ function flattenSelectionActions(children) {
       actions.push(...flattenSelectionActions(child.props.children))
       return
     }
-    if (child != null && child !== false && child.props?.visible !== false) {
+    if (
+      child != null && child !== false && child.props?.visible !== false &&
+      child.type?.selectionActionVisible?.(child.props) !== false
+    ) {
       actions.push(child)
     }
   })
@@ -114,51 +129,36 @@ function inspectSelectionAction(action) {
     return { actionable: false, enabled: false, score: -1 }
   }
 
-  if (action.type === Button) {
-    const enabled =
-      action.props.disabled !== true && action.props.loading !== true
-    if (action.props.type === 'primary') {
-      return { actionable: true, enabled, score: 100 }
-    }
-    if (action.props.danger) {
-      return { actionable: true, enabled, score: 10 }
-    }
-    if (action.props.type === 'link') {
-      return { actionable: true, enabled, score: 0 }
-    }
-    return { actionable: true, enabled, score: 40 }
-  }
-
   const nestedActions = flattenSelectionActions(action.props.children)
     .map(inspectSelectionAction)
     .filter((item) => item.actionable)
-  if (nestedActions.length > 0) {
-    const enabledNestedActions = nestedActions.filter((item) => item.enabled)
-    const nestedScore = Math.max(...nestedActions.map((item) => item.score))
-    return {
-      actionable: true,
-      enabled:
-        action.props.disabled !== true && enabledNestedActions.length > 0,
-      score: Number.isFinite(action.props.selectionActionPriority)
-        ? action.props.selectionActionPriority
-        : action.type === Dropdown
-          ? Math.min(nestedScore, 30)
-          : nestedScore,
-    }
+  const actionable = action.type === Button || nestedActions.length > 0 ||
+    typeof action.type === 'function' || typeof action.type === 'object'
+  const role = action.props['data-business-action-role'] || action.type?.selectionActionRole
+  const priority = action.props.selectionActionPriority ?? action.type?.selectionActionPriority
+  const nestedScore = nestedActions.length ? Math.max(...nestedActions.map((item) => item.score)) : 30
+  return {
+    actionable,
+    enabled: action.props.disabled !== true && action.props.loading !== true && (nestedActions.length === 0 || nestedActions.some((item) => item.enabled)),
+    score: Number.isFinite(priority)
+      ? priority
+      : SELECTION_ACTION_PRIORITIES[role] ?? (action.type === Button ? 40 : nestedScore),
+    overflow: Number.isFinite(priority)
+      ? false
+      : role
+        ? OVERFLOW_ACTION_ROLES.has(role)
+        : action.type === Dropdown || (nestedActions.length > 0 && nestedActions.every((item) => item.overflow)),
   }
+}
 
-  // Shared action components such as the attachment button expose their
-  // interaction internally, so keep them as normal-priority actions.
-  if (typeof action.type === 'function' || typeof action.type === 'object') {
-    const explicitPriority = Number(action.type?.selectionActionPriority)
-    return {
-      actionable: true,
-      enabled: action.props.disabled !== true && action.props.loading !== true,
-      score: Number.isFinite(explicitPriority) ? explicitPriority : 30,
-    }
+function deEmphasizeCreation(action) {
+  if (!React.isValidElement(action)) return action
+  if (action.type === Button || action.type === ToolbarButton) {
+    return action.props.type === 'primary' ? React.cloneElement(action, { type: 'default' }) : action
   }
-
-  return { actionable: false, enabled: false, score: -1 }
+  return action.props.children
+    ? React.cloneElement(action, undefined, React.Children.map(action.props.children, deEmphasizeCreation))
+    : action
 }
 
 function partitionSelectionActions(children, limit) {
@@ -1161,6 +1161,14 @@ export function BusinessOperationPanel({
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
   const hasActiveFilters = hasClearFilters && clearFiltersDisabled === false
+  const childActions = React.Children.toArray(flattenSelectionActions(children))
+  const hasSelectedRecord = childActions.some((child) => child.type === SelectionActionBar && Number(child.props.selectedCount) > 0)
+  const hasRecordActions = childActions.some((child) =>
+    child.type === SelectionActionBar && flattenSelectionActions(child.props.children)
+      .some((action) => action.type !== SelectionClearAction && inspectSelectionAction(action).actionable)
+  )
+  const showSelectionPlaceholder = showSelection && hasRecordActions && !hasSelectedRecord
+  const visibleChildren = childActions.filter((child) => child.type !== SelectionActionBar || Number(child.props.selectedCount) > 0)
   const [internalFiltersOpen, setInternalFiltersOpen] = React.useState(false)
   const filtersOpen = controlledFiltersOpen ?? internalFiltersOpen
   const setFiltersOpen = (open) => {
@@ -1191,7 +1199,8 @@ export function BusinessOperationPanel({
     <Card
       className={joinClassNames(
         'erp-business-operation-panel',
-        compact ? 'erp-business-operation-panel--compact' : ''
+        compact ? 'erp-business-operation-panel--compact' : '',
+        hasRecordActions ? 'erp-business-operation-panel--record-actions' : ''
       )}
     >
       <div className="erp-business-operation-panel__command">
@@ -1342,15 +1351,21 @@ export function BusinessOperationPanel({
             ) : null}
             {primaryAction ? (
               <div className="erp-business-operation-panel__primary">
-                {primaryAction}
+                {hasSelectedRecord ? deEmphasizeCreation(primaryAction) : primaryAction}
               </div>
             ) : null}
           </div>
         ) : null}
       </div>
-      {showSelection && children ? (
-        <div className="erp-business-operation-panel__selection">
-          {children}
+      {showSelection && childActions.length > 0 ? (
+        <div
+          className={joinClassNames('erp-business-operation-panel__selection',
+            visibleChildren.length === 0 && showSelectionPlaceholder ? 'erp-business-operation-panel__selection--placeholder' : '')}
+          hidden={visibleChildren.length === 0 && !showSelectionPlaceholder}
+          style={visibleChildren.length || showSelectionPlaceholder ? undefined : { display: 'none' }}
+        >
+          {childActions}
+          {showSelectionPlaceholder ? <div data-business-selection-placeholder /> : null}
         </div>
       ) : null}
     </Card>
@@ -1435,10 +1450,10 @@ export function SelectionActionBar({
   )
 
   if (embedded) {
-    return <div className={className}>{content}</div>
+    return <div className={className} hidden={!hasSelection} style={hasSelection ? undefined : { display: 'none' }}>{content}</div>
   }
 
-  return <Card className={className}>{content}</Card>
+  return <Card className={className} hidden={!hasSelection} style={hasSelection ? undefined : { display: 'none' }}>{content}</Card>
 }
 
 export function BusinessActionTooltip({
@@ -1571,7 +1586,7 @@ export function BusinessLifecycleSecondaryAction({
   )
 }
 
-BusinessLifecycleSecondaryAction.selectionActionPriority = 20
+BusinessLifecycleSecondaryAction.selectionActionRole = 'secondary'
 
 export function SelectedItemsSummaryTag({
   selectedCount,
@@ -1668,6 +1683,17 @@ export function BusinessDataTable({
   emptyDescription = '暂无匹配记录',
 }) {
   const { mobileTaskBusiness } = useOutletContext() || {}
+  const tableCardRef = React.useRef(null)
+  const [selectionPlaceholderHost, setSelectionPlaceholderHost] = React.useState(null)
+  const busy = typeof loading === 'object' ? Boolean(loading?.spinning) : Boolean(loading)
+  const showSelectionPlaceholder = !busy && rowSelection &&
+    !(rowSelection.selectedRowKeys?.length > 0) &&
+    dataSource?.some((record) => !rowSelection.getCheckboxProps?.(record)?.disabled)
+  React.useLayoutEffect(() => {
+    // Keep availability with the table and preserve the mounted record actions.
+    const scope = tableCardRef.current?.closest('[data-table-scroll-scope]')
+    setSelectionPlaceholderHost(scope?.querySelector('[data-business-selection-placeholder]') || null)
+  }, [dataSource, rowSelection, loading, mobileTaskBusiness])
   const resolvedColumns = React.useMemo(
     () => normalizeBusinessTableColumns(columns),
     [columns]
@@ -1733,7 +1759,19 @@ export function BusinessDataTable({
   }
 
   return (
-    <Card className="erp-business-data-table-card erp-business-module-table-card">
+    <Card ref={tableCardRef} className="erp-business-data-table-card erp-business-module-table-card">
+      {selectionPlaceholderHost && showSelectionPlaceholder ? createPortal(
+        <div className="erp-business-selection-action-bar erp-business-module-current-action erp-business-selection-action-bar--empty erp-business-selection-action-bar--embedded erp-business-selection-action-bar--placeholder">
+          <div className="erp-business-selection-action-bar__row">
+            <div className="erp-business-selection-action-bar__copy">
+              <div className="erp-business-selection-action-bar__primary">
+                <Text strong>当前操作</Text>
+                <span className="erp-business-selection-action-bar__placeholder-text">选中记录后显示可用操作</span>
+              </div>
+            </div>
+          </div>
+        </div>, selectionPlaceholderHost
+      ) : null}
       {tableHeader ? (
         <div className="erp-business-data-table-card__header">{tableHeader}</div>
       ) : null}
@@ -1763,11 +1801,12 @@ export function BusinessDataTable({
   )
 }
 
-export function ToolbarButton({ className = '', ...props }) {
+export const ToolbarButton = React.forwardRef(({ className = '', ...props }, ref) => {
   return (
     <Button
+      ref={ref}
       className={joinClassNames('erp-business-toolbar-button', className)}
       {...props}
     />
   )
-}
+})

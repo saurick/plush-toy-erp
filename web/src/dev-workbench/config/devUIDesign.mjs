@@ -46,7 +46,7 @@ const SANDBOX_STORAGE_SHIM = `<meta http-equiv="Content-Security-Policy" content
   document.addEventListener('keydown', function (event) {
     if (event.key !== 'Escape') return
     // Inner dialogs, popovers and the narrow navigation own Escape first.
-    if (document.querySelector('#floating > *, [role="dialog"], dialog[open], :popover-open, .modal-layer, .drawer-layer, body.nav-open')) return
+    if (document.querySelector('#floating > *, [role="dialog"], dialog[open], :popover-open, .business-action-menu[open], .modal-layer, .drawer-layer, body.nav-open')) return
     window.parent.postMessage({ type: 'ui-design-escape' }, '*')
   }, true)
 })()

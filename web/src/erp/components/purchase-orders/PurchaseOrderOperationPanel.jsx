@@ -1,16 +1,15 @@
 import React from 'react'
 import {
   DownOutlined,
-  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
   ImportOutlined,
   LinkOutlined,
   PlusOutlined,
-  SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Space } from 'antd'
+import { Button, Dropdown } from 'antd'
+import { BusinessListToolbarActions } from '../business-list/BusinessListToolbarActions.jsx'
 import BusinessTaskActions from '../workflow/BusinessTaskActions.jsx'
 import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
@@ -217,22 +216,12 @@ export default function PurchaseOrderOperationPanel({
         </>
       }
       actions={
-        <Space wrap>
-          <ToolbarButton
-            icon={<DownloadOutlined />}
-            loading={exporting}
-            disabled={exportDisabled || orders.length === 0}
-            onClick={exportOrders}
-          >
-            导出筛选结果
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<SettingOutlined />}
-            onClick={() => setColumnOrderOpen(true)}
-          >
-            列设置
-          </ToolbarButton>
-        </Space>
+        <BusinessListToolbarActions
+          onExport={exportOrders}
+          exportDisabled={exportDisabled || exporting || orders.length === 0}
+          exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+          onOpenColumnOrder={() => setColumnOrderOpen(true)}
+        />
       }
       primaryAction={
         canCreate ? (
@@ -281,6 +270,7 @@ export default function PurchaseOrderOperationPanel({
         >
           <Button
             data-business-action-key="purchase-details"
+            data-business-action-role="view"
             size="small"
             icon={<EyeOutlined />}
             disabled={!hasSingleSelection || recordActionBusy}
@@ -316,6 +306,7 @@ export default function PurchaseOrderOperationPanel({
           >
             <Button
               data-business-action-key="purchase-edit"
+              data-business-action-role="edit"
               size="small"
               icon={<EditOutlined />}
               loading={itemsLoading}
@@ -344,6 +335,7 @@ export default function PurchaseOrderOperationPanel({
             >
               <Button
                 data-business-action-key="related-records"
+                data-business-action-role="related"
                 size="small"
                 icon={<LinkOutlined />}
                 disabled={relatedActionAvailability.disabled}
@@ -397,6 +389,7 @@ export default function PurchaseOrderOperationPanel({
           >
             <Button
               data-business-action-key="generate-inbound"
+              data-business-action-role="primary"
               size="small"
               type="primary"
               icon={<ImportOutlined />}
@@ -427,6 +420,7 @@ export default function PurchaseOrderOperationPanel({
         >
           <Button
             data-business-action-key="print-contract"
+            data-business-action-role="secondary"
             size="small"
             icon={<FileTextOutlined />}
             disabled={!printSelectionReady || recordActionBusy}

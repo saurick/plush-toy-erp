@@ -1259,6 +1259,7 @@ export default function PurchaseReceiptsPage() {
                   size="small"
                   icon={<LinkOutlined />}
                   data-business-action-key="related-records"
+                  data-business-action-role="related"
                   disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
@@ -1272,6 +1273,7 @@ export default function PurchaseReceiptsPage() {
           >
             <Button
               data-business-action-key="view-details"
+              data-business-action-role="view"
               size="small"
               icon={<EyeOutlined />}
               disabled={!selectedRow}
@@ -1301,6 +1303,7 @@ export default function PurchaseReceiptsPage() {
             >
               <Button
                 data-business-action-key="exception-records"
+                data-business-action-role="related"
                 size="small"
                 disabled={!selectedRow || saving}
                 onClick={() => setReceiptExceptionRecordsOpen(true)}
@@ -1327,6 +1330,7 @@ export default function PurchaseReceiptsPage() {
             >
               <Button
                 data-business-action-key="create-return"
+                data-business-action-role="secondary"
                 size="small"
                 disabled={
                   !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
@@ -1355,6 +1359,7 @@ export default function PurchaseReceiptsPage() {
             >
               <Button
                 data-business-action-key="create-adjustment"
+                data-business-action-role="secondary"
                 size="small"
                 disabled={
                   !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
@@ -1372,6 +1377,7 @@ export default function PurchaseReceiptsPage() {
             >
               <Button
                 data-business-action-key="view-payable"
+                data-business-action-role="related"
                 size="small"
                 disabled={payableViewAvailability.disabled}
                 onClick={() => viewPurchaseReceiptPayable(selectedRow)}
@@ -1401,6 +1407,7 @@ export default function PurchaseReceiptsPage() {
             >
               <Button
                 data-business-action-key="create-payable"
+                data-business-action-role="action"
                 size="small"
                 disabled={
                   !selectedRow ||
@@ -1444,6 +1451,7 @@ export default function PurchaseReceiptsPage() {
               >
                 <Button
                   data-business-action-key="post"
+                  data-business-action-role="primary"
                   size="small"
                   type="primary"
                   className="erp-business-module-status-action"
@@ -1506,6 +1514,7 @@ export default function PurchaseReceiptsPage() {
               >
                 <Button
                   data-business-action-key="cancel"
+                  data-business-action-role="danger"
                   size="small"
                   danger
                   className="erp-business-module-status-action"

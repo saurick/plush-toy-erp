@@ -111,7 +111,7 @@ test('BusinessDataTable 把正式记录打开动作合并进页面 onRow', () =>
   const componentSource = sliceBetween(
     businessListLayoutSource,
     'export function BusinessDataTable(',
-    'export function ToolbarButton('
+    'export const ToolbarButton ='
   )
 
   assert.match(componentSource, /\bonOpenRecord\b/u)
@@ -165,7 +165,7 @@ test('BusinessDataTable 双击打开前过滤表格内交互元素', () => {
   const componentSource = sliceBetween(
     businessListLayoutSource,
     'export function BusinessDataTable(',
-    'export function ToolbarButton('
+    'export const ToolbarButton ='
   )
   assert.match(
     componentSource,

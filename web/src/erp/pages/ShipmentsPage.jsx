@@ -1758,6 +1758,7 @@ export default function ShipmentsPage() {
               size="small"
               icon={<EyeOutlined />}
               data-business-action-key="shipment-details"
+              data-business-action-role="view"
               disabled={!selectedRow || saving}
               onClick={() => openShipmentDetails(selectedRow)}
             >
@@ -1786,6 +1787,7 @@ export default function ShipmentsPage() {
                 size="small"
                 icon={<EditOutlined />}
                 data-business-action-key="shipment-edit"
+                data-business-action-role="edit"
                 disabled={
                   !selectedRow ||
                   saving ||
@@ -1816,6 +1818,7 @@ export default function ShipmentsPage() {
                   size="small"
                   icon={<LinkOutlined />}
                   data-business-action-key="related-records"
+                  data-business-action-role="related"
                   disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
@@ -1832,6 +1835,7 @@ export default function ShipmentsPage() {
                 size="small"
                 loading={qualitySourceLoading && !qualitySourceContext}
                 data-business-action-key="shipment-quality"
+                data-business-action-role="action"
                 disabled={shipmentActionAvailability.quality.disabled}
                 onClick={openShipmentQualitySource}
               >
@@ -1867,6 +1871,7 @@ export default function ShipmentsPage() {
                   size="small"
                   className="erp-business-module-status-action"
                   data-business-action-key="shipment-release"
+                  data-business-action-role="primary"
                   disabled={shipmentActionAvailability.release.disabled}
                 >
                   核对出货审批
@@ -1893,6 +1898,7 @@ export default function ShipmentsPage() {
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   data-business-action-key="shipment-ship"
+                  data-business-action-role="primary"
                   disabled={shipmentActionAvailability.ship.disabled}
                 >
                   确认出货
@@ -1929,6 +1935,7 @@ export default function ShipmentsPage() {
                   className="erp-business-module-status-action"
                   icon={<CloseCircleOutlined />}
                   data-business-action-key="shipment-cancel"
+                  data-business-action-role="danger"
                   disabled={shipmentActionAvailability.cancel.disabled}
                 >
                   {selectedRow?.status === ShipmentStatus.DRAFT
@@ -1948,6 +1955,7 @@ export default function ShipmentsPage() {
               <Button
                 size="small"
                 data-business-action-key="shipment-receivable"
+                data-business-action-role="secondary"
                 disabled={shipmentActionAvailability.receivable.disabled}
                 onClick={() => openShipmentFinanceSource('receivable')}
               >
@@ -1963,6 +1971,7 @@ export default function ShipmentsPage() {
               <Button
                 size="small"
                 data-business-action-key="shipment-invoice"
+                data-business-action-role="secondary"
                 disabled={shipmentActionAvailability.invoice.disabled}
                 onClick={() => openShipmentFinanceSource('invoice')}
               >

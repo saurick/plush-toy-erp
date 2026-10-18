@@ -1,3 +1,5 @@
+import { openBusinessTableTool } from './businessTableTools.mjs'
+
 export function createBusinessRecordNavigationScenarios(deps) {
   const {
     expectHeading,
@@ -123,8 +125,7 @@ export function createBusinessHeaderScenarios(deps) {
           .first()
         const beforeSettings =
           await firstSortableHeader.getAttribute('aria-sort')
-        const settingsTrigger = page.getByRole('button', { name: /列设置$/u })
-        await settingsTrigger.click()
+        const settingsTrigger = await openBusinessTableTool(page, '列设置')
         const columnDialog = page.getByRole('dialog', { name: /^列设置/u })
         await columnDialog.waitFor({ state: 'visible' })
         await page.waitForFunction(() =>

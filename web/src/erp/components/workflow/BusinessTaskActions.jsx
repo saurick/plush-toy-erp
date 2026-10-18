@@ -385,4 +385,5 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   )
 }
 
-BusinessTaskActions.selectionActionPriority = 85
+BusinessTaskActions.selectionActionRole = 'related'
+BusinessTaskActions.selectionActionVisible = ({ adminProfile }) => hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)

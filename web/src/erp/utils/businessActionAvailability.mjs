@@ -130,7 +130,7 @@ export function resolveBusinessLifecycleActions({
 
 export function selectStableBusinessActionIndexes(descriptors = [], limit = 0) {
   return descriptors
-    .filter((item) => item?.actionable)
+    .filter((item) => item?.actionable && !item.overflow)
     .sort(
       (left, right) =>
         Number(right?.score || 0) - Number(left?.score || 0) ||

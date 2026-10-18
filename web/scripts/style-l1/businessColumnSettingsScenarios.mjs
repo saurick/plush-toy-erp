@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 
 export function createBusinessColumnSettingsScenarios({
   assert,
@@ -11,11 +12,7 @@ export function createBusinessColumnSettingsScenarios({
     '.erp-business-data-table-card .ant-table-thead:not([aria-hidden="true"]) .erp-module-column-header-text'
   const labels = (page) => page.locator(headerSelector).allTextContents()
   const open = async (page) => {
-    await page
-      .locator('.erp-business-operation-panel__actions')
-      .getByRole('button', { name: /列设置/u })
-      .first()
-      .click()
+    await openBusinessTableTool(page, '列设置')
     const dialog = page.getByRole('dialog', { name: /^列设置/u })
     await dialog.waitFor({ state: 'visible' })
     return dialog
@@ -218,11 +215,7 @@ export function createBusinessColumnSettingsScenarios({
         assert(!(await labels(page)).includes('颜色'), '调整顺序应保留显隐设置')
 
         const download = page.waitForEvent('download')
-        await page
-          .locator('.erp-business-operation-panel__actions')
-          .getByRole('button', { name: /导出/u })
-          .first()
-          .click()
+        await openBusinessTableTool(page, '导出筛选结果')
         const csv = await download
         const csvText = await fs.readFile(await csv.path(), 'utf8')
         assert(
@@ -394,7 +387,7 @@ export function createBusinessColumnSettingsScenarios({
         assert(
           await page
             .locator('.erp-business-operation-panel__actions')
-            .getByRole('button', { name: /列设置/u })
+            .getByRole('button', { name: '表格工具', exact: true })
             .first()
             .evaluate((node) => node === document.activeElement),
           '关闭后焦点回到入口'

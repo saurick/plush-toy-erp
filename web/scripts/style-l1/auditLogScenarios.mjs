@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 const events = Array.from({ length: 201 }, (_, index) => ({
@@ -122,7 +123,7 @@ export function createAuditLogScenarios({
       await verifyDrawer(page, 640)
       // Full filtered export must read beyond the first server page.
       const downloadPromise = page.waitForEvent('download')
-      await page.getByRole('button', { name: '导出筛选结果' }).click()
+      await openBusinessTableTool(page, '导出筛选结果')
       const csv = await readFile(await (await downloadPromise).path(), 'utf8')
       assert.equal(csv.trim().split('\n').length, 202)
       assert(csv.includes('历史员工201'))
@@ -133,7 +134,7 @@ export function createAuditLogScenarios({
           (params) => params.offset === 200 && params.limit === 200
         )
       )
-      await page.getByRole('button', { name: /列设置/u }).click()
+      await openBusinessTableTool(page, '列设置')
       const columnDialog = page.getByRole('dialog')
       await columnDialog.getByText('发生时间', { exact: true }).waitFor()
       await page.waitForFunction(() =>

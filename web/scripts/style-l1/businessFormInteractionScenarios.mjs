@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { withDeadline } from './boundedWait.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyPurchaseArrivalRedesign } from './purchaseArrivalRedesignScenarios.mjs'
@@ -1666,10 +1667,9 @@ export function createBusinessFormInteractionScenarios({
         await expectText(page, 'PAY-STYLE-L1')
         await expectText(page, '暗色客户')
         await expectButton(page, '登记收付款')
-        await expectButton(page, '导出筛选结果')
-        await expectButton(page, '列设置')
-        const paymentExportButton = page.getByRole('button', {
-          name: '导出筛选结果',
+        await page.getByRole('button', { name: '表格工具', exact: true }).click()
+        const paymentExportButton = page.getByRole('menuitem', {
+          name: /导出筛选结果/u,
         })
         if (await paymentExportButton.isDisabled()) {
           await paymentExportButton.locator('xpath=..').hover()
@@ -1799,22 +1799,18 @@ export function createBusinessFormInteractionScenarios({
           '红冲记录页签应在切换后保持选中'
         )
         await expectButton(page, '登记红冲')
-        await expectButton(page, '导出筛选结果')
-        await expectButton(page, '列设置')
-        const creditToolbarActions = page
-          .locator('.erp-business-operation-panel__actions')
-          .first()
+        const creditTools = page.getByRole('button', { name: '表格工具', exact: true })
+        await creditTools.click()
         assert(
-          await creditToolbarActions
-            .getByRole('button', {
-              name: '导出筛选结果',
+          await page
+            .getByRole('menuitem', {
+              name: /导出筛选结果/u,
             })
             .isDisabled(),
           '没有红冲记录时导出筛选结果应保持禁用'
         )
-        await creditToolbarActions
-          .getByRole('button', { name: '列设置' })
-          .click()
+        await creditTools.press('Escape')
+        await openBusinessTableTool(page, '列设置')
         const creditColumnOrderDialog = page.locator(
           '.erp-business-action-modal--columns:visible'
         )

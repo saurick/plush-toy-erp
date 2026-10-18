@@ -30,7 +30,7 @@ after(() => {
   globalThis.MessageChannel = NativeMessageChannel
 })
 
-test('岗位操作在默认和清空选择后仍可发现，未选择或无权限时不能办理', async (t) => {
+test('未选和清空选择时收起记录操作，选中后按权限展示办理动作', async (t) => {
   const [
     { SelectionActionBar, SelectionClearAction, BusinessActionTooltip },
     { Button },
@@ -82,11 +82,9 @@ test('岗位操作在默认和清空选择后仍可发现，未选择或无权�
   })
 
   await render()
-  assert.match(container.textContent, /请选择一条记录/u)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
   assert.equal(button('提交')?.disabled, true)
   assert.equal(button('清空已选'), undefined)
-  assert(container.querySelector('[aria-label="请先选择一条记录"]'))
-  await act(async () => button('提交').click())
   assert.equal(handled, 0)
 
   selected = true
@@ -97,6 +95,7 @@ test('岗位操作在默认和清空选择后仍可发现，未选择或无权�
   await act(async () => button('清空已选').click())
   await render()
   assert.equal(button('提交')?.disabled, true)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
   assert.equal(button('清空已选'), undefined)
 
   authorized = false
@@ -116,12 +115,14 @@ test('更多操作重新打开时使用最新选择状态', async (t) => {
   document.body.appendChild(container)
   const root = createRoot(container)
   let selected = false
+  let selectedID = 1
+  let printedID = null
   const render = async () =>
     act(async () =>
       root.render(
         createElement(
           SelectionActionBar,
-          { selectedCount: selected ? 1 : 0 },
+          { selectedCount: 1, selectedLabel: `订单 ${selectedID}` },
           [1, 2, 3, 4].map((index) =>
             createElement(Button, { key: index }, `主操作${index}`)
           ),
@@ -131,7 +132,7 @@ test('更多操作重新打开时使用最新选择状态', async (t) => {
               disabled: !selected,
               disabledReason: '请先选择一条记录',
             },
-            createElement(Button, { disabled: !selected }, '加工合同打印')
+            createElement(Button, { disabled: !selected, onClick: () => { printedID = selectedID } }, '加工合同打印')
           )
         )
       )
@@ -159,9 +160,156 @@ test('更多操作重新打开时使用最新选择状态', async (t) => {
   await click(more())
 
   selected = true
+  selectedID = 2
   await render()
   await click(more())
   assert.equal(printButton().disabled, false)
+  await click(printButton())
+  assert.equal(printedID, 2)
+})
+
+test('记录动作按任务角色排序，按钮颜色和临时忙碌不改变分组', async (t) => {
+  const [{ SelectionActionBar }, { Button, Space }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let busy = false
+  const render = () => act(async () => root.render(createElement(SelectionActionBar, { selectedCount: 1 }, createElement(Button, { 'data-business-action-role': 'secondary', type: 'primary' }, '打印'), createElement(Button, { 'data-business-action-role': 'recovery' }, '重新读取'), createElement(Button, { 'data-business-action-role': 'view' }, '查看'), createElement(Button, { 'data-business-action-role': 'edit', disabled: busy }, '编辑'), createElement(Space, { 'data-business-action-role': 'primary' }, createElement(Button, { disabled: busy }, '判定合格'), createElement(Button, { disabled: busy, danger: true }, '判定不合格'))
+  )))
+  const direct = () => [...container.querySelectorAll('.erp-business-selection-action-bar__record-actions button')].map((button) => button.textContent.replace(/\s+/gu, ''))
+  await render()
+  assert.deepEqual(direct(), ['查看', '编辑', '判定合格', '判定不合格', '更多操作'])
+  busy = true
+  await render()
+  assert.deepEqual(direct(), ['查看', '编辑', '判定合格', '判定不合格', '更多操作'])
+  assert.equal([...container.querySelectorAll('button')].find((button) => button.textContent.replace(/\s+/gu, '') === '编辑').disabled, true)
+})
+
+test('内部受权限控制的组件没有入口时，不生成空的更多操作', async (t) => {
+  const [{ SelectionActionBar }, { Button }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  function Related({ authorized }) { return authorized ? createElement(Button, null, '相关任务') : null }
+  Related.selectionActionRole = 'related'
+  Related.selectionActionVisible = ({ authorized }) => authorized
+  const render = (authorized) => act(async () => root.render(createElement(SelectionActionBar, { selectedCount: 1 },
+    createElement(Button, { 'data-business-action-role': 'view' }, '查看详情'), createElement(Related, { authorized })
+  )))
+  await render(false)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar__compact-more'), null)
+  await render(true)
+  assert(container.querySelector('.erp-business-selection-action-bar__compact-more'))
+})
+
+test('选中记录时新建降低强调，清空后恢复且保留原入口', async (t) => {
+  const [{ BusinessOperationPanel, SelectionActionBar, ToolbarButton, BusinessActionTooltip }, { Button }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let selected = false
+  let created = 0
+  const render = () => act(async () => root.render(createElement(BusinessOperationPanel, {
+    primaryAction: createElement(BusinessActionTooltip, null, createElement(ToolbarButton, { type: 'primary', onClick: () => { created += 1 } }, '新建订单')),
+  }, createElement(SelectionActionBar, { selectedCount: Number(selected) }, createElement(Button, { type: 'primary', 'data-business-action-role': 'primary' }, '提交订单')))))
+  await render()
+  const create = () => [...container.querySelectorAll('button')].find((button) => button.textContent === '新建订单')
+  assert(create().classList.contains('ant-btn-primary'))
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
+  assert.equal(container.querySelector('[data-business-selection-placeholder]').childElementCount, 0)
+  selected = true
+  await render()
+  assert.equal(create().classList.contains('ant-btn-primary'), false)
+  await act(async () => create().click())
+  assert.equal(created, 1)
+  selected = false
+  await render()
+  assert(create().classList.contains('ant-btn-primary'))
+})
+
+test('收起记录操作区保留内部尚未确认的办理状态，并允许非记录内容独立显示', async (t) => {
+  const [{ BusinessOperationPanel, SelectionActionBar }, { Button }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let selected = true
+  function PendingAction() {
+    const [pending, setPending] = useState(false)
+    return createElement(Button, { onClick: () => setPending(true) }, pending ? '确认办理结果' : '办理')
+  }
+  const render = () => act(async () => root.render(createElement(BusinessOperationPanel, null, createElement('span', null, '来源资料尚未加载完成'), createElement(SelectionActionBar, { selectedCount: Number(selected) }, createElement(PendingAction))
+  )))
+  await render()
+  await act(async () => container.querySelector('.erp-business-selection-action-bar button').click())
+  selected = false
+  await render()
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
+  assert.equal(container.querySelector('.erp-business-operation-panel__selection').hidden, false)
+  selected = true
+  await render()
+  assert.match(container.querySelector('.erp-business-selection-action-bar').textContent, /确认办理结果/u)
+})
+
+test('表格工具保留导出和列设置各自回调，禁用导出不能执行', async (t) => {
+  const [{ BusinessListToolbarActions }, { ConfigProvider }] = await Promise.all([import('./BusinessListToolbarActions.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let exported = 0
+  let configured = 0
+  let disabled = false
+  const render = () => act(async () => root.render(createElement(ConfigProvider, { theme: { token: { motion: false } } }, createElement(BusinessListToolbarActions, {
+    onExport: () => { exported += 1 }, onOpenColumnOrder: () => { configured += 1 }, exportDisabled: disabled,
+  }))))
+  const open = () => act(async () => container.querySelector('button').click())
+  const item = (label) => [...document.querySelectorAll('[role="menuitem"]')].find((node) => node.textContent === label)
+  await render()
+  assert.equal(container.querySelector('button').getAttribute('aria-label'), '表格工具')
+  await open()
+  await act(async () => item('导出筛选结果').click())
+  assert.equal(exported, 1)
+  assert.equal(configured, 0)
+  await open()
+  await act(async () => item('列设置').click())
+  assert.equal(configured, 1)
+  assert.equal(document.activeElement, container.querySelector('button'))
+  disabled = true
+  await render()
+  await open()
+  assert.equal(item('导出筛选结果').getAttribute('aria-disabled'), 'true')
+  await act(async () => item('导出筛选结果').click())
+  assert.equal(exported, 1)
+})
+
+test('长状态组使用紧凑控件并保留当前状态、数量与筛选回调', async (t) => {
+  const { default: BusinessStatusFilter } = await import('./BusinessStatusFilter.jsx')
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let value = 'SUBMITTED'
+  let inline = true
+  const render = () => act(async () => root.render(createElement(BusinessStatusFilter, {
+    inline,
+value,
+'aria-label': '质检状态',
+counts: { DRAFT: 2, SUBMITTED: 3 },
+    options: [{ value: 'DRAFT', label: '草稿' }, { value: 'SUBMITTED', label: '已提交' }, { value: 'PASSED', label: '合格' }, { value: 'REJECTED', label: '不合格' }, { value: 'CANCELLED', label: '已取消' }],
+    onChange: (next) => { value = next },
+  })))
+  await render()
+  assert(container.querySelector('[role="combobox"][aria-label="质检状态"]'))
+  assert.match(container.textContent, /已提交 3/u)
+  inline = false
+  await render()
+  assert.equal(container.querySelectorAll('button').length, 6)
+  await act(async () => [...container.querySelectorAll('button')].find((button) => button.textContent.includes('草稿')).click())
+  assert.equal(value, 'DRAFT')
 })
 
 test('更多操作中的单据菜单按 Escape 后同时关闭，焦点恢复且可再次执行', async (t) => {

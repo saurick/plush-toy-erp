@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const BUSINESS_ROUTES = [
@@ -412,11 +413,7 @@ export function createGlobalSurfaceScenarios({
     verify: async (page) => {
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 900 })
-        const trigger = page
-          .locator('.erp-business-operation-panel__actions')
-          .getByRole('button', { name: /列设置/u })
-          .first()
-        await trigger.click()
+        const trigger = await openBusinessTableTool(page, '列设置')
         const dialog = page.getByRole('dialog', { name: /^列设置/u })
         await dialog.waitFor()
         await waitForFiniteAnimations(page)

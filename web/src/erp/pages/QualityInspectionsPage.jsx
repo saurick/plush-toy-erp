@@ -3,13 +3,11 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DownOutlined,
-  DownloadOutlined,
   EyeOutlined,
   FileDoneOutlined,
   LinkOutlined,
   PlusOutlined,
   RollbackOutlined,
-  SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons'
 import {
@@ -63,7 +61,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
-import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
@@ -561,7 +559,8 @@ export default function QualityInspectionsPage() {
   const showQualityDispositionAction =
     hasAnyDispositionCapability &&
     (!selectedRow ||
-      (selectedDispositionSourceSupported &&
+      (selectedQualityStatus === QualityInspectionStatus.REJECTED &&
+        selectedDispositionSourceSupported &&
         selectedDispositionAuthorized &&
         !selectedDispositionCompleted))
   const selectedDispositionKind = selectedIsIncomingInspection
@@ -1491,19 +1490,12 @@ export default function QualityInspectionsPage() {
           </>
         }
         actions={
-          <Space wrap>
-            <ToolbarButton
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              disabled={loading || exporting || total === 0}
-              onClick={exportQualityInspections}
-            >
-              导出筛选结果
-            </ToolbarButton>
-            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
-              列设置
-            </ToolbarButton>
-          </Space>
+          <BusinessListToolbarActions
+            onExport={exportQualityInspections}
+            exportDisabled={loading || exporting || total === 0}
+            exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+            onOpenColumnOrder={openColumnOrder}
+          />
         }
         primaryAction={
           canCreate ? (
@@ -1562,6 +1554,7 @@ export default function QualityInspectionsPage() {
                   size="small"
                   icon={<LinkOutlined />}
                   data-business-action-key="related-records"
+                  data-business-action-role="related"
                   disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
@@ -1575,6 +1568,7 @@ export default function QualityInspectionsPage() {
           >
             <Button
               data-business-action-key="view-details"
+              data-business-action-role="view"
               size="small"
               icon={<EyeOutlined />}
               disabled={!selectedRow}
@@ -1613,6 +1607,7 @@ export default function QualityInspectionsPage() {
               >
                 <Button
                   data-business-action-key="submit"
+                  data-business-action-role="primary"
                   type="primary"
                   size="small"
                   className="erp-business-module-status-action"
@@ -1626,8 +1621,8 @@ export default function QualityInspectionsPage() {
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdate ? (
-            <>
+          {canUpdate && selectedQualityStatus === QualityInspectionStatus.SUBMITTED ? (
+            <Space data-business-action-role="primary">
               <BusinessActionTooltip
                 visible={
                   !selectedRow ||
@@ -1648,6 +1643,7 @@ export default function QualityInspectionsPage() {
               >
                 <Button
                   data-business-action-key="pass"
+                  data-business-action-role="primary"
                   size="small"
                   type={
                     selectedQualityStatus === QualityInspectionStatus.SUBMITTED
@@ -1684,6 +1680,7 @@ export default function QualityInspectionsPage() {
               >
                 <Button
                   data-business-action-key="reject"
+                  data-business-action-role="primary"
                   size="small"
                   danger
                   className="erp-business-module-status-action"
@@ -1696,7 +1693,7 @@ export default function QualityInspectionsPage() {
                   判定不合格
                 </Button>
               </BusinessActionTooltip>
-            </>
+            </Space>
           ) : null}
           {showQualityDispositionAction ? (
             <BusinessActionTooltip
@@ -1705,6 +1702,7 @@ export default function QualityInspectionsPage() {
             >
               <Button
                 data-business-action-key="quality-disposition"
+                data-business-action-role="primary"
                 size="small"
                 danger
                 className="erp-business-module-status-action"
@@ -1725,6 +1723,7 @@ export default function QualityInspectionsPage() {
             >
               <Button
                 data-business-action-key="outsourcing-disposition-view"
+                data-business-action-role="related"
                 size="small"
                 disabled={outsourcingDispositionViewAvailability.disabled}
                 onClick={() => setOutsourcingDispositionOpen(true)}
@@ -1759,6 +1758,7 @@ export default function QualityInspectionsPage() {
             >
               <Button
                 data-business-action-key="cancel"
+                data-business-action-role="danger"
                 size="small"
                 className="erp-business-module-status-action"
                 icon={<CloseCircleOutlined />}

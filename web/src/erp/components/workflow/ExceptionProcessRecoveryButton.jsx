@@ -140,3 +140,6 @@ export default function ExceptionProcessRecoveryButton({
     </>
   )
 }
+
+ExceptionProcessRecoveryButton.selectionActionRole = 'recovery'
+ExceptionProcessRecoveryButton.selectionActionVisible = ({ canRecover }) => Boolean(canRecover)

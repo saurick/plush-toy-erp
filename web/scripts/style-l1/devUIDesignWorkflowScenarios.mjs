@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
@@ -128,6 +129,39 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
     ...createDevTaskGovernanceScenarios({ assert, outputDir, path }),
     ...createDevRoleFlowScenarios({ assert, outputDir, path }),
     {
+      name: 'ui-design-persistent-operation-bar',
+      path: '/__style-l1/persistent-operation-bar',
+      viewport: { width: 1440, height: 1000 },
+      beforeNavigate: async (page) => {
+        const source = prepareUIDesignSandboxSource(await readFile(new URL('../../../docs/product/ui-design/index.html', import.meta.url), 'utf8'))
+        const srcdoc = source.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        await page.route('**/__style-l1/persistent-operation-bar', (route) => route.fulfill({
+          status: 200,
+          contentType: 'text/html; charset=utf-8',
+          body: `<!doctype html><html><head><style>html,body{height:100%;margin:0}body{display:grid;grid-template-rows:auto minmax(0,1fr)}h1{margin:0;font:14px system-ui}iframe{width:100%;height:100%;border:0}</style></head><body><h1>UI 交互设计</h1><iframe title="ERP 当前交互设计" sandbox="allow-scripts" srcdoc="${srcdoc}"></iframe></body></html>`,
+        }))
+      },
+      verify: async (page) => {
+        const frame = page.frameLocator('iframe[title="ERP 当前交互设计"]')
+        await frame.getByRole('button', { name: '产品工程', exact: true }).click()
+        const placeholder = frame.locator('.record-row--placeholder')
+        await placeholder.waitFor({ state: 'visible' })
+        assert.match(await placeholder.innerText(), /当前操作.*选中记录后显示可用操作/su)
+        assert.doesNotMatch(await frame.locator('.command-row').innerText(), /先选记录|选中记录后/u)
+        await frame.getByRole('checkbox', { name: '选择 BOM-20260925-001', exact: true }).check()
+        assert.equal(await placeholder.count(), 0)
+        await frame.getByRole('button', { name: '清空已选', exact: true }).click()
+        await placeholder.waitFor({ state: 'visible' })
+        const search = frame.getByRole('textbox', { name: '搜索', exact: true })
+        await search.fill('不存在的BOM样例')
+        await frame.getByText('没有匹配的记录', { exact: true }).first().waitFor({ state: 'visible' })
+        assert.equal(await placeholder.count(), 0, '空列表不保留操作占位')
+        await search.fill('')
+        await placeholder.waitFor({ state: 'visible' })
+        await shot(page, 'persistent-operation-bar-design')
+      },
+    },
+    {
       name: 'dev-ui-design-business-orders-finance',
       path: '/__dev/ui-design',
       viewport: { width: 1920, height: 1080 },
@@ -227,9 +261,8 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         const confirm = () => frame.locator('[data-action="business-record-confirm"]').click()
         const back = () => frame.getByRole('button', { name: '返回原视图', exact: true }).click()
         await frame.locator('.nav-item[data-page="engineering-hub"]').click()
-        for (const id of ['edit', 'activate', 'copy-version', 'archive', 'print-material', 'print-color', 'print-instruction']) {
-          assert.equal(await action(id).isDisabled(), true, `未选记录时显示禁用的 ${id}`)
-        }
+        await frame.locator('.record-row--placeholder').waitFor({ state: 'visible' })
+        assert.equal(await toolbar.count(), 0, '未选记录时仅显示常驻引导')
         await select('bom-1')
         await toolbar.locator('[data-action="open-related-tasks"]').click()
         const relatedTasks = frame.getByRole('dialog', { name: '相关任务', exact: true })
@@ -650,7 +683,10 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         await frame.locator('[data-action="nav"][data-page="sales"]').click()
         const headers = frame.locator('.table-wrap .sort-btn')
         const before = await headers.allTextContents()
-        const openSettings = () => frame.getByRole('button', { name: '列设置', exact: true }).click()
+        const openSettings = async () => {
+          await frame.getByRole('button', { name: '表格工具', exact: true }).click()
+          await frame.getByRole('button', { name: '列设置', exact: true }).click()
+        }
         const dialog = frame.getByRole('dialog', { name: '列设置', exact: true })
         await openSettings()
         assert(!(await dialog.getByRole('checkbox', { name: '当前进度', exact: true }).isChecked()))

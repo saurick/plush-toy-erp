@@ -1,3 +1,4 @@
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
@@ -493,7 +494,7 @@ async function installActionStabilityRpcRows(
 async function waitForBusinessPage(page, heading) {
   await expectHeading(page, heading)
   await page
-    .locator('.erp-business-module-current-action')
+    .locator('.erp-business-operation-panel')
     .first()
     .waitFor({ state: 'visible', timeout: 10_000 })
 }
@@ -529,7 +530,8 @@ async function selectBusinessRow(page, recordNo) {
 }
 
 async function captureActionLayout(page) {
-  const actionBar = page.locator('.erp-business-module-current-action').first()
+  const actionBar = page.locator('.erp-business-module-current-action:visible').first()
+  if (await actionBar.count() === 0) return { buttons: [], keys: [], actionOverflow: 0, pageOverflow: 0 }
   if (await actionBar.locator('button').count()) {
     await assertButtonSpacing(actionBar, '当前操作区', {
       contentSized: await page.evaluate(
@@ -627,16 +629,9 @@ async function assertDesktopActionState(
 
 async function assertUnselectedActions(page, assert) {
   const layout = await captureActionLayout(page)
-  const recordButtons = layout.buttons.filter(
-    (button) => button.key !== '更多操作'
-  )
-  assert(recordButtons.length > 0, '未选择时应保留岗位操作入口')
-  assert(
-    recordButtons.every((button) => button.disabled),
-    '未选择时不能办理本单操作'
-  )
+  assert.equal(await page.locator('.erp-business-selection-action-bar--placeholder:visible').count(), 1, '有记录未选择时保留常驻操作栏')
   assert.equal(
-    await page.locator('[data-business-action-key="clear-selection"]').count(),
+    await page.locator('[data-business-action-key="clear-selection"]:visible').count(),
     0,
     '未选择时无需清空已选'
   )
@@ -1278,16 +1273,12 @@ export function createBusinessActionStabilityScenarios(deps) {
         }
 
         await page.setViewportSize({ width: 1440, height: 900 })
-        await page.getByRole('button', { name: /列设置/u }).click()
+        await openBusinessTableTool(page, '列设置')
         const modal = page.getByRole('dialog', {
           name: /^列设置/u,
         })
         await modal.waitFor({ state: 'visible' })
-        await modal.evaluate(async (element) => {
-          await Promise.all(
-            element.getAnimations().map((animation) => animation.finished)
-          )
-        })
+        await waitForFiniteAnimations(page, { selector: '.ant-modal-root' })
         await assertButtonSpacing(
           modal.locator('.ant-modal-footer'),
           `button-spacing-${themeMode}-modal`,
@@ -1299,15 +1290,16 @@ export function createBusinessActionStabilityScenarios(deps) {
         await gotoScenarioPath(page, '/erp/finance/receivables', {
           waitUntil: 'domcontentloaded',
         })
-        await waitForBusinessPage(page, '应收管理')
+        await waitForBusinessPage(page, '应收')
+        await assertUnselectedActions(page, assert)
+        await selectBusinessRow(page, 'AR-STYLE-L1')
         const shortActions = page
-          .locator('.erp-business-module-current-action')
+          .locator('.erp-business-selection-action-bar__record-actions')
           .first()
         const confirm = shortActions.locator(
           '[data-business-action-key="finance-fact-confirm"]'
         )
-        await confirm.waitFor({ state: 'visible' })
-        assert.equal(await confirm.isDisabled(), true, '未选择时确认应禁用')
+        assert.equal(await confirm.count(), 0, '已过账记录不显示草稿确认')
         await assertButtonSpacing(
           shortActions,
           `button-spacing-${themeMode}-short`,
@@ -1640,8 +1632,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         )
 
         await selectBusinessRow(page, 'QI-ACTION-OUTSOURCING-REJECTED')
-        assert.equal(await viewDisposition.count(), 1)
-        assert.equal(await viewDisposition.isEnabled(), true)
+        await assertDesktopActionState(page, assert, 'outsourcing-disposition-view', { visible: true, disabled: false })
         assert.equal(
           await actionBar
             .getByRole('button', {
@@ -1744,12 +1735,11 @@ export function createBusinessActionStabilityScenarios(deps) {
           })
           for (const key of ['pass', 'reject'])
             { await assertDesktopActionState(page, assert, key, {
-              visible: status !== 'CANCELLED',
-              disabled: status !== 'SUBMITTED',
+              visible: status === 'SUBMITTED',
+              disabled: false,
             }) }
           await assertDesktopActionState(page, assert, 'quality-disposition', {
-            visible: status !== 'CANCELLED',
-            disabled: true,
+            visible: false,
           })
           await assertDesktopActionState(page, assert, 'cancel', {
             visible: status !== 'CANCELLED',
@@ -2018,7 +2008,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await waitForBusinessPage(page, '生产记录')
+        await waitForBusinessPage(page, '异常处理')
         await assertUnselectedActions(page, assert)
         const cases = {
           'SUBMITTED-SCRAP': {

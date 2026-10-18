@@ -49,6 +49,16 @@ export function createBusinessPageContractScenarios({
     }
     return false
   }
+  const selectFirstBusinessRecord = async (page) => {
+    const row = page.locator('.ant-table-tbody > tr.ant-table-row').first()
+    await row.waitFor({ state: 'visible', timeout: 10_000 })
+    await row.locator('input[type="radio"], input[type="checkbox"]').first().check()
+    await page.waitForFunction(
+      () => document.querySelectorAll('.ant-table-tbody > tr.ant-table-row-selected').length === 1,
+      null,
+      { timeout: 10_000 }
+    )
+  }
   const assertClassifiedBusinessFormPage = async (
     page,
     {
@@ -505,7 +515,15 @@ export function createBusinessPageContractScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectButton(page, '新建订单')
-        await expectText(page, '当前操作')
+        const actionBar = page.locator('.erp-business-selection-action-bar:visible')
+        await actionBar.waitFor({ state: 'visible' })
+        assert.equal(await actionBar.count(), 1, '未选择订单时只展示一条常驻操作栏')
+        assert.match(
+          await actionBar.innerText(),
+          /选中记录后显示可用操作/u,
+          '常驻操作栏应说明先选记录再操作'
+        )
+        assert.equal(await actionBar.getByRole('button').count(), 0, '未选择订单时不展示记录操作')
         await expectText(page, '订单列表')
         for (const group of [
           '工作中心',
@@ -558,11 +576,11 @@ export function createBusinessPageContractScenarios({
         }
         await moduleCatalog.locator('.ant-modal-close').click()
         await moduleCatalog.waitFor({ state: 'hidden', timeout: 10_000 })
-        await page.getByRole('button', { name: /导出/u }).waitFor()
-        await page
-          .locator('.erp-business-operation-panel')
-          .getByRole('button', { name: /列顺序|列设置/u })
-          .waitFor()
+        const tools = page.getByRole('button', { name: '表格工具', exact: true })
+        await tools.click()
+        await page.getByRole('menuitem', { name: /导出筛选结果/u }).waitFor()
+        await page.getByRole('menuitem', { name: /列设置/u }).waitFor()
+        await tools.press('Escape')
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'sales-orders',
           heading: '销售订单',
@@ -619,6 +637,7 @@ export function createBusinessPageContractScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '物料清单（BOM）')
+        await selectFirstBusinessRecord(page)
         await expectText(page, '当前操作')
         const bomOverflowOpen = await exposeSelectionActionOverflow(page)
         for (const label of ['打印物料明细', '打印色卡', '打印作业指导书']) {
@@ -656,6 +675,7 @@ export function createBusinessPageContractScenarios({
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '委外订单')
+        await selectFirstBusinessRecord(page)
         const outsourcingOverflowOpen =
           await exposeSelectionActionOverflow(page)
         await expectButton(page, '加工合同打印')

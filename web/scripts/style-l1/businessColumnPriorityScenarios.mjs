@@ -1,3 +1,5 @@
+import { openBusinessTableTool } from './businessTableTools.mjs'
+
 export function createBusinessColumnPriorityScenarios({
   assert,
   customerRuntimeEffectiveSession,
@@ -59,7 +61,7 @@ export function createBusinessColumnPriorityScenarios({
   const verifySavedOrderAndReset = async (page, targetLabel, direction) => {
     const defaults = await readLabels(page)
     const openColumnSettings = async () => {
-      await page.getByRole('button', { name: /列设置$/u }).click()
+      await openBusinessTableTool(page, '列设置')
       return page.getByRole('dialog', { name: /^列设置/u })
     }
     let dialog = await openColumnSettings()

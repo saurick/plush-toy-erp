@@ -1566,9 +1566,9 @@ export default function InventoryLedgerPage() {
               adminProfile,
               PermissionCode.WAREHOUSE_MANAGE
             ) ? (
-              <Button onClick={() => setWarehouseSettingsOpen(true)}>
-                仓库设置
-              </Button>
+              <Dropdown trigger={['click']} menu={{ items: [{ key: 'warehouses', label: '仓库设置', onClick: () => setWarehouseSettingsOpen(true) }] }}>
+                <Button aria-label="管理">管理 <DownOutlined /></Button>
+              </Dropdown>
             ) : null}
             <BusinessListToolbarActions
               moduleTitle="库存台账"
@@ -1585,16 +1585,13 @@ export default function InventoryLedgerPage() {
               }
               onOpenColumnOrder={openColumnOrder}
             />
-            {canCreateInventoryOperation || canApproveInventoryOperation ? (
-              <Button
-                data-business-action-key="inventory-operation-records"
-                onClick={() => setOperationRecordsOpen(true)}
-              >
-                库存作业
-              </Button>
-            ) : null}
           </Space>
         }
+        primaryAction={canCreateInventoryOperation || canApproveInventoryOperation ? (
+          <Button data-business-action-key="inventory-operation-records" onClick={() => setOperationRecordsOpen(true)}>
+            库存作业
+          </Button>
+        ) : null}
       >
         <SelectionActionBar
           embedded
@@ -1629,6 +1626,7 @@ export default function InventoryLedgerPage() {
                   size="small"
                   icon={<LinkOutlined />}
                   data-business-action-key="related-records"
+                  data-business-action-role="related"
                   disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
@@ -1645,6 +1643,7 @@ export default function InventoryLedgerPage() {
               icon={<EyeOutlined />}
               disabled={!selectedRow}
               onClick={() => openInventoryDetails(selectedRow)}
+              data-business-action-role="view"
             >
               查看详情
             </Button>
@@ -1669,6 +1668,7 @@ export default function InventoryLedgerPage() {
                     icon={<Icon aria-hidden="true" />}
                     className="erp-action-button"
                     data-business-action-key={`inventory-${type.toLowerCase()}`}
+                    data-business-action-role="action"
                     size="small"
                     type={primary ? 'primary' : 'default'}
                     disabled={!selectedRow || operationLoading}

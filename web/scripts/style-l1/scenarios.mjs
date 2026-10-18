@@ -52,6 +52,7 @@ import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessAttachmentScenarios } from './businessAttachmentScenarios.mjs'
 import { createBusinessActionStabilityScenarios } from './businessActionStabilityScenarios.mjs'
+import { createWorkflowModuleSelectionScenarios } from './workflowModuleSelectionScenarios.mjs'
 import { createBusinessDetailsScenarios } from './businessDetailsScenarios.mjs'
 import { createDevBusinessUsabilityScenarios } from './devBusinessUsabilityScenarios.mjs'
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
@@ -515,6 +516,13 @@ export function createStyleL1Scenarios(deps) {
       assertNoHorizontalOverflow,
       customerRuntimeEffectiveSession,
       gotoScenarioPath,
+      outputDir,
+      path,
+    }),
+    ...createWorkflowModuleSelectionScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      customerRuntimeEffectiveSession,
       outputDir,
       path,
     }),

@@ -466,6 +466,10 @@
 }
 
 @media (max-width: 767px) {
+  .erp-business-operation-panel--record-actions .erp-business-operation-panel__command {
+    padding-inline: 4px;
+  }
+
   .erp-business-filter-trigger-group > .ant-btn {
     min-width: 44px;
     min-height: 44px;
@@ -549,6 +553,16 @@
   border-end-end-radius: calc(var(--erp-business-card-radius) - 1px);
   padding: 4px 8px 4px 12px;
   background: var(--erp-surface-bg-muted);
+}
+
+.erp-business-operation-panel__selection--placeholder:has([data-business-selection-placeholder]:empty) {
+  display: none;
+}
+
+.erp-business-selection-action-bar__placeholder-text {
+  min-width: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
 }
 
 .erp-business-filter-panel:has(+ .erp-business-list-toolbar).ant-card,
@@ -1642,7 +1656,13 @@
   gap: 6px 8px;
 }
 
+.erp-business-selection-action-bar__primary {
+  max-width: 100%;
+  flex-wrap: nowrap;
+}
+
 .erp-business-selection-action-bar__tag.ant-tag {
+  min-width: 0;
   max-width: min(680px, 100%);
   margin-inline-end: 0;
   border-radius: 999px;
@@ -1717,6 +1737,11 @@
   display: inline-flex;
   max-width: 100%;
   align-items: center;
+}
+
+.erp-business-selection-action-bar__primary > .ant-typography,
+.erp-business-selection-action-bar__primary > .erp-business-action-tooltip-anchor {
+  flex-shrink: 0;
 }
 
 .erp-business-action-tooltip-anchor:focus-visible {

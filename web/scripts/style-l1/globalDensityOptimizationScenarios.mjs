@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
 import { assertTrackingNavigation } from './taskTrackingScenarios.mjs'
@@ -94,7 +95,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     const headings = await page.locator('.erp-business-data-table-card .ant-table-thead:not([aria-hidden="true"]) th').allTextContents()
     await fs.writeFile(path.join(outputDir, `density-${key}-columns.json`), JSON.stringify(headings, null, 2))
     await capture(page, key)
-    await page.locator('.erp-business-operation-panel__actions').getByRole('button', { name: /列设置/u }).first().click()
+    await openBusinessTableTool(page, '列设置')
     const dialog = page.getByRole('dialog', { name: /^列设置/u })
     await dialog.waitFor()
     await capture(page, `${key}-settings`, dialog)
@@ -102,7 +103,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     await dialog.press('Escape')
     await dialog.waitFor({ state: 'hidden' })
     assert.equal(await dialog.isVisible(), false)
-    await page.locator('.erp-business-operation-panel__actions').getByRole('button', { name: /列设置/u }).first().click()
+    await openBusinessTableTool(page, '列设置')
     const all = dialog.getByRole('button', { name: '全部显示', exact: true })
     if (await all.isEnabled()) await all.click()
     await dialog.getByRole('button', { name: '完成', exact: true }).click()
@@ -158,7 +159,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     assert(!metrics.lineClamp || metrics.lineClamp === 'none', '取消原因不得通过行数截断')
     await capture(page, 'finance-cancelled-long')
     const download = page.waitForEvent('download')
-    await page.locator('.erp-business-operation-panel__actions').getByRole('button', { name: /导出/u }).first().click()
+    await openBusinessTableTool(page, '导出筛选结果')
     const file = await download
     const csv = await fs.readFile(await file.path(), 'utf8')
     for (const value of ['手续费', '收款分类', '账期', '备注', cancelReason]) assert(csv.includes(value), `完整导出应保留 ${value}`)

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { businessModuleDefinitions } from '../../src/erp/config/businessModules.mjs'
 import {
   assertTableHeaderControlsFit,
@@ -241,7 +242,7 @@ export function createTableAlignmentScenarios({
           .getAttribute('data-row-key'),
         '2'
       )
-      await page.getByRole('button', { name: '列设置', exact: true }).click()
+      await openBusinessTableTool(page, '列设置')
       const columnPanel = page.getByRole('dialog', { name: /^列设置/u })
       await columnPanel.getByRole('button', { name: '单位 移到最前' }).click()
       await columnPanel.getByRole('button', { name: /^完\s*成$/u }).click()

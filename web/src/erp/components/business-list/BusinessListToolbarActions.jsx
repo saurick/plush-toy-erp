@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
-import { Space, Tooltip } from 'antd'
+import { DownOutlined, DownloadOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons'
+import { Dropdown, Tooltip } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import { AUTH_SCOPE, getToken } from '@/common/auth/auth'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -161,6 +161,7 @@ export function useBusinessColumnOrder({
       .filter((column) => displayed.has(column))
       .map((column) => ({
         ...column,
+        exportTitle: getColumnLabel(column),
         title: (
           <span className="erp-module-column-header-text">
             {React.isValidElement(column.title)
@@ -194,15 +195,6 @@ export function useBusinessColumnOrder({
   }
 }
 
-function TooltipButton({ title, children }) {
-  if (!title) return children
-  return (
-    <Tooltip title={title}>
-      <span>{children}</span>
-    </Tooltip>
-  )
-}
-
 export function BusinessListToolbarActions({
   onExport,
   showExport = true,
@@ -212,34 +204,41 @@ export function BusinessListToolbarActions({
   columnOrderDisabled = false,
   columnOrderDisabledReason = '',
 }) {
+  const triggerRef = useRef(null)
+  const [open, setOpen] = useState(false)
   const normalizedExportReason =
     exportDisabledReason || (exportDisabled ? '当前没有可导出的列表数据' : '')
   const normalizedColumnReason =
     columnOrderDisabledReason ||
     (columnOrderDisabled ? '当前列表暂不支持列设置' : '')
+  const items = [
+    ...(showExport ? [{
+      key: 'export',
+      icon: <DownloadOutlined />,
+      label: <Tooltip title={normalizedExportReason}><span>导出筛选结果</span></Tooltip>,
+      title: normalizedExportReason,
+      disabled: exportDisabled || !onExport,
+      onClick: onExport,
+    }] : []),
+    {
+      key: 'columns',
+      icon: <SettingOutlined />,
+      label: <Tooltip title={normalizedColumnReason}><span>列设置</span></Tooltip>,
+      title: normalizedColumnReason,
+      disabled: columnOrderDisabled || !onOpenColumnOrder,
+      onClick: () => {
+        // The menu closes before the dialog; return focus to its stable trigger.
+        triggerRef.current?.focus({ preventScroll: true })
+        onOpenColumnOrder?.()
+      },
+    },
+  ]
 
   return (
-    <Space size={8} wrap>
-      {showExport ? (
-        <TooltipButton title={normalizedExportReason}>
-          <ToolbarButton
-            icon={<DownloadOutlined />}
-            disabled={exportDisabled || !onExport}
-            onClick={onExport}
-          >
-            导出筛选结果
-          </ToolbarButton>
-        </TooltipButton>
-      ) : null}
-      <TooltipButton title={normalizedColumnReason}>
-        <ToolbarButton
-          icon={<SettingOutlined />}
-          disabled={columnOrderDisabled || !onOpenColumnOrder}
-          onClick={onOpenColumnOrder}
-        >
-          列设置
-        </ToolbarButton>
-      </TooltipButton>
-    </Space>
+    <Dropdown trigger={['click']} open={open} onOpenChange={(next, info) => setOpen(info.source === 'menu' ? false : next)} menu={{ items }}>
+      <ToolbarButton ref={triggerRef} icon={<TableOutlined />} aria-label="表格工具" aria-haspopup="menu" aria-expanded={open}>
+        表格工具 <DownOutlined />
+      </ToolbarButton>
+    </Dropdown>
   )
 }

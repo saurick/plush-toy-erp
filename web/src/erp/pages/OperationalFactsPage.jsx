@@ -1094,6 +1094,7 @@ export function OperationalFactWorkspace({
                   size="small"
                   icon={<LinkOutlined />}
                   data-business-action-key="related-records"
+                  data-business-action-role="related"
                   disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
@@ -1109,6 +1110,7 @@ export function OperationalFactWorkspace({
               size="small"
               icon={<EyeOutlined />}
               data-business-action-key="operational-fact-details"
+              data-business-action-role="view"
               disabled={!activeSelectedRow}
               onClick={() => openOperationalFactDetails(activeSelectedRow)}
             >
@@ -1164,6 +1166,7 @@ export function OperationalFactWorkspace({
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   data-business-action-key="operational-fact-post"
+                  data-business-action-role="primary"
                   disabled={
                     !activeSelectedRow ||
                     activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
@@ -1208,6 +1211,7 @@ export function OperationalFactWorkspace({
                 size="small"
                 icon={<EditOutlined />}
                 data-business-action-key="production-fact-edit-draft"
+                data-business-action-role="edit"
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
@@ -1246,6 +1250,7 @@ export function OperationalFactWorkspace({
               <Button
                 size="small"
                 data-business-action-key="production-rework-start"
+                data-business-action-role="primary"
                 disabled={
                   !activeSelectedRow ||
                   !selectedCanStartProductionRework ||
@@ -1269,6 +1274,7 @@ export function OperationalFactWorkspace({
               <Button
                 size="small"
                 data-business-action-key="production-rework-progress"
+                data-business-action-role="related"
                 disabled={productionReworkProgressAvailability.disabled}
                 loading={productionReworkProgressLoading}
                 onClick={() => openProductionReworkProgress(activeSelectedRow)}
@@ -1314,6 +1320,7 @@ export function OperationalFactWorkspace({
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   data-business-action-key="finance-fact-confirm"
+                  data-business-action-role="primary"
                   disabled={
                     !activeSelectedRow ||
                     activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
@@ -1348,6 +1355,7 @@ export function OperationalFactWorkspace({
               <Button
                 size="small"
                 data-business-action-key="finance-single-reconciliation"
+                data-business-action-role="action"
                 disabled={
                   !activeSelectedRow ||
                   !selectedIsSingleReconciliationSource ||
@@ -1395,6 +1403,7 @@ export function OperationalFactWorkspace({
                 className="erp-business-module-status-action"
                 icon={<CloseCircleOutlined />}
                 data-business-action-key="finance-fact-cancel"
+                data-business-action-role="danger"
                 disabled={
                   !activeSelectedRow ||
                   ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
@@ -1419,6 +1428,7 @@ export function OperationalFactWorkspace({
                 size="small"
                 icon={<PrinterOutlined />}
                 data-business-action-key="outsourcing-contract-print"
+                data-business-action-role="secondary"
                 disabled={!activeSelectedRow}
                 onClick={openProcessingContractPrint}
               >
@@ -1434,6 +1444,7 @@ export function OperationalFactWorkspace({
               <Button
                 size="small"
                 data-business-action-key="outsourcing-payable"
+                data-business-action-role="action"
                 disabled={outsourcingPayableViewAvailability.disabled}
                 onClick={() => viewOutsourcingPayable(activeSelectedRow)}
               >
@@ -1508,6 +1519,7 @@ export function OperationalFactWorkspace({
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   data-business-action-key="shipment-post"
+                  data-business-action-role="primary"
                   disabled={
                     !activeSelectedRow ||
                     activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
@@ -1557,6 +1569,7 @@ export function OperationalFactWorkspace({
                   className="erp-business-module-status-action"
                   icon={<RollbackOutlined />}
                   data-business-action-key="reservation-release"
+                  data-business-action-role="primary"
                   disabled={
                     !activeSelectedRow ||
                     activeSelectedRow.status !== StockReservationStatus.ACTIVE ||
@@ -1604,6 +1617,7 @@ export function OperationalFactWorkspace({
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   data-business-action-key="finance-reconciliation-settle"
+                  data-business-action-role="primary"
                   disabled={
                     !activeSelectedRow || !selectedCanSettleFinance || saving
                   }
@@ -1651,6 +1665,7 @@ export function OperationalFactWorkspace({
                 className="erp-business-module-status-action"
                 icon={<CloseCircleOutlined />}
                 data-business-action-key="operational-fact-cancel"
+                data-business-action-role="danger"
                 disabled={
                   !activeSelectedRow ||
                   ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
@@ -1707,6 +1722,7 @@ export function OperationalFactWorkspace({
                   className="erp-business-module-status-action"
                   icon={<CloseCircleOutlined />}
                   data-business-action-key="shipment-cancel"
+                  data-business-action-role="danger"
                   disabled={
                     !activeSelectedRow ||
                     ![ShipmentStatus.DRAFT, ShipmentStatus.SHIPPED].includes(activeSelectedRow.status) ||

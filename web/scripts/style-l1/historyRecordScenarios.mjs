@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 const customers = Array.from({ length: 201 }, (_, index) => ({
@@ -104,7 +105,7 @@ export function createHistoryRecordScenarios(deps) {
         )
       )
       const downloadPromise = page.waitForEvent('download')
-      await page.getByRole('button', { name: '导出筛选结果' }).click()
+      await openBusinessTableTool(page, '导出筛选结果')
       const csv = await readFile(await (await downloadPromise).path(), 'utf8')
       assert.equal(csv.trim().split('\n').length, 202)
       assert(csv.includes('HISTORY-201'))
@@ -114,7 +115,7 @@ export function createHistoryRecordScenarios(deps) {
           (params) => params.offset === 200 && params.limit === 200
         )
       )
-      await page.getByRole('button', { name: /列设置/u }).click()
+      await openBusinessTableTool(page, '列设置')
       await page
         .getByRole('dialog')
         .getByText('编号 / 名称', { exact: true })

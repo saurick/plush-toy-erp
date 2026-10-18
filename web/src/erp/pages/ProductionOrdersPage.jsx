@@ -1737,6 +1737,7 @@ export default function ProductionOrdersPage() {
           >
             <Button
               data-business-action-key="view"
+              data-business-action-role="view"
               disabled={!selected || detailLoading}
               icon={<EyeOutlined />}
               onClick={() => loadDetail(selected, 'view')}
@@ -1766,6 +1767,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="edit"
+                data-business-action-role="edit"
                 disabled={
                   !selected ||
                   selected.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
@@ -1812,6 +1814,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="completion"
+                data-business-action-role="primary"
                 type={
                   selected?.status === PRODUCTION_ORDER_STATUS.DRAFT
                     ? 'default'
@@ -1841,6 +1844,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="route-execution"
+                data-business-action-role="action"
                 disabled={productionRouteActionAvailability.disabled}
                 onClick={() => setProductionRouteOpen(true)}
               >
@@ -1861,6 +1865,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="rework-progress"
+                data-business-action-role="related"
                 disabled={productionReworkProgressAvailability.disabled}
                 loading={reworkProgressLoading}
                 onClick={() => openProductionReworkProgress(selected)}
@@ -1878,6 +1883,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="production-records"
+                data-business-action-role="related"
                 disabled={!selected || detailLoading}
                 onClick={() => viewProductionFacts(selected)}
               >
@@ -1894,6 +1900,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="production-scheduling"
+                data-business-action-role="action"
                 disabled={productionSchedulingActionAvailability.disabled}
                 onClick={() => openProductionScheduling(selected)}
               >
@@ -1926,6 +1933,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="release"
+                data-business-action-role="primary"
                 type="primary"
                 className="erp-business-module-status-action"
                 disabled={
@@ -1977,6 +1985,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="close"
+                data-business-action-role="secondary"
                 className="erp-business-module-status-action"
                 disabled={
                   !selected ||
@@ -2025,6 +2034,7 @@ export default function ProductionOrdersPage() {
             >
               <Button
                 data-business-action-key="cancel"
+                data-business-action-role="danger"
                 danger
                 className="erp-business-module-status-action"
                 disabled={
