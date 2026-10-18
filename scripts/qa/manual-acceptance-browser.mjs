@@ -38,7 +38,10 @@ import {
   resolveManualAcceptanceDatasetStageLogicFingerprints,
 } from "./manual-acceptance-dataset-runner.mjs";
 import { normalizeDatabaseRunID } from "./database-target.mjs";
-import { MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES } from "./manual-acceptance-source-data.mjs";
+import {
+  MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES,
+  buildManualAcceptanceSourceDataPlan,
+} from "./manual-acceptance-source-data.mjs";
 import {
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
@@ -2066,8 +2069,19 @@ async function filterVisibleListToCurrentBatch(page, target, filter) {
 
 const SOURCE_QUANTITY_PROBE_IDS = Object.freeze({
   "material-bom": "bom-versions",
-  "accessories-purchase": "purchase-orders",
-  "processing-contracts": "outsourcing-orders",
+});
+
+const CANONICAL_SOURCE_ORDER_FIELDS = Object.freeze({
+  "accessories-purchase": [
+    "purchase_order",
+    "purchaseOrders",
+    "purchase_order_no",
+  ],
+  "processing-contracts": [
+    "outsourcing_order",
+    "outsourcingOrders",
+    "outsourcing_order_no",
+  ],
 });
 
 function sourceQuantityProbe(currentBatch, unit) {
@@ -2100,6 +2114,7 @@ export function evaluateCurrentBatchListEvidence({
   const quantityDOM = quantityScope?.currentBatchDOM;
   const prefixProven =
     quantityScope?.mode === "filtered_prefix" &&
+    !Object.hasOwn(CANONICAL_SOURCE_ORDER_FIELDS, expectedUnit) &&
     probe?.status === "pass" &&
     probe.batchEvidence === "prefix_filtered" &&
     Boolean(probe.batchPrefix) &&
@@ -2323,7 +2338,74 @@ export function matchCanonicalDOMRows(rows, records) {
   return [...matched];
 }
 
-export function buildCurrentBatchDOMRecords({ facts, role, task } = {}) {
+function canonicalSourceOrderRecords(source) {
+  if (
+    !Object.hasOwn(
+      MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES,
+      source.sourceScaleProfile,
+    )
+  )
+    throw new BrowserAcceptanceError("源单 canonical 集合缺少正式来源规模");
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: source.runId,
+    dataVersion: source.dataVersion,
+    target: source.target,
+    backendURL: source.backendURL,
+    databaseName: source.databaseName,
+    sourceScaleProfile: source.sourceScaleProfile,
+    anchorDate: source.anchorDate,
+  });
+  if (
+    source.semanticDigest !== plan.semanticDigest ||
+    source.prefix !== plan.prefix ||
+    source.anchorDate !== plan.anchorDate ||
+    Object.keys(source.scale || {}).length !== Object.keys(plan.scale).length ||
+    Object.entries(plan.scale).some(
+      ([key, value]) => source.scale?.[key] !== value,
+    )
+  )
+    throw new BrowserAcceptanceError(
+      "源单 canonical 集合与当前来源计划身份不一致",
+    );
+  return Object.fromEntries(
+    Object.entries(CANONICAL_SOURCE_ORDER_FIELDS).map(
+      ([unit, [target, recordsKey, numberField]]) => {
+        const expected = new Set(
+          plan.records[recordsKey].map((row) => row[numberField]),
+        );
+        const rows = (source.steps || []).filter(
+          (row) =>
+            row.target === target && ["create", "reuse"].includes(row.action),
+        );
+        if (
+          rows.length !== expected.size ||
+          new Set(rows.map((row) => row.id)).size !== rows.length ||
+          new Set(rows.map((row) => row.key)).size !== rows.length ||
+          rows.some(
+            (row) =>
+              !Number.isSafeInteger(row.id) ||
+              row.id <= 0 ||
+              !expected.has(row.key),
+          )
+        )
+          throw new BrowserAcceptanceError(
+            `${unit} 缺少完整且唯一的当前源单 ID / 单号集合`,
+          );
+        return [
+          unit,
+          rows.map((row) => ({ key: String(row.id), identifier: row.key })),
+        ];
+      },
+    ),
+  );
+}
+
+export function buildCurrentBatchDOMRecords({
+  source,
+  facts,
+  role,
+  task,
+} = {}) {
   const refs = facts?.referenceRecords || {};
   const entries = (items, fields, withID = true) =>
     (items || []).flatMap((item) => {
@@ -2376,6 +2458,7 @@ export function buildCurrentBatchDOMRecords({ facts, role, task } = {}) {
       .map((item) => ({ key: "", identifier: item.createParams.task_code }));
   }
   return {
+    ...(source ? canonicalSourceOrderRecords(source) : {}),
     "task-board": taskCodes,
     "production-orders": entries(refs.productionOrders, [
       "order_no",
@@ -2898,7 +2981,10 @@ async function readListEvidence(page, target, datasetBinding) {
       filter,
       datasetBinding?.dataset?.currentBatchDOMRecords?.[target.key],
     );
-  } else if (filter.mode === "source_prefix") {
+  } else if (
+    filter.mode === "source_prefix" &&
+    !Object.hasOwn(CANONICAL_SOURCE_ORDER_FIELDS, target.key)
+  ) {
     quantityScope = await readPrefixQuantity(
       page,
       target,
@@ -4391,7 +4477,12 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
     currentBatchIdentifiers: currentBatchFactIdentifiers(
       components.facts.report,
     ),
-    currentBatchDOMRecords: buildCurrentBatchDOMRecords({ facts: components.facts.report, role: components.role.report, task: components.task.report }),
+    currentBatchDOMRecords: buildCurrentBatchDOMRecords({
+      source: components.source.report,
+      facts: components.facts.report,
+      role: components.role.report,
+      task: components.task.report,
+    }),
     attachments: {
       reportPath: path.relative(REPO_ROOT, components.attachments.path),
       componentDigest: componentDigests.attachments,

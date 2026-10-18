@@ -60,6 +60,7 @@ import {
   verifyScenarioDemoBrowserRuntimeIdentity,
   verifyScenarioDemoBrowserSession,
 } from "./manual-acceptance-browser.mjs";
+import { buildManualAcceptanceSourceDataPlan } from "./manual-acceptance-source-data.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
@@ -204,6 +205,43 @@ function taskGroupCoverageFixture(catalogScenarioDigest = "c".repeat(64)) {
   };
 }
 
+function sourceOrderReportFixture(options = {}) {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    target: "local-dev",
+    backendURL: "http://127.0.0.1:8310",
+    databaseName: "plush_erp_acceptance_local_fixture_dev",
+    ...options,
+  });
+  return {
+    runId: plan.runId,
+    dataVersion: plan.dataVersion,
+    target: plan.target,
+    backendURL: plan.backendURL,
+    databaseName: plan.databaseName,
+    sourceScaleProfile: plan.sourceScaleProfile,
+    scale: plan.scale,
+    prefix: plan.prefix,
+    anchorDate: plan.anchorDate,
+    semanticDigest: plan.semanticDigest,
+    steps: [
+      ...plan.records.purchaseOrders.map((row, index) => ({
+        target: "purchase_order",
+        key: row.purchase_order_no,
+        id: index + 1,
+        action: "create",
+      })),
+      ...plan.records.outsourcingOrders.map((row, index) => ({
+        target: "outsourcing_order",
+        key: row.outsourcing_order_no,
+        id: index + 1,
+        action: "reuse",
+      })),
+    ],
+  };
+}
+
 async function datasetApplyEvidenceFixture({
   remote = false,
   sourceScaleProfile = "acceptance",
@@ -287,11 +325,11 @@ async function datasetApplyEvidenceFixture({
       baseReport(stageKey),
     ]),
   );
-  Object.assign(reports.source, {
-    sourceScaleProfile,
-    scale: currentPlan.semanticPlan.stages.find((stage) => stage.key === "source")
-      .expected.scale,
-  });
+  Object.assign(
+    reports.source,
+    sourceOrderReportFixture({ ...printInput, sourceScaleProfile }),
+  );
+  printInput.semanticDigest = reports.source.semanticDigest;
   Object.assign(reports.core, {
     configRevision: printInput.configRevision,
     configProductVersion: remote
@@ -550,11 +588,11 @@ async function scenarioBrowserEvidenceFixture() {
     configDatasetVersion: null,
     configTarget: null,
   });
-  Object.assign(reports.source, {
-    sourceScaleProfile: "volume",
-    scale: expected.semanticPlan.stages.find((stage) => stage.key === "source")
-      .expected.scale,
-  });
+  Object.assign(
+    reports.source,
+    sourceOrderReportFixture({ ...printInput, sourceScaleProfile: "volume" }),
+  );
+  printInput.semanticDigest = reports.source.semanticDigest;
   Object.assign(reports.baseline, {
     contract: PERSISTENT_BASELINE_REPORT_CONTRACT,
     scope: "manual-acceptance-persistent-target-baseline",
@@ -1782,8 +1820,22 @@ test("default browser binds both registered source scales to the current plan in
         readinessReportPath: fixture.readinessReportPath,
         printInput: fixture.printInput,
       });
-      assert.equal(binding.datasetSemanticDigest, fixture.datasetSemanticDigest);
-      assert.notEqual(binding.datasetSemanticDigest, fixture.printInput.semanticDigest);
+      assert.equal(
+        binding.datasetSemanticDigest,
+        fixture.datasetSemanticDigest,
+      );
+      assert.notEqual(
+        binding.datasetSemanticDigest,
+        fixture.printInput.semanticDigest,
+      );
+      assert.equal(
+        binding.currentBatchDOMRecords["accessories-purchase"].length,
+        450,
+      );
+      assert.equal(
+        binding.currentBatchDOMRecords["processing-contracts"].length,
+        450,
+      );
     } finally {
       await fs.rm(fixture.outputRoot, { recursive: true, force: true });
     }
@@ -3889,8 +3941,6 @@ test("both registered task profiles derive the boss DOM code set from the formal
 test("source quantity binds the formal probe scope independently of a representative category", () => {
   for (const [unit, probeID, representative, total] of [
     ["material-bom", "bom-versions", "YS8-BOM-", 48],
-    ["accessories-purchase", "purchase-orders", "YS8-CG-", 45],
-    ["processing-contracts", "outsourcing-orders", "YS8-WW-", 45],
   ]) {
     const base = sourceQuantityFixture(unit, total, probeID, representative);
     base.minimumRecords = 45;
@@ -4087,5 +4137,225 @@ test("audit readiness waits through the empty result before a delayed spinner an
     for (const [key, value] of Object.entries(saved))
       if (value === undefined) delete globalThis[key];
       else globalThis[key] = value;
+  }
+});
+
+test("source document DOM pools bind every planned ID/number in acceptance and volume", () => {
+  for (const [profile, expected] of [
+    ["acceptance", 45],
+    ["volume", 450],
+  ]) {
+    const source = sourceOrderReportFixture({ sourceScaleProfile: profile });
+    // The operational references contain only approved/confirmed subsets.
+    source.referenceRecords = {
+      purchaseOrders: Array(9).fill({ id: 1 }),
+      outsourcingOrders: Array(9).fill({ id: 1 }),
+    };
+    const records = buildCurrentBatchDOMRecords({ source });
+    for (const unit of ["accessories-purchase", "processing-contracts"]) {
+      assert.equal(records[unit].length, expected);
+      assert.equal(new Set(records[unit].map((row) => row.key)).size, expected);
+      assert.equal(
+        new Set(records[unit].map((row) => row.identifier)).size,
+        expected,
+      );
+    }
+    for (const mutate of [
+      (s) => s.steps.pop(),
+      (s) => s.steps.push(structuredClone(s.steps[0])),
+      (s) => (s.steps[0].id = 0),
+      (s) => (s.steps[0].id = "1"),
+      (s) => (s.steps[0].id = Number.MAX_SAFE_INTEGER + 1),
+      (s) => (s.steps[1].id = s.steps[0].id),
+      (s) => (s.steps[1].key = s.steps[0].key),
+      (s) => (s.steps[0].key = "YS7-CG-001"),
+      (s) => (s.steps[0].action = "not_created"),
+      (s) => delete s.steps,
+      (s) => delete s.sourceScaleProfile,
+      (s) => (s.sourceScaleProfile = "unknown"),
+      (s) =>
+        (s.sourceScaleProfile =
+          profile === "acceptance" ? "volume" : "acceptance"),
+      (s) => (s.semanticDigest = "old-recipe"),
+      (s) => (s.prefix = "YS7"),
+      (s) => delete s.anchorDate,
+      (s) => (s.scale.purchaseOrders += 1),
+    ]) {
+      const changed = structuredClone(source);
+      mutate(changed);
+      assert.throws(() => buildCurrentBatchDOMRecords({ source: changed }));
+    }
+  }
+});
+
+test("broad purchase199/outsourcing46 UI results prove only exact canonical source45 rows across real pagination", async () => {
+  const source = sourceOrderReportFixture();
+  const canonical = buildCurrentBatchDOMRecords({ source });
+  const saved = { document: globalThis.document, window: globalThis.window };
+  const node = (text, attributes = {}) => ({
+    textContent: text,
+    getAttribute: (key) => attributes[key] || null,
+    getBoundingClientRect: () => ({ width: 100, height: 20 }),
+  });
+  globalThis.window = { getComputedStyle: () => ({ visibility: "visible" }) };
+  try {
+    for (const [unit, extraCount, extraPrefix] of [
+      ["accessories-purchase", 154, "PO-MR-"],
+      ["processing-contracts", 1, "OS-WIP-"],
+    ]) {
+      const records = canonical[unit];
+      const rows = [
+        ...Array.from({ length: extraCount }, (_, index) => ({
+          key: String(46 + index),
+          identifier: `${extraPrefix}${index + 1} 来源YS8`,
+        })),
+        ...records,
+      ];
+      const total = rows.length;
+      const pages = Array.from({ length: Math.ceil(total / 20) }, (_, index) =>
+        rows.slice(index * 20, (index + 1) * 20),
+      );
+      let position = 0;
+      globalThis.document = {
+        querySelector: () => null,
+        querySelectorAll: (selector) => {
+          if (selector.includes(".ant-pagination-total-text"))
+            return [node(`共 ${total} 条`)];
+          if (selector.includes(".ant-table-tbody"))
+            return pages[position].map((row) => ({
+              ...node(row.identifier, { "data-row-key": row.key }),
+              querySelector: () => null,
+              querySelectorAll: () => [node(row.identifier)],
+            }));
+          return [];
+        },
+      };
+      const next = {
+        filter() {
+          return this;
+        },
+        last() {
+          return this;
+        },
+        async count() {
+          return position + 1 < pages.length ? 1 : 0;
+        },
+        async click() {
+          position += 1;
+        },
+      };
+      const page = {
+        async waitForFunction(fn, value) {
+          assert.equal(Boolean(fn(value)), true);
+        },
+        async evaluate(fn) {
+          return fn();
+        },
+        locator() {
+          return next;
+        },
+      };
+      const target = { key: unit, title: unit, minimumRecords: 45 };
+      const proof = await collectCanonicalQuantity(page, target, records, {
+        lifecycle: "all",
+        search: "",
+      });
+      assert.equal(proof.total, total);
+      assert.equal(proof.matchedIdentifiers.length, 45);
+      assert.equal(proof.pages.length, pages.length);
+      assert.equal(
+        proof.pages[0].matchedSoFar,
+        unit === "accessories-purchase" ? 0 : 19,
+      );
+      const base = {
+        currentBatch: { dataStatus: "pass", actual: 45 },
+        currentBatchDOM: { mode: "source_prefix", identifier: "YS8" },
+        renderedItems: proof.renderedRows,
+        pageReportedTotal: total,
+        minimumRecords: 45,
+        expectedUnit: unit,
+        quantityScope: proof,
+      };
+      assert.equal(
+        evaluateCurrentBatchListEvidence(base).minimumSatisfied,
+        true,
+      );
+      const wrongIDRows = records.map((row, index) => ({
+        key: index === 0 ? "99999" : row.key,
+        cells: [row.identifier],
+      }));
+      const wrongNumberRows = records.map((row, index) => ({
+        key: row.key,
+        cells: [index === 0 ? `${row.identifier}0` : row.identifier],
+      }));
+      const unrelatedRows = rows
+        .slice(0, extraCount)
+        .map((row) => ({ key: row.key, cells: [row.identifier] }));
+      for (const rendered of [wrongIDRows, wrongNumberRows, unrelatedRows]) {
+        const matched = matchCanonicalDOMRows(rendered, records);
+        assert.ok(matched.length < 45);
+        assert.equal(
+          evaluateCurrentBatchListEvidence({
+            ...base,
+            quantityScope: { ...proof, matchedIdentifiers: matched },
+          }).minimumSatisfied,
+          false,
+        );
+      }
+    }
+  } finally {
+    for (const [key, value] of Object.entries(saved))
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+  }
+});
+
+test("broad-search source orders cannot use a prefix total as canonical batch quantity", () => {
+  for (const [unit, probeID, representative] of [
+    ["accessories-purchase", "purchase-orders", "YS8-CG-"],
+    ["processing-contracts", "outsourcing-orders", "YS8-WW-"],
+  ]) {
+    const input = sourceQuantityFixture(unit, 45, probeID, representative);
+    assert.equal(
+      evaluateCurrentBatchListEvidence(input).minimumSatisfied,
+      false,
+    );
+  }
+});
+
+test("bound dataset rejects incomplete source document pools before any browser or request", async () => {
+  const fixture = await datasetApplyEvidenceFixture();
+  let requests = 0;
+  try {
+    fixture.reports.source.steps.pop();
+    await fs.writeFile(
+      fixture.sourceReportPath,
+      JSON.stringify(fixture.reports.source),
+    );
+    fixture.datasetReport.stages.find(
+      (stage) => stage.key === "source",
+    ).references.runner.componentDigest =
+      digestManualAcceptanceDatasetComponentReport(fixture.reports.source);
+    await fs.writeFile(
+      fixture.datasetReportPath,
+      JSON.stringify(fixture.datasetReport),
+    );
+    await assert.rejects(
+      verifyManualAcceptanceDatasetApplyReportBinding({
+        datasetReportPath: fixture.datasetReportPath,
+        sourceReportPath: fixture.sourceReportPath,
+        factReportPath: fixture.factReportPath,
+        readinessReportPath: fixture.readinessReportPath,
+        printInput: fixture.printInput,
+        fetchImpl: async () => {
+          requests += 1;
+          throw new Error("must fail before request");
+        },
+      }),
+      /processing-contracts.*完整/u,
+    );
+    assert.equal(requests, 0);
+  } finally {
+    await fs.rm(fixture.outputRoot, { recursive: true, force: true });
   }
 });
