@@ -25,7 +25,7 @@
 .erp-dev-chain__grid { display: grid; grid-template-columns: repeat(var(--chain-columns),minmax(0,1fr)); align-items: start; gap: 14px 18px; min-width: 0; }
 .erp-dev-chain__stage { position: relative; z-index: 1; min-width: 0; }
 .erp-dev-chain__stage[data-conditional] { padding-top: 44px; }
-.erp-dev-chain__stage-card { min-height: 88px; overflow: hidden; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg); }
+.erp-dev-chain__stage-card { position: relative; min-height: 88px; overflow: hidden; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg); }
 .erp-dev-chain__stage[data-conditional] .erp-dev-chain__stage-card { border-style: dashed; }
 .erp-dev-chain__stage[data-role-match="true"] .erp-dev-chain__stage-card { border-color: color-mix(in srgb, var(--erp-primary) 36%, var(--erp-border)); background: var(--erp-primary-soft); }
 .erp-dev-chain__stage[data-origin] .erp-dev-chain__stage-card { outline: 2px solid var(--chain-branch); outline-offset: 2px; }
@@ -34,10 +34,14 @@
 .erp-dev-chain__stage[data-reentry]:not([data-origin]) .erp-dev-chain__stage-card,
 .erp-dev-chain__stage[data-return]:not([data-origin]) .erp-dev-chain__stage-card { border: 2px solid var(--chain-branch); }
 .erp-dev-chain__stage-main { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: start; gap: 5px; width: 100%; min-height: 62px; padding: 10px 7px 7px; border: 0; background: transparent; color: var(--erp-text); text-align: left; font: inherit; font-size: var(--erp-font-small); line-height: 1.5; cursor: pointer; }
+/* 主入口覆盖卡片留白与说明，异常按钮在其上保留独立点击区域。 */
+.erp-dev-chain__stage-main::after { position: absolute; inset: 0; border-radius: inherit; content: ''; }
+.erp-dev-chain__stage-main:focus-visible { outline: none; }
+.erp-dev-chain__stage-main:focus-visible::after { outline: 2px solid var(--erp-primary); outline-offset: -3px; }
 .erp-dev-chain__stage-main > span { color: var(--erp-text-muted); font-variant-numeric: tabular-nums; }
 .erp-dev-chain__stage-main > strong { overflow-wrap: anywhere; font-weight: 500; }
-.erp-dev-chain__stage-foot { display: flex; align-items: center; justify-content: center; min-height: 23px; padding: 0 4px 3px; }
-.erp-dev-chain__stage-foot > button { padding: 1px 3px; border: 0; background: transparent; color: var(--chain-branch); font: inherit; font-size: var(--erp-font-caption); cursor: pointer; }
+.erp-dev-chain__stage-foot { display: flex; align-items: center; justify-content: center; min-height: 23px; padding: 0 4px 3px; pointer-events: none; }
+.erp-dev-chain__stage-foot > button { position: relative; z-index: 1; padding: 1px 3px; border: 0; background: transparent; color: var(--chain-branch); font: inherit; font-size: var(--erp-font-caption); cursor: pointer; pointer-events: auto; }
 .erp-dev-chain__stage-foot > small { color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
 .erp-dev-chain__branch-lane { position: relative; grid-column: 1 / -1; min-width: 0; height: 180px; }
 .erp-dev-chain__work { position: absolute; z-index: 2; top: 80px; left: 25%; width: min(244px,65%); min-height: 74px; padding: 10px 9px; border: 1px solid var(--chain-branch); border-radius: 7px; background: var(--erp-surface-bg); color: var(--erp-text); font: inherit; text-align: center; cursor: pointer; }
@@ -63,7 +67,7 @@
 .erp-dev-chain__independent-heading, .erp-dev-chain__independent-path { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; font-size: var(--erp-font-small); }
 .erp-dev-chain__independent-heading > span { color: var(--erp-text-muted); }
 .erp-dev-chain__independent-path { justify-content: center; padding: 20px 0 12px; }
-.erp-dev-chain button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 3px; }
+.erp-dev-chain button:not(.erp-dev-chain__stage-main):focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 3px; }
 @container fulfillment-guide (max-width: 639px) {
   .erp-dev-chain__legend { display: grid; justify-content: start; }
   .erp-dev-chain__map { padding-inline: 18px; }

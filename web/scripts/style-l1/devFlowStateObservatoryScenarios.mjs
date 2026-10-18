@@ -1,4 +1,4 @@
-import { assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
+import { assertFulfillmentChainClickTargets, assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../src/common/consts/workflowTaskDiscovery.generated.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
 import {
@@ -84,6 +84,7 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(await guide.locator('[data-chain-phase]').count(), 3)
         assert.equal(await guide.locator('[data-chain-stage][data-conditional]').count(), 2)
         assert.equal(await guide.locator('.erp-dev-fulfillment-guide__result').count(), 0, '总图初始不展开详情')
+        await assertFulfillmentChainClickTargets(guide.locator('[data-fulfillment-chain]'))
         await chooseRole('仓库')
         assert.equal(await stages.filter({ has: page.locator('[aria-expanded="true"]') }).count(), 0)
         assert.equal(await guide.locator('[data-fulfillment-stage][data-role-match="true"]').count(), 8)
