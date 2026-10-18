@@ -20,7 +20,7 @@ async function mount(t, { entries, target, options = {} }) {
   document.body.appendChild(container)
   const root = createRoot(container)
   t.after(async () => { await act(async () => root.unmount()); container.remove(); dom.restore() })
-  await act(async () => root.render(createElement(router.MemoryRouter, { initialEntries: entries, initialIndex: entries.length - 1 }, createElement(BusinessPage))))
+  await act(async () => root.render(createElement(router.MemoryRouter, { initialEntries: entries, initialIndex: entries.length - 1, future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(BusinessPage))))
   return { container, observed: () => observed, click: () => act(async () => container.querySelector('button').click()), followLink: () => act(async () => container.querySelector('a').dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))) }
 }
 

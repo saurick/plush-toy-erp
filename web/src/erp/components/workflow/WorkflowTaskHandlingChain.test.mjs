@@ -175,7 +175,7 @@ test('shared chain handles read errors, retry, source switching and permission w
   document.body.appendChild(container)
   const root = createRoot(container)
   const render = (task = taskFor(), user = profile) =>
-    act(async () => root.render(createElement(MemoryRouter, {}, createElement(Chain, { task, profile: user }))))
+    act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Chain, { task, profile: user }))))
   t.after(async () => {
     await act(async () => root.unmount())
     container.remove()
@@ -238,7 +238,7 @@ finance_reviewed_at: '2026-09-16T02:38:04Z',
     JsonRpc.prototype.call = original
     dom.restore()
   })
-  const render = (canOpen, mobile = false) => act(async () => root.render(createElement(MemoryRouter, { key: mobile ? 'mobile' : 'desktop', initialEntries: [mobile ? '/m/engineering/tasks' : '/erp/task-board'] }, createElement(Chain, {
+  const render = (canOpen, mobile = false) => act(async () => root.render(createElement(MemoryRouter, { key: mobile ? 'mobile' : 'desktop', initialEntries: [mobile ? '/m/engineering/tasks' : '/erp/task-board'], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Chain, {
     task: taskFor(), variant: mobile ? 'mobile' : 'desktop', profile: { ...profile, permissions: [...profile.permissions, ...(canOpen ? ['purchase.order.read'] : [])], effective_session: { actions: [...profile.effective_session.actions, ...(canOpen ? ['purchase.order.read'] : [])] } },
   }))))
   await render(true)
@@ -278,7 +278,7 @@ items: [
   document.body.appendChild(container)
   const root = createRoot(container)
   t.after(async () => { await act(async () => root.unmount()); container.remove(); JsonRpc.prototype.call = original; dom.restore() })
-  const render = (id = 801) => act(async () => root.render(createElement(MemoryRouter, {}, createElement(Chain, { task: { ...task, id }, profile: user }))))
+  const render = (id = 801) => act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Chain, { task: { ...task, id }, profile: user }))))
   await render()
   assert.deepEqual(views, ['task'])
   assert.match(container.textContent, /本次返工复检/u)

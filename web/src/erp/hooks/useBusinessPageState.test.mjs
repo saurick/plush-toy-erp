@@ -23,7 +23,7 @@ test('筛选地址变化与清空后切换页签，不恢复已清除的旧筛�
     root.render(
       createElement(
         MemoryRouter,
-        null,
+        { future: { v7_startTransition: true, v7_relativeSplatPath: true } },
         createElement(
           Routes,
           null,

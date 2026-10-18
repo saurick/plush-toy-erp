@@ -18,7 +18,7 @@ test('tracking tab and session changes cancel older reads and never restore stal
   const node = document.createElement('div')
   document.body.appendChild(node)
   const root = createRoot(node)
-  const render = (scope, sessionKey = 'session-one') => act(async () => root.render(createElement(MemoryRouter, null, createElement(Panel, { scope, sessionKey, refreshKey: 0 }))))
+  const render = (scope, sessionKey = 'session-one') => act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Panel, { scope, sessionKey, refreshKey: 0 }))))
   const response = (title) => ({ data: {
     items: [{ kind: 'task', id: 1, process_key: '', title, source_type: 'sales_order', source_id: 1, source_no: 'SO-TRACK', display_context: null, status: 'done', resolution_kind: null, started_at: 1791367200, updated_at: 1791367200, completed_at: 1791367200, initiator_name: '业务', initiator_role_key: 'sales', current_tasks: [] }],
     total: 1,
@@ -80,7 +80,7 @@ test('tracking pagination cancels stale pages, retries the requested page and co
     await act(async () => root.unmount())
     node.remove(); JsonRpc.prototype.call = original; dom.restore()
   })
-  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/?track_page_started=2'] }, createElement(Probe))))
+  await act(async () => root.render(createElement(MemoryRouter, { initialEntries: ['/?track_page_started=2'], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Probe))))
   assert.equal(calls[0].params.offset, 20)
   await respond(calls[0], 25, '第二页')
   assert.match(node.textContent, /第二页-4/)
