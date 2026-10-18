@@ -37,8 +37,8 @@ scan_pdf_runtime_image() (
   printf '[pdf-runtime] trivy-tool-cache=%s trivy-db-cache=%s\n' "$tool_cache" "$database_cache"
   report_tmp="$(mktemp "$output/.vulnerabilities-XXXXXX.json")"
   GODEBUG=http2client=0 "$tool_dir/trivy" image --image-src docker --scanners vuln --list-all-pkgs --skip-version-check \
-    --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
     --db-repository ghcr.io/aquasecurity/trivy-db:2 \
+    --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
     --cache-dir "$root/output/cache/pdf-runtime/trivy-db" --cache-backend memory \
     --timeout 30m --parallel 2 \
     --format json --output "$report_tmp" "$image_id"

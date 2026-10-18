@@ -295,7 +295,7 @@ test("PDF runtime keeps repeatable source pins while comparing numeric upstream 
 test("Trivy keeps the official database and a proxy-tolerant transfer contract", () => {
   assert.match(
     trivyScript,
-    /curl --fail --location --retry 2 --connect-timeout 15 --max-time 900[\s\S]+GODEBUG=http2client=0 "\$tool_dir\/trivy" image[\s\S]+--db-repository public[.]ecr[.]aws\/aquasecurity\/trivy-db:2[\s\S]+--db-repository ghcr[.]io\/aquasecurity\/trivy-db:2[\s\S]+--timeout 30m --parallel 2/u,
+    /curl --fail --location --retry 2 --connect-timeout 15 --max-time 900[\s\S]+GODEBUG=http2client=0 "\$tool_dir\/trivy" image[\s\S]+--db-repository ghcr[.]io\/aquasecurity\/trivy-db:2[\s\S]+--db-repository public[.]ecr[.]aws\/aquasecurity\/trivy-db:2[\s\S]+--timeout 30m --parallel 2/u,
   );
   assert.match(
     runtimeScript,
