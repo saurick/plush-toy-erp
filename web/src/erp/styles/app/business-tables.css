@@ -1869,15 +1869,32 @@
   scrollbar-gutter: stable;
 }
 
+.erp-business-column-order-modal__description {
+  margin: 0 0 8px;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+
+.erp-business-column-order-modal__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+
 .erp-business-column-order-modal__row {
   display: grid;
   width: 100%;
   min-width: 0;
   min-height: 46px;
   align-items: center;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 12px;
-  border: 1px solid #e2ece4;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
   background: var(--erp-surface-bg-soft);
   padding: 6px 10px;
@@ -1889,22 +1906,33 @@
 
 .erp-business-column-order-modal__index {
   display: inline-flex;
-  width: 32px;
+  width: 48px;
   height: 32px;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d5ddd8;
+  border: 1px solid var(--erp-border);
   border-radius: 8px;
   background: var(--erp-surface-bg);
-  color: #17231c;
+  color: var(--erp-text-muted);
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: 500;
+}
+
+.erp-business-column-order-modal__drag-handle.ant-btn {
+  padding-inline: 4px;
+  cursor: grab;
+}
+
+.erp-business-column-order-modal
+  .erp-business-column-order-modal__row[data-drop-target='true'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
 }
 
 .erp-business-column-order-modal__label {
   min-width: 0;
-  color: #17231c;
-  font-weight: 600;
+  color: var(--erp-text);
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
@@ -1930,7 +1958,25 @@
 }
 
 .erp-business-column-order-modal__footer {
-  justify-content: flex-end;
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.erp-business-column-order-modal__footer > .ant-space {
+  margin-left: auto;
+}
+
+.erp-business-column-order-modal__draft-status {
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+
+.erp-business-column-order-modal__draft-status[data-dirty='true'] {
+  color: var(--erp-primary);
 }
 
 .erp-business-module-table-card .ant-table-row {

@@ -23,8 +23,9 @@ test('column settings move focus inside after the opening transition', () => {
   assert.match(source, /window\.requestAnimationFrame/u)
   assert.match(
     source,
-    /querySelector\('input:not\(:disabled\), button:not\(:disabled\)'\)/u
+    /querySelector\('input:not\(:disabled\)'\)/u
   )
+  assert.match(source, /querySelector\('button:not\(:disabled\)'\)/u)
   assert.match(source, /focus\(\{ preventScroll: true \}\)/u)
 })
 

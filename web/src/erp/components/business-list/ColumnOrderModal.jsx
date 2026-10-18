@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
+  HolderOutlined,
   UndoOutlined,
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
@@ -16,8 +17,7 @@ import {
   moveModuleColumnOrder,
   repositionModuleColumnOrder,
   resolveModuleColumnKey,
-  sanitizeModuleColumnOrder,
-  sanitizeModuleHiddenColumns,
+  resolveModuleHiddenColumns,
 } from '../../utils/moduleTableColumns.mjs'
 
 const EMPTY_COLUMNS = Object.freeze([])
@@ -46,13 +46,20 @@ export function ColumnOrderModal({
 }) {
   const [draftOrder, setDraftOrder] = useState([])
   const [draftHidden, setDraftHidden] = useState([])
+  const [dropTarget, setDropTarget] = useState(null)
   const contentRef = useRef(null)
+  const wasOpenRef = useRef(false)
+  const draggedColumnRef = useRef(null)
 
   useEffect(() => {
-    if (open) {
-      setDraftOrder(sanitizeModuleColumnOrder(order, columns))
-      setDraftHidden(sanitizeModuleHiddenColumns(hiddenColumns, columns))
+    // 同一次打开只初始化一次草稿，普通重绘和保存失败不覆盖用户调整。
+    if (open && !wasOpenRef.current) {
+      setDraftOrder(completeModuleColumnOrder(order, columns))
+      setDraftHidden(resolveModuleHiddenColumns(order, hiddenColumns, columns))
+      setDropTarget(null)
+      draggedColumnRef.current = null
     }
+    wasOpenRef.current = open
   }, [columns, hiddenColumns, open, order])
 
   const normalizedOrder = useMemo(() => {
@@ -65,11 +72,24 @@ export function ColumnOrderModal({
       ),
     [columns, normalizedOrder]
   )
+  const normalizedHidden = resolveModuleHiddenColumns(
+    draftOrder,
+    draftHidden,
+    columns
+  )
+  const savedOrder = completeModuleColumnOrder(order, columns)
+  const savedHidden = resolveModuleHiddenColumns(order, hiddenColumns, columns)
+  const hasChanges =
+    normalizedOrder.some((key, index) => key !== savedOrder[index]) ||
+    normalizedHidden.length !== savedHidden.length ||
+    normalizedHidden.some((key) => !savedHidden.includes(key))
+  const visibleCount = orderedColumns.length - normalizedHidden.length
 
   const moveColumn = (key, direction) => {
     if (saving) {
       return
     }
+    setDraftHidden(normalizedHidden)
     setDraftOrder(
       moveModuleColumnOrder(normalizedOrder, columns, key, direction)
     )
@@ -78,6 +98,7 @@ export function ColumnOrderModal({
     if (saving) {
       return
     }
+    setDraftHidden(normalizedHidden)
     setDraftOrder(
       repositionModuleColumnOrder(normalizedOrder, columns, key, targetIndex)
     )
@@ -86,7 +107,7 @@ export function ColumnOrderModal({
     if (saving) {
       return
     }
-    setDraftOrder([])
+    setDraftOrder(completeModuleColumnOrder([], columns))
     setDraftHidden(buildDefaultModuleHiddenColumns(columns))
   }
   const saveDraftOrder = async () => {
@@ -94,8 +115,8 @@ export function ColumnOrderModal({
       return
     }
     const saved = await onChange?.(
-      sanitizeModuleColumnOrder(draftOrder, columns),
-      sanitizeModuleHiddenColumns(draftHidden, columns)
+      normalizedOrder,
+      normalizedHidden
     )
     if (saved !== false) onClose?.()
   }
@@ -106,9 +127,7 @@ export function ColumnOrderModal({
       title={
         <div className="erp-business-action-modal__title">
           <span>列设置</span>
-          <small>
-            勾选显示列并调整顺序，点击完成保存到当前账号；不影响详情和导出。
-          </small>
+          <small>{moduleTitle || '当前列表'} · 仅对当前账号生效</small>
         </div>
       }
       open={open}
@@ -116,9 +135,10 @@ export function ColumnOrderModal({
       afterOpenChange={(visible) => {
         if (!visible) return
         window.requestAnimationFrame(() => {
-          contentRef.current
-            ?.querySelector('input:not(:disabled), button:not(:disabled)')
-            ?.focus({ preventScroll: true })
+          const firstControl =
+            contentRef.current?.querySelector('input:not(:disabled)') ||
+            contentRef.current?.querySelector('button:not(:disabled)')
+          firstControl?.focus({ preventScroll: true })
         })
       }}
       onCancel={saving ? undefined : onClose}
@@ -127,33 +147,55 @@ export function ColumnOrderModal({
       keyboard={!saving}
       destroyOnHidden={false}
       footer={
-        <Space wrap className="erp-business-column-order-modal__footer">
+        <div className="erp-business-column-order-modal__footer">
+          <span
+            className="erp-business-column-order-modal__draft-status"
+            data-dirty={hasChanges}
+            role="status"
+          >
+            {hasChanges ? '有未保存的调整' : '至少保留一列'}
+          </span>
+          <Space>
+            <Button disabled={saving} onClick={onClose}>取消</Button>
+            <Button
+              type="primary"
+              aria-label="完成"
+              aria-busy={saving}
+              loading={saving}
+              onClick={saveDraftOrder}
+            >
+              完成
+            </Button>
+          </Space>
+        </div>
+      }
+    >
+      <p className="erp-business-column-order-modal__description">
+        勾选显示列，拖动或用箭头调整顺序；详情和导出不变。
+      </p>
+      <div className="erp-business-column-order-modal__toolbar">
+        <span role="status">已选 {visibleCount} / {orderedColumns.length} 列</span>
+        <Space size={4} wrap>
           <Button
-            disabled={saving || draftHidden.length === 0}
-            onClick={() => setDraftHidden([])}
+            type="link"
+            disabled={saving || normalizedHidden.length === 0}
+            onClick={() => {
+              setDraftOrder(normalizedOrder)
+              setDraftHidden([])
+            }}
           >
             全部显示
           </Button>
           <Button
+            type="link"
             icon={<UndoOutlined aria-hidden="true" />}
-            className="erp-action-button"
             disabled={saving}
             onClick={resetDraftOrder}
           >
             恢复默认
           </Button>
-          <Button
-            type="primary"
-            aria-label="完成"
-            aria-busy={saving}
-            loading={saving}
-            onClick={saveDraftOrder}
-          >
-            完成
-          </Button>
         </Space>
-      }
-    >
+      </div>
       <div
         ref={contentRef}
         className="erp-business-column-order-modal"
@@ -165,30 +207,64 @@ export function ColumnOrderModal({
           const label = getColumnDisplayLabel(column)
           const isFirst = index === 0
           const isLast = index === orderedColumns.length - 1
-          const checked = !draftHidden.includes(key)
-          const isOnlyVisible =
-            checked && orderedColumns.length - draftHidden.length <= 1
+          const checked = !normalizedHidden.includes(key)
+          const isOnlyVisible = checked && visibleCount <= 1
           return (
             <div
               key={key}
               className="erp-business-column-order-modal__row erp-business-column-order-modal__row--visibility"
               role="listitem"
+              data-column-key={key}
+              data-drop-target={dropTarget === key}
+              onDragOver={(event) => {
+                if (saving || !draggedColumnRef.current) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+                setDropTarget(key)
+              }}
+              onDrop={(event) => {
+                const draggedKey = draggedColumnRef.current
+                if (saving || !draggedKey) return
+                event.preventDefault()
+                draggedColumnRef.current = null
+                setDropTarget(null)
+                repositionColumn(draggedKey, index)
+              }}
             >
-              <span className="erp-business-column-order-modal__index">
+              <Button
+                type="text"
+                className="erp-business-column-order-modal__index erp-business-column-order-modal__drag-handle"
+                icon={<HolderOutlined aria-hidden="true" />}
+                aria-label={`${label} 拖动排列`}
+                title="拖动排列，也可使用右侧移动按钮"
+                tabIndex={-1}
+                draggable={!saving}
+                disabled={saving}
+                onDragStart={(event) => {
+                  draggedColumnRef.current = key
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('text/plain', key)
+                }}
+                onDragEnd={() => {
+                  draggedColumnRef.current = null
+                  setDropTarget(null)
+                }}
+              >
                 {index + 1}
-              </span>
+              </Button>
               <Checkbox
                 className="erp-business-column-order-modal__label"
                 checked={checked}
                 disabled={saving || isOnlyVisible}
                 title={isOnlyVisible ? '至少保留一列' : undefined}
-                onChange={(event) =>
-                  setDraftHidden((current) =>
+                onChange={(event) => {
+                  setDraftOrder(normalizedOrder)
+                  setDraftHidden(
                     event.target.checked
-                      ? current.filter((item) => item !== key)
-                      : [...current, key]
+                      ? normalizedHidden.filter((item) => item !== key)
+                      : [...normalizedHidden, key]
                   )
-                }
+                }}
               >
                 {label}
               </Checkbox>

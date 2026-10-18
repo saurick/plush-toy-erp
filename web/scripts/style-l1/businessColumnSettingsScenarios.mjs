@@ -85,6 +85,12 @@ export function createBusinessColumnSettingsScenarios({
       const hitTargetRowBox = hitTarget
         ?.closest('.erp-business-column-order-modal__row')
         ?.getBoundingClientRect()
+      const footer = node.querySelector('.ant-modal-footer')
+      const footerContent = node.querySelector('.erp-business-column-order-modal__footer')
+      const footerStyle = footer && getComputedStyle(footer)
+      const footerWidth = footer
+        ? footer.clientWidth - parseFloat(footerStyle.paddingLeft) - parseFloat(footerStyle.paddingRight)
+        : 0
       return {
         width: box.width,
         inViewport:
@@ -97,6 +103,7 @@ export function createBusinessColumnSettingsScenarios({
           (row) => row.scrollWidth > row.clientWidth
         ),
         hitTargetHeight: hitTargetBox?.height || 0,
+        footerFillsContent: Boolean(footerContent && Math.abs(footerContent.getBoundingClientRect().width - footerWidth) <= 1.5),
         hitTargetTopInset:
           hitTargetBox && hitTargetRowBox
             ? hitTargetBox.top - hitTargetRowBox.top
@@ -112,6 +119,7 @@ export function createBusinessColumnSettingsScenarios({
       `布局度量必须等弹窗展开动画结束: ${JSON.stringify(metrics)}`
     )
     assert(metrics.hitTargetHeight >= 44, JSON.stringify(metrics))
+    assert(metrics.footerFillsContent, '未保存状态与完成按钮应分居页脚两侧')
     assert(
       metrics.inViewport && !metrics.overflow && !metrics.rowOverflow,
       JSON.stringify(metrics)
@@ -124,11 +132,13 @@ export function createBusinessColumnSettingsScenarios({
       path: '/erp/master/materials',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
-      viewport: { width: 1440, height: 900 },
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
       verify: async (page) => {
         await page.locator(headerSelector).first().waitFor()
         const defaults = await labels(page)
         let dialog = await open(page)
+        await dialog.getByText(`已选 ${defaults.length} / ${await dialog.getByRole('checkbox').count()} 列`, { exact: true }).waitFor()
         const colorCheckbox = dialog.getByRole('checkbox', {
           name: '颜色',
           exact: true,
@@ -164,6 +174,16 @@ export function createBusinessColumnSettingsScenarios({
             .isChecked(),
           '关闭应放弃草稿'
         )
+        const rows = dialog.locator('[data-column-key]')
+        await dialog
+          .getByRole('button', { name: '颜色 拖动排列', exact: true })
+          .dragTo(rows.first())
+        assert.equal(await rows.first().getAttribute('data-column-key'), 'color', '拖动应调整草稿顺序')
+        await dialog.getByText('有未保存的调整', { exact: true }).waitFor()
+        assert.deepEqual(await labels(page), defaults, '拖动草稿不得提前改变列表')
+        await dialog.getByRole('button', { name: '取消', exact: true }).click()
+        dialog = await open(page)
+        assert.notEqual(await rows.first().getAttribute('data-column-key'), 'color', '取消应放弃拖动顺序')
         await dialog
           .getByRole('checkbox', { name: '颜色', exact: true })
           .uncheck()
@@ -174,8 +194,10 @@ export function createBusinessColumnSettingsScenarios({
         await dialog.screenshot({
           path: path.join(outputDir, 'business-column-settings-materials.png'),
         })
+        await page.screenshot({ path: path.join(outputDir, 'business-column-settings-desktop-dialog.png') })
         const saved = await save(page, dialog)
         assert(saved.hidden_columns.includes('color'), '显隐与排序应一起保存')
+        assert.equal(saved.order[0], 'color', '顺序与显隐使用同一次保存')
         assert(!(await labels(page)).includes('颜色'))
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page.locator(headerSelector).first().waitFor()
@@ -187,6 +209,7 @@ export function createBusinessColumnSettingsScenarios({
           '表头只保留列名与排序，列设置集中在工具栏'
         )
         dialog = await open(page)
+        assert.equal(await dialog.locator('[data-column-key]').first().getAttribute('data-column-key'), 'color', '刷新后保留隐藏列的排列位置')
         await dialog
           .getByRole('button', { name: `${defaults[0]} 下移`, exact: true })
           .click()
@@ -223,8 +246,15 @@ export function createBusinessColumnSettingsScenarios({
           !(await checkboxes[0].isDisabled()),
           '增加可见列后应解除最后一列限制'
         )
+        const beforeReset = await labels(page)
         await dialog.getByRole('button', { name: '恢复默认' }).click()
-        await save(page, dialog)
+        await dialog.getByRole('button', { name: '取消', exact: true }).click()
+        assert.deepEqual(await labels(page), beforeReset, '取消恢复默认应保留已保存的列表')
+        dialog = await open(page)
+        await dialog.getByRole('button', { name: '恢复默认' }).click()
+        const reset = await save(page, dialog)
+        assert.deepEqual(reset.order, [], '恢复默认清除个人顺序覆盖')
+        assert.deepEqual(reset.hidden_columns, [], '恢复默认清除个人显隐覆盖')
         assert.deepEqual(await labels(page), defaults)
 
         let failure = true
@@ -348,13 +378,13 @@ export function createBusinessColumnSettingsScenarios({
             .getByRole('checkbox', { name: '颜色', exact: true })
             .isChecked())
         )
-        const metrics = await geometry(dialog)
-        await dialog.screenshot({
-          path: path.join(
-            outputDir,
-            'business-column-settings-dark-narrow.png'
-          ),
-        })
+        const metrics = []
+        for (const width of [760, 390]) {
+          await page.setViewportSize({ width, height: 900 })
+          metrics.push({ viewportWidth: width, ...await geometry(dialog) })
+          await dialog.screenshot({ path: path.join(outputDir, `business-column-settings-dark-${width}-dialog.png`) })
+        }
+        await page.setViewportSize({ width: 760, height: 900 })
         await fs.writeFile(
           path.join(outputDir, 'business-column-settings-geometry.json'),
           JSON.stringify(metrics, null, 2)

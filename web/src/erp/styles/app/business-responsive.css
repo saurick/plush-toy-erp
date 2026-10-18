@@ -572,6 +572,24 @@ body
   cursor: pointer;
 }
 
+@media screen and (max-width: 520px) {
+  .erp-business-column-order-modal__row {
+    grid-template-columns: 48px minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .erp-business-column-order-modal__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    padding-bottom: 8px;
+  }
+
+  .erp-business-column-order-modal__actions .ant-space-item,
+  .erp-business-column-order-modal__action {
+    flex: 0 0 auto;
+  }
+}
+
 @media screen and (max-width: 1200px) {
   .erp-business-filter-panel__aside {
     flex-basis: 100%;
@@ -687,20 +705,6 @@ body
 
   .erp-purchase-receipt-inline-item-editor__button {
     flex: 1 1 120px;
-  }
-
-  .erp-business-column-order-modal__row {
-    grid-template-columns: 40px minmax(0, 1fr);
-  }
-
-  .erp-business-column-order-modal__actions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-  }
-
-  .erp-business-column-order-modal__actions .ant-space-item,
-  .erp-business-column-order-modal__action {
-    flex: 0 0 auto;
   }
 
   .erp-business-module-variant-grid {

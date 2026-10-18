@@ -564,6 +564,18 @@
     .column-row { min-height: 42px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; display: flex; align-items: center; gap: 8px; }
     .column-row span { flex: 1; }
     .column-row label { display: flex; align-items: center; gap: 8px; flex: 1; min-height: 34px; cursor: pointer; }
+    .column-settings-modal .column-row { padding-block: 0; }
+    .column-settings-modal .column-row label { min-height: 44px; }
+    .column-settings-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 0 12px; }
+    .column-settings-tools > div, .column-moves { display: flex; gap: 4px; }
+    .column-row .column-drag { cursor: grab; }
+    .column-row .column-moves { flex: 0 0 auto; }
+    .column-row[data-drop-target] { border-color: var(--accent); }
+    @media (max-width: 520px) {
+      .column-settings-modal .column-row { flex-wrap: wrap; }
+      .column-settings-modal .column-row label { min-width: 120px; }
+      .column-row .column-moves { margin-left: auto; padding-bottom: 6px; }
+    }
 
     .catalog-modal { width: min(1040px, 100%); height: min(790px, calc(100vh - 36px)); }
     .catalog-tools { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 10px; align-items: end; }
@@ -16968,8 +16980,48 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderColumnsModal() {
       const config = currentPageConfig() || listConfig.sales;
       const draft = state.columnDraft;
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal" role="dialog" aria-modal="true" aria-label="列设置"><header class="modal-head"><strong>列设置</strong><span class="data-note">勾选显示列并调整顺序；次要列可随时找回，不影响详情、导出或已有偏好。</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="column-list">${columnDefs(config,draft.order).map(([key,label],index) => `<div class="column-row">${icon('grip')}<label><input class="checkbox" type="checkbox" data-action="toggle-column" data-key="${key}" ${draft.visible.has(key)?'checked':''} ${draft.visible.has(key)&&draft.visible.size===1?'disabled':''}/><span>${label}</span></label><button class="btn icon-btn" data-action="column-up" data-key="${key}" aria-label="${label} 上移" ${index===0?'disabled':''}>↑</button><button class="btn icon-btn" data-action="column-down" data-key="${key}" aria-label="${label} 下移" ${index===draft.order.length-1?'disabled':''}>↓</button></div>`).join('')}</div></div><footer class="modal-foot"><button class="btn" data-action="all-columns" ${draft.visible.size===draft.order.length?'disabled':''}>全部显示</button><button class="btn" data-action="reset-columns">恢复默认</button><button class="btn primary" data-action="save-columns">完成</button></footer></section></div>`;
+      const dirty = draft.order.join('|') !== state.columnOrder.join('|') || draft.visible.size !== state.visibleColumns.size || [...draft.visible].some(key=>!state.visibleColumns.has(key));
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal column-settings-modal" role="dialog" aria-modal="true" aria-label="列设置"><header class="modal-head"><strong>列设置</strong><span class="data-note">${config.title || '当前列表'} · 仅对当前账号生效</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p class="data-note">勾选显示列，拖动或用箭头调整顺序；详情和导出不变。</p><div class="column-settings-tools"><span class="data-note" role="status">已选 ${draft.visible.size} / ${draft.order.length} 列</span><div><button class="btn ghost" data-action="all-columns" ${draft.visible.size===draft.order.length?'disabled':''}>全部显示</button><button class="btn ghost" data-action="reset-columns">恢复默认</button></div></div><div class="column-list">${columnDefs(config,draft.order).map(([key,label],index) => `<div class="column-row" data-column-key="${key}"><button class="btn ghost icon-btn column-drag" draggable="true" tabindex="-1" data-column-drag="${key}" aria-label="${label} 拖动排列">${icon('grip')}</button><label><input class="checkbox" type="checkbox" data-action="toggle-column" data-key="${key}" ${draft.visible.has(key)?'checked':''} ${draft.visible.has(key)&&draft.visible.size===1?'disabled':''}/><span>${label}</span></label><div class="column-moves"><button class="btn icon-btn" data-action="column-first" data-key="${key}" aria-label="${label} 移到最前" ${index===0?'disabled':''}>⇈</button><button class="btn icon-btn" data-action="column-up" data-key="${key}" aria-label="${label} 上移" ${index===0?'disabled':''}>↑</button><button class="btn icon-btn" data-action="column-down" data-key="${key}" aria-label="${label} 下移" ${index===draft.order.length-1?'disabled':''}>↓</button><button class="btn icon-btn" data-action="column-last" data-key="${key}" aria-label="${label} 移到最后" ${index===draft.order.length-1?'disabled':''}>⇊</button></div></div>`).join('')}</div></div><footer class="modal-foot"><span class="data-note" role="status">${dirty?'有未保存的调整':'至少保留一列'}</span><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="save-columns">完成</button></footer></section></div>`;
     }
+
+    function moveColumnDraft(key, position) {
+      const draft = state.columnDraft;
+      if (!draft) return;
+      const from = draft.order.indexOf(key);
+      const to = Math.max(0, Math.min(draft.order.length - 1, position));
+      if (from < 0 || from === to) return;
+      draft.order.splice(from, 1);
+      draft.order.splice(to, 0, key);
+      renderFloating();
+    }
+
+    let draggedColumnKey = null;
+    document.addEventListener('dragstart', event=>{
+      const handle=event.target.closest('[data-column-drag]');
+      if (!handle || state.overlay!=='columns') return;
+      draggedColumnKey=handle.dataset.columnDrag;
+      event.dataTransfer.effectAllowed='move';
+      event.dataTransfer.setData('text/plain',draggedColumnKey);
+    });
+    document.addEventListener('dragover', event=>{
+      const row=event.target.closest('.column-settings-modal [data-column-key]');
+      if (!row || !draggedColumnKey) return;
+      event.preventDefault();event.dataTransfer.dropEffect='move';
+      document.querySelectorAll('.column-row[data-drop-target]').forEach(node=>node.removeAttribute('data-drop-target'));
+      row.dataset.dropTarget='true';
+    });
+    document.addEventListener('drop', event=>{
+      const row=event.target.closest('.column-settings-modal [data-column-key]');
+      if (!row || !draggedColumnKey || !state.columnDraft) return;
+      event.preventDefault();
+      const key=draggedColumnKey;draggedColumnKey=null;
+      moveColumnDraft(key,state.columnDraft.order.indexOf(row.dataset.columnKey));
+      document.querySelectorAll('.column-row[data-drop-target]').forEach(node=>node.removeAttribute('data-drop-target'));
+    });
+    document.addEventListener('dragend', ()=>{
+      draggedColumnKey=null;
+      document.querySelectorAll('.column-row[data-drop-target]').forEach(node=>node.removeAttribute('data-drop-target'));
+    });
 
     function renderCatalogModal() {
       const q = state.catalogSearch.trim().toLowerCase();
@@ -17721,7 +17773,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'all-columns') { state.columnDraft.visible=new Set(state.columnDraft.order);renderFloating(); }
       else if (action === 'reset-columns') { state.columnDraft={visible:new Set(['no','party','status','date','metric','owner','risk']),order:['no','party','status','date','metric','owner','progress','risk']};renderFloating(); }
       else if (action === 'save-columns') { state.visibleColumns=new Set(state.columnDraft.visible);state.columnOrder=[...state.columnDraft.order];state.columnDraft=null;state.overlay=null;renderAll();toast('列设置已保存'); }
-      else if (action === 'column-up' || action === 'column-down') { const key=target.dataset.key;const draft=state.columnDraft;const from=draft.order.indexOf(key);const delta=action==='column-up'?-1:1;const to=Math.max(0,Math.min(draft.order.length-1,from+delta));if(from>=0&&to!==from){const next=[...draft.order];[next[from],next[to]]=[next[to],next[from]];draft.order=next;renderFloating();} }
+      else if (['column-first','column-up','column-down','column-last'].includes(action)) { const draft=state.columnDraft;const from=draft.order.indexOf(target.dataset.key);const to=action==='column-first'?0:action==='column-last'?draft.order.length-1:from+(action==='column-up'?-1:1);moveColumnDraft(target.dataset.key,to); }
       else if (action === 'set-accent') { state.accent = target.dataset.value; applyTheme(); renderAll(); }
       else if (action === 'set-mode') { state.mode = target.dataset.value; applyTheme(); renderAll(); }
       else if (action === 'set-density') { state.density = target.dataset.value; applyTheme(); renderAll(); }
