@@ -649,14 +649,17 @@ function buildProcesses(prefix, count) {
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const name = names[offset % names.length];
+    // 生产节点只绑定首组工序，扩容时的重复名称作为普通工序。
+    const routeOperation = offset < names.length
+      ? productionRouteOperationByName.get(name)
+      : undefined;
     return {
       code: `${prefix}-GX-${pad(index, 3)}`,
       name,
       category: name,
-      ...(productionRouteOperationByName.has(name)
+      ...(routeOperation
         ? {
-            production_route_operation_code:
-              productionRouteOperationByName.get(name),
+            production_route_operation_code: routeOperation,
           }
         : {}),
       outsourcing_enabled: ![

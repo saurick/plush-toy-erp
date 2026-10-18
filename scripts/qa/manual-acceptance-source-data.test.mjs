@@ -250,6 +250,11 @@ test("volume source profile produces linked multi-page records without changing 
   }
   assert.equal(volume.records.products.flatMap((record) => record.skus).length, 480);
   assert.equal(volume.records.bomVersions.length, 450);
+  const routeOwners = (plan) => plan.records.processes
+    .filter((record) => record.production_route_operation_code)
+    .map((record) => [record.code, record.name, record.production_route_operation_code]);
+  assert.deepEqual(routeOwners(volume), routeOwners(acceptance));
+  assert.equal(routeOwners(volume).length, 4);
   assert.notEqual(volume.semanticDigest, acceptance.semanticDigest);
   assert.equal(volume.dataVersion, acceptance.dataVersion);
   assert.equal(volume.prefix, acceptance.prefix);
