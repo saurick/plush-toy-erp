@@ -7,7 +7,8 @@ test('popup readiness waits for the selected portal motion and ignores paused or
   let release
   let finished = false
   let frames = 0
-  const running = { playState: 'running', effect: { getTiming: () => ({ iterations: 1 }) }, finished: new Promise((resolve) => { release = resolve }) }
+  const running = { playState: 'running', effect: { getTiming: () => ({ iterations: 1 }) }, get finished() { throw new Error('read live animation state instead of retaining a finished promise') } }
+  release = () => { running.playState = 'finished' }
   const neverWait = (playState, iterations) => ({ playState, effect: { getTiming: () => ({ iterations }) }, get finished() { throw new Error('unrelated animation must not block the popup') } })
   const popup = { getClientRects: () => [1], getAnimations: () => [running, neverWait('paused', 1), neverWait('running', Infinity)] }
   globalThis.requestAnimationFrame = (callback) => queueMicrotask(() => { frames += 1; callback() })
@@ -17,10 +18,11 @@ test('popup readiness waits for the selected portal motion and ignores paused or
   const waiting = waitForFiniteAnimations(page, { selector: '.ant-modal' }).then(() => { finished = true })
   for (let tick = 0; tick < 8; tick += 1) await Promise.resolve()
   assert.equal(finished, false)
+  const framesBeforeFinish = frames
   release()
   await waiting
   assert.equal(finished, true)
-  assert.equal(frames, 4)
+  assert.ok(frames >= framesBeforeFinish + 2, '完成后还需核对稳定绘制帧')
 })
 
 test('motion that does not finish fails with a bounded diagnostic', async (t) => {
@@ -37,4 +39,36 @@ test('motion that does not finish fails with a bounded diagnostic', async (t) =>
   expire()
   await assert.rejects(waiting, /Browser motion did not settle: document/u)
   assert.equal(cleared, true)
+})
+
+test('readiness follows a replacement transition instead of returning when the original one finishes', async (t) => {
+  const previous = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame }
+  const animation = () => ({ playState: 'running', effect: { getTiming: () => ({ iterations: 1 }) } })
+  const first = animation(), replacement = animation()
+  let current = [first]
+  let finished = false
+  globalThis.requestAnimationFrame = (callback) => queueMicrotask(callback)
+  globalThis.document = { getAnimations: () => current }
+  t.after(() => Object.assign(globalThis, previous))
+  const waiting = waitForFiniteAnimations({ evaluate: (fn, value) => fn(value) }).then(() => { finished = true })
+  for (let tick = 0; tick < 8; tick += 1) await Promise.resolve()
+  first.playState = 'finished'
+  current = [replacement]
+  for (let tick = 0; tick < 8; tick += 1) await Promise.resolve()
+  assert.equal(finished, false, '新出现的有限动画仍须等待')
+  replacement.playState = 'finished'
+  await waiting
+  assert.equal(finished, true)
+})
+
+test('readiness settles when a completed transition retains an unresolved finished promise', async (t) => {
+  const previous = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame }
+  const motion = { playState: 'running', effect: { getTiming: () => ({ iterations: 1 }) }, finished: new Promise(() => {}) }
+  globalThis.requestAnimationFrame = (callback) => queueMicrotask(callback)
+  globalThis.document = { getAnimations: () => [motion] }
+  t.after(() => Object.assign(globalThis, previous))
+  const waiting = waitForFiniteAnimations({ evaluate: (fn, value) => fn(value) })
+  for (let tick = 0; tick < 8; tick += 1) await Promise.resolve()
+  motion.playState = 'finished'
+  await waiting
 })
