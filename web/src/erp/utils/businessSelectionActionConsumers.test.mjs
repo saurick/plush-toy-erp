@@ -183,7 +183,7 @@ test('采购订单页通过唯一操作面板消费共享动作合同', () => {
   assert.match(purchasePanel, /<BusinessLifecycleSecondaryAction/u)
 })
 
-test('共享操作区保留岗位动作入口，桌面和窄屏均限制常驻动作数量', () => {
+test('共享操作区保留岗位动作入口，桌面和窄屏均按实际空间收纳', () => {
   const layout = readFileSync(
     resolve(
       currentDirectory,
@@ -191,9 +191,8 @@ test('共享操作区保留岗位动作入口，桌面和窄屏均限制常驻�
     ),
     'utf8'
   )
-  assert.match(layout, /DESKTOP_SELECTION_ACTION_LIMIT = 4/u)
-  assert.match(layout, /TABLET_SELECTION_ACTION_LIMIT = 2/u)
-  assert.match(layout, /PHONE_SELECTION_ACTION_LIMIT = 1/u)
+  assert.match(layout, /selectStableBusinessActionIndexes/u)
+  assert.match(layout, /ResizeObserver/u)
   assert.match(layout, /child\.props\?\.visible !== false/u)
   assert.match(
     layout,

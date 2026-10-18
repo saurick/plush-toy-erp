@@ -9,6 +9,25 @@ import {
 import { resolveBusinessActionAvailability } from '../../utils/businessActionAvailability.mjs'
 
 const dom = installTestDOM()
+function installActionSpace(t, initialWidth = 420) {
+  let availableWidth = initialWidth
+  const prototype = dom.runtimeWindow.HTMLElement.prototype
+  const originalRect = prototype.getBoundingClientRect
+  prototype.getBoundingClientRect = function getActionRect() {
+    let width
+    if (this.matches('.erp-business-selection-action-bar__actions--responsive')) width = availableWidth
+    else if (this.matches('.erp-business-selection-action-bar__measure-item')) {
+      const count = this.querySelectorAll('.ant-btn').length
+      width = count * 80 + Math.max(0, count - 1) * 8
+    } else if (this.matches('.erp-business-selection-action-bar__measure .ant-btn')) width = 96
+    return width === undefined ? originalRect.call(this) : new dom.runtimeWindow.DOMRect(0, 0, width, 32)
+  }
+  t.after(() => { prototype.getBoundingClientRect = originalRect })
+  return (width) => {
+    availableWidth = width
+    dom.runtimeWindow.dispatchEvent(new dom.runtimeWindow.Event('resize'))
+  }
+}
 const NativeMessageChannel = globalThis.MessageChannel
 const testChannels = []
 globalThis.MessageChannel = class TestMessageChannel extends (
@@ -109,6 +128,7 @@ test('未选和清空选择时收起记录操作，选中后按权限展示办�
 })
 
 test('更多操作重新打开时使用最新选择状态', async (t) => {
+  installActionSpace(t)
   const [{ SelectionActionBar, BusinessActionTooltip }, { Button }] =
     await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
   const container = document.createElement('div')
@@ -166,9 +186,66 @@ test('更多操作重新打开时使用最新选择状态', async (t) => {
   assert.equal(printButton().disabled, false)
   await click(printButton())
   assert.equal(printedID, 2)
+  selectedID = 3
+  await render()
+  await click(more())
+  await click(printButton())
+  assert.equal(printedID, 3)
 })
 
-test('记录动作按任务角色排序，按钮颜色和临时忙碌不改变分组', async (t) => {
+test('空间变大展开少量动作，变窄收纳，确认中不迁移触发按钮且权限变化不残留', async (t) => {
+  const resize = installActionSpace(t, 240)
+  const [{ SelectionActionBar }, { Button, Popconfirm, ConfigProvider }] = await Promise.all([
+    import('./BusinessListLayout.jsx'), import('antd'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let related = true
+  let writable = true
+  let handled = 0
+  const render = () => act(async () => root.render(createElement(ConfigProvider, { theme: { token: { motion: false } } },
+    createElement(SelectionActionBar, { selectedCount: 1 },
+      createElement(Button, { 'data-business-action-role': 'view' }, '查看明细'),
+      related ? createElement(Button, { 'data-business-action-role': 'related' }, '相关单据') : null,
+      writable ? createElement(Popconfirm, { title: '确认撤销测试出货？', okText: '确认撤销', cancelText: '保留出货', onConfirm: () => { handled += 1 } },
+        createElement(Button, { danger: true, 'data-business-action-role': 'danger' }, '撤销出货')) : null
+    ))))
+  const more = () => container.querySelector('.erp-business-selection-action-bar__compact-more')
+  const button = (label) => [...document.querySelectorAll('button')].find((node) => node.textContent.replace(/\s+/gu, '') === label)
+  const click = (node) => act(async () => { assert(node); node.click() })
+  const settle = () => act(async () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  await render()
+  assert(more())
+  await click(more())
+  await click(button('撤销出货'))
+  assert.equal(handled, 0)
+  await act(async () => resize(600))
+  await settle()
+  assert(more(), '确认期间保持原操作位置')
+  assert(button('保留出货'))
+  await click(button('保留出货'))
+  await settle()
+  assert.equal(more(), null)
+  assert.equal(handled, 0)
+  assert.equal(container.querySelectorAll('.erp-business-selection-action-bar__compact-visible button').length, 3)
+  await click(button('撤销出货'))
+  await click(button('确认撤销'))
+  assert.equal(handled, 1)
+  related = false
+  writable = false
+  await render()
+  assert.equal(more(), null)
+  assert.equal(button('相关单据'), undefined)
+  assert.equal(button('撤销出货'), undefined)
+  await act(async () => resize(200))
+  await settle()
+  assert.equal(more(), null, '少量动作在窄容器仍能放下时不强制收纳')
+})
+
+test('放得下时完整展示动作，按钮颜色和临时忙碌不改变分组', async (t) => {
+  installActionSpace(t, 600)
   const [{ SelectionActionBar }, { Button, Space }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -179,10 +256,10 @@ test('记录动作按任务角色排序，按钮颜色和临时忙碌不改变�
   )))
   const direct = () => [...container.querySelectorAll('.erp-business-selection-action-bar__record-actions button')].map((button) => button.textContent.replace(/\s+/gu, ''))
   await render()
-  assert.deepEqual(direct(), ['查看', '编辑', '判定合格', '判定不合格', '更多操作'])
+  assert.deepEqual(direct(), ['打印', '重新读取', '查看', '编辑', '判定合格', '判定不合格'])
   busy = true
   await render()
-  assert.deepEqual(direct(), ['查看', '编辑', '判定合格', '判定不合格', '更多操作'])
+  assert.deepEqual(direct(), ['打印', '重新读取', '查看', '编辑', '判定合格', '判定不合格'])
   assert.equal([...container.querySelectorAll('button')].find((button) => button.textContent.replace(/\s+/gu, '') === '编辑').disabled, true)
 })
 
@@ -195,13 +272,13 @@ test('内部受权限控制的组件没有入口时，不生成空的更多操�
   function Related({ authorized }) { return authorized ? createElement(Button, null, '相关任务') : null }
   Related.selectionActionRole = 'related'
   Related.selectionActionVisible = ({ authorized }) => authorized
-  const render = (authorized) => act(async () => root.render(createElement(SelectionActionBar, { selectedCount: 1 },
-    createElement(Button, { 'data-business-action-role': 'view' }, '查看详情'), createElement(Related, { authorized })
+  const render = (authorized) => act(async () => root.render(createElement(SelectionActionBar, { selectedCount: 1 }, createElement(Button, { 'data-business-action-role': 'view' }, '查看详情'), createElement(Related, { authorized })
   )))
   await render(false)
   assert.equal(container.querySelector('.erp-business-selection-action-bar__compact-more'), null)
   await render(true)
-  assert(container.querySelector('.erp-business-selection-action-bar__compact-more'))
+  assert.equal(container.querySelector('.erp-business-selection-action-bar__compact-more'), null)
+  assert([...container.querySelectorAll('button')].some((node) => node.textContent === '相关任务'))
 })
 
 test('选中记录时新建降低强调，清空后恢复且保留原入口', async (t) => {
@@ -313,6 +390,7 @@ counts: { DRAFT: 2, SUBMITTED: 3 },
 })
 
 test('更多操作中的单据菜单按 Escape 后同时关闭，焦点恢复且可再次执行', async (t) => {
+  installActionSpace(t)
   const [{ SelectionActionBar }, { Button, ConfigProvider, Dropdown }] =
     await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
   const container = document.createElement('div')
@@ -420,6 +498,7 @@ test('更多操作中的单据菜单按 Escape 后同时关闭，焦点恢复且
 })
 
 test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后收起且键盘可恢复', async (t) => {
+  installActionSpace(t)
   const [
     {
       SelectionActionBar,

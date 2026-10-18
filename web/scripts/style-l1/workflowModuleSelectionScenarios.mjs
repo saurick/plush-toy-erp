@@ -46,6 +46,8 @@ function scenarioIdentity(definition, effectiveSession, readonly = false) {
 
 const actionBar = (page) =>
   page.locator('.erp-business-module-current-action:visible')
+const availableActions = (page) =>
+  page.locator('.erp-business-module-current-action:visible, .erp-business-selection-action-menu:visible')
 const taskRow = (page, id) =>
   page.locator(`.ant-table-tbody > tr[data-row-key="${id}"]`)
 const taskAction = (page, action) =>
@@ -220,15 +222,14 @@ export function createWorkflowModuleSelectionScenarios(deps) {
               true,
               'closing details retains the selected task'
             )
-            await actionBar(page)
-              .getByRole('button', { name: /更多操作/u })
-              .click()
+            const more = actionBar(page).getByRole('button', { name: /更多操作/u })
+            if (await more.count()) await more.click()
             const menu = page.locator(
               '.erp-business-selection-action-menu:visible'
             )
             for (const action of ['block', 'reject', 'urge']) {
               assert.equal(
-                await menu
+                await availableActions(page)
                   .locator(
                     `[data-business-action-key="workflow-task-${action}"]`
                   )
@@ -236,8 +237,10 @@ export function createWorkflowModuleSelectionScenarios(deps) {
                 true
               )
             }
-            await menu.press('Escape')
-            await menu.waitFor({ state: 'hidden' })
+            if (await menu.count()) {
+              await menu.press('Escape')
+              await menu.waitFor({ state: 'hidden' })
+            }
 
             await taskRow(page, readyID + 1)
               .getByRole('radio')
@@ -470,20 +473,19 @@ export function createWorkflowModuleSelectionScenarios(deps) {
           true
         )
       }
-      await actionBar(page)
-        .getByRole('button', { name: /更多操作/u })
-        .click()
+      const more = actionBar(page).getByRole('button', { name: /更多操作/u })
+      if (await more.count()) await more.click()
       const menu = page.locator('.erp-business-selection-action-menu:visible')
       for (const key of ['related-tasks', 'copy']) {
         assert.equal(
-          await menu.locator(`[data-business-action-key="${key}"]`).isEnabled(),
+          await availableActions(page).locator(`[data-business-action-key="${key}"]:visible`).isEnabled(),
           true,
           `BOM draft retains ${key}`
         )
       }
       for (const label of ['打印物料明细', '打印色卡', '打印作业指导书']) {
         assert.equal(
-          await menu
+          await availableActions(page)
             .getByRole('button', { name: new RegExp(label, 'u') })
             .isEnabled(),
           true
@@ -493,8 +495,10 @@ export function createWorkflowModuleSelectionScenarios(deps) {
         path: path.join(outputDir, 'business-selection-bom-action-entries.png'),
         fullPage: true,
       })
-      await menu.press('Escape')
-      await menu.waitFor({ state: 'hidden' })
+      if (await menu.count()) {
+        await menu.press('Escape')
+        await menu.waitFor({ state: 'hidden' })
+      }
       await actionBar(page).locator('[data-business-action-key="edit"]').click()
       await page
         .getByRole('heading', { name: '编辑 BOM 草稿 · 未生效', exact: true })

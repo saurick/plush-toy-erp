@@ -18,34 +18,18 @@ const businessTableCss = readFileSync(
   'utf8'
 )
 
-test('当前操作条按手机和平板宽度收口动作，不为页面各写一套分支', () => {
-  assert.match(layoutSource, /PHONE_SELECTION_ACTION_LIMIT\s*=\s*1/u)
-  assert.match(layoutSource, /TABLET_SELECTION_ACTION_LIMIT\s*=\s*2/u)
+test('共享操作条按真实可用空间收纳，不按动作类别或屏幕固定数量隐藏', () => {
   assert.match(
     layoutSource,
-    /resolveInitialSelectionActionScreens\(\{ screenLG, screenMD \}\)[\s\S]*Grid\.useBreakpoint\(true, initialScreens\)/u
-  )
-  assert.match(
-    layoutSource,
-    /erp-business-selection-action-bar__actions--compact/u
+    /erp-business-selection-action-bar__actions--responsive/u
   )
   assert.match(layoutSource, /更多操作/u)
   assert.match(layoutSource, /selectStableBusinessActionIndexes/u)
-  assert.doesNotMatch(
-    layoutSource,
-    /Number\(right\.enabled\) - Number\(left\.enabled\)/u
-  )
+  assert.doesNotMatch(layoutSource, /(?:PHONE|TABLET|DESKTOP)_SELECTION_ACTION_LIMIT|OVERFLOW_ACTION_ROLES/u)
 })
 
-test('当前操作条首帧读取真实断点，且按钮尺寸不参与过渡', () => {
-  assert.match(
-    layoutSource,
-    /matchMedia\(`\(min-width: \$\{token\.screenLG\}px\)`\)/u
-  )
-  assert.match(
-    layoutSource,
-    /matchMedia\(`\(min-width: \$\{token\.screenMD\}px\)`\)/u
-  )
+test('当前操作条适配容器变化，按钮尺寸不参与过渡', () => {
+  assert.match(layoutSource, /ResizeObserver/u)
   assert.match(
     businessTableCss,
     /erp-business-selection-action-bar__actions \.ant-btn[\s\S]*?transition-property:\s*color, background-color, border-color, box-shadow;/u
@@ -121,15 +105,15 @@ test('次级状态动作直接使用共享按钮，保留禁用原因与危险�
 test('窄屏动作保持可读触控尺寸，不再把全部按钮逐行撑满', () => {
   assert.match(
     responsiveCss,
-    /erp-business-selection-action-bar__actions--compact[\s\S]*white-space:\s*nowrap/u
+    /erp-business-selection-action-bar__actions--responsive[\s\S]*white-space:\s*nowrap/u
   )
   assert.match(
     responsiveCss,
-    /erp-business-selection-action-bar__actions--compact\s+\.erp-business-selection-action-bar__compact-visible\s+\.ant-btn,[\s\S]*?min-height:\s*44px/u
+    /@media screen and \(max-width: 991px\)[\s\S]*?erp-business-selection-action-bar__actions--responsive\s+\.ant-btn\s*\{[^}]*min-height:\s*44px/u
   )
   assert.match(
     responsiveCss,
-    /erp-business-selection-action-bar__actions--compact\s+\.erp-business-selection-action-bar__compact-more\.ant-btn\s*\{[\s\S]*?width:\s*auto;[\s\S]*?flex:\s*0 0 auto;/u
+    /erp-business-selection-action-bar__action-item,[\s\S]*?width:\s*max-content;[\s\S]*?flex:\s*0 0 auto;/u
   )
   assert.match(
     responsiveCss,

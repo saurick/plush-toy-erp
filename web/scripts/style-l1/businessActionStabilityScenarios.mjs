@@ -773,6 +773,41 @@ async function closeActionMenu(page) {
   await waitForFiniteAnimations(page)
 }
 
+async function settleActionSpace(page) {
+  await waitForFiniteAnimations(page)
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  })
+}
+
+async function assertActionSpace(page, assert, name) {
+  await settleActionSpace(page)
+  const metrics = await page.locator('.erp-business-selection-action-bar__record-actions').first().evaluate((bar) => {
+    const root = bar.querySelector('.erp-business-selection-action-bar__actions--responsive')
+    const rect = root.getBoundingClientRect()
+    const buttons = [...root.querySelectorAll('.erp-business-selection-action-bar__compact-visible button, .erp-business-selection-action-bar__compact-more')].map((button) => {
+      const box = button.getBoundingClientRect()
+      return { text: button.textContent.trim(), key: button.dataset.businessActionKey, left: box.left, right: box.right, top: box.top, height: box.height }
+    })
+    return {
+      width: window.innerWidth,
+      left: rect.left,
+      right: rect.right,
+      buttons,
+      inline: buttons.filter((item) => item.key).map((item) => item.key),
+      overflow: [...document.querySelectorAll('.erp-business-selection-action-menu [data-business-action-key]')].map((item) => item.dataset.businessActionKey),
+      more: Boolean(root.querySelector('.erp-business-selection-action-bar__compact-more')),
+    }
+  })
+  assert.ok(metrics.buttons.every((button) => button.left >= metrics.left - 1 && button.right <= metrics.right + 1), `${name} 按钮必须在容器内: ${JSON.stringify(metrics)}`)
+  assert.ok(new Set(metrics.buttons.map((button) => Math.round(button.top))).size <= 1, `${name} 动作必须保持一行: ${JSON.stringify(metrics)}`)
+  assert.equal(new Set([...metrics.inline, ...metrics.overflow]).size, metrics.inline.length + metrics.overflow.length, `${name} 每个合法动作只渲染一次`)
+  assert.equal(metrics.more, metrics.overflow.length > 0, `${name} 仅溢出时显示更多操作`)
+  if (metrics.width < 992) assert.ok(metrics.buttons.every((button) => button.height >= 44), `${name} 保留44px触控高度`)
+  return metrics
+}
+
 async function screenshot(page, path, outputDir, fileName) {
   await page.screenshot({
     path: path.join(outputDir, fileName),
@@ -817,6 +852,90 @@ export function createBusinessActionStabilityScenarios(deps) {
   const productionIdentity = roleIdentity('production')
 
   return [
+    {
+      name: 'business-action-space-shipments-wide-narrow',
+      path: SHIPMENT_PATH,
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, { includeSales: false, includeShipments: true })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '出货单')
+        await assertUnselectedActions(page, assert)
+        for (const suffix of ['DRAFT', 'DRAFT-APPROVED', 'SHIPPED', 'CANCELLED']) {
+          await page.setViewportSize({ width: 1920, height: 1080 })
+          await selectBusinessRow(page, `SHIP-ACTION-${suffix}`)
+          const wide = await assertActionSpace(page, assert, `出货${suffix}-1920`)
+          assert.equal(wide.more, false, '宽度足够时相关、财务和危险动作均直接展示')
+          const expected = [...wide.inline].sort()
+          if (wide.inline.includes('shipment-cancel')) assert.equal(wide.inline.at(-1), 'shipment-cancel', '危险动作排在末尾')
+          if (suffix === 'SHIPPED') await page.screenshot({ path: path.join(outputDir, 'business-action-space-shipments-4k.png'), fullPage: false })
+          for (const width of [1440, 1280, 1100, 1024, 992, 991, 768, 390, 320, 1920]) {
+            await page.setViewportSize({ width, height: 1080 })
+            const current = await assertActionSpace(page, assert, `出货${suffix}-${width}`)
+            assert.deepEqual([...current.inline, ...current.overflow].sort(), expected, '缩放只调整位置，不遗漏或新增动作')
+            if (current.more && suffix === 'DRAFT') {
+              assert.ok(current.inline.some((key) => ['shipment-release', 'shipment-ship'].includes(key)) || current.inline.length === 0, '空间不足时优先保留当前办理动作')
+            }
+            await assertNoHorizontalOverflow(page, `出货${suffix}-${width}`)
+          }
+          if (suffix === 'CANCELLED') assert.ok(wide.inline.every((key) => !['shipment-edit', 'shipment-ship', 'shipment-cancel'].includes(key)), '终态不保留失效动作')
+        }
+        await selectBusinessRow(page, 'SHIP-ACTION-DRAFT-APPROVED')
+        const canceledRequests = []
+        page.on('request', (request) => {
+          if (request.method() === 'POST' && request.url().endsWith('/rpc/operational_fact') && request.postDataJSON()?.method === 'cancel_shipment') canceledRequests.push(request)
+        })
+        await page.locator('[data-business-action-key="shipment-cancel"]:visible').click()
+        const confirmation = page.locator('.ant-popconfirm:visible')
+        await confirmation.waitFor({ state: 'visible' })
+        await page.setViewportSize({ width: 320, height: 900 })
+        await settleActionSpace(page)
+        assert.equal(await confirmation.count(), 1, '缩窄后确认浮层保留，不迁移触发按钮')
+        await confirmation.getByRole('button', { name: '取消', exact: true }).click()
+        await confirmation.waitFor({ state: 'hidden' })
+        await assertActionSpace(page, assert, '出货确认取消后重新适配320')
+        assert.equal(canceledRequests.length, 0, '取消确认不发出业务写入')
+        await page.getByRole('button', { name: '清空已选', exact: true }).click()
+        await assertUnselectedActions(page, assert)
+        await page.setViewportSize({ width: 1920, height: 1080 })
+      },
+    },
+    {
+      name: 'business-action-space-shipments-readonly',
+      path: SHIPMENT_PATH,
+      auth: 'admin',
+      adminProfile: {
+        username: 'style-l1-shipment-readonly',
+        is_super_admin: false,
+        roles: [{ role_key: 'warehouse', name: '仓库' }],
+        permissions: ['erp.workbench.read', 'shipment.read', 'sales_order.read'],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: ['shipment.read', 'sales_order.read'],
+      },
+      viewport: { width: 1280, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, { includeSales: false, includeShipments: true })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '出货单')
+        for (const suffix of ['DRAFT', 'SHIPPED', 'CANCELLED']) {
+          await selectBusinessRow(page, `SHIP-ACTION-${suffix}`)
+          for (const width of [1280, 768, 390, 320, 1280]) {
+            await page.setViewportSize({ width, height: 900 })
+            const metrics = await assertActionSpace(page, assert, `出货只读${suffix}-${width}`)
+            assert.equal(metrics.more, false, '少量只读按钮放得下时不出现更多操作')
+            assert.deepEqual(metrics.inline, ['shipment-details', 'related-records'])
+            await assertNoHorizontalOverflow(page, `出货只读${suffix}-${width}`)
+          }
+        }
+      },
+    },
     {
       name: 'purchase-order-batch-print-selection-desktop',
       path: PURCHASE_ORDER_PATH,
@@ -1204,19 +1323,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           const actions = page
             .locator('.erp-business-selection-action-bar__record-actions')
             .first()
-          await actions
-            .locator('.erp-business-selection-action-bar__compact-more')
-            .waitFor({ state: 'visible' })
-          if (compact) {
-            const visibleCount = width >= 768 ? 2 : 1
-            const primaryButtons = actions.locator(
-              '.erp-business-selection-action-bar__compact-visible .ant-btn'
-            )
-            await primaryButtons
-              .nth(visibleCount - 1)
-              .waitFor({ state: 'visible' })
-            await primaryButtons.nth(visibleCount).waitFor({ state: 'hidden' })
-          }
+          await settleActionSpace(page)
           await actions.evaluate(async (element) => {
             await Promise.allSettled(
               element
@@ -1236,17 +1343,18 @@ export function createBusinessActionStabilityScenarios(deps) {
               `${name} 同一操作区的按钮高度应一致: ${JSON.stringify(metrics)}`
             )
           }
+          assert(
+            Math.max(...metrics.map((button) => button.top)) -
+              Math.min(...metrics.map((button) => button.top)) <= 1,
+            `${name} 直接动作和更多操作应保持一行: ${JSON.stringify(metrics)}`
+          )
           if (compact) {
             assert(
               metrics.every((button) => button.height >= 44),
               `${name} 窄屏按钮应保留 44px 触控高度: ${JSON.stringify(metrics)}`
             )
-            assert(
-              Math.max(...metrics.map((button) => button.top)) -
-                Math.min(...metrics.map((button) => button.top)) <=
-                1,
-              `${name} 主按钮和更多操作应对齐，桌面宽度不能变成窄屏高度: ${JSON.stringify(metrics)}`
-            )
+          }
+          if (await actions.locator('.erp-business-selection-action-bar__compact-more').isVisible()) {
             await openActionMenu(page)
             const actionMenu = page.locator(
               '.erp-business-selection-action-menu'
@@ -1376,9 +1484,9 @@ export function createBusinessActionStabilityScenarios(deps) {
         }
 
         await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
-        await openActionMenu(page)
+        if (await page.locator('[data-business-action-key="lifecycle-short_close"]:visible').count() === 0) await openActionMenu(page)
         await page
-          .locator('.erp-business-selection-action-menu')
+          .locator('.erp-business-module-current-action:visible, .erp-business-selection-action-menu:visible')
           .getByRole('button', { name: '提前关闭', exact: true })
           .click()
         await page.locator('.erp-business-selection-action-menu').waitFor({
@@ -1745,6 +1853,15 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: status !== 'CANCELLED',
             disabled: false,
           })
+          if (status === 'SUBMITTED') {
+            for (const width of [1440, 991, 768, 390, 320, 1440]) {
+              await page.setViewportSize({ width, height: 900 })
+              const metrics = await assertActionSpace(page, assert, `质检成对判定-${width}`)
+              assert.equal(metrics.inline.includes('pass'), metrics.inline.includes('reject'), '合格与不合格始终成组显示或收纳')
+              assert.equal([...metrics.inline, ...metrics.overflow].filter((key) => ['pass', 'reject'].includes(key)).length, 2, '判定动作完整可达')
+              await assertNoHorizontalOverflow(page, `质检成对判定-${width}`)
+            }
+          }
           await assertNoHorizontalOverflow(page, `质检 ${status}`)
         }
         await selectBusinessRow(page, 'QI-ACTION-PRODUCTION-WIP')
@@ -1965,15 +2082,15 @@ export function createBusinessActionStabilityScenarios(deps) {
         ]) {
           await selectBusinessRow(page, `SHIP-ACTION-${suffix}`)
           await assertDesktopActionState(page, assert, 'shipment-ship', {
-            visible,
+            visible: visible && warehouseIdentity.adminProfile.permissions.includes('shipment.ship'),
             disabled,
           })
           await assertDesktopActionState(page, assert, 'shipment-cancel', {
-            visible: suffix !== 'CANCELLED',
+            visible: suffix !== 'CANCELLED' && warehouseIdentity.adminProfile.permissions.includes('shipment.cancel'),
             disabled: false,
           })
           await assertDesktopActionState(page, assert, 'shipment-release', {
-            visible: suffix === 'DRAFT',
+            visible: suffix === 'DRAFT' && warehouseIdentity.adminProfile.permissions.includes('shipment.create'),
             disabled: false,
           })
           for (const key of [
@@ -2071,11 +2188,12 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
         await assertUnselectedActions(page, assert)
         await selectBusinessRow(page, 'SO-ACTION-DRAFT')
-        assert.deepEqual((await captureMobileActionLayout(page)).visible, [
-          'lifecycle-primary',
-        ])
+        assert.ok((await captureMobileActionLayout(page)).visible.includes('lifecycle-primary'))
         await openActionMenu(page)
-        const draftKeys = await captureActionMenuKeys(page)
+        const draftKeys = [
+          ...(await captureMobileActionLayout(page)).visible,
+          ...await captureActionMenuKeys(page),
+        ]
         assert(draftKeys.includes('edit'))
         assert(draftKeys.includes('reserve-stock'))
         assert(draftKeys.includes('lifecycle-cancel'))
@@ -2084,7 +2202,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           0
         )
         const reserve = page.locator(
-          '.erp-business-selection-action-menu [data-business-action-key="reserve-stock"]'
+          '[data-business-action-key="reserve-stock"]:visible'
         )
         assert.equal(await reserve.isDisabled(), true)
         await reserve.evaluate((button) => button.parentElement.focus())
@@ -2094,9 +2212,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           .waitFor({ state: 'visible' })
         await closeActionMenu(page)
         await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
-        assert.deepEqual((await captureMobileActionLayout(page)).visible, [
-          'lifecycle-primary',
-        ])
+        assert.ok((await captureMobileActionLayout(page)).visible.includes('lifecycle-primary'))
         await assertDesktopActionState(page, assert, 'edit', { visible: false })
         await assertDesktopActionState(page, assert, 'reserve-stock', {
           visible: true,

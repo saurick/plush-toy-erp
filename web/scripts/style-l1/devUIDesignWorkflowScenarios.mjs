@@ -150,6 +150,33 @@ export function createDevUIDesignWorkflowScenarios({ assert, outputDir, path }) 
         assert.doesNotMatch(await frame.locator('.command-row').innerText(), /先选记录|选中记录后/u)
         await frame.getByRole('checkbox', { name: '选择 BOM-20260925-001', exact: true }).check()
         assert.equal(await placeholder.count(), 0)
+        let allActions
+        for (const width of [1920, 1280, 768, 390, 320, 1440]) {
+          await page.setViewportSize({ width, height: 1000 })
+          await frame.locator('[data-adaptive-actions]').evaluate(async () => {
+            await document.fonts.ready
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+          })
+          const geometry = await frame.locator('[data-adaptive-actions]').evaluate((bar) => {
+            const visible = bar.querySelector('.business-action-visible')
+            const menu = bar.querySelector('.business-action-menu')
+            const buttons = [...visible.querySelectorAll('button')]
+            const rect = bar.getBoundingClientRect()
+            return {
+              keys: [...bar.querySelectorAll('.business-action-group button')].map((button) => button.textContent.trim()).sort(),
+              more: !menu.hidden,
+              overflow: menu.querySelectorAll('.business-action-group').length,
+              top: buttons.map((button) => Math.round(button.getBoundingClientRect().top)),
+              outside: buttons.some((button) => button.getBoundingClientRect().right > rect.right + 1),
+            }
+          })
+          allActions ??= geometry.keys
+          assert.deepEqual(geometry.keys, allActions, '原型缩放不遗漏既有操作')
+          assert.ok(new Set(geometry.top).size <= 1, '原型直接按钮保持一行')
+          assert.equal(geometry.outside, false, '原型按钮不超出可用宽度')
+          assert.equal(geometry.more, geometry.overflow > 0, '原型仅溢出时显示更多操作')
+          if (width === 1920) assert.equal(geometry.more, false, '原型宽度足够时全部直接显示')
+        }
         await frame.getByRole('button', { name: '清空已选', exact: true }).click()
         await placeholder.waitFor({ state: 'visible' })
         const search = frame.getByRole('textbox', { name: '搜索', exact: true })

@@ -373,11 +373,11 @@ test('九个岗位未选择时展示已授权的禁用动作，选中后仅展�
   }
 })
 
-test('窄屏动作排序：状态和 loading 只改变禁用态，不改变固定优先级与原始顺序', () => {
+test('空间不足时按固定优先级收纳，状态和 loading 不改变直接入口', () => {
   const descriptors = [
-    { index: 0, actionable: true, enabled: false, score: 40 },
-    { index: 1, actionable: true, enabled: true, score: 100 },
-    { index: 2, actionable: true, enabled: true, score: 40 },
+    { index: 0, actionable: true, enabled: false, score: 40, width: 72 },
+    { index: 1, actionable: true, enabled: true, score: 100, width: 88 },
+    { index: 2, actionable: true, enabled: true, score: 40, width: 72 },
     { index: 3, actionable: false, enabled: false, score: -1 },
   ]
   const toggledDescriptors = descriptors.map((item) => ({
@@ -385,19 +385,37 @@ test('窄屏动作排序：状态和 loading 只改变禁用态，不改变固�
     enabled: !item.enabled,
   }))
 
-  assert.deepEqual(selectStableBusinessActionIndexes(descriptors, 2), [1, 0])
+  const space = { availableWidth: 248, moreWidth: 96, gap: 8 }
+  assert.deepEqual(selectStableBusinessActionIndexes(descriptors, space), [0, 1, 2])
+  space.availableWidth = 247
+  assert.deepEqual(selectStableBusinessActionIndexes(descriptors, space), [1])
   assert.deepEqual(
-    selectStableBusinessActionIndexes(toggledDescriptors, 2),
-    [1, 0]
+    selectStableBusinessActionIndexes(toggledDescriptors, space),
+    [1]
   )
 })
 
-test('辅助动作留在更多操作，不因外部操作位有空余而抢占主路径', () => {
+test('所有动作放得下时直接显示，辅助、例外和危险动作不固定折叠', () => {
   const actions = [
-    { index: 0, actionable: true, enabled: true, score: 100, overflow: true },
-    { index: 1, actionable: true, enabled: false, score: 80 },
-    { index: 2, actionable: true, enabled: true, score: 60 },
+    { index: 0, actionable: true, enabled: true, score: 20, width: 80 },
+    { index: 1, actionable: true, enabled: false, score: 10, width: 88 },
+    { index: 2, actionable: true, enabled: true, score: 60, width: 72 },
   ]
-  assert.deepEqual(selectStableBusinessActionIndexes(actions, 4), [1, 2])
-  assert.deepEqual(selectStableBusinessActionIndexes(actions, 0), [])
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, { availableWidth: 256, moreWidth: 96 }), [0, 1, 2])
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, { availableWidth: 255, moreWidth: 96 }), [2])
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, { availableWidth: 0, moreWidth: 96 }), [])
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, { availableWidth: 256 }), [0, 1, 2])
+})
+
+test('分组原子性、隐藏空组和更多入口宽度共同参与空间计算', () => {
+  const groups = [
+    { index: 0, actionable: true, score: 100, width: 160 },
+    { index: 1, actionable: true, score: 60, width: 80 },
+    { index: 2, actionable: true, score: 20, width: 72 },
+    { index: 3, actionable: true, score: 100, width: 0 },
+    { index: 4, actionable: false, score: 200, width: 50 },
+  ]
+  assert.deepEqual(selectStableBusinessActionIndexes(groups, { availableWidth: 328, moreWidth: 96 }), [0, 1, 2])
+  assert.deepEqual(selectStableBusinessActionIndexes(groups, { availableWidth: 327, moreWidth: 96 }), [0])
+  assert.deepEqual(selectStableBusinessActionIndexes(groups, { availableWidth: 184, moreWidth: 96 }), [1])
 })

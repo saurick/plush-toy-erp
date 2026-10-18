@@ -20,7 +20,6 @@ import {
   DatePicker,
   Dropdown,
   Empty,
-  Grid,
   Popconfirm,
   Popover,
   Select,
@@ -72,9 +71,6 @@ const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
 const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
-const PHONE_SELECTION_ACTION_LIMIT = 1
-const TABLET_SELECTION_ACTION_LIMIT = 2
-const DESKTOP_SELECTION_ACTION_LIMIT = 4
 const SELECTION_ACTION_PRIORITIES = {
   primary: 100,
   edit: 80,
@@ -84,17 +80,6 @@ const SELECTION_ACTION_PRIORITIES = {
   secondary: 20,
   danger: 10,
   recovery: 0,
-}
-const OVERFLOW_ACTION_ROLES = new Set(['related', 'secondary', 'danger', 'recovery'])
-
-function resolveInitialSelectionActionScreens(token) {
-  const matchMedia = globalThis.window?.matchMedia?.bind(globalThis.window)
-  if (!matchMedia) return {}
-
-  return {
-    lg: matchMedia(`(min-width: ${token.screenLG}px)`).matches,
-    md: matchMedia(`(min-width: ${token.screenMD}px)`).matches,
-  }
 }
 
 function joinClassNames(...items) {
@@ -139,15 +124,11 @@ function inspectSelectionAction(action) {
   const nestedScore = nestedActions.length ? Math.max(...nestedActions.map((item) => item.score)) : 30
   return {
     actionable,
+    dangerous: role === 'danger' || (!role && nestedActions.length > 0 && nestedActions.every((item) => item.dangerous)),
     enabled: action.props.disabled !== true && action.props.loading !== true && (nestedActions.length === 0 || nestedActions.some((item) => item.enabled)),
     score: Number.isFinite(priority)
       ? priority
       : SELECTION_ACTION_PRIORITIES[role] ?? (action.type === Button ? 40 : nestedScore),
-    overflow: Number.isFinite(priority)
-      ? false
-      : role
-        ? OVERFLOW_ACTION_ROLES.has(role)
-        : action.type === Dropdown || (nestedActions.length > 0 && nestedActions.every((item) => item.overflow)),
   }
 }
 
@@ -161,27 +142,31 @@ function deEmphasizeCreation(action) {
     : action
 }
 
-function partitionSelectionActions(children, limit) {
+function partitionSelectionActions(children, space) {
   const nodes = flattenSelectionActions(children)
   const descriptors = nodes.map((node, index) => ({
     index,
     node,
     ...inspectSelectionAction(node),
   }))
-  const visibleIndexes = new Set(
-    selectStableBusinessActionIndexes(descriptors, limit)
+  const measured = space && descriptors.every((item) =>
+    !item.actionable || Object.hasOwn(space.widths, item.index)
   )
+  const actions = descriptors
+    .filter((item) => item.actionable && (!measured || space.widths[item.index] > 0))
+    .sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || left.index - right.index)
+  const visibleIndexes = new Set(measured
+    ? selectStableBusinessActionIndexes(actions.map((item) => ({
+      ...item, width: space.widths[item.index],
+    })), space)
+    : actions.map((item) => item.index))
 
   return {
     context: descriptors
       .filter((item) => !item.actionable)
       .map((item) => item.node),
-    visible: descriptors
-      .filter((item) => visibleIndexes.has(item.index))
-      .map((item) => item.node),
-    overflow: descriptors
-      .filter((item) => item.actionable && !visibleIndexes.has(item.index))
-      .map((item) => item.node),
+    visible: actions.filter((item) => visibleIndexes.has(item.index)),
+    overflow: actions.filter((item) => !visibleIndexes.has(item.index)),
   }
 }
 
@@ -189,22 +174,26 @@ function callSelectionActionThenClose(handler, close, ...args) {
   try {
     return handler?.(...args)
   } finally {
-    close()
+    close?.()
   }
 }
 
-function wrapOverflowSelectionAction(action, close) {
+function wrapSelectionAction(action, close, onOverlayChange) {
   if (!React.isValidElement(action)) return action
 
   if (action.type === Button) {
-    return React.cloneElement(action, {
+    return close ? React.cloneElement(action, {
       onClick: (...args) =>
         callSelectionActionThenClose(action.props.onClick, close, ...args),
-    })
+    }) : action
   }
 
   if (action.type === Popconfirm) {
     return React.cloneElement(action, {
+      onOpenChange: (open, event) => {
+        onOverlayChange(open)
+        action.props.onOpenChange?.(open, event)
+      },
       onConfirm: (...args) =>
         callSelectionActionThenClose(action.props.onConfirm, close, ...args),
     })
@@ -213,6 +202,10 @@ function wrapOverflowSelectionAction(action, close) {
   if (action.type === Dropdown) {
     const menu = action.props.menu || {}
     return React.cloneElement(action, {
+      onOpenChange: (open, info) => {
+        onOverlayChange(open)
+        action.props.onOpenChange?.(open, info)
+      },
       menu: {
         ...menu,
         onClick: (...args) =>
@@ -226,7 +219,7 @@ function wrapOverflowSelectionAction(action, close) {
       action,
       undefined,
       React.Children.map(action.props.children, (child) =>
-        wrapOverflowSelectionAction(child, close)
+        wrapSelectionAction(child, close, onOverlayChange)
       )
     )
   }
@@ -258,35 +251,106 @@ function selectionActionRenderState(action) {
 
 function ResponsiveSelectionActions({ children }) {
   const { token } = theme.useToken()
-  const { screenLG, screenMD } = token
-  const initialScreens = React.useMemo(
-    () => resolveInitialSelectionActionScreens({ screenLG, screenMD }),
-    [screenLG, screenMD]
-  )
-  const screens = Grid.useBreakpoint(true, initialScreens)
+  const [space, setSpace] = React.useState(null)
+  const [measurementRevision, setMeasurementRevision] = React.useState(0)
   const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
   const [actionOverlayOpen, setActionOverlayOpen] = React.useState(false)
+  const actionsRef = React.useRef(null)
+  const visibleActionsRef = React.useRef(null)
+  const contextRef = React.useRef(null)
+  const measureItemsRef = React.useRef(null)
+  const measureMoreRef = React.useRef(null)
   const moreActionsListRef = React.useRef(null)
   const moreActionsTriggerRef = React.useRef(null)
   const moreActionsId = React.useId()
-  const visibleLimit = screens.lg
-    ? DESKTOP_SELECTION_ACTION_LIMIT
-    : screens.md
-      ? TABLET_SELECTION_ACTION_LIMIT
-      : PHONE_SELECTION_ACTION_LIMIT
   // Moving a stateful action between the toolbar and menu unmounts its dialog.
   // Let the dialog adapt to the viewport before regrouping its trigger on close.
-  const partitionLimitRef = React.useRef(visibleLimit)
-  if (!actionOverlayOpen) partitionLimitRef.current = visibleLimit
-  const partitionLimit = partitionLimitRef.current
+  const partitionSpaceRef = React.useRef(space)
+  if (!actionOverlayOpen) partitionSpaceRef.current = space
+  const partitionSpace = partitionSpaceRef.current
   const { context, visible, overflow } = React.useMemo(
-    () => partitionSelectionActions(children, partitionLimit),
-    [children, partitionLimit]
+    () => partitionSelectionActions(children, partitionSpace),
+    [children, partitionSpace]
   )
   const overflowRenderKey = React.useMemo(
-    () => overflow.map(selectionActionRenderState).join('|'),
+    () => overflow.map((item) => selectionActionRenderState(item.node)).join('|'),
     [overflow]
   )
+  const attachMoreActionsList = React.useCallback((node) => {
+    moreActionsListRef.current = node
+    if (node) setMeasurementRevision((current) => current + 1)
+  }, [])
+
+  React.useLayoutEffect(() => {
+    const root = actionsRef.current
+    const rail = measureItemsRef.current
+    if (!root || !rail) return undefined
+    let frame
+    let stopped = false
+    const measure = () => {
+      if (stopped || !root.isConnected) return
+      const { width } = root.getBoundingClientRect()
+      if (width <= 0) return
+      const gap = Number.parseFloat(getComputedStyle(root).columnGap) || 8
+      const nodes = [
+        ...visibleActionsRef.current.querySelectorAll('[data-selection-action-index]'),
+        ...(moreActionsListRef.current?.querySelectorAll('[data-selection-action-index]') || []),
+      ]
+      // Measure inert DOM copies in toolbar styles, including actions in the hidden menu.
+      // Business components are never duplicated just to discover their natural width.
+      const clones = nodes.map((node) => {
+        const clone = node.cloneNode(true)
+        clone.className = 'erp-business-selection-action-bar__measure-item'
+        clone.querySelectorAll('[id]').forEach((item) => item.removeAttribute('id'))
+        clone.querySelectorAll('[data-business-action-key]').forEach((item) => item.removeAttribute('data-business-action-key'))
+        clone.querySelectorAll('.ant-btn-loading-icon').forEach((item) => item.remove())
+        clone.querySelectorAll('button').forEach((button) => {
+          const item = document.createElement('span')
+          item.className = button.className
+          item.style.cssText = button.style.cssText
+          item.append(...button.childNodes)
+          button.replaceWith(item)
+        })
+        return clone
+      })
+      rail.replaceChildren(...clones)
+      const widths = Object.fromEntries(clones.map((node) => [
+        node.dataset.selectionActionIndex,
+        Math.ceil(node.getBoundingClientRect().width),
+      ]))
+      rail.replaceChildren()
+      const contextWidth = contextRef.current?.getBoundingClientRect().width || 0
+      const next = {
+        availableWidth: Math.floor(width - contextWidth - (contextWidth ? gap : 0)),
+        moreWidth: Math.ceil(measureMoreRef.current.getBoundingClientRect().width),
+        gap,
+        widths,
+      }
+      setSpace((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next)
+    }
+    const schedule = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measure)
+    }
+    measure()
+    const resizeObserver = new ResizeObserver(schedule)
+    resizeObserver.observe(root)
+    resizeObserver.observe(visibleActionsRef.current)
+    const mutationObserver = new MutationObserver(schedule)
+    const options = { childList: true, subtree: true, characterData: true }
+    mutationObserver.observe(visibleActionsRef.current, options)
+    if (moreActionsListRef.current) mutationObserver.observe(moreActionsListRef.current, options)
+    window.addEventListener('resize', schedule)
+    document.fonts?.addEventListener('loadingdone', schedule)
+    return () => {
+      stopped = true
+      cancelAnimationFrame(frame)
+      resizeObserver.disconnect()
+      mutationObserver.disconnect()
+      window.removeEventListener('resize', schedule)
+      document.fonts?.removeEventListener('loadingdone', schedule)
+    }
+  }, [children, measurementRevision, overflow.length, visible.length])
   const closeMoreActions = React.useCallback(() => {
     setMoreActionsOpen(false)
   }, [])
@@ -328,7 +392,7 @@ function ResponsiveSelectionActions({ children }) {
   const renderMoreActions = React.useCallback(
     () => (
       <div
-        ref={moreActionsListRef}
+        ref={attachMoreActionsList}
         id={moreActionsId}
         className="erp-business-selection-action-menu"
         style={{
@@ -359,9 +423,10 @@ function ResponsiveSelectionActions({ children }) {
           focusMoreAction(event)
         }}
       >
-        {overflow.map((action, index) => (
+        {overflow.map(({ node: action, index }) => (
           <div
             key={action?.key || `selection-overflow-action-${index}`}
+            data-selection-action-index={index}
             className="erp-business-selection-action-menu__item"
             onClick={(event) => {
               const button = event.target.closest('button')
@@ -375,13 +440,14 @@ function ResponsiveSelectionActions({ children }) {
               }
             }}
           >
-            {wrapOverflowSelectionAction(action, closeMoreActions)}
+            {wrapSelectionAction(action, closeMoreActions, setActionOverlayOpen)}
           </div>
         ))}
       </div>
     ),
     [
       closeMoreActions,
+      attachMoreActionsList,
       closeMoreActionsAndRestoreFocus,
       focusMoreAction,
       moreActionsId,
@@ -390,63 +456,57 @@ function ResponsiveSelectionActions({ children }) {
     ]
   )
 
-  if (overflow.length === 0) {
-    return (
-      <SelectionActionOverlayContext.Provider value={setActionOverlayOpen}>
-        <Space
-          wrap
-          className="erp-business-selection-action-bar__actions erp-business-module-selection-actions"
-        >
-          {children}
-        </Space>
-      </SelectionActionOverlayContext.Provider>
-    )
-  }
-
   return (
     <SelectionActionOverlayContext.Provider value={setActionOverlayOpen}>
       <div
-        className={joinClassNames(
-          'erp-business-selection-action-bar__actions erp-business-module-selection-actions',
-          screens.lg
-            ? 'erp-business-selection-action-bar__actions--overflow'
-            : 'erp-business-selection-action-bar__actions--compact'
-        )}
+        ref={actionsRef}
+        data-selection-layout-locked={actionOverlayOpen || undefined}
+        className="erp-business-selection-action-bar__actions erp-business-module-selection-actions erp-business-selection-action-bar__actions--responsive"
       >
         {context.length > 0 ? (
-          <div className="erp-business-selection-action-bar__compact-context">
+          <div ref={contextRef} className="erp-business-selection-action-bar__compact-context">
             {context}
           </div>
         ) : null}
-        <div className="erp-business-selection-action-bar__compact-visible">
-          {visible}
+        <div ref={visibleActionsRef} className="erp-business-selection-action-bar__compact-visible">
+          {visible.map(({ node, index }) => (
+            <div key={node?.key || `selection-action-${index}`} data-selection-action-index={index} className="erp-business-selection-action-bar__action-item">
+              {wrapSelectionAction(node, undefined, setActionOverlayOpen)}
+            </div>
+          ))}
         </div>
-        <Dropdown
-          key={overflowRenderKey}
-          trigger={['click']}
-          placement="bottomRight"
-          open={moreActionsOpen}
-          onOpenChange={setMoreActionsOpen}
-          autoFocus
-          autoAdjustOverflow
-          // Stateful actions own dialogs and drawers that must outlive the menu.
-          // The render key still rebuilds them when external action state changes.
-          forceRender
-          destroyOnHidden={false}
-          overlayClassName="erp-business-selection-action-dropdown"
-          popupRender={renderMoreActions}
-        >
-          <Button
-            ref={moreActionsTriggerRef}
-            className="erp-business-selection-action-bar__compact-more erp-action-button"
-            size="small"
-            aria-label={`更多操作，共 ${overflow.length} 项`}
-            aria-expanded={moreActionsOpen}
-            aria-controls={moreActionsId}
+        {overflow.length > 0 ? (
+          <Dropdown
+            key={overflowRenderKey}
+            trigger={['click']}
+            placement="bottomRight"
+            open={moreActionsOpen}
+            onOpenChange={setMoreActionsOpen}
+            autoFocus
+            autoAdjustOverflow
+            // Stateful actions own dialogs and drawers that must outlive the menu.
+            // The render key still rebuilds them when external action state changes.
+            forceRender
+            destroyOnHidden={false}
+            overlayClassName="erp-business-selection-action-dropdown"
+            popupRender={renderMoreActions}
           >
-            更多操作 <DownOutlined />
-          </Button>
-        </Dropdown>
+            <Button
+              ref={moreActionsTriggerRef}
+              className="erp-business-selection-action-bar__compact-more erp-action-button"
+              size="small"
+              aria-label={`更多操作，共 ${overflow.length} 项`}
+              aria-expanded={moreActionsOpen}
+              aria-controls={moreActionsId}
+            >
+              更多操作 <DownOutlined />
+            </Button>
+          </Dropdown>
+        ) : null}
+        <div className="erp-business-selection-action-bar__measure" aria-hidden="true">
+          <Button ref={measureMoreRef} href="#" tabIndex={-1} size="small" className="erp-action-button">更多操作 <DownOutlined /></Button>
+          <div ref={measureItemsRef} />
+        </div>
       </div>
     </SelectionActionOverlayContext.Provider>
   )

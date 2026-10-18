@@ -349,10 +349,25 @@
     .record-state span { color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .record-actions { min-width: 0; margin-left: auto; display: flex; align-items: center; gap: 5px; }
     .record-actions .btn { height: 30px; }
-    .business-record-row { align-items:flex-start; flex-wrap:wrap; gap:8px; }
-    .business-record-row .record-state { flex:1 0 100%; }
-    .business-record-actions { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-left:0; }
+    .business-record-row { align-items:center; gap:8px; }
+    .business-record-row .record-state { flex:0 1 auto; max-width:45%; }
+    .business-record-actions { position:relative; min-width:0; display:flex; flex:1 1 0; align-items:center; gap:6px; margin-left:auto; }
     .business-record-actions .btn { height:30px; }
+    .business-action-visible,.business-action-group { display:inline-flex; flex:none; align-items:center; gap:6px; }
+    .business-action-visible { margin-left:auto; }
+    .business-record-actions .business-action-menu { flex:none; }
+    .business-record-actions .business-action-menu[hidden] { display:none; }
+    .business-record-actions .text-btn { flex:none; white-space:nowrap; }
+    .business-action-measure { position:absolute; width:0; height:0; overflow:hidden; visibility:hidden; pointer-events:none; }
+    .business-action-measure > div { display:flex; width:max-content; }
+    .business-action-menu .business-action-group { display:flex; }
+    @media(max-width:991px) {
+      .business-record-row { flex-direction:column; align-items:stretch; }
+      .business-record-row .record-state { max-width:100%; }
+      .business-record-actions { width:100%; flex:auto; }
+      .business-action-visible { margin-left:0; }
+      .business-record-actions .btn { min-height:44px; height:44px; }
+    }
     .business-operation-dialog .detail-grid { grid-template-columns:92px minmax(0,1fr); }
     .business-operation-dialog table { min-width:0; table-layout:fixed; }
     .business-operation-dialog th:first-child,.business-operation-dialog td:first-child { position:static; width:40%; }
@@ -4491,21 +4506,45 @@
       if(!row)return '';
       const pending=businessRecordTasks(config,row).filter(task=>task.lane!=='done').length;
       const tasksVisible=supportsTaskCreation(config)||['bom','inbound','quality'].includes(config.key);
-      const basics=`${detail?'':`<button class="btn" data-action="open-selected">查看详情</button>`}${canEditRecord(config,row)||(config.key==='bom'&&row.status==='active')?`<button class="btn" data-action="business-record-action" data-operation="edit" ${attrs}>${config.key==='bom'?(row.status==='active'?bomRevisionActionLabel(row):'编辑 BOM'):'编辑'}</button>`:''}`;
-      const related=`<button class="btn" data-action="business-record-action" data-operation="related" ${attrs}>相关单据</button>${tasksVisible?`<button class="btn" data-action="open-related-tasks" ${attrs}>${pending?`相关任务 ${pending}`:'相关任务'}</button>`:''}`;
+      const group=(html,priority)=>`<div class="business-action-group" data-action-priority="${priority}">${html}</div>`;
+      const basics=`${detail?'':group('<button class="btn" data-action="open-selected">查看详情</button>',60)}${canEditRecord(config,row)||(config.key==='bom'&&row.status==='active')?group(`<button class="btn" data-action="business-record-action" data-operation="edit" ${attrs}>${config.key==='bom'?(row.status==='active'?bomRevisionActionLabel(row):'编辑 BOM'):'编辑'}</button>`,80):''}`;
+      const related=group(`<button class="btn" data-action="business-record-action" data-operation="related" ${attrs}>相关单据</button>`,30)+(tasksVisible?group(`<button class="btn" data-action="open-related-tasks" ${attrs}>${pending?`相关任务 ${pending}`:'相关任务'}</button>`,30):'');
       const specs=businessRecordActions[config.key].filter(spec=>(!spec.states||spec.states.includes(row.status))&&!(config.key==='bom'&&spec.id==='copy-version'&&row.status==='active'));
       const auxiliary=spec=>['cancel','close','archive','copy-version','records','reverse'].includes(spec.id)||spec.template;
       const candidates=specs.filter(spec=>!auxiliary(spec));
       const primary=candidates.find(spec=>spec.primary)||candidates.find(spec=>['submit','pass','release','approval','allocate','completion','disposition'].includes(spec.id));
-      const basicCount=(detail?0:1)+(canEditRecord(config,row)||(config.key==='bom'&&row.status==='active')?1:0);
-      const ranked=[primary,...candidates.filter(spec=>spec!==primary)].filter(Boolean);
-      const chosen=new Set(ranked.slice(0,Math.max(0,4-basicCount)));
-      if(config.key==='quality'&&row.status==='submitted')for(const spec of candidates)if(['pass','reject'].includes(spec.id))chosen.add(spec);
-      const direct=candidates.filter(spec=>chosen.has(spec));
       const button=spec=>{const reason=businessActionBlock(config,row,spec);const label=config.key==='bom'&&spec.id==='activate'&&row.status==='obsolete'?'重新启用':spec.label;return `<button class="btn ${spec===primary?'primary':''}" data-action="business-record-action" data-operation="${spec.id}" ${attrs} ${reason?`disabled title="${escapeHTML(reason)}"`:''}>${label}</button>`;};
-      const more=related+specs.filter(spec=>!chosen.has(spec)).map(button).join('');
-      return `<div class="business-record-actions">${basics}${direct.map(button).join('')}${renderBusinessActionMenu(more)}${detail?'':'<button class="text-btn" data-action="clear-selection">清空已选</button>'}</div>`;
+      const paired=config.key==='quality'&&row.status==='submitted'?specs.filter(spec=>['pass','reject'].includes(spec.id)):[];
+      const actions=specs.filter(spec=>!paired.includes(spec)).map(spec=>group(button(spec),spec===primary?100:['cancel','reverse','close','archive'].includes(spec.id)?10:auxiliary(spec)?20:40)).join('');
+      return `<div class="business-record-actions" data-adaptive-actions><div class="business-action-visible">${basics}${related}${paired.length?group(paired.map(button).join(''),100):''}${actions}</div><details class="task-copy-menu business-action-menu" hidden><summary class="btn" role="button" aria-label="更多操作">更多操作 ▾</summary><div class="task-copy-options"></div></details>${detail?'':'<button class="text-btn" data-action="clear-selection">清空已选</button>'}<div class="business-action-measure" aria-hidden="true"><div></div></div></div>`;
     }
+    const adaptiveActionBars=new Set();
+    const adaptiveActionObserver=new ResizeObserver(syncBusinessActionSpace);
+    function syncBusinessActionSpace() {
+      for(const bar of adaptiveActionBars)if(!bar.isConnected){adaptiveActionObserver.unobserve(bar);adaptiveActionBars.delete(bar);}
+      for(const bar of document.querySelectorAll('[data-adaptive-actions]')){
+        if(!adaptiveActionBars.has(bar)){adaptiveActionBars.add(bar);adaptiveActionObserver.observe(bar);}
+        const visible=bar.querySelector('.business-action-visible'),menu=bar.querySelector('.business-action-menu'),options=menu.querySelector('.task-copy-options'),rail=bar.querySelector('.business-action-measure > div');
+        if(menu.open||(bar._actionMeasured&&(state.overlay||state.drawer)))continue;
+        const groups=[...visible.children,...options.children];
+        groups.forEach((node,index)=>{node._actionOrder??=index;});
+        groups.sort((a,b)=>Number(a.dataset.actionPriority=== '10')-Number(b.dataset.actionPriority==='10')||a._actionOrder-b._actionOrder);
+        const copies=groups.map(node=>node.cloneNode(true)),more=menu.querySelector('summary').cloneNode(true);
+        rail.replaceChildren(...copies,more);
+        const widths=copies.map(node=>Math.ceil(node.getBoundingClientRect().width)),gap=6,clear=bar.querySelector(':scope > .text-btn'),available=bar.clientWidth-(clear?clear.getBoundingClientRect().width+gap:0);
+        const total=widths.reduce((sum,width)=>sum+width,0)+Math.max(0,widths.length-1)*gap;
+        const selected=new Set();let used=more.getBoundingClientRect().width;
+        if(total<=available)groups.forEach(node=>selected.add(node));
+        else groups.map((node,index)=>({node,width:widths[index]})).sort((a,b)=>Number(b.node.dataset.actionPriority)-Number(a.node.dataset.actionPriority)||a.node._actionOrder-b.node._actionOrder).forEach(({node,width})=>{if(used+gap+width<=available){selected.add(node);used+=gap+width;}});
+        rail.replaceChildren();
+        const direct=groups.filter(node=>selected.has(node)),overflow=groups.filter(node=>!selected.has(node));
+        if(direct.some((node,index)=>visible.children[index]!==node)||visible.children.length!==direct.length)visible.replaceChildren(...direct);
+        if(overflow.some((node,index)=>options.children[index]!==node)||options.children.length!==overflow.length)options.replaceChildren(...overflow);
+        menu.hidden=overflow.length===0;
+        bar._actionMeasured=true;
+      }
+    }
+    document.addEventListener('toggle',event=>{if(event.target.matches?.('[data-adaptive-actions] > details')&&!event.target.open)requestAnimationFrame(syncBusinessActionSpace);},true);
     function recordBusinessOperation(row,label,note='') {
       row.operations=row.operations||[];row.operations.unshift({label,note,time:'刚刚 · 当前账号'});
       row.progress=label;
@@ -16457,6 +16496,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       restorePageScroll();
       syncDashboardSummaryScroll();
       updateMobileBackToTop();
+      syncBusinessActionSpace();
     }
 
     const LOGIN_DEMO = Object.freeze({ account: 'admin', password: 'demo123456', phone: '13800000000', code: '123456' });
@@ -16965,6 +17005,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         if (!modal.hasAttribute('aria-label')) modal.setAttribute('aria-label', modal.querySelector('.modal-head strong')?.textContent?.trim() || '对话框');
       });
       bindFloatingInputs();
+      syncBusinessActionSpace();
       observeMaterialSummaryOverflow();
       const modal = [...root.querySelectorAll('[role="dialog"][aria-modal="true"]')].at(-1);
       document.querySelector('.app').inert = Boolean(modal);

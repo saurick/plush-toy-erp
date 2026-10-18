@@ -128,14 +128,27 @@ export function resolveBusinessLifecycleActions({
   }
 }
 
-export function selectStableBusinessActionIndexes(descriptors = [], limit = 0) {
-  return descriptors
-    .filter((item) => item?.actionable && !item.overflow)
+export function selectStableBusinessActionIndexes(
+  descriptors = [],
+  { availableWidth = Infinity, moreWidth = 0, gap = 8 } = {}
+) {
+  const actions = descriptors.filter((item) => item?.actionable && item.width > 0)
+  const width = actions.reduce((total, item) => total + item.width, 0) +
+    Math.max(0, actions.length - 1) * gap
+  if (width <= availableWidth) return actions.map((item) => item.index)
+
+  let usedWidth = moreWidth
+  return [...actions]
     .sort(
       (left, right) =>
         Number(right?.score || 0) - Number(left?.score || 0) ||
         Number(left?.index || 0) - Number(right?.index || 0)
     )
-    .slice(0, Math.max(0, Number(limit) || 0))
+    .filter((item) => {
+      const nextWidth = usedWidth + gap + item.width
+      if (nextWidth > availableWidth) return false
+      usedWidth = nextWidth
+      return true
+    })
     .map((item) => item.index)
 }
