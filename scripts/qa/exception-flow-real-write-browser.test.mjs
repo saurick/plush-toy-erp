@@ -13,6 +13,7 @@ import {
   verifyRuntimeIdentity,
   readExceptionFlowReadyTask,
   actOnExceptionFlowTaskPage,
+  closeSession,
 } from "./exception-flow-real-write-browser.mjs";
 
 const DATABASE_NAME = "plush_erp_acceptance_79da_contract_browser_actions_dev";
@@ -22,6 +23,60 @@ const REPORT =
 const CONFIRMATION = exceptionFlowConfirmation({
   backendURL: BACKEND_URL,
   databaseName: DATABASE_NAME,
+});
+
+test("exception session waits for forwarded requests before closing their context", async () => {
+  let release;
+  const response = new Promise((resolve) => { release = resolve; });
+  const events = [];
+  const session = {
+    page: { unrouteAll: async (options) => {
+      assert.deepEqual(options, { behavior: "wait" });
+      events.push("page-drained");
+    } },
+    context: {
+      unrouteAll: async (options) => {
+        assert.deepEqual(options, { behavior: "wait" });
+        await response;
+        events.push("response-forwarded");
+      },
+      close: async () => events.push("context-closed"),
+    },
+    httpFailures: [],
+  };
+  const closing = closeSession(session, "forwarded request");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(!events.includes("context-closed"));
+  release();
+  await closing;
+  assert.deepEqual(events, ["page-drained", "response-forwarded", "context-closed"]);
+});
+
+test("exception session reports HTTP failures arriving while routes drain", async () => {
+  let closed = false;
+  const session = {
+    page: { unrouteAll: async () => {} },
+    context: {
+      unrouteAll: async () => {
+        session.httpFailures.push({ status: 503, pathname: "/rpc/workflow", rpcMethod: "get_task_board" });
+      },
+      close: async () => { closed = true; },
+    },
+    httpFailures: [],
+  };
+  await assert.rejects(closeSession(session, "late failure"), /unexpected HTTP failures/u);
+  assert.equal(closed, true);
+});
+
+test("exception session still closes its context when route draining fails", async () => {
+  let closed = false;
+  const session = {
+    page: { unrouteAll: async () => { throw new Error("route drain failed"); } },
+    context: { close: async () => { closed = true; } },
+    httpFailures: [],
+  };
+  await assert.rejects(closeSession(session, "drain failure"), /route drain failed/u);
+  assert.equal(closed, true);
 });
 
 function readyTaskFixture(group = "finance_payment_execution") {

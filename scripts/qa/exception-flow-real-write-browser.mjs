@@ -276,11 +276,17 @@ export function assertNoUnexpectedHTTPFailures(
   );
 }
 
-async function closeSession(session, label) {
-  const failures = Array.isArray(session?.httpFailures)
+export async function closeSession(session, label) {
+  if (!session) return;
+  try {
+    await session.page.unrouteAll({ behavior: "wait" });
+    await session.context.unrouteAll({ behavior: "wait" });
+  } finally {
+    await session.context.close();
+  }
+  const failures = Array.isArray(session.httpFailures)
     ? [...session.httpFailures]
     : [];
-  await session?.context?.close();
   assertNoUnexpectedHTTPFailures(failures, label);
 }
 
@@ -503,7 +509,7 @@ async function login(browser, { baseURL, backendURL, password, roleKey }) {
     );
     return { account, context, page, httpFailures };
   } catch (error) {
-    await context.close().catch(() => {});
+    await closeSession({ context, page, httpFailures }, "login cleanup");
     throw error;
   }
 }

@@ -64,14 +64,19 @@ export function browserRPCURL(backendURL, requestURL) {
 export async function bindBrowserWriteBackend(context, backendURL) {
   const origin = browserWriteOrigin(backendURL);
   await context.route("**/rpc/**", async (route) => {
-    const response = await route.fetch({
-      url: browserRPCURL(origin, route.request().url()),
-      maxRedirects: 0,
-    });
-    if (response.status() >= 300 && response.status() < 400) {
-      await route.abort("failed");
-      return;
+    try {
+      const response = await route.fetch({
+        url: browserRPCURL(origin, route.request().url()),
+        maxRedirects: 0,
+      });
+      if (response.status() >= 300 && response.status() < 400) {
+        await route.abort("failed");
+        return;
+      }
+      await route.fulfill({ response });
+    } catch {
+      // Playwright request errors contain authorization headers.
+      throw new Error("browser RPC forwarding failed");
     }
-    await route.fulfill({ response });
   });
 }

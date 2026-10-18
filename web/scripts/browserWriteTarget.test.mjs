@@ -8,6 +8,75 @@ import {
   bindBrowserWriteBackend,
 } from '../../scripts/qa/browser-write-target.mjs'
 import { buildYoyoosunLocalEntryAudit } from './yoyoosunLocalEntryAudit.mjs'
+import { closeSession } from '../../scripts/qa/exception-flow-real-write-browser.mjs'
+
+test('forwarding failures remain failures without exposing request headers', async () => {
+  let handler
+  await bindBrowserWriteBackend({ route: async (_pattern, callback) => { handler = callback } }, 'http://127.0.0.1:8300')
+  await assert.rejects(handler({
+    request: () => ({ url: () => 'http://127.0.0.1:15201/rpc/workflow' }),
+    fetch: async () => { throw new Error('authorization: Bearer synthetic-sensitive-value') },
+  }), (error) => {
+    assert.equal(error.message, 'browser RPC forwarding failed')
+    assert.equal(error.cause, undefined)
+    assert.ok(!error.stack.includes('synthetic-sensitive-value'))
+    return true
+  })
+})
+
+test('real forwarded response drains before exception browser context disposal', async () => {
+  let releaseResponse
+  let markReceived
+  let responseEnded = false
+  let disposed = false
+  const received = new Promise((resolve) => { markReceived = resolve })
+  const readyToRespond = new Promise((resolve) => { releaseResponse = resolve })
+  const backend = createServer(async (request, response) => {
+    if (request.url.startsWith('/rpc/')) {
+      markReceived()
+      await readyToRespond
+      responseEnded = true
+      response.setHeader('content-type', 'application/json')
+      response.end('{"result":{"code":0}}')
+      return
+    }
+    response.end('<!doctype html><title>owned RPC lifecycle test</title>')
+  })
+  await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve))
+  let browser
+  try {
+    const origin = `http://127.0.0.1:${backend.address().port}`
+    browser = await chromium.launch({ headless: true })
+    const context = await browser.newContext()
+    await bindBrowserWriteBackend(context, origin)
+    const page = await context.newPage()
+    await page.goto(origin)
+    const request = page.evaluate(() => fetch('/rpc/workflow', { method: 'POST', body: '{}' }).then((response) => response.text())).catch(() => null)
+    await received
+    const closing = closeSession({
+      page,
+      context: {
+        unrouteAll: (options) => context.unrouteAll(options),
+        close: async () => {
+          assert.equal(responseEnded, true)
+          disposed = true
+          await context.close()
+        },
+      },
+      httpFailures: [],
+    }, 'real pending response')
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(disposed, false)
+    releaseResponse()
+    await closing
+    await request
+    assert.equal(disposed, true)
+  } finally {
+    releaseResponse()
+    await browser?.close()
+    await new Promise((resolve) => backend.close(resolve))
+  }
+})
 
 test('browser writes reject remote and unknown database identities before fetching', async () => {
   let calls = 0
