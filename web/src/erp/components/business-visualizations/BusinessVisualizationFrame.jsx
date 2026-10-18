@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react'
 import { useLocation, useOutletContext } from 'react-router-dom'
 import { Button, Empty, Pagination } from 'antd'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
 
 export function VisualizationPagination({ pagination, onChange }) {
@@ -20,12 +20,10 @@ export function VisualizationPagination({ pagination, onChange }) {
 }
 
 export function BusinessViewSwitch({ value, onChange, options }) {
-  const { moduleWorkspace } = useOutletContext() || {}
   return (
     <div className="erp-business-visual-switch">
-      <Segmented
+      <SlidingTabList
         aria-label="页面展示方式"
-        hierarchy={moduleWorkspace ? 'secondary' : 'primary'}
         value={value}
         options={options}
         onChange={onChange}

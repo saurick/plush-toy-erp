@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
@@ -26,10 +27,7 @@ import {
 } from '../../utils/businessStatistics.mjs'
 import { DateRangeFilter } from '../business-list/BusinessListLayout.jsx'
 import WorkflowTaskPagination from '../workflow/WorkflowTaskPagination.jsx'
-import {
-  BusinessViewSurface,
-  BusinessViewSwitch,
-} from './BusinessVisualizationFrame.jsx'
+import { BusinessViewSurface } from './BusinessVisualizationFrame.jsx'
 import '../../styles/app/business-statistics.css'
 
 const clearGroup = {
@@ -854,13 +852,16 @@ export default function useBusinessStatistics({
                   update({ sort, direction })
                 }}
               />
-              <BusinessViewSwitch
-                value={display}
-                options={displayOptions}
-                onChange={(value) =>
-                  update({ display: value }, { resetPage: false })
-                }
-              />
+              <div className="erp-business-visual-switch">
+                <Segmented
+                  aria-label="页面展示方式"
+                  value={display}
+                  options={displayOptions}
+                  onChange={(value) =>
+                    update({ display: value }, { resetPage: false })
+                  }
+                />
+              </div>
             </>
           )}
         </div>
