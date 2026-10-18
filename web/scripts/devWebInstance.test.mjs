@@ -87,6 +87,7 @@ test('迁移服务代码变化后不能复用旧进程，文档、页面和测�
   for (const file of [
     'web/dev-server/nested/newRuntime.mjs',
     'web/vite.shared.mjs',
+    'web/scripts/openDevBrowser.js',
     'scripts/local-migration.mjs',
     'scripts/local-database-roles.mjs',
     'scripts/local-runtime-bundle.mjs',

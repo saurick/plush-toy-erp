@@ -7,7 +7,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { runInNewContext } from 'node:vm'
-import { createServer } from 'vite'
+import { createServer, resolveConfig } from 'vite'
 import WebSocket from 'ws'
 import { findAvailableDevAuxPort } from '../scripts/dev-ports.mjs'
 
@@ -23,6 +23,16 @@ const ports = Object.freeze({
   web: 5175,
   style: 6175,
   auxStart: 15200,
+})
+
+test('Vite CLI bundles its shared browser policy from the actual config file', async () => {
+  const config = await resolveConfig({
+    configFile: path.join(import.meta.dirname, 'vite.config.mjs'),
+    root: import.meta.dirname,
+    logLevel: 'silent',
+  }, 'serve', 'development')
+  assert(config.plugins.some((plugin) => plugin.name === 'plush-dev-browser-policy'))
+  assert.equal(config.server.open, false)
 })
 
 test('isolated Vite serves linked dependency assets while rejecting unrelated and denied files', async (t) => {
@@ -90,6 +100,7 @@ test(
       'CI',
       'NODE_ENV',
       'NODE_TEST_CONTEXT',
+      'BROWSER',
       'ERP_VITE_PORT',
       'ERP_VITE_HMR_CLIENT_PORT',
       'ERP_VITE_HMR_HOST',
@@ -117,11 +128,13 @@ test(
       ['test environment', { NODE_ENV: 'test' }, 0],
       ['Node test runner', { NODE_TEST_CONTEXT: 'child-v8' }, 0],
       ['manual terminal', {}, 1],
+      ['explicit browser opt-out', { BROWSER: 'none' }, 0],
       ['disabled automation markers', { CODEX_CI: '0', CI: 'false' }, 1],
       ['Codex CLI open path override', { CODEX_THREAD_ID: 'browser-startup-fixture' }, 0, 'false'],
       ['CI explicit open override', { CI: 'true' }, 0, true],
       ['test explicit open override', { NODE_ENV: 'test' }, 0, true],
       ['manual explicit open path', {}, 1, '/erp'],
+      ['browser opt-out overrides explicit open path', { BROWSER: 'none' }, 0, '/erp'],
     ]) {
       await t.test(name, async (t) => {
         for (const key of envKeys) delete process.env[key]

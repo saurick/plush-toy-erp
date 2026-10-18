@@ -17,6 +17,7 @@ const RUNTIME_SOURCE_PATHS = [
   'web/vite.config.mjs',
   'web/vite.shared.mjs',
   'web/scripts/startWebDev.mjs',
+  'web/scripts/openDevBrowser.js',
   'web/scripts/startYoyoosunDev.mjs',
   'web/scripts/devWebInstance.mjs',
   'web/scripts/localPort.mjs',

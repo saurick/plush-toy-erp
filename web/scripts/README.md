@@ -140,7 +140,7 @@ pnpm start
 
 需要重新加载主入口启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。客户辅助入口的 `pnpm start:yoyoosun` 会自动替换过期实例；`pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart` 也会重启同配置实例。两者都使用指定端口（默认 `15200`），不会顺延到新端口。入口先完成运行预检，客户入口还检查客户配置；随后通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间。macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描；Linux 使用 `lsof` 定位监听 PID 和工作目录。逐进程检查均有超时，仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。启动竞争失败后的实例查询只允许复用同配置赢家，不触发自动替换。
 
-日常主前端重启使用 `pnpm start:restart`，`pnpm restart` 具有相同的实际行为。pnpm 原生会执行 stop / restart / start 生命周期，启动器仅让 restart 阶段执行完整重启，其前后两个阶段立即返回，防止重复停服或退出后再次启动。`pnpm stop` 停止主前端，`pnpm stop:yoyoosun` 停止客户辅助前端；指定辅助端口可执行 `pnpm start:yoyoosun --stop --port 15201`。停止入口仅检查端口、PID、工作目录、Vite 命令和启动时间，不运行数据库预检、读取客户包或启动后端；数据库故障不阻断停止前端。前端停止后后端仍独立管理，状态与停止命令见 [服务端入口](../../server/README.md#快速开始)。
+日常主前端重启使用 `pnpm start:restart`，`pnpm restart` 具有相同的实际行为。人工启动、重启和复用已运行服务均使用下述浏览器页签策略，不因 `--restart` 一律禁开页。pnpm 原生会执行 stop / restart / start 生命周期，启动器仅让 restart 阶段执行完整重启，其前后两个阶段立即返回，防止重复停服或退出后再次启动。`pnpm stop` 停止主前端，`pnpm stop:yoyoosun` 停止客户辅助前端；指定辅助端口可执行 `pnpm start:yoyoosun --stop --port 15201`。停止入口仅检查端口、PID、工作目录、Vite 命令和启动时间，不运行数据库预检、读取客户包或启动后端；数据库故障不阻断停止前端。前端停止后后端仍独立管理，状态与停止命令见 [服务端入口](../../server/README.md#快速开始)。
 
 修改迁移页服务端插件或上述启动代码后，交付前须在用户实际使用的端口显式重启并复验；页面热更新和辅助端口验证不会更新已运行进程中的 Node 模块。仅刷新浏览器不能加载这些服务端改动。
 
@@ -156,7 +156,9 @@ HMR 默认跟随浏览器加载页面模块的协议、主机和端口，因此�
 
 Codex（`CODEX_THREAD_ID` / `CODEX_CI`）、CI、`NODE_ENV=test` 或 Node 测试进程启动 Vite 时，只输出服务地址，不自动打开系统浏览器；普通入口、客户入口和直接运行 Vite 共用此策略。该策略约束 CLI 与 inline config 合并后的开发和预览配置，显式 `--open` 也不能绕过自动化禁开页边界。测试启动器使用 `BROWSER=none`，不要用 `--open false` 关闭开页：Vite 会将 `false` 当作页面路径。需要实际页面验证时，由浏览器工具按会话创建和回收标签，不以系统自动开页代替。
 
-人工终端在 Windows / WSL 下运行 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 时，通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与有图形桌面的原生 Linux 保留 Vite 的平台默认打开行为；无图形桌面的 Linux 只输出访问地址，不调用 `xdg-open`。
+人工终端的 `pnpm start`、`pnpm start:restart` / `pnpm restart`、`pnpm start:frontend-only`、`pnpm start:isolated` 与客户启动 / 重启入口共用 `openDevBrowser.js`；复用已有服务进程时也会检查浏览器页签。macOS 检查已运行的 Chrome、Edge、Brave、Chromium、Vivaldi 与 Safari，以协议和实际端口精确匹配服务，`127.0.0.1` / `localhost` / `[::1]` 视为本机别名；命中后保留页面路径、查询、锚点及焦点，由 HMR 恢复连接，没有同服务页签才后台新开。页签读取失败时提示检查终端的浏览器自动化权限，保留服务，不以重复新开掩盖失败。直接运行 Vite 也加载同一入口。
+
+Windows / WSL 保留已有 Chrome、Edge、Brave 的受管复用方式：仅检查属于本项目的候选标题，再精确核对本机地址和端口；命中时激活、刷新，未命中或 UI Automation 不可用时使用系统默认新页。原生 Linux 有桌面时使用平台默认浏览器，无图形桌面时只输出地址。显式 `BROWSER=none` 或自定义 `BROWSER` 优先；不输出已有页面内容、关闭历史重复标签或修改用户窗口布局。
 
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。受限模式保留 `/__dev/database-migration` 恢复页、固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status`；其它 DEV API 继续阻断。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 

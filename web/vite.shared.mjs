@@ -23,6 +23,7 @@ const DEV_WORKBENCH_PLUGIN_MODULE = new URL(
   './dev-server/devWorkbenchPlugins.mjs',
   import.meta.url
 ).href
+const DEV_BROWSER_MODULE = new URL('./scripts/openDevBrowser.js', import.meta.url).href
 
 export function resolveERPDevServerPort(rawPort, ports = devPorts) {
   return resolvePort(rawPort, ports)
@@ -117,7 +118,7 @@ const createDevBrowserPolicy = (suppressBrowserOpen) => ({
   apply: 'serve',
   configResolved(config) {
     if (!suppressBrowserOpen) return
-    // CLI 和 inline config 会覆盖初始值，自动化开页边界须约束最终配置。
+    // CLI 和 inline config 会覆盖初始值，禁开页策略须约束最终配置。
     config.server.open = false
     config.preview.open = false
   },
@@ -182,11 +183,12 @@ export function createERPViteConfig(appId) {
     const env = loadEnv(mode, process.cwd(), '')
     const isProd = mode === 'production'
     const isDev = mode === 'development'
-    const suppressBrowserOpen =
-      isCodexDevSession() ||
-      ['1', 'true'].includes(process.env.CI) ||
-      process.env.NODE_ENV === 'test' ||
-      Boolean(process.env.NODE_TEST_CONTEXT)
+    const { resolveDevBrowserLaunchEnv, shouldSuppressDevBrowser } =
+      await import(DEV_BROWSER_MODULE)
+    if (command === 'serve') {
+      Object.assign(process.env, resolveDevBrowserLaunchEnv())
+    }
+    const suppressBrowserOpen = shouldSuppressDevBrowser()
 
     if (!isProd) {
       console.log(`[vite] erp app=${app.id} command=${command} mode=${mode}`)
@@ -272,7 +274,7 @@ export function createERPViteConfig(appId) {
           : [],
         port: serverPort,
         strictPort: true,
-        // 自动化页面由会话浏览器工具管理，避免系统 opener 留下无法归属的标签。
+        // 人工入口按服务地址复用页签；自动化页面由会话浏览器工具管理。
         open: suppressBrowserOpen ? false : createDevOrigin(serverPort),
         // 默认跟随浏览器加载模块的地址，让远程访问和端口转发共用同源 HMR。
         hmr: {

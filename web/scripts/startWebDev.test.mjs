@@ -23,7 +23,8 @@ import {
   stopLocalWebFrontend,
   writeWebStartupSummary,
 } from './startWebDev.mjs'
-import { parseYoyoosunDevArgs } from './startYoyoosunDev.mjs'
+import { parseYoyoosunDevArgs, runYoyoosunVite } from './startYoyoosunDev.mjs'
+import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
 import {
   LOCAL_RUNTIME_RECOVERY_MODE,
   LocalRuntimePreflightError,
@@ -249,6 +250,41 @@ test('start web dev: recovery 环境显式覆盖且普通启动清除遗留值',
   })
   assert.equal(Object.hasOwn(normal, 'ERP_DEV_RECOVERY_MODE'), false)
   assert.equal(Object.hasOwn(normal, 'ERP_DEV_RECOVERY_REASON'), false)
+})
+
+test('frontend starts and restarts retain the shared browser launcher and explicit preferences', () => {
+  const startup = {
+    apiOrigin: 'http://127.0.0.1:8300',
+    gitlabCredential: { source: 'missing', token: '' },
+  }
+  for (const BROWSER of [undefined, 'none', '/fixture/browser.js']) {
+    const env = BROWSER === undefined ? {} : { BROWSER }
+    const original = { ...env }
+    for (const recoveryMode of ['', LOCAL_RUNTIME_RECOVERY_MODE]) {
+      const environment = createViteChildEnvironment({
+        ...startup, recoveryMode, env,
+      })
+      assert.equal(environment.BROWSER, BROWSER || resolveDevBrowserLaunchEnv(env).BROWSER)
+      assert.equal(environment.ERP_DEV_RECOVERY_MODE, recoveryMode || undefined)
+    }
+    assert.deepEqual(env, original)
+  }
+})
+
+test('customer frontend starts and restarts retain the configured browser launcher', () => {
+  for (const restart of [false, true]) {
+    const result = runYoyoosunVite(
+      { customer: 'yoyoosun', port: '15200', apiOrigin: 'http://127.0.0.1:8300', restart },
+      { apiOrigin: 'http://127.0.0.1:8300' },
+      { source: 'missing', token: '' },
+      {
+        env: { BROWSER: '/fixture/browser.js' },
+        run: (_args, startup, gitlabCredential, env) =>
+          createViteChildEnvironment({ ...startup, gitlabCredential, env }),
+      }
+    )
+    assert.equal(result.BROWSER, '/fixture/browser.js')
+  }
 })
 
 test('start web dev: 所有本地数据库预检阻断保留恢复入口', async () => {

@@ -1,17 +1,57 @@
-#!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { isCodexDevSession } from './localPort.mjs'
 
 const DEV_BROWSER_SCRIPT_PATH = fileURLToPath(import.meta.url)
 const WSL_POWERSHELL_PATH =
   '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
 const REUSED_MARKER = 'PLUSH_DEV_BROWSER_REUSED'
 const OPENED_MARKER = 'PLUSH_DEV_BROWSER_OPENED'
+const NOT_FOUND_MARKER = 'PLUSH_DEV_BROWSER_NOT_FOUND'
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
+
+const MACOS_TAB_REUSE_SOURCE = String.raw`
+function run(argv) {
+  var origins = JSON.parse(argv[0]);
+  var browsers = [
+    'com.google.Chrome', 'com.google.Chrome.beta', 'com.google.Chrome.canary',
+    'com.microsoft.edgemac', 'com.brave.Browser', 'org.chromium.Chromium',
+    'com.vivaldi.Vivaldi', 'com.apple.Safari'
+  ];
+  var inspectionFailed = false;
+  for (var index = 0; index < browsers.length; index++) {
+    var browser;
+    try {
+      browser = Application(browsers[index]);
+      if (!browser.running()) continue;
+    } catch (error) {
+      continue;
+    }
+    try {
+      var windows = browser.windows();
+      for (var windowIndex = 0; windowIndex < windows.length; windowIndex++) {
+        var tabs = windows[windowIndex].tabs();
+        for (var tabIndex = 0; tabIndex < tabs.length; tabIndex++) {
+          var address = String(tabs[tabIndex].url() || '');
+          var match = address.match(/^(https?:)\/\/([^/?#]+)/i);
+          if (match && origins.indexOf((match[1] + '//' + match[2]).toLowerCase()) >= 0) {
+            // HMR reconnects the current page without changing its URL or focus.
+            return '${REUSED_MARKER}';
+          }
+        }
+      }
+    } catch (error) {
+      inspectionFailed = true;
+    }
+  }
+  if (inspectionFailed) throw new Error('Browser tab inspection is unavailable');
+  return '${NOT_FOUND_MARKER}';
+}
+`
 
 const WINDOWS_TAB_REUSE_SOURCE = String.raw`
 $ErrorActionPreference = "Stop"
@@ -300,6 +340,10 @@ export function resolveDevBrowserLaunchEnv(
     return {}
   }
 
+  if ((runtime.platform || process.platform) === 'darwin') {
+    return { BROWSER: DEV_BROWSER_SCRIPT_PATH }
+  }
+
   const powerShellPath = resolveWindowsPowerShellPath({ env, ...runtime })
   if (!powerShellPath) {
     if (
@@ -339,6 +383,16 @@ export function normalizeDevBrowserTarget(rawTarget) {
   return target
 }
 
+export function shouldSuppressDevBrowser(env = process.env) {
+  return (
+    String(env.BROWSER || '').trim().toLowerCase() === 'none' ||
+    isCodexDevSession(env) ||
+    ['1', 'true'].includes(env.CI) ||
+    env.NODE_ENV === 'test' ||
+    Boolean(env.NODE_TEST_CONTEXT)
+  )
+}
+
 export function parseDevBrowserTarget(argv) {
   for (let index = argv.length - 1; index >= 0; index -= 1) {
     try {
@@ -354,12 +408,42 @@ export function openDevBrowser(
   rawTarget,
   {
     env = process.env,
+    platform = process.platform,
     powerShellPath = env.ERP_DEV_BROWSER_POWERSHELL ||
-      resolveWindowsPowerShellPath({ env }),
+      resolveWindowsPowerShellPath({ env, platform }),
     spawnSyncImpl = spawnSync,
   } = {}
 ) {
   const target = normalizeDevBrowserTarget(rawTarget)
+  const options = { encoding: 'utf8', env, timeout: 10_000, windowsHide: true }
+  if (platform === 'darwin') {
+    const origins = [...LOOPBACK_HOSTS].map((host) =>
+      `${target.protocol}//${host}${target.port ? `:${target.port}` : ''}`
+    )
+    const inspected = spawnSyncImpl(
+      '/usr/bin/osascript',
+      ['-l', 'JavaScript', '-e', MACOS_TAB_REUSE_SOURCE, JSON.stringify(origins)],
+      options
+    )
+    if (inspected.error || inspected.status !== 0) {
+      throw new Error('macOS 无法核对浏览器页签；请检查终端的浏览器自动化权限')
+    }
+    const result = String(inspected.stdout || '').trim()
+    if (result === REUSED_MARKER) return { action: 'reused', origin: target.origin }
+    if (result !== NOT_FOUND_MARKER) {
+      throw new Error('macOS 浏览器页签检查未返回有效结果')
+    }
+    const opened = spawnSyncImpl('/usr/bin/open', ['-g', target.href], options)
+    if (opened.error || opened.status !== 0) {
+      throw new Error('macOS 无法打开开发页面')
+    }
+    return { action: 'opened', origin: target.origin }
+  }
+  if (platform === 'linux' && !powerShellPath) {
+    const opened = spawnSyncImpl('xdg-open', [target.href], options)
+    if (opened.error || opened.status !== 0) throw new Error('无法打开开发页面')
+    return { action: 'opened', origin: target.origin }
+  }
   if (!powerShellPath) {
     throw new Error('Windows PowerShell is unavailable for browser launch')
   }
@@ -404,14 +488,48 @@ export function openDevBrowser(
   throw new Error('Windows browser launcher returned an unknown result')
 }
 
+export function launchDevBrowser(rawTarget, {
+  env = process.env,
+  platform = process.platform,
+  openBrowser = openDevBrowser,
+  spawnSyncImpl = spawnSync,
+  writeLine = (line) => process.stdout.write(`${line}\n`),
+} = {}) {
+  const target = normalizeDevBrowserTarget(rawTarget)
+  const launchEnv = { ...env, ...resolveDevBrowserLaunchEnv(env, { platform }) }
+  if (shouldSuppressDevBrowser(launchEnv)) {
+    return { action: 'suppressed', origin: target.origin }
+  }
+  try {
+    const browser = String(launchEnv.BROWSER || '').trim()
+    let result
+    if (!browser || browser === DEV_BROWSER_SCRIPT_PATH) {
+      result = openBrowser(target, { env: launchEnv, platform, spawnSyncImpl })
+    } else {
+      let command = browser
+      let args = [target.href]
+      if (browser.endsWith('.js')) {
+        command = process.execPath
+        args = [browser, target.href]
+      } else if (platform === 'darwin') {
+        command = '/usr/bin/open'
+        args = ['-g', '-a', browser, target.href]
+      }
+      const opened = spawnSyncImpl(command, args, { encoding: 'utf8', env: launchEnv, timeout: 10_000, windowsHide: true })
+      if (opened.error || opened.status !== 0) throw new Error('指定浏览器无法打开开发页面')
+      result = { action: 'opened', origin: target.origin }
+    }
+    writeLine(`[dev-browser] ${result.action === 'reused' ? '已复用现有标签页，保留当前页面' : '未找到同服务标签页，已打开新标签页'}：${result.origin}`)
+    return result
+  } catch {
+    writeLine(`[dev-browser] 无法核对或打开浏览器页签；服务已就绪，请检查终端的浏览器自动化权限或访问 ${target.origin}`)
+    return { action: 'unavailable', origin: target.origin }
+  }
+}
+
 function main() {
-  const target = parseDevBrowserTarget(process.argv.slice(2))
-  const result = openDevBrowser(target)
-  const message =
-    result.action === 'reused'
-      ? '已复用并刷新现有标签页'
-      : '未找到同端口标签页，已打开新标签页'
-  process.stdout.write(`[dev-browser] ${message}：${result.origin}\n`)
+  const result = launchDevBrowser(parseDevBrowserTarget(process.argv.slice(2)))
+  if (result.action === 'unavailable') process.exitCode = 1
 }
 
 const isDirectRun =

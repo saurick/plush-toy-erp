@@ -23,7 +23,7 @@ import {
   executeCommand,
   redactDatabaseMigrationDiagnostic,
 } from '../dev-server/devDatabaseMigrationRuntime.mjs'
-import { resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
+import { launchDevBrowser, resolveDevBrowserLaunchEnv } from './openDevBrowser.js'
 import { DEV_DATABASE_MIGRATION_RECOVERY_ROUTE } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 import {
   isCodexDevSession,
@@ -472,6 +472,7 @@ async function main() {
       `[start-web] 已复用本工作区前端（PID ${instance.pid}）；需要重新加载启动配置时执行 pnpm start --restart`,
       { tone: startup.complete ? 'success' : 'warning' }
     )
+    launchDevBrowser(url)
     return
   }
   if (gitlabCredential.source === 'keychain') {
@@ -511,6 +512,7 @@ async function main() {
           `[start-web] 已复用同时启动的本工作区前端：${url}`,
           { tone: startup.complete ? 'success' : 'warning' }
         )
+        launchDevBrowser(url)
         return
       }
     } catch {

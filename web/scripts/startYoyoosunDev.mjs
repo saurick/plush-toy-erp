@@ -9,6 +9,7 @@ import { loadDevPorts, validateDevAuxPort } from '../../scripts/dev-ports.mjs'
 import { prepareWebInstance, webInstanceSignature } from './devWebInstance.mjs'
 import { normalizeAPIOrigin } from '../../scripts/local-runtime-preflight.mjs'
 import { writeTerminalMessage } from '../../scripts/terminal-log.mjs'
+import { launchDevBrowser } from './openDevBrowser.js'
 import {
   runManagedVite,
   resolveDevGitlabCredential,
@@ -208,6 +209,7 @@ async function main() {
       `[start-yoyoosun] 已复用本工作区前端（PID ${instance.pid}）：http://127.0.0.1:${options.port}/erp`,
       { tone: startup.complete ? 'success' : 'warning' }
     )
+    launchDevBrowser(`http://127.0.0.1:${options.port}/erp`)
     return
   }
   writeTerminalMessage(
@@ -235,6 +237,7 @@ async function main() {
           `[start-yoyoosun] 已复用同时启动的本工作区前端（PID ${winner.pid}）：http://127.0.0.1:${options.port}/erp`,
           { tone: startup.complete ? 'success' : 'warning' }
         )
+        launchDevBrowser(`http://127.0.0.1:${options.port}/erp`)
         return
       }
     } catch {
