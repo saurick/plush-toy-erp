@@ -25,12 +25,21 @@ const CONFIRMATION = exceptionFlowConfirmation({
   databaseName: DATABASE_NAME,
 });
 
+function idleBrowserPage() {
+  return {
+    pendingRPC: new Set(),
+    rpcResponses: new Set(),
+    waitForLoadState: async () => {},
+    evaluate: async () => {},
+  };
+}
+
 test("exception session waits for forwarded requests before closing their context", async () => {
   let release;
   const response = new Promise((resolve) => { release = resolve; });
   const events = [];
   const session = {
-    page: { unrouteAll: async (options) => {
+    page: { ...idleBrowserPage(), unrouteAll: async (options) => {
       assert.deepEqual(options, { behavior: "wait" });
       events.push("page-drained");
     } },
@@ -55,7 +64,7 @@ test("exception session waits for forwarded requests before closing their contex
 test("exception session reports HTTP failures arriving while routes drain", async () => {
   let closed = false;
   const session = {
-    page: { unrouteAll: async () => {} },
+    page: { ...idleBrowserPage(), unrouteAll: async () => {} },
     context: {
       unrouteAll: async () => {
         session.httpFailures.push({ status: 503, pathname: "/rpc/workflow", rpcMethod: "get_task_board" });
@@ -71,7 +80,7 @@ test("exception session reports HTTP failures arriving while routes drain", asyn
 test("exception session still closes its context when route draining fails", async () => {
   let closed = false;
   const session = {
-    page: { unrouteAll: async () => { throw new Error("route drain failed"); } },
+    page: { ...idleBrowserPage(), unrouteAll: async () => { throw new Error("route drain failed"); } },
     context: { close: async () => { closed = true; } },
     httpFailures: [],
   };

@@ -8,7 +8,7 @@ import {
   bindBrowserWriteBackend,
 } from '../../scripts/qa/browser-write-target.mjs'
 import { buildYoyoosunLocalEntryAudit } from './yoyoosunLocalEntryAudit.mjs'
-import { closeSession } from '../../scripts/qa/exception-flow-real-write-browser.mjs'
+import { assertNoUnexpectedHTTPFailures, closeSession } from '../../scripts/qa/exception-flow-real-write-browser.mjs'
 
 test('forwarding failures remain failures without exposing request headers', async () => {
   let handler
@@ -22,6 +22,20 @@ test('forwarding failures remain failures without exposing request headers', asy
     assert.ok(!error.stack.includes('synthetic-sensitive-value'))
     return true
   })
+})
+
+test('owned forwarding failures are collected and leave no pending request', async () => {
+  let handler
+  const failures = []
+  const binding = await bindBrowserWriteBackend({ route: async (_pattern, callback) => { handler = callback } }, 'http://127.0.0.1:8300', { onForwardError: (failure) => failures.push({ status: 0, ...failure }) })
+  await handler({
+    request: () => ({ url: () => 'http://127.0.0.1:15201/rpc/workflow', postDataJSON: () => ({ method: 'get_task_board' }) }),
+    fetch: async () => { throw new Error('authorization: Bearer synthetic-sensitive-value') },
+    abort: async () => {},
+  })
+  assert.deepEqual(failures, [{ status: 0, pathname: '/rpc/workflow', rpcMethod: 'get_task_board', reason: 'forwarding_failed' }])
+  assert.equal(binding.pending.size, 0)
+  assert.throws(() => assertNoUnexpectedHTTPFailures(failures), /forwarding_failed/u)
 })
 
 test('real forwarded response drains before exception browser context disposal', async () => {
@@ -48,8 +62,10 @@ test('real forwarded response drains before exception browser context disposal',
     const origin = `http://127.0.0.1:${backend.address().port}`
     browser = await chromium.launch({ headless: true })
     const context = await browser.newContext()
-    await bindBrowserWriteBackend(context, origin)
+    const binding = await bindBrowserWriteBackend(context, origin)
     const page = await context.newPage()
+    page.pendingRPC = binding.pending
+    page.rpcResponses = binding.pending
     await page.goto(origin)
     const request = page.evaluate(() => fetch('/rpc/workflow', { method: 'POST', body: '{}' }).then((response) => response.text())).catch(() => null)
     await received

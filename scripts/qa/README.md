@@ -588,6 +588,8 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 
 三条流程使用独立业务来源；单条失败会保留诊断并继续核对其余流程，最终必须三条全部通过且失败列表为空。运行身份预检失败仍立即停止，不执行业务动作。
 
+页面导航、故障路由撤销和会话关闭前复用真实 RPC 完成等待，避免未结束的转发回调使进程退出而跳过清理。后台转发失败以脱敏的路径、方法和 `status: 0` 归入验收失败，仍走报告与清理；不输出 Playwright 原始请求头。
+
 ```bash
 MANUAL_ACCEPTANCE_DEMO_PASSWORD='<local-demo-password>' \
 EXCEPTION_FLOW_BROWSER_CONFIRM='RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:plush_erp_acceptance_exception_example_browser_actions_dev:http://127.0.0.1:8323' \

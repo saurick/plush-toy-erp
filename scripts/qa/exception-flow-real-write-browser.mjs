@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import {
   verifyDatabaseRuntimeIdentity,
   bindBrowserWriteBackend,
-  browserRPCURL,
 } from "./browser-write-target.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs/promises";
@@ -14,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { classifyDatabaseName } from "./database-target.mjs";
 import { FORMAL_DEMO_ACCOUNT_PROFILES } from "./manual-acceptance-account-scenarios.mjs";
+import { dropRealResponse, settleRPCPage } from "./transaction-browser-ui.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -279,6 +279,7 @@ export function assertNoUnexpectedHTTPFailures(
 export async function closeSession(session, label) {
   if (!session) return;
   try {
+    await settleRPCPage(session.page);
     await session.page.unrouteAll({ behavior: "wait" });
     await session.context.unrouteAll({ behavior: "wait" });
   } finally {
@@ -415,43 +416,32 @@ function waitForRpcResponse(page, service, method) {
 }
 
 async function installLostMutationResponse(page, service, method) {
+  const fault = await dropRealResponse(
+    page,
+    { backendURL: page.verifiedBackendURL },
+    service,
+    method,
+  );
   const state = {
     service,
     method,
-    injected: false,
-    backendResultCode: null,
+    get injected() {
+      return fault.state.injected;
+    },
+    get backendResultCode() {
+      return fault.state.backendCode;
+    },
     transportFault: "response_dropped_after_backend_completed",
   };
-  const pattern = `**/rpc/${service}`;
-  const handler = async (route) => {
-    let request;
-    try {
-      request = route.request().postDataJSON();
-    } catch {
-      request = null;
-    }
-    if (state.injected || request?.method !== method) {
-      await route.fallback();
-      return;
-    }
-    const response = await route.fetch({
-      url: browserRPCURL(page.verifiedBackendURL, route.request().url()),
-      maxRedirects: 0,
-    });
-    let json = null;
-    try {
-      json = await response.json();
-    } catch {
-      json = null;
-    }
-    state.injected = true;
-    state.backendResultCode = rpcErrorCode(json);
-    await route.abort("failed");
-  };
-  await page.route(pattern, handler);
   return {
     state,
-    remove: () => page.unroute(pattern, handler),
+    remove: async () => {
+      try {
+        await fault.remove();
+      } catch {
+        throw new AcceptanceError("lost-response verification or cleanup failed");
+      }
+    },
   };
 }
 
@@ -460,10 +450,15 @@ async function login(browser, { baseURL, backendURL, password, roleKey }) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
   });
-  await bindBrowserWriteBackend(context, backendURL);
   const page = await context.newPage();
   page.verifiedBackendURL = backendURL;
   const httpFailures = attachUnexpectedHTTPFailureCollector(page);
+  const binding = await bindBrowserWriteBackend(context, backendURL, {
+    onForwardError: (failure) => httpFailures.push({ status: 0, ...failure }),
+  });
+  page.pendingRPC = binding.pending;
+  page.rpcResponses = binding.pending;
+  page.expectedRPCFailures = new Map();
   page.setDefaultTimeout(PAGE_TIMEOUT_MS);
   try {
     await page.goto(new URL("/admin-login", `${baseURL}/`).toString(), {
@@ -476,6 +471,7 @@ async function login(browser, { baseURL, backendURL, password, roleKey }) {
       page.waitForURL((url) => url.pathname !== "/admin-login"),
       page.locator('button[type="submit"]').click(),
     ]);
+    await settleRPCPage(page);
     await page.goto(new URL("/entry", `${baseURL}/`).toString(), {
       waitUntil: "domcontentloaded",
     });
@@ -489,10 +485,7 @@ async function login(browser, { baseURL, backendURL, password, roleKey }) {
       state: "visible",
       timeout: LOGIN_SETTLE_TIMEOUT_MS,
     });
-    await page
-      .waitForLoadState("networkidle", { timeout: 750 })
-      .catch(() => {});
-    await page.waitForTimeout(250);
+    await settleRPCPage(page);
     if (
       await page
         .getByTestId("legal-notice-gate")
@@ -515,12 +508,14 @@ async function login(browser, { baseURL, backendURL, password, roleKey }) {
 }
 
 async function goto(page, baseURL, pathname, expectedText) {
+  await settleRPCPage(page);
   await page.goto(new URL(pathname, `${baseURL}/`).toString(), {
     waitUntil: "domcontentloaded",
   });
   await page.getByText(expectedText, { exact: true }).first().waitFor({
     state: "visible",
   });
+  await settleRPCPage(page);
 }
 
 async function selectRow(page, visibleToken) {

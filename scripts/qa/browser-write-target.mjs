@@ -61,22 +61,46 @@ export function browserRPCURL(backendURL, requestURL) {
 }
 
 // Route the browser's writes to the verified backend, independent of a frontend proxy.
-export async function bindBrowserWriteBackend(context, backendURL) {
+export async function bindBrowserWriteBackend(
+  context,
+  backendURL,
+  { onForwardError } = {},
+) {
   const origin = browserWriteOrigin(backendURL);
+  const pending = new Set();
   await context.route("**/rpc/**", async (route) => {
-    try {
-      const response = await route.fetch({
-        url: browserRPCURL(origin, route.request().url()),
-        maxRedirects: 0,
-      });
-      if (response.status() >= 300 && response.status() < 400) {
-        await route.abort("failed");
-        return;
+    const forwarded = (async () => {
+      try {
+        const response = await route.fetch({
+          url: browserRPCURL(origin, route.request().url()),
+          maxRedirects: 0,
+        });
+        if (response.status() >= 300 && response.status() < 400) {
+          await route.abort("failed");
+          return;
+        }
+        await route.fulfill({ response });
+      } catch {
+        // Playwright request errors contain authorization headers.
+        if (!onForwardError) throw new Error("browser RPC forwarding failed");
+        let method = "unknown";
+        try {
+          method = String(route.request().postDataJSON()?.method || method);
+        } catch {}
+        onForwardError({
+          pathname: new URL(route.request().url()).pathname,
+          rpcMethod: method,
+          reason: "forwarding_failed",
+        });
+        await route.abort("failed").catch(() => {});
       }
-      await route.fulfill({ response });
-    } catch {
-      // Playwright request errors contain authorization headers.
-      throw new Error("browser RPC forwarding failed");
+    })();
+    pending.add(forwarded);
+    try {
+      await forwarded;
+    } finally {
+      pending.delete(forwarded);
     }
   });
+  return { pending };
 }
