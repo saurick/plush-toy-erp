@@ -70,6 +70,8 @@ test('advance receipt requires both read permission and an effective session bef
 })
 
 test('advance payment filters eligible supplier orders and clears the old order and currency on source change', async (t) => {
+  const originalError = console.error
+  const errors = t.mock.method(console, 'error', (...args) => originalError(...args))
   const ui = await setup(t, (method) => {
     if (method === 'list_purchase_orders') {
       return page('purchase_orders', [
@@ -98,6 +100,7 @@ test('advance payment filters eligible supplier orders and clears the old order 
   assert.equal(ui.values().currency, 'HKD')
   assert.equal(ui.calls.length, 2)
   assert.deepEqual(ui.calls.map(({ params }) => [params.supplier_id, params.lifecycle_status]), [[7, 'approved'], [7, 'confirmed']])
+  assert.equal(errors.mock.callCount(), 0, 'source switching must not relabel a selected order with another source schema')
 })
 
 test('changing the counterparty aborts the previous request and ignores its late response', async (t) => {

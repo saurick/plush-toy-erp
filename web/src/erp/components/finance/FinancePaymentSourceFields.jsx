@@ -46,12 +46,17 @@ export default function FinancePaymentSourceFields({ form, profile, open, source
   const direction = Form.useWatch('direction', form)
   const party = Form.useWatch('counterparty_id', form)
   const sourceType = Form.useWatch('source_type', form)
-  const [orders, setOrders] = useState([])
+  // 选项属于读取它们的来源和往来方，切换时不能套用另一类单号字段。
+  const [orderSource, setOrderSource] = useState({ sourceType: null, party: null, rows: [] })
+  const orders = orderSource.sourceType === sourceType && orderSource.party === party
+    ? orderSource.rows
+    : []
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => {
     const controller = new AbortController()
     const source = sources[sourceType]
+    const setOrders = (rows) => setOrderSource({ sourceType, party, rows })
     setOrders([])
     setError('')
     setLoading(false)

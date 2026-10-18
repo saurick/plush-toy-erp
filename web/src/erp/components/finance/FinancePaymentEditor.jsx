@@ -123,6 +123,7 @@ export function FinancePaymentEditor({
           rules={[{ required: true, message: '请选择往来方' }]}
         >
           <Select
+            key={partyIsCustomer ? 'customer' : 'supplier'}
             showSearch
             optionFilterProp="label"
             loading={referenceLoading}

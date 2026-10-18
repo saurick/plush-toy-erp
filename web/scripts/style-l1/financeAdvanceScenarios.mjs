@@ -31,6 +31,8 @@ export function createFinanceAdvanceScenarios({
           'finance.payment.reverse',
           'finance.receivable.read',
           'sales.order.read',
+          'purchase.order.read',
+          'outsourcing.order.read',
         ],
       },
       beforeNavigate: async (page) => {
@@ -156,35 +158,69 @@ export function createFinanceAdvanceScenarios({
             }),
           })
         })
-        await page.route('**/rpc/sales_order', async (route) => {
-          const body = route.request().postDataJSON()
-          if (body.method !== 'list_sales_orders') {
-            await route.fallback()
-            return
-          }
-          const orders = [
-            {
+        for (const { service, method, recordKey, order } of [
+          {
+            service: 'sales_order',
+            method: 'list_sales_orders',
+            recordKey: 'sales_orders',
+            order: {
               id: 311,
               order_no: 'SO-ADVANCE-01',
               customer_id: 1,
               currency: 'USD',
               lifecycle_status: 'active',
             },
-          ]
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: body.id,
-              result: styleRpcResult(
-                stylePaginatedRpcData(orders, 'sales_orders', body.params)
-              ),
-            }),
+          },
+          {
+            service: 'purchase_order',
+            method: 'list_purchase_orders',
+            recordKey: 'purchase_orders',
+            order: {
+              id: 311,
+              purchase_order_no: 'PO-ADVANCE-01',
+              supplier_id: 1,
+              currency: 'USD',
+              lifecycle_status: 'approved',
+            },
+          },
+          {
+            service: 'outsourcing_order',
+            method: 'list_outsourcing_orders',
+            recordKey: 'outsourcing_orders',
+            order: {
+              id: 311,
+              outsourcing_order_no: 'OUT-ADVANCE-01',
+              supplier_id: 1,
+              currency: 'HKD',
+              lifecycle_status: 'confirmed',
+            },
+          },
+        ]) {
+          await page.route(`**/rpc/${service}`, async (route) => {
+            const body = route.request().postDataJSON()
+            if (body.method !== method) {
+              await route.fallback()
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id,
+                result: styleRpcResult(
+                  stylePaginatedRpcData([order], recordKey, body.params)
+                ),
+              }),
+            })
           })
-        })
+        }
       },
       verify: async (page) => {
+        const selection = (label) => page
+          .getByLabel(label, { exact: true })
+          .locator('xpath=ancestor::div[contains(@class, "ant-select-selector")][1]')
+          .locator('.ant-select-selection-item')
         const choose = async (label, text) => {
           await page
             .getByLabel(label, { exact: true })
@@ -296,6 +332,7 @@ export function createFinanceAdvanceScenarios({
           await page.getByLabel('币种', { exact: true }).isDisabled(),
           true
         )
+        await selection('币种').filter({ hasText: '美元（USD）' }).waitFor({ state: 'visible' })
         await choose('款项用途', '应收应付结算')
         await page
           .getByLabel('订单 / 合同', { exact: true })
@@ -304,10 +341,22 @@ export function createFinanceAdvanceScenarios({
           await page.getByLabel('订单 / 合同', { exact: true }).count(),
           0
         )
-        assert.equal(
-          await page.getByLabel('币种', { exact: true }).inputValue(),
-          ''
-        )
+        await selection('币种').waitFor({ state: 'detached' })
+        await choose('款项用途', '订单预收 / 预付（首款、分期款、发货前尾款）')
+        await choose('收付款方向', '付款')
+        await choose('供应商', /样式供应商/u)
+        await choose('关联单据', '采购订单')
+        await choose('订单 / 合同', 'PO-ADVANCE-01 · USD')
+        await selection('币种').filter({ hasText: '美元（USD）' }).waitFor({ state: 'visible' })
+        await choose('关联单据', '委外合同')
+        await selection('币种').waitFor({ state: 'detached' })
+        await selection('订单 / 合同').waitFor({ state: 'detached' })
+        await choose('订单 / 合同', 'OUT-ADVANCE-01 · HKD')
+        await selection('币种').filter({ hasText: '港币（HKD）' }).waitFor({ state: 'visible' })
+        await choose('关联单据', '采购订单')
+        await selection('币种').waitFor({ state: 'detached' })
+        await choose('订单 / 合同', 'PO-ADVANCE-01 · USD')
+        await selection('币种').filter({ hasText: '美元（USD）' }).waitFor({ state: 'visible' })
       },
     }
   })
