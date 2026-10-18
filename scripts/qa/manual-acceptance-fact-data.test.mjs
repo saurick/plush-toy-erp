@@ -17,6 +17,7 @@ import {
   buildManualAcceptanceFactPlan,
   ensureManualAcceptanceProductionExceptionApproval,
   ensureReceiptQualities,
+  ensureManualAcceptanceQualityCorrections,
   assertReceiptMatchesPlan,
   manualAcceptanceFactRPCCall,
   manualAcceptanceFactRole,
@@ -37,7 +38,10 @@ import {
   verifyManualAcceptanceFactPlan,
 } from "./manual-acceptance-fact-data.mjs";
 import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
-import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
+import {
+  buildSourceDrivenFactPlan,
+  manualAcceptanceBusinessNo,
+} from "./manual-acceptance-source-driven-facts.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
@@ -395,7 +399,7 @@ function purchaseStage() {
   ];
   const correctionStatuses = ["DRAFT", "POSTED", "CANCELLED"];
   return {
-    purchaseReceipts: fakeRecords(54, 1000).map((item, offset) => ({
+    purchaseReceipts: fakeRecords(57, 1000).map((item, offset) => ({
       ...item,
       receipt_no: `PR-${offset}`,
       status: receiptStatuses[offset % receiptStatuses.length],
@@ -416,12 +420,12 @@ function purchaseStage() {
         },
       ],
     })),
-    qualityInspections: fakeRecords(60, 4000).map((item, offset) => ({
+    qualityInspections: fakeRecords(63, 4000).map((item, offset) => ({
       ...item,
       inspection_no: `QI-${offset}`,
       status: qualityStatuses[offset % qualityStatuses.length],
       source_type: "PURCHASE_RECEIPT",
-      source_id: 1000 + (offset % 54),
+      source_id: 1000 + (offset % 57),
     })),
     inventoryLots: fakeRecords(45, 5000).map((item, offset) => ({
       ...item,
@@ -708,7 +712,239 @@ function localMutationGuards(report) {
   };
 }
 
-test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact runs", () => {
+test("fact plan reserves unposted receipts for correction reinspection", () => {
+  const plan = buildManualAcceptanceFactPlan(sourceReport());
+  assert.equal(plan.receipts.length, 57);
+  assert.deepEqual(
+    plan.qualityCorrections.map((item) => item.status),
+    ["SUBMITTED", "PASSED", "REJECTED"],
+  );
+  for (const [index, correction] of plan.qualityCorrections.entries()) {
+    const source = plan.receipts[correction.receiptIndex];
+    assert.equal(source.status, "DRAFT");
+    assert.equal(source.qualityTarget, "PASSED");
+    assert.equal(source.items.length, 1);
+    assert.equal(
+      correction.inspectionNo,
+      manualAcceptanceBusinessNo({
+        dataVersion: plan.dataVersion,
+        code: "ZJ",
+        sequence: 2001 + index,
+      }),
+    );
+    assert.ok(correction.reason);
+  }
+  assert.equal(plan.expectedMinimums.purchaseReceipts, 57);
+  assert.equal(plan.expectedMinimums.qualityInspections, 63);
+});
+
+function qualityCorrectionFixture() {
+  const plan = buildManualAcceptanceFactPlan(sourceReport());
+  const receipts = plan.receipts.map((recipe, index) => ({
+    id: 1000 + index,
+    status: recipe.status,
+    items: [{ id: 3000 + index }],
+    quality_inspections: [],
+  }));
+  const rows = new Map();
+  for (const [index, recipe] of plan.qualityCorrections.entries()) {
+    const receipt = receipts[recipe.receiptIndex];
+    const row = {
+      id: 5000 + index,
+      inspection_no: `IQC-PR-${receipt.id}-ITEM-${receipt.items[0].id}`,
+      purchase_receipt_id: receipt.id,
+      purchase_receipt_item_id: receipt.items[0].id,
+      source_type: "PURCHASE_RECEIPT",
+      source_id: receipt.id,
+      inspection_type: "INCOMING",
+      status: "PASSED",
+      result: "PASS",
+      decision_note: "原合格判定",
+      check_items: [
+        { name: "外观", result: "PASS", observation: "原检验记录" },
+      ],
+      defect_rate_operator: "APPROX",
+      defect_rate_percent: "5",
+      inspected_at: plan.anchorDate,
+    };
+    rows.set(row.id, row);
+    receipt.quality_inspections.push(structuredClone(row));
+  }
+  const calls = [];
+  const rpc = async ({ domain, method, params }) => {
+    assert.equal(domain, "quality");
+    calls.push({ method, params });
+    if (method === "list_quality_inspections") {
+      const list = [...rows.values()].filter(
+        (row) =>
+          !params.purchase_receipt_id ||
+          row.purchase_receipt_id === params.purchase_receipt_id,
+      );
+      return { quality_inspections: structuredClone(list), total: list.length };
+    }
+    if (method === "get_quality_inspection")
+      return { quality_inspection: structuredClone(rows.get(params.id)) };
+    if (method === "correct_quality_inspection_result") {
+      const original = rows.get(params.id);
+      let child = [...rows.values()].find(
+        (row) => row.correction_of_inspection_id === original.id,
+      );
+      if (child) {
+        assert.equal(child.inspection_no, params.correction_inspection_no);
+        assert.equal(original.superseded_reason, params.reason);
+      } else {
+        original.superseded_at = 1_800_000_000;
+        original.superseded_by = 77;
+        original.superseded_reason = params.reason;
+        child = {
+          id: 6000 + rows.size,
+          inspection_no: params.correction_inspection_no,
+          purchase_receipt_id: original.purchase_receipt_id,
+          purchase_receipt_item_id: original.purchase_receipt_item_id,
+          correction_of_inspection_id: original.id,
+          status: "SUBMITTED",
+          decision_note: params.reason,
+        };
+        rows.set(child.id, child);
+      }
+      return { quality_inspection: structuredClone(child) };
+    }
+    assert.ok(
+      ["pass_quality_inspection", "reject_quality_inspection"].includes(method),
+      method,
+    );
+    const row = rows.get(params.id);
+    assert.equal(row.status, "SUBMITTED");
+    Object.assign(row, params, {
+      status: method === "pass_quality_inspection" ? "PASSED" : "REJECTED",
+    });
+    return { quality_inspection: structuredClone(row) };
+  };
+  return { plan, receipts, rows, calls, rpc };
+}
+
+test("quality correction seed creates independent pending, passed and rejected reinspections and preserves verdicts", async () => {
+  const fixture = qualityCorrectionFixture();
+  const { plan, receipts, rows, calls, rpc } = fixture;
+  const created = await ensureManualAcceptanceQualityCorrections(
+    rpc,
+    plan,
+    receipts,
+  );
+  assert.deepEqual(
+    created.map((row) => row.status),
+    ["SUBMITTED", "PASSED", "REJECTED"],
+  );
+  assert.equal(rows.size, 6);
+  for (const child of created) {
+    const original = rows.get(child.correction_of_inspection_id);
+    assert.equal(original.status, "PASSED");
+    assert.equal(original.result, "PASS");
+    assert.equal(original.decision_note, "原合格判定");
+    assert.deepEqual(original.check_items, [
+      { name: "外观", result: "PASS", observation: "原检验记录" },
+    ]);
+    assert.ok(original.superseded_at > 0);
+    assert.equal(original.superseded_by, 77);
+    assert.equal(
+      receipts.find((r) => r.id === child.purchase_receipt_id)
+        .quality_inspections[0].superseded_at,
+      original.superseded_at,
+    );
+  }
+  assert.equal(
+    calls.filter((call) => call.method === "correct_quality_inspection_result")
+      .length,
+    3,
+  );
+  const repeated = await ensureManualAcceptanceQualityCorrections(
+    rpc,
+    plan,
+    receipts,
+  );
+  assert.deepEqual(repeated, created);
+  assert.equal(rows.size, 6);
+  const before = structuredClone([...rows.values()]);
+  calls.length = 0;
+  const verified = await ensureManualAcceptanceQualityCorrections(
+    rpc,
+    plan,
+    receipts,
+    { apply: false },
+  );
+  assert.deepEqual(verified, created);
+  assert.deepEqual([...rows.values()], before);
+  assert.ok(
+    calls.every((call) =>
+      ["get_quality_inspection", "list_quality_inspections"].includes(
+        call.method,
+      ),
+    ),
+  );
+});
+
+test("quality correction seed rejects conflicting child linkage before deciding another record", async () => {
+  const f = qualityCorrectionFixture();
+  const rpc = async (call) => {
+    const result = await f.rpc(call);
+    if (call.method === "correct_quality_inspection_result")
+      result.quality_inspection.purchase_receipt_id += 1;
+    return result;
+  };
+  await assert.rejects(
+    ensureManualAcceptanceQualityCorrections(rpc, f.plan, f.receipts),
+    /conflicting source/u,
+  );
+  assert.ok(
+    !f.calls.some((c) =>
+      ["pass_quality_inspection", "reject_quality_inspection"].includes(
+        c.method,
+      ),
+    ),
+  );
+});
+
+test("quality correction seed rejects changed original verdict and missing supersession evidence", async () => {
+  for (const field of ["decision_note", "superseded_reason", "superseded_at"]) {
+    const f = qualityCorrectionFixture();
+    const rpc = async (call) => {
+      const result = await f.rpc(call);
+      if (
+        call.method === "get_quality_inspection" &&
+        result.quality_inspection?.superseded_at
+      ) {
+        result.quality_inspection[field] =
+          field === "superseded_at" ? 0 : "已更改";
+      }
+      return result;
+    };
+    await assert.rejects(
+      ensureManualAcceptanceQualityCorrections(rpc, f.plan, f.receipts),
+      /preserve the original/u,
+    );
+  }
+});
+
+test("quality correction seed refuses posted sources and incomplete recipe coverage without a write", async () => {
+  const f = qualityCorrectionFixture();
+  f.receipts[f.plan.qualityCorrections[0].receiptIndex].status = "POSTED";
+  await assert.rejects(
+    ensureManualAcceptanceQualityCorrections(f.rpc, f.plan, f.receipts),
+    /unposted/u,
+  );
+  assert.equal(f.calls.length, 0);
+  await assert.rejects(
+    ensureManualAcceptanceQualityCorrections(
+      f.rpc,
+      { ...f.plan, qualityCorrections: [] },
+      f.receipts,
+    ),
+    /three independent/u,
+  );
+  assert.equal(f.calls.length, 0);
+});
+
+test("plan is target-bound, source-driven, and prepares 57 receipts plus 45 fact runs", () => {
   const plan = buildManualAcceptanceFactPlan(sourceReport());
   assert.equal(plan.datasetKey, DATASET_KEY);
   assert.equal(plan.dataVersion, DATA_VERSION);
@@ -717,7 +953,7 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
   assert.equal(plan.semanticDigest, "digest-v2");
   assert.equal(plan.directSQL, false);
   assert.equal(plan.retiredGenericFactWriter, false);
-  assert.equal(plan.receipts.length, 54);
+  assert.equal(plan.receipts.length, 57);
   assert.ok(
     plan.receipts.every(
       (receipt) =>
@@ -2820,7 +3056,7 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
   assert.equal(result.reportContract, SOURCE_DRIVEN_FACT_REPORT_CONTRACT);
   assert.equal(result.mode, "apply");
   assert.equal(result.semanticDigest, report.semanticDigest);
-  assert.equal(result.referenceRecords.purchaseReceipts.length, 54);
+  assert.equal(result.referenceRecords.purchaseReceipts.length, 57);
   assert.ok(
     result.referenceRecords.purchaseReceiptAdjustments.every(
       (item) =>

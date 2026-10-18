@@ -54,6 +54,11 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/fact-data";
 const APPLY_CONFIRMATION = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const RECEIPT_COUNT = 54;
+const QUALITY_CORRECTION_STATUSES = Object.freeze([
+  "SUBMITTED",
+  "PASSED",
+  "REJECTED",
+]);
 const FACT_RUN_COUNT = MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs;
 const PRODUCTION_PLANNED_QUANTITY =
   MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.plannedQuantity;
@@ -585,53 +590,57 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
   const fallbackGrain = materialGrains[0];
   if (!fallbackGrain)
     throw new CliError("source report has no required material grain", 2);
-  const receipts = Array.from({ length: RECEIPT_COUNT }, (_, offset) => {
-    const index = offset + 1;
-    const linked = offset < 9;
-    const status = receiptStatus(offset);
-    const quality = qualityTarget(offset);
-    const grains = linked
-      ? []
-      : status === "POSTED" && offset < 24
-        ? postedItems[offset - 9]?.length
-          ? postedItems[offset - 9]
-          : [fallbackGrain]
-        : [fallbackGrain];
-    return {
-      index,
-      receiptNo: shortBusinessNo(report, "PR", index),
-      status,
-      qualityTarget: quality,
-      qualityDraftNo:
-        quality === "DRAFT"
-          ? shortBusinessNo(report, "ZJ", 900 + index)
-          : undefined,
-      linkedPurchaseOrder: linked ? linkedOrders[offset] : undefined,
-      sourcePurchaseOrderNo: linked
-        ? linkedOrders[offset].orderNo
-        : shortBusinessNo(report, "PR", 1000 + index),
-      supplierId: positiveID(
-        linked
-          ? linkedOrders[offset].supplierId
-          : (refs.suppliers || [])[offset % refs.suppliers.length]?.id,
-        "receipt.supplierId",
-      ),
-      supplierName: linked
-        ? linkedOrders[offset].supplierName
-        : (refs.suppliers || [])[offset % refs.suppliers.length]?.name,
-      warehouseId: positiveID(materialWarehouse.id, "materialWarehouse.id"),
-      items: grains.map((grain, itemOffset) => ({
-        ...grain,
-        materialName: materialById.get(grain.materialId)?.name,
-        lotNo: shortBusinessNo(
-          report,
-          "RM",
-          `${pad(index, 3)}${pad(itemOffset + 1)}`,
+  const receipts = Array.from(
+    { length: RECEIPT_COUNT + QUALITY_CORRECTION_STATUSES.length },
+    (_, offset) => {
+      const index = offset + 1;
+      const linked = offset < 9;
+      const correctionSample = offset >= RECEIPT_COUNT;
+      const status = correctionSample ? "DRAFT" : receiptStatus(offset);
+      const quality = correctionSample ? "PASSED" : qualityTarget(offset);
+      const grains = linked
+        ? []
+        : status === "POSTED" && offset < 24
+          ? postedItems[offset - 9]?.length
+            ? postedItems[offset - 9]
+            : [fallbackGrain]
+          : [fallbackGrain];
+      return {
+        index,
+        receiptNo: shortBusinessNo(report, "PR", index),
+        status,
+        qualityTarget: quality,
+        qualityDraftNo:
+          quality === "DRAFT"
+            ? shortBusinessNo(report, "ZJ", 900 + index)
+            : undefined,
+        linkedPurchaseOrder: linked ? linkedOrders[offset] : undefined,
+        sourcePurchaseOrderNo: linked
+          ? linkedOrders[offset].orderNo
+          : shortBusinessNo(report, "PR", 1000 + index),
+        supplierId: positiveID(
+          linked
+            ? linkedOrders[offset].supplierId
+            : (refs.suppliers || [])[offset % refs.suppliers.length]?.id,
+          "receipt.supplierId",
         ),
-        quantity: "500",
-      })),
-    };
-  });
+        supplierName: linked
+          ? linkedOrders[offset].supplierName
+          : (refs.suppliers || [])[offset % refs.suppliers.length]?.name,
+        warehouseId: positiveID(materialWarehouse.id, "materialWarehouse.id"),
+        items: grains.map((grain, itemOffset) => ({
+          ...grain,
+          materialName: materialById.get(grain.materialId)?.name,
+          lotNo: shortBusinessNo(
+            report,
+            "RM",
+            `${pad(index, 3)}${pad(itemOffset + 1)}`,
+          ),
+          quantity: "500",
+        })),
+      };
+    },
+  );
   const corrections = Array.from({ length: 12 }, (_, offset) => ({
     index: offset + 1,
     receiptIndex: offset + 9,
@@ -645,6 +654,16 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     // correction; increase rejection remains covered by repository tests.
     adjustType: "QUANTITY_DECREASE",
   }));
+  // Dedicated unposted receipts keep reinspection independent of stock posting
+  // and the rejected-receipt disposition specimens.
+  const qualityCorrections = QUALITY_CORRECTION_STATUSES.map(
+    (status, offset) => ({
+      receiptIndex: RECEIPT_COUNT + offset,
+      inspectionNo: shortBusinessNo(report, "ZJ", 2001 + offset),
+      reason: "模拟确认资料补齐后重新检验",
+      status,
+    }),
+  );
   return Object.freeze({
     scope: "manual-acceptance-fact-data",
     reportContract: FACT_REPORT_CONTRACT,
@@ -667,12 +686,16 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     productWarehouse,
     receipts,
     corrections,
+    qualityCorrections,
     productionCandidates,
     outsourcingCandidates,
     shipmentLineSample,
     expectedMinimums: Object.freeze({
-      purchaseReceipts: RECEIPT_COUNT,
-      qualityInspections: RECEIPT_COUNT,
+      purchaseReceipts: receipts.length,
+      qualityInspections:
+        receipts.length +
+        receipts.filter((item) => item.qualityTarget === "DRAFT").length +
+        qualityCorrections.length,
       productionOrders: FACT_RUN_COUNT,
       productionFacts: FACT_RUN_COUNT,
       productionExceptions: 1,
@@ -1887,16 +1910,166 @@ export async function readManualAcceptanceFinalInventoryReferences(rpc, lots) {
   };
 }
 
+export async function ensureManualAcceptanceQualityCorrections(
+  rpc,
+  plan,
+  receipts,
+  { apply = true } = {},
+) {
+  if (
+    !Array.isArray(plan.qualityCorrections) ||
+    plan.qualityCorrections.length !== QUALITY_CORRECTION_STATUSES.length ||
+    new Set(plan.qualityCorrections.map((item) => item.inspectionNo)).size !==
+      QUALITY_CORRECTION_STATUSES.length ||
+    new Set(plan.qualityCorrections.map((item) => item.receiptIndex)).size !==
+      QUALITY_CORRECTION_STATUSES.length
+  ) {
+    throw new CliError(
+      "quality correction plan must contain three independent specimens",
+    );
+  }
+  const records = [];
+  for (const [index, expected] of plan.qualityCorrections.entries()) {
+    const receipt = receipts[expected.receiptIndex];
+    if (
+      expected.status !== QUALITY_CORRECTION_STATUSES[index] ||
+      !receipt ||
+      receipt.status !== "DRAFT" ||
+      receipt.items?.length !== 1
+    ) {
+      throw new CliError(
+        "quality correction specimen requires its own unposted single-line receipt",
+      );
+    }
+    const { generated } = await readPurchaseReceiptQualities(rpc, receipt);
+    if (generated.length !== 1)
+      throw new CliError("quality correction original is ambiguous");
+    const getInspection = async (id) =>
+      resultItem(
+        await rpc({
+          domain: "quality",
+          method: "get_quality_inspection",
+          params: { id },
+        }),
+        "quality_inspection",
+        "get_quality_inspection",
+      );
+    const original = await getInspection(generated[0].id);
+    const sameSource = (row) =>
+      Number(row?.purchase_receipt_id) === Number(receipt.id) &&
+      Number(row?.purchase_receipt_item_id) === Number(receipt.items[0].id);
+    if (
+      !sameSource(original) ||
+      original.id !== generated[0].id ||
+      original.status !== "PASSED" ||
+      original.result !== "PASS" ||
+      !Array.isArray(receipt.quality_inspections) ||
+      !receipt.quality_inspections.some((row) => row.id === original.id) ||
+      !Array.isArray(original.check_items) ||
+      !original.check_items.length
+    ) {
+      throw new CliError(
+        "quality correction original must retain the passed inspection evidence",
+      );
+    }
+    const frozenEvidence = (row) =>
+      JSON.stringify(
+        Object.fromEntries(
+          [
+            "inspection_no",
+            "status",
+            "result",
+            "decision_note",
+            "check_items",
+            "defect_rate_operator",
+            "defect_rate_percent",
+            "inspected_at",
+          ].map((key) => [key, row[key] ?? null]),
+        ),
+      );
+    const evidence = frozenEvidence(original);
+    let child = apply
+      ? resultItem(
+          await rpc({
+            domain: "quality",
+            method: "correct_quality_inspection_result",
+            params: {
+              id: original.id,
+              correction_inspection_no: expected.inspectionNo,
+              reason: expected.reason,
+            },
+          }),
+          "quality_inspection",
+          "correct_quality_inspection_result",
+        )
+      : await exactByBusinessNo({
+          rpc,
+          domain: "quality",
+          method: "list_quality_inspections",
+          listKey: "quality_inspections",
+          businessField: "inspection_no",
+          businessNo: expected.inspectionNo,
+        });
+    const assertChild = (row) => {
+      if (
+        !row ||
+        row.id === original.id ||
+        !Number.isSafeInteger(row.id) ||
+        row.id <= 0 ||
+        row.inspection_no !== expected.inspectionNo ||
+        !sameSource(row) ||
+        Number(row.correction_of_inspection_id) !== original.id ||
+        !QUALITY_CORRECTION_STATUSES.includes(row.status) ||
+        Number(row.superseded_at || 0) !== 0
+      ) {
+        throw new CliError(
+          "quality correction child has conflicting source, identity or lifecycle",
+        );
+      }
+    };
+    assertChild(child);
+    if (apply) child = await advanceQuality(rpc, child, expected.status, plan);
+    child = await getInspection(child.id);
+    assertChild(child);
+    if (child.status !== expected.status)
+      throw new CliError("quality correction child has the wrong final state");
+    const after = await getInspection(original.id);
+    if (
+      after.id !== original.id ||
+      !sameSource(after) ||
+      frozenEvidence(after) !== evidence ||
+      !(Number(after.superseded_at) > 0) ||
+      !(Number(after.superseded_by) > 0) ||
+      after.superseded_reason !== expected.reason
+    ) {
+      throw new CliError(
+        "quality correction must preserve the original verdict and supersession evidence",
+      );
+    }
+    receipt.quality_inspections = receipt.quality_inspections.map((row) =>
+      row.id === after.id ? after : row,
+    );
+    records.push(child);
+  }
+  return records;
+}
+
 export async function applyPurchaseQualityStage(plan, { rpc }) {
   const receipts = [];
   for (const receiptPlan of plan.receipts) {
     receipts.push(await createOrReadReceipt(rpc, receiptPlan, plan));
   }
   const corrections = await ensureCorrections(rpc, plan, receipts);
-  const inventory = await inventoryReferences(rpc, receipts);
-  const qualities = dedupeByID(
-    receipts.flatMap((receipt) => receipt.quality_inspections || []),
+  const qualityCorrections = await ensureManualAcceptanceQualityCorrections(
+    rpc,
+    plan,
+    receipts,
   );
+  const inventory = await inventoryReferences(rpc, receipts);
+  const qualities = dedupeByID([
+    ...receipts.flatMap((receipt) => receipt.quality_inspections || []),
+    ...qualityCorrections,
+  ]);
   for (const receiptPlan of plan.receipts.filter(
     (item) => item.qualityTarget === "DRAFT",
   )) {
@@ -1915,7 +2088,10 @@ export async function applyPurchaseQualityStage(plan, { rpc }) {
     });
     if (draft) qualities.push(draft);
   }
-  if (receipts.length < RECEIPT_COUNT || qualities.length < RECEIPT_COUNT) {
+  if (
+    receipts.length < plan.expectedMinimums.purchaseReceipts ||
+    qualities.length < plan.expectedMinimums.qualityInspections
+  ) {
     throw new CliError(
       "purchase/quality stage did not meet its minimum record counts",
     );
@@ -1992,10 +2168,17 @@ async function verifyPurchaseQualityStage(plan, { rpc }) {
     returns.push(returned);
     adjustments.push(adjustment);
   }
-  const inventory = await inventoryReferences(rpc, receipts);
-  const qualities = receipts.flatMap(
-    (receipt) => receipt.quality_inspections || [],
+  const qualityCorrections = await ensureManualAcceptanceQualityCorrections(
+    rpc,
+    plan,
+    receipts,
+    { apply: false },
   );
+  const inventory = await inventoryReferences(rpc, receipts);
+  const qualities = [
+    ...receipts.flatMap((receipt) => receipt.quality_inspections || []),
+    ...qualityCorrections,
+  ];
   return {
     purchaseReceipts: dedupeByID(receipts),
     purchaseReturns: dedupeByID(returns),
