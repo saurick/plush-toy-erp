@@ -1116,14 +1116,14 @@ export default function DevDataPreparationPage() {
     const poll = async () => {
       try {
         const operation = await client.operation(activeOperationId)
-        if (cancelled) return
+        if (cancelled || currentOperationIdRef.current !== activeOperationId) return
         setPollError('')
         updateOperation(operation)
         if (!operation.terminal) {
           timerId = window.setTimeout(poll, POLL_INTERVAL_MS)
         }
       } catch (error) {
-        if (cancelled) return
+        if (cancelled || currentOperationIdRef.current !== activeOperationId) return
         setPollError(error?.message || '回执刷新暂时失败')
         timerId = window.setTimeout(poll, POLL_RECOVERY_INTERVAL_MS)
       }
@@ -1186,8 +1186,15 @@ export default function DevDataPreparationPage() {
         confirmation
       )
     : ''
+  const invalidateSelectionPreflight = () => {
+    requestVersionRef.current += 1
+    refreshAbortRef.current?.abort()
+    setLoading(true)
+  }
+
   const selectProfile = (profileKey) => {
     if (preparing || executing) return
+    invalidateSelectionPreflight()
     setSelectedProfileKey(profileKey)
     setSearchParams(
       (currentSearchParams) =>
@@ -1209,6 +1216,7 @@ export default function DevDataPreparationPage() {
 
   const selectScenarioTarget = (targetKey) => {
     if (preparing || executing) return
+    invalidateSelectionPreflight()
     setSelectedScenarioTargetKey(targetKey)
     setSearchParams(
       (currentSearchParams) =>

@@ -4,7 +4,9 @@ import { buildManualAcceptanceBusinessChainReviewPlan } from '../../../scripts/q
 import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../../scripts/qa/manual-acceptance-dataset.mjs'
 import {
   DEV_DATA_PREPARATION_PROFILE_KEYS,
+  DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
   DEV_DATA_PREPARATION_TARGET_KEYS,
+  DEV_DATA_PREPARATION_TARGET_QUERY_KEY,
   projectDataPreparationAcceptancePlan,
   validateDevDataPreparationSummary,
   validateDevDataPreparationOperation,
@@ -297,6 +299,26 @@ export function createDevDataPreparationScenarios({
       beforeNavigate: async (page) => {
         fixture = createDataPreparationBrowserFixture()
         await installDataPreparationBrowserRoutes(page, fixture)
+        await page.addInitScript(({ profileQuery, targetQuery }) => {
+          window.dataPreparationSummaryDispatches = []
+          const originalFetch = window.fetch.bind(window)
+          window.fetch = (...args) => {
+            const requestURL = new URL(String(args[0]), location.href)
+            if (requestURL.pathname === '/__dev/api/data-preparation/summary') {
+              const query = new URLSearchParams(location.search)
+              const button = document.querySelector('.erp-dev-data-prepare-actions button')
+              window.dataPreparationSummaryDispatches.push({
+                profile: query.get(profileQuery),
+                target: query.get(targetQuery),
+                prepareDisabled: button?.disabled ?? null,
+              })
+            }
+            return originalFetch(...args)
+          }
+        }, {
+          profileQuery: DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
+          targetQuery: DEV_DATA_PREPARATION_TARGET_QUERY_KEY,
+        })
       },
       verify: async (page) => {
         await expectHeading(page, '选择要准备的数据')
@@ -462,6 +484,11 @@ export function createDevDataPreparationScenarios({
           )
         )
         assert.equal(await scenarioPrepare.isDisabled(), false)
+        assert.equal(await page.getByRole('radio', { name: 'demo 演练环境', exact: true }).isChecked(), true)
+        const targetDispatches = await page.evaluate(() => window.dataPreparationSummaryDispatches)
+        const demoDispatch = targetDispatches.find((item) => item.profile === 'scenario-demo' && item.target === 'customer-trial-133')
+        assert.ok(demoDispatch, '切换 demo 目标必须发起对应预检')
+        assert.equal(demoDispatch.prepareDisabled, true, '新目标预检发起前必须禁用准备按钮，不能先出现可操作窗口')
         assert.equal(fixture.actions.length, 1)
         await assertNoHorizontalOverflow(page, 'dev-data-preparation-workflow')
         let releasePrepare
