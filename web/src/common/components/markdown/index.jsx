@@ -624,6 +624,7 @@ export function MermaidDiagram({
           <div
             ref={viewportRef}
             className="erp-markdown-mermaid__viewport"
+            data-scroll-edges="off"
             role="region"
             aria-label={`${displayLabel}画布`}
             tabIndex={0}

@@ -13,12 +13,24 @@ async function readScroll(row, assert) {
     )
   const metrics = await row.evaluate((node) => {
     const box = node.getBoundingClientRect()
-    const last = node.querySelector('button:last-child').getBoundingClientRect()
+    const last = [...node.querySelectorAll('button')]
+      .at(-1)
+      .getBoundingClientRect()
+    const frame = node.querySelector(':scope > .app-scroll-edges')
     return {
       width: node.clientWidth,
       content: node.scrollWidth,
       left: node.scrollLeft,
-      mask: getComputedStyle(node).maskImage,
+      edgeRight: Boolean(
+        frame && !frame.hidden && frame.dataset.right === 'true'
+      ),
+      edgeLeft: Boolean(
+        frame && !frame.hidden && frame.dataset.left === 'true'
+      ),
+      mask: frame
+        ? getComputedStyle(frame.querySelector('.app-scroll-edge--right'))
+            .maskImage
+        : 'none',
       height: box.height,
       lastVisible: last.left >= box.left - 1 && last.right <= box.right + 1,
       pageOverflow:
@@ -27,7 +39,8 @@ async function readScroll(row, assert) {
     }
   })
   const remaining = metrics.content - metrics.width - metrics.left
-  assert.equal(metrics.mask !== 'none', remaining > 1, JSON.stringify(metrics))
+  assert.equal(metrics.edgeRight, remaining > 1, JSON.stringify(metrics))
+  assert.equal(metrics.edgeLeft, metrics.left > 1, JSON.stringify(metrics))
   if (remaining > 1) assert.match(metrics.mask, /linear-gradient/)
   assert(metrics.pageOverflow <= 1, JSON.stringify(metrics))
   return metrics
@@ -52,26 +65,33 @@ export function createMobileFilterScrollScenarios({
         await panel.locator('.mobile-progress-card').first().waitFor()
         await page.evaluate(() => document.fonts.ready)
         await page.setViewportSize({ width: 320, height: 844 })
-        const row = panel.getByRole('group', {
+        const progress = panel.getByRole('group', {
           name: '进度快捷筛选',
           exact: true,
         })
-        const evidence = { start: await readScroll(row, assert) }
-        assert(evidence.start.content > evidence.start.width + 1)
+        const evidence = { progress: await readScroll(progress, assert) }
+        assert.equal(
+          evidence.progress.edgeRight,
+          false,
+          '进度快捷筛选按当前设计换行展示'
+        )
+        await page.getByTestId('mobile-role-nav-tasks').click()
+        const row = page.getByTestId('mobile-role-task-filters')
+        evidence.start = await readScroll(row, assert)
         await row.screenshot({
           path: path.join(outputDir, `${name}-start.png`),
         })
 
-        await row.evaluate((node) => {
-          node.scrollLeft = (node.scrollWidth - node.clientWidth) / 2
-        })
-        evidence.middle = await readScroll(row, assert)
-        assert(evidence.middle.left > 0)
-        await row.evaluate((node) => {
-          node.scrollLeft = node.scrollWidth
-        })
-        evidence.end = await readScroll(row, assert)
-        assert.equal(evidence.end.mask, 'none')
+        for (const [key, fraction] of [
+          ['middle', 0.5],
+          ['end', 1],
+        ]) {
+          await row.evaluate((node, value) => {
+            node.scrollLeft = (node.scrollWidth - node.clientWidth) * value
+          }, fraction)
+          evidence[key] = await readScroll(row, assert)
+        }
+        assert.equal(evidence.end.edgeRight, false)
         assert(evidence.end.lastVisible)
         assert.equal(evidence.end.height, evidence.start.height)
         await row.screenshot({ path: path.join(outputDir, `${name}-end.png`) })
@@ -85,10 +105,8 @@ export function createMobileFilterScrollScenarios({
           node.scrollLeft = 0
         })
         evidence.returned = await readScroll(row, assert)
-        assert.notEqual(evidence.returned.mask, 'none')
         await row.getByRole('button').first().focus()
         const count = await row.getByRole('button').count()
-        // macOS WebKit uses Option-Tab to include buttons in keyboard traversal.
         const tabKey =
           process.platform === 'darwin' &&
           page.context().browser().browserType().name() === 'webkit'
@@ -110,57 +128,46 @@ export function createMobileFilterScrollScenarios({
             node.scrollLeft = 0
           })
           evidence[`width${width}`] = await readScroll(row, assert)
-          if (width === 390) {
-            await panel.locator('.mobile-progress-controls').screenshot({
-              path: path.join(outputDir, `${name}-progress.png`),
-            })
-          }
         }
-        assert.equal(evidence.width800.mask, 'none')
-        const badge = row.locator('.erp-filter-chip__count').first()
+        assert.equal(evidence.width800.edgeRight, false)
+        const badge = row.locator('.mobile-role-task-filter__count').first()
         const original = await badge.textContent()
         await badge.evaluate((node) => {
           node.textContent = '1234567890'.repeat(20)
         })
         evidence.longCount = await readScroll(row, assert)
-        assert.notEqual(evidence.longCount.mask, 'none')
+        assert(
+          evidence.longCount.content > evidence.longCount.width + 1,
+          '长内容在真实横向组件中产生溢出'
+        )
+        assert.equal(evidence.longCount.edgeRight, true)
+        await row.evaluate((node) => {
+          node.scrollLeft = node.scrollWidth
+        })
+        evidence.longCountEnd = await readScroll(row, assert)
+        assert.equal(evidence.longCountEnd.edgeLeft, true)
+        assert.equal(evidence.longCountEnd.edgeRight, false)
         await badge.evaluate((node, value) => {
           node.textContent = value
         }, original)
         evidence.restoredCount = await readScroll(row, assert)
-        assert.equal(evidence.restoredCount.mask, 'none')
+        assert.equal(evidence.restoredCount.edgeRight, false)
+        assert.equal(evidence.restoredCount.edgeLeft, false)
 
         await page.setViewportSize({ width: 320, height: 844 })
-        await page.getByTestId('mobile-role-nav-tasks').click()
-        const tasks = page.getByTestId('mobile-role-task-filters')
-        await tasks.waitFor()
-        evidence.tasks = await readScroll(tasks, assert)
-        await tasks.evaluate((node) => {
-          node.scrollLeft = node.scrollWidth
-        })
-        evidence.tasksEnd = await readScroll(tasks, assert)
-        assert.equal(evidence.tasksEnd.mask, 'none')
-        await tasks.getByRole('button').last().click()
-        assert.equal(
-          await tasks.getByRole('button').last().getAttribute('aria-pressed'),
-          'true'
-        )
-        await tasks.screenshot({
-          path: path.join(outputDir, `${name}-tasks.png`),
-        })
-
         await page.getByTestId('mobile-role-nav-progress').click()
+        await progress.waitFor()
+        await page.getByTestId('mobile-role-nav-tasks').click()
         await row.waitFor()
         await row.evaluate((node) => {
           node.scrollLeft = 0
         })
         evidence.reopened = await readScroll(row, assert)
-        assert.notEqual(evidence.reopened.mask, 'none')
         await page.emulateMedia({ reducedMotion: 'reduce' })
         await row.evaluate((node) => {
           node.scrollLeft = node.scrollWidth
         })
-        assert.equal((await readScroll(row, assert)).mask, 'none')
+        assert.equal((await readScroll(row, assert)).edgeRight, false)
         await page.setViewportSize(base.viewport)
         await writeFile(
           path.join(outputDir, `${name}.json`),

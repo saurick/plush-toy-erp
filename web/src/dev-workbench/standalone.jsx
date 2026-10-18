@@ -9,6 +9,7 @@ import '../tailwind.css'
 import '../erp/styles/app.css'
 import { AppAlertProvider } from '@/common/components/modal/AppAlertProvider'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
+import ScrollEdges from '@/common/components/scroll/ScrollEdges'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
@@ -35,6 +36,7 @@ function StandaloneWorkbenchTheme() {
     >
       <AntdApp message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
         <AntdAppBridge />
+        <ScrollEdges />
         <DevWorkbenchRoutes />
       </AntdApp>
     </ConfigProvider>

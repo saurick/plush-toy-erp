@@ -49,6 +49,8 @@ pnpm install
 
 分页范围与总数文案由 `src/common/utils/pagination.mjs` 提供，ERP 列表和 DEV 工作台直接复用；业务页码、查询参数和精确记录分页仍由 `src/erp/utils/businessPagination.mjs` 负责。
 
+横向与纵向滚动提示统一由 [`ScrollEdges`](src/common/components/scroll/ScrollEdges.jsx) 管理，ERP 和独立工作台各在入口挂载一次。共享控制器识别实际可滚动的容器及弹窗、抽屉中的动态内容，使用被动滚动监听和按帧合并的测量更新，保留原生滚动、尺寸和焦点。边缘在对应方向还有内容时出现，到尽头或内容不再溢出时消失；固定列和吸顶／底部控件占用的区域保持清楚。效果集中在 [`scrollEdges.css`](src/common/components/scroll/scrollEdges.css)：模糊 `3px`、横向宽 `24px`、纵向高 `10px`，随主题背景适配，打印隐藏，减少动态效果时取消过渡。手机吸顶栏复用这些参数和滚动边界计算，并标记已负责的顶部提示以避免叠加。输入控件与可编辑区域自动排除；纸面、图片和图形画布等细节预览用 `data-scroll-edges="off"` 标记其容器。
+
 打印条款分组支持新增、改名、排序和删除，组内条目与明细支持增删、调序和清空，纸面继续作为预览、PDF 和打印的输出来源；清空与删除、空组标题、自动编号及留白定位规则见[打印字段与编辑行为](../docs/打印模板字段与编辑行为清单.md#条目编辑)，实现分层见[打印模板实现原理](../docs/打印模板实现原理.md)。
 
 产品路由只在 `import.meta.env.DEV` 下动态加载 `DevWorkbenchBridge.jsx` 这一处 DEV 入口。该入口包裹业务路由的停服恢复边界，并在进入 `/__dev` 时按需加载工作台页面；App 不直接引用 DEV 模块。

@@ -151,8 +151,17 @@ export function createBusinessTableScrollScenarios({
 
       const bottom = await scrollToTableEnd(page)
       await assertTableScrollDockVisible(page, page.locator(tableSelector))
-      const lastRow = page.locator(`${tableSelector} tr.ant-table-row`).last()
-      await lastRow.hover()
+      // Locator hover can scroll the last row into view and move pagination.
+      // Aim the wheel at the already visible table area without moving it.
+      const wheelPoint = await page.locator(`${tableSelector} .ant-table-content`).evaluate(content => {
+        const box = content.getBoundingClientRect()
+        const wrapper = content.closest('.ant-table-wrapper').getBoundingClientRect()
+        return {
+          x: (Math.max(0, box.left, wrapper.left) + Math.min(innerWidth, box.right, wrapper.right)) / 2,
+          y: (Math.max(0, box.top, wrapper.top) + Math.min(innerHeight, box.bottom, wrapper.bottom)) / 2,
+        }
+      })
+      await page.mouse.move(wheelPoint.x, wheelPoint.y)
       await page.mouse.wheel(10000, 0)
       await page.waitForFunction((selector) => {
         const content = document.querySelector(`${selector} .ant-table-content`)

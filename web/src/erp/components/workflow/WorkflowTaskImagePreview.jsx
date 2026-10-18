@@ -57,7 +57,7 @@ export default function WorkflowTaskImagePreview({
           <CloseOutlined aria-hidden="true" />
         </button>
       </div>
-      <div className="erp-task-image-preview__stage">
+      <div className="erp-task-image-preview__stage" data-scroll-edges="off">
         {failed ? (
           <div className="erp-task-image-preview__status" role="alert">
             <span>图片加载失败，请重试</span>

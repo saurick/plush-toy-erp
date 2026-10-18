@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { getScrollEdgeState } from '@/common/components/scroll/scrollEdgeController.mjs'
 
 export default function MobileScrollEdge({
   scrollContainerRef,
@@ -20,8 +21,7 @@ export default function MobileScrollEdge({
       frame = 0
       // 只区分内容是否经过吸顶栏，回看和停留时保持同一层次。
       const next =
-        scroll.clientHeight > 0 &&
-        scroll.scrollHeight > scroll.clientHeight + 1 &&
+        getScrollEdgeState(scroll, { x: false }).top &&
         getComputedStyle(controls).position === 'sticky' &&
         scroll.scrollTop > (shown ? 1 : 4)
       if (shown !== next) {
@@ -51,6 +51,7 @@ export default function MobileScrollEdge({
     <span
       ref={edgeRef}
       className="mobile-scroll-edge"
+      data-scroll-edge-owner="top"
       data-visible={enabled && visible}
       aria-hidden="true"
     />

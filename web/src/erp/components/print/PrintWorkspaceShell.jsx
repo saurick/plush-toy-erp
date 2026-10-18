@@ -603,6 +603,7 @@ export default function PrintWorkspaceShell({
           <section className="erp-print-shell__workspace">
             <div
               className="erp-print-shell__stage"
+              data-scroll-edges="off"
               ref={stageRef}
               style={{ '--print-view-scale': scale }}
               onInputCapture={captureInput}

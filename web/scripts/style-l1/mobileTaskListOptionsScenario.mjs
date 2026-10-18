@@ -109,11 +109,11 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
               const count = button.querySelector('.mobile-role-task-filter__count').getBoundingClientRect()
               return { box: button.getBoundingClientRect().toJSON(), centerDelta: Math.abs((label.top + label.bottom - count.top - count.bottom) / 2) }
             })
-            return { width: node.clientWidth, scrollWidth: node.scrollWidth, mask: getComputedStyle(node).maskImage, box: box.toJSON(), buttons, pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }
+            return { width: node.clientWidth, scrollWidth: node.scrollWidth, edgesVisible: Boolean(node.querySelector(':scope > .app-scroll-edges:not([hidden])[data-left="true"],:scope > .app-scroll-edges:not([hidden])[data-right="true"]')), box: box.toJSON(), buttons, pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }
           })
           assert(geometry.pageOverflow <= 1, JSON.stringify(geometry))
           assert(geometry.scrollWidth <= geometry.width + 1, JSON.stringify(geometry))
-          assert.equal(geometry.mask, 'none', `${theme}/${width} 两项筛选完整显示时不得渐隐`)
+          assert.equal(geometry.edgesVisible, false, `${theme}/${width} 两项筛选完整显示时不得渐隐`)
           assert(geometry.buttons.every((item) => item.centerDelta <= 1 && item.box.right <= geometry.box.right + 1), JSON.stringify(geometry))
         }
         await page.setViewportSize({ width: 390, height: 844 })

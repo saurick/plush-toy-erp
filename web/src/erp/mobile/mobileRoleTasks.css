@@ -1798,11 +1798,11 @@
 .mobile-scroll-edge {
   position: absolute;
   inset: 100% 0 auto;
-  height: 10px;
+  height: var(--scroll-edge-block-size);
   pointer-events: none;
   opacity: 0;
   background: color-mix(in srgb, var(--erp-page-bg) 25%, transparent);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(var(--scroll-edge-blur));
   mask-image: linear-gradient(#000, transparent);
   transition: opacity 160ms ease-out;
 }

@@ -9,6 +9,7 @@ import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
 import { appAlert } from '@/common/components/modal/alertBridge'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
+import ScrollEdges from '@/common/components/scroll/ScrollEdges'
 import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
 import '@/common/components/feedback/feedback.css'
 import { getActiveERPBrand } from '@/common/consts/brand'
@@ -161,6 +162,7 @@ function ThemedApp() {
     >
       <AntdApp message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
         <AntdAppBridge />
+        <ScrollEdges />
         <AppContent />
       </AntdApp>
     </ConfigProvider>

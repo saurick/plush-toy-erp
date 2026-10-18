@@ -30,6 +30,7 @@ import { createHistoryRecordScenarios } from './historyRecordScenarios.mjs'
 import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
+import { createScrollEdgeScenarios } from './scrollEdgeScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingScenarios.mjs'
 import { createTaskLinkScenarios } from './taskLinkScenarios.mjs'
@@ -873,5 +874,5 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
   ]
-  return [...scenarios, ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
+  return [...scenarios, ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
 }

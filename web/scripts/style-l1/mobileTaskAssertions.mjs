@@ -1058,7 +1058,7 @@ export function createMobileTaskAssertions(deps) {
         noticeMetrics.filters &&
         noticeMetrics.filters.width > 280 &&
         noticeMetrics.filters.scrollWidth <= noticeMetrics.filters.clientWidth + 1 &&
-        noticeMetrics.filters.mask === 'none',
+        !noticeMetrics.filters.edgesVisible,
       `${scenarioName} 两项风险筛选完整显示，不应横向滚动或渐隐: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
@@ -2518,7 +2518,7 @@ export function createMobileTaskAssertions(deps) {
           height: rect.height,
           clientWidth: filters.clientWidth,
           scrollWidth: filters.scrollWidth,
-          mask: getComputedStyle(filters).maskImage,
+          edgesVisible: Boolean(filters.querySelector(':scope > .app-scroll-edges:not([hidden])[data-left="true"],:scope > .app-scroll-edges:not([hidden])[data-right="true"]')),
         },
         cards,
         documentScrollWidth: document.documentElement.scrollWidth,

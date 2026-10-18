@@ -1,0 +1,85 @@
+.app-scroll-edges,
+.mobile-scroll-edge {
+  --scroll-edge-blur: 3px;
+  --scroll-edge-inline-size: 24px;
+  --scroll-edge-block-size: 10px;
+}
+
+.app-scroll-edges {
+  position: fixed;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-scroll-edges[hidden] {
+  display: none;
+}
+
+.app-scroll-edge {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--scroll-edge-surface) 75%, transparent);
+  backdrop-filter: blur(var(--scroll-edge-blur));
+  transition: opacity 160ms ease-out;
+}
+
+.app-scroll-edge--left,
+.app-scroll-edge--right {
+  top: var(--scroll-edge-top-inset);
+  bottom: var(--scroll-edge-bottom-inset);
+  width: var(--scroll-edge-inline-size);
+}
+
+.app-scroll-edge--left {
+  left: var(--scroll-edge-left-inset);
+  mask-image: linear-gradient(to right, #000, transparent);
+}
+
+.app-scroll-edge--right {
+  right: var(--scroll-edge-right-inset);
+  mask-image: linear-gradient(to left, #000, transparent);
+}
+
+.app-scroll-edge--top,
+.app-scroll-edge--bottom {
+  right: var(--scroll-edge-right-inset);
+  left: var(--scroll-edge-left-inset);
+  height: var(--scroll-edge-block-size);
+}
+
+.app-scroll-edge--top {
+  top: var(--scroll-edge-top-inset);
+  mask-image: linear-gradient(#000, transparent);
+}
+
+.app-scroll-edge--bottom {
+  bottom: var(--scroll-edge-bottom-inset);
+  mask-image: linear-gradient(to top, #000, transparent);
+}
+
+.app-scroll-edges[data-left='true'] > .app-scroll-edge--left,
+.app-scroll-edges[data-right='true'] > .app-scroll-edge--right,
+.app-scroll-edges[data-top='true'] > .app-scroll-edge--top,
+.app-scroll-edges[data-bottom='true'] > .app-scroll-edge--bottom {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-scroll-edge {
+    transition: none;
+  }
+}
+
+@media print {
+  .app-scroll-edges {
+    display: none;
+  }
+}

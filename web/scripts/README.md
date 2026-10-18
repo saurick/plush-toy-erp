@@ -118,6 +118,8 @@ happy-dom 的文本框 computed style 会将 `none` / `hidden` 边框宽度保�
 
 `global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
 
+`global-scroll-edges-surfaces-light` / `global-scroll-edges-surfaces-dark` 通过 `test/ScrollEdgesFixture.jsx` 检查共享滚动提示的双轴边界、固定列、动态内容、缩放与嵌套裁切、弹窗／抽屉、排除区域、卸载恢复、打印和减少动态效果。`global-scroll-edges-table-desktop` / `-dark` / `-short` / `-mobile` 复用实际出货列表及现有表格滚动回归，验证横纵滚动提示与表格导航共存；桌面截图为 `1920×1080`、DPR `2` 的原生 `3840×2160`。这些浏览器场景使用模拟 RPC 数据，不证明真实数据库、发布或客户验收。
+
 `dev-page-docs-desktop-light` 与 `inventory-visible-copy-desktop` 另在实际页面逐帧检查选中后不被旧 URL 拉回、指示条不反向、页签条持续挂载及位置和尺寸稳定，并覆盖深链、刷新和前进后退。库存窄屏切换由 `inventory-compact-header-dark-mobile` 覆盖；业务记录查询 hook 的同名测试检查有效与未启用视图及来源参数保留。这些检查使用模拟接口，不写业务数据。
 
 `global-table-alignment-light` / `global-table-alignment-dark` / `global-table-alignment-mobile` 使用 `test/TableAlignmentFixture.html` 和真实共用表格、材料汇总表、单据编辑明细，验证表头及单元格的对齐、独立序号、长文本、排序、列顺序、复制、展开与收起、明细数量输入及空表恢复；使用模拟数据，不调用业务写入。输出同名 JSON 几何证据与材料表截图。
