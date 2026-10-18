@@ -302,7 +302,7 @@ approval_form: null,
         assert.equal(await handling.locator('.ant-drawer-footer').getByRole('button', { name: '返回流程', exact: true }).count(), 0)
         await waitForFiniteAnimations(page)
         assert.equal(await drawer.isVisible(), false, 'handling must replace the progress drawer')
-        assert.equal(await handling.getByRole('tablist', { name: '任务处理步骤', exact: true }).isVisible(), false)
+        assert.equal(await handling.getByRole('tablist', { name: '任务处理步骤', exact: true }).isVisible(), true, '核对任务打开时保留现有三步引导')
         await handling.getByRole('button', { name: '选择处理方式', exact: true }).click()
         await handling.getByRole('tablist', { name: '任务处理步骤', exact: true }).waitFor()
         assert.match(await handling.innerText(), /核对任务.*选择处理.*确认/s)

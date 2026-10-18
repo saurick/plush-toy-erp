@@ -457,6 +457,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             align: 'left',
             defaultPriority: 40,
             title: '简称',
+            defaultHidden: type === 'suppliers',
             exportTitle: '简称',
             dataIndex: 'short_name',
             copyable: true,
@@ -647,7 +648,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             title: '默认付款方式',
             exportTitle: '默认付款方式',
             dataIndex: 'default_payment_method',
-            width: 160,
+            width: 140,
             sorter: (a, b) =>
               compareText(a?.default_payment_method, b?.default_payment_method),
             render: (value) => value || '-',
@@ -656,7 +657,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             title: '默认付款周期',
             exportTitle: '默认付款周期',
             dataIndex: 'default_payment_term_days',
-            width: 160,
+            width: 120,
             sorter: (a, b) =>
               Number(a?.default_payment_term_days || 0) -
               Number(b?.default_payment_term_days || 0),
@@ -669,6 +670,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
           },
           {
             title: '默认发票要求',
+            defaultHidden: true,
             exportTitle: '默认发票要求',
             key: 'default_invoice_preference',
             width: 220,

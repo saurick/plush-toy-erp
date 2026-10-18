@@ -1553,6 +1553,7 @@ export default function PurchaseReceiptsPage() {
         emptyDescription="暂无采购入库单"
       />
       <BusinessDetailsModal
+        descriptionInHelp
         columns={visibleColumns}
         description="查看采购入库单头、状态、数量汇总和完整材料明细。"
         lineItems={{

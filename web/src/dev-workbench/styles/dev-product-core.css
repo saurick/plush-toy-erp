@@ -144,6 +144,22 @@
   border-radius: 6px;
 }
 
+.erp-dev-product-core-scope {
+  margin-top: 6px;
+}
+
+.erp-dev-product-core-scope > summary {
+  min-height: 32px;
+  align-content: center;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.erp-dev-product-core-scope ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
 .erp-dev-product-core-table {
   width: 100%;
   min-width: 980px;

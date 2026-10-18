@@ -25,7 +25,7 @@ function IdentityCode({ item, copyable = true }) {
   )
 }
 
-function IdentityItem({ item, copyable = true, codeCopyable = copyable, source = null }) {
+function IdentityItem({ item, copyable = true, codeCopyable = copyable, summaryCopyable = copyable, source = null }) {
   return (
     <span className="erp-task-identity__row">
       <WorkflowTaskProductImage item={item} />
@@ -36,7 +36,7 @@ function IdentityItem({ item, copyable = true, codeCopyable = copyable, source =
             {item.name ||
               `${item.kind === 'material' ? '物料' : '产品'}名称未填写`}
           </strong>
-          {copyable ? <TaskCopyButton
+          {summaryCopyable ? <TaskCopyButton
             text={formatWorkflowProductCopy([item])}
             label={item.kind === 'material' ? '物料信息' : '产品信息'}
             showLabel
@@ -78,6 +78,7 @@ export default function WorkflowTaskIdentity({
   keyword = '',
   compact = false,
   copyable = true,
+  summaryCopyable = copyable,
   detailView = false,
   showTaskName = false,
   showStyleNo = false,
@@ -177,14 +178,14 @@ export default function WorkflowTaskIdentity({
   }
   return (
     <div className="erp-task-identity" aria-label="任务关联内容">
-      <IdentityItem item={identity.first} copyable={copyable} />
+      <IdentityItem item={identity.first} copyable={copyable} summaryCopyable={summaryCopyable} />
       {identity.remainingItems.length ? (
         <details key={task?.id} className="erp-task-identity__more">
           <summary>
             展开其余 {identity.remainingItems.length} 项关联内容
           </summary>
           {identity.remainingItems.map((item, index) => (
-            <IdentityItem key={index} item={item} copyable={copyable} />
+            <IdentityItem key={index} item={item} copyable={copyable} summaryCopyable={summaryCopyable} />
           ))}
         </details>
       ) : null}

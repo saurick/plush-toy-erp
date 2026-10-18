@@ -459,6 +459,10 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
   )
   const itemsSignature = shipmentWeightItemsSignature(items)
   const preview = resolveShipmentWeightPreview({ items, products, productSKUs })
+  const hasWeightInput = items.some((item) =>
+    [item?.product_id, item?.product_sku_id, item?.sales_order_item_id, item?.quantity]
+      .some((value) => String(value ?? '').trim() !== '')
+  )
 
   useEffect(() => {
     const hasManualWeight = String(manualWeight ?? '').trim() !== ''
@@ -502,14 +506,14 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
         </div>
       ) : (
         <>
-          <Alert
+          {hasWeightInput ? <Alert
             showIcon
             type="warning"
             message="预计总净重暂不可计算"
             description={`${
               preview.issues[0]?.message || '当前明细缺少可用单重'
             }。系统不会显示或提交部分合计；可补齐产品档案，或按整单实际称重填写下方总净重。`}
-          />
+          /> : <p className="erp-business-inline-note">填写出货明细后显示预计总净重。</p>}
           <Form.Item
             className="erp-business-action-form__field"
             extra="选填。该数值与当前整组出货明细绑定；产品、SKU、单位、数量、增删行或重新导入后需要重新填写。"
@@ -1084,19 +1088,11 @@ export default function ShipmentEditor({
                     <section className="erp-master-contact-list erp-shipment-modal-items">
                       <BusinessLineItemsHeader
                         title="出货明细"
-                        description="明细随当前编辑页保存；可从销售订单导入来源，确认出货时才会扣减相应库存。"
+                        description="确认出货时才会扣减相应库存。"
                         addLabel="添加出货明细"
                         addDisabled={Boolean(selectedSalesOrder)}
                         onAdd={() => appendShipmentItem(add, fields.length)}
-                      />
-                      <div className="erp-line-items-form__import-row">
-                        <div className="erp-line-items-form__import-copy">
-                          <strong>从销售订单导入</strong>
-                          <span>
-                            先选择销售订单来源；产品、SKU、单位和订单行追溯带回编辑页，
-                            仓库 / 批次仍在出货明细里补齐。
-                          </span>
-                        </div>
+                      >
                         <Button
                           icon={<FolderOpenOutlined aria-hidden="true" />}
                           className="erp-line-items-form__import-button erp-action-button"
@@ -1105,11 +1101,10 @@ export default function ShipmentEditor({
                         >
                           从销售订单导入
                         </Button>
-                      </div>
+                      </BusinessLineItemsHeader>
                       <SourceImportPickerModal
                         open={salesOrderImportOpen}
-                        title="从销售订单导入出货明细"
-                        description="选择同一张销售订单的来源行；导入后回到编辑页维护仓库和批次。"
+                        title={<BusinessHelpLabel label="从销售订单导入出货明细" description="选择同一张销售订单的来源行；导入后回到编辑页维护仓库和批次。产品、SKU、单位和订单行追溯沿用来源。" />}
                         rows={salesOrderSources}
                         columns={salesOrderImportColumns}
                         multiple

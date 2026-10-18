@@ -400,14 +400,6 @@ export default function DevQualityGatesPage() {
       </header>
 
       <main className="erp-dev-quality-shell">
-        {summaryError ? (
-          <Alert
-            type="error"
-            showIcon
-            message="质量门禁状态读取失败"
-            description={summaryError}
-          />
-        ) : null}
         {!parsed.valid ? (
           <Alert
             type="warning"
@@ -430,10 +422,10 @@ export default function DevQualityGatesPage() {
 
         <Alert
           className="erp-dev-quality-status-banner"
-          type={displayedStatus?.tone || 'info'}
+          type={summaryError ? 'error' : displayedStatus?.tone || 'info'}
           showIcon
           icon={
-            displayedStatus?.tone === 'success' ? (
+            summaryError ? <CloseCircleOutlined /> : displayedStatus?.tone === 'success' ? (
               <CheckCircleOutlined />
             ) : displayedStatus?.tone === 'error' ? (
               <CloseCircleOutlined />
@@ -441,14 +433,14 @@ export default function DevQualityGatesPage() {
               <InfoCircleOutlined />
             )
           }
-          message={displayedStatus?.title || '正在读取当前质量状态'}
+          message={summaryError ? '质量门禁状态读取失败' : displayedStatus?.title || '正在读取当前质量状态'}
           description={
             <Space direction="vertical" size={4}>
-              <Text>{displayedStatus?.description || '正在读取状态。'}</Text>
-              {displayedStatus?.recommendation ? (
+              <Text>{summaryError || displayedStatus?.description || '正在读取状态。'}</Text>
+              {summaryError ? <Text strong>请刷新状态；当前数据尚未重新核实。</Text> : displayedStatus?.recommendation ? (
                 <Text strong>下一步：{displayedStatus.recommendation}</Text>
               ) : null}
-              {displayedStatus?.notProven?.length ? (
+              {!summaryError && displayedStatus?.notProven?.length ? (
                 <Text type="secondary">
                   尚未证明：{displayedStatus.notProven.join('、')}
                 </Text>

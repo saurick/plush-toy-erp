@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { RedoOutlined } from '@ant-design/icons'
-import { Alert, Button, Divider, Empty, Spin } from 'antd'
+import { Alert, Button, Divider, Spin } from 'antd'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -92,6 +92,9 @@ function BusinessLineItems({ config, record, state, contentRef }) {
     title = '完整明细',
   } = config
   const { loadState, pageItems, pageStart, retry } = state
+  if (loadState.status === 'success' && loadState.items.length === 0) {
+    return <section aria-label={title} ref={contentRef}><p className="erp-business-inline-note">{emptyDescription}</p></section>
+  }
   return (
     <section aria-label={title} ref={contentRef}>
       <Divider orientation="left" plain>
@@ -120,12 +123,6 @@ function BusinessLineItems({ config, record, state, contentRef }) {
           message={getActionErrorMessage(loadState.error, '加载明细失败')}
           showIcon
           type="error"
-        />
-      ) : null}
-      {loadState.status === 'success' && loadState.items.length === 0 ? (
-        <Empty
-          description={emptyDescription}
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
         />
       ) : null}
       {loadState.status === 'success' && pageItems.length > 0 ? (
@@ -171,7 +168,7 @@ export default function BusinessDetailsModal({
       footer={
         <>
           {extraActions}
-          {lineItems && lineItemsState.loadState.status === 'success' ? (
+          {lineItems && lineItemsState.loadState.status === 'success' && lineItemsState.loadState.items.length > 0 ? (
             <BusinessDetailsPagination
               current={lineItemsState.page}
               pageSize={lineItemsState.pageSize}

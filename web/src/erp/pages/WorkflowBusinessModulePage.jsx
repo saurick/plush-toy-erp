@@ -1436,6 +1436,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       {columnOrderModal}
 
       <BusinessDetailsModal
+        descriptionInHelp
         columns={visibleColumns}
         description="查看任务来源、责任、到期和当前原因；完成、阻塞、退回和催办仍从当前操作区办理。"
         open={Boolean(detailTask)}

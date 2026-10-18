@@ -499,6 +499,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       exportValue: (record) => formatQuantity(record?.amount),
     },
     fee_amount: {
+      defaultHidden: true,
       align: 'right',
       defaultPriority: 70,
       title: '手续费',
@@ -521,6 +522,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       sortType: 'text',
     },
     collection_type: {
+      defaultHidden: true,
       title: '收款分类',
       dataIndex: 'collection_type',
       width: 130,
@@ -534,6 +536,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         ),
     },
     payment_term: {
+      defaultHidden: true,
       title: React.createElement(BusinessHelpLabel, {
         label: '账期',
         pageKey:
@@ -596,12 +599,12 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       align: 'left',
       title: '取消记录',
       key: 'cancellation',
-      width: 320,
+      width: 180,
       sortable: false,
       render: (_, record) => financeCancelAuditText(record),
       exportValue: financeCancelAuditText,
     },
-    ...sourceColumns,
+    ...sourceColumns.map((column) => column.dataIndex === 'note' ? { ...column, defaultHidden: true } : column),
   ]
 
   const columnsByKey = {

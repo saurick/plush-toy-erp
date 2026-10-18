@@ -1861,6 +1861,7 @@ export function OperationalFactWorkspace({
           ) : null}
         />
       ) : <BusinessDetailsModal
+        descriptionInHelp
         columns={visibleColumns}
         description="当前弹窗只用于查看记录；如需编辑草稿、确认、结清、取消、返工或继续办理，请使用列表上方的当前操作区。"
         open={Boolean(visibleDetailRecord)}

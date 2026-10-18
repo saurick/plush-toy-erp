@@ -54,7 +54,9 @@ function getProductCoreSource() {
   )
 }
 
-function CapabilityRow({ item }) {
+function CapabilityRow({ item, keyword }) {
+  const [scopeLead, ...scopeDetails] = item.availableScope.split('；')
+  const showMatchedScope = Boolean(keyword.trim()) && scopeDetails.join('；').toLowerCase().includes(keyword.trim().toLowerCase())
   return (
     <tr data-membership={item.membershipKey}>
       <td data-label="业务能力">
@@ -67,7 +69,15 @@ function CapabilityRow({ item }) {
           </Tag>
         </div>
       </td>
-      <td data-label="当前可用范围">{item.availableScope}</td>
+      <td data-label="当前可用范围">
+        {scopeLead}
+        {scopeDetails.length > 0 ? (
+          <details className="erp-dev-product-core-scope" open={showMatchedScope || undefined}>
+            <summary>其余可用范围（{scopeDetails.length} 项）</summary>
+            <ul>{scopeDetails.map((text, index) => <li key={index}>{text}</li>)}</ul>
+          </details>
+        ) : null}
+      </td>
       <td data-label="当前边界">{item.boundary}</td>
     </tr>
   )
@@ -245,7 +255,7 @@ export default function DevProductCorePage() {
                   </thead>
                   <tbody>
                     {filteredCapabilities.map((item) => (
-                      <CapabilityRow key={item.key} item={item} />
+                      <CapabilityRow key={`${item.key}:${keyword}`} item={item} keyword={keyword} />
                     ))}
                   </tbody>
                 </table>

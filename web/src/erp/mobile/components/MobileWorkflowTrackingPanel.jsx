@@ -370,7 +370,6 @@ function MobileTrackingContent({
   }
   const resetFilters = () => updateQuery({ status: '', owner_role_key: '', attention: '' })
   const filterSummary = [
-    ['status', '流转状态', TRACKING_STATUS_OPTIONS],
     ['owner_role_key', '当前岗位', TRACKING_ROLE_OPTIONS],
     ['attention', '关注事项', TRACKING_ATTENTION_OPTIONS],
   ]

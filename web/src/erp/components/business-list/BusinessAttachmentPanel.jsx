@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons'
 import { AttachmentPolicy } from '../../../common/consts/attachments.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
 import BusinessAttachmentThumbnail from './BusinessAttachmentThumbnail.jsx'
 
@@ -221,21 +222,13 @@ function SavedAttachmentAuditMeta({ item }) {
 
   return (
     <>
-      <Typography.Text type="secondary" title={uploaderLabel}>
-        {uploaderLabel}
-      </Typography.Text>
-      <Typography.Text type="secondary" title={uploadedAtLabel}>
-        {uploadedAtLabel}
-      </Typography.Text>
+      <BusinessHelpLabel
+        label="上传记录"
+        description={`${uploaderLabel}；${uploadedAtLabel}${withdrawn ? `；${withdrawerLabel}；${withdrawnAtLabel}` : ''}`}
+      />
       {withdrawn ? (
         <>
           <Tag color="error">已撤销</Tag>
-          <Typography.Text type="secondary" title={withdrawerLabel}>
-            {withdrawerLabel}
-          </Typography.Text>
-          <Typography.Text type="secondary" title={withdrawnAtLabel}>
-            {withdrawnAtLabel}
-          </Typography.Text>
           <Typography.Text
             type="secondary"
             title={withdrawalReasonLabel}
@@ -1294,11 +1287,13 @@ const BusinessAttachmentPanel = forwardRef(
         >
           <div className="business-attachment-panel__header">
             {variant !== 'manager' ? (
-              <Typography.Text strong>{title}</Typography.Text>
+              <BusinessHelpLabel label={title} description={!missingOwner ? panelDescription : undefined} />
+            ) : !missingOwner ? <BusinessHelpLabel label="附件说明" description={panelDescription} /> : null}
+            {missingOwner ? (
+              <Typography.Paragraph type="secondary">
+                {panelDescription}
+              </Typography.Paragraph>
             ) : null}
-            <Typography.Paragraph type="secondary">
-              {panelDescription}
-            </Typography.Paragraph>
           </div>
           <div className="business-attachment-panel__toolbar">
             <SlidingSegmented
@@ -1453,9 +1448,7 @@ const BusinessAttachmentPanel = forwardRef(
                 </>
               ) : missingOwner && canQueuePending ? (
                 '待上传附件将在保存业务记录后绑定'
-              ) : (
-                '保留上传记录；已上传附件按权限撤销'
-              )}
+              ) : null}
             </span>
             <div className="business-attachment-panel__footer-actions">
               {onClose ? (

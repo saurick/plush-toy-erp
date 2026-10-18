@@ -175,7 +175,7 @@ export async function verifyBusinessCoreShipments(page, deps) {
       '从销售订单导入',
       '产品',
       '仓库',
-      '预计总净重暂不可计算',
+      '填写出货明细后显示预计总净重。',
       '实际总净重（克）',
     ],
     afterOpen: async (modal) => {

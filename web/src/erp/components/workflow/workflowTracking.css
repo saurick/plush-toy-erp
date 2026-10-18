@@ -46,6 +46,13 @@
   line-height: 1.6;
 }
 
+.erp-workflow-initiator--compact {
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
 .erp-workflow-tracking-origin {
   display: flex;
   align-items: center;
@@ -221,8 +228,21 @@
 }
 
 .erp-workflow-tracking-drawer .ant-drawer-header {
+  position: relative;
   min-height: 58px;
   padding: 6px 12px;
+}
+
+.erp-workflow-tracking-drawer .ant-drawer-extra {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
 }
 
 .erp-workflow-tracking-drawer .ant-drawer-header-title {

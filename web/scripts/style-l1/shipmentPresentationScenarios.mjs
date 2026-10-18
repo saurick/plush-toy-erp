@@ -296,7 +296,7 @@ export function createShipmentWeightScenarios(deps) {
           expectedTexts: [
             '出货明细',
             '从销售订单导入',
-            '预计总净重暂不可计算',
+            '填写出货明细后显示预计总净重。',
             '实际总净重（克）',
           ],
           afterOpen: async (modal) => {

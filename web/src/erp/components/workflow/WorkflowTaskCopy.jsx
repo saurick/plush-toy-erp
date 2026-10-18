@@ -67,7 +67,7 @@ export function WorkflowTaskSource({ task, label, copyable = true, onOpen }) {
   )
 }
 
-function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask }) {
+function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask, includeLink }) {
   const triggerRef = React.useRef(null)
   const [open, setOpen] = React.useState(false)
   const handleKeyDown = (event) => {
@@ -77,7 +77,7 @@ function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask }) {
     setOpen(false)
     triggerRef.current?.focus({ preventScroll: true })
   }
-  const path = workflowTaskLinkPath(task?.id)
+  const path = includeLink ? workflowTaskLinkPath(task?.id) : ''
   const identity = getWorkflowTaskIdentity(task)
   const entries = [
     ...(path ? [{ key: 'link', label: '任务链接', text: new URL(path, window.location.origin).href }] : []),
@@ -110,9 +110,9 @@ function WorkflowTaskCopyMenu({ task, assigneeLabel, includeTask }) {
   )
 }
 
-export function WorkflowTaskCopySummary({ task, assigneeLabel, compact = false, taskOnly = false, includeTask = true }) {
+export function WorkflowTaskCopySummary({ task, assigneeLabel, compact = false, taskOnly = false, includeTask = true, includeLink = true }) {
   const path = workflowTaskLinkPath(task?.id)
-  if (compact) return <WorkflowTaskCopyMenu key={`${task?.id}:${task?.source_type}:${task?.source_id}:${task?.display_context?.available}`} task={task} assigneeLabel={assigneeLabel} includeTask={includeTask} />
+  if (compact) return <WorkflowTaskCopyMenu key={`${task?.id}:${task?.source_type}:${task?.source_id}:${task?.display_context?.available}`} task={task} assigneeLabel={assigneeLabel} includeTask={includeTask} includeLink={includeLink} />
   return (
     <>
       <TaskCopyButton

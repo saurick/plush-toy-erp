@@ -66,6 +66,7 @@ export function FinancePaymentDetails({
   return (
     <>
       <BusinessDetailsModal
+        descriptionInHelp
         open={Boolean(paymentDetail)}
         title="收付款详情"
         description="收付款来源、核销明细与当前状态均以系统最新记录为准。"

@@ -80,3 +80,21 @@ test('task identity restores the primary number copy without inline summary copi
   await render(createElement(WorkflowTaskIdentity, { task, detailView: true, copyable: false }))
   assert.equal(container.querySelectorAll('.erp-task-copy').length, 0)
 })
+
+test('tracking keeps pure code copies and inline multi-product expansion when the full summary moves to its menu', async (t) => {
+  const { container, render, act } = await createReactTestHarness(t)
+  const { default: WorkflowTaskIdentity } = await import('./WorkflowTaskIdentity.jsx')
+  const writes = []
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => writes.push(value) } })
+  const multi = { ...task, display_context: { ...task.display_context, items: [...task.display_context.items, { kind: 'product', name: '第二件产品', code: 'P-LONG-20261018-000000000002' }] } }
+  await render(createElement(WorkflowTaskIdentity, { task: multi, summaryCopyable: false }))
+  assert.equal(container.querySelectorAll('.erp-task-copy--label').length, 0)
+  const details = container.querySelector('.erp-task-identity__more')
+  assert.ok(details, '原行内展开保留，不换成新的弹窗流程')
+  details.open = true
+  assert.match(details.textContent, /第二件产品/u)
+  const copies = container.querySelectorAll('[aria-label="复制产品编号"]')
+  assert.equal(copies.length, 2)
+  await act(async () => copies[1].click())
+  assert.deepEqual(writes, ['P-LONG-20261018-000000000002'])
+})

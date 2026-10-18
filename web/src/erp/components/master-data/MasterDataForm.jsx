@@ -467,9 +467,9 @@ export function MasterDataFormFields({
         <BusinessFormSection title="路线与加工能力">
           <Form.Item
             className="erp-business-action-form__field"
-            label="标准生产路线位置"
+            label={<BusinessHelpLabel label="标准生产路线位置" description="将工序明确绑定到固定生产路线；不能根据名称、类别或排序自动推断。" />}
             name="production_route_operation_code"
-            extra="仅用于把这条工序明确绑定到固定生产路线；每个位置只能绑定一条启用工序，不能根据名称、类别或排序自动推断。"
+            extra="每个路线位置只能绑定一条启用工序。"
           >
             <Select
               allowClear
@@ -479,8 +479,8 @@ export function MasterDataFormFields({
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
-            extra="可与“可内制”同时开启；这里只记录工序能力，具体订单仍由生产经理另行决定。"
-            label="可委外"
+            extra="可与内制同时启用；具体订单另行安排。"
+            label={<BusinessHelpLabel label="可委外" description="这里只记录工序能力；具体订单由生产经理决定本厂或外发安排。" />}
             name="outsourcing_enabled"
             valuePropName="checked"
           >
@@ -498,9 +498,9 @@ export function MasterDataFormFields({
         <BusinessFormSection title="补充资料">
           <Form.Item
             className="erp-business-action-form__field"
-            label="质检参考"
+            label={<BusinessHelpLabel label="质检参考" description="记录该工序通常是否需要检验，供资料查询。" />}
             name="quality_required"
-            extra="仅供查阅该工序通常是否需要检验；不会生成质检任务，也不代替实际检验结果。"
+            extra="仅作参考，不生成任务或代替检验结果。"
             valuePropName="checked"
           >
             <Switch />

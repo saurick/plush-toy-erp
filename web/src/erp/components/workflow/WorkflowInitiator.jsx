@@ -2,12 +2,12 @@ import React from 'react'
 import { getRoleDisplayName } from '../../utils/roleKeys.mjs'
 import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 
-export default function WorkflowInitiator({ summary }) {
+export default function WorkflowInitiator({ summary, compact = false }) {
   const roleName = summary.initiator_role_key === 'admin'
     ? '管理员'
     : getRoleDisplayName(summary.initiator_role_key)
   return (
-    <span className="erp-workflow-initiator">
+    <span className={`erp-workflow-initiator${compact ? ' erp-workflow-initiator--compact' : ''}`}>
       <strong>{summary.initiator_name || '未记录'}</strong>
       <small>
         {roleName ? (

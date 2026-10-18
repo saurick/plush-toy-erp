@@ -13,7 +13,9 @@ import WorkflowInitiator from './WorkflowInitiator.jsx'
 import WorkflowExceptionPanel from './WorkflowExceptionPanel.jsx'
 import { getWorkflowTaskSourceNo } from '../../utils/dashboardTaskDisplay.mjs'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
-import { WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
+import { WorkflowTaskCopySummary, WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
+import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 import './workflowTracking.css'
 
@@ -125,6 +127,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
     }
   }
   const summary = data?.summary
+  const identity = getWorkflowTaskIdentity(summary || {})
   const stageModel = data && summary.kind === 'process' ? buildTrackingStageModel(data) : null
   const eventItems = data?.events.map((event) => {
     const task = data.tasks.find((item) => item.task_id === event.task_id)
@@ -145,6 +148,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
   return (
     <Drawer
       title="流程跟踪"
+      extra={identity.available && identity.items.length > 0 ? <WorkflowTaskCopySummary task={summary} compact includeTask={false} includeLink={false} /> : null}
       closeIcon={<LeftOutlined aria-hidden />}
       closable={{ placement: 'start', 'aria-label': closeLabel }}
       open={Boolean(trackingRef)}
@@ -207,10 +211,10 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
               </div>
             </div>
             <div className="erp-workflow-tracking-origin">
-              <WorkflowInitiator summary={summary} />
-              <span className="erp-workflow-tracking-meta">发起于 {formatWorkflowTaskEventTime(summary.started_at)}</span>
+              <WorkflowInitiator summary={summary} compact />
+              <span className="erp-workflow-tracking-meta"><BusinessHelpLabel label={`发起于 ${formatWorkflowTaskEventTime(summary.started_at).replace(/:\d{2}$/u, '')}`} description={`精确发起时间：${formatWorkflowTaskEventTime(summary.started_at)}`} /></span>
             </div>
-            {summary.display_context ? <div className="erp-workflow-tracking-identity"><WorkflowTaskIdentity task={summary} /></div> : null}
+            {summary.display_context ? <div className="erp-workflow-tracking-identity"><WorkflowTaskIdentity task={summary} summaryCopyable={false} /></div> : null}
             <TrackingExceptions key={`${kind}:${id}:${refreshKey}`} trackingRef={{ kind, id }} onOpenTask={onOpenTask} refreshKey={reload} />
           </section>
           {stageModel?.items.length ? (

@@ -1,3 +1,4 @@
+import { createGlobalDensityOptimizationScenarios } from './globalDensityOptimizationScenarios.mjs'
 import { createInformationDensityExtras } from './informationDensityExtras.mjs'
 import { createInformationDensityScenarios } from './informationDensityScenarios.mjs'
 import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
@@ -367,7 +368,7 @@ export function createStyleL1Scenarios(deps) {
     }
   }
 
-  return [
+  const scenarios = [
     ...createBusinessFollowupScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
@@ -872,4 +873,5 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
   ]
+  return [...scenarios, ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
 }

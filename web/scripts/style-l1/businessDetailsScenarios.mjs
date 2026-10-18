@@ -850,28 +850,22 @@ export function createBusinessDetailsScenarios(deps) {
             .locator('.erp-business-data-table-card')
             .getByText(number, { exact: true })
             .dblclick()
-          await modal
-            .locator('.erp-business-details-total')
-            .getByText(`共 ${count} 条`, { exact: true })
-            .waitFor()
+          if (count === 0) {
+            await modal.getByText('当前采购订单暂无明细', { exact: true }).waitFor()
+            assert.equal(await modal.locator('.ant-pagination').count(), 0)
+            assert.equal(await modal.locator('.erp-business-details-total').count(), 0)
+          } else {
+            await modal.locator('.erp-business-details-total').getByText(`共 ${count} 条`, { exact: true }).waitFor()
+          }
           assert.equal(
             await modal.locator('.erp-business-row-item-card').count(),
             count
           )
-          assert.equal(
-            await modal
-              .getByRole('combobox', { name: '每页明细条数' })
-              .isDisabled(),
-            count === 0
-          )
-          assert.equal(
-            await modal.locator('.ant-pagination-prev button').isDisabled(),
-            true
-          )
-          assert.equal(
-            await modal.locator('.ant-pagination-next button').isDisabled(),
-            true
-          )
+          if (count > 0) {
+            assert.equal(await modal.getByRole('combobox', { name: '每页明细条数' }).isDisabled(), false)
+            assert.equal(await modal.locator('.ant-pagination-prev button').isDisabled(), true)
+            assert.equal(await modal.locator('.ant-pagination-next button').isDisabled(), true)
+          }
           if (count === 1) {
             await changeDetailsPageSize(page, modal, 20)
             assert.equal(
