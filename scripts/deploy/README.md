@@ -83,9 +83,26 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 历史运行 SHA 只有在已有完整 v2 七资产时，才可通过 protected main 的 `backfill_release_source` job 补齐唯一 `source.tar`。该 job 在 Runner 内证明目标 SHA 是当前 main 的 ancestor，下载并校验四个小控制文件与服务端七资产目录，再由 `git archive` 生成并核对 source digest；它只写 `plush-release-source`，不改写七资产、GitLab Release、镜像或 public asset。旧 v1 不允许借 backfill 升格为 promotion 输入。
 
+## 命令行发起 GitLab 发布
+
+日常发布使用 `gitlab-release-cli.mjs` 调用现有 Delivery Service，无需操作 GitLab 网页或登录 Runner。它只发起不可变制品发布；目标部署继续使用既有 promotion operation。
+
+| 命令 | 行为 |
+| --- | --- |
+| `node scripts/deploy/gitlab-release-cli.mjs plan` | 读取当前源码身份，输出计划；不读取凭据、不连接 GitLab、不创建 operation |
+| `node scripts/deploy/gitlab-release-cli.mjs check-credentials` | 核对专用项目 API 凭据、角色、到期日、受保护 main 和流水线变量权限，不发起流水线 |
+| `node scripts/deploy/gitlab-release-cli.mjs publish --execute` | 发布当前 clean HEAD；复用完整 CI 判断、上海日期版本号、幂等意图及正式发布服务 |
+| `node scripts/deploy/gitlab-release-cli.mjs status --sha <40位SHA>` | 只读核对流水线及不可变资产状态 |
+
+`publish` 不带 `--execute` 时仍只输出计划。可用 `--sha` 绑定已审阅提交，用 `--version` 核对已审阅版本；指定值必须与当前源码和正式版本目录一致。已有流水线运行时只返回状态，已有失败发布或请求结果不确定时停止，不自动重试、不切换到浏览器。
+
+发布凭据与只读凭据分开。Mac 从当前用户的 Keychain 项 `plush-toy-erp.gitlab-release-api` 读取；Linux 默认读取 `~/.config/plush-toy-erp/gitlab-release-token`，也可显式设置 `PLUSH_GITLAB_TOKEN_FILE`。文件必须为当前用户所有的普通文件、权限 `0400 / 0600`，拒绝符号链接。显式 `PLUSH_GITLAB_TOKEN` 仍沿用既有服务端输入合同；命令参数不接受 token，凭据不进入公开输出或仓库。
+
+专用身份使用本项目带到期日的 Maintainer API token，并受当前 protected-main 与流水线变量规则约束；不复用或提升 CI 发布机器人的权限。到期前通过正式 GitLab 凭据维护轮换此专用身份，并重新运行 `check-credentials`。只读查询继续沿用 `PLUSH_GITLAB_READ_TOKEN`、Mac 的 `plush-toy-erp.gitlab-read-api` 或既有受控只读文件。
+
 ## Operation 真源
 
-`delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用 `0600` 原子文件保存工作台 operation。只有工作台发起的 release、promotion、database rebuild 和 rollback 才是“工作台操作记录”。
+`delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用 `0600` 原子文件保存工作台 operation。通过工作台或上述 CLI 调用同一 Delivery Service 发起的 release、promotion、database rebuild 和 rollback 才是“工作台操作记录”。
 
 GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，由 GitLab Provider 单独读取；它们不会被伪造成 operation。Codex 聊天、普通 SSH、手工排障和没有正式回执的动作也不会进入 operation store。
 

@@ -184,6 +184,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/github-release-asset-set.test.mjs",
     "scripts/deploy/gitlab-delivery-provider.test.mjs",
     "scripts/deploy/gitlab-release-candidate.test.mjs",
+    "scripts/deploy/gitlab-release-cli.test.mjs",
     "scripts/deploy/gitlab-release-publication.test.mjs",
     "scripts/deploy/gitlab-release-retirement.test.mjs",
     "scripts/deploy/gitlab-runner-images.test.mjs",
