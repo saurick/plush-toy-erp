@@ -13,7 +13,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { classifyDatabaseName } from "./database-target.mjs";
 import { FORMAL_DEMO_ACCOUNT_PROFILES } from "./manual-acceptance-account-scenarios.mjs";
-import { dropRealResponse, settleRPCPage } from "./transaction-browser-ui.mjs";
+import {
+  dropRealResponse,
+  pageAction,
+  settleRPCPage,
+} from "./transaction-browser-ui.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -889,7 +893,7 @@ async function runFinancePaymentFlow(browser, options, report) {
       session.page,
       options.baseURL,
       "/erp/finance/payments",
-      "收付款与核销",
+      "收付款",
     );
     await selectRow(session.page, source.payment_no);
     await session.page
@@ -938,9 +942,7 @@ async function runFinancePaymentFlow(browser, options, report) {
       allocationCount: posted.allocations.length,
     });
 
-    await session.page
-      .getByRole("button", { name: "冲销收付款", exact: true })
-      .click();
+    await pageAction(session.page, "冲销收付款");
     const reverseModal = await visibleModal(session.page, "冲销收付款");
     await reverseModal.getByLabel("冲销原因").fill("真实浏览器异常流验收冲销");
     await reverseModal
