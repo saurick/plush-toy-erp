@@ -211,19 +211,35 @@ test("exception task identity reads every task page before asserting source/node
 
 function taskTablePage(
   task,
-  { rowCount = 1, entryCount = 1, confirmCount = 1 } = {},
+  { rowCount = 1, entryCount = 1, actionCount = 1, confirmCount = 1 } = {},
 ) {
   const events = [];
-  const control = (key) => ({
-    count: async () =>
-      key === "row"
-        ? rowCount
-        : key === "entry"
-          ? entryCount
+  const visible = new Set();
+  const isTransitionControl = (key) =>
+    ["处理完成", "审批通过", "确认完成", "确认通过"].includes(key);
+  const actualCount = (key) =>
+    key === "row"
+      ? rowCount
+      : key === "entry"
+        ? entryCount
+        : key === "处理完成" || key === "审批通过"
+          ? actionCount
           : key === "确认完成" || key === "确认通过"
             ? confirmCount
-            : 1,
-    waitFor: async () => events.push(`visible:${key}`),
+            : 1;
+  const control = (key) => ({
+    count: async () => {
+      events.push(`count:${key}`);
+      return isTransitionControl(key) && !visible.has(key)
+        ? 0
+        : actualCount(key);
+    },
+    waitFor: async ({ state }) => {
+      assert.equal(state, "visible");
+      if (actualCount(key) === 0) throw new Error(`not visible:${key}`);
+      visible.add(key);
+      events.push(`visible:${key}`);
+    },
     fill: async (value) => events.push(`fill:${key}:${value}`),
     press: async (value) => events.push(`press:${key}:${value}`),
     click: async () => events.push(`click:${key}`),
@@ -290,6 +306,17 @@ test("exception task browser action clicks the exact table row detail entry and 
     assert.ok(
       ui.events.includes(approval ? "click:确认通过" : "click:确认完成"),
     );
+    for (const key of [
+      approval ? "审批通过" : "处理完成",
+      approval ? "确认通过" : "确认完成",
+    ]) {
+      assert.ok(
+        ui.events.indexOf(`visible:${key}`) < ui.events.indexOf(`count:${key}`),
+      );
+      assert.ok(
+        ui.events.indexOf(`count:${key}`) < ui.events.indexOf(`click:${key}`),
+      );
+    }
     assert.equal(ui.events.includes("fill:reason:批准"), approval);
   }
 });
@@ -298,6 +325,7 @@ test("exception task browser action refuses duplicate rows, detail entries and c
   for (const counts of [
     { rowCount: 2 },
     { entryCount: 2 },
+    { actionCount: 2 },
     { confirmCount: 2 },
   ]) {
     const { task } = readyTaskFixture();
@@ -309,6 +337,22 @@ test("exception task browser action refuses duplicate rows, detail entries and c
         successMessage: "任务已处理完成",
       }),
       /unique/u,
+    );
+    assert.ok(!ui.events.includes("click:确认完成"));
+  }
+});
+
+test("exception task browser action stops before submission when a transition control never appears", async () => {
+  for (const counts of [{ actionCount: 0 }, { confirmCount: 0 }]) {
+    const { task } = readyTaskFixture();
+    const ui = taskTablePage(task, counts);
+    await assert.rejects(
+      actOnExceptionFlowTaskPage(ui.page, task, {
+        actionTitle: "处理完成",
+        confirmLabel: "确认完成",
+        successMessage: "任务已处理完成",
+      }),
+      /not visible/u,
     );
     assert.ok(!ui.events.includes("click:确认完成"));
   }

@@ -726,6 +726,7 @@ export async function actOnExceptionFlowTaskPage(
     .getByRole("button", { name: "选择处理方式", exact: true })
     .click();
   const action = drawer.getByRole("radio").filter({ hasText: actionTitle });
+  await action.waitFor({ state: "visible" });
   assert.equal(await action.count(), 1, "exception task action must be unique");
   await action.click();
   if (reason) await drawer.locator("textarea").fill(reason);
@@ -734,6 +735,7 @@ export async function actOnExceptionFlowTaskPage(
     name: confirmLabel,
     exact: true,
   });
+  await confirmButton.waitFor({ state: "visible" });
   assert.equal(
     await confirmButton.count(),
     1,
