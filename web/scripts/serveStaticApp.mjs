@@ -128,9 +128,14 @@ function observeRequest(request, response) {
   const record = (aborted = false) => {
     if (state.recorded || (!aborted && response.statusCode < 400)) return
     state.recorded = true
-    const outcome = response.statusCode >= 500 || (aborted && state.reason !== 'client_aborted') ? 'error' : 'rejected'
-    console.error(JSON.stringify({
-      ts: new Date().toISOString(), level: outcome === 'error' ? 'ERROR' : 'WARN',
+    if (aborted && !state.reason && response.statusCode < 500) state.reason = 'client_aborted'
+    let outcome = 'rejected'
+    if (response.statusCode >= 500 || (aborted && state.reason !== 'client_aborted')) outcome = 'error'
+    else if (state.reason === 'client_aborted') outcome = 'canceled'
+    const level = { error: 'ERROR', canceled: 'INFO', rejected: 'WARN' }[outcome]
+    const writeLog = outcome === 'canceled' ? console.log : console.error
+    writeLog(JSON.stringify({
+      ts: new Date().toISOString(), level,
       msg: 'web request failed', 'service.name': 'web-static', request_id: requestId,
       method: request.method, path: safeRequestPath(request.url), status: response.statusCode,
       outcome, reason: state.reason || (aborted ? 'response_aborted' : `http_${response.statusCode}`),
@@ -316,7 +321,13 @@ async function serveStatic(request, response, requestUrl) {
     return
   }
 
-  fs.createReadStream(resolvedPath).pipe(response)
+  const file = fs.createReadStream(resolvedPath)
+  file.once('error', () => {
+    request.observation.reason = 'static_read_failed'
+    response.destroy()
+  })
+  response.once('close', () => file.destroy())
+  file.pipe(response)
 }
 
 async function resolveExistingFile(filePath, pathname) {
@@ -433,13 +444,21 @@ function proxyRequest(request, response, requestUrl) {
         proxyResponse.statusCode || 502,
         stripHopByHopHeaders(proxyResponse.headers)
       )
-      proxyResponse.on('aborted', () => response.destroy())
+      const failResponse = () => {
+        if (request.observation.reason !== 'client_aborted') {
+          request.observation.reason ||= 'dependency_response_aborted'
+        }
+        response.destroy()
+      }
+      proxyResponse.once('aborted', failResponse)
+      proxyResponse.once('error', failResponse)
       proxyResponse.pipe(response)
     }
   )
   activeUpstreamRequests.add(proxy)
   const proxyDeadline = setTimeout(() => {
     timedOut = true
+    request.observation.reason ||= 'dependency_timeout'
     proxy.destroy(new Error('proxy deadline exceeded'))
   }, proxyTimeoutMs)
   proxyDeadline.unref()
@@ -450,11 +469,12 @@ function proxyRequest(request, response, requestUrl) {
 
   proxy.on('timeout', () => {
     timedOut = true
+    request.observation.reason ||= 'dependency_timeout'
     proxy.destroy(new Error('proxy timeout'))
   })
 
   proxy.on('error', (error) => {
-    if (bodyTooLarge) {
+    if (bodyTooLarge || request.observation.reason === 'client_aborted') {
       return
     }
     if (request.observation.reason !== 'client_aborted') {
@@ -472,7 +492,7 @@ function proxyRequest(request, response, requestUrl) {
   })
 
   request.on('aborted', () => {
-    request.observation.reason = 'client_aborted'
+    request.observation.reason ||= 'client_aborted'
     proxy.destroy(new Error('client aborted'))
   })
   let receivedBytes = 0

@@ -367,3 +367,80 @@ test('proxy failure logs one redacted result with a correlated request ID', { ti
   assert(!stderr.includes('private-'))
   assert(!stderr.includes(`:${closedBackendPort}`))
 })
+
+test('proxy distinguishes canceled clients from a broken upstream response', { timeout: 15_000 }, async (t) => {
+  for (const phase of ['before-headers', 'during-response', 'upstream-aborted', 'server-error-aborted']) {
+    await t.test(phase, async (t) => {
+      const root = await mkdtemp(path.join(os.tmpdir(), 'serve-static-cancel-'))
+      const port = await reservePort()
+      await writeFile(path.join(root, 'index.html'), '<!doctype html><title>ok</title>')
+      let arrived
+      let disconnected
+      const arrival = new Promise((resolve) => { arrived = resolve })
+      const disconnection = new Promise((resolve) => { disconnected = resolve })
+      const backend = http.createServer((request, response) => {
+        request.resume()
+        response.once('close', disconnected)
+        arrived()
+        if (phase !== 'before-headers') {
+          response.writeHead(phase === 'server-error-aborted' ? 500 : 200, { 'content-type': 'text/plain' })
+          response.write('partial response')
+          if (phase === 'upstream-aborted') setImmediate(() => response.destroy())
+        }
+      })
+      await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve))
+      const child = spawn(process.execPath, [scriptPath], {
+        env: { ...process.env, API_ORIGIN: `http://127.0.0.1:${backend.address().port}`, HOST: '127.0.0.1', PORT: String(port), STATIC_ROOT: root },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      let output = ''
+      child.stdout.on('data', (chunk) => { output += chunk.toString('utf8') })
+      child.stderr.on('data', (chunk) => { output += chunk.toString('utf8') })
+      const completion = new Promise((resolve, reject) => {
+        child.once('error', reject)
+        child.once('close', (code, signal) => resolve({ code, signal }))
+      })
+      t.after(async () => {
+        backend.closeAllConnections()
+        await new Promise((resolve) => backend.close(resolve))
+        if (child.exitCode === null && child.signalCode === null) { child.kill('SIGTERM'); await completion }
+        await rm(root, { recursive: true, force: true })
+      })
+      await waitForHealth(port)
+      const requestID = `req-${phase}`
+      const client = http.request({ hostname: '127.0.0.1', port, path: '/rpc/system', method: 'POST', headers: { 'x-request-id': requestID } })
+      client.on('error', () => {})
+      const closed = new Promise((resolve) => client.once('close', resolve))
+      client.once('response', (response) => {
+        response.on('error', () => {})
+        response.resume()
+        if (phase === 'during-response' || phase === 'server-error-aborted') client.destroy()
+      })
+      client.end('{}')
+      await arrival
+      if (phase === 'before-headers') client.destroy()
+      await closed
+      await disconnection
+      child.kill('SIGTERM')
+      await completion
+      const events = output.split('\n').filter((line) => line.startsWith('{')).map((line) => JSON.parse(line))
+      assert.equal(events.length, 1, output)
+      const event = events[0]
+      assert.equal(event.request_id, requestID)
+      assert.equal(event.path, '/rpc/system')
+      if (phase === 'server-error-aborted') {
+        assert.equal(event.status, 500)
+        assert.equal(event.outcome, 'error')
+        assert.equal(event.level, 'ERROR')
+      } else if (phase === 'upstream-aborted') {
+        assert.equal(event.outcome, 'error')
+        assert.equal(event.level, 'ERROR')
+        assert.equal(event.reason, 'dependency_response_aborted')
+      } else {
+        assert.equal(event.outcome, 'canceled')
+        assert.equal(event.level, 'INFO')
+        assert.equal(event.reason, 'client_aborted')
+      }
+    })
+  }
+})
