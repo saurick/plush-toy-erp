@@ -10,7 +10,7 @@ export function DevIntegrationAccess({ boundary, onGuide, onInventory }) {
     <section className="erp-dev-integration__access" aria-label="接入关系">
       <div className="erp-dev-integration__section-heading">
         <h2>{onGuide ? '接入关系' : '实际接入关系'}</h2>
-        <Tag>当前内部接口</Tag>
+        <Tag>当前接口合同</Tag>
       </div>
       {onGuide ? (
         <Descriptions
@@ -18,7 +18,7 @@ export function DevIntegrationAccess({ boundary, onGuide, onInventory }) {
           column={1}
           items={[
             { key: 'role', label: '接口职责', children: '内部 JSON-RPC 业务接口' },
-            { key: 'mode', label: '接入方式', children: '内部直接调用' },
+            { key: 'mode', label: '接入方式', children: '按正式合同鉴权' },
             { key: 'external', label: '外部开放', children: '尚未开放' },
             {
               key: 'adapter',

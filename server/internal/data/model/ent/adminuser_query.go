@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/supplier"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -18,10 +20,12 @@ import (
 // AdminUserQuery is the builder for querying AdminUser entities.
 type AdminUserQuery struct {
 	config
-	ctx        *QueryContext
-	order      []adminuser.OrderOption
-	inters     []Interceptor
-	predicates []predicate.AdminUser
+	ctx          *QueryContext
+	order        []adminuser.OrderOption
+	inters       []Interceptor
+	predicates   []predicate.AdminUser
+	withSupplier *SupplierQuery
+	withCustomer *CustomerQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +60,50 @@ func (_q *AdminUserQuery) Unique(unique bool) *AdminUserQuery {
 func (_q *AdminUserQuery) Order(o ...adminuser.OrderOption) *AdminUserQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QuerySupplier chains the current query on the "supplier" edge.
+func (_q *AdminUserQuery) QuerySupplier() *SupplierQuery {
+	query := (&SupplierClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(adminuser.Table, adminuser.FieldID, selector),
+			sqlgraph.To(supplier.Table, supplier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, adminuser.SupplierTable, adminuser.SupplierColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryCustomer chains the current query on the "customer" edge.
+func (_q *AdminUserQuery) QueryCustomer() *CustomerQuery {
+	query := (&CustomerClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(adminuser.Table, adminuser.FieldID, selector),
+			sqlgraph.To(customer.Table, customer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, adminuser.CustomerTable, adminuser.CustomerColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first AdminUser entity from the query.
@@ -245,15 +293,39 @@ func (_q *AdminUserQuery) Clone() *AdminUserQuery {
 		return nil
 	}
 	return &AdminUserQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]adminuser.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.AdminUser{}, _q.predicates...),
+		config:       _q.config,
+		ctx:          _q.ctx.Clone(),
+		order:        append([]adminuser.OrderOption{}, _q.order...),
+		inters:       append([]Interceptor{}, _q.inters...),
+		predicates:   append([]predicate.AdminUser{}, _q.predicates...),
+		withSupplier: _q.withSupplier.Clone(),
+		withCustomer: _q.withCustomer.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithSupplier tells the query-builder to eager-load the nodes that are connected to
+// the "supplier" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AdminUserQuery) WithSupplier(opts ...func(*SupplierQuery)) *AdminUserQuery {
+	query := (&SupplierClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withSupplier = query
+	return _q
+}
+
+// WithCustomer tells the query-builder to eager-load the nodes that are connected to
+// the "customer" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AdminUserQuery) WithCustomer(opts ...func(*CustomerQuery)) *AdminUserQuery {
+	query := (&CustomerClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withCustomer = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -262,12 +334,12 @@ func (_q *AdminUserQuery) Clone() *AdminUserQuery {
 // Example:
 //
 //	var v []struct {
-//		Username string `json:"username,omitempty"`
+//		AccountKind int `json:"account_kind,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.AdminUser.Query().
-//		GroupBy(adminuser.FieldUsername).
+//		GroupBy(adminuser.FieldAccountKind).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *AdminUserQuery) GroupBy(field string, fields ...string) *AdminUserGroupBy {
@@ -285,11 +357,11 @@ func (_q *AdminUserQuery) GroupBy(field string, fields ...string) *AdminUserGrou
 // Example:
 //
 //	var v []struct {
-//		Username string `json:"username,omitempty"`
+//		AccountKind int `json:"account_kind,omitempty"`
 //	}
 //
 //	client.AdminUser.Query().
-//		Select(adminuser.FieldUsername).
+//		Select(adminuser.FieldAccountKind).
 //		Scan(ctx, &v)
 func (_q *AdminUserQuery) Select(fields ...string) *AdminUserSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
@@ -332,8 +404,12 @@ func (_q *AdminUserQuery) prepareQuery(ctx context.Context) error {
 
 func (_q *AdminUserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*AdminUser, error) {
 	var (
-		nodes = []*AdminUser{}
-		_spec = _q.querySpec()
+		nodes       = []*AdminUser{}
+		_spec       = _q.querySpec()
+		loadedTypes = [2]bool{
+			_q.withSupplier != nil,
+			_q.withCustomer != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*AdminUser).scanValues(nil, columns)
@@ -341,6 +417,7 @@ func (_q *AdminUserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Ad
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &AdminUser{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +429,84 @@ func (_q *AdminUserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Ad
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withSupplier; query != nil {
+		if err := _q.loadSupplier(ctx, query, nodes, nil,
+			func(n *AdminUser, e *Supplier) { n.Edges.Supplier = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withCustomer; query != nil {
+		if err := _q.loadCustomer(ctx, query, nodes, nil,
+			func(n *AdminUser, e *Customer) { n.Edges.Customer = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (_q *AdminUserQuery) loadSupplier(ctx context.Context, query *SupplierQuery, nodes []*AdminUser, init func(*AdminUser), assign func(*AdminUser, *Supplier)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*AdminUser)
+	for i := range nodes {
+		if nodes[i].SupplierID == nil {
+			continue
+		}
+		fk := *nodes[i].SupplierID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(supplier.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "supplier_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *AdminUserQuery) loadCustomer(ctx context.Context, query *CustomerQuery, nodes []*AdminUser, init func(*AdminUser), assign func(*AdminUser, *Customer)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*AdminUser)
+	for i := range nodes {
+		if nodes[i].CustomerID == nil {
+			continue
+		}
+		fk := *nodes[i].CustomerID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(customer.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "customer_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (_q *AdminUserQuery) sqlCount(ctx context.Context) (int, error) {
@@ -379,6 +533,12 @@ func (_q *AdminUserQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != adminuser.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withSupplier != nil {
+			_spec.Node.AddColumnOnce(adminuser.FieldSupplierID)
+		}
+		if _q.withCustomer != nil {
+			_spec.Node.AddColumnOnce(adminuser.FieldCustomerID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

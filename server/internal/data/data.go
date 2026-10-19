@@ -33,6 +33,7 @@ import (
 
 // ProviderSet 是 data 层对外暴露的依赖注入集合。
 var ProviderSet = wire.NewSet(
+	NewPartnerReadRepo,
 	NewData,
 	NewHelpContentRepo,
 	wire.Bind(new(biz.HelpContentRepo), new(*helpContentRepo)),

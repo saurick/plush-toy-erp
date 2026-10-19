@@ -85,6 +85,9 @@ func (r *adminAuthRepo) GetAdminByID(ctx context.Context, id int) (*biz.AdminUse
 		CreatedAt:       createdAt,
 		UpdatedAt:       updatedAt,
 	}
+	if err := r.loadAccountBoundary(ctx, admin); err != nil {
+		return nil, err
+	}
 	if err := loadAdminRBAC(ctx, r.data.sqldb, admin); err != nil {
 		return nil, err
 	}
@@ -148,6 +151,9 @@ func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string)
 		CreatedAt:       createdAt,
 		UpdatedAt:       updatedAt,
 	}
+	if err := r.loadAccountBoundary(ctx, admin); err != nil {
+		return nil, err
+	}
 	return admin, nil
 }
 
@@ -178,7 +184,7 @@ func (r *adminAuthRepo) GetAdminByPhone(ctx context.Context, phone string) (*biz
 
 	err := r.data.sqldb.QueryRowContext(
 		ctx,
-		"SELECT id, username, phone, password_hash, is_super_admin, erp_preferences, disabled, auth_version, revoked_at, status_reason, status_changed_at, status_changed_by, last_login_at, created_at, updated_at FROM admin_users WHERE phone = $1 LIMIT 1",
+		"SELECT id, username, phone, password_hash, is_super_admin, erp_preferences, disabled, auth_version, revoked_at, status_reason, status_changed_at, status_changed_by, last_login_at, created_at, updated_at FROM admin_users WHERE phone = $1 AND account_kind = 0 LIMIT 1",
 		phone,
 	).Scan(&id, &uname, &phoneValue, &passwordHash, &isSuperAdmin, &erpPreferences, &disabled, &authVersion, &revokedAt, &statusReason, &statusChangedAt, &statusChangedBy, &lastLoginAt, &createdAt, &updatedAt)
 	if err != nil {
@@ -209,6 +215,9 @@ func (r *adminAuthRepo) GetAdminByPhone(ctx context.Context, phone string) (*biz
 		UpdatedAt:       updatedAt,
 	}
 	if err := loadAdminRBAC(ctx, r.data.sqldb, admin); err != nil {
+		return nil, err
+	}
+	if err := r.loadAccountBoundary(ctx, admin); err != nil {
 		return nil, err
 	}
 	return admin, nil
@@ -364,4 +373,20 @@ func maskAdminAuthPhone(phone string) string {
 		return "***"
 	}
 	return phone[:3] + "****" + phone[len(phone)-4:]
+}
+
+// The current binding and organization status are read on every authentication.
+func (r *adminAuthRepo) loadAccountBoundary(ctx context.Context, account *biz.AdminUser) error {
+	var supplierID, customerID sql.NullInt64
+	var displayName sql.NullString
+	err := r.data.sqldb.QueryRowContext(ctx, `SELECT account_kind, supplier_id, customer_id, display_name,
+ CASE WHEN account_kind = 1 THEN EXISTS(SELECT 1 FROM suppliers WHERE id = admin_users.supplier_id AND is_active = TRUE)
+ WHEN account_kind = 2 THEN EXISTS(SELECT 1 FROM customers WHERE id = admin_users.customer_id AND is_active = TRUE)
+ ELSE FALSE END FROM admin_users WHERE id = $1`, account.ID).Scan(&account.AccountKind, &supplierID, &customerID, &displayName, &account.PartnerActive)
+	if err != nil {
+		return err
+	}
+	account.DisplayName = nullStringValue(displayName)
+	account.SupplierID, account.CustomerID = nullIntPointer(supplierID), nullIntPointer(customerID)
+	return nil
 }

@@ -19,7 +19,9 @@ HTTP 路由：
 
 ## 代表性接口合同与系统接入边界
 
-当前接口面向内部员工身份。外部系统、供应商或客户协作身份尚未开放；增加适配入口必须复用同等后端授权和所属领域业务路径。架构与暂缓项见[系统接入边界](../../docs/engineering/跨层公共契约与生成规范.md#系统接入边界--integration-boundary)。
+员工业务接口与合作方订单只读入口分别鉴权。合作方使用独立登录及当前单位绑定，固定只读范围见[合作方合同](#合作方身份与订单只读边界)；当前没有合作方业务写入、外部小系统或真实第三方联调。增加适配入口必须复用同等后端授权和所属领域业务路径。
+
+架构与暂缓项见[系统接入边界](../../docs/engineering/跨层公共契约与生成规范.md#系统接入边界--integration-boundary)。
 
 传输文档为 [`api/jsonrpc/v1/jsonrpc.swagger.json`](../api/jsonrpc/v1/jsonrpc.swagger.json)，由 `server/` 下 `make api` 生成。它描述 `POST /rpc/{url}` 的通用信封，不是完整业务字段 Schema。`node scripts/gen-public-contracts.mjs --check` 从已生成的 Protobuf 消息描述、HTTP binding、Swagger 和真实分发核对运行接口，生成的 `RpcTransport / RpcDomain / RpcMethod` 供 Web 与工作台共用。修改 proto 必须先运行 `make api` 并核对生成差异；公共契约提取不解析 proto，也不替代这一步。
 
@@ -85,11 +87,33 @@ HTTP 路由：
 | 上游申报至质检入库 | `purchase_order.get_purchase_order`、`purchase.create_purchase_receipt_from_purchase_order / post_purchase_receipt / get_purchase_receipt`、`quality.pass_quality_inspection` | 申报 4、实收 3 分别保留；并发创建复用原单与自动质检单，判定及入库只生效一次；仓库不能代质检判定，按实收 3 入库且只有一条库存流水；错误 ID、超量、不同意图及收回仓库范围后的读取和重放拒绝 | `TestSourceDocumentPostgresIntegrationSupplierDelivery` |
 | WMS 仓间调拨 | `inventory.post_inventory_operation / get_inventory_operation` | 来源仓减 3、目标仓加 3，重复请求不增加库存流水；收窄仓库范围后读取和重放均拒绝 | `TestSourceDocumentPostgresIntegrationWarehouseTransfer` |
 | 预收款核销与恢复 | `operational_fact.allocate_finance_payment` | 同键核销一次，金额须为十进制字符串；跨客户目标导致整笔回滚，保留原版本与余额，修正后可恢复 | `TestSourceDocumentPostgresIntegrationFinanceAllocation` |
+| 合作方订单只读隔离 | `auth.partner_login`、`partner.me / list_purchase_orders / get_purchase_order / list_sales_orders / get_sales_order`、`admin.create_partner / list_partners` | 供应商 A/B 与客户 A/B 仅能读各自生效订单及明细；总数、搜索、越界、字段、员工入口旁路、停用、改密、单位停用及退出均按真实身份验证 | `TestSourceDocumentPostgresIntegrationPartnerReadIsolation` |
 | HTTP 准入 | `auth` 与受控 RPC 路由 | GET 不作为业务入口，坏 JSON 拒绝；query token 不授权，未建设的集成身份登录保持未开放 | `TestSourceDocumentPostgresIntegrationTransportBoundary` |
 
 上述用例同源维护于 [HTTP 消费者回归](../internal/data/source_document_integration_consumers_postgres_test.go)，复用 [既有数据夹具](../internal/data/source_document_integration_export_test.go)；`TestSourceDocumentPostgresIntegration*` 已属于现有 `critical_transactions_pg_test` 的 `TestSourceDocumentPostgres` 家族，正常 CI 与质量门禁会执行，缺少数据库时的 skip 不能当成通过。命令与证据边界见 [QA 入口](../../scripts/qa/README.md#模拟系统接入验证--integration-consumers)。
 
-模拟身份使用隔离库中的普通 ERP 员工岗位，验证的是现有内核的受控复用与适配边界；合作方专用身份和客户 / 供应商对象隔离仍未开放。供应商申报不能自动替代仓库点数、质检结果、出货或财务事实。没有真实第三方时不宣称完成第三方联调或客户验收；工作台从本节同源关联场景、方法与用例，按需读取既有隔离数据库门禁的原始 Go JSON、运行回执及代码身份；只有实际 run/pass 才显示场景通过，历史、缺失、失败与跳过分别显示，不外推为逐接口完整覆盖。
+模拟身份使用隔离库中的普通 ERP 员工岗位，验证的是现有内核的受控复用与适配边界；合作方只读身份与订单归属隔离按下节合同验证；原六类业务闭环仍使用员工岗位，不代表合作方可写入。供应商申报不能自动替代仓库点数、质检结果、出货或财务事实。没有真实第三方时不宣称完成第三方联调或客户验收；工作台从本节同源关联场景、方法与用例，按需读取既有隔离数据库门禁的原始 Go JSON、运行回执及代码身份；只有实际 run/pass 才显示场景通过，历史、缺失、失败与跳过分别显示，不外推为逐接口完整覆盖。
+
+## 合作方身份与订单只读边界
+
+账号和可撤销会话继续使用 `admin_users / admin_sessions`。`account_kind` 的领域真源为 `biz.AccountKind`：员工为 0、供应商为 1、客户为 2；现有账号由迁移默认保留为员工。合作方只绑定一个现有 `supplier_id` 或 `customer_id`，数据库互斥约束与外键共同保护，不能成为超级管理员或分配员工岗位。绑定在创建后不可修改；更换单位须停用原账号并创建新账号。没有外部账号、订单或授权关系副本。
+
+`auth.partner_login` 复用现有密码、会话、认证版本和退出机制，拒绝员工；`auth.admin_login` 及员工短信登录拒绝合作方。每次认证读取当前账号、绑定及单位启用状态，不接受请求字段或 Token 中的旧范围授予访问权。账号停用、注销、改密、会话退出或单位停用均使后续访问拒绝；查询认证来源失败不降级为匿名成功。`customer_key` 仍只选择当前部署配置，不承担合作方或 tenant 语义。
+
+合作方固定只开放下表五项能力；不建设可配置岗位或通用对象 ACL。订单读取同时受部署模块的可读状态限制。列表查询先限定归属与生效状态，再搜索、计数及分页；详情按对象、所属单位和状态共同读取，明细沿已授权父单读取。越界与不存在返回同一错误，不返回对象信息。返回值采用明确字段投影，不公开内部备注、工程、BOM、导入来源、审批、附件标识或其他方信息。采购只显示 `approved`，销售只显示 `active`；内部草稿及其他状态本期不公开。
+
+| 业务域 / 方法 | 入参与范围 | 身份与返回 | 重试边界 | 回归来源 |
+| --- | --- | --- | --- | --- |
+| `auth / partner_login` | 仅 username、password 字符串 | 当前启用合作方账号及绑定单位；返回会话和本人摘要 | 登录建立新会话，退出使用现有 auth.logout | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+| `admin / create_partner` | display_name、username、password、account_kind，及互斥的 supplier_id / customer_id 正整数 | 员工账号创建权限；返回账号摘要 | 不支持业务幂等键；重复用户名拒绝 | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+| `admin / list_partners` | 空对象 | 员工账号查看权限；返回绑定及状态 | 只读 | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+| `partner / me` | 空对象 | 当前有效合作方；仅本人身份与绑定 | 只读，每次核对当前会话 | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+| `partner / list_purchase_orders` | keyword、limit 1—100、offset 非负整数；不接受范围参数 | 当前供应商的已批准采购单列表与所属总数 | 只读 | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+| `partner / get_purchase_order` | id 正整数 | 当前供应商的已批准采购单及明细 | 只读，不同归属与不存在同样拒绝 | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+| `partner / list_sales_orders` | keyword、limit 1—100、offset 非负整数；不接受范围参数 | 当前客户的已激活销售单列表与所属总数 | 只读 | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+| `partner / get_sales_order` | id 正整数 | 当前客户的已激活销售单及明细 | 只读，不同归属与不存在同样拒绝 | [合作方隔离](../internal/data/source_document_partner_read_postgres_test.go) |
+
+员工使用既有账号权限管理合作方；`admin.list` 与岗位目录仅返回员工。合作方调用内部 RPC、内部订单查询、主数据、附件、打印、审批、库存或财务入口均不获得员工身份。模拟使用供应商 A/B、客户 A/B 的真实 HTTP 与隔离 PostgreSQL，覆盖归属、搜索与总数、内部字段、交叉访问、伪造范围、员工入口旁路及撤权。当前没有合作方业务写入、门户、API Key 或 OAuth。
 
 ## 当前默认保留的业务域
 
@@ -108,10 +132,21 @@ HTTP 路由：
 
 `system.version` 是公开只读的运行身份回读，返回构建时注入的正式 catalog 版本、完整与短 Git SHA，以及是否具备正式身份；不返回运行配置、凭据或客户数据。正式 Web 静态包和 Server / Web 镜像必须绑定同一 `RELEASE_VERSION + GIT_SHA`，后台和手机端据此提示一致、缺失或不一致；未注入身份的本地进程只报告 `local`，不能作为发布或目标部署证据。
 
+### 合作方只读 `partner`
+
+| 方法 | 中文名称 | 用途 |
+| --- | --- | --- |
+| `me` | 查看合作方身份 | 读取当前合作方账号与绑定单位。 |
+| `list_purchase_orders` | 查询本供应商采购订单 | 仅返回当前供应商已批准订单及总数。 |
+| `get_purchase_order` | 查看本供应商采购订单 | 核对所属采购单及允许公开的明细字段。 |
+| `list_sales_orders` | 查询本客户销售订单 | 仅返回当前客户已激活订单及总数。 |
+| `get_sales_order` | 查看本客户销售订单 | 核对所属销售单及允许公开的明细字段。 |
+
 ### 登录与会话 `auth`
 
 | 方法 | 中文名称 | 用途 |
 | --- | --- | --- |
+| `partner_login` | 合作方密码登录 | 验证供应商或客户账号，建立可撤销的只读会话；拒绝员工账号。 |
 | `admin_login` | 密码登录 | 校验后台账号与密码并建立登录会话。 |
 | `capabilities` | 查看登录能力 | 查询当前部署启用的登录方式与相关能力。 |
 | `logout` | 退出登录 | 结束当前登录会话。 |
@@ -122,7 +157,7 @@ HTTP 路由：
 
 
 
-用途：管理员密码登录、管理员短信验证码登录、退出和当前登录态查询。当前产品不提供普通协作账号登录或公开自助注册方法。
+用途：员工密码及短信登录、合作方专用密码登录、退出和当前登录态查询。合作方只通过受控绑定账号使用 `partner_login`；不提供公开自助注册，原 `scope=user` 登录路径不恢复。
 
 ### 账号与权限 `admin`
 
@@ -131,6 +166,8 @@ HTTP 路由：
 | `acknowledge_legal_notice` | 确认法律声明 | 记录当前账号对指定声明内容的确认。 |
 | `audit_logs` | 查询系统审计日志 | 按操作者、对象和时间追溯账号、权限与配置变更。 |
 | `change_password` | 修改本人密码 | 校验本人原密码并更新登录密码，不接受指定其他账号。 |
+| `create_partner` | 创建合作方账号 | 由有账号创建权限的员工绑定现有供应商或客户，不分配员工岗位。 |
+| `list_partners` | 查询合作方账号 | 由有账号查看权限的员工查看绑定和状态，复用现有停用、注销及重置密码入口。 |
 | `create` | 创建员工账号 | 创建后台账号并保存姓名、登录资料及允许分配的角色。 |
 | `effective_role_access` | 预览岗位有效权限 | 解释已保存或待保存权限最终允许进入的业务页面。 |
 | `help_chapter` | 查看帮助章节 | 读取当前账号可见的章节与相应补充内容。 |
@@ -909,7 +946,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 - `token_type`
 - `issued_at`
 
-`auth.sms_login` 只接受 `scope=admin`，验证码通过后按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`。普通协作账号登录链路及 `scope=user` 已退出运行时。
+`auth.sms_login` 只接受 `scope=admin`，验证码通过后按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`。原普通用户登录链路及 `scope=user` 已退出运行时；合作方身份只使用受控的 `partner_login` 与只读 `partner` 入口。
 
 岗位任务端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`。对格式合法的手机号，发码接口始终返回相同的“验证码已发送”受理合同；服务端只在账号存在、active 且具备 `mobile.<role>.access` 时实际请求短信发送，账号资格、查询失败或短信供应商失败只进入内部脱敏日志，不能从公开响应判断手机号是否绑定管理员或具备岗位资格。登录后的岗位任务读取还必须通过 active revision effective session 对同一角色的入口动作；短信登录成功不能替代该运行态门禁。
 
@@ -2103,8 +2140,8 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `content_fingerprint` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "content_fingerprint")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:430`。 |
-| `notice_version` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "notice_version")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:429`。 |
+| `content_fingerprint` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "content_fingerprint")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:432`。 |
+| `notice_version` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "notice_version")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:431`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -2127,10 +2164,10 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.acknowledged` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:441`。 |
-| `result.data.acknowledged_at` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:442`。 |
-| `result.data.content_fingerprint` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:440`。 |
-| `result.data.notice_version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:439`。 |
+| `result.data.acknowledged` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:443`。 |
+| `result.data.acknowledged_at` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:444`。 |
+| `result.data.content_fingerprint` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:442`。 |
+| `result.data.notice_version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:441`。 |
 
 以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
 
@@ -2159,17 +2196,17 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `actor_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "actor_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:473`。 |
-| `created_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "created_from")`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:453`。 |
-| `created_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "created_to")`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:457`。 |
-| `event_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "event_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:472`。 |
-| `event_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "event_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:471`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:476`。 |
-| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:479`。 |
-| `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:480`。 |
-| `source` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:470`。 |
-| `target_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "target_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:475`。 |
-| `target_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "target_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:474`。 |
+| `actor_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "actor_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:475`。 |
+| `created_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "created_from")`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:455`。 |
+| `created_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "created_to")`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:459`。 |
+| `event_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "event_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:474`。 |
+| `event_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "event_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:473`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:478`。 |
+| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:481`。 |
+| `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:482`。 |
+| `source` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:472`。 |
+| `target_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "target_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:477`。 |
+| `target_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "target_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:476`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -2198,7 +2235,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.events` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:489`。 |
+| `result.data.events` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:491`。 |
 | `result.data.events[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:503`。 |
 | `result.data.events[].action_label` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:510`。 |
 | `result.data.events[].actor_key` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:512`。 |
@@ -2213,9 +2250,9 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.events[].summary` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:511`。 |
 | `result.data.events[].target_key` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:514`。 |
 | `result.data.events[].target_type` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:513`。 |
-| `result.data.limit` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:491`。 |
-| `result.data.offset` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:492`。 |
-| `result.data.total` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:490`。 |
+| `result.data.limit` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:493`。 |
+| `result.data.offset` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:494`。 |
+| `result.data.total` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:492`。 |
 
 以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
 
@@ -2275,12 +2312,12 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `display_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "display_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:83`。 |
-| `password` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "password")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:86`。 |
-| `phone` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "phone")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:85`。 |
-| `role_keys` | array | 按业务条件 | 解析器 `NormalizeAdminRoleKeys`；调用 `biz.NormalizeAdminRoleKeys(roleKeys)`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:94`。 |
+| `display_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "display_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:85`。 |
+| `password` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "password")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:88`。 |
+| `phone` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "phone")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:87`。 |
+| `role_keys` | array | 按业务条件 | 解析器 `NormalizeAdminRoleKeys`；调用 `biz.NormalizeAdminRoleKeys(roleKeys)`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:96`。 |
 | `role_keys[]` | string | 按业务条件 | 解析器 `NormalizeRoleKey`；调用 `NormalizeRoleKey(raw)`。 依据：`server/internal/biz/rbac.go:701`。 |
-| `username` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "username")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:84`。 |
+| `username` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "username")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:86`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -2304,7 +2341,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:109`。 |
+| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:111`。 |
 | `result.data.admin.account_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:314`。 |
 | `result.data.admin.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:311`。 |
 | `result.data.admin.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:309`。 |
@@ -2346,15 +2383,85 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 样例依据：[TestJsonrpcDispatcher_AdminCreateWithRolesRequiresRoleAssignPermission](../internal/service/jsonrpc_admin_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
+#### 创建合作方账号 `admin.create_partner`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `account_kind` | string | 必填 | 拒绝条件：“!validDisplay &#124;&#124; !validName &#124;&#124; !validPassword &#124;&#124; !validKind”。 依据：`server/internal/service/jsonrpc_partner.go:180`。 |
+| `customer_id` | integer | 条件必填（account_kind=customer） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "customer_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_partner.go:199`。 |
+| `display_name` | string | 必填 | 拒绝条件：“!validDisplay &#124;&#124; !validName &#124;&#124; !validPassword &#124;&#124; !validKind”。 依据：`server/internal/service/jsonrpc_partner.go:177`。 |
+| `password` | string | 必填 | 拒绝条件：“!validDisplay &#124;&#124; !validName &#124;&#124; !validPassword &#124;&#124; !validKind”。 依据：`server/internal/service/jsonrpc_partner.go:179`。 |
+| `supplier_id` | integer | 条件必填（account_kind=supplier） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "supplier_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_partner.go:190`。 |
+| `username` | string | 必填 | 拒绝条件：“!validDisplay &#124;&#124; !validName &#124;&#124; !validPassword &#124;&#124; !validKind”。 依据：`server/internal/service/jsonrpc_partner.go:178`。 |
+
+必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "create_partner",
+  "params": {
+    "account_kind": "supplier",
+    "display_name": "模拟供应商A",
+    "password": "<partner-password>",
+    "supplier_id": 11,
+    "username": "sim_supplier_a"
+  },
+  "id": "rpc-demo-admin.create_partner"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.partner` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:212`。 |
+| `result.data.partner.account_kind` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.customer_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.supplier_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.username` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-admin.create_partner",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "partner": {
+        "account_kind": "supplier",
+        "customer_id": null,
+        "display_name": "模拟供应商A",
+        "id": 31,
+        "supplier_id": 11,
+        "username": "sim_supplier_a"
+      }
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
+
 #### 预览岗位有效权限 `admin.effective_role_access`
 
 ##### 请求参数
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `permission_keys` | array | 条件必填（permission_keys 有值） | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "permission_keys", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:171`。 |
+| `permission_keys` | array | 条件必填（permission_keys 有值） | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "permission_keys", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:173`。 |
 | `permission_keys[]` | string | 条件必填（permission_keys 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_helpers.go:92`。 |
-| `role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:166`。 |
+| `role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:168`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -2380,7 +2487,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.effective_access` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:201`。 |
+| `result.data.effective_access` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:203`。 |
 | `result.data.effective_access.config_hash` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:575`。 |
 | `result.data.effective_access.config_hash_version` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:576`。 |
 | `result.data.effective_access.config_revision` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:574`。 |
@@ -2993,8 +3100,8 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `content_fingerprint` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "content_fingerprint")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:407`。 |
-| `notice_version` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "notice_version")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:406`。 |
+| `content_fingerprint` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "content_fingerprint")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:409`。 |
+| `notice_version` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "notice_version")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:408`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -3017,10 +3124,10 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.acknowledged` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:418`。 |
-| `result.data.acknowledged_at` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:419`。 |
-| `result.data.content_fingerprint` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:417`。 |
-| `result.data.notice_version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:416`。 |
+| `result.data.acknowledged` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:420`。 |
+| `result.data.acknowledged_at` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:421`。 |
+| `result.data.content_fingerprint` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:419`。 |
+| `result.data.notice_version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:418`。 |
 
 以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
 
@@ -3068,7 +3175,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.admins` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:73`。 |
+| `result.data.admins` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:75`。 |
 | `result.data.admins[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:302`。 |
 | `result.data.admins[].account_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:314`。 |
 | `result.data.admins[].display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:311`。 |
@@ -3112,6 +3219,71 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 ```
 
 样例依据：[TestJsonrpcDispatcher_AdminListUsesMinimalAccountProjection](../internal/service/jsonrpc_admin_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
+#### 查询合作方账号 `admin.list_partners`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+
+此方法不读取业务参数；示例使用空对象。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "list_partners",
+  "params": {},
+  "id": "rpc-demo-admin.list_partners"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.partners` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:169`。 |
+| `result.data.partners[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partners[].account_kind` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partners[].customer_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partners[].disabled` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 |
+| `result.data.partners[].display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partners[].id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partners[].status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 |
+| `result.data.partners[].supplier_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partners[].username` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-admin.list_partners",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "partners": [
+        {
+          "account_kind": "supplier",
+          "customer_id": null,
+          "disabled": false,
+          "display_name": "模拟供应商A",
+          "id": 31,
+          "status": "active",
+          "supplier_id": 11,
+          "username": "sim_supplier_a"
+        }
+      ]
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
 
 #### 查看本人账号 `admin.me`
 
@@ -3278,7 +3450,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.menu_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:148`。 |
+| `result.data.menu_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:150`。 |
 | `result.data.menu_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:525`。 |
 | `result.data.menu_options[].key` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:526`。 |
 | `result.data.menu_options[].label` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:527`。 |
@@ -3287,7 +3459,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.menu_options[].required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:530`。 |
 | `result.data.menu_options[].required_any` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
 | `result.data.menu_options[].required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
-| `result.data.menus` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:145`。 |
+| `result.data.menus` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:147`。 |
 | `result.data.menus[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:525`。 |
 | `result.data.menus[].key` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:526`。 |
 | `result.data.menus[].label` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:527`。 |
@@ -3296,7 +3468,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.menus[].required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:530`。 |
 | `result.data.menus[].required_any` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
 | `result.data.menus[].required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
-| `result.data.permission_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:147`。 |
+| `result.data.permission_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:149`。 |
 | `result.data.permission_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:417`。 |
 | `result.data.permission_options[].action` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:424`。 |
 | `result.data.permission_options[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:428`。 |
@@ -3343,7 +3515,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.permission_options[].usage.required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:444`。 |
 | `result.data.permission_options[].usage.required_any` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
 | `result.data.permission_options[].usage.required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
-| `result.data.permissions` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:144`。 |
+| `result.data.permissions` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:146`。 |
 | `result.data.permissions[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:417`。 |
 | `result.data.permissions[].action` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:424`。 |
 | `result.data.permissions[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:428`。 |
@@ -3390,7 +3562,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.permissions[].usage.required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:444`。 |
 | `result.data.permissions[].usage.required_any` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
 | `result.data.permissions[].usage.required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
-| `result.data.role_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:146`。 |
+| `result.data.role_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:148`。 |
 | `result.data.role_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:363`。 |
 | `result.data.role_options[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:378`。 |
 | `result.data.role_options[].assignable_by_current_admin` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 |
@@ -3421,7 +3593,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.role_options[].secondary_menu_paths[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:375`。 |
 | `result.data.role_options[].sort_order` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:370`。 |
 | `result.data.role_options[].version` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:372`。 |
-| `result.data.roles` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:143`。 |
+| `result.data.roles` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:145`。 |
 | `result.data.roles[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:363`。 |
 | `result.data.roles[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:378`。 |
 | `result.data.roles[].assignable_by_current_admin` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 |
@@ -3452,7 +3624,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.roles[].secondary_menu_paths[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:375`。 |
 | `result.data.roles[].sort_order` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:370`。 |
 | `result.data.roles[].version` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:372`。 |
-| `result.data.warehouse_scope_options` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:149`。 |
+| `result.data.warehouse_scope_options` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:151`。 |
 | `result.data.warehouse_scope_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_masterdata_shared.go:152`。 |
 | `result.data.warehouse_scope_options[].code` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_masterdata_shared.go:156`。 |
 | `result.data.warehouse_scope_options[].created_at` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_masterdata_shared.go:160`。 |
@@ -3562,7 +3734,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.menu_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:148`。 |
+| `result.data.menu_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:150`。 |
 | `result.data.menu_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:525`。 |
 | `result.data.menu_options[].key` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:526`。 |
 | `result.data.menu_options[].label` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:527`。 |
@@ -3571,7 +3743,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.menu_options[].required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:530`。 |
 | `result.data.menu_options[].required_any` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
 | `result.data.menu_options[].required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
-| `result.data.menus` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:145`。 |
+| `result.data.menus` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:147`。 |
 | `result.data.menus[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:525`。 |
 | `result.data.menus[].key` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:526`。 |
 | `result.data.menus[].label` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:527`。 |
@@ -3580,7 +3752,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.menus[].required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:530`。 |
 | `result.data.menus[].required_any` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
 | `result.data.menus[].required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:529`。 |
-| `result.data.permission_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:147`。 |
+| `result.data.permission_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:149`。 |
 | `result.data.permission_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:417`。 |
 | `result.data.permission_options[].action` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:424`。 |
 | `result.data.permission_options[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:428`。 |
@@ -3627,7 +3799,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.permission_options[].usage.required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:444`。 |
 | `result.data.permission_options[].usage.required_any` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
 | `result.data.permission_options[].usage.required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
-| `result.data.permissions` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:144`。 |
+| `result.data.permissions` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:146`。 |
 | `result.data.permissions[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:417`。 |
 | `result.data.permissions[].action` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:424`。 |
 | `result.data.permissions[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:428`。 |
@@ -3674,7 +3846,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.permissions[].usage.required_all[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:444`。 |
 | `result.data.permissions[].usage.required_any` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
 | `result.data.permissions[].usage.required_any[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:443`。 |
-| `result.data.role_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:146`。 |
+| `result.data.role_options` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:148`。 |
 | `result.data.role_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:363`。 |
 | `result.data.role_options[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:378`。 |
 | `result.data.role_options[].assignable_by_current_admin` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 |
@@ -3705,7 +3877,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.role_options[].secondary_menu_paths[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:375`。 |
 | `result.data.role_options[].sort_order` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:370`。 |
 | `result.data.role_options[].version` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:372`。 |
-| `result.data.roles` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:143`。 |
+| `result.data.roles` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:145`。 |
 | `result.data.roles[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:363`。 |
 | `result.data.roles[].assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:378`。 |
 | `result.data.roles[].assignable_by_current_admin` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 |
@@ -3736,7 +3908,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.roles[].secondary_menu_paths[]` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:375`。 |
 | `result.data.roles[].sort_order` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:370`。 |
 | `result.data.roles[].version` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:372`。 |
-| `result.data.warehouse_scope_options` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:149`。 |
+| `result.data.warehouse_scope_options` | array &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:151`。 |
 | `result.data.warehouse_scope_options[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_masterdata_shared.go:152`。 |
 | `result.data.warehouse_scope_options[].code` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_masterdata_shared.go:156`。 |
 | `result.data.warehouse_scope_options[].created_at` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_masterdata_shared.go:160`。 |
@@ -3954,8 +4126,8 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:582`。 |
-| `password` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "password")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:586`。 |
+| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:584`。 |
+| `password` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "password")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:588`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -3978,7 +4150,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:601`。 |
+| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:603`。 |
 | `result.data.admin.account_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:314`。 |
 | `result.data.admin.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:311`。 |
 | `result.data.admin.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:309`。 |
@@ -4026,7 +4198,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:566`。 |
+| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:568`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -4048,7 +4220,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.temporary_password` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:574`。 |
+| `result.data.temporary_password` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:576`。 |
 
 以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
 
@@ -4074,8 +4246,8 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:530`。 |
-| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:534`。 |
+| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:532`。 |
+| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:536`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -4098,7 +4270,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:541`。 |
+| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:543`。 |
 | `result.data.admin.account_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:314`。 |
 | `result.data.admin.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:311`。 |
 | `result.data.admin.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:309`。 |
@@ -4111,7 +4283,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.data.admin.roles[].role_key` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:331`。 |
 | `result.data.admin.status_reason` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:315`。 |
 | `result.data.admin.username` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:310`。 |
-| `result.data.released_task_count` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:542`。 |
+| `result.data.released_task_count` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:544`。 |
 
 以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
 
@@ -4148,9 +4320,9 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `disabled` | boolean | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:507`。 |
-| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:503`。 |
-| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:511`。 |
+| `disabled` | boolean | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:509`。 |
+| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:505`。 |
+| `reason` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "reason")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:513`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -4174,7 +4346,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:519`。 |
+| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:521`。 |
 | `result.data.admin.account_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:314`。 |
 | `result.data.admin.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:311`。 |
 | `result.data.admin.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:309`。 |
@@ -4222,10 +4394,10 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `accent` | string | 条件必填（accent 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:384`。 |
-| `density` | string | 条件必填（density 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:384`。 |
-| `tableLines` | string | 条件必填（tableLines 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:384`。 |
-| `theme_mode` | string | 条件必填（theme_mode 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:384`。 |
+| `accent` | string | 条件必填（accent 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:386`。 |
+| `density` | string | 条件必填（density 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:386`。 |
+| `tableLines` | string | 条件必填（tableLines 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:386`。 |
+| `theme_mode` | string | 条件必填（theme_mode 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:386`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -4247,7 +4419,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.erp_preferences` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:397`。 |
+| `result.data.erp_preferences` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:399`。 |
 | `result.data.erp_preferences.appearance` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:258`。 |
 | `result.data.erp_preferences.appearance.accent` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:260`。 |
 | `result.data.erp_preferences.appearance.density` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:261`。 |
@@ -4297,10 +4469,10 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `hidden_columns` | array | 可选 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "hidden_columns", false)`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:358`。 |
+| `hidden_columns` | array | 可选 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "hidden_columns", false)`。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:360`。 |
 | `hidden_columns[]` | string | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_helpers.go:92`。 |
-| `module_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "module_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:353`。 |
-| `order` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "order", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:354`。 |
+| `module_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "module_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:355`。 |
+| `order` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "order", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:356`。 |
 | `order[]` | string | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_helpers.go:92`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
@@ -4333,7 +4505,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.erp_preferences` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:370`。 |
+| `result.data.erp_preferences` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:372`。 |
 | `result.data.erp_preferences.appearance` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:258`。 |
 | `result.data.erp_preferences.appearance.accent` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:260`。 |
 | `result.data.erp_preferences.appearance.density` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:261`。 |
@@ -4383,9 +4555,9 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `display_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "display_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:337`。 |
-| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:333`。 |
-| `phone` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "phone")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:337`。 |
+| `display_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "display_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:339`。 |
+| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:335`。 |
+| `phone` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "phone")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:339`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
 
@@ -4407,7 +4579,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:345`。 |
+| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:347`。 |
 | `result.data.admin.account_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:314`。 |
 | `result.data.admin.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:311`。 |
 | `result.data.admin.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:309`。 |
@@ -4455,20 +4627,20 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `data_scopes` | array | 必填 | 解析器 `getStrictRoleDataScopes`；调用 `getStrictRoleDataScopes(pm, "data_scopes")`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:252`。 |
-| `data_scopes[]` | object | 必填 | 拒绝条件：“!ok &#124;&#124; len(item) < 2 &#124;&#124; len(item) > 3”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:734`。 |
-| `data_scopes[].mode` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(item, "mode")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:759`。 |
-| `data_scopes[].resource_ids` | array | 条件必填（data_scopes[].resource_ids 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:745`。 |
-| `data_scopes[].resource_ids[]` | integer | 条件必填（data_scopes[].resource_ids 有值） | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(value)`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:750`。 |
-| `data_scopes[].resource_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(item, "resource_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:758`。 |
-| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:264`。 |
-| `navigation_mode` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "navigation_mode")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:270`。 |
-| `permission_keys` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "permission_keys", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:248`。 |
+| `data_scopes` | array | 必填 | 解析器 `getStrictRoleDataScopes`；调用 `getStrictRoleDataScopes(pm, "data_scopes")`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:254`。 |
+| `data_scopes[]` | object | 必填 | 拒绝条件：“!ok &#124;&#124; len(item) < 2 &#124;&#124; len(item) > 3”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:736`。 |
+| `data_scopes[].mode` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(item, "mode")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:761`。 |
+| `data_scopes[].resource_ids` | array | 条件必填（data_scopes[].resource_ids 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:747`。 |
+| `data_scopes[].resource_ids[]` | integer | 条件必填（data_scopes[].resource_ids 有值） | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(value)`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:752`。 |
+| `data_scopes[].resource_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(item, "resource_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:760`。 |
+| `expected_version` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:266`。 |
+| `navigation_mode` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "navigation_mode")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:272`。 |
+| `permission_keys` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "permission_keys", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:250`。 |
 | `permission_keys[]` | string | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_helpers.go:92`。 |
-| `primary_menu_paths` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "primary_menu_paths", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:256`。 |
+| `primary_menu_paths` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "primary_menu_paths", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:258`。 |
 | `primary_menu_paths[]` | string | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_helpers.go:92`。 |
-| `role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:268`。 |
-| `secondary_menu_paths` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "secondary_menu_paths", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:260`。 |
+| `role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:270`。 |
+| `secondary_menu_paths` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "secondary_menu_paths", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:262`。 |
 | `secondary_menu_paths[]` | string | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_helpers.go:92`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
@@ -4505,7 +4677,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.role` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:322`。 |
+| `result.data.role` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:324`。 |
 | `result.data.role.assignable` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:378`。 |
 | `result.data.role.builtin` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:368`。 |
 | `result.data.role.data_scopes` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:376`。 |
@@ -4582,8 +4754,8 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:212`。 |
-| `role_keys` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "role_keys", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:216`。 |
+| `id` | integer | 必填 | 解析器 `strictJSONRPCPositiveInt`；调用 `strictJSONRPCPositiveInt(pm["id"])`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validID”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:214`。 |
+| `role_keys` | array | 必填 | 解析器 `getStrictStringSlice`；调用 `getStrictStringSlice(pm, "role_keys", true)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:218`。 |
 | `role_keys[]` | string | 必填 | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_dispatch_helpers.go:92`。 |
 
 必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
@@ -4609,7 +4781,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:228`。 |
+| `result.data.admin` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_admin.go:230`。 |
 | `result.data.admin.account_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:314`。 |
 | `result.data.admin.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:311`。 |
 | `result.data.admin.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_permissions.go:309`。 |
@@ -5504,6 +5676,75 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
       "updated_at": 1792394181,
       "user_id": 1,
       "username": "admin"
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
+
+#### 合作方密码登录 `auth.partner_login`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `password` | string | 必填 | 拒绝条件：“!validName &#124;&#124; !validPassword &#124;&#124; username == "" &#124;&#124; password == ""”。 依据：`server/internal/service/jsonrpc_dispatch_auth.go:146`。 |
+| `username` | string | 必填 | 拒绝条件：“!validName &#124;&#124; !validPassword &#124;&#124; username == "" &#124;&#124; password == ""”。 依据：`server/internal/service/jsonrpc_dispatch_auth.go:145`。 |
+
+必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "partner_login",
+  "params": {
+    "password": "<partner-password>",
+    "username": "sim_supplier_a"
+  },
+  "id": "rpc-demo-auth.partner_login"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.access_token` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_auth.go:154`。 |
+| `result.data.expires_at` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_auth.go:154`。 |
+| `result.data.partner` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_auth.go:154`。 |
+| `result.data.partner.account_kind` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.customer_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.supplier_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.username` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.token_type` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch_auth.go:154`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-auth.partner_login",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "access_token": "<partner-session-token>",
+      "expires_at": 1792400400,
+      "partner": {
+        "account_kind": "supplier",
+        "customer_id": null,
+        "display_name": "模拟供应商A",
+        "id": 31,
+        "supplier_id": 11,
+        "username": "sim_supplier_a"
+      },
+      "token_type": "Bearer"
     }
   }
 }
@@ -39733,6 +39974,386 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 样例依据：[TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions](../internal/service/jsonrpc_outsourcing_order_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
+#### 查看本供应商采购订单 `partner.get_purchase_order`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid &#124;&#124; !jsonRPCParamsAllowed(pm, "id")”。 依据：`server/internal/service/jsonrpc_partner.go:48`。 |
+
+必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_purchase_order",
+  "params": {
+    "id": 41
+  },
+  "id": "rpc-demo-partner.get_purchase_order"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.items` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:60`。 |
+| `result.data.items[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].amount` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].color` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].expected_arrival_date` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].line_no` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].material_code` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].material_name` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].quantity` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].unit_id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.items[].unit_price` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:58`。 |
+| `result.data.purchase_order` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:60`。 |
+| `result.data.purchase_order.currency` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_order.expected_arrival_date` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_order.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_order.lifecycle_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_order.order_no` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_order.purchase_date` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_order.supplier_purchase_order_no` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-partner.get_purchase_order",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "items": [
+        {
+          "amount": "3.75",
+          "color": null,
+          "expected_arrival_date": null,
+          "id": 61,
+          "line_no": 1,
+          "material_code": "SIM-MAT",
+          "material_name": "模拟面料",
+          "quantity": "3",
+          "unit_id": 21,
+          "unit_price": "1.25"
+        }
+      ],
+      "purchase_order": {
+        "currency": "CNY",
+        "expected_arrival_date": null,
+        "id": 41,
+        "lifecycle_status": "approved",
+        "order_no": "SIM-PO-A",
+        "purchase_date": 1792396800,
+        "supplier_purchase_order_no": null
+      }
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
+
+#### 查看本客户销售订单 `partner.get_sales_order`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid &#124;&#124; !jsonRPCParamsAllowed(pm, "id")”。 依据：`server/internal/service/jsonrpc_partner.go:82`。 |
+
+必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_sales_order",
+  "params": {
+    "id": 51
+  },
+  "id": "rpc-demo-partner.get_sales_order"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.items` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:94`。 |
+| `result.data.items[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].amount` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].color` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].customer_product_no` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].line_no` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].planned_delivery_date` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].product_name` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].quantity` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].requested_product_name` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].unit_id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.items[].unit_price` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:92`。 |
+| `result.data.sales_order` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:94`。 |
+| `result.data.sales_order.currency` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_order.customer_order_no` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_order.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_order.lifecycle_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_order.order_date` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_order.order_no` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-partner.get_sales_order",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "items": [
+        {
+          "amount": "3.75",
+          "color": null,
+          "customer_product_no": null,
+          "id": 71,
+          "line_no": 1,
+          "planned_delivery_date": null,
+          "product_name": null,
+          "quantity": "3",
+          "requested_product_name": "模拟毛绒兔",
+          "unit_id": 21,
+          "unit_price": "1.25"
+        }
+      ],
+      "sales_order": {
+        "currency": "CNY",
+        "customer_order_no": null,
+        "id": 51,
+        "lifecycle_status": "active",
+        "order_date": 1792396800,
+        "order_no": "SIM-SO-A",
+        "planned_delivery_date": null
+      }
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
+
+#### 查询本供应商采购订单 `partner.list_purchase_orders`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `keyword` | string | 条件必填（keyword 有值） | 拒绝条件：“!valid &#124;&#124; len(f.Keyword) > 255”。 依据：`server/internal/service/jsonrpc_partner.go:113`。 |
+| `limit` | integer | 条件必填（limit 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "limit")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid &#124;&#124; f.Limit > 100”。 依据：`server/internal/service/jsonrpc_partner.go:121`。 |
+| `offset` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(pm, "offset")`。 依据：`server/internal/service/jsonrpc_partner.go:128`。 |
+
+必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "list_purchase_orders",
+  "params": {
+    "limit": 20,
+    "offset": 0
+  },
+  "id": "rpc-demo-partner.list_purchase_orders"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.purchase_orders` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:43`。 |
+| `result.data.purchase_orders[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_orders[].currency` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_orders[].expected_arrival_date` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_orders[].id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_orders[].lifecycle_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_orders[].order_no` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_orders[].purchase_date` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.purchase_orders[].supplier_purchase_order_no` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:140`。 |
+| `result.data.total` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:43`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-partner.list_purchase_orders",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "purchase_orders": [
+        {
+          "currency": "CNY",
+          "expected_arrival_date": null,
+          "id": 41,
+          "lifecycle_status": "approved",
+          "order_no": "SIM-PO-A",
+          "purchase_date": 1792396800,
+          "supplier_purchase_order_no": null
+        }
+      ],
+      "total": 1
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
+
+#### 查询本客户销售订单 `partner.list_sales_orders`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `keyword` | string | 条件必填（keyword 有值） | 拒绝条件：“!valid &#124;&#124; len(f.Keyword) > 255”。 依据：`server/internal/service/jsonrpc_partner.go:113`。 |
+| `limit` | integer | 条件必填（limit 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "limit")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid &#124;&#124; f.Limit > 100”。 依据：`server/internal/service/jsonrpc_partner.go:121`。 |
+| `offset` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(pm, "offset")`。 依据：`server/internal/service/jsonrpc_partner.go:128`。 |
+
+必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "list_sales_orders",
+  "params": {
+    "limit": 20,
+    "offset": 0
+  },
+  "id": "rpc-demo-partner.list_sales_orders"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.sales_orders` | array | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:77`。 |
+| `result.data.sales_orders[]` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_orders[].currency` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_orders[].customer_order_no` | string &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_orders[].id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_orders[].lifecycle_status` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_orders[].order_date` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_orders[].order_no` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.sales_orders[].planned_delivery_date` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:143`。 |
+| `result.data.total` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:77`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-partner.list_sales_orders",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "sales_orders": [
+        {
+          "currency": "CNY",
+          "customer_order_no": null,
+          "id": 51,
+          "lifecycle_status": "active",
+          "order_date": 1792396800,
+          "order_no": "SIM-SO-A",
+          "planned_delivery_date": null
+        }
+      ],
+      "total": 1
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
+
+#### 查看合作方身份 `partner.me`
+
+##### 请求参数
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+
+此方法不读取业务参数；示例使用空对象。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "me",
+  "params": {},
+  "id": "rpc-demo-partner.me"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
+| `result.data.partner` | object | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:26`。 |
+| `result.data.partner.account_kind` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.customer_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.display_name` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.id` | integer | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.supplier_id` | integer &#124; null | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+| `result.data.partner.username` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_partner.go:137`。 |
+
+以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-partner.me",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "partner": {
+        "account_kind": "supplier",
+        "customer_id": null,
+        "display_name": "模拟供应商A",
+        "id": 31,
+        "supplier_id": 11,
+        "username": "sim_supplier_a"
+      }
+    }
+  }
+}
+```
+
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
+
 #### 办理在制生产动作 `production_wip.execute_production_wip_action`
 
 ##### 请求参数
@@ -47989,7 +48610,7 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.pong` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:315`。 |
+| `result.data.pong` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:321`。 |
 
 以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
 
@@ -48034,11 +48655,11 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 | `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |
 | `result.message` | string | 业务结果提示。 |
 | `result.data` | object / null | 当前方法的业务返回内容；统一封装允许空 data。 |
-| `result.data.formal` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:324`。 |
-| `result.data.git_sha` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:322`。 |
-| `result.data.git_sha_short` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:323`。 |
-| `result.data.release_version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:321`。 |
-| `result.data.version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:320`。 |
+| `result.data.formal` | boolean | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:330`。 |
+| `result.data.git_sha` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:328`。 |
+| `result.data.git_sha_short` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:329`。 |
+| `result.data.release_version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:327`。 |
+| `result.data.version` | string | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。 依据：`server/internal/service/jsonrpc_dispatch.go:326`。 |
 
 以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。
 

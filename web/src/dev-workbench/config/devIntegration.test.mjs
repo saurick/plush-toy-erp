@@ -86,7 +86,8 @@ test('integration selection respects Markdown fences and chapter boundaries and 
 
 test('integration scenarios derive unique real methods and tests from the formal table', () => {
   const rows = readIntegrationScenarios(api)
-  assert.equal(rows.length, 6)
+  assert.equal(rows.length, 7)
+  assert(rows.some((row) => row.test === 'TestSourceDocumentPostgresIntegrationPartnerReadIsolation' && row.methods.includes('partner.get_sales_order') && row.methods.includes('partner.get_purchase_order')))
   for (const row of rows) {
     assert(row.methods.length > 0 || row.label === 'HTTP 准入')
     for (const key of row.methods) {
@@ -449,7 +450,8 @@ test('call details reject incorrect examples and ignore fenced headings and remo
 
 test('integration access and future examples reuse formal sources without invented actual adapters', () => {
   const boundary = readIntegrationBoundary(api)
-  assert.match(boundary, /外部系统、供应商或客户协作身份尚未开放/u)
+  assert.match(boundary, /员工业务接口与合作方订单只读入口分别鉴权/u)
+  assert.match(boundary, /没有合作方业务写入、外部小系统或真实第三方联调/u)
   assert.doesNotMatch(boundary, /Swagger/u)
   assert.equal(readIntegrationBoundary('# 缺失'), '')
   const specification = readFileSync(

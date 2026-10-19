@@ -9,6 +9,12 @@ import (
 )
 
 func loadAdminRBAC(ctx context.Context, db *sql.DB, admin *biz.AdminUser) error {
+	if admin != nil && !admin.IsEmployee() {
+		admin.Roles = nil
+		admin.Permissions = nil
+		return nil
+	}
+
 	if db == nil || admin == nil {
 		return nil
 	}

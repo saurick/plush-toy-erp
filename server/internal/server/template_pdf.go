@@ -483,7 +483,7 @@ func registerTemplatePDFHandler(
 		span := oteltrace.SpanFromContext(ctx)
 
 		admin, adminOK := biz.GetCurrentAdminFromContext(ctx)
-		if !adminOK || admin == nil || !admin.IsActive() {
+		if !adminOK || admin == nil || !admin.IsEmployee() || !admin.IsActive() {
 			span.SetStatus(codes.Error, "admin required")
 			l.Warnw(
 				"msg", "template pdf render denied",
@@ -821,7 +821,7 @@ func authorizeTemplatePDFRequest(
 	customerKey string,
 	templateKey string,
 ) error {
-	if guard == nil || !biz.AdminHasPermission(admin, biz.PermissionERPPrintTemplateRead) {
+	if admin == nil || !admin.IsEmployee() || guard == nil || !biz.AdminHasPermission(admin, biz.PermissionERPPrintTemplateRead) {
 		return biz.ErrForbidden
 	}
 	session, err := guard.GetEffectiveSessionRequiringActiveRevision(ctx, customerKey, admin)

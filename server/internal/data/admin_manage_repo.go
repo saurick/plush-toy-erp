@@ -12,12 +12,14 @@ import (
 	"server/internal/data/model/ent/adminsession"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/adminuserrole"
+	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/runtimeauditevent"
+	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/warehouse"
 	"server/internal/data/model/ent/workflowtask"
 	pkglogger "server/pkg/logger"
@@ -70,6 +72,8 @@ func mapEntAdminUser(a *ent.AdminUser) *biz.AdminUser {
 		return nil
 	}
 	return &biz.AdminUser{
+		AccountKind: biz.AccountKind(a.AccountKind),
+		SupplierID:  a.SupplierID, CustomerID: a.CustomerID,
 		ID:              a.ID,
 		Username:        a.Username,
 		DisplayName:     stringValue(a.DisplayName),
@@ -134,7 +138,7 @@ func (r *adminManageRepo) GetAdminByPhone(ctx context.Context, phone string) (*b
 }
 
 func (r *adminManageRepo) ListAdmins(ctx context.Context) ([]*biz.AdminUser, error) {
-	rows, err := r.data.postgres.AdminUser.Query().Order(ent.Desc(adminuser.FieldID)).All(ctx)
+	rows, err := r.data.postgres.AdminUser.Query().Where(adminuser.AccountKindEQ(int(biz.AccountKindEmployee))).Order(ent.Desc(adminuser.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +164,9 @@ func (r *adminManageRepo) CreateAdminWithAudit(ctx context.Context, command *biz
 	if username == "" || displayName == "" || strings.TrimSpace(in.PasswordHash) == "" {
 		return nil, biz.ErrBadParam
 	}
+	if !in.Binding.Valid() || (in.Binding.Kind != biz.AccountKindEmployee && (len(in.RoleKeys) != 0 || phone != "")) {
+		return nil, biz.ErrBadParam
+	}
 	roleKeys := biz.NormalizeAdminRoleKeys(in.RoleKeys)
 
 	tx, err := r.data.postgres.Tx(ctx)
@@ -180,7 +187,26 @@ func (r *adminManageRepo) CreateAdminWithAudit(ctx context.Context, command *biz
 		return nil, err
 	}
 
+	if in.Binding.Kind == biz.AccountKindSupplier {
+		ok, e := tx.Supplier.Query().Where(supplier.ID(*in.Binding.SupplierID), supplier.IsActive(true)).Exist(ctx)
+		if e != nil {
+			return nil, e
+		}
+		if !ok {
+			return nil, biz.ErrBadParam
+		}
+	}
+	if in.Binding.Kind == biz.AccountKindCustomer {
+		ok, e := tx.Customer.Query().Where(customer.ID(*in.Binding.CustomerID), customer.IsActive(true)).Exist(ctx)
+		if e != nil {
+			return nil, e
+		}
+		if !ok {
+			return nil, biz.ErrBadParam
+		}
+	}
 	row, err := tx.AdminUser.Create().
+		SetAccountKind(int(in.Binding.Kind)).SetNillableSupplierID(in.Binding.SupplierID).SetNillableCustomerID(in.Binding.CustomerID).
 		SetUsername(username).
 		SetDisplayName(displayName).
 		SetNillablePhone(stringPtrOrNil(phone)).
@@ -239,7 +265,7 @@ func (r *adminManageRepo) SetAdminRolesWithAudit(ctx context.Context, change *bi
 	if operator.ID == before.ID {
 		return nil, biz.ErrAdminSelfRoleChangeForbidden
 	}
-	if before.IsSuperAdmin {
+	if !before.IsEmployee() || before.IsSuperAdmin {
 		return nil, biz.ErrNoPermission
 	}
 	if err := biz.ValidateAdminControlTarget(operator, before); err != nil {
@@ -731,7 +757,7 @@ func (r *adminManageRepo) loadOperatorForUpdate(ctx context.Context, tx *ent.Tx,
 	if err != nil {
 		return nil, err
 	}
-	if !operator.IsActive() {
+	if !operator.IsEmployee() || !operator.IsActive() {
 		return nil, biz.ErrUserDisabled
 	}
 	return operator, nil
@@ -760,7 +786,7 @@ func (r *adminManageRepo) loadAdminPairForUpdate(
 		return nil, nil, biz.ErrAdminNotFound
 	}
 	operator := mapEntAdminUser(operatorRow)
-	if !operator.IsActive() {
+	if !operator.IsEmployee() || !operator.IsActive() {
 		return nil, nil, biz.ErrUserDisabled
 	}
 	target, err := r.loadAdminSnapshotFromRowInTx(ctx, tx, targetRow)

@@ -138,6 +138,20 @@ func (d *jsonrpcDispatcher) handleAuth(
 				"issued_at":    time.Now().Unix(),
 			})),
 		}, nil
+	case "partner_login":
+		if !jsonRPCParamsAllowed(pm, "username", "password") {
+			return id, invalidParamResult(), nil
+		}
+		username, validName := pm["username"].(string)
+		password, validPassword := pm["password"].(string)
+		if !validName || !validPassword || username == "" || password == "" {
+			return id, invalidParamResult(), nil
+		}
+		token, expireAt, account, err := d.adminAuthUC.LoginPartner(ctx, username, password)
+		if err != nil {
+			return id, d.mapAdminPasswordLoginError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"access_token": token, "expires_at": expireAt.Unix(), "token_type": "Bearer", "partner": partnerAccountToMap(account)})}, nil
 
 	case "logout":
 		claims, _ := biz.GetClaimsFromContext(ctx)

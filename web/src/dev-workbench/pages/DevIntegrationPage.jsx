@@ -384,7 +384,7 @@ export default function DevIntegrationPage() {
             </button>
           ))}
         </SlidingTabList>
-        <p className="erp-dev-integration__note">当前内部接口 · 外部接入未开放</p>
+        <p className="erp-dev-integration__note">接入身份与范围见正式合同</p>
       </header>
       <main className="erp-dev-integration__main">
         <div
@@ -522,7 +522,7 @@ export default function DevIntegrationPage() {
                         <Tag>业务接口</Tag>
                       </div>
                       <div className="erp-dev-integration__access-summary">
-                        <span>内部直接调用 · 未关联实际适配器</span>
+                        <span>按正式合同鉴权 · 未关联实际适配器</span>
                         <Button type="link" onClick={() => updateQuery({ detail: 'governance', section: 'access' })}>
                           查看接入关系
                         </Button>

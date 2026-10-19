@@ -21,6 +21,7 @@ import (
 
 // jsonrpcDispatcher 负责 JSON-RPC URL/method 分发、鉴权和错误映射；真实业务动作仍由 biz usecase 承接。
 type jsonrpcDispatcher struct {
+	partnerUC     *biz.PartnerReadUsecase
 	log           *log.Helper
 	helpContentUC *biz.HelpContentUsecase
 
@@ -234,6 +235,9 @@ func (d *jsonrpcDispatcher) Handle(
 		jsonrpc = "2.0"
 	}
 	ctx = withAdminPermissionCache(ctx)
+	if claims, ok := biz.GetClaimsFromContext(ctx); ok && claims.Role == biz.RolePartner && url != "partner" && (url != "auth" || method != "logout") && (url != "system" || (method != "ping" && method != "version")) {
+		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+	}
 	d.log.WithContext(ctx).Debugf(
 		"[jsonrpc] handle url=%s jsonrpc=%s method=%s id=%s",
 		url, jsonrpc, method, id,
@@ -254,6 +258,8 @@ func (d *jsonrpcDispatcher) Handle(
 			return d.handleSystem(ctx, id, method, params)
 		case "auth":
 			return d.handleAuth(ctx, method, id, params)
+		case "partner":
+			return d.handlePartner(ctx, method, id, params)
 		case "admin":
 			return d.handleAdmin(ctx, method, id, params)
 		case "workflow":

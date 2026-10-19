@@ -30,6 +30,8 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		return id, res, nil
 	}
 	switch method {
+	case "create_partner", "list_partners":
+		return d.handlePartnerAccountAdmin(ctx, method, id, pm)
 	case "help_content", "help_chapter", "help_supplement_save", "help_supplement_publish", "help_supplement_restore", "help_feedback_create", "help_feedback_respond":
 		return id, d.helpContentResult(ctx, method, pm), nil
 	case "project_manuals":

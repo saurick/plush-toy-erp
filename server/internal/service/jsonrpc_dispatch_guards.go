@@ -46,6 +46,9 @@ func (d *jsonrpcDispatcher) requireAdmin(ctx context.Context) (*biz.AuthClaims, 
 			return nil, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 		}
 	}
+	if !admin.IsEmployee() {
+		return nil, &v1.JsonrpcResult{Code: errcode.AdminRequired.Code, Message: errcode.AdminRequired.Message}
+	}
 	if !admin.IsActive() {
 		return nil, &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}
 	}
@@ -85,7 +88,7 @@ func (d *jsonrpcDispatcher) isPublic(url, method string) bool {
 	if url == "system" && (method == "ping" || method == "version") {
 		return true
 	}
-	if url == "auth" && (method == "capabilities" || method == "admin_login" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
+	if url == "auth" && (method == "capabilities" || method == "admin_login" || method == "partner_login" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
 		return true
 	}
 	return false

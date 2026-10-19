@@ -6,8 +6,9 @@ import "context"
 type Role int8
 
 const (
-	RoleUser  Role = 0
-	RoleAdmin Role = 1
+	RoleUser    Role = 0
+	RoleAdmin   Role = 1
+	RolePartner Role = 2
 )
 
 type AuthClaims struct {
@@ -31,8 +32,9 @@ func GetClaimsFromContext(ctx context.Context) (*AuthClaims, bool) {
 	return c, ok
 }
 
-// WithCurrentAdmin stores the administrator identity that has already passed
-// the shared token, session, account-state, auth-version, and RBAC checks.
+// WithCurrentAdmin stores the account identity that has already passed
+// token, session, account-state and auth-version checks. Employee and partner
+// authorization remains explicit at each protected entry.
 // HTTP handlers must not construct this value from unverified token claims.
 func WithCurrentAdmin(ctx context.Context, admin *AdminUser) context.Context {
 	return context.WithValue(ctx, ctxKeyCurrentAdmin{}, admin)
@@ -44,7 +46,7 @@ func GetCurrentAdminFromContext(ctx context.Context) (*AdminUser, bool) {
 }
 
 func (c *AuthClaims) IsAdmin() bool {
-	// RoleAdmin is retained for trusted in-process contexts and tests. External requests only
-	// receive claims after AdminAuthUsecase has validated the server-side session.
-	return c != nil && c.UserID > 0 && (c.Role == RoleAdmin || (c.SessionKey != "" && c.AuthVersion > 0))
+	// Authentication resolves the role from the current account. A valid session
+	// alone does not grant employee access.
+	return c != nil && c.UserID > 0 && c.Role == RoleAdmin
 }

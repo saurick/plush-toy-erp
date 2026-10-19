@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // ID filters vertices based on their ID field.
@@ -52,6 +53,21 @@ func IDLT(id int) predicate.AdminUser {
 // IDLTE applies the LTE predicate on the ID field.
 func IDLTE(id int) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldLTE(FieldID, id))
+}
+
+// AccountKind applies equality check predicate on the "account_kind" field. It's identical to AccountKindEQ.
+func AccountKind(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldAccountKind, v))
+}
+
+// SupplierID applies equality check predicate on the "supplier_id" field. It's identical to SupplierIDEQ.
+func SupplierID(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldSupplierID, v))
+}
+
+// CustomerID applies equality check predicate on the "customer_id" field. It's identical to CustomerIDEQ.
+func CustomerID(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldCustomerID, v))
 }
 
 // Username applies equality check predicate on the "username" field. It's identical to UsernameEQ.
@@ -127,6 +143,106 @@ func CreatedAt(v time.Time) predicate.AdminUser {
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldUpdatedAt, v))
+}
+
+// AccountKindEQ applies the EQ predicate on the "account_kind" field.
+func AccountKindEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldAccountKind, v))
+}
+
+// AccountKindNEQ applies the NEQ predicate on the "account_kind" field.
+func AccountKindNEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldAccountKind, v))
+}
+
+// AccountKindIn applies the In predicate on the "account_kind" field.
+func AccountKindIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldAccountKind, vs...))
+}
+
+// AccountKindNotIn applies the NotIn predicate on the "account_kind" field.
+func AccountKindNotIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldAccountKind, vs...))
+}
+
+// AccountKindGT applies the GT predicate on the "account_kind" field.
+func AccountKindGT(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldAccountKind, v))
+}
+
+// AccountKindGTE applies the GTE predicate on the "account_kind" field.
+func AccountKindGTE(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldAccountKind, v))
+}
+
+// AccountKindLT applies the LT predicate on the "account_kind" field.
+func AccountKindLT(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldAccountKind, v))
+}
+
+// AccountKindLTE applies the LTE predicate on the "account_kind" field.
+func AccountKindLTE(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldAccountKind, v))
+}
+
+// SupplierIDEQ applies the EQ predicate on the "supplier_id" field.
+func SupplierIDEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldSupplierID, v))
+}
+
+// SupplierIDNEQ applies the NEQ predicate on the "supplier_id" field.
+func SupplierIDNEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldSupplierID, v))
+}
+
+// SupplierIDIn applies the In predicate on the "supplier_id" field.
+func SupplierIDIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldSupplierID, vs...))
+}
+
+// SupplierIDNotIn applies the NotIn predicate on the "supplier_id" field.
+func SupplierIDNotIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldSupplierID, vs...))
+}
+
+// SupplierIDIsNil applies the IsNil predicate on the "supplier_id" field.
+func SupplierIDIsNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIsNull(FieldSupplierID))
+}
+
+// SupplierIDNotNil applies the NotNil predicate on the "supplier_id" field.
+func SupplierIDNotNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotNull(FieldSupplierID))
+}
+
+// CustomerIDEQ applies the EQ predicate on the "customer_id" field.
+func CustomerIDEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldCustomerID, v))
+}
+
+// CustomerIDNEQ applies the NEQ predicate on the "customer_id" field.
+func CustomerIDNEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldCustomerID, v))
+}
+
+// CustomerIDIn applies the In predicate on the "customer_id" field.
+func CustomerIDIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldCustomerID, vs...))
+}
+
+// CustomerIDNotIn applies the NotIn predicate on the "customer_id" field.
+func CustomerIDNotIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldCustomerID, vs...))
+}
+
+// CustomerIDIsNil applies the IsNil predicate on the "customer_id" field.
+func CustomerIDIsNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIsNull(FieldCustomerID))
+}
+
+// CustomerIDNotNil applies the NotNil predicate on the "customer_id" field.
+func CustomerIDNotNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotNull(FieldCustomerID))
 }
 
 // UsernameEQ applies the EQ predicate on the "username" field.
@@ -887,6 +1003,52 @@ func UpdatedAtLT(v time.Time) predicate.AdminUser {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasSupplier applies the HasEdge predicate on the "supplier" edge.
+func HasSupplier() predicate.AdminUser {
+	return predicate.AdminUser(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, SupplierTable, SupplierColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSupplierWith applies the HasEdge predicate on the "supplier" edge with a given conditions (other predicates).
+func HasSupplierWith(preds ...predicate.Supplier) predicate.AdminUser {
+	return predicate.AdminUser(func(s *sql.Selector) {
+		step := newSupplierStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasCustomer applies the HasEdge predicate on the "customer" edge.
+func HasCustomer() predicate.AdminUser {
+	return predicate.AdminUser(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, CustomerTable, CustomerColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasCustomerWith applies the HasEdge predicate on the "customer" edge with a given conditions (other predicates).
+func HasCustomerWith(preds ...predicate.Customer) predicate.AdminUser {
+	return predicate.AdminUser(func(s *sql.Selector) {
+		step := newCustomerStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

@@ -50,6 +50,7 @@ type AdminRoleAccess struct {
 }
 
 type AdminCreate struct {
+	Binding      PartnerBinding
 	Username     string
 	DisplayName  string
 	Phone        string
@@ -225,6 +226,9 @@ func (uc *AdminManageUsecase) requireActiveAdmin(ctx context.Context) (*AdminUse
 	if err != nil {
 		return nil, err
 	}
+	if !admin.IsEmployee() {
+		return nil, ErrNoPermission
+	}
 	if !admin.IsActive() {
 		return nil, ErrUserDisabled
 	}
@@ -305,11 +309,12 @@ func AdminAuditUserSnapshot(admin *AdminUser) map[string]any {
 		return nil
 	}
 	return map[string]any{
-		"id":             admin.ID,
-		"username":       admin.Username,
-		"display_name":   admin.DisplayName,
-		"phone":          maskAdminAuditPhone(admin.Phone),
-		"role_keys":      AdminRoleKeys(admin),
+		"id":           admin.ID,
+		"username":     admin.Username,
+		"display_name": admin.DisplayName,
+		"phone":        maskAdminAuditPhone(admin.Phone),
+		"role_keys":    AdminRoleKeys(admin),
+		"account_kind": admin.AccountKind.String(), "supplier_id": admin.SupplierID, "customer_id": admin.CustomerID,
 		"disabled":       admin.Disabled,
 		"account_status": string(admin.AccountStatus()),
 		"status_reason":  admin.StatusReason,
@@ -698,6 +703,17 @@ func (uc *AdminManageUsecase) Create(
 	password string,
 	roleKeys []string,
 ) (created *AdminUser, err error) {
+	return uc.createAccount(ctx, displayName, username, phone, password, roleKeys, PartnerBinding{})
+}
+
+func (uc *AdminManageUsecase) CreatePartner(ctx context.Context, displayName, username, password string, binding PartnerBinding) (*AdminUser, error) {
+	if binding.Kind == AccountKindEmployee || !binding.Valid() {
+		return nil, ErrBadParam
+	}
+	return uc.createAccount(ctx, displayName, username, "", password, nil, binding)
+}
+
+func (uc *AdminManageUsecase) createAccount(ctx context.Context, displayName, username, phone, password string, roleKeys []string, binding PartnerBinding) (created *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.create",
 		trace.WithAttributes(
 			attribute.Int("admin.role_count", len(roleKeys)),
@@ -775,6 +791,7 @@ func (uc *AdminManageUsecase) Create(
 	created, err = uc.repo.CreateAdminWithAudit(ctx, &AdminCreateCommand{
 		OperatorID: operator.ID,
 		Admin: &AdminCreate{
+			Binding:      binding,
 			Username:     username,
 			DisplayName:  displayName,
 			Phone:        normalizedPhone,

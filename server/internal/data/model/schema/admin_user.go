@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
@@ -21,12 +22,16 @@ func (AdminUser) Annotations() []schema.Annotation {
 			"admin_users_revoked_requires_disabled": `"revoked_at" IS NULL OR "disabled" = TRUE`,
 			"admin_users_status_audit_bundle":       `(("status_changed_at" IS NULL AND "status_changed_by" IS NULL AND "status_reason" IS NULL) OR ("status_changed_at" IS NOT NULL AND "status_changed_by" IS NOT NULL))`,
 			"admin_users_revoked_requires_reason":   `"revoked_at" IS NULL OR ("status_reason" IS NOT NULL AND length(trim("status_reason")) BETWEEN 1 AND 255)`,
+			"admin_users_account_binding":           `(("account_kind" = 0 AND "supplier_id" IS NULL AND "customer_id" IS NULL) OR ("account_kind" = 1 AND "supplier_id" IS NOT NULL AND "customer_id" IS NULL AND "is_super_admin" = FALSE) OR ("account_kind" = 2 AND "customer_id" IS NOT NULL AND "supplier_id" IS NULL AND "is_super_admin" = FALSE))`,
 		}},
 	}
 }
 
 func (AdminUser) Fields() []ent.Field {
 	return []ent.Field{
+		field.Int("account_kind").Default(0).Immutable().Comment("账号类别：0 员工、1 供应商、2 客户"),
+		field.Int("supplier_id").Optional().Nillable().Positive().Immutable(),
+		field.Int("customer_id").Optional().Nillable().Positive().Immutable(),
 		field.String("username").
 			NotEmpty().
 			MaxLen(64),
@@ -34,7 +39,7 @@ func (AdminUser) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxRuneLen(64).
-			Comment("员工姓名；业务页面优先展示，存量缺失时回退账号名"),
+			Comment("账号显示名；业务页面优先展示，存量缺失时回退账号名"),
 		field.String("phone").
 			Optional().
 			Nillable().
@@ -83,6 +88,13 @@ func (AdminUser) Fields() []ent.Field {
 		field.Time("updated_at").
 			Default(time.Now).
 			UpdateDefault(time.Now),
+	}
+}
+
+func (AdminUser) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("supplier", Supplier.Type).Field("supplier_id").Unique().Immutable().Annotations(entsql.OnDelete(entsql.Restrict)),
+		edge.To("customer", Customer.Type).Field("customer_id").Unique().Immutable().Annotations(entsql.OnDelete(entsql.Restrict)),
 	}
 }
 

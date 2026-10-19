@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/supplier"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -18,6 +20,48 @@ type AdminUserCreate struct {
 	config
 	mutation *AdminUserMutation
 	hooks    []Hook
+}
+
+// SetAccountKind sets the "account_kind" field.
+func (_c *AdminUserCreate) SetAccountKind(v int) *AdminUserCreate {
+	_c.mutation.SetAccountKind(v)
+	return _c
+}
+
+// SetNillableAccountKind sets the "account_kind" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableAccountKind(v *int) *AdminUserCreate {
+	if v != nil {
+		_c.SetAccountKind(*v)
+	}
+	return _c
+}
+
+// SetSupplierID sets the "supplier_id" field.
+func (_c *AdminUserCreate) SetSupplierID(v int) *AdminUserCreate {
+	_c.mutation.SetSupplierID(v)
+	return _c
+}
+
+// SetNillableSupplierID sets the "supplier_id" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableSupplierID(v *int) *AdminUserCreate {
+	if v != nil {
+		_c.SetSupplierID(*v)
+	}
+	return _c
+}
+
+// SetCustomerID sets the "customer_id" field.
+func (_c *AdminUserCreate) SetCustomerID(v int) *AdminUserCreate {
+	_c.mutation.SetCustomerID(v)
+	return _c
+}
+
+// SetNillableCustomerID sets the "customer_id" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableCustomerID(v *int) *AdminUserCreate {
+	if v != nil {
+		_c.SetCustomerID(*v)
+	}
+	return _c
 }
 
 // SetUsername sets the "username" field.
@@ -214,6 +258,16 @@ func (_c *AdminUserCreate) SetNillableUpdatedAt(v *time.Time) *AdminUserCreate {
 	return _c
 }
 
+// SetSupplier sets the "supplier" edge to the Supplier entity.
+func (_c *AdminUserCreate) SetSupplier(v *Supplier) *AdminUserCreate {
+	return _c.SetSupplierID(v.ID)
+}
+
+// SetCustomer sets the "customer" edge to the Customer entity.
+func (_c *AdminUserCreate) SetCustomer(v *Customer) *AdminUserCreate {
+	return _c.SetCustomerID(v.ID)
+}
+
 // Mutation returns the AdminUserMutation object of the builder.
 func (_c *AdminUserCreate) Mutation() *AdminUserMutation {
 	return _c.mutation
@@ -249,6 +303,10 @@ func (_c *AdminUserCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *AdminUserCreate) defaults() {
+	if _, ok := _c.mutation.AccountKind(); !ok {
+		v := adminuser.DefaultAccountKind
+		_c.mutation.SetAccountKind(v)
+	}
 	if _, ok := _c.mutation.IsSuperAdmin(); !ok {
 		v := adminuser.DefaultIsSuperAdmin
 		_c.mutation.SetIsSuperAdmin(v)
@@ -277,6 +335,19 @@ func (_c *AdminUserCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *AdminUserCreate) check() error {
+	if _, ok := _c.mutation.AccountKind(); !ok {
+		return &ValidationError{Name: "account_kind", err: errors.New(`ent: missing required field "AdminUser.account_kind"`)}
+	}
+	if v, ok := _c.mutation.SupplierID(); ok {
+		if err := adminuser.SupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "AdminUser.supplier_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.CustomerID(); ok {
+		if err := adminuser.CustomerIDValidator(v); err != nil {
+			return &ValidationError{Name: "customer_id", err: fmt.Errorf(`ent: validator failed for field "AdminUser.customer_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Username(); !ok {
 		return &ValidationError{Name: "username", err: errors.New(`ent: missing required field "AdminUser.username"`)}
 	}
@@ -367,6 +438,10 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 		_node = &AdminUser{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(adminuser.Table, sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.AccountKind(); ok {
+		_spec.SetField(adminuser.FieldAccountKind, field.TypeInt, value)
+		_node.AccountKind = value
+	}
 	if value, ok := _c.mutation.Username(); ok {
 		_spec.SetField(adminuser.FieldUsername, field.TypeString, value)
 		_node.Username = value
@@ -426,6 +501,40 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(adminuser.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.SupplierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   adminuser.SupplierTable,
+			Columns: []string{adminuser.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SupplierID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.CustomerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   adminuser.CustomerTable,
+			Columns: []string{adminuser.CustomerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(customer.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.CustomerID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

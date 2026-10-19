@@ -698,6 +698,17 @@ func TestAuthorizeTemplatePDFRequestDoesNotTrustClaimsWithoutCurrentAdmin(t *tes
 	}
 }
 
+func TestAuthorizeTemplatePDFRequestRejectsPartnerWithEmployeePermission(t *testing.T) {
+	guard := &stubTemplatePDFModuleGuard{session: &biz.EffectiveSession{
+		Actions: []string{biz.PermissionERPPrintTemplateRead},
+		Modules: map[string]string{"purchase_orders": "enabled"},
+	}}
+	account := &biz.AdminUser{ID: 1, AccountKind: biz.AccountKindSupplier, Permissions: []string{biz.PermissionERPPrintTemplateRead}}
+	if err := authorizeTemplatePDFRequest(context.Background(), guard, account, biz.DefaultCustomerKey, "material-purchase-contract"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("partner must not inherit employee printing: %v", err)
+	}
+}
+
 func TestTemplatePDFChromeArgsKeepSandboxEnabled(t *testing.T) {
 	t.Parallel()
 

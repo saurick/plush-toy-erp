@@ -8,7 +8,7 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
-// AdminSession is the server-side source of truth for revocable administrator access tokens.
+// AdminSession is the server-side source of truth for revocable ERP account access tokens.
 type AdminSession struct {
 	ent.Schema
 }

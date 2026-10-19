@@ -99,6 +99,26 @@
     },
     "test": "TestJsonrpcDispatcher_AdminCreateWithRolesRequiresRoleAssignPermission"
   },
+  "admin.create_partner": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "partner": {
+        "account_kind": "supplier",
+        "customer_id": null,
+        "display_name": "模拟供应商A",
+        "id": 31,
+        "supplier_id": 11,
+        "username": "sim_supplier_a"
+      }
+    },
+    "params": {
+      "account_kind": "supplier",
+      "display_name": "模拟供应商A",
+      "password": "<partner-password>",
+      "supplier_id": 11,
+      "username": "sim_supplier_a"
+    }
+  },
   "admin.effective_role_access": {
     "basis": "handler-fixture",
     "data": {
@@ -308,6 +328,24 @@
     "message": "OK",
     "params": {},
     "test": "TestJsonrpcDispatcher_AdminListUsesMinimalAccountProjection"
+  },
+  "admin.list_partners": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "partners": [
+        {
+          "account_kind": "supplier",
+          "customer_id": null,
+          "disabled": false,
+          "display_name": "模拟供应商A",
+          "id": 31,
+          "status": "active",
+          "supplier_id": 11,
+          "username": "sim_supplier_a"
+        }
+      ]
+    },
+    "params": {}
   },
   "admin.me": {
     "basis": "handler-fixture",
@@ -1069,6 +1107,26 @@
       "username": "admin"
     },
     "params": {}
+  },
+  "auth.partner_login": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "access_token": "<partner-session-token>",
+      "expires_at": 1792400400,
+      "partner": {
+        "account_kind": "supplier",
+        "customer_id": null,
+        "display_name": "模拟供应商A",
+        "id": 31,
+        "supplier_id": 11,
+        "username": "sim_supplier_a"
+      },
+      "token_type": "Bearer"
+    },
+    "params": {
+      "password": "<partner-password>",
+      "username": "sim_supplier_a"
+    }
   },
   "auth.report_client_error": {
     "basis": "backend-wire-shape",
@@ -17333,6 +17391,125 @@
       "idempotency_key": "test/submit/1/v1"
     },
     "test": "TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions"
+  },
+  "partner.get_purchase_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "items": [
+        {
+          "amount": "3.75",
+          "color": null,
+          "expected_arrival_date": null,
+          "id": 61,
+          "line_no": 1,
+          "material_code": "SIM-MAT",
+          "material_name": "模拟面料",
+          "quantity": "3",
+          "unit_id": 21,
+          "unit_price": "1.25"
+        }
+      ],
+      "purchase_order": {
+        "currency": "CNY",
+        "expected_arrival_date": null,
+        "id": 41,
+        "lifecycle_status": "approved",
+        "order_no": "SIM-PO-A",
+        "purchase_date": 1792396800,
+        "supplier_purchase_order_no": null
+      }
+    },
+    "params": {
+      "id": 41
+    }
+  },
+  "partner.get_sales_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "items": [
+        {
+          "amount": "3.75",
+          "color": null,
+          "customer_product_no": null,
+          "id": 71,
+          "line_no": 1,
+          "planned_delivery_date": null,
+          "product_name": null,
+          "quantity": "3",
+          "requested_product_name": "模拟毛绒兔",
+          "unit_id": 21,
+          "unit_price": "1.25"
+        }
+      ],
+      "sales_order": {
+        "currency": "CNY",
+        "customer_order_no": null,
+        "id": 51,
+        "lifecycle_status": "active",
+        "order_date": 1792396800,
+        "order_no": "SIM-SO-A",
+        "planned_delivery_date": null
+      }
+    },
+    "params": {
+      "id": 51
+    }
+  },
+  "partner.list_purchase_orders": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_orders": [
+        {
+          "currency": "CNY",
+          "expected_arrival_date": null,
+          "id": 41,
+          "lifecycle_status": "approved",
+          "order_no": "SIM-PO-A",
+          "purchase_date": 1792396800,
+          "supplier_purchase_order_no": null
+        }
+      ],
+      "total": 1
+    },
+    "params": {
+      "limit": 20,
+      "offset": 0
+    }
+  },
+  "partner.list_sales_orders": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "sales_orders": [
+        {
+          "currency": "CNY",
+          "customer_order_no": null,
+          "id": 51,
+          "lifecycle_status": "active",
+          "order_date": 1792396800,
+          "order_no": "SIM-SO-A",
+          "planned_delivery_date": null
+        }
+      ],
+      "total": 1
+    },
+    "params": {
+      "limit": 20,
+      "offset": 0
+    }
+  },
+  "partner.me": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "partner": {
+        "account_kind": "supplier",
+        "customer_id": null,
+        "display_name": "模拟供应商A",
+        "id": 31,
+        "supplier_id": 11,
+        "username": "sim_supplier_a"
+      }
+    },
+    "params": {}
   },
   "production_order.cancel_production_order": {
     "basis": "handler-fixture",

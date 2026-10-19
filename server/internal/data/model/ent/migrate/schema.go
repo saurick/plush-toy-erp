@@ -85,6 +85,7 @@ var (
 	// AdminUsersColumns holds the columns for the "admin_users" table.
 	AdminUsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "account_kind", Type: field.TypeInt, Default: 0},
 		{Name: "username", Type: field.TypeString, Size: 64},
 		{Name: "display_name", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "phone", Type: field.TypeString, Nullable: true, Size: 32},
@@ -100,27 +101,43 @@ var (
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "supplier_id", Type: field.TypeInt, Nullable: true},
+		{Name: "customer_id", Type: field.TypeInt, Nullable: true},
 	}
 	// AdminUsersTable holds the schema information for the "admin_users" table.
 	AdminUsersTable = &schema.Table{
 		Name:       "admin_users",
 		Columns:    AdminUsersColumns,
 		PrimaryKey: []*schema.Column{AdminUsersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "admin_users_suppliers_supplier",
+				Columns:    []*schema.Column{AdminUsersColumns[17]},
+				RefColumns: []*schema.Column{SuppliersColumns[0]},
+				OnDelete:   schema.Restrict,
+			},
+			{
+				Symbol:     "admin_users_customers_customer",
+				Columns:    []*schema.Column{AdminUsersColumns[18]},
+				RefColumns: []*schema.Column{CustomersColumns[0]},
+				OnDelete:   schema.Restrict,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "adminuser_username",
 				Unique:  true,
-				Columns: []*schema.Column{AdminUsersColumns[1]},
+				Columns: []*schema.Column{AdminUsersColumns[2]},
 			},
 			{
 				Name:    "adminuser_phone",
 				Unique:  true,
-				Columns: []*schema.Column{AdminUsersColumns[3]},
+				Columns: []*schema.Column{AdminUsersColumns[4]},
 			},
 			{
 				Name:    "adminuser_is_super_admin",
 				Unique:  false,
-				Columns: []*schema.Column{AdminUsersColumns[5]},
+				Columns: []*schema.Column{AdminUsersColumns[6]},
 			},
 		},
 	}
@@ -5198,8 +5215,11 @@ var (
 )
 
 func init() {
+	AdminUsersTable.ForeignKeys[0].RefTable = SuppliersTable
+	AdminUsersTable.ForeignKeys[1].RefTable = CustomersTable
 	AdminUsersTable.Annotation = &entsql.Annotation{}
 	AdminUsersTable.Annotation.Checks = map[string]string{
+		"admin_users_account_binding":           "((\"account_kind\" = 0 AND \"supplier_id\" IS NULL AND \"customer_id\" IS NULL) OR (\"account_kind\" = 1 AND \"supplier_id\" IS NOT NULL AND \"customer_id\" IS NULL AND \"is_super_admin\" = FALSE) OR (\"account_kind\" = 2 AND \"customer_id\" IS NOT NULL AND \"supplier_id\" IS NULL AND \"is_super_admin\" = FALSE))",
 		"admin_users_revoked_requires_disabled": "\"revoked_at\" IS NULL OR \"disabled\" = TRUE",
 		"admin_users_revoked_requires_reason":   "\"revoked_at\" IS NULL OR (\"status_reason\" IS NOT NULL AND length(trim(\"status_reason\")) BETWEEN 1 AND 255)",
 		"admin_users_status_audit_bundle":       "((\"status_changed_at\" IS NULL AND \"status_changed_by\" IS NULL AND \"status_reason\" IS NULL) OR (\"status_changed_at\" IS NOT NULL AND \"status_changed_by\" IS NOT NULL))",

@@ -168,7 +168,7 @@ func newIntegrationHTTP(t *testing.T) *integrationHTTPFixture {
 		biz.NewProductionOrderUsecase(data.NewProductionOrderRepo(db, logger)),
 		biz.NewOutsourcingOrderUsecase(data.NewOutsourcingOrderRepo(db, logger)), inventory, facts,
 		biz.NewBusinessAttachmentUsecase(data.NewBusinessAttachmentRepo(db, nil, logger)), customerConfig, authRepo,
-		biz.NewBusinessProgressUsecase(data.NewBusinessProgressRepo(db)), biz.NewBusinessStatisticsUsecase(data.NewBusinessStatisticsRepo(db)), data.NewHelpContentRepo(db))
+		biz.NewBusinessProgressUsecase(data.NewBusinessProgressRepo(db)), biz.NewBusinessStatisticsUsecase(data.NewBusinessStatisticsRepo(db)), data.NewHelpContentRepo(db), biz.NewPartnerReadUsecase(data.NewPartnerReadRepo(db)))
 	srv := appserver.NewHTTPServer(&conf.Server{}, logger, svc, nil, db, customerConfig, auth, config)
 	host := httptest.NewServer(srv)
 	t.Cleanup(host.Close)

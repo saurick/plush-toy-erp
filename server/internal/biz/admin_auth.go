@@ -39,6 +39,10 @@ type AdminDirectoryReader interface {
 }
 
 type AdminUser struct {
+	AccountKind     AccountKind
+	SupplierID      *int
+	CustomerID      *int
+	PartnerActive   bool
 	ID              int
 	Username        string
 	DisplayName     string
@@ -239,7 +243,16 @@ func (uc *AdminAuthUsecase) Authenticate(ctx context.Context, rawToken string) (
 		return nil, nil, ErrAuthVersionStale
 	}
 	claims.Username = admin.Username
+	if !admin.PartnerBinding().Valid() {
+		return nil, nil, ErrUserDisabled
+	}
 	claims.Role = RoleAdmin
+	if !admin.IsEmployee() {
+		if !admin.PartnerActive || admin.IsSuperAdmin {
+			return nil, nil, ErrUserDisabled
+		}
+		claims.Role = RolePartner
+	}
 	return claims, admin, nil
 }
 
@@ -258,6 +271,14 @@ func (uc *AdminAuthUsecase) Tracer(opts ...trace.TracerOption) trace.Tracer {
 }
 
 func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string) (token string, expireAt time.Time, u *AdminUser, err error) {
+	return uc.loginPassword(ctx, username, password, false)
+}
+
+func (uc *AdminAuthUsecase) LoginPartner(ctx context.Context, username, password string) (token string, expireAt time.Time, u *AdminUser, err error) {
+	return uc.loginPassword(ctx, username, password, true)
+}
+
+func (uc *AdminAuthUsecase) loginPassword(ctx context.Context, username, password string, partner bool) (token string, expireAt time.Time, u *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_auth.login")
 	defer span.End()
 
@@ -295,6 +316,9 @@ func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string
 		l.Infof("Login admin rejected admin_id=%d reason=password_invalid", admin.ID)
 		return "", time.Time{}, nil, err
 	}
+	if !admin.PartnerBinding().Valid() || partner == admin.IsEmployee() || (partner && (!admin.PartnerActive || admin.IsSuperAdmin)) {
+		return "", time.Time{}, nil, ErrInvalidPassword
+	}
 	if statusErr := adminLoginAccountStatusError(admin); statusErr != nil {
 		err = statusErr
 		span.SetStatus(codes.Error, err.Error())
@@ -323,6 +347,9 @@ func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("Login admin rejected admin_id=%d reason=credentials_changed", admin.ID)
 		return "", time.Time{}, nil, err
+	}
+	if !admin.PartnerBinding().Valid() || partner == admin.IsEmployee() || (partner && (!admin.PartnerActive || admin.IsSuperAdmin)) {
+		return "", time.Time{}, nil, ErrInvalidPassword
 	}
 	if statusErr := adminLoginAccountStatusError(admin); statusErr != nil {
 		err = statusErr
@@ -398,7 +425,7 @@ func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone, mobi
 		span.SetStatus(codes.Ok, "accepted")
 		return newDecoySMSLoginChallenge(normalizedPhone)
 	}
-	if !admin.IsActive() {
+	if !admin.IsEmployee() || !admin.IsActive() {
 		span.SetAttributes(attribute.Int("admin_auth.admin_id", admin.ID), attribute.Bool("admin_auth.sms_delivery_eligible", false))
 		span.SetStatus(codes.Ok, "accepted")
 		l.Infof("RequestSMSLoginCode accepted admin_id=%d phone=%s delivery_eligible=false reason=account_inactive", admin.ID, maskPhone(normalizedPhone))
@@ -464,7 +491,7 @@ func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code, m
 	}
 
 	span.SetAttributes(attribute.Int("admin_auth.admin_id", admin.ID))
-	if !admin.IsActive() {
+	if !admin.IsEmployee() || !admin.IsActive() {
 		err = ErrUserDisabled
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("SMSLogin identity rejected admin_id=%d phone=%s reason=account_inactive", admin.ID, maskPhone(normalizedPhone))
@@ -492,7 +519,7 @@ func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code, m
 		l.Info("SMSLogin admin rejected reason=account_not_found_after_verification")
 		return "", time.Time{}, nil, err
 	}
-	if !admin.IsActive() {
+	if !admin.IsEmployee() || !admin.IsActive() {
 		err = ErrUserDisabled
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("SMSLogin admin rejected admin_id=%d reason=account_inactive_after_verification", admin.ID)

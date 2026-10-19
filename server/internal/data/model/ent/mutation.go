@@ -1891,6 +1891,8 @@ type AdminUserMutation struct {
 	op                   Op
 	typ                  string
 	id                   *int
+	account_kind         *int
+	addaccount_kind      *int
 	username             *string
 	display_name         *string
 	phone                *string
@@ -1909,6 +1911,10 @@ type AdminUserMutation struct {
 	created_at           *time.Time
 	updated_at           *time.Time
 	clearedFields        map[string]struct{}
+	supplier             *int
+	clearedsupplier      bool
+	customer             *int
+	clearedcustomer      bool
 	done                 bool
 	oldValue             func(context.Context) (*AdminUser, error)
 	predicates           []predicate.AdminUser
@@ -2010,6 +2016,160 @@ func (m *AdminUserMutation) IDs(ctx context.Context) ([]int, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
+}
+
+// SetAccountKind sets the "account_kind" field.
+func (m *AdminUserMutation) SetAccountKind(i int) {
+	m.account_kind = &i
+	m.addaccount_kind = nil
+}
+
+// AccountKind returns the value of the "account_kind" field in the mutation.
+func (m *AdminUserMutation) AccountKind() (r int, exists bool) {
+	v := m.account_kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountKind returns the old "account_kind" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldAccountKind(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountKind: %w", err)
+	}
+	return oldValue.AccountKind, nil
+}
+
+// AddAccountKind adds i to the "account_kind" field.
+func (m *AdminUserMutation) AddAccountKind(i int) {
+	if m.addaccount_kind != nil {
+		*m.addaccount_kind += i
+	} else {
+		m.addaccount_kind = &i
+	}
+}
+
+// AddedAccountKind returns the value that was added to the "account_kind" field in this mutation.
+func (m *AdminUserMutation) AddedAccountKind() (r int, exists bool) {
+	v := m.addaccount_kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAccountKind resets all changes to the "account_kind" field.
+func (m *AdminUserMutation) ResetAccountKind() {
+	m.account_kind = nil
+	m.addaccount_kind = nil
+}
+
+// SetSupplierID sets the "supplier_id" field.
+func (m *AdminUserMutation) SetSupplierID(i int) {
+	m.supplier = &i
+}
+
+// SupplierID returns the value of the "supplier_id" field in the mutation.
+func (m *AdminUserMutation) SupplierID() (r int, exists bool) {
+	v := m.supplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSupplierID returns the old "supplier_id" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldSupplierID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSupplierID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSupplierID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSupplierID: %w", err)
+	}
+	return oldValue.SupplierID, nil
+}
+
+// ClearSupplierID clears the value of the "supplier_id" field.
+func (m *AdminUserMutation) ClearSupplierID() {
+	m.supplier = nil
+	m.clearedFields[adminuser.FieldSupplierID] = struct{}{}
+}
+
+// SupplierIDCleared returns if the "supplier_id" field was cleared in this mutation.
+func (m *AdminUserMutation) SupplierIDCleared() bool {
+	_, ok := m.clearedFields[adminuser.FieldSupplierID]
+	return ok
+}
+
+// ResetSupplierID resets all changes to the "supplier_id" field.
+func (m *AdminUserMutation) ResetSupplierID() {
+	m.supplier = nil
+	delete(m.clearedFields, adminuser.FieldSupplierID)
+}
+
+// SetCustomerID sets the "customer_id" field.
+func (m *AdminUserMutation) SetCustomerID(i int) {
+	m.customer = &i
+}
+
+// CustomerID returns the value of the "customer_id" field in the mutation.
+func (m *AdminUserMutation) CustomerID() (r int, exists bool) {
+	v := m.customer
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCustomerID returns the old "customer_id" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldCustomerID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCustomerID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCustomerID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCustomerID: %w", err)
+	}
+	return oldValue.CustomerID, nil
+}
+
+// ClearCustomerID clears the value of the "customer_id" field.
+func (m *AdminUserMutation) ClearCustomerID() {
+	m.customer = nil
+	m.clearedFields[adminuser.FieldCustomerID] = struct{}{}
+}
+
+// CustomerIDCleared returns if the "customer_id" field was cleared in this mutation.
+func (m *AdminUserMutation) CustomerIDCleared() bool {
+	_, ok := m.clearedFields[adminuser.FieldCustomerID]
+	return ok
+}
+
+// ResetCustomerID resets all changes to the "customer_id" field.
+func (m *AdminUserMutation) ResetCustomerID() {
+	m.customer = nil
+	delete(m.clearedFields, adminuser.FieldCustomerID)
 }
 
 // SetUsername sets the "username" field.
@@ -2684,6 +2844,60 @@ func (m *AdminUserMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
+// ClearSupplier clears the "supplier" edge to the Supplier entity.
+func (m *AdminUserMutation) ClearSupplier() {
+	m.clearedsupplier = true
+	m.clearedFields[adminuser.FieldSupplierID] = struct{}{}
+}
+
+// SupplierCleared reports if the "supplier" edge to the Supplier entity was cleared.
+func (m *AdminUserMutation) SupplierCleared() bool {
+	return m.SupplierIDCleared() || m.clearedsupplier
+}
+
+// SupplierIDs returns the "supplier" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SupplierID instead. It exists only for internal usage by the builders.
+func (m *AdminUserMutation) SupplierIDs() (ids []int) {
+	if id := m.supplier; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSupplier resets all changes to the "supplier" edge.
+func (m *AdminUserMutation) ResetSupplier() {
+	m.supplier = nil
+	m.clearedsupplier = false
+}
+
+// ClearCustomer clears the "customer" edge to the Customer entity.
+func (m *AdminUserMutation) ClearCustomer() {
+	m.clearedcustomer = true
+	m.clearedFields[adminuser.FieldCustomerID] = struct{}{}
+}
+
+// CustomerCleared reports if the "customer" edge to the Customer entity was cleared.
+func (m *AdminUserMutation) CustomerCleared() bool {
+	return m.CustomerIDCleared() || m.clearedcustomer
+}
+
+// CustomerIDs returns the "customer" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// CustomerID instead. It exists only for internal usage by the builders.
+func (m *AdminUserMutation) CustomerIDs() (ids []int) {
+	if id := m.customer; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetCustomer resets all changes to the "customer" edge.
+func (m *AdminUserMutation) ResetCustomer() {
+	m.customer = nil
+	m.clearedcustomer = false
+}
+
 // Where appends a list predicates to the AdminUserMutation builder.
 func (m *AdminUserMutation) Where(ps ...predicate.AdminUser) {
 	m.predicates = append(m.predicates, ps...)
@@ -2718,7 +2932,16 @@ func (m *AdminUserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AdminUserMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 18)
+	if m.account_kind != nil {
+		fields = append(fields, adminuser.FieldAccountKind)
+	}
+	if m.supplier != nil {
+		fields = append(fields, adminuser.FieldSupplierID)
+	}
+	if m.customer != nil {
+		fields = append(fields, adminuser.FieldCustomerID)
+	}
 	if m.username != nil {
 		fields = append(fields, adminuser.FieldUsername)
 	}
@@ -2772,6 +2995,12 @@ func (m *AdminUserMutation) Fields() []string {
 // schema.
 func (m *AdminUserMutation) Field(name string) (ent.Value, bool) {
 	switch name {
+	case adminuser.FieldAccountKind:
+		return m.AccountKind()
+	case adminuser.FieldSupplierID:
+		return m.SupplierID()
+	case adminuser.FieldCustomerID:
+		return m.CustomerID()
 	case adminuser.FieldUsername:
 		return m.Username()
 	case adminuser.FieldDisplayName:
@@ -2811,6 +3040,12 @@ func (m *AdminUserMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *AdminUserMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
+	case adminuser.FieldAccountKind:
+		return m.OldAccountKind(ctx)
+	case adminuser.FieldSupplierID:
+		return m.OldSupplierID(ctx)
+	case adminuser.FieldCustomerID:
+		return m.OldCustomerID(ctx)
 	case adminuser.FieldUsername:
 		return m.OldUsername(ctx)
 	case adminuser.FieldDisplayName:
@@ -2850,6 +3085,27 @@ func (m *AdminUserMutation) OldField(ctx context.Context, name string) (ent.Valu
 // type.
 func (m *AdminUserMutation) SetField(name string, value ent.Value) error {
 	switch name {
+	case adminuser.FieldAccountKind:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountKind(v)
+		return nil
+	case adminuser.FieldSupplierID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSupplierID(v)
+		return nil
+	case adminuser.FieldCustomerID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCustomerID(v)
+		return nil
 	case adminuser.FieldUsername:
 		v, ok := value.(string)
 		if !ok {
@@ -2963,6 +3219,9 @@ func (m *AdminUserMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *AdminUserMutation) AddedFields() []string {
 	var fields []string
+	if m.addaccount_kind != nil {
+		fields = append(fields, adminuser.FieldAccountKind)
+	}
 	if m.addauth_version != nil {
 		fields = append(fields, adminuser.FieldAuthVersion)
 	}
@@ -2977,6 +3236,8 @@ func (m *AdminUserMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *AdminUserMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case adminuser.FieldAccountKind:
+		return m.AddedAccountKind()
 	case adminuser.FieldAuthVersion:
 		return m.AddedAuthVersion()
 	case adminuser.FieldStatusChangedBy:
@@ -2990,6 +3251,13 @@ func (m *AdminUserMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *AdminUserMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case adminuser.FieldAccountKind:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAccountKind(v)
+		return nil
 	case adminuser.FieldAuthVersion:
 		v, ok := value.(int64)
 		if !ok {
@@ -3012,6 +3280,12 @@ func (m *AdminUserMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *AdminUserMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(adminuser.FieldSupplierID) {
+		fields = append(fields, adminuser.FieldSupplierID)
+	}
+	if m.FieldCleared(adminuser.FieldCustomerID) {
+		fields = append(fields, adminuser.FieldCustomerID)
+	}
 	if m.FieldCleared(adminuser.FieldDisplayName) {
 		fields = append(fields, adminuser.FieldDisplayName)
 	}
@@ -3047,6 +3321,12 @@ func (m *AdminUserMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *AdminUserMutation) ClearField(name string) error {
 	switch name {
+	case adminuser.FieldSupplierID:
+		m.ClearSupplierID()
+		return nil
+	case adminuser.FieldCustomerID:
+		m.ClearCustomerID()
+		return nil
 	case adminuser.FieldDisplayName:
 		m.ClearDisplayName()
 		return nil
@@ -3076,6 +3356,15 @@ func (m *AdminUserMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *AdminUserMutation) ResetField(name string) error {
 	switch name {
+	case adminuser.FieldAccountKind:
+		m.ResetAccountKind()
+		return nil
+	case adminuser.FieldSupplierID:
+		m.ResetSupplierID()
+		return nil
+	case adminuser.FieldCustomerID:
+		m.ResetCustomerID()
+		return nil
 	case adminuser.FieldUsername:
 		m.ResetUsername()
 		return nil
@@ -3127,19 +3416,35 @@ func (m *AdminUserMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *AdminUserMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 2)
+	if m.supplier != nil {
+		edges = append(edges, adminuser.EdgeSupplier)
+	}
+	if m.customer != nil {
+		edges = append(edges, adminuser.EdgeCustomer)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *AdminUserMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case adminuser.EdgeSupplier:
+		if id := m.supplier; id != nil {
+			return []ent.Value{*id}
+		}
+	case adminuser.EdgeCustomer:
+		if id := m.customer; id != nil {
+			return []ent.Value{*id}
+		}
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *AdminUserMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 2)
 	return edges
 }
 
@@ -3151,25 +3456,53 @@ func (m *AdminUserMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *AdminUserMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 2)
+	if m.clearedsupplier {
+		edges = append(edges, adminuser.EdgeSupplier)
+	}
+	if m.clearedcustomer {
+		edges = append(edges, adminuser.EdgeCustomer)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *AdminUserMutation) EdgeCleared(name string) bool {
+	switch name {
+	case adminuser.EdgeSupplier:
+		return m.clearedsupplier
+	case adminuser.EdgeCustomer:
+		return m.clearedcustomer
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *AdminUserMutation) ClearEdge(name string) error {
+	switch name {
+	case adminuser.EdgeSupplier:
+		m.ClearSupplier()
+		return nil
+	case adminuser.EdgeCustomer:
+		m.ClearCustomer()
+		return nil
+	}
 	return fmt.Errorf("unknown AdminUser unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *AdminUserMutation) ResetEdge(name string) error {
+	switch name {
+	case adminuser.EdgeSupplier:
+		m.ResetSupplier()
+		return nil
+	case adminuser.EdgeCustomer:
+		m.ResetCustomer()
+		return nil
+	}
 	return fmt.Errorf("unknown AdminUser edge %s", name)
 }
 

@@ -263,8 +263,20 @@ func init() {
 	adminsession.UpdateDefaultUpdatedAt = adminsessionDescUpdatedAt.UpdateDefault.(func() time.Time)
 	adminuserFields := schema.AdminUser{}.Fields()
 	_ = adminuserFields
+	// adminuserDescAccountKind is the schema descriptor for account_kind field.
+	adminuserDescAccountKind := adminuserFields[0].Descriptor()
+	// adminuser.DefaultAccountKind holds the default value on creation for the account_kind field.
+	adminuser.DefaultAccountKind = adminuserDescAccountKind.Default.(int)
+	// adminuserDescSupplierID is the schema descriptor for supplier_id field.
+	adminuserDescSupplierID := adminuserFields[1].Descriptor()
+	// adminuser.SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
+	adminuser.SupplierIDValidator = adminuserDescSupplierID.Validators[0].(func(int) error)
+	// adminuserDescCustomerID is the schema descriptor for customer_id field.
+	adminuserDescCustomerID := adminuserFields[2].Descriptor()
+	// adminuser.CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
+	adminuser.CustomerIDValidator = adminuserDescCustomerID.Validators[0].(func(int) error)
 	// adminuserDescUsername is the schema descriptor for username field.
-	adminuserDescUsername := adminuserFields[0].Descriptor()
+	adminuserDescUsername := adminuserFields[3].Descriptor()
 	// adminuser.UsernameValidator is a validator for the "username" field. It is called by the builders before save.
 	adminuser.UsernameValidator = func() func(string) error {
 		validators := adminuserDescUsername.Validators
@@ -282,51 +294,51 @@ func init() {
 		}
 	}()
 	// adminuserDescDisplayName is the schema descriptor for display_name field.
-	adminuserDescDisplayName := adminuserFields[1].Descriptor()
+	adminuserDescDisplayName := adminuserFields[4].Descriptor()
 	// adminuser.DisplayNameValidator is a validator for the "display_name" field. It is called by the builders before save.
 	adminuser.DisplayNameValidator = adminuserDescDisplayName.Validators[0].(func(string) error)
 	// adminuserDescPhone is the schema descriptor for phone field.
-	adminuserDescPhone := adminuserFields[2].Descriptor()
+	adminuserDescPhone := adminuserFields[5].Descriptor()
 	// adminuser.PhoneValidator is a validator for the "phone" field. It is called by the builders before save.
 	adminuser.PhoneValidator = adminuserDescPhone.Validators[0].(func(string) error)
 	// adminuserDescPasswordHash is the schema descriptor for password_hash field.
-	adminuserDescPasswordHash := adminuserFields[3].Descriptor()
+	adminuserDescPasswordHash := adminuserFields[6].Descriptor()
 	// adminuser.PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
 	adminuser.PasswordHashValidator = adminuserDescPasswordHash.Validators[0].(func(string) error)
 	// adminuserDescIsSuperAdmin is the schema descriptor for is_super_admin field.
-	adminuserDescIsSuperAdmin := adminuserFields[4].Descriptor()
+	adminuserDescIsSuperAdmin := adminuserFields[7].Descriptor()
 	// adminuser.DefaultIsSuperAdmin holds the default value on creation for the is_super_admin field.
 	adminuser.DefaultIsSuperAdmin = adminuserDescIsSuperAdmin.Default.(bool)
 	// adminuserDescErpPreferences is the schema descriptor for erp_preferences field.
-	adminuserDescErpPreferences := adminuserFields[5].Descriptor()
+	adminuserDescErpPreferences := adminuserFields[8].Descriptor()
 	// adminuser.DefaultErpPreferences holds the default value on creation for the erp_preferences field.
 	adminuser.DefaultErpPreferences = adminuserDescErpPreferences.Default.(string)
 	// adminuser.ErpPreferencesValidator is a validator for the "erp_preferences" field. It is called by the builders before save.
 	adminuser.ErpPreferencesValidator = adminuserDescErpPreferences.Validators[0].(func(string) error)
 	// adminuserDescDisabled is the schema descriptor for disabled field.
-	adminuserDescDisabled := adminuserFields[6].Descriptor()
+	adminuserDescDisabled := adminuserFields[9].Descriptor()
 	// adminuser.DefaultDisabled holds the default value on creation for the disabled field.
 	adminuser.DefaultDisabled = adminuserDescDisabled.Default.(bool)
 	// adminuserDescAuthVersion is the schema descriptor for auth_version field.
-	adminuserDescAuthVersion := adminuserFields[7].Descriptor()
+	adminuserDescAuthVersion := adminuserFields[10].Descriptor()
 	// adminuser.DefaultAuthVersion holds the default value on creation for the auth_version field.
 	adminuser.DefaultAuthVersion = adminuserDescAuthVersion.Default.(int64)
 	// adminuser.AuthVersionValidator is a validator for the "auth_version" field. It is called by the builders before save.
 	adminuser.AuthVersionValidator = adminuserDescAuthVersion.Validators[0].(func(int64) error)
 	// adminuserDescStatusReason is the schema descriptor for status_reason field.
-	adminuserDescStatusReason := adminuserFields[9].Descriptor()
+	adminuserDescStatusReason := adminuserFields[12].Descriptor()
 	// adminuser.StatusReasonValidator is a validator for the "status_reason" field. It is called by the builders before save.
 	adminuser.StatusReasonValidator = adminuserDescStatusReason.Validators[0].(func(string) error)
 	// adminuserDescStatusChangedBy is the schema descriptor for status_changed_by field.
-	adminuserDescStatusChangedBy := adminuserFields[11].Descriptor()
+	adminuserDescStatusChangedBy := adminuserFields[14].Descriptor()
 	// adminuser.StatusChangedByValidator is a validator for the "status_changed_by" field. It is called by the builders before save.
 	adminuser.StatusChangedByValidator = adminuserDescStatusChangedBy.Validators[0].(func(int) error)
 	// adminuserDescCreatedAt is the schema descriptor for created_at field.
-	adminuserDescCreatedAt := adminuserFields[13].Descriptor()
+	adminuserDescCreatedAt := adminuserFields[16].Descriptor()
 	// adminuser.DefaultCreatedAt holds the default value on creation for the created_at field.
 	adminuser.DefaultCreatedAt = adminuserDescCreatedAt.Default.(func() time.Time)
 	// adminuserDescUpdatedAt is the schema descriptor for updated_at field.
-	adminuserDescUpdatedAt := adminuserFields[14].Descriptor()
+	adminuserDescUpdatedAt := adminuserFields[17].Descriptor()
 	// adminuser.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	adminuser.DefaultUpdatedAt = adminuserDescUpdatedAt.Default.(func() time.Time)
 	// adminuser.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

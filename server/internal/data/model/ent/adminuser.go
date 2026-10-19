@@ -5,6 +5,8 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/supplier"
 	"strings"
 	"time"
 
@@ -17,9 +19,15 @@ type AdminUser struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// 账号类别：0 员工、1 供应商、2 客户
+	AccountKind int `json:"account_kind,omitempty"`
+	// SupplierID holds the value of the "supplier_id" field.
+	SupplierID *int `json:"supplier_id,omitempty"`
+	// CustomerID holds the value of the "customer_id" field.
+	CustomerID *int `json:"customer_id,omitempty"`
 	// Username holds the value of the "username" field.
 	Username string `json:"username,omitempty"`
-	// 员工姓名；业务页面优先展示，存量缺失时回退账号名
+	// 账号显示名；业务页面优先展示，存量缺失时回退账号名
 	DisplayName *string `json:"display_name,omitempty"`
 	// 管理员手机号，用于短信验证码登录
 	Phone *string `json:"phone,omitempty"`
@@ -46,8 +54,44 @@ type AdminUser struct {
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the AdminUserQuery when eager-loading is set.
+	Edges        AdminUserEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// AdminUserEdges holds the relations/edges for other nodes in the graph.
+type AdminUserEdges struct {
+	// Supplier holds the value of the supplier edge.
+	Supplier *Supplier `json:"supplier,omitempty"`
+	// Customer holds the value of the customer edge.
+	Customer *Customer `json:"customer,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [2]bool
+}
+
+// SupplierOrErr returns the Supplier value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e AdminUserEdges) SupplierOrErr() (*Supplier, error) {
+	if e.Supplier != nil {
+		return e.Supplier, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: supplier.Label}
+	}
+	return nil, &NotLoadedError{edge: "supplier"}
+}
+
+// CustomerOrErr returns the Customer value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e AdminUserEdges) CustomerOrErr() (*Customer, error) {
+	if e.Customer != nil {
+		return e.Customer, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: customer.Label}
+	}
+	return nil, &NotLoadedError{edge: "customer"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -57,7 +101,7 @@ func (*AdminUser) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case adminuser.FieldIsSuperAdmin, adminuser.FieldDisabled:
 			values[i] = new(sql.NullBool)
-		case adminuser.FieldID, adminuser.FieldAuthVersion, adminuser.FieldStatusChangedBy:
+		case adminuser.FieldID, adminuser.FieldAccountKind, adminuser.FieldSupplierID, adminuser.FieldCustomerID, adminuser.FieldAuthVersion, adminuser.FieldStatusChangedBy:
 			values[i] = new(sql.NullInt64)
 		case adminuser.FieldUsername, adminuser.FieldDisplayName, adminuser.FieldPhone, adminuser.FieldPasswordHash, adminuser.FieldErpPreferences, adminuser.FieldStatusReason:
 			values[i] = new(sql.NullString)
@@ -84,6 +128,26 @@ func (_m *AdminUser) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case adminuser.FieldAccountKind:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field account_kind", values[i])
+			} else if value.Valid {
+				_m.AccountKind = int(value.Int64)
+			}
+		case adminuser.FieldSupplierID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field supplier_id", values[i])
+			} else if value.Valid {
+				_m.SupplierID = new(int)
+				*_m.SupplierID = int(value.Int64)
+			}
+		case adminuser.FieldCustomerID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field customer_id", values[i])
+			} else if value.Valid {
+				_m.CustomerID = new(int)
+				*_m.CustomerID = int(value.Int64)
+			}
 		case adminuser.FieldUsername:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field username", values[i])
@@ -194,6 +258,16 @@ func (_m *AdminUser) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QuerySupplier queries the "supplier" edge of the AdminUser entity.
+func (_m *AdminUser) QuerySupplier() *SupplierQuery {
+	return NewAdminUserClient(_m.config).QuerySupplier(_m)
+}
+
+// QueryCustomer queries the "customer" edge of the AdminUser entity.
+func (_m *AdminUser) QueryCustomer() *CustomerQuery {
+	return NewAdminUserClient(_m.config).QueryCustomer(_m)
+}
+
 // Update returns a builder for updating this AdminUser.
 // Note that you need to call AdminUser.Unwrap() before calling this method if this AdminUser
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -217,6 +291,19 @@ func (_m *AdminUser) String() string {
 	var builder strings.Builder
 	builder.WriteString("AdminUser(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	builder.WriteString("account_kind=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AccountKind))
+	builder.WriteString(", ")
+	if v := _m.SupplierID; v != nil {
+		builder.WriteString("supplier_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CustomerID; v != nil {
+		builder.WriteString("customer_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("username=")
 	builder.WriteString(_m.Username)
 	builder.WriteString(", ")
