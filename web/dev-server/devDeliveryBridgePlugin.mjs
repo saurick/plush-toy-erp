@@ -1492,6 +1492,7 @@ export function createDevDeliveryService({
       readDeliveryProvider.downloadReleaseControl(payload.gitSha, destination)
     )
     await qualifyReleaseTransport(downloaded, payload.target)
+    const targetPreflight = await runPreflight(payload.target)
     const result = await Promise.resolve(
       prepareDatabaseRebuildAction(
         {
@@ -1504,7 +1505,7 @@ export function createDevDeliveryService({
           idempotencyKey: payload.idempotencyKey,
           operationStore: store,
         },
-        { runPreflight, classifyRelation, now }
+        { runPreflight: () => targetPreflight, classifyRelation, now }
       )
     )
     preflightCache.delete(payload.target)

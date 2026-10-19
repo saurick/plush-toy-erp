@@ -508,6 +508,11 @@ test('version center keeps test data rebuild on its dedicated two-step executor'
   const downloads = []
   let preparedRequest
   let spawned
+  let preflightReads = 0
+  const qualified = {
+    status: 'passed',
+    remote: { runtime: { serverSha: SHA } },
+  }
   const service = createDevDeliveryService({
     projectRoot: root,
     operationStore: store,
@@ -526,7 +531,15 @@ test('version center keeps test data rebuild on its dedicated two-step executor'
         return directControlDownload(destination)
       },
     },
-    prepareDatabaseRebuildAction(request) {
+    async runPreflight(target) {
+      assert.equal(target, 'customer-test-133')
+      preflightReads += 1
+      return qualified
+    },
+    prepareDatabaseRebuildAction(request, { runPreflight }) {
+      const preflight = runPreflight(request.targetKey)
+      assert.equal(preflight.remote?.runtime?.serverSha, SHA)
+      assert.equal(preflight, qualified)
       preparedRequest = request
       let { operation } = createOrReuseDeliveryOperation(store, {
         action: 'rebuild-database',
@@ -565,6 +578,7 @@ test('version center keeps test data rebuild on its dedicated two-step executor'
       idempotencyKey: IDEMPOTENCY_KEY,
     },
   })
+  assert.equal(preflightReads, 1)
   assert.equal(prepared.operation.action, 'rebuild-database')
   assert.equal(prepared.operation.status, 'ready')
   assert.equal(
