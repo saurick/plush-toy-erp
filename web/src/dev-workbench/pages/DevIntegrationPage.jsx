@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftOutlined, CloseOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Drawer, Empty, Select, Tag, Tooltip, Typography } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import Table from '@/common/components/table/AppTable'
@@ -27,7 +27,7 @@ import {
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
 } from '../config/devRoutes.mjs'
-import { buildDevDocsLocation } from './devDocsNavigation.mjs'
+import { buildDevDocsLocation, resolveDevDocsMarkdownHref } from './devDocsNavigation.mjs'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import {
   INTEGRATION_PAGE_SIZE,
@@ -90,8 +90,10 @@ function ColumnHelp({ label, children }) {
 }
 
 export default function DevIntegrationPage() {
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const inventorySurface = useRef(null)
+  const guideSurface = useRef(null)
   const detailOpener = useRef(null)
   const closeButton = useRef(null)
   const query = parseIntegrationSearch(params)
@@ -187,6 +189,21 @@ export default function DevIntegrationPage() {
       })
     return () => controller.abort()
   }, [evidenceReload, query.view])
+
+  useEffect(() => {
+    const container = guideSurface.current
+    if (!container) return undefined
+    const followGuideLink = (event) => {
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor || !container.contains(anchor)) return
+      const target = resolveDevDocsMarkdownHref(anchor.getAttribute('href'), INTEGRATION_GUIDE_DOCUMENT)
+      if (!target) return
+      event.preventDefault()
+      navigate(buildDevDocsLocation({ path: target.path, headingId: target.headingId }))
+    }
+    container.addEventListener('click', followGuideLink)
+    return () => container.removeEventListener('click', followGuideLink)
+  }, [navigate, query.view])
 
   const updateQuery = useCallback(
     (values, replace = false) => {
@@ -703,7 +720,7 @@ export default function DevIntegrationPage() {
             </>
           ) : (
             <>
-              <section className="erp-dev-integration__table erp-dev-integration__guide" aria-label="接入方式选择">
+              <section className="erp-dev-integration__table erp-dev-integration__guide" aria-label="接入方式选择" ref={guideSurface}>
                 <h2>接入方式选择</h2>
                 {integrationGuide ? (
                   <>

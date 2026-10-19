@@ -21,7 +21,7 @@ HTTP 路由：
 
 员工业务接口与合作方订单只读入口分别鉴权。合作方使用独立登录及当前单位绑定，固定只读范围见[合作方合同](#合作方身份与订单只读边界)；当前没有合作方业务写入、外部小系统或真实第三方联调。增加适配入口必须复用同等后端授权和所属领域业务路径。
 
-架构与暂缓项见[系统接入边界](../../docs/engineering/跨层公共契约与生成规范.md#系统接入边界--integration-boundary)。
+当前优先级、实际对接的实施条件及已有实现 / 模拟验证 / 真实接入的区别，见[接入指引](../../docs/engineering/跨层公共契约与生成规范.md#接入方式选择--integration-selection)；架构与暂缓项见[系统接入边界](../../docs/engineering/跨层公共契约与生成规范.md#系统接入边界--integration-boundary)。
 
 传输文档为 [`api/jsonrpc/v1/jsonrpc.swagger.json`](../api/jsonrpc/v1/jsonrpc.swagger.json)，由 `server/` 下 `make api` 生成。它描述 `POST /rpc/{url}` 的通用信封，不是完整业务字段 Schema。`node scripts/gen-public-contracts.mjs --check` 从已生成的 Protobuf 消息描述、HTTP binding、Swagger 和真实分发核对运行接口，生成的 `RpcTransport / RpcDomain / RpcMethod` 供 Web 与工作台共用。修改 proto 必须先运行 `make api` 并核对生成差异；公共契约提取不解析 proto，也不替代这一步。
 

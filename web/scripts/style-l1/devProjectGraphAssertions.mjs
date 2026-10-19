@@ -109,12 +109,29 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   const inventoryTab = tabs.getByRole('tab', { name: '接口清单', exact: true })
   const guideTab = tabs.getByRole('tab', { name: '接入指引', exact: true })
   const guide = page.locator('.erp-dev-integration__guide')
+  const guideStatus = guide.getByRole('table').filter({ has: page.getByRole('columnheader', { name: '核对层次', exact: true }) })
+  const guideChoices = guide.getByRole('table').filter({ has: page.getByRole('columnheader', { name: '接入情况', exact: true }) })
   assert.equal(await inventoryTab.getAttribute('aria-selected'), 'true')
   assert.equal(await guide.count(), 0)
   await verifySlidingMotion(page, assert, '.erp-dev-integration__tabs', 1)
-  await guide.getByRole('table').waitFor()
+  await guideChoices.waitFor()
   assert.equal(await inventory.count(), 0, '指引页不混放接口清单')
-  assert.equal(await guide.locator('tbody tr').count(), 3)
+  assert.equal(await guideChoices.locator('tbody tr').count(), 3)
+  for (const name of ['已有实现', '模拟验证', '真实接入']) {
+    assert.equal(await guideStatus.getByRole('cell', { name, exact: true }).isVisible(), true, '当前状态默认可核对')
+  }
+  for (const name of ['正式 API 合同', '合作方只读合同', '既有用例和运行证据']) {
+    const link = guideStatus.getByRole('link', { name, exact: true })
+    const target = new URL(await link.getAttribute('href'), `https://source.local/${INTEGRATION_GUIDE_DOCUMENT}`)
+    await link.click()
+    await page.waitForURL((url) => url.pathname === '/__dev/docs' &&
+      url.searchParams.get('path') === target.pathname.slice(1) && url.hash === target.hash)
+    await page.waitForFunction((id) => Boolean(document.getElementById(id)), decodeURIComponent(target.hash.slice(1)))
+    await page.goBack()
+    await guideChoices.waitFor()
+    assert.equal(await guideTab.getAttribute('aria-selected'), 'true', '引用文档返回后保留接入指引')
+  }
+  await guide.getByText('不作为当前完成条件', { exact: false }).waitFor()
   await guide.getByRole('heading', { name: '接入方式选择', exact: true }).waitFor()
   await guide.getByText('直接调用已有 API', { exact: false }).waitFor()
   await guide.locator('.erp-dev-integration__guide-notes > summary').click()
@@ -132,7 +149,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   await page.reload()
   await examples.getByText('不一定新增本地 API', { exact: false }).waitFor()
   await guide.locator('.erp-dev-integration__guide-notes > summary').click()
-  assert.equal(await guide.getByRole('table').isVisible(), true, '进入指引页直接展示选择规则')
+  assert.equal(await guideChoices.isVisible(), true, '进入指引页直接展示选择规则')
   const specificationLink = new URL(await guide.getByRole('link', { name: '查看正式接入规范', exact: true }).getAttribute('href'), page.url())
   assert.equal(specificationLink.searchParams.get('path'), INTEGRATION_GUIDE_DOCUMENT)
   assert.equal(decodeURIComponent(specificationLink.hash), '#接入方式选择--integration-selection')
@@ -162,7 +179,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   await page.goBack()
   await cancel.getByRole('button', { name: /取消销售订单.*cancel_sales_order/u }).waitFor()
   await page.goForward()
-  await guide.getByRole('table').waitFor()
+  await guideChoices.waitFor()
   await inventoryTab.click()
   await cancel.getByRole('button', { name: /取消销售订单.*cancel_sales_order/u }).waitFor()
   assert.equal(await search.inputValue(), 'CANCEL')
@@ -430,7 +447,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   await page.getByRole('heading', { name: '接入方式选择 / Integration Selection', exact: true }).waitFor()
   await page.goBack()
   await page.waitForURL((url) => url.pathname === DEV_INTEGRATION_ROUTE)
-  await guide.getByRole('table').waitFor()
+  await guideChoices.waitFor()
   assert.equal(await guideTab.getAttribute('aria-selected'), 'true', '文档返回后仍停留在接入指引')
   const reads = []
   const recordReads = (request) => {
@@ -438,7 +455,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   }
   page.on('request', recordReads)
   await page.reload()
-  await guide.getByRole('table').waitFor()
+  await guideChoices.waitFor()
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   assert.equal(reads.length, 0, '直接打开接入指引不读取接口权限与门禁')
   await inventoryTab.click()
@@ -496,7 +513,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
     delete window.__integrationCancellation
   })
   await page.unroute(`**${DEV_PERMISSION_RELATIONSHIPS_API}`, delayPermission)
-  await guide.getByRole('table').waitFor()
+  await guideChoices.waitFor()
   await assertNoHorizontalOverflow(page, '4K 接入指引与分页恢复')
   await waitForFiniteAnimations(page, { selector: '.erp-dev-integration__tabs' })
   assert.equal(await guideTab.getAttribute('aria-selected'), 'true')

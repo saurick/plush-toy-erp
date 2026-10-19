@@ -260,7 +260,8 @@ export function readIntegrationGuide(source) {
     .trim()
   if (!markdown) return null
   const contentTokens = new Remarkable().parse(markdown, {})
-  const table = contentTokens.find((token) => token.type === 'table_open')
+  // Keep current-state and approach comparisons visible together.
+  const table = contentTokens.findLast((token) => token.type === 'table_open')
   const note = table && contentTokens.find((token) =>
     token.type === 'paragraph_open' && token.lines[0] >= table.lines[1]
   )
