@@ -5,9 +5,10 @@ import path from 'node:path'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { loadCatalog, renderCatalog, syncOutputs, syncTaskDesignCatalog } from './gen-public-contracts.mjs'
+import { loadCatalog, renderCatalog, renderRPCDocumentation, syncOutputs, syncRPCDocumentation, syncTaskDesignCatalog } from './gen-public-contracts.mjs'
 import { checkConsumerSource, checkConsumers, checkScriptConsumerSource, checkScriptConsumers } from './qa/public-contract-consumers.mjs'
 import { RpcMethod } from '../web/src/common/consts/rpcMethods.generated.mjs'
+import { readIntegrationCallDetails } from '../web/src/dev-workbench/config/devIntegration.mjs'
 
 test('public contracts: extraction rejects unsupported declarations and matches runtime registries', () => {
   const output = execFileSync('go', ['test', './cmd/public-contracts'], {
@@ -28,6 +29,110 @@ test('public contracts: all generated files agree with current backend declarati
   assert.equal(catalog.states.WorkflowTaskStatus.DONE, 'done')
   assert.deepEqual(syncOutputs(renderCatalog(catalog), { check: true }), [])
   assert.deepEqual(syncTaskDesignCatalog(catalog, { check: true }), [])
+  assert.deepEqual(syncRPCDocumentation(catalog, { check: true }), [])
+  const api = fs.readFileSync(new URL('../server/docs/api.md', import.meta.url), 'utf8')
+  const calls = readIntegrationCallDetails(api, catalog.rpc)
+  const authored = new Set([...api.split('<!-- BEGIN GENERATED RPC FIELD CONTRACTS -->')[0].matchAll(/^#### .*`([a-z_]+\.[a-z_]+)`/gmu)].map((match) => match[1]))
+  for (const [domain, methods] of Object.entries(catalog.rpcCalls)) {
+    for (const [method, contract] of Object.entries(methods)) {
+      const parsed = calls.get(`${domain}.${method}`)
+      for (const [part, fields] of [['request', contract.parameters], ['response', contract.response || []]]) {
+        for (const field of fields) {
+          const actual = parsed?.[part]?.fields?.find((row) => row.name === field.name)
+          assert(actual, `${domain}.${method}: ${part} field missing: ${field.name}`)
+          const expectedType = field.nullable && !field.type.includes('null') ? `${field.type} | null` : field.type
+          if (part === 'request' && authored.has(`${domain}.${method}`)) {
+            const accepted = new Set(expectedType.split(' | '))
+            assert(actual.type.split(' | ').every((type) => accepted.has(type)), `${domain}.${method}.${field.name}: authored domain type exceeds backend parser`)
+            assert(actual.required, `${domain}.${method}.${field.name}: authored requirement absent`)
+            if (field.required === '必填') assert.match(actual.required, /必填/u)
+          } else {
+            assert.equal(actual.type, expectedType, `${domain}.${method}.${field.name}: type column drift`)
+            if (part === 'request') assert.equal(actual.required, field.required, `${domain}.${method}.${field.name}: required column drift`)
+          }
+          assert(!actual.type.endsWith('\\'), `${domain}.${method}.${field.name}: escaped pipe was split into columns`)
+        }
+      }
+    }
+  }
+  assert(catalog.rpcInspection.admin.change_password.emptyData)
+  assert.equal(catalog.rpcInspection.admin.change_password.entry.path, 'server/internal/service/jsonrpc_dispatch_admin.go')
+  const outputs = renderCatalog(catalog)
+  assert.match(outputs['rpcInspection.generated.mjs'], /仅供 DEV 工作台/u)
+  assert(!outputs['rpcMethods.generated.mjs'].includes('old_password'))
+})
+
+test('public contracts: RPC documentation preserves authored examples and descriptions, updates fields and stays idempotent', () => {
+  const catalog = {
+    rpc: { orders: { GET: 'get', LIST: 'list' } },
+    rpcCalls: { orders: {
+      get: { parameters: [{ name: 'id', type: 'integer', required: '必填', description: '解析器 strictID', source: { path: 'server/internal/service/orders.go', line: 1 } }, { name: 'note', type: 'string', nullable: true, required: '可选', description: '解析器 optionalText', source: { path: 'server/internal/service/orders.go', line: 2 } }], response: [{ name: 'result.data.order.id', type: 'integer', source: { path: 'server/internal/service/orders.go', line: 3 } }], dataType: 'object', example: { params: { id: 1 }, data: { order: { id: 1 } } } },
+      list: { parameters: [], response: [{ name: 'result.data.orders', type: 'array', source: { path: 'server/internal/service/orders.go', line: 4 } }], dataType: 'object', example: { params: {}, data: { orders: [] }, basis: 'handler-fixture', test: 'TestOrders', source: { path: 'server/internal/service/orders_test.go', line: 5 } } },
+    } },
+  }
+  const original = `user-owned-before\n### 订单 \`orders\`\n\n| 方法 | 用途 |\n| --- | --- |\n| \`get\` | 查看订单 |\n| \`list\` | 查询订单 |\n\n#### 查看订单 \`orders.get\`\n\n##### 请求参数\n\n| 字段 | 类型 | 必填条件 | 说明 |\n| --- | --- | --- | --- |\n| \`id\` | integer | 必填 | 读取到的订单 ID。 |\n\n\`\`\`json\n{"jsonrpc":"2.0","method":"get","params":{"id":42},"id":"authored"}\n\`\`\`\n\n##### 返回结果\n\n| 返回字段 | 类型 | 说明 |\n| --- | --- | --- |\n| \`result.code\` | integer | 业务结果码。 |\n| \`result.data\` | object / null | 业务投影。 |\n\n\`\`\`json\n{"result":{"code":0,"data":{"order":{"id":42}}}}\n\`\`\`\nuser-owned-after\n`
+  const generated = renderRPCDocumentation(catalog, original)
+  assert.match(generated, /\| `id` \| integer \| 必填 \| 读取到的订单 ID。/u)
+  assert(generated.includes('| `note` | string &#124; null | 可选 |'))
+  assert(generated.includes('"id":42'))
+  assert(generated.startsWith('user-owned-before\n'))
+  assert(generated.includes('user-owned-after\n'))
+  assert.equal((generated.match(/^#### /gmu) || []).length, 2)
+  assert.equal((generated.match(/^##### 请求参数/gmu) || []).length, 2)
+  assert.equal((generated.match(/^##### 返回结果/gmu) || []).length, 2)
+  assert.match(generated, /TestOrders.*orders_test\.go/u)
+  assert.equal(renderRPCDocumentation(catalog, generated), generated)
+  const changed = structuredClone(catalog)
+  changed.rpcCalls.orders.get.parameters[1].required = '条件必填'
+  changed.rpcCalls.orders.get.parameters[1].source.line = 10
+  const updated = renderRPCDocumentation(changed, generated)
+  assert(updated.includes('| `note` | string &#124; null | 条件必填 |'))
+  assert(updated.includes('orders.go:10'))
+  assert(!updated.includes('orders.go:2'))
+})
+
+test('public contracts: RPC documentation checks never write and reject invalid generation boundaries or missing names', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'public-contract-rpc-'))
+  const file = path.join(directory, 'server/docs/api.md')
+  const catalog = { rpc: { orders: { LIST: 'list' } }, rpcCalls: { orders: { list: { parameters: [], response: [], dataType: 'null', example: { params: {}, data: null, basis: 'backend-wire-shape' } } } } }
+  const original = '### 订单 `orders`\n\n| 方法 | 用途 |\n| --- | --- |\n| `list` | 查询订单 |\n'
+  const start = '<!-- BEGIN GENERATED RPC FIELD CONTRACTS -->'
+  const end = '<!-- END GENERATED RPC FIELD CONTRACTS -->'
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, original)
+    assert.throws(() => syncRPCDocumentation(catalog, { repositoryRoot: directory, check: true }), /未同步/u)
+    assert.equal(fs.readFileSync(file, 'utf8'), original)
+    syncRPCDocumentation(catalog, { repositoryRoot: directory })
+    const generated = fs.readFileSync(file, 'utf8')
+    assert.match(generated, /此方法不读取业务参数/u)
+    assert(generated.includes('"data": null'))
+    assert.deepEqual(syncRPCDocumentation(catalog, { repositoryRoot: directory, check: true }), [])
+    for (const invalid of [start, end, end + start, start + start + end, start + end + end]) {
+      fs.writeFileSync(file, original + invalid)
+      assert.throws(() => syncRPCDocumentation(catalog, { repositoryRoot: directory }), /生成标记/u)
+      assert.equal(fs.readFileSync(file, 'utf8'), original + invalid)
+    }
+    assert.throws(() => renderRPCDocumentation(catalog, ''), /中文名称缺失/u)
+    assert.throws(() => renderRPCDocumentation({ ...catalog, rpcCalls: {} }, original), /合同或中文名称缺失/u)
+  } finally { fs.rmSync(directory, { recursive: true, force: true }) }
+})
+
+test('public contracts: authored result.data tables gain all nested fields and domain request restrictions remain stricter', () => {
+  const catalog = { rpc: { orders: { SAVE: 'save' } }, rpcCalls: { orders: { save: {
+    parameters: [{ name: 'route', type: 'string', nullable: true, required: '可选', description: '解析器 optionalRoute' }],
+    response: [{ name: 'result.data.order', type: 'object' }, { name: 'result.data.order.id', type: 'integer' }],
+    dataType: 'object', example: { params: { route: 'route' }, data: { order: { id: 1 } } },
+  } } } }
+  const source = '### 订单 `orders`\n| 方法 | 用途 |\n| --- | --- |\n| `save` | 保存订单 |\n\n#### 保存订单 `orders.save`\n\n##### 请求参数\n\n| 字段 | 类型 | 必填条件 | 约束 |\n| --- | --- | --- | --- |\n| `route` | string | 必填 | 领域校验要求显式指定路线。 |\n\n##### 返回结果\n\n| result.data 字段 | 类型 | 说明 |\n| --- | --- | --- |\n| order | object | 当前订单投影。 |\n'
+  const result = renderRPCDocumentation(catalog, source)
+  assert(result.includes('| `route` | string | 必填 | 领域校验要求显式指定路线。 |'))
+  assert(result.includes('| `result.data.order` | object | 当前订单投影。 |'))
+  assert(result.includes('| `result.data.order.id` | integer |'))
+  assert(result.includes('| `result.code` | integer |'))
+  assert(!result.includes('| result.data 字段 |'))
+  assert.equal(renderRPCDocumentation(catalog, result), result)
+  assert.throws(() => renderRPCDocumentation(catalog, source.replace('| `route` | string |', '| `route` | integer |')), /人工字段类型超出后端/u)
 })
 
 test('public contracts: task design synchronization preserves surrounding edits and checks without writing', () => {

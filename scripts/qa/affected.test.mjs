@@ -34,6 +34,13 @@ test("affected: backend public declarations select readonly generation and consu
     "server/internal/biz/rbac.go",
     "server/internal/core/status/shipment.go",
     "server/internal/service/jsonrpc_dispatch.go",
+    "server/internal/biz/admin_legal_notice.go",
+    "server/internal/biz/sales_order_lifecycle.go",
+    "server/internal/core/qualitycheck/inspection.go",
+    "server/internal/buildinfo/buildinfo.go",
+    "server/internal/projectmanuals/manuals.go",
+    "server/cmd/public-contracts/testdata/rpc_examples.json",
+    "server/docs/api.md",
     "server/api/jsonrpc/v1/jsonrpc.proto",
     "server/api/jsonrpc/v1/jsonrpc.pb.go",
     "server/api/jsonrpc/v1/jsonrpc_http.pb.go",
@@ -51,7 +58,7 @@ test("affected: backend public declarations select readonly generation and consu
     assert(selectedTests(plan).includes("web/src/erp/utils/businessStatusCoverage.test.mjs"), file);
     assert(plan.commands.find((item) => item.id === "public-contracts-sync").args.includes("--check"));
   }
-  const unrelated = buildAffectedPlan(["server/internal/biz/admin_legal_notice.go"], { root: ROOT });
+  const unrelated = buildAffectedPlan(["server/internal/server/health.go"], { root: ROOT });
   assert(!ids(unrelated).includes("public-contracts-sync"));
 });
 

@@ -4,6 +4,8 @@ import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { readIntegrationRunEvidence } from './devIntegrationEvidence.mjs'
+import { INTEGRATION_EVIDENCE_API } from '../src/dev-workbench/config/devIntegration.mjs'
 
 import {
   DEV_QUALITY_GATE_ACTIVE_STATUSES,
@@ -1926,6 +1928,11 @@ export function createDevQualityGateMiddleware({
       return
     }
     try {
+      if (request.method === 'GET' && requestPath === INTEGRATION_EVIDENCE_API) {
+        if (requestUrl.search) throw new Error('integration evidence query is unsupported')
+        sendJson(response, 200, await readIntegrationRunEvidence(path.resolve(projectRoot || process.cwd())))
+        return
+      }
       if (
         request.method === 'GET' &&
         requestPath === DEV_QUALITY_GATE_SESSION_API_PATH

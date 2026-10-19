@@ -751,9 +751,10 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     if (
       PUBLIC_CONTRACT_SOURCE.test(file) ||
       RPC_TRANSPORT_SOURCE.test(file) ||
-      /^server\/internal\/service\/jsonrpc[^/]*\.go$/u.test(file) && !file.endsWith("_test.go") ||
+      /^server\/internal\/(?:biz|service|buildinfo|projectmanuals|core\/qualitycheck)\/[^/]+\.go$/u.test(file) && !file.endsWith("_test.go") ||
       /^web\/src\/common\/consts\/[^/]+\.generated\.mjs$/u.test(file) ||
       file === "scripts/gen-public-contracts.mjs" ||
+      file === "server/docs/api.md" ||
       file === "scripts/qa/public-contract-consumers.mjs"
     ) {
       addFixed(state, "publicContracts", file);
@@ -773,7 +774,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       addFixed(state, "serverUnitPolicy", file);
       continue;
     }
-    if (file === "scripts/gen-public-contracts.mjs" || file === "scripts/qa/public-contract-consumers.mjs") {
+    if (file === "scripts/gen-public-contracts.mjs" || file === "scripts/qa/public-contract-consumers.mjs" || file.startsWith("server/cmd/public-contracts/testdata/")) {
       continue;
     }
     if (MIGRATION_CONTRACT_PATHS.has(file)) {

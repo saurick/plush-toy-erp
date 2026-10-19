@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"io"
+	"os"
+	"strings"
 	"testing"
 
 	"server/internal/biz"
@@ -22,6 +25,7 @@ func TestJsonrpcAdminPasswordContracts(t *testing.T) {
 		noAuth bool
 		want   int32
 	}{
+		{name: "documented self change", method: "change_password", params: documentedAdminPasswordParams(t), want: errcode.OK.Code},
 		{name: "self change without management permissions", method: "change_password", params: map[string]any{"old_password": "old-password", "new_password": "new-password"}, want: errcode.OK.Code},
 		{name: "super self change", method: "change_password", super: true, params: map[string]any{"old_password": "old-password", "new_password": "new-password"}, want: errcode.OK.Code},
 		{name: "wrong old password", method: "change_password", params: map[string]any{"old_password": "wrong-password", "new_password": "new-password"}, want: errcode.AuthInvalidPassword.Code},
@@ -62,6 +66,13 @@ func TestJsonrpcAdminPasswordContracts(t *testing.T) {
 			if err != nil || result == nil || result.Code != tc.want {
 				t.Fatalf("result = %v, err = %v, want code %d", result, err, tc.want)
 			}
+			if tc.name == "documented self change" {
+				sample := documentedAdminPasswordExample(t, 1)
+				value, ok := sample["result"].(map[string]any)
+				if !ok || value["code"] != float64(result.Code) || value["message"] != result.Message || value["data"] != nil || result.Data != nil {
+					t.Fatalf("documented response differs: sample=%#v actual=%v", sample, result)
+				}
+			}
 			if tc.want != errcode.OK.Code {
 				if repo.admins[1].PasswordHash != string(hash) || repo.admins[2].PasswordHash != "other-hash" {
 					t.Fatal("rejected request changed credentials")
@@ -80,4 +91,43 @@ func TestJsonrpcAdminPasswordContracts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func documentedAdminPasswordExample(t *testing.T, index int) map[string]any {
+	t.Helper()
+	source, err := os.ReadFile("../../docs/api.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, section, found := strings.Cut(string(source), "#### 修改本人密码 `admin.change_password`")
+	if !found {
+		t.Fatal("password documentation missing")
+	}
+	section, _, _ = strings.Cut(section, "\n### ")
+	blocks := strings.Split(section, "```json\n")
+	if len(blocks) != 3 || index < 0 || index > 1 {
+		t.Fatal("password examples incomplete")
+	}
+	block, _, found := strings.Cut(blocks[index+1], "\n```")
+	if !found {
+		t.Fatal("password example incomplete")
+	}
+	var value map[string]any
+	if err := json.Unmarshal([]byte(block), &value); err != nil {
+		t.Fatal(err)
+	}
+	if value["jsonrpc"] != "2.0" {
+		t.Fatal("wrong documentation envelope")
+	}
+	return value
+}
+
+func documentedAdminPasswordParams(t *testing.T) map[string]any {
+	t.Helper()
+	request := documentedAdminPasswordExample(t, 0)
+	params, ok := request["params"].(map[string]any)
+	if request["method"] != "change_password" || !ok {
+		t.Fatal("wrong documentation method or parameters")
+	}
+	return params
 }

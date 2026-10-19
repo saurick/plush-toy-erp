@@ -4261,7 +4261,7 @@
       loginBusy: false, loginInvalid: [], loginCapsLock: false, loginDialog: null,
       loginSmsSending: false, loginSmsPhone: '', loginSmsDeadline: 0, loginSmsExpires: 0, loginSmsHint: '',
       page: taskHandlingPreview ? 'tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'mobile-tasks' ? 'mobile-tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1,
-      devGraphModel: 'dag', devGraphExample: 'overview', devGraphNode: '', devGraphReferences: false, devGraphHighlightReturns: true, devArea: 'overview', devViews: { overview: 'evidence', engineering: 'tools', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
+      devIntegrationView: 'inventory', devGraphModel: 'dag', devGraphExample: 'overview', devGraphNode: '', devGraphReferences: false, devGraphHighlightReturns: true, devArea: 'overview', devViews: { overview: 'evidence', engineering: 'tools', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
       devQualityChecked: false, devPressurePreview: null,
       density: initialAppearance.density,
       tableLines: initialAppearance.tableLines,
@@ -4982,7 +4982,8 @@
     function updateDevDesignTabs() {
       for (const tabs of document.querySelectorAll('.dev-design-tabs')) {
         for (const button of tabs.querySelectorAll('[role="tab"]')) {
-          const active = button.dataset.value === state.devViews[state.devArea];
+          const selectedView = state.devArea==='engineering'&&state.devViews.engineering==='integration' ? state.devIntegrationView : state.devViews[state.devArea];
+          const active = button.dataset.value === selectedView;
           button.classList.toggle('active', active);
           button.setAttribute('aria-selected', String(active));
           button.tabIndex = active ? 0 : -1;
@@ -5006,7 +5007,8 @@
       devDesignTabObserver.disconnect();
       devProjectGraphObserver.disconnect();
       const focused=state.devArea==='engineering'&&state.devViews.engineering==='integration';
-      const area=focused?{...devDesignAreas.engineering,label:'接口与集成',views:[]}:devDesignAreas[state.devArea];
+      const area=focused?{...devDesignAreas.engineering,label:'接口与集成',views:[['inventory','接口清单'],['guide','接入指引']]}:devDesignAreas[state.devArea];
+      const currentView=focused?state.devIntegrationView:state.devViews[state.devArea];
       const viewKey=focused?'integration':state.devArea;
       if (view.dataset.devArea !== viewKey || !view.querySelector('.dev-design')) {
         view.dataset.devArea = viewKey;
@@ -5022,7 +5024,7 @@
       const panel = document.querySelector('#dev-design-panel');
       if (area.views.length) {
         panel.setAttribute('role', 'tabpanel');
-        panel.setAttribute('aria-labelledby', `dev-tab-${state.devViews[state.devArea]}`);
+        panel.setAttribute('aria-labelledby', `dev-tab-${currentView}`);
         panel.removeAttribute('aria-label');
       } else {
         panel.setAttribute('role', 'region');
@@ -5147,7 +5149,8 @@ active = new Set()
         const query=state.devSearch.integration||'',domain=state.devFilter.integration||'';
         const samples=[['auth','system_ping','未登记','章节说明','未关联回归来源'],['sales_order','get_sales_order','未登记','明细合同','1 项回归来源'],['sales_order','cancel_sales_order','取消销售订单','明细合同','2 项回归来源']];
         const rows=samples.filter(row=>(!domain||row[0]===domain)&&query.trim().toLowerCase().split(/\s+/).every(word=>`${row[0]}.${row[1]}`.includes(word)));
-        return `<section class="surface dev-design-section" aria-label="接口只读治理样例"><nav class="dev-design-toolbar" aria-label="合同与验证入口">${links}</nav><p class="data-note">3 条交互样例；正式页面读取公共契约生成物与已有只读来源。权限登记不表示当前调用者授权，回归来源不表示已执行。</p><div class="dev-design-toolbar"><label>业务域 <select data-dev-integration-domain aria-label="筛选业务域">${[['','全部业务域'],['auth','auth'],['sales_order','sales_order']].map(([value,label])=>`<option value="${value}" ${domain===value?'selected':''}>${label}</option>`).join('')}</select></label><label class="search"><input data-dev-integration-search aria-label="搜索业务域或方法" placeholder="搜索业务域或方法" value="${escapeHTML(query)}"></label><span>${rows.length} / 3 个接口样例</span></div><div class="dev-tool-list"><table class="dev-tool-table" aria-label="接口清单样例"><thead><tr><th>业务域</th><th>方法</th><th>关联权限</th><th>正式合同</th><th>验证来源</th></tr></thead><tbody>${rows.length?rows.map(row=>`<tr><td>${row[0]}</td><th><button class="btn dev-tool-link" data-action="dev-integration-method" data-value="${row[0]}.${row[1]}">${row[1]}</button></th><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`).join(''):'<tr><td colspan="5">没有匹配的接口，请调整筛选</td></tr>'}</tbody></table></div><section class="dev-tool-list" aria-label="模拟接入运行证据样例"><h3>模拟接入运行证据</h3><p class="data-note">设计样例，非运行结果。实际页面按需读取既有门禁原始回执，显示场景结果、源码身份与清理状态；历史、失败、跳过和缺失分别标注。</p><table class="dev-tool-table"><thead><tr><th>模拟场景</th><th>执行结果</th></tr></thead><tbody><tr><th>上游申报至质检入库</th><td>未读取（样例）</td></tr><tr><th>下游校对至出货应收</th><td>未读取（样例）</td></tr></tbody></table></section><p class="data-note">关联场景不等于逐接口完整覆盖；完整证据回到质量门禁核对。</p><details data-dev-integration-graph ${state.devIntegrationGraphOpen?'open':''}><summary>接入边界图</summary>${content}</details></section>`;
+        if(state.devIntegrationView==='guide') return `<section class="surface dev-design-section" aria-label="接入指引样例"><nav class="dev-design-toolbar" aria-label="合同与验证入口">${links}</nav><section data-dev-integration-guide><h3>接入方式选择</h3><p class="data-note">选择规则以正式接入规范为准，正式页面从同一章节读取。</p><button class="btn" data-action="dev-evidence" data-value="docs" data-reference="/__dev/docs?path=docs%2Fengineering%2F%E8%B7%A8%E5%B1%82%E5%85%AC%E5%85%B1%E5%A5%91%E7%BA%A6%E4%B8%8E%E7%94%9F%E6%88%90%E8%A7%84%E8%8C%83.md#%E6%8E%A5%E5%85%A5%E6%96%B9%E5%BC%8F%E9%80%89%E6%8B%A9--integration-selection">查看正式接入规范</button></section><details data-dev-integration-graph ${state.devIntegrationGraphOpen?'open':''}><summary>接入边界图</summary>${content}</details></section>`;
+        return `<section class="surface dev-design-section" aria-label="接口只读治理样例"><nav class="dev-design-toolbar" aria-label="合同与验证入口">${links}</nav><p class="data-note">3 条交互样例；正式页面读取公共契约生成物与已有只读来源。权限登记不表示当前调用者授权，回归来源不表示已执行。</p><div class="dev-design-toolbar"><label>业务域 <select data-dev-integration-domain aria-label="筛选业务域">${[['','全部业务域'],['auth','auth'],['sales_order','sales_order']].map(([value,label])=>`<option value="${value}" ${domain===value?'selected':''}>${label}</option>`).join('')}</select></label><label class="search"><input data-dev-integration-search aria-label="搜索业务域或方法" placeholder="搜索业务域或方法" value="${escapeHTML(query)}"></label><span>${rows.length} / 3 个接口样例</span></div><div class="dev-tool-list"><table class="dev-tool-table" aria-label="接口清单样例"><thead><tr><th>业务域</th><th>方法</th><th>关联权限</th><th>正式合同</th><th>验证来源</th></tr></thead><tbody>${rows.length?rows.map(row=>`<tr><td>${row[0]}</td><th><button class="btn dev-tool-link" data-action="dev-integration-method" data-value="${row[0]}.${row[1]}">${row[1]}</button></th><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`).join(''):'<tr><td colspan="5">没有匹配的接口，请调整筛选</td></tr>'}</tbody></table></div><section class="dev-tool-list" aria-label="模拟接入运行证据样例"><h3>模拟接入运行证据</h3><p class="data-note">设计样例，非运行结果。实际页面按需读取既有门禁原始回执，显示场景结果、源码身份与清理状态；历史、失败、跳过和缺失分别标注。</p><table class="dev-tool-table"><thead><tr><th>模拟场景</th><th>执行结果</th></tr></thead><tbody><tr><th>上游申报至质检入库</th><td>未读取（样例）</td></tr><tr><th>下游校对至出货应收</th><td>未读取（样例）</td></tr></tbody></table></section><p class="data-note">关联场景不等于逐接口完整覆盖；完整证据回到质量门禁核对。</p></section>`;
       }
       return `<section class="dev-project-models" aria-label="项目图视角"><nav class="surface dev-project-model-catalog" aria-label="图模型分类">${devProjectGraphGroups.map(group=>`<section><h3>${group.label}</h3>${group.models.map(key=>`<button class="dev-project-model-button" type="button" data-action="dev-project-graph-model" data-value="${key}" aria-pressed="${key===modelKey}"><strong>${devProjectGraphModels[key].name}</strong><span>${devProjectGraphModels[key].summary}</span></button>`).join('')}</section>`).join('')}</nav><section class="surface dev-design-section dev-project-model-panel" aria-label="图模型与项目示例"><div class="data-note">${model.crumb}</div><div class="dev-design-toolbar"><h3>${model.title}</h3><span class="badge" data-project-graph-classification>${classification.label}</span></div><p>${model.definition}</p><div class="dev-design-toolbar">${model.examples.length>1?`<label>项目示例 <select aria-label="项目示例" data-dev-project-example>${model.examples.map(key=>`<option value="${key}" ${key===exampleKey?'selected':''}>${devProjectGraphExamples[key].name}</option>`).join('')}</select></label>`:`<span>项目示例：${graph.name}</span>`}${graph.referenceEdge?`<label><input type="checkbox" data-dev-project-references ${state.devGraphReferences?'checked':''}> 叠加跨目录引用</label>`:''}${graph.edges.some(edge=>edge.kind==='return')?`<label><input type="checkbox" data-dev-project-loops ${state.devGraphHighlightReturns!==false?'checked':''}> 标出退回回路</label>`:''}</div>${content}<details><summary>模型判断与对应入口</summary><p>${state.devGraphReferences&&graph.referenceEdge?'叠加跨目录引用后，仍无有向回路，但整体已是一般 DAG，不再是严格目录树。':'树／森林按父 → 子定向时属于 DAG 的特例；DAG 允许多个前置汇合。'}</p><p>${graph.destinations.map(destination=>destination.label).join(' / ')}</p></details></section></section>`;
     }
@@ -5289,6 +5292,9 @@ active = new Set()
       } else if (action==='dev-pressure-preview') {
         state.devPressureScale=document.querySelector('#dev-pressure-scale-preview')?.value;state.devPressurePreview=target.dataset.value==='capacity'?'capacity':'quick';renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-view') {
+        if (state.devArea==='engineering'&&state.devViews.engineering==='integration'&&['inventory','guide'].includes(target.dataset.value)) {
+          state.devIntegrationView=target.dataset.value;renderDevWorkbench(document.querySelector('#view'));return true;
+        }
         if (!devDesignAreas[state.devArea].views.some(([key]) => key === target.dataset.value)) return true;
         state.devViews[state.devArea]=target.dataset.value;state.devPrepared=null;renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-filter'||action==='dev-clear') {
@@ -5299,7 +5305,7 @@ active = new Set()
       } else if (action==='dev-refresh') {
         state.devState='data';renderDevWorkbench(document.querySelector('#view'));
       } else if (action==='dev-integration-method') {
-        state.infoModal={title:`${target.dataset.value} · 接口依据样例`,html:'<dl class="dev-design-evidence"><dt>权限登记</dt><dd>正式页面按现有 backend_methods 精确关联，未关联和读取失败分别标注。</dd><dt>正式合同</dt><dd>进入 API 原文锚点；明细、章节说明与未逐项登记分别展示。</dd><dt>验证依据</dt><dd>回归源码只证明来源存在；未关联逐接口运行回执，当前结果为未验证。</dd></dl><p class="data-note">这是交互样例，不读取真实权限、运行测试或写入业务。</p>',confirmAction:'dev-close',confirmLabel:'返回接口清单'};state.overlay='info';renderFloating();
+        state.infoModal={title:`${target.dataset.value} · 接口依据样例`,html:'<dl class="dev-design-evidence"><dt>权限登记</dt><dd>正式页面按现有 backend_methods 精确关联，未关联和读取失败分别标注。</dd><dt>查看位置</dt><dd>正式页面从清单右侧打开详情；地址、页签和返回按钮保持可见，长资料在正文区滚动。关闭后保留筛选并恢复入口焦点。</dd><dt>正式合同</dt><dd>权限、合同和验证来源分别定位对应资料；缺少字段或报文时可直接查看正式文档关联。</dd><dt>报文复制</dt><dd>JSON / cURL 格式随 URL 恢复；复制失败提供已选中的只读文本。切换资料清除旧反馈和待复制内容。</dd><dt>验证依据</dt><dd>回归源码只证明来源存在；未关联逐接口运行回执，当前结果为未验证。</dd></dl><p class="data-note">这是交互样例，不读取真实权限、运行测试或写入业务。</p>',confirmAction:'dev-close',confirmLabel:'返回接口清单'};state.overlay='info';renderFloating();
       } else if (action==='dev-evidence') {
         const source=devDesignRecords.find(item=>item.key===target.dataset.value);if(!source)return true;
         const row=devDesignRecordState(source);

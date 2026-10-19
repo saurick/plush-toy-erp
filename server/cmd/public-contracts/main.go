@@ -19,14 +19,16 @@ import (
 )
 
 type catalog struct {
-	TaskDiscovery map[string]any               `json:"taskDiscovery"`
-	Permissions   map[string]string            `json:"permissions"`
-	States        map[string]map[string]string `json:"states"`
-	Attachments   map[string]any               `json:"attachments"`
-	Numeric       map[string]int64             `json:"numeric"`
-	Policies      map[string]map[string]int64  `json:"policies"`
-	RPC           map[string]map[string]string `json:"rpc"`
-	RPCTransport  map[string]string            `json:"rpcTransport"`
+	TaskDiscovery map[string]any                            `json:"taskDiscovery"`
+	Permissions   map[string]string                         `json:"permissions"`
+	States        map[string]map[string]string              `json:"states"`
+	Attachments   map[string]any                            `json:"attachments"`
+	Numeric       map[string]int64                          `json:"numeric"`
+	Policies      map[string]map[string]int64               `json:"policies"`
+	RPC           map[string]map[string]string              `json:"rpc"`
+	RPCTransport  map[string]string                         `json:"rpcTransport"`
+	RPCInspection map[string]map[string]rpcSourceInspection `json:"rpcInspection"`
+	RPCCalls      map[string]map[string]rpcCallContract     `json:"rpcCalls"`
 }
 
 var wordBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
@@ -661,6 +663,14 @@ func collect(root string) (catalog, error) {
 		return out, err
 	}
 	out.RPCTransport, err = rpcTransport(root)
+	if err != nil {
+		return out, err
+	}
+	out.RPCInspection, err = rpcInspection(root, out.RPC)
+	if err != nil {
+		return out, err
+	}
+	out.RPCCalls, err = rpcCallContracts(root, out.RPC, out.RPCInspection)
 	return out, err
 }
 

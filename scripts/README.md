@@ -98,4 +98,4 @@ bash scripts/doctor.sh
 
 ## 公共契约生成 / Public Contracts
 
-`node scripts/gen-public-contracts.mjs` 从后端正式声明生成 Web 权限、业务及流程状态、附件约束、RPC 标识、数值、密码和打印限制，并同步任务目录的 Web 模块与交互稿片段；`--check` 只读检查漂移。`node scripts/qa/public-contract-consumers.mjs` 检查 Web 引用和发布脚本的静态 RPC；契约源变化由 affected 自动选择同步及消费者检查。维护步骤与边界见[跨层公共契约与生成规范](../docs/engineering/跨层公共契约与生成规范.md)，错误码继续使用 `gen-error-codes.mjs`。
+`node scripts/gen-public-contracts.mjs` 从后端正式声明生成 Web 权限、业务及流程状态、附件约束、RPC 标识、数值、密码和打印限制，并同步任务目录的 Web 模块与交互稿片段；同一入口从实际分发、参数解析和返回映射补齐 `server/docs/api.md` 的全部逐方法字段合同、请求与响应示例，校验模拟样例的覆盖、类型、必填条件、可空值和测试来源，并生成仅供 DEV 工作台追溯的方法源码索引。`--check` 只读检查全部生成物漂移，不改文档或样例。`node scripts/qa/public-contract-consumers.mjs` 检查 Web 引用和发布脚本的静态 RPC；契约源变化由 affected 自动选择同步及消费者检查。维护步骤与边界见[跨层公共契约与生成规范](../docs/engineering/跨层公共契约与生成规范.md)，错误码继续使用 `gen-error-codes.mjs`。

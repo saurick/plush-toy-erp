@@ -30,7 +30,7 @@ function moduleSource(source, exports) {
 }
 
 export function renderCatalog(catalog) {
-  for (const key of ['permissions', 'states', 'attachments', 'numeric', 'policies', 'rpc', 'rpcTransport', 'taskDiscovery']) {
+  for (const key of ['permissions', 'states', 'attachments', 'numeric', 'policies', 'rpc', 'rpcTransport', 'rpcInspection', 'taskDiscovery']) {
     if (!catalog[key] || Object.keys(catalog[key]).length === 0) throw new Error(`缺少契约：${key}`)
   }
   const precision = catalog.numeric.Precision
@@ -53,12 +53,13 @@ export function renderCatalog(catalog) {
     'numeric.generated.mjs': moduleSource('server/internal/core/value/numeric.go', { NumericContract: numeric }),
     'policies.generated.mjs': moduleSource('server/internal/biz/admin_password.go、server/internal/biz/help_content.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
     'rpcMethods.generated.mjs': moduleSource('server/api/jsonrpc/v1/jsonrpc.pb.go 消息描述、HTTP binding、Swagger 及 server/internal/service 的实际分发', { RpcTransport: catalog.rpcTransport, RpcDomain: domains, RpcMethod: catalog.rpc }),
+    'rpcInspection.generated.mjs': moduleSource('server/internal/service 实际分支与参数读取点；仅供 DEV 工作台核对，不是完整 Schema 或授权结论', { RpcInspection: catalog.rpcInspection }),
   }
 }
 
 export function loadCatalog(repositoryRoot = root) {
   const result = spawnSync('go', ['run', './cmd/public-contracts', '--root', repositoryRoot], {
-    cwd: path.join(root, 'server'), encoding: 'utf8', maxBuffer: 2 * 1024 * 1024, timeout: 120_000,
+    cwd: path.join(root, 'server'), encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 120_000,
     env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
   })
   if (result.error) throw result.error
@@ -69,11 +70,15 @@ export function loadCatalog(repositoryRoot = root) {
 export function syncOutputs(outputs, { repositoryRoot = root, check = false } = {}) {
   const changed = []
   for (const [name, content] of Object.entries(outputs)) {
-    const relative = `${outputDirectory}/${name}`
+    const relative = name === 'rpcInspection.generated.mjs'
+      ? `web/src/dev-workbench/config/${name}` : `${outputDirectory}/${name}`
     const destination = path.join(repositoryRoot, relative)
     if (fs.existsSync(destination) && fs.readFileSync(destination, 'utf8') === content) continue
     changed.push(relative)
-    if (!check) fs.writeFileSync(destination, content)
+    if (!check) {
+      fs.mkdirSync(path.dirname(destination), { recursive: true })
+      fs.writeFileSync(destination, content)
+    }
   }
   if (check && changed.length) {
     throw new Error(`公共契约生成物未同步：${changed.join(', ')}；请运行 node scripts/gen-public-contracts.mjs`)
@@ -100,13 +105,157 @@ export function syncTaskDesignCatalog(catalog, { repositoryRoot = root, check = 
   return [relative]
 }
 
+const rpcDocsStart = '<!-- BEGIN GENERATED RPC FIELD CONTRACTS -->'
+const rpcDocsEnd = '<!-- END GENERATED RPC FIELD CONTRACTS -->'
+const requestFieldType = (field) => field.nullable && !field.type.split(/\s*\|\s*/u).includes('null') ? `${field.type} | null` : field.type
+const rpcTableCell = (value) => String(value ?? '').replaceAll('|', '&#124;').replace(/\s+/gu, ' ').trim()
+
+function completeManualRPCTables(catalog, source) {
+  const lines = source.split('\n')
+  const out = []
+  let current
+  let part
+  let fence = false
+  const cell = rpcTableCell
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]
+    if (!fence && line === '```json' && current && part === 'response' && typeof current.example.message === 'string') {
+      const close = lines.indexOf('```', index + 1)
+      if (close > index) {
+        try {
+          const value = JSON.parse(lines.slice(index + 1, close).join('\n'))
+          if (value?.result?.code === 0) {
+            value.result.message = current.example.message
+            out.push(line, JSON.stringify(value, null, 2), lines[close])
+            index = close
+            continue
+          }
+        } catch { /* Keep authored invalid examples visible for their existing format guard. */ }
+      }
+    }
+    if (/^```/u.test(line)) fence = !fence
+    if (!fence) {
+      if (/^#{1,4} /u.test(line)) {
+        current = undefined
+        part = undefined
+        const method = /^#### .*`([a-z_]+)\.([a-z_]+)`/u.exec(line)
+        if (method) current = catalog.rpcCalls?.[method[1]]?.[method[2]]
+      }
+      if (line === '##### 请求参数') part = 'parameters'
+      if (line === '##### 返回结果') part = 'response'
+      if (current && part && /^\| (字段|返回字段|result\.data 字段) \|/u.test(line) && /^\| ---/u.test(lines[index + 1] || '')) {
+        const header = line
+        const relativeResponse = part === 'response' && /^\| result\.data 字段 \|/u.test(line)
+        const originals = new Map()
+        index += 2
+        while (lines[index]?.startsWith('|')) {
+          const cells = lines[index].split(/(?<!\\)\|/u).slice(1, -1).map((value) => value.trim().replaceAll('\\|', '|'))
+          const name = cells[0].replaceAll('`', '')
+          originals.set(relativeResponse ? `result.data.${name}` : name, cells)
+          index++
+        }
+        index--
+        out.push(part === 'parameters' ? header : '| 返回字段 | 类型 | 说明 |', part === 'parameters' ? '| --- | --- | --- | --- |' : '| --- | --- | --- |')
+        if (part === 'response') {
+          for (const [name, type, description] of [
+            ['result.code', 'integer', '业务结果码；成功为 0，错误复用正式码表。'],
+            ['result.message', 'string', '业务结果提示。'],
+            ['result.data', current.dataType === 'null' ? 'null' : `${current.dataType} / null`, '当前方法的业务返回内容；统一封装允许空 data。'],
+          ]) {
+            const old = originals.get(name)
+            if (old) out.push(`| ${old.map(cell).join(' | ')} |`)
+            else out.push(`| \`${name}\` | ${cell(type)} | ${description} |`)
+          }
+        }
+        for (const field of current[part] || []) {
+          const old = originals.get(field.name)
+          const description = old?.at(-1) || ''
+          const generated = /^(解析器 |后端返回映射字段|由后端实际解析读取|当前参数白名单接受|读取 JSON 原值)/u.test(description) || /依据：`server\/[^`]+:\d+`。$/u.test(description)
+          if (old && !generated) {
+            if (part === 'parameters') {
+              const accepted = new Set(requestFieldType(field).split(' | '))
+              const authored = old[1].replaceAll('&#124;', '|').replaceAll('\\|', '|').split(' | ')
+              if (!authored.every((type) => accepted.has(type.replace(/^array<.*>$/u, 'array')))) throw new Error(`人工字段类型超出后端解析器：${field.name}`)
+            }
+            out.push(part === 'parameters' ? `| \`${field.name}\` | ${cell(old[1])} | ${cell(old[2])} | ${cell(description)} |` : `| \`${field.name}\` | ${cell(field.type)} | ${cell(description)} |`)
+          } else {
+            const reference = field.source?.path ? ` 依据：\`${field.source.path}:${field.source.line}\`。` : ''
+            out.push(part === 'parameters' ? `| \`${field.name}\` | ${cell(requestFieldType(field))} | ${cell(field.required)} | ${cell(field.description)}${reference} |` : `| \`${field.name}\` | ${cell(field.type)} | 后端返回映射字段；按实际权限、状态及查询范围返回。${reference} |`)
+          }
+        }
+        continue
+      }
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
+export function renderRPCDocumentation(catalog, source) {
+  const begin = source.indexOf(rpcDocsStart)
+  const end = source.indexOf(rpcDocsEnd)
+  if ((begin < 0) !== (end < 0) || (begin >= 0 && (end <= begin || source.indexOf(rpcDocsStart, begin + 1) >= 0 || source.indexOf(rpcDocsEnd, end + 1) >= 0))) {
+    throw new Error('接口字段合同生成标记缺失、重复或顺序错误')
+  }
+  const base = begin < 0 ? source : source.slice(0, begin) + source.slice(end + rpcDocsEnd.length)
+  const methods = new Set(Object.entries(catalog.rpc).flatMap(([domain, names]) => Object.values(names).map((method) => `${domain}.${method}`)))
+  const names = new Map()
+  const manual = new Set()
+  let domain = ''
+  let fence = false
+  for (const line of base.split(/\r?\n/u)) {
+    if (/^```/u.test(line)) fence = !fence
+    if (fence) continue
+    const heading = /^### .*`([a-z_]+)`\s*$/u.exec(line)
+    if (heading && catalog.rpc[heading[1]]) domain = heading[1]
+    const row = /^\|\s*`([a-z_]+)`\s*\|\s*([^|]+)\|/u.exec(line)
+    if (row && methods.has(`${domain}.${row[1]}`)) names.set(`${domain}.${row[1]}`, row[2].trim())
+    if (/^#### /u.test(line)) {
+      for (const match of line.matchAll(/`([a-z_]+\.[a-z_]+)`/gu)) if (methods.has(match[1])) manual.add(match[1])
+    }
+  }
+  const cell = rpcTableCell
+  const sourceRef = (field) => field.source?.path && field.source?.line ? ` 依据：\`${field.source.path}:${field.source.line}\`。` : ''
+  const body = []
+  for (const key of [...methods].sort()) {
+    const [domainKey, method] = key.split('.')
+    const contract = catalog.rpcCalls?.[domainKey]?.[method]
+    if (!contract || !names.has(key)) throw new Error(`接口字段合同或中文名称缺失：${key}`)
+    if (manual.has(key)) continue
+    const fields = contract.parameters || []
+    const response = contract.response || []
+    const request = { jsonrpc: '2.0', method, params: contract.example.params, id: `rpc-demo-${key}` }
+    const result = { jsonrpc: '2.0', id: request.id, result: { code: 0, ...(typeof contract.example.message === 'string' ? { message: contract.example.message } : {}), data: contract.example.data } }
+    body.push(`#### ${names.get(key)} \`${key}\``, '', '##### 请求参数', '', '| 字段 | 类型 | 必填条件 | 说明 |', '| --- | --- | --- | --- |')
+    for (const field of fields) body.push(`| \`${cell(field.name)}\` | ${cell(requestFieldType(field))} | ${cell(field.required)} | ${cell(field.description)}${sourceRef(field)} |`)
+    body.push('', fields.length ? '必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。' : '此方法不读取业务参数；示例使用空对象。', '', '```json', JSON.stringify(request, null, 2), '```', '', '##### 返回结果', '', '| 返回字段 | 类型 | 说明 |', '| --- | --- | --- |', '| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |', '| `result.message` | string | 业务结果提示。 |', `| \`result.data\` | ${cell(contract.dataType)}${contract.dataType === 'null' ? '' : ' / null'} | 当前方法的业务返回内容；统一封装允许空 data。 |`)
+    for (const field of response) body.push(`| \`${cell(field.name)}\` | ${cell(field.type)} | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。${sourceRef(field)} |`)
+    body.push('', '以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。', '', '```json', JSON.stringify(result, null, 2), '```', '')
+    if (contract.example.source) body.push(`样例依据：[${contract.example.test}](../${contract.example.source.path.replace(/^server\//u, '')}) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。`, '')
+    else body.push('样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。', '')
+  }
+  const generated = `${rpcDocsStart}\n\n本节由 \`node scripts/gen-public-contracts.mjs\` 从当前后端解析器、DTO、返回映射和模拟样例生成。前文逐项维护的调用合同继续作为其方法真源；本节补齐其余方法，不维护第二份方法目录。\n\n${body.join('\n')}\n${rpcDocsEnd}`
+  return begin >= 0 ? completeManualRPCTables(catalog, source.slice(0, begin)) + generated + completeManualRPCTables(catalog, source.slice(end + rpcDocsEnd.length)) : `${completeManualRPCTables(catalog, source).trimEnd()}\n\n## 全量接口字段合同 / RPC Field Contracts\n\n${generated}\n`
+}
+
+export function syncRPCDocumentation(catalog, { repositoryRoot = root, check = false } = {}) {
+  const relative = 'server/docs/api.md'
+  const file = path.join(repositoryRoot, relative)
+  const source = fs.readFileSync(file, 'utf8')
+  const next = renderRPCDocumentation(catalog, source)
+  if (next === source) return []
+  if (check) throw new Error('接口字段合同未同步，请运行 node scripts/gen-public-contracts.mjs')
+  fs.writeFileSync(file, next)
+  return [relative]
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const args = process.argv.slice(2)
     if (args.some((arg) => arg !== '--check') || args.length > 1) throw new Error('仅支持 --check 或无参数生成')
     const catalog = loadCatalog()
     const outputs = renderCatalog(catalog)
-    const changed = [...syncOutputs(outputs, { check: args.includes('--check') }), ...syncTaskDesignCatalog(catalog, { check: args.includes('--check') })]
+    const changed = [...syncOutputs(outputs, { check: args.includes('--check') }), ...syncTaskDesignCatalog(catalog, { check: args.includes('--check') }), ...syncRPCDocumentation(catalog, { check: args.includes('--check') })]
     console.log(`[gen-public-contracts] ${args.includes('--check') ? '检查通过' : `已同步 ${changed.length} 个文件`}`)
   } catch (error) {
     console.error(`[gen-public-contracts] ${error.message}`)
