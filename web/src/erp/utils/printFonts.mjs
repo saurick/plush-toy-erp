@@ -1,5 +1,12 @@
 import { PrintPolicy } from '../../common/consts/policies.generated.mjs'
 
+export class PrintFontLoadError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'PrintFontLoadError'
+  }
+}
+
 export const PRINT_FONT_FAMILIES = [
   'Noto Sans SC Variable',
   'Noto Serif SC Variable',
@@ -75,7 +82,7 @@ export async function preparePrintFonts(element) {
     )
   })
   if (!selected.length || selected.length > PRINT_FONT_LIMITS.count) {
-    throw new Error('打印字体尚未就绪，请刷新页面后重试。')
+    throw new PrintFontLoadError('打印字体尚未就绪，请刷新页面后重试。')
   }
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 8000)
@@ -92,7 +99,7 @@ export async function preparePrintFonts(element) {
         url.origin !== new URL(document.baseURI).origin ||
         !/\.woff2(?:\?|$)/.test(url.href)
       ) {
-        throw new Error('打印字体来源无效，请刷新页面后重试。')
+        throw new PrintFontLoadError('打印字体来源无效，请刷新页面后重试。')
       }
       const response = await view.fetch(url.href, {
         signal: controller.signal,
@@ -103,7 +110,7 @@ export async function preparePrintFonts(element) {
         Number(response.headers.get('content-length')) >
           PRINT_FONT_LIMITS.eachBytes
       ) {
-        throw new Error('打印字体加载失败，请刷新页面后重试。')
+        throw new PrintFontLoadError('打印字体加载失败，请刷新页面后重试。')
       }
       const reader = response.body?.getReader()
       let bytes
@@ -117,7 +124,7 @@ export async function preparePrintFonts(element) {
             length += part.value.length
             if (length > PRINT_FONT_LIMITS.eachBytes) {
               await reader.cancel()
-              throw new Error('打印字体超出单次大小限制，请重试。')
+              throw new PrintFontLoadError('打印字体超出单次大小限制，请重试。')
             }
             parts.push(part.value)
           }
@@ -139,7 +146,9 @@ export async function preparePrintFonts(element) {
         totalBytes > PRINT_FONT_LIMITS.totalBytes ||
         String.fromCharCode(...bytes.slice(0, 4)) !== 'wOF2'
       ) {
-        throw new Error('打印字体超出单次大小限制，请减少内容后重试。')
+        throw new PrintFontLoadError(
+          '打印字体超出单次大小限制，请减少内容后重试。'
+        )
       }
       let binary = ''
       for (let index = 0; index < bytes.length; index += 8192) {
@@ -172,7 +181,7 @@ export async function preparePrintFonts(element) {
     return chunks.join('\n')
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw new Error('打印字体加载超时，请重试。')
+      throw new PrintFontLoadError('打印字体加载超时，请重试。')
     }
     throw error
   } finally {

@@ -1,7 +1,65 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { __TEST_ONLY__, openPdfPreviewWindowFromBlob } from './printPdf.mjs'
+import {
+  __TEST_ONLY__,
+  openPdfPreviewWindowFromBlob,
+  schedulePdfPreviewWarmup,
+} from './printPdf.mjs'
+import { PrintFontLoadError } from './printFonts.mjs'
+
+test('printPdf: background warmup observes asynchronous font failures and cancellation prevents queued work', async () => {
+  const originalWindow = globalThis.window
+  const callbacks = new Map()
+  let nextID = 0
+  const reported = []
+  globalThis.window = {
+    setTimeout(callback) {
+      callbacks.set(++nextID, callback)
+      return nextID
+    },
+    clearTimeout(id) {
+      callbacks.delete(id)
+    },
+    reportError(error) {
+      reported.push(error)
+    },
+  }
+  try {
+    let observed = 0
+    schedulePdfPreviewWarmup(() => ({
+      then(_resolve, reject) {
+        observed++
+        reject(new PrintFontLoadError('打印字体加载超时，请重试。'))
+      },
+    }))
+    callbacks.get(1)()
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(observed, 1, 'background promise rejection must have an owner')
+    assert.deepEqual(reported, [])
+    let canceledCalls = 0
+    const cancel = schedulePdfPreviewWarmup(() => {
+      canceledCalls++
+    })
+    const queued = callbacks.get(2)
+    cancel()
+    queued()
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.equal(canceledCalls, 0)
+    const programmingError = new TypeError('unexpected render failure')
+    schedulePdfPreviewWarmup(() => Promise.reject(programmingError))
+    callbacks.get(3)()
+    await new Promise((resolve) => setImmediate(resolve))
+    assert.deepEqual(
+      reported,
+      [programmingError],
+      'unexpected faults must still reach runtime reporting'
+    )
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window
+    else globalThis.window = originalWindow
+  }
+})
 
 class FakeNode {
   constructor(tagName, ownerDocument) {
@@ -1030,7 +1088,10 @@ test('printPdf: 快照移除编辑提示并保留图片及业务正文，不改�
 
   assert.equal(root.querySelector('[data-print-editor-only]'), null)
   assert.doesNotMatch(root.outerHTML, /右上产品图 1/)
-  assert.equal(root.querySelector('img').getAttribute('src'), 'data:image/png;base64,AA==')
+  assert.equal(
+    root.querySelector('img').getAttribute('src'),
+    'data:image/png;base64,AA=='
+  )
   assert.equal(root.querySelector('img').getAttribute('alt'), '已确认产品图')
   assert.match(root.outerHTML, /按产品图核对裁片颜色/)
   assert.equal(target.querySelector('[data-print-editor-only]'), hint)

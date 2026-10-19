@@ -1,5 +1,5 @@
 import { assertPrintSnapshotBudget } from './printOutputPreflight.mjs'
-import { preparePrintFonts } from './printFonts.mjs'
+import { preparePrintFonts, PrintFontLoadError } from './printFonts.mjs'
 import { AUTH_SCOPE, getToken } from '../../common/auth/auth.js'
 import { getActionErrorMessage } from '../../common/utils/errorMessage.js'
 
@@ -1325,9 +1325,21 @@ export const schedulePdfPreviewWarmup = (callback, options = {}) => {
   let delayID = window.setTimeout(() => {
     delayID = 0
     const runWarmup = () => {
-      if (!cancelled) {
-        callback()
-      }
+      // 预热只填充缓存；失败仍由显式预览或导出重试并展示操作提示。
+      Promise.resolve()
+        .then(() => {
+          if (!cancelled) return callback()
+        })
+        .catch((error) => {
+          if (error instanceof PrintFontLoadError) return
+          if (typeof window.reportError === 'function') {
+            window.reportError(error)
+          } else {
+            window.setTimeout(() => {
+              throw error
+            }, 0)
+          }
+        })
     }
 
     if (typeof window.requestIdleCallback === 'function') {
