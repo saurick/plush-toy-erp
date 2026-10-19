@@ -52,6 +52,7 @@ func TestSafeServerTracingClassifiesRPCEnvelopeAndPreservesReply(t *testing.T) {
 	}{
 		{name: "success", outcome: "success", code: errcode.OK.Code, status: codes.Ok},
 		{name: "permission rejection", outcome: "rejected", code: errcode.PermissionDenied.Code, status: codes.Ok},
+		{name: "request canceled", outcome: "canceled", code: errcode.RequestCanceled.Code, status: codes.Ok},
 		{name: "system error in HTTP 200", outcome: "error", code: errcode.Internal.Code, status: codes.Error},
 		{name: "domain system error", outcome: "error", code: errcode.UserListFailed.Code, status: codes.Error},
 		{name: "reply error", outcome: "error", replyError: "private-reply-error", status: codes.Error},

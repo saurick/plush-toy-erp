@@ -24,8 +24,21 @@ test('page-level attachment entrypoints open attachments through modal actions',
   for (const relativePath of pageLevelAttachmentEntrypoints) {
     const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
 
+    let attachmentSource = source
+    if (relativePath === '../mobile/components/MobileTaskDetailScreen.jsx') {
+      assert.match(source, /import MobileTaskAttachments from '\.\/MobileTaskAttachments\.jsx'/u)
+      assert.match(source, /<MobileTaskAttachments task=\{selectedTask\} canManage=\{canManageAttachments\}\s*\/>/u)
+      attachmentSource = readFileSync(new URL('../mobile/components/MobileTaskAttachments.jsx', import.meta.url), 'utf8')
+      assert.match(attachmentSource, /<BusinessAttachmentModalButton/u)
+      assert.match(attachmentSource, /ownerType="workflow_task"/u)
+      assert.match(attachmentSource, /ownerId=\{task\.id\}/u)
+      assert.match(attachmentSource, /ownerVersion=\{task\.version\}/u)
+      assert.match(attachmentSource, /canUpload=\{canManage\}/u)
+      assert.match(attachmentSource, /canWithdraw=\{canManage\}/u)
+      assert(!attachmentSource.includes('<BusinessAttachmentPanel'))
+    }
     assert(
-      source.includes('BusinessAttachmentModalButton'),
+      attachmentSource.includes('BusinessAttachmentModalButton'),
       `${relativePath} should expose page-level attachments through the modal action button`
     )
     assert(

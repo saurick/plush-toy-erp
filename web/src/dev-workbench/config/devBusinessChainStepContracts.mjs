@@ -123,11 +123,52 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         responsibilityMode: 'system',
         stateRefs: [state('master.bom', 'ACTIVE', 'precondition')],
       }),
-      'sales_acceptance:posts_fact:stock_reservation': step({
-        responsibilityMode: 'system',
+      'sales_order:posts_fact:stock_reservation': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['sales', 'warehouse'],
+        capabilityKeys: [PermissionCode.STOCK_RESERVATION_CREATE],
         stateRefs: [
           state('source.sales_order', 'active', 'precondition'),
           state('fact.stock_reservation', 'ACTIVE', 'result'),
+        ],
+      }),
+      'effective_bom:calls_domain_command:material_request': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['engineering', 'boss', 'finance'],
+        stateTransitionRefs: [
+          transition(
+            'source.engineering_material_request',
+            'SUBMITTED->BOSS_APPROVED'
+          ),
+          transition(
+            'source.engineering_material_request',
+            'BOSS_APPROVED->APPROVED'
+          ),
+        ],
+        stateRefs: [
+          state('source.sales_order', 'active', 'precondition'),
+          state('source.sales_order_engineering', 'CONFIRMED', 'precondition'),
+          state('master.bom', 'ACTIVE', 'precondition'),
+        ],
+      }),
+      'material_request:creates_source:generated_purchase_order': step({
+        stateRefs: [
+          state(
+            'source.engineering_material_request',
+            'APPROVED',
+            'precondition'
+          ),
+          state('source.purchase_order', 'approved', 'result'),
+        ],
+      }),
+      'material_request:requires:production_order': step({
+        stateRefs: [
+          state(
+            'source.engineering_material_request',
+            'APPROVED',
+            'precondition'
+          ),
+          state('source.sales_order_engineering', 'CONFIRMED', 'precondition'),
         ],
       }),
       'effective_bom:creates_source:production_order': step({
@@ -154,7 +195,10 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'sales_acceptance:creates_task:sales_tasks',
         'sales_tasks:calls_domain_command:sales_acceptance',
         'sales_acceptance:requires:effective_bom',
-        'sales_acceptance:posts_fact:stock_reservation',
+        'sales_order:posts_fact:stock_reservation',
+        'effective_bom:calls_domain_command:material_request',
+        'material_request:creates_source:generated_purchase_order',
+        'material_request:requires:production_order',
         'effective_bom:creates_source:production_order',
       ],
       interruptionStepKeys: [
@@ -785,6 +829,21 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           ),
         ],
       }),
+      'inventory_operation:posts_fact:adjusted_inventory_lot': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
+        stateTransitionRefs: [
+          transition('fact.inventory_operation', 'DRAFT->POSTED'),
+        ],
+        stateRefs: [state('fact.inventory_lot', 'ACTIVE', 'result')],
+      }),
+      'adjusted_inventory_lot:reverses:inventory_operation': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
+        stateTransitionRefs: [
+          transition('fact.inventory_operation', 'POSTED->CANCELLED'),
+        ],
+      }),
       'inventory_adjustment_task:returns:inventory_operation': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['boss'],
@@ -806,6 +865,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'inventory_adjustment_process:creates_task:inventory_adjustment_task',
         'inventory_adjustment_task:calls_domain_command:inventory_adjustment_process',
         'inventory_adjustment_process:posts_fact:adjusted_inventory_lot',
+        'inventory_operation:posts_fact:adjusted_inventory_lot',
       ],
       interruptionStepKeys: [
         'inventory_adjustment_task:returns:inventory_operation',
@@ -814,6 +874,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       interruptionKinds: ['blocked', 'rejected', 'resume'],
       correctionStepKeys: [
         'inventory_adjustment_process:posts_fact:adjusted_inventory_lot',
+        'adjusted_inventory_lot:reverses:inventory_operation',
       ],
       protectedStepKey:
         'inventory_adjustment_process:posts_fact:adjusted_inventory_lot',

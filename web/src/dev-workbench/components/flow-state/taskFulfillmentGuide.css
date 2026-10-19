@@ -9,7 +9,10 @@
 .erp-dev-fulfillment-guide__step-number { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--erp-surface-bg-soft); color: var(--erp-text-muted); font-variant-numeric: tabular-nums; }
 .erp-dev-fulfillment-guide__step-copy { display: grid; gap: 3px; min-width: 0; }
 .erp-dev-fulfillment-guide__step-copy small { font-size: var(--erp-font-caption); font-weight: 400; }
+.erp-dev-exception-directory__stages button { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: baseline; width: 100%; height: 100%; min-height: 44px; padding: 12px; border: 1px solid var(--erp-border); border-radius: 6px; text-align: left; background: var(--erp-surface-bg); color: var(--erp-text); cursor: pointer; font: inherit; }
 .erp-dev-exception-directory__list button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 16px 8px; text-align: left; border: 0; border-bottom: 1px solid var(--erp-border); background: var(--erp-surface-bg); color: var(--erp-text); cursor: pointer; font: inherit; }
+.erp-dev-exception-directory__stages button:hover { background: var(--erp-interactive-bg-hover); }
+.erp-dev-exception-directory__stages button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 2px; }
 .erp-dev-exception-directory__list button:hover { background: var(--erp-interactive-bg-hover); }
 .erp-dev-exception-directory__list button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: -2px; }
 .erp-dev-fulfillment-guide__steps button:hover { background: var(--erp-interactive-bg-hover); }
@@ -69,6 +72,17 @@
 .erp-dev-exception-directory .ant-drawer-title { text-align: center; padding-right: 44px; }
 .erp-dev-exception-directory .ant-drawer-close { min-width: 44px; min-height: 44px; margin: 0; }
 .erp-dev-exception-directory__scope { margin: 0 0 16px; color: var(--erp-text-muted); font-size: var(--erp-font-small); }
+.erp-dev-exception-directory__stages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; }
+.erp-dev-exception-directory__stages[data-current] { grid-template-columns: minmax(0, 1fr); }
+.erp-dev-exception-directory__stage-copy { display: grid; gap: 6px; min-width: 0; line-height: 1.6; }
+.erp-dev-exception-directory__stage-copy small { color: var(--erp-text-muted); font: inherit; }
+.erp-dev-exception-directory__stages li[data-role-match="false"] button { color: var(--erp-text-muted); }
+.erp-dev-exception-directory__stages li[data-role-match="true"] button { background: var(--erp-primary-soft); }
+.erp-dev-exception-directory__heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.erp-dev-exception-directory__heading h3 { margin: 0; }
+.erp-dev-exception-directory__boundary { margin-top: 20px; color: var(--erp-text-muted); line-height: 1.7; }
+.erp-dev-fulfillment-guide__mode { justify-self: start; max-width: 100%; }
+.erp-dev-fulfillment-guide__handling { display: grid; gap: 16px; scroll-margin-block: 16px; }
 .erp-dev-exception-directory__list { list-style: none; margin: 0; padding: 0; }
 .erp-dev-exception-directory__list small { display: block; margin-top: 6px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); line-height: 1.6; }
 .erp-dev-exception-directory__marks { display: flex; flex-wrap: wrap; justify-content: end; flex-shrink: 0; gap: 6px 10px; max-width: 104px; color: var(--erp-primary); font-size: var(--erp-font-caption); }
@@ -95,6 +109,7 @@
   .erp-dev-fulfillment-guide__back-to-overview { display: inline-flex; }
 }
 @media (max-width: 800px) {
+  .erp-dev-exception-directory__stages { grid-template-columns: minmax(0, 1fr); }
   .erp-dev-fulfillment-guide__role { width: 100%; }
   .erp-dev-fulfillment-guide__role .ant-select { flex: 1; }
 }

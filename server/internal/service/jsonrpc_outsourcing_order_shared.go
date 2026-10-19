@@ -182,6 +182,9 @@ func outsourcingOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.Outs
 }
 
 func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if result := d.outsourcingOrderErrorResult(ctx, err); result != nil {
 		return result
 	}

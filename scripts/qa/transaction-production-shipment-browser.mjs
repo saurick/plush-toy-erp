@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { captureFlowFieldPage } from "./transaction-flow-fields-browser.mjs";
 import { createRequire } from "node:module";
-import { prepareTransactionProductionSource, prepareTransactionSourceTask } from "./transaction-real-backend-fixture.mjs";
+import { prepareTransactionProductionSource, prepareTransactionSourceTask, prepareTransactionProductOutsourcingContract } from "./transaction-real-backend-fixture.mjs";
 import {
   businessURL,
   flowKey,
@@ -160,6 +160,10 @@ export function assertProductionShipmentEvidence(report) {
         },
       ],
     );
+    for (const stage of production.fulfillment.slice(1)) {
+      assert.deepEqual(stage.visibleReadiness, stage.readiness, 'the actual inventory surface must show the same fulfillment quantities');
+      assert.ok(Number.isSafeInteger(stage.inventoryRecordID) && stage.inventoryRecordID > 0);
+    }
     assert.equal(production.qualityBlockedTransfer, true);
     assert.equal(shipment.productionOrderID, production.productionOrderID);
     assert.ok(
@@ -221,12 +225,15 @@ export async function productionShipmentFlow(
   client,
   fixture,
   report,
+  scenario = {},
 ) {
   const source = await prepareTransactionProductionSource(
     client,
     options,
-    fixture,
+    scenario.key ? { ...fixture, prefix: `${fixture.prefix}-${scenario.key}` } : fixture,
   );
+  const outsourced = new Map();
+  for (const code of scenario.outsourcingOperations || []) outsourced.set(code, await prepareTransactionProductOutsourcingContract(client, source, code));
   const sessions = new Map();
   let activePage;
   const getPage = async (role) => {
@@ -257,7 +264,7 @@ export async function productionShipmentFlow(
       if (url.pathname === BUSINESS_ROUTE_PATHS.inventory) {
         await sourceTask('production_fact', receipt.id, ['handoff_production_inbound']);
         await page.getByRole('button', { name: '核对已入库批次', exact: true }).click();
-        await expect(page.getByTestId('mobile-task-related-business')).toBeVisible();
+        await expect(page.getByTestId('mobile-task-fact-form')).toHaveAttribute('data-handler-mode', 'inventory');
         return page;
       }
       if (url.pathname === BUSINESS_ROUTE_PATHS.shipments && shipment) return sourceTask('shipment', shipment.id, ['handoff_shipment_execute']);
@@ -268,7 +275,7 @@ export async function productionShipmentFlow(
       await sourceTask(type, id, ['business_followup']);
       if (type === 'sales_order') {
         await page.getByRole('button', { name: createPlan ? '办理关联生产计划' : '办理关联出货', exact: true }).click();
-        await expect(page.getByTestId('mobile-task-related-business')).toBeVisible();
+        await expect(page.getByTestId('mobile-task-fact-form')).toHaveAttribute('data-handler-mode', url.pathname === BUSINESS_ROUTE_PATHS.inventory ? 'inventory' : createPlan ? 'production_plan' : 'shipment');
       }
       return page;
     }
@@ -308,6 +315,7 @@ export async function productionShipmentFlow(
   };
   let production, receipt, shipment;
   const actions = [];
+  const returnFaults = [];
   const fulfillment = [];
   const progress = {
     surface: options.mobile ? "mobile" : "desktop",
@@ -436,14 +444,17 @@ export async function productionShipmentFlow(
     // The confirmed upstream processing contract is a fixture; its issue and every WIP transition use product UI.
     page = await open("warehouse", BUSINESS_ROUTE_PATHS.processingContracts);
     await selectRow(page, source.contract.id);
-    await pageAction(page, "查看详情");
-    const contractDetail = page
-      .locator(".ant-modal:visible")
-      .filter({ hasText: source.contract.outsourcing_order_no });
-    await expect(contractDetail).toHaveCount(1);
-    await contractDetail
-      .getByRole("button", { name: "委外发料", exact: true })
-      .click();
+    if (options.mobile) {
+      const actions = page.getByTestId("mobile-outsourcing-task-actions");
+      await expect(actions).toBeVisible();
+      await expect(page.getByRole("button", { name: "查看完整单据", exact: true })).toHaveCount(0);
+      await actions.getByRole("button", { name: "委外发料", exact: true }).click();
+    } else {
+      await pageAction(page, "查看详情");
+      const contractDetail = page.locator(".ant-modal:visible").filter({ hasText: source.contract.outsourcing_order_no });
+      await expect(contractDetail).toHaveCount(1);
+      await contractDetail.getByRole("button", { name: "委外发料", exact: true }).click();
+    }
     const issueDialog = page.getByRole("dialog", {
       name: "委外发料",
       exact: true,
@@ -607,14 +618,21 @@ export async function productionShipmentFlow(
       current.page.on("request", observer);
       let next;
       try {
-        next = await clickRPC(
-          current.page,
-          "execute_production_wip_action",
-          () =>
-            current.dialog
-              .getByRole("button", { name: "确认办理", exact: true })
-              .click(),
-        );
+        const submit = current.dialog.getByRole("button", { name: "确认办理", exact: true });
+        if (scenario.dropReturnResponse && outsourced.has(code) && action === WIP.RECEIVE_OUTSOURCING_RETURN) {
+          const lost = await dropRealResponse(current.page, options, "production_wip", "execute_production_wip_action");
+          await submit.click();
+          await expect.poll(() => lost.state.injected).toBe(true);
+          assert.equal(lost.state.backendCode, 0);
+          await expect(current.page.locator('.ant-message-error')).toBeVisible();
+          await lost.remove();
+          await expect(submit).toBeEnabled();
+          const beforeRetry = await readWip();
+          next = await clickRPC(current.page, "execute_production_wip_action", () => submit.click());
+          assert.deepEqual(params, lost.state.params, "unknown-result retry must keep the exact request");
+          assert.deepEqual(next, beforeRetry, "retry must replay the stored WIP receipt");
+          returnFaults.push(faultEvidence(lost.state));
+        } else next = await clickRPC(current.page, "execute_production_wip_action", () => submit.click());
       } finally {
         current.page.off("request", observer);
       }
@@ -627,6 +645,10 @@ export async function productionShipmentFlow(
         assert.equal(Object.hasOwn(params, "production_wip_batch_id"), false);
       } else assert.equal(params.production_wip_batch_id, batch.id);
       const beforeReplay = inventory();
+      if (outsourced.has(code)) {
+        assert.equal((await client.raw("finance", "production_wip", "execute_production_wip_action", params)).code, 40304);
+        assert.deepEqual(await readWip(), next);
+      }
       await client.rpc(
         role,
         "production_wip",
@@ -789,18 +811,29 @@ export async function productionShipmentFlow(
     );
     for (const code of ["FABRIC_PROCESSING", "SEWING", "HANDWORK"]) {
       if (code !== "FABRIC_PROCESSING") {
+        const external = outsourced.get(code);
         await actWip(
           "production",
           code,
           WIP.ASSIGN_EXECUTION,
           async (p, dialog) => {
-            await dialog
-              .getByRole("radio", { name: "本厂生产", exact: true })
-              .check();
+            await dialog.getByRole("radio", { name: external ? "外发加工" : "本厂生产", exact: true }).check();
+            if (external) await selectOption(p, dialog.getByLabel("关联加工合同明细", { exact: true }), new RegExp(external.contract.outsourcing_order_no, "u"));
           },
         );
         await actWip("production", code, WIP.START_OPERATION);
-        await actWip("production", code, WIP.COMPLETE_OPERATION);
+        if (external) {
+          const beforeReturn = await readWip();
+          assert.equal(batchFor(beforeReturn, code).batch.status, "OUTSOURCED");
+          await actWip("warehouse", code, WIP.RECEIVE_OUTSOURCING_RETURN, async (p, dialog) => {
+            const beforeInvalid = await readWip();
+            await dialog.getByLabel("仓库实点数量", { exact: true }).fill("1");
+            await dialog.getByRole("button", { name: "确认办理", exact: true }).click();
+            await expect(dialog.getByText("实点数量与本批次不一致，请先核对，暂不能整批送检", { exact: true })).toBeVisible();
+            assert.deepEqual(await readWip(), beforeInvalid);
+            await dialog.getByLabel("仓库实点数量", { exact: true }).fill(String(source.quantity));
+          });
+        } else await actWip("production", code, WIP.COMPLETE_OPERATION);
       }
       state = await readWip();
       current = batchFor(state, code);
@@ -839,6 +872,10 @@ export async function productionShipmentFlow(
         );
       }
       assert.deepEqual(inventory(), { quantity: 0, net: 0, txns: 0 });
+      if (code === "SEWING" && scenario.onShellRejected) {
+        await scenario.onShellRejected({ browser, options, client, report, open, readWip, batch: current.batch, source, production, inventory });
+        return;
+      }
       if (code !== "HANDWORK") {
         for (let gate = 0; gate < gateCount; gate++)
           await passStage(current.batch.id);
@@ -953,9 +990,17 @@ export async function productionShipmentFlow(
     );
     page = await open("warehouse", BUSINESS_ROUTE_PATHS.productionProgress);
     await selectRow(page, receipt.id);
-    await pageAction(page, "确认成品入库");
-    receipt = (await confirmPopup(page, "post_production_fact"))
-      .production_fact;
+    const taskReview = options.mobile ? page.getByRole("dialog", { name: "核对本次生产记录", exact: true }) : null;
+    if (taskReview) {
+      await expect(taskReview).toBeVisible();
+      await expect(taskReview).toContainText(receipt.fact_no);
+      await expect(taskReview.getByRole("button", { name: "确认成品入库", exact: true })).toHaveCount(1);
+      receipt = (await clickRPC(page, "post_production_fact", () => taskReview.getByRole("button", { name: "确认成品入库", exact: true }).click())).production_fact;
+      await expect(taskReview).toBeHidden();
+    } else {
+      await pageAction(page, "确认成品入库");
+      receipt = (await confirmPopup(page, "post_production_fact")).production_fact;
+    }
     assert.equal(receipt.status, "POSTED");
     assert.deepEqual(inventory(), {
       quantity: source.quantity,
@@ -992,7 +1037,7 @@ export async function productionShipmentFlow(
         pendingPackaging,
       );
       assert.equal(Number(balances[0].ready_to_ship_quantity), ready);
-      return { pendingInspection, pendingPackaging, ready };
+      return { readiness: { pendingInspection, pendingPackaging, ready }, inventoryRecordID: balances[0].id };
     };
     const recordFulfillment = async (
       stage,
@@ -1000,13 +1045,32 @@ export async function productionShipmentFlow(
       pendingPackaging,
       ready,
     ) => {
-      const readiness = await assertReadiness(
+      const { readiness, inventoryRecordID } = await assertReadiness(
         pendingInspection,
         pendingPackaging,
         ready,
       );
       const p = await open("warehouse", BUSINESS_ROUTE_PATHS.inventory);
-      if (!options.mobile) {
+      const visibleReadiness = {};
+      const quantities = [
+        ['pendingInspection', '待成品检验', pendingInspection],
+        ['pendingPackaging', '待查货包装', pendingPackaging],
+        ['ready', '可发货数量', ready],
+      ];
+      if (options.mobile) {
+        const sourceCard = p.getByTestId('mobile-task-business-source');
+        await expect(sourceCard).toHaveCount(1);
+        await expect(sourceCard).toHaveAttribute('data-record-id', String(inventoryRecordID));
+        await expect(sourceCard).toContainText(`${source.prefix}-FG`);
+        for (const [key, label, expected] of quantities) {
+          const field = sourceCard.locator('.ant-descriptions-row').filter({ has: p.locator('.ant-descriptions-item-label').getByText(label, { exact: true }) });
+          await expect(field).toHaveCount(1);
+          await field.scrollIntoViewIfNeeded();
+          await expect(field.locator('.ant-descriptions-item-content')).toHaveText(String(expected));
+          visibleReadiness[key] = Number((await field.locator('.ant-descriptions-item-content').textContent()).trim());
+        }
+        await settleRPCPage(p);
+      } else {
         const row = p
           .locator("tr.ant-table-row")
           .filter({ hasText: `${source.prefix}-FG` });
@@ -1015,11 +1079,7 @@ export async function productionShipmentFlow(
           await p.locator(".ant-table-thead:visible th").allTextContents()
         ).map((text) => text.trim());
         const cells = await row.locator("td").allTextContents();
-        for (const [label, expected] of [
-          ["待成品检验", pendingInspection],
-          ["待查货包装", pendingPackaging],
-          ["可发货数量", ready],
-        ]) {
+        for (const [key, label, expected] of quantities) {
           const index = headers.indexOf(label);
           assert.ok(index >= 0, `missing readiness column: ${label}`);
           assert.equal(
@@ -1027,6 +1087,7 @@ export async function productionShipmentFlow(
             expected,
             `${stage}: ${label}`,
           );
+          visibleReadiness[key] = Number(cells[index].trim());
         }
       }
       const key = `${flowKey(options, "production")}-${stage}`;
@@ -1035,7 +1096,7 @@ export async function productionShipmentFlow(
         : (await captureFlowFieldPage(p, options.outputDir, key)).screenshot;
       if (options.mobile)
         await p.screenshot({ path: screenshot, fullPage: false });
-      fulfillment.push({ stage, stock: inventory(), readiness, screenshot });
+      fulfillment.push({ stage, stock: inventory(), readiness, visibleReadiness, inventoryRecordID, screenshot });
     };
     await recordFulfillment("finished_goods_inbound", source.quantity, 0, 0);
     const beforeQuality = await readWip();
@@ -1167,8 +1228,11 @@ export async function productionShipmentFlow(
     );
     assert.equal(materialTxnCount(), initialMaterialTxns + 1);
     report.flows.push({
-      key: flowKey(options, "production"),
+      key: flowKey(options, scenario.key || "production"),
       passed: true,
+      outsourcingOperations: [...outsourced.keys()],
+      transportFaults: returnFaults,
+      outsourcingContracts: [...outsourced.values()].map(({ contract, item }) => ({ id: contract.id, itemID: item.id })),
       productionOrderID: production.id,
       receiptID: receipt.id,
       taskSourceMismatchBlocked: options.mobile ? progress.taskSourceMismatchBlocked : undefined,
@@ -1181,11 +1245,12 @@ export async function productionShipmentFlow(
     await page.screenshot({
       path: path.join(
         options.outputDir,
-        `${flowKey(options, "production")}.png`,
+        `${flowKey(options, scenario.key || "production")}.png`,
       ),
       fullPage: true,
     });
 
+    if (scenario.skipShipment) return { source, production, receipt, actions };
     page = await open("sales", BUSINESS_ROUTE_PATHS.shipments);
     await pageAction(page, /^新建出货单$/u);
     const shipping = page.getByRole("region", {

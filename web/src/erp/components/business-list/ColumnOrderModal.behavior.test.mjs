@@ -13,9 +13,13 @@ const columns = [
 async function modalHarness(t, initial = {}) {
   const runtime = await createReactTestHarness(t)
   const { ColumnOrderModal } = await import('./ColumnOrderModal.jsx')
-  const saves = [], closes = []
+  const saves = []; const
+closes = []
   let props = {
-    open: true, columns, order: [], hiddenColumns: ['amount', 'note'],
+    open: true,
+columns,
+order: [],
+hiddenColumns: ['amount', 'note'],
     moduleTitle: '销售订单',
     onChange: async (...settings) => { saves.push(settings); return false },
     onClose: () => closes.push(true),
@@ -29,11 +33,11 @@ async function modalHarness(t, initial = {}) {
   await update()
   const dialog = () => document.querySelector('.erp-business-action-modal--columns')
   const checkbox = (label) => [...dialog().querySelectorAll('.ant-checkbox-wrapper')]
-    .find(node => node.textContent.trim() === label)?.querySelector('input')
+    .find((node) => node.textContent.trim() === label)?.querySelector('input')
   const button = (label) => [...dialog().querySelectorAll('button')]
-    .find(node => node.getAttribute('aria-label') === label || node.textContent.replace(/\s/gu, '') === label)
+    .find((node) => node.getAttribute('aria-label') === label || node.textContent.replace(/\s/gu, '') === label)
   const click = async (node) => { assert(node, '操作入口存在'); await runtime.act(async () => node.click()); await runtime.flush() }
-  const rowOrder = () => [...dialog().querySelectorAll('[data-column-key]')].map(row => row.dataset.columnKey)
+  const rowOrder = () => [...dialog().querySelectorAll('[data-column-key]')].map((row) => row.dataset.columnKey)
   return { ...runtime, update, dialog, checkbox, button, click, rowOrder, saves, closes }
 }
 
@@ -46,7 +50,7 @@ test('列设置保留未完成的调整，普通重绘、保存中和失败重�
   assert.match(ui.dialog().textContent, /已选 2 \/ 4 列/u)
   assert.match(ui.dialog().textContent, /有未保存的调整/u)
 
-  const freshProps = () => ({ columns: columns.map(column => ({ ...column })), order: [], hiddenColumns: ['amount', 'note'] })
+  const freshProps = () => ({ columns: columns.map((column) => ({ ...column })), order: [], hiddenColumns: ['amount', 'note'] })
   await ui.update({ ...freshProps(), saving: true })
   assert.equal(ui.checkbox('金额').checked, true)
   assert.equal(ui.checkbox('客户').checked, false)
@@ -93,7 +97,7 @@ test('列权限与新增列变化保留有效草稿，新增可选列可开启�
   const ui = await modalHarness(t)
   await ui.click(ui.checkbox('金额'))
   await ui.click(ui.button('客户 移到最前'))
-  await ui.update({ columns: [...columns.map(column => ({ ...column, hiddenByEffectiveFieldPolicy: column.dataIndex === 'amount' })), { dataIndex: 'phone', title: '电话', defaultHidden: true }] })
+  await ui.update({ columns: [...columns.map((column) => ({ ...column, hiddenByEffectiveFieldPolicy: column.dataIndex === 'amount' })), { dataIndex: 'phone', title: '电话', defaultHidden: true }] })
   assert.equal(ui.checkbox('金额'), undefined, '个人设置不能开放受限列')
   assert.equal(ui.rowOrder()[0], 'party')
   assert.equal(ui.checkbox('电话').checked, false)
@@ -124,7 +128,8 @@ test('共享列设置通过既有 RPC 按账号和列表保存，重新挂载从
     requests.push({ account, module })
     return new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { code: 0, data: { erp_preferences: structuredClone(stored) } } }), { status: 200 })
   })
-  let controls, mount = 0
+  let controls; let
+mount = 0
   function Probe({ profile, module }) {
     controls = useBusinessColumnOrder({ adminProfile: profile, moduleKey: module, moduleTitle: '订单', columns })
     return null
@@ -133,7 +138,7 @@ test('共享列设置通过既有 RPC 按账号和列表保存，重新挂载从
     localStorage.setItem('admin_access_token', `account-${account}`)
     await runtime.render(createElement(Probe, { key: refresh ? ++mount : mount, profile: { id: account, is_super_admin: true, erp_preferences: structuredClone(preferences[account]) }, module }))
   }
-  const visible = () => controls.tableColumns.map(column => column.dataIndex)
+  const visible = () => controls.tableColumns.map((column) => column.dataIndex)
   const save = async (order, hidden) => runtime.act(async () => assert.equal(await controls.columnOrderModal.props.onChange(order, hidden), true))
   await enter(1, 'customers')
   await save(['party', 'number', 'amount', 'note'], ['amount', 'note'])
@@ -157,10 +162,11 @@ test('共享列设置通过既有 RPC 按账号和列表保存，重新挂载从
 test('账号切换后，旧账号尚未完成的列设置响应不得覆盖当前列表', async (t) => {
   const runtime = await createReactTestHarness(t)
   const { useBusinessColumnOrder } = await import('./BusinessListToolbarActions.jsx')
-  let finish, request, controls, pendingSave
+  let finish; let request; let controls; let
+pendingSave
   t.mock.method(globalThis, 'fetch', async (_url, options) => {
     request = JSON.parse(options.body)
-    return new Promise(resolve => { finish = resolve })
+    return new Promise((resolve) => { finish = resolve })
   })
   function Probe({ account }) {
     controls = useBusinessColumnOrder({ adminProfile: { id: account, erp_preferences: { column_orders: {}, hidden_columns: {} } }, moduleKey: 'customers', columns })
@@ -175,5 +181,5 @@ test('账号切换后，旧账号尚未完成的列设置响应不得覆盖当�
     finish(new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { code: 0, data: { erp_preferences: { column_orders: { customers: ['amount', 'party', 'number', 'note'] }, hidden_columns: { customers: ['note'] } } } } }), { status: 200 }))
     assert.equal(await pendingSave, false)
   })
-  assert.deepEqual(controls.tableColumns.map(column => column.dataIndex), ['number', 'party'])
+  assert.deepEqual(controls.tableColumns.map((column) => column.dataIndex), ['number', 'party'])
 })

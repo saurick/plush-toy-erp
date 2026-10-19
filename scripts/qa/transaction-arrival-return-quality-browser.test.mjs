@@ -50,6 +50,9 @@ function complete() {
       cancelReplayExact: true,
       correctionPreservesEvidence: true,
       dependentCancelBlocked: true,
+      correctionCreatedInBrowser: true,
+      correctionReasonRequired: true,
+      correctionReplayAfterDecisionExact: true,
       transportFaults: [
         { injected: true, backendCode: 0, requestID: `request-${index}` },
       ],
@@ -73,6 +76,9 @@ test("receiving evidence rejects missing flows, weakened business evidence and u
     "cancelReplayExact",
     "correctionPreservesEvidence",
     "dependentCancelBlocked",
+    "correctionCreatedInBrowser",
+    "correctionReasonRequired",
+    "correctionReplayAfterDecisionExact",
   ]) {
     const report = complete();
     for (const flow of report.flows) flow[key] = false;

@@ -10,11 +10,8 @@ import {
   RollbackOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Input, Popconfirm, Tag } from 'antd'
-import {
-  useOutletContext,
-  useLocation,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext, useLocation } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { OperationalFactStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
@@ -141,7 +138,7 @@ export function OperationalFactWorkspace({
     outletContext?.productionRecordsWorkspace || null
   const navigate = useBusinessNavigate()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
+  const [searchParams] = useBusinessSearchParams()
   const [savedContentView, setContentView] = useBusinessPageState(
     'contentView',
     () => (searchParams.get('display') === 'process' ? 'process' : 'list')

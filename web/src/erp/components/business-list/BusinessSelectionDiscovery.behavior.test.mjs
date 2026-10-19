@@ -109,6 +109,10 @@ test('常驻操作栏覆盖未选、选中、清空和空列表，并隔离相�
     loading = pending
     await renderPage()
     assert.equal(hint(), null, '加载时不提示操作尚未就绪的记录')
+    const spacer = document.querySelector('.erp-business-selection-action-bar--loading')
+    assert.ok(spacer, '加载期间保留已有操作栏的布局空间')
+    assert.equal(spacer.getAttribute('aria-hidden'), 'true')
+    assert.equal(spacer.querySelectorAll('button').length, 0)
   }
   loading = { spinning: false }
   await renderPage()

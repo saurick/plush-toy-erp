@@ -6,12 +6,13 @@ export function createMobileTaskBusinessScenarios(deps) {
   const { assert, assertNoHorizontalOverflow, outputDir, path } = deps
   const base = createTaskBusinessReturnScenarios(deps).find((item) => item.name === 'task-business-return-mobile')
   const task = base.workflowTaskFixtures[0]
-  const open = async (page, taskName = task.task_name) => {
+  const open = async (page, taskName = task.task_name, beforeEnter = () => {}) => {
     const card = page.locator('.erp-task-card').filter({ hasText: taskName })
     await clickTaskCardContent(card, card.getByText(taskName, { exact: true }))
-    await page.getByTestId('mobile-task-detail-screen').getByRole('button', { name: '办理业务', exact: true }).click()
-    await page.getByTestId('mobile-task-business-screen').waitFor()
-    assert.equal(new URL(page.url()).pathname.includes('/tasks/'), true)
+    await beforeEnter()
+    await page.getByTestId('mobile-task-detail-screen').getByRole('button', { name: '填写办理表单', exact: true }).click()
+    await page.getByTestId('mobile-task-fact-form').waitFor()
+    assert.match(new URL(page.url()).pathname, /^\/m\/[a-z_]+\/tasks$/u)
     assert.equal(await page.locator('.erp-admin-layout').count(), 0)
     assert.equal(await page.getByTestId('mobile-task-flow-steps').locator('[data-step-key]').count(), 3)
   }
@@ -38,27 +39,40 @@ export function createMobileTaskBusinessScenarios(deps) {
     {
       ...base,
       name: 'mobile-task-business-source-mismatch',
-      verify: async (page) => {
-        await open(page)
-        const dialog = page.getByRole('dialog').filter({ hasText: task.source_no })
-        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
-        await page.evaluate(() => {
-          const url = new URL(window.location.href)
-          url.searchParams.set('production_order_id', '72')
-          const state = window.history.state
-          window.history.replaceState({ ...state, usr: { ...state.usr, workflowTaskNavigation: { ...state.usr.workflowTaskNavigation, entryPath: `${url.pathname}${url.search}` } } }, '', url)
-          window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+      beforeNavigate: async (page) => {
+        await base.beforeNavigate(page)
+        page.substituteTaskSource = false
+        await page.route('**/rpc/workflow', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'get_task' || !page.substituteTaskSource) return route.fallback()
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { task: { ...task, source_id: task.source_id + 1 } } } } })
         })
-        await page.getByText('此单据与当前任务不匹配，请返回原任务。', { exact: true }).waitFor()
+      },
+      verify: async (page) => {
+        await open(page, task.task_name, () => { page.substituteTaskSource = true })
+        await page.getByText('暂时无法确认任务办理资料或权限，请重新读取。', { exact: true }).waitFor()
         assert.equal(await page.locator('.erp-production-orders-page').count(), 0)
         assert.equal(await page.getByRole('dialog').count(), 0)
+        assert.equal(new URL(page.url()).pathname, '/m/sales/tasks')
         await assertNoHorizontalOverflow(page, 'mobile-task-source-mismatch')
+        page.substituteTaskSource = false
+        await page.getByTestId('mobile-task-fact-form').getByRole('button', { name: '重新读取', exact: true }).click()
+        await page.locator('[data-testid="mobile-task-business-source"][data-record-id="71"]').waitFor()
+        assert.equal(await page.getByTestId('mobile-task-business-source').getAttribute('data-record-id'), '71')
       },
     },
     {
       ...base,
       name: 'mobile-task-business-completed-source',
       workflowTaskFixtures: [{ ...task, task_status_key: 'done' }],
+      beforeNavigate: async (page) => {
+        await base.beforeNavigate(page)
+        await page.route('**/rpc/workflow', async (route) => {
+          const { id, method } = route.request().postDataJSON()
+          if (method !== 'get_task') return route.fallback()
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: { task: { ...task, task_status_key: 'done' } } } } })
+        })
+      },
       verify: async (page) => {
         await page.getByTestId('mobile-role-nav-tasks').click()
         await page.getByLabel('任务状态', { exact: true }).getByText('已办', { exact: true }).click()
@@ -67,8 +81,8 @@ export function createMobileTaskBusinessScenarios(deps) {
         const detail = page.getByTestId('mobile-task-detail-screen')
         await detail.getByText('已完成', { exact: true }).first().waitFor()
         assert.equal(await detail.getByRole('button', { name: '选择处理方式', exact: true }).count(), 0)
-        await detail.getByRole('button', { name: '办理业务', exact: true }).click()
-        await page.getByTestId('mobile-task-business-source').waitFor()
+        await detail.getByRole('button', { name: '填写办理表单', exact: true }).click()
+        await page.locator('[data-testid="mobile-task-business-source"][data-record-id="71"]').waitFor()
         assert.equal(await page.getByTestId('mobile-task-business-source').getAttribute('data-record-id'), '71')
         await assertNoHorizontalOverflow(page, 'mobile-completed-source-access')
       },

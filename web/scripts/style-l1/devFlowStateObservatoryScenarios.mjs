@@ -1,3 +1,4 @@
+import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { assertFulfillmentChainClickTargets, assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../src/common/consts/workflowTaskDiscovery.generated.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
@@ -85,15 +86,37 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(await guide.locator('[data-chain-stage][data-conditional]').count(), 2)
         assert.equal(await guide.locator('.erp-dev-fulfillment-guide__result').count(), 0, '总图初始不展开详情')
         await assertFulfillmentChainClickTargets(guide.locator('[data-fulfillment-chain]'))
+        assert.equal(await guide.getByRole('button', { name: /查看第\d+环节问题处理/u }).count(), 0, '总图不重复放置通用处理入口')
+        for (const [index, step] of taskCatalog.fulfillment_flow.entries()) {
+          await guide.getByRole('button', { name: `${index + 1} ${step.label}`, exact: true }).click()
+          await guide.locator('[data-stage-mode="normal"]').getByRole('heading', { name: step.label, exact: true }).waitFor()
+          const mode = guide.getByRole('radiogroup', { name: '环节办理方式', exact: true })
+          await mode.getByText('正常办理', { exact: true }).waitFor()
+          assert.equal(await guide.locator('[data-stage-handling]').count(), 0)
+          await mode.getByText('异常处理', { exact: true }).click()
+          const handling = guide.locator(`[data-stage-handling="${step.stage}"]`)
+          await handling.getByText(step.handling.resume, { exact: true }).waitFor()
+          assert.equal(new URL(page.url()).searchParams.get('flow_handling'), '1')
+          assert.equal(await guide.locator('.erp-dev-fulfillment-guide__subflow, [data-stage-normal]').count(), 0, '问题处理不叠加正常流程')
+          await assertNoHorizontalOverflow(page, `handling-${step.stage}`)
+        }
+        await verifyMobileNavigationMotion(page, assert, '.erp-dev-fulfillment-guide__mode', 0)
+        await verifyMobileNavigationMotion(page, assert, '.erp-dev-fulfillment-guide__mode', 1, true)
+        await page.reload()
+        await guide.locator('[data-stage-handling="financial_settlement"]').getByText(taskCatalog.fulfillment_flow.at(-1).handling.resume, { exact: true }).waitFor()
+        await guide.getByRole('button', { name: '收起环节', exact: true }).click()
+        assert.equal(new URL(page.url()).searchParams.has('flow_handling'), false)
         await chooseRole('仓库')
         assert.equal(await stages.filter({ has: page.locator('[aria-expanded="true"]') }).count(), 0)
         assert.equal(await guide.locator('[data-fulfillment-stage][data-role-match="true"]').count(), 8)
         assert.equal(await stages.count(), 17, '岗位关注保留全部位置')
-        const exceptionDirectory = page.getByRole('dialog', { name: '异常流程', exact: true })
+        const exceptionDirectory = page.getByRole('dialog', { name: '异常情况与处理', exact: true })
         for (const source of ['over_issue', 'outsourcing_rejection', 'posted_purchase']) {
-          await guide.getByRole('button', { name: '异常流程', exact: true }).click()
+          await guide.getByRole('button', { name: '异常情况', exact: true }).click()
           await exceptionDirectory.waitFor()
+          assert.equal(await exceptionDirectory.locator('[data-handling-entry]').count(), 17)
           assert.equal(await exceptionDirectory.locator('[data-exception-entry]').count(), taskCatalog.exception_guides.length)
+          for (const step of taskCatalog.fulfillment_flow) assert((await exceptionDirectory.locator(`[data-handling-entry="${step.stage}"]`).innerText()).includes(step.handling.issues), `${step.stage} 的异常摘要不需再点开`)
           await exceptionDirectory.locator(`[data-exception-entry="${source}"] button`).click()
           await guide.locator(`[data-exception-guide="${source}"]`).waitFor()
           assert.equal(new URL(page.url()).searchParams.has('flow_stage'), false, '全局异常入口不补造来源环节')
@@ -111,7 +134,15 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(await substepControl.getAttribute('aria-expanded'), 'true')
         await page.getByRole('option', { name: '确认加工合同', exact: true }).click()
         await issueResult.locator('[data-selected-substep="contract"]').waitFor()
-        await guide.getByRole('button', { name: '异常流程', exact: true }).click()
+        await guide.getByRole('button', { name: '异常情况', exact: true }).click()
+        assert.equal(await exceptionDirectory.locator('[data-handling-entry]').count(), 1)
+        assert.equal(await exceptionDirectory.locator('[data-exception-entry]').count(), 1)
+        await exceptionDirectory.getByRole('button', { name: '查看全部环节与异常分支', exact: true }).click()
+        await exceptionDirectory.locator('[data-handling-entry="sales_order"]').waitFor()
+        assert.equal(await exceptionDirectory.locator('[data-handling-entry]').count(), 17)
+        await exceptionDirectory.getByRole('button', { name: '返回当前环节', exact: true }).click()
+        await exceptionDirectory.locator('[data-handling-entry="sales_order"]').waitFor({ state: 'hidden' })
+        assert.equal(await exceptionDirectory.locator('[data-handling-entry]').count(), 1)
         await exceptionDirectory.locator('[data-exception-entry="over_issue"] button').click()
         await guide.locator('[data-exception-guide="over_issue"]').waitFor()
         await guide.getByRole('button', { name: '收起异常分支', exact: true }).click()
@@ -271,16 +302,24 @@ export function createDevFlowStateObservatoryScenarios({
           name: '导出',
           exact: true,
         })
-        await exportButton.hover()
-        await page
-          .getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' })
-          .click()
-        await page.waitForFunction(() => window.__flowPrintCount === 1)
-        assert.equal(await root.getAttribute('data-flow-print-current'), 'true')
-        await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
-        await page.waitForFunction(
-          () => !document.querySelector('[data-flow-print-current]')
-        )
+        for (const [index, mode] of ['normal', 'handling'].entries()) {
+          await guide.getByRole('radiogroup', { name: '环节办理方式' }).getByText(mode === 'normal' ? '正常办理' : '异常处理', { exact: true }).click()
+          await guide.locator(`[data-stage-mode="${mode}"]`).waitFor()
+          await exportButton.hover()
+          await page.getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' }).click()
+          await page.waitForFunction((count) => window.__flowPrintCount === count, index + 1)
+          assert.equal(await root.getAttribute('data-flow-print-current'), 'true')
+          await page.emulateMedia({ media: 'print' })
+          await guide.locator(`[data-stage-mode="${mode}"]`).waitFor({ state: 'visible' })
+          assert.equal(await guide.locator('[data-stage-handling]').count(), mode === 'handling' ? 1 : 0)
+          assert.equal(await guide.locator('.erp-dev-fulfillment-guide__subflow').count(), mode === 'normal' ? 1 : 0)
+          if (page.context().browser()?.browserType().name() === 'chromium') {
+            await page.pdf({ path: path.join(outputDir, `order-role-current-${mode}.pdf`), preferCSSPageSize: true, printBackground: true })
+          }
+          await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+          await page.waitForFunction(() => !document.querySelector('[data-flow-print-current]'))
+          await page.emulateMedia({ media: 'screen' })
+        }
         await exportButton.hover()
         await page.getByRole('menuitem', { name: '客户校对稿…' }).click()
         const review = page.getByRole('dialog', { name: '客户校对稿' })
@@ -295,7 +334,7 @@ export function createDevFlowStateObservatoryScenarios({
         await review
           .getByRole('button', { name: '打印 / 保存 PDF', exact: true })
           .click()
-        await page.waitForFunction(() => window.__flowPrintCount === 2)
+        await page.waitForFunction(() => window.__flowPrintCount === 3)
         const fulfillmentPrint = page.locator(
           '[data-customer-review-fulfillment]'
         )
@@ -303,6 +342,12 @@ export function createDevFlowStateObservatoryScenarios({
           await fulfillmentPrint.locator('tbody tr').count(),
           taskCatalog.fulfillment_flow.length
         )
+        const handlingPrint = page.locator('[data-customer-review-handling-table]')
+        assert.equal(await fulfillmentPrint.locator('[data-customer-review-handling]').count(), 0, '正常办理和问题处理分表输出')
+        assert.equal(await handlingPrint.locator('[data-customer-review-handling]').count(), 17)
+        for (const step of taskCatalog.fulfillment_flow) {
+          assert((await handlingPrint.locator(`[data-customer-review-handling="${step.stage}"]`).innerText()).includes(step.handling.resume))
+        }
         assert.match(
           await fulfillmentPrint.innerText(),
           /正式成品入库[\s\S]*查货与包装[\s\S]*业务显式确认实际发货/u
@@ -337,6 +382,11 @@ export function createDevFlowStateObservatoryScenarios({
           'none'
         )
         await fulfillmentPrint.waitFor({ state: 'visible' })
+        const handlingColumnWidths = await handlingPrint.locator('thead th').evaluateAll((nodes) => {
+          const total = nodes[0].closest('table').getBoundingClientRect().width
+          return nodes.map((node) => node.getBoundingClientRect().width / total)
+        })
+        for (const [index, ratio] of [0.17, 0.23, 0.32, 0.28].entries()) assert(Math.abs(handlingColumnWidths[index] - ratio) < 0.02, `问题处理表列宽：${handlingColumnWidths}`)
         if (page.context().browser()?.browserType().name() === 'chromium')
           { await page.pdf({
             path: path.join(outputDir, 'order-role-flow-customer-review.pdf'),
@@ -449,7 +499,9 @@ export function createDevFlowStateObservatoryScenarios({
           await guide.locator('.erp-dev-fulfillment-guide__role').innerText(),
           /仓库/u
         )
-        await result.getByRole('button', { name: '本环节异常', exact: true }).click()
+        await guide.getByRole('button', { name: '异常情况', exact: true }).click()
+        await exceptionDirectory.waitFor()
+        assert.equal(await exceptionDirectory.locator('[data-handling-entry]').count(), 1)
         await exceptionDirectory.locator('[data-exception-entry="purchase_rejection"] button').click()
         await guide.locator('[data-exception-guide="purchase_rejection"]').waitFor()
         await chooseRole('采购')
@@ -563,6 +615,33 @@ export function createDevFlowStateObservatoryScenarios({
           page,
           'role-business-topics-print-return'
         )
+
+        await page.goto(new URL(`${DEV_FLOW_STATE_OBSERVATORY_PATH}&flow_stage=financial_settlement&flow_handling=1&flow_role=finance`, page.url()).href)
+        for (const width of [800, 390]) {
+          await page.setViewportSize({ width, height: 900 })
+          await guide.locator('[data-stage-handling="financial_settlement"]').waitFor()
+          await assertNoHorizontalOverflow(page, `handling-responsive-${width}`)
+          const mode = guide.getByRole('radiogroup', { name: '环节办理方式' })
+          assert((await mode.locator('.ant-segmented-item-label').first().evaluate((node) => getComputedStyle(node).fontSize)) === '14px', '视图切换保持正文字号')
+          if (width < 768) assert((await mode.locator('.ant-segmented-item-label').first().boundingBox()).height >= 44)
+          await mode.getByText('正常办理', { exact: true }).click()
+          await guide.locator('[data-stage-mode="normal"]').waitFor()
+          await assertNoHorizontalOverflow(page, `normal-responsive-${width}`)
+          await mode.getByText('异常处理', { exact: true }).click()
+          await guide.locator('[data-stage-handling="financial_settlement"]').waitFor()
+          await guide.getByRole('button', { name: '异常情况', exact: true }).click()
+          await exceptionDirectory.waitFor()
+          assert.equal(await exceptionDirectory.locator('[data-handling-entry]').count(), 1)
+          await exceptionDirectory.getByRole('button', { name: '查看全部环节与异常分支', exact: true }).click()
+          await exceptionDirectory.locator('[data-handling-entry="sales_order"]').waitFor()
+          assert.equal(await exceptionDirectory.locator('[data-handling-entry]').count(), 17)
+          await assertNoHorizontalOverflow(page, `directory-responsive-${width}`)
+          await exceptionDirectory.locator('[data-handling-entry="financial_settlement"] button').click()
+          await exceptionDirectory.waitFor({ state: 'hidden' })
+          await guide.locator('[data-stage-handling="financial_settlement"]').waitFor()
+          assert.equal(new URL(page.url()).searchParams.get('flow_handling'), '1', '从目录重选当前环节仍恢复问题视图')
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
 
         assert.deepEqual(
           writeRequestsByPage.get(page) || [],

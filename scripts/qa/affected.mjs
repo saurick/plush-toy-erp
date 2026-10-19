@@ -11,6 +11,7 @@ import { collectGitChangedFiles } from "./lib/git-range.mjs";
 import { NODE_TEST_GROUPS } from "./node-test-groups.mjs";
 import { MIGRATION_CONTRACT_TESTS } from "./migration-contracts.mjs";
 import { discoverWebUnitTests } from "../../web/scripts/runUnitTests.mjs";
+import { requiresRPCContractCheck } from "../lib/rpc-contract-review.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
@@ -144,6 +145,10 @@ const FIXED_COMMANDS = {
   publicContractConsumers: command(
     "public-contract-consumers", "T3", "检查公共契约消费者引用", "node",
     ["scripts/qa/public-contract-consumers.mjs"],
+  ),
+  publicContractExamples: command(
+    "public-contract-examples", "T3", "核对已登记接口文档样例的实际执行结果", "node",
+    ["scripts/gen-public-contracts.mjs", "--verify-examples"],
   ),
   serverUnitPolicy: command(
     "server-unit-policy", "T3", "检查共享标准单位目录", "go",
@@ -750,6 +755,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   for (const file of changedFiles) {
     if (
       PUBLIC_CONTRACT_SOURCE.test(file) ||
+      requiresRPCContractCheck([file]) ||
       RPC_TRANSPORT_SOURCE.test(file) ||
       /^server\/internal\/(?:biz|service|buildinfo|projectmanuals|core\/qualitycheck)\/[^/]+\.go$/u.test(file) && !file.endsWith("_test.go") ||
       /^web\/src\/common\/consts\/[^/]+\.generated\.mjs$/u.test(file) ||
@@ -759,7 +765,10 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     ) {
       addFixed(state, "publicContracts", file);
       addFixed(state, "publicContractConsumers", file);
+      addFixed(state, "publicContractExamples", file);
       directTests.add(PUBLIC_CONTRACTS_TEST);
+      directTests.add("scripts/lib/rpc-contract-review.test.mjs");
+      directTests.add("scripts/lib/rpc-contract-review-node.test.mjs");
       directTests.add(PUBLIC_STATUS_COVERAGE_TEST);
     }
     if (RPC_TRANSPORT_SOURCE.test(file)) {
@@ -774,7 +783,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       addFixed(state, "serverUnitPolicy", file);
       continue;
     }
-    if (file === "scripts/gen-public-contracts.mjs" || file === "scripts/qa/public-contract-consumers.mjs" || file.startsWith("server/cmd/public-contracts/testdata/")) {
+    if (file === "scripts/gen-public-contracts.mjs" || file.startsWith("scripts/lib/rpc-contract-review") || file === "scripts/qa/public-contract-consumers.mjs" || file.startsWith("server/cmd/public-contracts/testdata/")) {
       continue;
     }
     if (MIGRATION_CONTRACT_PATHS.has(file)) {

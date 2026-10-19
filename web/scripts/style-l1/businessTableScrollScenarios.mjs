@@ -197,7 +197,7 @@ export function createBusinessTableScrollScenarios({
       })
       const secondPage = await scrollToTableEnd(page)
 
-      const search = page.locator('.erp-business-operation-panel input').first()
+      const search = page.locator('.erp-business-operation-panel').getByRole('textbox')
       await search.fill('NO-SCROLL-MATCH')
       await page.getByText('暂无出货单', { exact: true }).waitFor()
       const empty = await measureScroll(page)

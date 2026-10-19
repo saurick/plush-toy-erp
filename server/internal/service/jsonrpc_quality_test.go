@@ -207,6 +207,18 @@ func TestJsonrpcDispatcher_CorrectQualityInspectionResultContract(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	denied := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.QualityRoleKey}, biz.PermissionQualityExceptionHandle,
+	))
+	_, deniedRes, deniedErr := denied.handleQuality(workflowJSONRPCAdminContext(), "correct_quality_inspection_result", "no-source-read", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(rejected.ID), "correction_inspection_no": "QI-RPC-CORR-DENIED", "reason": "仪器校准复核失败",
+	}))
+	if deniedErr != nil || deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("source read denial: res=%#v err=%v", deniedRes, deniedErr)
+	}
+	if count, err := client.QualityInspection.Query().Count(ctx); err != nil || count != 1 {
+		t.Fatalf("denied correction changed quality evidence: count=%d err=%v", count, err)
+	}
 	_, res, err := j.handleQuality(workflowJSONRPCAdminContext(), "correct_quality_inspection_result", "correct", mustJSONRPCStruct(t, map[string]any{
 		"id": float64(rejected.ID), "correction_inspection_no": "QI-RPC-CORR-R2", "reason": "仪器校准复核失败",
 	}))

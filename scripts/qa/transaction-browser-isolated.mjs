@@ -20,13 +20,31 @@ import {
   MANAGED_DATABASE_LABELS,
 } from "./run-gate-with-managed-database.mjs";
 import { databaseNameForRun } from "./database-target.mjs";
-import { allocateLocalAcceptancePorts } from "./local-acceptance-lifecycle.mjs";
+import { allocateLocalAcceptancePorts, allocateLocalAcceptanceWebEndpoint } from "./local-acceptance-lifecycle.mjs";
+import { findListenerPids, runProcessInspection } from '../dev-process-inspection.mjs';
 import { verifyDatabaseRuntimeIdentity } from "./browser-write-target.mjs";
 import { verifyGoTestJson } from "./verify-go-test-json.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const STORAGE_IMAGE = "chrislusf/seaweedfs:4.46";
+
+export function transactionBrowserBudget({ sourceOrdersOnly = false, receivingOnly = false, desktopVariantsOnly = false } = {}) {
+  assert.equal(typeof sourceOrdersOnly, 'boolean');
+  assert.equal(typeof receivingOnly, 'boolean');
+  assert.equal(typeof desktopVariantsOnly, 'boolean');
+  assert.ok([sourceOrdersOnly, receivingOnly, desktopVariantsOnly].filter(Boolean).length <= 1, 'select only one browser scope');
+  const narrow = sourceOrdersOnly || receivingOnly || desktopVariantsOnly;
+  return { browserTimeoutMS: (narrow ? 8 : 12) * 60 * 1000, runTimeoutMS: (narrow ? 15 : 25) * 60 * 1000 };
+}
+
+export async function ownedServiceIsListening(child, port, inspect = runProcessInspection) {
+  assert.ok(Number.isSafeInteger(child.pid) && child.pid > 1);
+  assert.ok(Number.isSafeInteger(port) && port > 0 && port <= 65535);
+  const pids = await findListenerPids(port, { inspect });
+  assert.ok(pids.every((pid) => pid === child.pid), 'listener must belong to the exact owned service process');
+  return pids.length > 0;
+}
 
 export function verifyTransactionRequestLogs(
   browser,
@@ -152,10 +170,16 @@ export async function runIsolatedTransactionBrowser({
   signal,
   sourceOrdersOnly = false,
   receivingOnly = false,
+  desktopVariantsOnly = false,
+  desktopCase = "all",
 } = {}) {
   assert.equal(typeof sourceOrdersOnly, "boolean");
   assert.equal(typeof receivingOnly, "boolean");
-  assert.ok(!(sourceOrdersOnly && receivingOnly), "select only one browser scope");
+  assert.equal(typeof desktopVariantsOnly, "boolean");
+  assert.ok([sourceOrdersOnly, receivingOnly, desktopVariantsOnly].filter(Boolean).length <= 1, "select only one browser scope");
+  assert.ok(["all", "advance", "outsourcing", "shell"].includes(desktopCase), "unknown desktop case");
+  assert.ok(desktopVariantsOnly || desktopCase === "all", "desktop case requires desktop variants scope");
+  const budget = transactionBrowserBudget({ sourceOrdersOnly, receivingOnly, desktopVariantsOnly });
   const out = path.resolve(
     outputDir ||
       path.join(root, "output/qa/transaction-browser", Date.now().toString()),
@@ -174,7 +198,9 @@ export async function runIsolatedTransactionBrowser({
     steps: [],
     outputDir: out,
     simulatedOnly: true,
-    scope: receivingOnly ? "receiving" : sourceOrdersOnly ? "source-orders" : "transactions-and-source-orders-and-receiving",
+    desktopCase: desktopVariantsOnly ? desktopCase : undefined,
+    scope: desktopVariantsOnly ? "desktop-variants" : receivingOnly ? "receiving" : sourceOrdersOnly ? "source-orders" : "transactions-and-source-orders-and-receiving",
+    budget,
   };
   const runID = randomBytes(6).toString("hex"),
     operationId = randomUUID();
@@ -253,11 +279,15 @@ export async function runIsolatedTransactionBrowser({
     children.push(child);
     return child;
   }
-  async function ready(url, child) {
+  async function ready(url, child, port) {
     for (let attempt = 0; attempt < 90; attempt += 1) {
       signal?.throwIfAborted();
       if (child.startError || child.exitCode !== null)
         throw new Error(`owned service exited before readiness: ${url}`);
+      if (!(await ownedServiceIsListening(child, port))) {
+        await delay(500, undefined, { signal });
+        continue;
+      }
       try {
         if ((await fetch(url, { signal: AbortSignal.timeout(1500) })).ok)
           return;
@@ -282,7 +312,7 @@ export async function runIsolatedTransactionBrowser({
         requiredNode,
         "use the repository's pinned Node version",
       );
-      if (!sourceOrdersOnly && !receivingOnly) {
+      if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) {
         await Promise.all(["pdfinfo", "pdffonts", "pdftotext"].map((tool) =>
           command(tool, ["-v"], { cwd: root, timeout: 10000 }),
         ));
@@ -457,9 +487,9 @@ export async function runIsolatedTransactionBrowser({
         JSON.stringify(status, null, 2),
       );
     });
-    const { httpPort, webPort } = await allocateLocalAcceptancePorts(root);
-    const backendURL = `http://127.0.0.1:${httpPort}`,
-      baseURL = `http://127.0.0.1:${webPort}`;
+    const { httpPort } = await allocateLocalAcceptancePorts(root);
+    const backendURL = `http://127.0.0.1:${httpPort}`;
+    let webPort, baseURL;
     const runtimeEnv = {
       ...env,
       POSTGRES_DSN: databaseURL,
@@ -516,7 +546,7 @@ export async function runIsolatedTransactionBrowser({
         runtimeEnv,
         "backend",
       );
-      await ready(`${backendURL}/readyz`, backend);
+      await ready(`${backendURL}/readyz`, backend, httpPort);
       report.runtimeIdentity = await verifyDatabaseRuntimeIdentity({
         backendURL,
         databaseName,
@@ -542,6 +572,9 @@ export async function runIsolatedTransactionBrowser({
       }
     });
     await stage("frontend", async () => {
+      const endpoint = await allocateLocalAcceptanceWebEndpoint(root);
+      webPort = endpoint.webPort;
+      baseURL = endpoint.webURL;
       const vite = service(
         process.execPath,
         [
@@ -560,7 +593,8 @@ export async function runIsolatedTransactionBrowser({
         },
         "vite",
       );
-      await ready(`${baseURL}/customer-config.js`, vite);
+      await ready(`${baseURL}/customer-config.js`, vite, webPort);
+      report.frontendOwnership = { pid: vite.pid, port: webPort, verified: true };
     });
     let sourceOrderBrowserFailure;
     try {
@@ -578,20 +612,21 @@ export async function runIsolatedTransactionBrowser({
           adminPassword: secrets.admin,
           rolePassword: secrets.roles,
           outputDir: path.join(out, "browser"),
+          desktopCase,
         }),
         { mode: 0o600 },
       );
       await command(
         process.execPath,
         [
-          path.join(source, receivingOnly ? "scripts/qa/transaction-arrival-return-quality-browser.mjs" : sourceOrdersOnly ? "scripts/qa/transaction-source-orders-browser.mjs" : "scripts/qa/transaction-real-backend-browser.mjs"),
+          path.join(source, desktopVariantsOnly ? "scripts/qa/transaction-desktop-variants-browser.mjs" : receivingOnly ? "scripts/qa/transaction-arrival-return-quality-browser.mjs" : sourceOrdersOnly ? "scripts/qa/transaction-source-orders-browser.mjs" : "scripts/qa/transaction-real-backend-browser.mjs"),
           "--environment",
           environmentPath,
         ],
-        { timeout: 480000 },
+        { timeout: budget.browserTimeoutMS },
       );
       const browser = JSON.parse(
-        await fs.readFile(path.join(out, receivingOnly ? "browser/receiving/report.json" : sourceOrdersOnly ? "browser/source-orders/report.json" : "browser/report.json"), "utf8"),
+        await fs.readFile(path.join(out, desktopVariantsOnly ? "browser/desktop-variants/report.json" : receivingOnly ? "browser/receiving/report.json" : sourceOrdersOnly ? "browser/source-orders/report.json" : "browser/report.json"), "utf8"),
       );
       assert.equal(browser.status, "passed");
       report.flows = browser.flows.map(({ key, passed }) => ({ key, passed }));
@@ -603,18 +638,18 @@ export async function runIsolatedTransactionBrowser({
       );
     });
     } catch (error) {
-      if (!sourceOrdersOnly && !receivingOnly) throw error;
+      if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) throw error;
       sourceOrderBrowserFailure = error;
       report.steps.push({ key: "browser-real-backend-postgres", passed: false });
     }
-    if (!sourceOrdersOnly && !receivingOnly) await stage("source-order-procurement-browser", async () => {
+    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) await stage("source-order-procurement-browser", async () => {
       await command(process.execPath, [path.join(source, "scripts/qa/transaction-source-orders-browser.mjs"), "--environment", path.join(directory, "browser-environment.json")], { timeout: 300000 });
       const orders = JSON.parse(await fs.readFile(path.join(out, "browser/source-orders/report.json"), "utf8"));
       assert.equal(orders.status, "passed");
       report.sourceOrders = orders.flows.map(({ key, passed }) => ({ key, passed }));
       report.sourceOrderRequestLogs = verifyTransactionRequestLogs(orders, await fs.readFile(path.join(directory, "backend.log"), "utf8"), Object.values(secrets));
     });
-    if (!sourceOrdersOnly && !receivingOnly) await stage("arrival-return-quality-browser", async () => {
+    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) await stage("arrival-return-quality-browser", async () => {
       await command(process.execPath, [path.join(source, "scripts/qa/transaction-arrival-return-quality-browser.mjs"), "--environment", path.join(directory, "browser-environment.json")], { timeout: 480000 });
       const receiving = JSON.parse(await fs.readFile(path.join(out, "browser/receiving/report.json"), "utf8"));
       assert.equal(receiving.status, "passed");
@@ -687,6 +722,10 @@ export async function runIsolatedTransactionBrowser({
         "TestInventoryPostgres",
         "TestQualityInspectionPostgres",
         "TestOperationalFactRepoFinance",
+        ...(desktopVariantsOnly ? [
+          "TestProductionOrderPostgresOutsourcedStageReturnRollbackAndReplay",
+          "TestProductionOrderPostgresShellDispositionRollbackReplayAndReversal",
+        ] : []),
       ]);
       await fs.writeFile(
         path.join(out, "postgres.jsonl"),
@@ -707,7 +746,7 @@ export async function runIsolatedTransactionBrowser({
       );
     });
     if (sourceOrderBrowserFailure) throw sourceOrderBrowserFailure;
-    if (!sourceOrdersOnly && !receivingOnly) await stage("shared-list-filter-print", async () => {
+    if (!sourceOrdersOnly && !receivingOnly && !desktopVariantsOnly) await stage("shared-list-filter-print", async () => {
       await command(
         process.execPath,
         [
@@ -892,12 +931,18 @@ if (
   const args = process.argv.slice(2);
   if (!args.length || args[0] === "--help") {
     process.stdout.write(
-      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--source-orders | --receiving] [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. --source-orders selects sales, purchase and outsourcing browser flows with the same real PostgreSQL and logging gates; it does not attest the other browser or print flows. --receiving selects arrival counts, purchase returns and outsourcing return quality with the same PostgreSQL and logging gates; it excludes other browser and print flows. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46. The default print scope also requires pdfinfo, pdffonts and pdftotext.\n",
+      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--source-orders | --receiving | --desktop-variants] [--desktop-case all|advance|outsourcing|shell] [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. --source-orders selects sales, purchase and outsourcing browser flows with the same real PostgreSQL and logging gates; it does not attest the other browser or print flows. --receiving selects arrival counts, purchase returns and outsourcing return quality with the same PostgreSQL and logging gates; it excludes other browser and print flows. --desktop-variants selects desktop supplier advance payments and production exception variants, with the same PostgreSQL and logging gates. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46. The default print scope also requires pdfinfo, pdffonts and pdftotext.\n",
     );
   } else {
-    const selected = args.filter(arg => !["--source-orders", "--receiving"].includes(arg));
+    const caseIndex = args.indexOf("--desktop-case");
+    assert.ok(args.filter(arg => arg === "--desktop-case").length <= 1, "repeat desktop case");
+    const desktopCase = caseIndex < 0 ? "all" : args[caseIndex + 1];
+    assert.ok(["all", "advance", "outsourcing", "shell"].includes(desktopCase), "unknown desktop case");
+    assert.ok(caseIndex < 0 || args.includes("--desktop-variants"), "desktop case requires desktop variants scope");
+    const scopeArgs = args.filter((arg, index) => index !== caseIndex && index !== caseIndex + 1 || caseIndex < 0);
+    const selected = scopeArgs.filter(arg => !["--source-orders", "--receiving", "--desktop-variants"].includes(arg));
     assert.ok(
-      args.filter(arg => ["--source-orders", "--receiving"].includes(arg)).length <= 1 && selected[0] === "--run" &&
+      args.filter(arg => ["--source-orders", "--receiving", "--desktop-variants"].includes(arg)).length <= 1 && selected[0] === "--run" &&
         (selected.length === 1 || (selected.length === 3 && selected[1] === "--out")),
       "unknown arguments",
     );
@@ -905,7 +950,7 @@ if (
     const timer = setTimeout(
       () =>
         controller.abort(new Error("isolated transaction test hard timeout")),
-      15 * 60 * 1000,
+      transactionBrowserBudget({ sourceOrdersOnly: args.includes('--source-orders'), receivingOnly: args.includes('--receiving'), desktopVariantsOnly: args.includes('--desktop-variants') }).runTimeoutMS,
     );
     process.once("SIGINT", () => controller.abort());
     process.once("SIGTERM", () => controller.abort());
@@ -914,6 +959,8 @@ if (
         outputDir: selected[2],
         sourceOrdersOnly: args.includes("--source-orders"),
         receivingOnly: args.includes("--receiving"),
+        desktopVariantsOnly: args.includes("--desktop-variants"),
+        desktopCase,
         signal: controller.signal,
       });
       if (report.status !== "passed") process.exitCode = 1;

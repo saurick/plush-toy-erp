@@ -285,6 +285,17 @@ export function MermaidDiagram({
     setPanning(false)
   }, [chart, startingZoom, initialZoomMode])
 
+  useLayoutEffect(() => {
+    if (!fullscreenOpen) return undefined
+
+    const root = diagramRef.current
+    // 顶层显示保留 DOM 和主题继承，同时越过父级的裁剪与层叠上下文。
+    root.showPopover()
+    return () => {
+      if (root.matches(':popover-open')) root.hidePopover()
+    }
+  }, [fullscreenOpen])
+
   useEffect(() => {
     if (!fullscreenOpen || typeof document === 'undefined') {
       return undefined
@@ -498,6 +509,7 @@ export function MermaidDiagram({
       data-mermaid-direction={activeDirection || undefined}
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}
       data-mermaid-native-size={nativeSize || undefined}
+      popover={fullscreenOpen ? 'manual' : undefined}
       aria-busy={renderState.status === 'loading'}
       role={fullscreenOpen ? 'dialog' : undefined}
       aria-modal={fullscreenOpen ? 'true' : undefined}

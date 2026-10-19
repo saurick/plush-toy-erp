@@ -1,5 +1,6 @@
+import { readFile, writeFile } from 'node:fs/promises'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
-import { readFile } from 'node:fs/promises'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { getBusinessPageHandbookSections } from '../../src/erp/config/businessHandbook.mjs'
@@ -561,11 +562,14 @@ export function createHelpCenterScenarios({
         await page.waitForFunction(()=>document.querySelector('.erp-help-reader').scrollTop>400)
         const saved=await settledScrollTop(reader)
         const sidebar=page.locator('#erp-help-directory')
-        for(const title of ['通用操作与岗位交接','产品工程','财务管理']) {
-          const summary=sidebar.locator('summary').filter({hasText:title})
+        for(const summary of await sidebar.locator('summary').all()) {
           if(!await summary.evaluate(element=>element.parentElement.open))await summary.click()
         }
+        const sidebarOverflow=await sidebar.evaluate(element=>element.scrollHeight-element.clientHeight)
+        assert(sidebarOverflow>30,'展开的目录需要真实溢出，才能验证目录与正文独立滚动')
         await sidebar.hover()
+        await page.mouse.wheel(0,-10000)
+        await page.waitForFunction(()=>document.querySelector('#erp-help-directory').scrollTop===0)
         await page.mouse.wheel(0,800)
         await page.waitForFunction(()=>document.querySelector('#erp-help-directory').scrollTop>30)
         await settledScrollTop(sidebar)
@@ -1394,12 +1398,21 @@ export function createHelpCenterScenarios({
             '查看应收管理页面说明'
         )
 
+        await openBusinessTableTool(page, '列设置')
+        const columnSettings = page.getByRole('dialog', { name: /^列设置/u })
+        const paymentTermColumn = columnSettings.getByRole('checkbox', { name: '账期', exact: true })
+        assert.equal(await paymentTermColumn.isChecked(), false, '账期辅助列默认收起，由账号按需显示')
+        await paymentTermColumn.check()
+        await columnSettings.getByRole('button', { name: '完成', exact: true }).click()
+        await columnSettings.waitFor({ state: 'hidden' })
         const inline = page.getByRole('button', {
           name: '查看账期说明',
           exact: true,
         })
         await inline.scrollIntoViewIfNeeded()
         await inline.focus()
+        await page.keyboard.press('Tab')
+        await page.keyboard.press('Shift+Tab')
         const popover = page.locator(
           '.erp-business-inline-help-popover:visible'
         )
@@ -1676,16 +1689,19 @@ export function createHelpCenterScenarios({
         })
         await page.setViewportSize({ width: 1100, height: 800 })
         await assertFlowFits(page)
-        const branchBox = await article
-          .locator('.erp-help-flow__issue button')
-          .boundingBox()
-        const stepsBox = await article
-          .locator('.erp-help-flow__steps')
-          .boundingBox()
-        const stacked=await article.locator('.erp-help-flow__issue').evaluate(element=>getComputedStyle(element).position==='static')
+        const flowGeometry = await article.evaluate(async (element) => {
+          const issue = element.querySelector('.erp-help-flow__issue')
+          const steps = element.querySelector('.erp-help-flow__steps')
+          const measure = () => ({ branchBox: issue.querySelector('button').getBoundingClientRect().toJSON(), stepsBox: steps.getBoundingClientRect().toJSON(), stacked: getComputedStyle(issue).position === 'static', issuePosition: getComputedStyle(issue).position, issueTop: getComputedStyle(issue).top, issueMarginTop: getComputedStyle(issue).marginTop })
+          const samples = [measure()]
+          for (let frame = 0; frame < 4; frame += 1) { await new Promise(requestAnimationFrame); samples.push(measure()) }
+          return samples
+        })
+        await writeFile(path.join(outputDir, 'help-center-warehouse-narrow-geometry.json'), JSON.stringify(flowGeometry, null, 2))
+        const { branchBox, stepsBox, stacked } = flowGeometry.at(-1)
         assert(
           branchBox.y >= stepsBox.y + stepsBox.height + (stacked ? 10 : 40),
-          '异常分支不能压住换行后的步骤'
+          `异常分支不能压住换行后的步骤: ${JSON.stringify(flowGeometry)}`
         )
         await page.screenshot({
           path: path.join(

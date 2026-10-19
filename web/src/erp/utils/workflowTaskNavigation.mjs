@@ -6,6 +6,14 @@ function localBusinessPath(value) {
   return typeof value === 'string' && /^\/(?:erp|m)\/[A-Za-z0-9/_?=&#.%:+-]+$/u.test(value)
 }
 
+export function workflowTaskBusinessReceipt(message, record = {}) {
+  return {
+    message,
+    recordID: Number.isSafeInteger(record?.id) && record.id > 0 ? record.id : null,
+    recordNo: [record?.fact_no, record?.inspection_no, record?.batch_no, record?.receipt_no, record?.return_no, record?.adjustment_no, record?.payment_no, record?.shipment_no, record?.operation_no, record?.order_no, record?.purchase_order_no].find((value) => typeof value === 'string' && value.trim()) || '',
+  }
+}
+
 export function workflowTaskEntryNavigation(task, entryPath, returnPath, adminID, returnSource = null) {
   if (!Number.isSafeInteger(task?.id) || task.id <= 0 || !localBusinessPath(entryPath) || !localBusinessPath(returnPath)) return {}
   const container = typeof document === 'undefined' ? null : document.querySelector('.erp-admin-content')

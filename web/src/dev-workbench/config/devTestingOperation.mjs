@@ -36,6 +36,13 @@ export const DEV_TESTING_FIXED_ACTIONS = Object.freeze([
       '验证字段来源、覆盖、清空、列表回显及打印合同，并原子更新专项报告。',
     boundary: '不连接数据库、不启动真实业务浏览器，也不代替端到端验收。',
   }),
+  Object.freeze({
+    key: 'rpc-examples',
+    priority: 'P1',
+    label: '接口文档样例执行核对',
+    description: '将登记的文档请求送入真实 Go handler 夹具，核对实际返回与主要字段投影。',
+    boundary: '仅覆盖登记的隔离服务夹具，不连接业务数据库，不外推为全部接口或业务事务通过。',
+  }),
 ])
 export const DEV_PRESSURE_ACTIONS = Object.freeze([
   Object.freeze({ key: 'pressure-quick',
@@ -165,7 +172,7 @@ const AFFECTED_SCOPE_PATTERN = /^T[0-8]$/u
 const PLAN_COMMAND_SCOPE_PATTERN = /^(?:T[0-8]|LOCAL_FULL)$/u
 const LOCAL_GATE_VALUES = Object.freeze(['focused', 'full'])
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
+  /^testing:(fast|role-access|field-linkage|rpc-examples|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
 const STATUS_META = Object.freeze({
   queued: Object.freeze({ label: '等待启动', tone: 'primary' }),
   running: Object.freeze({ label: '运行中', tone: 'primary' }),

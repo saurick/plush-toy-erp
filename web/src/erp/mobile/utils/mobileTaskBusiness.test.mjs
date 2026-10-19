@@ -2,16 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   canOpenMobileTaskBusiness,
-  matchesMobileTaskBusinessEntry,
-  mobileTaskBusinessPath,
   resolveMobileTaskBusinessEntry,
   selectMobileRelatedBusinessTask,
   mobileTaskRelatedCommands,
-  mobileTaskRelatedCommand,
+  taskScopedSearchParams,
 } from './mobileTaskBusiness.mjs'
 import { workflowTaskSourceForEntryPath } from '../../utils/dashboardTaskDisplay.mjs'
-import { canonicalBusinessPath, mobileBusinessPath } from '../../utils/businessTaskRoute.mjs'
-import { workflowTaskNavigationState } from '../../utils/workflowTaskNavigation.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 
 const task = {
@@ -50,14 +46,14 @@ test('tampered source anchors and keyword-only tasks cannot select a business fo
   ]) assert.equal(resolveMobileTaskBusinessEntry(invalid), '')
 })
 
-test('task-scoped routes preserve source identity and reject a different or additional record', () => {
-  const path = mobileTaskBusinessPath(task, 'warehouse')
-  assert.equal(path, '/m/warehouse/tasks/31/handle/warehouse/inbound?receipt_id=91')
-  assert.equal(canonicalBusinessPath(path), task.payload.entry_path)
-  assert.equal(matchesMobileTaskBusinessEntry(`${path}&link_source=task-dashboard`, task), true)
-  assert.equal(matchesMobileTaskBusinessEntry(path.replace('receipt_id=91', 'receipt_id=92'), task), false)
-  assert.equal(matchesMobileTaskBusinessEntry(`${path}&source_id=92`, task), false)
-  assert.equal(mobileTaskBusinessPath(task, '../boss'), '')
+test('task form query changes preserve the verified source and selected lot', () => {
+  const receipt = new URLSearchParams('receipt_id=91')
+  assert.equal(taskScopedSearchParams(receipt, 'receipt_id=92&view=txns').toString(), 'receipt_id=91&view=txns')
+  assert.equal(taskScopedSearchParams(receipt, '').get('receipt_id'), '91')
+  const inventory = taskScopedSearchParams(new URLSearchParams('lot_id=7&warehouse_id=8'), 'lot_id=9&warehouse_id=10&view=txns')
+  assert.equal(inventory.get('lot_id'), '7')
+  assert.equal(inventory.get('warehouse_id'), '8')
+  assert.equal(inventory.get('view'), 'txns')
 })
 
 test('a source follow-up opens its exact record without broad keyword matching', () => {
@@ -68,25 +64,12 @@ test('a source follow-up opens its exact record without broad keyword matching',
 })
 
 test('related forms require their own menu and mutation capability and cannot substitute a task or source', () => {
-  const path = '/m/warehouse/tasks/31/handle/related/inventory'
   const user = { menus: ['/erp/warehouse/inventory'], permissions: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE], effective_session: { actions: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE] } }
   assert.equal(mobileTaskRelatedCommands(task, user, allowed).length, 1)
-  assert.equal(matchesMobileTaskBusinessEntry(path, task), true)
-  for (const changed of [`${path}?lot_id=9`, path.replace('/31/', '/32/'), path.replace('/inventory', '/shipment'), `${path}/extra`]) assert.equal(matchesMobileTaskBusinessEntry(changed, task), false)
-  assert.equal(mobileTaskRelatedCommand(path, { ...task, source_type: 'sales_order' }), null)
-  assert.equal(matchesMobileTaskBusinessEntry(path, { ...task, task_code: 'forged' }), false)
   assert.deepEqual(mobileTaskRelatedCommands(task, { menus: user.menus, permissions: [] }, allowed), [])
   assert.deepEqual(mobileTaskRelatedCommands(task, { menus: [], permissions: user.permissions }, allowed), [])
   assert.deepEqual(mobileTaskRelatedCommands(task, user, { ...allowed, allowed: false }), [])
   assert.deepEqual(mobileTaskRelatedCommands(task, { ...user, effective_session: { actions: [] } }, allowed), [])
-})
-
-test('related navigation preserves the task scope and return receipt without reopening legacy mobile routes', () => {
-  const path = mobileBusinessPath('/erp/warehouse/inbound?receipt_id=91', 'warehouse', task.id)
-  const navigation = { taskID: task.id, adminID: 12, returnPath: '/m/warehouse/tasks', businessReceipt: { message: '已入库' } }
-  assert.deepEqual(workflowTaskNavigationState({}, navigation, path).workflowTaskNavigation, { ...navigation, entryPath: path })
-  assert.equal(workflowTaskNavigationState({}, navigation, '/m/warehouse/tasks').workflowTaskNavigation, undefined)
-  assert.equal(mobileBusinessPath('/erp/dashboard', 'warehouse', task.id), '/m/warehouse/tasks')
 })
 
 test('related source identity comes from exact record keys and child facts retain their own identity', () => {

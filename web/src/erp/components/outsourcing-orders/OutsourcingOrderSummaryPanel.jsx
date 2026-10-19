@@ -9,7 +9,8 @@ import React, {
 } from 'react'
 import { Alert, Button, Space, Tag } from 'antd'
 import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import useBusinessSearchParams from '../../hooks/useBusinessSearchParams.js'
+
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
@@ -51,7 +52,7 @@ export default forwardRef((
   { adminProfile, supplierOptions, processOptions, onOpenContract },
   ref
 ) => {
-  const [params, setParams] = useSearchParams()
+  const [params, setParams] = useBusinessSearchParams()
   const filters = useMemo(() => readOutsourcingSummaryFilters(params), [params])
   const requestKey = JSON.stringify(filters)
   const [result, setResult] = useState({ items: [], total: 0 })

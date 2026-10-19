@@ -40,7 +40,7 @@
 .erp-dev-chain__stage-main:focus-visible::after { outline: 2px solid var(--erp-primary); outline-offset: -3px; }
 .erp-dev-chain__stage-main > span { color: var(--erp-text-muted); font-variant-numeric: tabular-nums; }
 .erp-dev-chain__stage-main > strong { overflow-wrap: anywhere; font-weight: 500; }
-.erp-dev-chain__stage-foot { display: flex; align-items: center; justify-content: center; min-height: 23px; padding: 0 4px 3px; pointer-events: none; }
+.erp-dev-chain__stage-foot { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: center; justify-content: center; min-height: 23px; padding: 0 4px 3px; pointer-events: none; }
 .erp-dev-chain__stage-foot > button { position: relative; z-index: 1; padding: 1px 3px; border: 0; background: transparent; color: var(--chain-branch); font: inherit; font-size: var(--erp-font-caption); cursor: pointer; pointer-events: auto; }
 .erp-dev-chain__stage-foot > small { color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
 .erp-dev-chain__branch-lane { position: relative; grid-column: 1 / -1; min-width: 0; height: 180px; }

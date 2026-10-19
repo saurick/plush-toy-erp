@@ -46,3 +46,24 @@ test('related-task readers do not expand followup creation and chain labels have
   for (const step of catalog.fulfillment_flow) for (const stage of step.stages) assert.ok(catalog.stages.some((item) => item.key === stage))
   for (const assignee of ['01', '-1', '1.1', '9007199254740992']) assert.deepEqual(normalizeTaskDiscoveryFilters({ assignee }), {})
 })
+
+test('任务分类用正式环节名称或路径末级，完整路径原样可追踪', async () => {
+  const { taskClassificationPresentation } = await import('./workflowTaskDiscovery.mjs')
+  const stage = workflowTaskDiscoveryCatalog.stages.find((entry) => entry.key === 'purchasing')
+  const path = taskStagePath(stage.key)
+  assert.deepEqual(taskClassificationPresentation({ discovery: { stage_key: stage.key, path } }), { label: stage.label, path })
+  assert.deepEqual(taskClassificationPresentation({ discovery: { path: '协同跟进 / 样品资料确认 / 颜色核对' } }), { label: '颜色核对', path: '协同跟进 / 样品资料确认 / 颜色核对' })
+  assert.deepEqual(taskClassificationPresentation({}), { label: '', path: '' })
+  assert.deepEqual(taskClassificationPresentation(null), { label: '', path: '' })
+})
+
+test('分类中的模拟短标签只认正式标记，不按任务名、办理人或文字猜测', async () => {
+  const { taskClassificationPresentation } = await import('./workflowTaskDiscovery.mjs')
+  const task = { task_name: '模拟资料复核', source_type: 'sales_order', discovery: { assignee_name: '演示业务', path: '协同跟进 / 业务跟进 / 资料复核' } }
+  assert.equal(taskClassificationPresentation(task).label, '资料复核')
+  assert.equal(taskClassificationPresentation({ ...task, payload: { simulated_only: 'true' } }).label, '资料复核')
+  assert.equal(taskClassificationPresentation({ ...task, payload: { simulated_only: true } }).label, '模拟任务')
+  assert.equal(taskClassificationPresentation({ ...task, source_type: 'simulated-manual-acceptance-task-batch' }).label, '模拟任务')
+  assert.equal(taskClassificationPresentation(task).path, task.discovery.path)
+  assert.equal(task.discovery.assignee_name, '演示业务')
+})

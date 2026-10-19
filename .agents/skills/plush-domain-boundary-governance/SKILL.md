@@ -42,6 +42,14 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 
 客户配置任务若进入 validate / publish / transition check / activate / readback、目标环境 migration 或 rollback，由本 skill 先确认 Product Core 与字段真源，再切 `$plush-operations-governance` 执行运行态步骤；不要另造页面私有配置真源或直接改库。
 
+## API 合同与工作台同步 / API Contract Sync
+
+新增、删除、改名接口，或变更请求 / 返回、权限、状态条件、幂等及错误行为时，按[公共契约维护步骤](../../../docs/engineering/跨层公共契约与生成规范.md#修改步骤--maintenance)完成同轮同步；纯实现调整且调用合同未变时核对生成零漂移。
+
+- 从实际分发、参数解析、返回映射及所属 usecase 核对合同；维护 `server/docs/api.md` 的中文名称、用途与业务约束，以及 `server/cmd/public-contracts/testdata/rpc_examples.json` 的模拟值和来源。提取不支持实际结构时扩展生成器并验证，不手改生成物或在文档中补造后端行为。
+- 运行现有生成与只读检查，使正式 API 文档、公共 RPC 标识、DEV 源码索引和“接口与集成”保持同源；删除或改名时清理旧合同、样例、调用方及失效来源关联，不留平行目录。
+- 同步实际权限登记与相关回归来源，按行为影响验证；来源关联、模拟样例和生成一致不等于已执行通过。涉及工作台解析、展示或交互时验证对应消费者及浏览器行为，普通接口变更不扩成全工作台回归。
+
 ## 输出 Output
 
 汇报 ownership decisions、source truth、changed layers、intentionally untouched layers、stale/missing paths、validation 和 residual risks。

@@ -409,23 +409,11 @@ export function createPermissionUnifiedScenarios({
           .locator('[data-action="permission-role"][data-value="finance"]')
           .click()
         await frame.getByRole('tab', { name: '岗位导航', exact: true }).click()
-        await frame
-          .getByRole('combobox', { name: '岗位导航排列方式' })
-          .selectOption('custom')
-        const finance = frame.locator('[data-navigation-module="财务管理"]')
-        assert.equal(await finance.count(), 1)
-        const defaultPage = frame.getByRole('combobox', {
-          name: '财务管理默认页面',
-        })
-        assert.equal(await defaultPage.locator('option').count(), 5)
-        await defaultPage.selectOption('payments')
-        await frame
-          .getByRole('button', { name: '移到其他 财务管理', exact: true })
-          .click()
-        await frame
-          .getByRole('button', { name: '移到常用 财务管理', exact: true })
-          .click()
-        assert.equal(await defaultPage.inputValue(), 'payments')
+        const preview = frame.getByRole('region', { name: '岗位实际菜单' })
+        await preview.waitFor()
+        assert.deepEqual(await preview.locator('h3').allTextContents(), ['工作中心', '业务模块', '工具与查询', '系统与帮助'])
+        assert.equal(await frame.getByRole('combobox', { name: '岗位导航排列方式' }).count(), 0)
+        assert.equal(await frame.getByRole('button', { name: '保存岗位设置', exact: true }).isDisabled(), true)
         await frame.getByRole('tab', { name: '页面访问', exact: true }).click()
         await frame
           .getByRole('combobox', { name: '筛选业务模块' })
@@ -440,18 +428,13 @@ export function createPermissionUnifiedScenarios({
         )
         await frame.getByRole('button', { name: /^不可进入\s*0$/u }).click()
         await frame.getByText('此筛选下暂无页面', { exact: true }).waitFor()
-        await frame.getByRole('tab', { name: '菜单排列', exact: true }).click()
-        assert.equal(await defaultPage.inputValue(), 'payments')
-        await frame
-          .getByRole('button', { name: '保存岗位设置', exact: true })
-          .click()
+        await frame.getByRole('tab', { name: '实际菜单', exact: true }).click()
         await frame
           .locator('[data-action="permission-role"][data-value="sales"]')
           .click()
         await frame
           .locator('[data-action="permission-role"][data-value="finance"]')
           .click()
-        assert.equal(await defaultPage.inputValue(), 'payments')
         assert.equal(
           await frame
             .getByRole('button', { name: '保存岗位设置', exact: true })
@@ -1415,7 +1398,7 @@ export function createPermissionUnifiedScenarios({
           .click()
         await frame.getByRole('tab', { name: /岗位导航/, exact: false }).click()
         await frame
-          .getByRole('tab', { name: '菜单排列', exact: true })
+          .getByRole('tab', { name: '实际菜单', exact: true })
           .waitFor()
         await tabs.getByRole('tab', { name: /岗位设置/ }).click()
         const scopeTrigger = frame.getByRole('button', {

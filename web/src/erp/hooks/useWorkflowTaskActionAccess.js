@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { createRequestScopeAbortReason, RequestScopeOwner, RequestScopeCancellationCause } from '../../common/utils/requestScopeCancellation.mjs'
 import { explainWorkflowActionAccess } from '../api/workflowApi.mjs'
 import {
   DEFAULT_WORKFLOW_ACTION_MODES,
@@ -78,7 +79,11 @@ export default function useWorkflowTaskActionAccess({
       })
 
     return () => {
-      controller.abort()
+      controller.abort(createRequestScopeAbortReason({
+        owner: RequestScopeOwner.WORKFLOW_ACTION_ACCESS,
+        cause: RequestScopeCancellationCause.DISPOSED,
+        generation: requestID,
+      }))
     }
   }, [enabled, requestKey, retryVersion, taskID])
 

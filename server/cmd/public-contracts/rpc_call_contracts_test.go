@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -37,6 +40,75 @@ func TestRPCParameterExamplesRejectInvalidContainersAndMissingFields(t *testing.
 				t.Fatalf("valid=%v: %v", tt.valid, err)
 			}
 		})
+	}
+}
+
+func TestRPCExampleKeysRejectDuplicateMethodsAndNestedFields(t *testing.T) {
+	for _, source := range []string{
+		`{"inventory.list":{},"inventory.list":{}}`,
+		`{"inventory.list":{"params":{"status":"ACTIVE","status":"HOLD"}}}`,
+		`{"inventory.list":{"data":[{"quantity":"12.5","quantity":"99"}]}}`,
+	} {
+		if validateRPCExampleKeys([]byte(source)) == nil {
+			t.Fatal("duplicate example or wire field was accepted")
+		}
+	}
+	if err := validateRPCExampleKeys([]byte(`{"a":{"id":1},"b":{"id":2}}`)); err != nil {
+		t.Fatalf("separate method scopes must remain independent: %v", err)
+	}
+}
+
+func TestRPCReviewRetainsShapesWithoutRelaxingGenerationValidation(t *testing.T) {
+	repository, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "server/cmd/public-contracts/testdata"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"internal", "api"} {
+		if err := os.Symlink(filepath.Join(repository, "server", name), filepath.Join(root, "server", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile(filepath.Join(repository, "server/cmd/public-contracts/testdata/rpc_examples.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var examples map[string]rpcExample
+	if err := json.Unmarshal(raw, &examples); err != nil {
+		t.Fatal(err)
+	}
+	delete(examples, "inventory.list_inventory_lots")
+	raw, err = json.Marshal(examples)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "server/cmd/public-contracts/testdata/rpc_examples.json"), raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	methods, err := rpcMethods(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index, err := rpcInspection(root, methods)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rpcCallContracts(root, methods, index); err == nil {
+		t.Fatal("generation accepted a missing example")
+	}
+	var issues []rpcExampleIssue
+	calls, err := rpcCallContracts(root, methods, index, &issues)
+	if err != nil || len(issues) == 0 {
+		t.Fatalf("review did not retain explicit issues: %v %#v", err, issues)
+	}
+	if calls["inventory"]["list_inventory_lots"].DataType != "object" || len(calls["inventory"]["list_inventory_lots"].Parameters) == 0 {
+		t.Fatal("review lost the real backend shape")
+	}
+	if _, err := rpcCallContracts(root, methods, index); err == nil {
+		t.Fatal("review relaxed a subsequent generation check")
 	}
 }
 

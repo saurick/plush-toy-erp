@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import useBusinessSearchParams from '../../hooks/useBusinessSearchParams.js'
+
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -33,7 +34,7 @@ import {
 } from '../../utils/lifecycleScope.mjs'
 
 export function useOutsourcingOrderQuery({ adminProfile }) {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
 
   const [rows, setRows] = useState([])
 

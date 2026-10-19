@@ -11,6 +11,7 @@ import { buildProjectGraph } from '../../src/dev-workbench/config/devProjectGrap
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertMermaidFits, waitForMermaidFit, switchMermaidLayout, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
+import { verifyRPCContractReviewWorkspace } from './devRPCContractReviewAssertions.mjs'
 
 const integrationScenarios = readIntegrationScenarios(readFileSync(new URL('../../../server/docs/api.md', import.meta.url), 'utf8'))
 const integrationEvidenceFixture = (current = false) => ({
@@ -32,11 +33,84 @@ name: '取消销售订单',
   await page.route(`**${INTEGRATION_EVIDENCE_API}`, (route) => route.fulfill({ json: integrationEvidenceFixture() }))
 }
 
+async function verifyIntegrationFilters(page, assert, assertNoHorizontalOverflow) {
+  const filters = page.locator('.erp-dev-integration__filters')
+  const search = filters.getByRole('textbox', { name: '搜索接口名称、方法名或用途', exact: true })
+  const reset = filters.getByRole('button', { name: '重置筛选', exact: true })
+  const inventory = page.getByRole('region', { name: '接口清单', exact: true })
+  const viewport = page.viewportSize()
+  const measureReset = () => reset.evaluate((button) => {
+    const bounds = button.getBoundingClientRect()
+    const toolbar = button.closest('.erp-dev-integration__filters').getBoundingClientRect()
+    return { x: bounds.x - toolbar.x, y: bounds.y - toolbar.y }
+  })
+  const resetBounds = await measureReset()
+  assert.equal(await reset.isEnabled(), false, '无筛选时保留固定位置的禁用重置操作')
+  await filters.getByRole('status').getByText(/^共 \d+ 个接口$/u).waitFor()
+  await filters.locator('.ant-select-selector').click()
+  await filters.getByRole('combobox', { name: '筛选业务域', exact: true }).fill('销售订单')
+  await page.getByRole('option', { name: '销售订单', exact: true }).click()
+  await search.fill('sales_order.save_sales_order_with_items')
+  await inventory.getByRole('button', { name: /save_sales_order_with_items/u }).click()
+  const detail = page.getByRole('dialog', { name: /sales_order \/ save_sales_order_with_items/u })
+  await detail.getByRole('tab', { name: '返回结果', exact: true }).click()
+  const filteredBounds = await measureReset()
+  assert(Math.abs(resetBounds.x - filteredBounds.x) <= 1 && Math.abs(resetBounds.y - filteredBounds.y) <= 1, '数量变化不会移动重置操作')
+  await filters.getByRole('status').getByText(/^找到 1 个接口 · 共 \d+ 个$/u).waitFor()
+  await filters.locator('.ant-select').hover()
+  await filters.locator('.ant-select-clear').click()
+  await page.waitForURL((url) => !url.searchParams.has('domain'))
+  assert.equal(await search.inputValue(), 'sales_order.save_sales_order_with_items', '业务域清除不清空关键词')
+  assert.equal(await detail.getByRole('tab', { name: '返回结果', exact: true }).getAttribute('aria-selected'), 'true')
+  await filters.locator('.ant-select-selector').click()
+  await filters.getByRole('combobox', { name: '筛选业务域', exact: true }).fill('销售订单')
+  await page.getByRole('option', { name: '销售订单', exact: true }).click()
+  await filters.locator('.ant-input-clear-icon').click()
+  await page.waitForURL((url) => !url.searchParams.has('q') && url.searchParams.get('domain') === 'sales_order')
+  await search.fill('不存在的接口关键词')
+  await detail.getByText('当前接口不在筛选结果中。', { exact: true }).waitFor()
+  await reset.click()
+  await page.waitForURL((url) => !url.searchParams.has('domain') && !url.searchParams.has('q') && url.searchParams.get('page') === '1')
+  assert.equal(new URL(page.url()).searchParams.get('rpc'), 'sales_order.save_sales_order_with_items', '重置筛选保留当前接口')
+  assert.equal(await detail.getByRole('tab', { name: '返回结果', exact: true }).getAttribute('aria-selected'), 'true', '重置筛选保留资料页签')
+  await inventory.locator('.ant-pagination-item-1.ant-pagination-item-active').waitFor()
+  await page.reload()
+  await detail.getByRole('tab', { name: '返回结果', exact: true }).waitFor()
+  assert.equal(await detail.getByRole('tab', { name: '返回结果', exact: true }).getAttribute('aria-selected'), 'true', '刷新恢复显式页码和当前资料')
+  await inventory.locator('.ant-pagination-item-1.ant-pagination-item-active').waitFor()
+  await detail.getByRole('button', { name: '关闭', exact: true }).click()
+  await detail.waitFor({ state: 'hidden' })
+  try {
+    await search.fill('production_order save')
+    await page.setViewportSize({ width: 768, height: 900 })
+    const bounds = await filters.evaluate((element) => {
+      const box = (target) => target.getBoundingClientRect().toJSON()
+      return {
+        root: box(element),
+        controls: box(element.querySelector('.erp-dev-integration__filter-controls')),
+        summary: box(element.querySelector('.erp-dev-integration__filter-summary')),
+        search: box(element.querySelector('.erp-search-input')),
+        items: [...element.querySelectorAll('.ant-select, .erp-search-input, button[aria-label="重置筛选"]')].map(box),
+      }
+    })
+    assert(bounds.summary.top >= bounds.controls.bottom, '窄窗口按筛选条件与结果操作分组换行')
+    assert(bounds.search.width >= 280, '换行后保持关键词输入宽度')
+    assert(bounds.items.every((item) => item.left >= bounds.root.left - 1 && item.right <= bounds.root.right + 1), '筛选控件不溢出或互相挤压')
+    await assertNoHorizontalOverflow(page, '接口筛选分组换行')
+    const narrowReset = await measureReset()
+    await reset.click()
+    const narrowResetAfter = await measureReset()
+    assert(Math.abs(narrowReset.x - narrowResetAfter.x) <= 1 && Math.abs(narrowReset.y - narrowResetAfter.y) <= 1, '窄窗口数量变化后重置仍保持原位')
+  } finally {
+    await page.setViewportSize(viewport)
+  }
+}
+
 export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizontalOverflow }) {
   const inventory = page.getByRole('region', { name: '接口清单', exact: true })
   const permissionSource = page.getByLabel('权限来源', { exact: true })
   const gate = page.getByRole('region', { name: '门禁整体证据', exact: true })
-  const search = page.getByRole('textbox', { name: '搜索业务域或方法', exact: true })
+  const search = page.getByRole('textbox', { name: '搜索接口名称、方法名或用途', exact: true })
   const navigation = page.locator('.erp-dev-workspace-nav')
   const links = page.getByRole('navigation', { name: '合同与验证入口' })
   const diagram = page.locator('.erp-dev-project-relationships .erp-markdown-mermaid')
@@ -97,7 +171,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   assert(hierarchy.filters.top >= hierarchy.header.bottom && hierarchy.filters.height <= 36, '桌面筛选使用单排控件')
   assert(Math.max(...hierarchy.filterCenters) - Math.min(...hierarchy.filterCenters) <= 1, '筛选标签与控件垂直居中对齐')
   assert(hierarchy.table.top - hierarchy.header.top <= 110, '清单在紧凑页头和筛选之后直接呈现')
-  assert.deepEqual(hierarchy.labels, ['业务域', '搜索接口'])
+  assert.deepEqual(hierarchy.labels, ['业务域'], '搜索框通过占位提示与无障碍名称表达用途，不重复外侧标签')
   assert.equal(await page.locator('.erp-dev-integration__evidence-disclosure').getAttribute('open'), null, '默认聚焦查询，保留折叠的依据入口')
   await page.locator('.erp-dev-integration__evidence-disclosure > summary').click()
   assert.equal(await links.getByRole('link').count(), buildProjectGraph('integration').destinations.length, '展开后保留全部正式入口')
@@ -113,7 +187,9 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   const guideChoices = guide.getByRole('table').filter({ has: page.getByRole('columnheader', { name: '接入情况', exact: true }) })
   assert.equal(await inventoryTab.getAttribute('aria-selected'), 'true')
   assert.equal(await guide.count(), 0)
-  await verifySlidingMotion(page, assert, '.erp-dev-integration__tabs', 1)
+  const guideIndex = await tabs.getByRole('tab').evaluateAll((buttons) => buttons.findIndex((button) => button.id === 'integration-tab-guide'))
+  assert(guideIndex >= 0, '接入指引页签必须存在')
+  await verifySlidingMotion(page, assert, '.erp-dev-integration__tabs', guideIndex)
   await guideChoices.waitFor()
   assert.equal(await inventory.count(), 0, '指引页不混放接口清单')
   assert.equal(await guideChoices.locator('tbody tr').count(), 3)
@@ -201,7 +277,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   await detail.waitFor()
   await detail.getByRole('button', { name: '关闭', exact: true }).click()
   await detail.waitFor({ state: 'hidden' })
-  await page.getByRole('button', { name: '清除筛选', exact: true }).click()
+  await page.getByRole('button', { name: '重置筛选', exact: true }).click()
   await inventory.locator('.ant-pagination-item-2').click()
   assert.equal(new URL(page.url()).searchParams.get('page'), '2')
   await page.reload()
@@ -426,7 +502,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   await page.goto(new URL(`${DEV_INTEGRATION_ROUTE}?rpc=unknown.method&domain=missing&page=999999`, page.url()).href)
   await page.getByText('该接口未在当前生成物中登记。', { exact: false }).waitFor()
   await page.getByRole('button', { name: '清除选择', exact: true }).click()
-  await page.getByRole('button', { name: '清除筛选', exact: true }).click()
+  await page.getByRole('button', { name: '重置筛选', exact: true }).click()
   await inventory.getByRole('button', { name: /audit_logs/u }).waitFor()
   await page.setViewportSize({ width: 3840, height: 2160 })
   await page.goto(new URL(`${DEV_INTEGRATION_ROUTE}?rpc=purchase.post_purchase_receipt`, page.url()).href)
@@ -440,6 +516,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
   await directDetail.getByRole('button', { name: '关闭', exact: true }).click()
   await directDetail.waitFor({ state: 'hidden' })
   await assertNoHorizontalOverflow(page, '接口清单、缺口、失败与恢复')
+  await verifyIntegrationFilters(page, assert, assertNoHorizontalOverflow)
   await guideTab.click()
   await guide.locator('.erp-dev-integration__guide-notes > summary').click()
   await guide.getByRole('link', { name: '查看正式接入规范', exact: true }).click()
@@ -522,6 +599,7 @@ export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizon
     selected: root.querySelector('[aria-selected="true"]').offsetLeft,
   }))
   assert(Math.abs(indicator.x - indicator.selected) < 1.5, '指示条最终位置与当前页签一致')
+  await verifyRPCContractReviewWorkspace(page, { assert, assertNoHorizontalOverflow })
 }
 
 export async function verifyProjectGraphDirectory(page, { assert, assertNoHorizontalOverflow }) {

@@ -6,8 +6,8 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 // Sample the actual business page while its content changes, so a passing
 // isolated navigation fixture cannot conceal a remounted or displaced strip.
-export async function assertBusinessViewMotion(page, name, outputDir) {
-  const group = page.locator('.erp-business-visual-switch .erp-navigation-tabs')
+export async function assertBusinessViewMotion(page, name, outputDir, { presentationSelector = '' } = {}) {
+  const group = page.locator(presentationSelector || '.erp-business-visual-switch .erp-navigation-tabs')
   await group.waitFor()
   const appearance = await group.evaluate((element) => {
     const style = getComputedStyle(element)
@@ -22,20 +22,22 @@ export async function assertBusinessViewMotion(page, name, outputDir) {
       indicatorShadow: indicator.boxShadow,
     }
   })
-  assert.equal(appearance.background, 'rgba(0, 0, 0, 0)', `${name}: 页签不应有分段底轨`)
-  assert.equal(appearance.radius, 0, `${name}: 页签基线不应有圆角`)
-  assert.equal(appearance.baseline, 1, `${name}: 页签应有 1px 中性基线`)
-  assert.equal(appearance.topBorder + appearance.sideBorder, 0, `${name}: 页签不应有分段外框`)
-  assert.equal(appearance.indicatorBackground, 'rgba(0, 0, 0, 0)', `${name}: 选中标记不应有滑块底色`)
-  assert.notEqual(appearance.indicatorShadow, 'none', `${name}: 选中项应有下划线`)
-  await group.evaluate(async (element) => {
-    await Promise.all(element.getAnimations({ subtree: true }).filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {})))
-  })
+  if (!presentationSelector) {
+    assert.equal(appearance.background, 'rgba(0, 0, 0, 0)', `${name}: 页签不应有分段底轨`)
+    assert.equal(appearance.radius, 0, `${name}: 页签基线不应有圆角`)
+    assert.equal(appearance.baseline, 1, `${name}: 页签应有 1px 中性基线`)
+    assert.equal(appearance.topBorder + appearance.sideBorder, 0, `${name}: 页签不应有分段外框`)
+    assert.equal(appearance.indicatorBackground, 'rgba(0, 0, 0, 0)', `${name}: 选中标记不应有滑块底色`)
+    assert.notEqual(appearance.indicatorShadow, 'none', `${name}: 选中项应有下划线`)
+  } else {
+    assert.equal(await group.locator('.ant-segmented-item input[type="radio"]').count(), 2, `${name}: 展示切换保留两个单选选项`)
+  }
+  await waitForFiniteAnimations(page, { selector: presentationSelector || '.erp-business-visual-switch .erp-navigation-tabs' })
   const sample = async (reverse) =>
-    group.evaluate(async (element, reverse) => {
-      const items = [...element.querySelectorAll(':scope > [role="tab"]')]
+    group.evaluate(async (element, { reverse, presentation }) => {
+      const items = [...element.querySelectorAll(presentation ? '.ant-segmented-item' : ':scope > [role="tab"]')]
       const selected = items.findIndex(
-        (item) => item.getAttribute('aria-selected') === 'true'
+        (item) => presentation ? item.querySelector('input').checked : item.getAttribute('aria-selected') === 'true'
       )
       const target = items.findIndex((_, index) => index !== selected)
       const read = () => {
@@ -69,14 +71,14 @@ export async function assertBusinessViewMotion(page, name, outputDir) {
         }
         requestAnimationFrame(frame)
       })
-      const final = items.find((item) => item.getAttribute('aria-selected') === 'true')
+      const final = items.find((item) => presentation ? item.querySelector('input').checked : item.getAttribute('aria-selected') === 'true')
       return {
         first,
         targetX,
         frames,
         expected: { x: final.offsetLeft, width: final.offsetWidth },
       }
-    }, reverse)
+    }, { reverse, presentation: Boolean(presentationSelector) })
   const samples = []
   for (const reverse of [true, false]) {
     const result = await sample(reverse)
@@ -121,14 +123,16 @@ export async function assertBusinessViewMotion(page, name, outputDir) {
     `${name}: 减少动态效果时不应继续滑动`
   )
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  const tabs = group.getByRole('tab')
-  await tabs.first().focus()
-  await tabs.first().press('End')
-  assert.equal(await tabs.last().getAttribute('aria-selected'), 'true', `${name}: End 应切换到末项`)
-  await tabs.last().press('Home')
-  assert.equal(await tabs.first().getAttribute('aria-selected'), 'true', `${name}: Home 应切换到首项`)
-  await tabs.first().press('ArrowRight')
-  assert.equal(await tabs.nth(1).getAttribute('aria-selected'), 'true', `${name}: 方向键应切换页签`)
+  if (!presentationSelector) {
+    const tabs = group.getByRole('tab')
+    await tabs.first().focus()
+    await tabs.first().press('End')
+    assert.equal(await tabs.last().getAttribute('aria-selected'), 'true', `${name}: End 应切换到末项`)
+    await tabs.last().press('Home')
+    assert.equal(await tabs.first().getAttribute('aria-selected'), 'true', `${name}: Home 应切换到首项`)
+    await tabs.first().press('ArrowRight')
+    assert.equal(await tabs.nth(1).getAttribute('aria-selected'), 'true', `${name}: 方向键应切换页签`)
+  }
   await writeFile(
     path.join(outputDir, `${name}-motion.json`),
     JSON.stringify({ samples, reduced, appearance }, null, 2)
@@ -168,16 +172,16 @@ export async function captureBusinessView(page, panel, name, width, outputDir) {
         node.closest('[disabled], [aria-disabled="true"]') ||
         !node.checkVisibility()
       )
-        continue
+        { continue }
       let background = [255, 255, 255]
       const ancestors = []
       for (let parent = node; parent; parent = parent.parentElement)
-        ancestors.unshift(parent)
+        { ancestors.unshift(parent) }
       for (const parent of ancestors)
-        background = blend(
+        { background = blend(
           rgba(getComputedStyle(parent).backgroundColor),
           background
-        )
+        ) }
       values.push({
         text,
         foreground: blend(rgba(getComputedStyle(node).color), background),

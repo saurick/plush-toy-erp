@@ -1,0 +1,32 @@
+.workflow-task-info-card__classification {
+  align-items: center;
+}
+
+.workflow-task-classification__value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.workflow-task-classification__value > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workflow-task-classification__path {
+  max-width: min(320px, calc(100vw - 64px));
+  overflow-wrap: anywhere;
+}
+
+.workflow-task-classification__path p {
+  margin: 6px 0 0;
+}
+
+@media (pointer: coarse) {
+  .workflow-task-classification__trigger.ant-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

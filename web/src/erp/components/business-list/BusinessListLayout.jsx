@@ -9,6 +9,7 @@ import {
   CloseOutlined,
   CopyOutlined,
   DownOutlined,
+  EllipsisOutlined,
   FilterOutlined,
   RollbackOutlined,
   SendOutlined,
@@ -24,6 +25,7 @@ import {
   Popover,
   Select,
   Space,
+  Spin,
   Tag,
   Tooltip,
   Typography,
@@ -105,6 +107,14 @@ function flattenSelectionActions(children) {
   return actions
 }
 
+function isSourceDocumentDetailsAction(action) {
+  if (!React.isValidElement(action)) return false
+  const key = action.props['data-business-action-key'] || ''
+  if (key === 'view' || key.endsWith('-details')) return true
+  const children = flattenSelectionActions(action.props.children)
+  return children.length > 0 && children.every(isSourceDocumentDetailsAction)
+}
+
 function inspectSelectionAction(action) {
   if (!React.isValidElement(action)) {
     return { actionable: false, enabled: false, score: -1 }
@@ -142,7 +152,7 @@ function deEmphasizeCreation(action) {
     : action
 }
 
-function partitionSelectionActions(children, space) {
+function partitionSelectionActions(children, space, mobile = false) {
   const nodes = flattenSelectionActions(children)
   const descriptors = nodes.map((node, index) => ({
     index,
@@ -155,6 +165,14 @@ function partitionSelectionActions(children, space) {
   const actions = descriptors
     .filter((item) => item.actionable && (!measured || space.widths[item.index] > 0))
     .sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || left.index - right.index)
+  if (mobile) {
+    const primary = [...actions].sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || Number(right.enabled) - Number(left.enabled) || right.score - left.score || left.index - right.index)[0]
+    return {
+      context: descriptors.filter((item) => !item.actionable).map((item) => item.node),
+      visible: primary ? [primary] : [],
+      overflow: actions.filter((item) => item !== primary),
+    }
+  }
   const visibleIndexes = new Set(measured
     ? selectStableBusinessActionIndexes(actions.map((item) => ({
       ...item, width: space.widths[item.index],
@@ -249,7 +267,7 @@ function selectionActionRenderState(action) {
   ].join(':')
 }
 
-function ResponsiveSelectionActions({ children }) {
+function ResponsiveSelectionActions({ children, mobile = false }) {
   const { token } = theme.useToken()
   const [space, setSpace] = React.useState(null)
   const [measurementRevision, setMeasurementRevision] = React.useState(0)
@@ -269,8 +287,8 @@ function ResponsiveSelectionActions({ children }) {
   if (!actionOverlayOpen) partitionSpaceRef.current = space
   const partitionSpace = partitionSpaceRef.current
   const { context, visible, overflow } = React.useMemo(
-    () => partitionSelectionActions(children, partitionSpace),
-    [children, partitionSpace]
+    () => partitionSelectionActions(children, partitionSpace, mobile),
+    [children, partitionSpace, mobile]
   )
   const overflowRenderKey = React.useMemo(
     () => overflow.map((item) => selectionActionRenderState(item.node)).join('|'),
@@ -499,12 +517,12 @@ function ResponsiveSelectionActions({ children }) {
               aria-expanded={moreActionsOpen}
               aria-controls={moreActionsId}
             >
-              更多操作 <DownOutlined />
+              {mobile ? <EllipsisOutlined aria-hidden="true" /> : <>更多操作 <DownOutlined /></>}
             </Button>
           </Dropdown>
         ) : null}
         <div className="erp-business-selection-action-bar__measure" aria-hidden="true">
-          <Button ref={measureMoreRef} href="#" tabIndex={-1} size="small" className="erp-action-button">更多操作 <DownOutlined /></Button>
+          <Button ref={measureMoreRef} href="#" tabIndex={-1} size="small" className="erp-action-button">{mobile ? <EllipsisOutlined aria-hidden="true" /> : <>更多操作 <DownOutlined /></>}</Button>
           <div ref={measureItemsRef} />
         </div>
       </div>
@@ -1443,13 +1461,22 @@ export function SelectionActionBar({
 }) {
   const { mobileTaskBusiness } = useOutletContext() || {}
   const hasSelection = Number(selectedCount) > 0
-  const actionNodes = flattenSelectionActions(children)
+  const actionNodes = flattenSelectionActions(children).filter((action) => !mobileTaskBusiness || !isSourceDocumentDetailsAction(action))
   const clearActions = actionNodes.filter(
     (child) => child.type === SelectionClearAction
   )
   const recordActions = actionNodes.filter(
     (child) => child.type !== SelectionClearAction
   )
+  if (mobileTaskBusiness) {
+    if (!hasSelection || !mobileTaskBusiness.actionHost) return null
+    return createPortal(
+      <div className="mobile-task-business-primary" role="group" aria-label="本次业务操作">
+        <ResponsiveSelectionActions mobile>{recordActions}</ResponsiveSelectionActions>
+      </div>,
+      mobileTaskBusiness.actionHost
+    )
+  }
   const className = joinClassNames(
     'erp-business-selection-action-bar erp-business-module-current-action',
     hasSelection
@@ -1724,6 +1751,64 @@ function isBusinessDataTableInteractiveTarget(target) {
   )
 }
 
+export function useBusinessTableRecordOpen({ dataSource, rowKey, onRow, onOpenRecord }) {
+  const rowClickOriginRef = React.useRef(null)
+  const handledDoubleClickRef = React.useRef(null)
+  const resolvedOnRow = React.useCallback(
+    (record, index) => {
+      const rowProps = onRow?.(record, index) || {}
+      if (typeof onOpenRecord !== 'function') return rowProps
+      const userDoubleClick = rowProps.onDoubleClick
+      return {
+        ...rowProps,
+        style: { cursor: 'pointer', ...(rowProps.style || {}) },
+        title: rowProps.title || '单击选中，双击打开',
+        onDoubleClick: (event) => {
+          rowClickOriginRef.current = null
+          if (isBusinessDataTableInteractiveTarget(event?.target)) return
+          userDoubleClick?.(event)
+          if (!event?.defaultPrevented) onOpenRecord(record, event)
+        },
+        onClick: (event) => {
+          if (event.detail === 1) {
+            rowClickOriginRef.current = !userDoubleClick && !isBusinessDataTableInteractiveTarget(event.target)
+              ? { node: event.currentTarget, key: typeof rowKey === 'function' ? rowKey(record, index) : record[rowKey || 'key'], top: event.currentTarget.getBoundingClientRect().top, x: event.clientX, y: event.clientY }
+              : null
+          }
+          rowProps.onClick?.(event)
+          if (event.defaultPrevented) rowClickOriginRef.current = null
+        },
+      }
+    },
+    [onOpenRecord, onRow, rowKey]
+  )
+  const captureRowClick = React.useCallback((event) => {
+    if (event.type === 'dblclick') {
+      const handled = handledDoubleClickRef.current
+      handledDoubleClickRef.current = null
+      if (handled && Math.abs(event.clientX - handled.x) <= 2 && Math.abs(event.clientY - handled.y) <= 2) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+      return
+    }
+    const origin = rowClickOriginRef.current
+    if (event.detail === 1) { rowClickOriginRef.current = null; handledDoubleClickRef.current = null; return }
+    if (event.detail !== 2 || !origin || typeof onOpenRecord !== 'function' || origin.node.contains(event.target)) return
+    rowClickOriginRef.current = null
+    if (!origin.node.isConnected || !origin.node.getClientRects().length || Math.abs(origin.node.getBoundingClientRect().top - origin.top) < 1 || Math.abs(event.clientX - origin.x) > 2 || Math.abs(event.clientY - origin.y) > 2) return
+    const matches = (dataSource || []).map((record, index) => ({ record, index })).filter(({ record, index }) => Object.is(typeof rowKey === 'function' ? rowKey(record, index) : record[rowKey || 'key'], origin.key))
+    if (matches.length !== 1 || onRow?.(matches[0].record, matches[0].index)?.onDoubleClick) return
+    // Selecting a row can insert the action bar between native clicks. Keep
+    // that double click on its original record and out of the shifted header.
+    event.preventDefault()
+    event.stopPropagation()
+    handledDoubleClickRef.current = { x: event.clientX, y: event.clientY }
+    onOpenRecord(matches[0].record, event)
+  }, [dataSource, onOpenRecord, onRow, rowKey])
+  return { onRow: resolvedOnRow, onClickCapture: captureRowClick, onDoubleClickCapture: captureRowClick }
+}
+
 export function BusinessDataTable({
   tableHeader,
   loading,
@@ -1744,16 +1829,21 @@ export function BusinessDataTable({
 }) {
   const { mobileTaskBusiness } = useOutletContext() || {}
   const tableCardRef = React.useRef(null)
+  const previousSelectionPlaceholder = React.useRef(false)
   const [selectionPlaceholderHost, setSelectionPlaceholderHost] = React.useState(null)
   const busy = typeof loading === 'object' ? Boolean(loading?.spinning) : Boolean(loading)
   const showSelectionPlaceholder = !busy && rowSelection &&
     !(rowSelection.selectedRowKeys?.length > 0) &&
     dataSource?.some((record) => !rowSelection.getCheckboxProps?.(record)?.disabled)
+  const reserveLoadingSelection = busy && rowSelection &&
+    !(rowSelection.selectedRowKeys?.length > 0) && previousSelectionPlaceholder.current
   React.useLayoutEffect(() => {
     // Keep availability with the table and preserve the mounted record actions.
     const scope = tableCardRef.current?.closest('[data-table-scroll-scope]')
-    setSelectionPlaceholderHost(scope?.querySelector('[data-business-selection-placeholder]') || null)
-  }, [dataSource, rowSelection, loading, mobileTaskBusiness])
+    const host = scope?.querySelector('[data-business-selection-placeholder]') || null
+    setSelectionPlaceholderHost(host)
+    if (!host || !busy) previousSelectionPlaceholder.current = Boolean(host && showSelectionPlaceholder)
+  }, [dataSource, rowSelection, loading, mobileTaskBusiness, busy, showSelectionPlaceholder])
   const resolvedColumns = React.useMemo(
     () => normalizeBusinessTableColumns(columns),
     [columns]
@@ -1784,44 +1874,30 @@ export function BusinessDataTable({
       }),
     }
   }, [resolvedColumns, resolvedRowSelection, scroll])
-  const resolvedOnRow = React.useCallback(
-    (record, index) => {
-      const rowProps = onRow?.(record, index) || {}
-      if (typeof onOpenRecord !== 'function') return rowProps
-      const userDoubleClick = rowProps.onDoubleClick
-      return {
-        ...rowProps,
-        style: { cursor: 'pointer', ...(rowProps.style || {}) },
-        title: rowProps.title || '单击选中，双击打开',
-        onDoubleClick: (event) => {
-          if (isBusinessDataTableInteractiveTarget(event?.target)) return
-          userDoubleClick?.(event)
-          if (!event?.defaultPrevented) onOpenRecord(record, event)
-        },
-      }
-    },
-    [onOpenRecord, onRow]
-  )
+  const { onRow: resolvedOnRow, onClickCapture: captureRowClick } = useBusinessTableRecordOpen({ dataSource, rowKey, onRow, onOpenRecord })
 
   if (mobileTaskBusiness) {
     const selectedKeys = rowSelection?.selectedRowKeys || []
     const selected = (dataSource || []).find((row) => selectedKeys.includes(typeof rowKey === 'function' ? rowKey(row) : row[rowKey || 'id']))
     return (
-      <Card className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} loading={loading}>
-        {selected ? (
-          <>
-            <BusinessRecordDetails columns={columns} record={selected} column={1} />
-            {onOpenRecord ? <Button onClick={() => onOpenRecord(selected)}>查看完整单据</Button> : null}
-          </>
-        ) : <Empty description="正在读取任务对应单据；如未显示，请重新读取。" />}
-      </Card>
+      <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} aria-busy={busy}>
+        <Spin spinning={busy}>
+          {selected ? (
+            <BusinessRecordDetails columns={columns} record={selected} presentation="mobile-task" />
+          ) : <Empty description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
+        </Spin>
+      </section>
     )
   }
 
   return (
-    <Card ref={tableCardRef} className="erp-business-data-table-card erp-business-module-table-card">
-      {selectionPlaceholderHost && showSelectionPlaceholder ? createPortal(
-        <div className="erp-business-selection-action-bar erp-business-module-current-action erp-business-selection-action-bar--empty erp-business-selection-action-bar--embedded erp-business-selection-action-bar--placeholder">
+    <Card ref={tableCardRef} className="erp-business-data-table-card erp-business-module-table-card" onClickCapture={captureRowClick} onDoubleClickCapture={captureRowClick}>
+      {selectionPlaceholderHost && (showSelectionPlaceholder || reserveLoadingSelection) ? createPortal(
+        <div
+          className={joinClassNames('erp-business-selection-action-bar erp-business-module-current-action erp-business-selection-action-bar--empty erp-business-selection-action-bar--embedded',
+            reserveLoadingSelection ? 'erp-business-selection-action-bar--loading' : 'erp-business-selection-action-bar--placeholder')}
+          aria-hidden={reserveLoadingSelection || undefined}
+        >
           <div className="erp-business-selection-action-bar__row">
             <div className="erp-business-selection-action-bar__copy">
               <div className="erp-business-selection-action-bar__primary">

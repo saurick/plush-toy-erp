@@ -496,6 +496,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       rejected: '交工程修改后重新提交，重新经过老板和财务审核。',
     })]),
     business_chain: 'sales_to_production',
+    handling: Object.freeze({
+      action: '业务与工程补齐来源资料；用料退回后修改重提。订单审批拒绝按原单规则结束本次申请。',
+      guides: Object.freeze([]),
+      issues: '订单资料、样品或 BOM 未就绪，用料审核退回。',
+      resume: '订单生效、样品确认、BOM 启用且用料审核通过后再采购。',
+      task_stages: Object.freeze(['engineering']),
+    }),
     handoffs: Object.freeze(['业务接单并提交订单，工程资料、BOM 与打样可并行准备。', '订单已生效、样品已确认、BOM 已启用后，工程提交用料。', '老板审核后，另一位财务人员审核；通过后按厂商生成已批准采购订单。']),
     label: '接单、工程与用料审批',
     result: '订单、样品和 BOM 满足条件，工程用料经老板、财务审核通过。',
@@ -609,6 +616,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     branch: true,
     business_chain: 'finance_payment_and_reversal',
     exception: '未到账继续跟进；订单取消后由财务办理实际退款，不能靠取消订单或完成任务消掉首款。',
+    handling: Object.freeze({
+      action: '业务跟进付款约定，财务核对实际到账；已登记款项按退款、撤销抵扣或冲正分别处理。',
+      guides: Object.freeze(['finance_settlement']),
+      issues: '首款未到账、到账金额有差异，或订单取消后需要退款。',
+      resume: '实际到账和剩余余额核清；后续生产或发货仍按订单约定及放行规则办理。',
+      task_stages: Object.freeze(['payment']),
+    }),
     handoffs: Object.freeze(['订单约定需提前收付时办理；业务记录订单付款约定并跟进客户；财务核实实际到账凭据，关联已生效销售订单登记预收款。', '有效审批人通过后，财务完成执行待办并确认实际收款；订单条件、原表定金标记不代表已经到账。', '待抵扣余额保留在原订单；是否允许生产或发货按订单约定和正式放行审批核对。']),
     label: '客户首款与分期收款',
     result: '已到账的首款、分期款或发货前尾款形成订单预收余额，实际出货后再抵扣应收。',
@@ -695,7 +709,14 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       rejected: '保留原因，取消本次已提交采购单，不生成收货或库存。',
     })]),
     business_chain: 'purchase_to_inventory',
-    handoffs: Object.freeze(['采购核对供应商、合同与到货安排并跟进供应商。', '工程用料审批生成的采购单已经批准；独立人工采购单另行提交审批。']),
+    handling: Object.freeze({
+      action: '采购联系供应商并通过来源单据安排跟进；草稿有误先修改。审批拒绝结束本次已提交采购单，需要继续采购时另建草稿；已生效单据不直接改历史。',
+      guides: Object.freeze([]),
+      issues: '采购审批拒绝、供应商延期、合同或供货安排不符。',
+      resume: '采购来源已批准，供应商、合同和到货安排核对完成后登记实际到货。',
+      task_stages: Object.freeze([]),
+    }),
+    handoffs: Object.freeze(['采购核对供应商、合同与到货安排并跟进供应商。', '工程用料审批生成的采购单已经批准；独立人工采购单另行提交审批。', '采购通过“补齐价格与交期”补缺价、维护交期，批准数量不变；补价可与到货跟进并行，缺价不阻止实物收货，财务生成应付前须有完整价格依据。']),
     label: '采购',
     result: '按用料需求向供应商采购。',
     role: '采购',
@@ -723,6 +744,10 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         from: 'approval',
         label: '未通过',
         to: 'rejected',
+      }), Object.freeze({
+        from: 'generated',
+        label: '缺价或需维护交期',
+        to: 'terms',
       })]),
       nodes: Object.freeze([Object.freeze({
         detail_refs: Object.freeze(['handoff:1']),
@@ -743,11 +768,16 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '采购下单与到货跟进',
         role_keys: Object.freeze(['purchase']),
       }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:2']),
+        key: 'terms',
+        label: '补齐价格与交期',
+        role_keys: Object.freeze(['purchase']),
+      }), Object.freeze({
         detail_refs: Object.freeze(['approval_rejected:0']),
         key: 'rejected',
         label: '取消本次已提交采购单',
       })]),
-      summary: '用料生成的采购单已经批准；只有独立人工采购单进入采购审批。',
+      summary: '用料生成单不重复审批；独立人工单按配置审批。缺价与交期由采购补齐，可与到货跟进并行，生成应付前核对价格依据。',
     }),
   }), Object.freeze({
     approvals: Object.freeze([Object.freeze({
@@ -759,6 +789,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     branch: true,
     business_chain: 'finance_payment_and_reversal',
     exception: '未付款、未到货、退货或取消分别跟进；供应商退回款项须由财务登记实际退款到账。',
+    handling: Object.freeze({
+      action: '采购或生产核实合同，财务核对实际付款；供应商退款到账、错误抵扣和错误登记各走对应正式动作。',
+      guides: Object.freeze(['finance_settlement']),
+      issues: '预付款未支付、支付金额有差异，或退货取消后需要收回款项。',
+      resume: '款项、来源和余额核清；到货、检验及入库仍分别办理。',
+      task_stages: Object.freeze(['payment']),
+    }),
     handoffs: Object.freeze(['订单约定需提前收付时办理；采购或合同经办人提供付款依据，生产提供加工安排；财务关联采购订单或委外合同登记预付款。', '有效审批人核对付款用途、金额及凭据；通过后交财务确认实际付款。', '仓库与品质继续按到货、检验、入库或回货办理；预付款不代表物料已经到达，也不直接形成应付。']),
     label: '采购及委外首付款',
     result: '实际预付款关联已批准采购订单或已确认委外合同，到货或回货形成应付后分批抵扣。',
@@ -839,6 +876,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     }),
   }), Object.freeze({
     business_chain: 'purchase_to_inventory',
+    handling: Object.freeze({
+      action: '仓库按实物和采购来源分批登记，采购跟进未到部分；错料不冒充订购物料，超量由来源数量校验阻止。草稿登记有误按原单规则更正。',
+      guides: Object.freeze([]),
+      issues: '实收不足、超出可收数量、材料或来源不符。',
+      resume: '材料、单位、批次和来源一致，实收不超过可收量；检验通过后才可入库。',
+      task_stages: Object.freeze([]),
+    }),
     label: '到货点数',
     result: '仓库按实际到货清点数量并登记来源，交 IQC 检验；送货数量不代替实点。',
     role: '仓库',
@@ -848,6 +892,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   }), Object.freeze({
     business_chain: 'purchase_to_inventory',
     exception: '首次来料不合格交采购联系供应商退厂或补换，仓库隔离与交接；补换材料重新清点、重新检验。',
+    handling: Object.freeze({
+      action: '品质记录检验结论；采购按来源行办理退厂或补换，仓库按实物交接。已入库数量通过退货、调整或冲正纠正。',
+      guides: Object.freeze(['purchase_rejection', 'posted_purchase']),
+      issues: '来料未检、不合格，或正式入库后发现数量及质量问题。',
+      resume: '未处置部分继续保留；补换重新点数和检验，符合条件的实际数量才可入库。',
+      task_stages: Object.freeze(['incoming_exception']),
+    }),
     handoffs: Object.freeze(['IQC 检查颜色等来料质量并记录正式结论。', '质量关口通过后，仓库确认材料入库，库存正式增加。']),
     label: '来料检验与材料入库',
     result: 'IQC 核对颜色等来料质量；合格后确认材料入库。',
@@ -890,15 +941,29 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
-    handoffs: Object.freeze(['PMC 安排排期，生产经理提出加工材料、厂商及回货要求。', '有合同权限的财务兼采购经办人确认加工合同。', '仓库核对可用材料、批次和数量，实际发料至委外厂商裁片。']),
+    handling: Object.freeze({
+      action: '核对来源合同、材料与可用批次；采购及生产跟进缺料。超出核定用量先申请超领额度，再通过正常领料实际出库。',
+      guides: Object.freeze(['over_issue']),
+      issues: '材料不足、批次不可用、加工合同未确认，或需要超领。',
+      resume: '合同、来源、批次、可用数量和超领额度满足校验后再发料；任务结束不代表已经出库。',
+      task_stages: Object.freeze(['production_exception']),
+    }),
+    handoffs: Object.freeze(['PMC 安排排期，生产经理提出加工材料、厂商及回货要求。', '有合同权限的财务兼采购经办人确认加工合同。', '仓库核对可用材料、批次和数量，实际发料至委外厂商裁片。', 'PMC 根据有效来源建立生产订单；PMC 或有权限的生产负责人核对样品、BOM 和用料审批后显式发布，冻结用料、工艺路线和检验条件，并生成排程任务。', '发布不代表物料齐套或已经领料；排程与到货可按前置条件并行，实际发料前仍须核对合同、批次和可用量。']),
     label: '发料外发裁片',
     result: '仓库发料至委外厂商裁片。',
-    role: '生产经理 / 财务兼采购 / 仓库',
+    role: 'PMC / 生产经理 / 财务兼采购 / 仓库',
     role_keys: Object.freeze(['pmc', 'production', 'finance', 'purchase', 'warehouse']),
     stage: 'cutting_issue',
     stages: Object.freeze(['production_schedule', 'outsourcing_contract', 'cutting_execute', 'cutting_issue']),
     subflow: Object.freeze({
       edges: Object.freeze([Object.freeze({
+        from: 'create',
+        to: 'release',
+      }), Object.freeze({
+        from: 'release',
+        label: '冻结用料与路线，生成排程任务',
+        to: 'plan',
+      }), Object.freeze({
         from: 'plan',
         to: 'contract',
       }), Object.freeze({
@@ -907,6 +972,16 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         to: 'issue',
       })]),
       nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:3']),
+        key: 'create',
+        label: 'PMC 建立生产订单',
+        role_keys: Object.freeze(['pmc']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:3', 'handoff:4']),
+        key: 'release',
+        label: '核对条件并发布',
+        role_keys: Object.freeze(['pmc', 'production']),
+      }), Object.freeze({
         detail_refs: Object.freeze(['handoff:0']),
         key: 'plan',
         label: '安排加工与回货要求',
@@ -922,10 +997,17 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '仓库核对并实际发料',
         role_keys: Object.freeze(['warehouse']),
       })]),
-      summary: '排期、合同与材料准备满足后，由仓库实际发料至委外厂商裁片。',
+      summary: '先建立并发布生产订单，冻结用料与路线并生成排程任务；排期、合同和可用材料满足后，仓库才实际发料。',
     }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
+    handling: Object.freeze({
+      action: '仓库重新实点并核对合同与批次，采购联系加工方处理差额；本路线按整批回货，不以虚填数量或手工完成待办放行。',
+      guides: Object.freeze([]),
+      issues: '回货数量与整批要求不符、来源合同或批次有误。',
+      resume: '实际回货与受控批次数量一致，来源正确后登记并进入检验。',
+      task_stages: Object.freeze([]),
+    }),
     label: '裁片回货点数',
     result: '仓库按合同、工序和批次核对裁片实收数量，交 IQC 检验。',
     role: '仓库',
@@ -935,6 +1017,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     exception: '裁片不合格暂停进入车缝；IQC 记录问题，业务提出原厂返工、换厂返工、补料重做或报废方案。',
+    handling: Object.freeze({
+      action: '品质记录不合格，业务选择返工、换厂、重做、报废或允许的让步方案，按正式审批执行；判定纠正仍受下游依赖校验。',
+      guides: Object.freeze(['production_quality']),
+      issues: '裁片颜色、尺寸或规格检验不合格，或检验记录有误。',
+      resume: '按获批方案执行并满足复检或让步条件后继续；报废结束原批，交付缺口另行安排。',
+      task_stages: Object.freeze(['cutting_exception', 'cutting_decision']),
+    }),
     label: '颜色与尺寸规格检验',
     result: 'IQC 核对裁片颜色、尺寸规格；不合格转业务决定方案。',
     role: 'IQC',
@@ -971,6 +1060,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
+    handling: Object.freeze({
+      action: '生产核对本厂或委外安排，按来源单据跟进；委外合同、发料及整批回货分别办理。质量问题交正式检验和处置，不直接修改批次数量。',
+      guides: Object.freeze([]),
+      issues: '排期或交接受阻、合同发料未就绪、回货数量不符。',
+      resume: '前道验收、合同收发、实际完成或回货均符合条件后进入皮套检验。',
+      task_stages: Object.freeze(['sewing_return', 'sewing_exception', 'sewing_decision']),
+    }),
     handoffs: Object.freeze(['生产经理选择本厂或委外车缝。', '本厂办理内部工序交接；委外先确认合同，仓库发出并在回货时实点。', '完成或回货后交 IQC 做皮套检验。']),
     label: '安排车缝 · 本厂 / 委外',
     result: '生产经理安排本厂或委外车缝，委外回货由仓库点数。',
@@ -1038,6 +1134,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     exception: '皮套不合格暂停进入手工，由业务提出处置方案，审批、执行并复检后再继续。',
+    handling: Object.freeze({
+      action: '品质记录问题，业务提出方案并经审批执行；原厂及换厂返工、补料重做、报废和让步保留各自结果与来源。',
+      guides: Object.freeze(['production_quality']),
+      issues: '皮套检验不合格、返工后仍不合格，或原检验依据有误。',
+      resume: '重新检验或获批让步满足条件后再进入手工；报废不恢复原批。',
+      task_stages: Object.freeze(['sewing_exception', 'sewing_decision']),
+    }),
     label: '皮套检验',
     result: 'IQC 完成皮套检验，合格后转手工。',
     role: 'IQC',
@@ -1074,6 +1177,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
+    handling: Object.freeze({
+      action: '生产按本工序独立安排本厂或委外，相关岗位跟进合同与收发；数量不符先核实，不通过结束待办补造成品。',
+      guides: Object.freeze([]),
+      issues: '排期或交接受阻、委外准备不齐、回货不足或工序未完成。',
+      resume: '实际完成或整批回货符合要求，按规定交仓库登记收仓；需要的质量关口继续办理。',
+      task_stages: Object.freeze(['handwork_return', 'handwork_exception', 'handwork_decision']),
+    }),
     handoffs: Object.freeze(['生产经理独立选择本厂或委外手工，不直接沿用车缝选择。', '委外按已确认合同收发，本厂按工序办理。', '手工完成后交仓库收仓，生成规定质量关口的待检记录。']),
     label: '安排手工 · 本厂 / 委外',
     result: '生产经理安排本厂或委外手工；完成后交仓库收仓。',
@@ -1140,6 +1250,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
+    handling: Object.freeze({
+      action: '仓库核对手工产出与未入库量；草稿错误按单据规则修改，已生效收仓通过正式取消或冲正恢复，存在下游依赖时先处理依赖。',
+      guides: Object.freeze([]),
+      issues: '收仓数量、来源或批次不符，重复登记，或已入库后需要纠错。',
+      resume: '收仓来源及数量一致并正式入库后继续；待检、待包装的库存仍不能发货。',
+      task_stages: Object.freeze(['production_fact']),
+    }),
     handoffs: Object.freeze(['仓库清点手工产出并正式入成品仓，记录库存。', '入库后仍可待检、待包装；条件未满足时禁止发货。']),
     label: '正式成品入库',
     result: '仓库正式入成品仓、记录库存，待检或待包装库存禁止发货。',
@@ -1176,9 +1293,16 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     exception: '成品不合格进入正式处置，涉及已入库数量由仓库执行获批方案；保留原质检和库存轨迹。',
-    handoffs: Object.freeze(['IQC 按冻结工艺路线办理成品检验、针检和抽检。', '订单要求客户验货时由业务协调、品质记录结果；不要求时不补造通过记录。']),
+    handling: Object.freeze({
+      action: '按冻结路线和订单要求逐关办理；不合格走正式质量处置，涉及已入库库存时交仓库执行获批方案。无要求的关口不补造通过记录。',
+      guides: Object.freeze(['production_quality']),
+      issues: '成品、针检、抽检或适用的客户验货未通过。',
+      resume: '适用关口全部通过或获批处置后达到规定条件；报废部分终止，原质量和库存轨迹保留。',
+      task_stages: Object.freeze(['handwork_exception', 'handwork_decision']),
+    }),
+    handoffs: Object.freeze(['IQC 按冻结路线依次完成成品检验、针检和抽检；上一关通过后才生成下一关。', '订单要求客户验货时由业务协调、品质记录结果；不要求时不补造通过记录。']),
     label: '成品检验及规定质量关口',
-    result: '按冻结工艺路线完成成品检验、针检、客户抽检等规定关口。',
+    result: '按冻结路线依次完成成品检验、针检和抽检；订单要求时再完成客户验货。',
     role: 'IQC / 业务',
     role_keys: Object.freeze(['quality', 'sales']),
     stage: 'finished_quality',
@@ -1189,19 +1313,35 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '按冻结路线',
         to: 'quality',
       }), Object.freeze({
-        from: 'route',
+        from: 'quality',
+        label: '合格',
+        to: 'needle',
+      }), Object.freeze({
+        from: 'needle',
+        label: '合格',
+        to: 'sampling',
+      }), Object.freeze({
+        from: 'sampling',
         label: '订单要求时',
         to: 'customer',
       }), Object.freeze({
-        from: 'quality',
-        label: '规定关口通过',
+        from: 'sampling',
+        label: '不要求客户验货',
         to: 'passed',
       }), Object.freeze({
         from: 'customer',
-        label: '要求验货时通过',
+        label: '验货通过',
         to: 'passed',
       }), Object.freeze({
         from: 'quality',
+        label: '不合格',
+        to: 'exception',
+      }), Object.freeze({
+        from: 'needle',
+        label: '不合格',
+        to: 'exception',
+      }), Object.freeze({
+        from: 'sampling',
         label: '不合格',
         to: 'exception',
       }), Object.freeze({
@@ -1216,7 +1356,17 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       }), Object.freeze({
         detail_refs: Object.freeze(['handoff:0', 'result']),
         key: 'quality',
-        label: '成品检验与规定关口',
+        label: '成品检验',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'needle',
+        label: '针检',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'sampling',
+        label: '抽检',
         role_keys: Object.freeze(['quality']),
       }), Object.freeze({
         detail_refs: Object.freeze(['handoff:1']),
@@ -1233,11 +1383,18 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         key: 'exception',
         label: '正式质量异常处置',
       })]),
-      summary: '图中是需核对的关口，不固定它们的先后顺序；按冻结工艺路线及订单要求办理，不补造通过记录。',
+      summary: '依次办理成品检验、针检、抽检；订单要求时再客户验货。适用关口全部通过后才能继续。',
     }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     exception: '查货或包装有问题先处理，满足条件后再办理发货。',
+    handling: Object.freeze({
+      action: '业务核对并确认包装版本，仓库按该版本处理实物差异后办理包装；版本未确认或前置条件不足时不能开始，不能用跟进任务代替实际包装。',
+      guides: Object.freeze([]),
+      issues: '包装版本未确认、查货或包装不符合已确认要求。',
+      resume: '已入库来源、规定质量关口、确认的包装版本及实际包装结果均符合要求后再准备发货。',
+      task_stages: Object.freeze([]),
+    }),
     handoffs: Object.freeze(['业务按客户要求确认包装版本，可提前办理。', '质量关口通过后，仓库对已入库成品查货、包装并记录结果；包装不重复增加库存。']),
     label: '查货与包装',
     result: '仓库完成查货与包装，并核对包装版本；未完成不能发货。',
@@ -1293,6 +1450,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     })]),
     business_chain: 'delivery_to_settlement',
     exception: '库存、质量或包装条件不足时停止发货；已出货纠错走正式取消或冲正，保留原记录。',
+    handling: Object.freeze({
+      action: '业务与财务核对未放行原因；补齐真实条件后按原单规则重办。未实际发货的单据按规则修改或取消；已发货错误走正式取消及冲正，受下游依赖限制。',
+      guides: Object.freeze([]),
+      issues: '财务未放行，库存、质量或包装条件不足，或出货登记需要纠错。',
+      resume: '取得有效放行且可发货数量、质量和包装均符合条件，再显式确认实际发货；放行或任务完成不代表已发货。',
+      task_stages: Object.freeze([]),
+    }),
     handoffs: Object.freeze(['业务核对订单、可发货数量和客户要求，准备出货单。', '财务审批放行后，业务显式确认实际发货。', '实际发货后减少库存，形成应收、对账等后续业务来源。']),
     label: '放行与实际发货',
     result: '业务准备、财务放行、业务实际发货完成后，才表示真实发货。',
@@ -1352,6 +1516,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     })]),
     business_chain: 'finance_payment_and_reversal',
     exception: '少收少付保留未结余额；多收多付按可退余额申请实际退款。错误抵扣先撤销，错误款项登记才办理冲销。',
+    handling: Object.freeze({
+      action: '业务及采购跟进余额，财务分别办理实际收付、退款、撤销抵扣或冲正；审批未通过按规则重新申请，不强行结清差额。',
+      guides: Object.freeze(['finance_settlement']),
+      issues: '款项逾期、少收少付、多收多付、错误抵扣或错误登记。',
+      resume: '相关应收应付及原款余额核清并保留实际收付结果后结清；未结余额继续跟进。',
+      task_stages: Object.freeze(['receivable_registration', 'payable_registration', 'reconciliation', 'invoice_registration']),
+    }),
     handoffs: Object.freeze(['真实发货形成应收来源；正式采购入库或合格委外回货形成应付来源，由财务核对并过账。', '财务把已确认预收预付抵扣到同一订单、往来方和币种的应收应付；支持分批抵扣，剩余款项保留。', '业务跟进客户尾款，采购跟进供应商对账；财务登记后续收付款并按审批核销，差额和逾期继续跟进。', '发票、对账、出货完成都不代表款项结清；实际退款、登记冲销和撤销抵扣各自保留记录。']),
     label: '尾款、对账与结清',
     result: '应收应付、预收预付及退款分别有正式结果；余额核清后结束本次结算。',

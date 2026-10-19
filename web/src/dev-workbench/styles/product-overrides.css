@@ -772,42 +772,6 @@
   color: var(--erp-border);
 }
 
-[data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid {
-  border-color: var(--erp-border);
-  background: #0f172a;
-}
-
-[data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid__tool {
-  border-color: var(--erp-border);
-  background: var(--erp-text);
-  color: var(--erp-text);
-}
-
-[data-erp-theme='dark']
-  .erp-dev-docs-markdown
-  .erp-markdown-mermaid__tool:hover {
-  border-color: var(--erp-interactive-border-focus);
-  background: var(--erp-interactive-bg-hover);
-  color: #86efac;
-}
-
-[data-erp-theme='dark']
-  .erp-dev-docs-markdown
-  .erp-markdown-mermaid__tool:focus-visible {
-  outline-color: #86efac;
-}
-
-[data-erp-theme='dark']
-  .erp-dev-docs-markdown
-  .erp-markdown-mermaid__zoom-label {
-  color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid__loading,
-[data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid__error {
-  color: var(--erp-text-muted);
-}
-
 [data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid--error {
   border-color: #7f1d1d;
   background: rgba(127, 29, 29, 0.24);

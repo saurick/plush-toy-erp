@@ -285,7 +285,15 @@ export function createDevWorkbenchDensityScenarios({
           cards: [...element.querySelectorAll('[data-stage-card]')].map(
             (card) => card.getBoundingClientRect().height
           ),
+          details: [...element.querySelectorAll('[data-stage-card]')].map((card) => ({
+            stage: card.closest('[data-chain-stage]').dataset.chainStage,
+            height: card.getBoundingClientRect().height,
+            mainHeight: card.querySelector('.erp-dev-chain__stage-main').getBoundingClientRect().height,
+            footHeight: card.querySelector('.erp-dev-chain__stage-foot').getBoundingClientRect().height,
+            footPaddingBottom: getComputedStyle(card.querySelector('.erp-dev-chain__stage-foot')).paddingBottom,
+          })),
         }))
+        await fs.writeFile(path.join(outputDir, 'dev-density-chain-geometry.json'), JSON.stringify(chain, null, 2) + '\n')
         assert(chain.height <= 760, '桌面总链应在一屏内保留主要结构')
         assert(
           chain.cards.every((height) => height >= 60 && height <= 88),

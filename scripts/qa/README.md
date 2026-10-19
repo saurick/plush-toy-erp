@@ -164,11 +164,15 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 库存、质检、生产、出货和收付款专项入口为 `transaction-browser-isolated.mjs`；不带参数仅显示帮助，`--run` 每次建立新环境，`--out output/qa/<目录>` 可指定本轮证据目录。`--source-orders` 单独选择接单、采购和委外的桌面 / 手机真实链路，仍运行相同的 PostgreSQL 与日志 / Trace 门禁；该范围不代表其他交易链路、字段页面或打印通过。`--receiving` 单独选择第 5/6 环节到货点数与材料入库、采购退货异常分支，以及第 8/9 环节相关的委外回货质检；覆盖桌面和手机真实页面、分包差异、权限拒绝、响应丢失重试、退货冲正和复检证据，同样运行 PostgreSQL 与日志 / Trace 门禁，不代表其他浏览器或打印链路通过。默认范围保留原交易与打印链路，并追加源单和到货退货质检验证。使用仓库锁定的 Node、已安装的 Web 依赖与 Chromium、本机 Go / Atlas / psql，以及已缓存的 `postgres:18.6` 和 `chrislusf/seaweedfs:4.46`；不自动拉取镜像。数据库运行身份与前端代理的认证读回均通过后，才操作页面；正常请求使用 Vite 的真实代理，故障注入仅在后端已成功处理后丢弃响应，不伪造业务返回。业务夹具走正式 seed、API、审批与岗位范围设置，数据库查询使用只读会话。
 
+`--desktop-variants` 定向验证电脑端采购及委外合同预付款、车缝 / 手工委外执行和皮套不合格处置，不新增手机专项。它复用相同的隔离资源、运行身份、认证代理、PostgreSQL 与日志门禁，浏览器上限 8 分钟、整个隔离运行上限 15 分钟。排障可用 `--desktop-case advance|outsourcing|shell` 只执行对应电脑端浏览器分支，默认 `all` 执行三类；各分支仍必须通过两组新增 PostgreSQL 回滚用例，窄范围不代表其他浏览器分支已通过。采购和委外分别核对 `ADVANCE` 的来源、金额、审批与过账分离、丢失响应恢复、幂等及冲销；委外按冻结产品规格、工序、单位和整批数量关联正式合同；皮套按让步、报废、原厂返工、换厂返工和补料重做分别保留原检验、审批、实际执行及冲正证据。原图及原始报告保存于 `browser/desktop-variants/**`。 生产异常详情的正常取消必须匹配精确只读接口、请求、执行上下文与最新读取生命周期；独立负例要求无来源 `ERR_ABORTED` 显示错误并经真实刷新恢复，写请求、HTTP错误或无效来源仍失败。上游已确认合同和模拟厂商通过正式 API 准备，受测业务动作由真实页面发起；不将夹具准备描述为客户事实或浏览器验收。
+
+完整范围主交易批次上限为 12 分钟，整个隔离运行上限为 25 分钟；接单或到货窄范围分别保持 8 分钟批次与 15 分钟总上限。预算覆盖真实任务入口、来源权限读取、业务办理与截图等步骤，不改变任何单步业务等待、数量 / 账本 / 权限断言或失败清理；实际预算记录在 `lifecycle.json.budget`，超时仍使整轮失败。 前端辅助端口在实际启动前分配；后端和 Vite 均复用平台端口表回读本轮确切 PID 的监听端口，再校验认证代理身份；macOS 使用既有原生 socket 表，读取异常或出现其他 PID 仍使运行失败。其他进程页面可达不能作为本轮服务就绪证据。
+
 接单、采购和委外通过 `transaction-source-orders-browser.mjs` 验证：浏览器打开真实草稿后，另一次正式保存造成版本冲突，页面保留未保存内容且不得覆盖；真实保存和流程提交成功后丢弃响应，再核对数据库唯一结果及重新打开后的回显。审批覆盖必填原因、越权拒绝、阻塞、解除阻塞、通过与退回，核对源单、行和流程的终态；委外合同覆盖提交、确认、未履行时正常关闭被拒、取消和终态保护。同键重放必须返回原结果，同一源单和操作范围内，同键改变流程关联意图或源版本必须拒绝。单据和任务操作前后比较库存、采购入库、委外事实、质检、财务及出货内容摘要，防止协同审批代写事实。证据保存在 `browser/source-orders/**`，对应 PostgreSQL 聚合中途失败、事务回滚与原版本重试测试纳入现有 `TestSourceDocumentPostgres` 门禁。
 
 工程用料审批另覆盖桌面和手机的过期来源拒绝、老板退回必填原因、工程重提、审批顺序与越权拒绝；财务审批真实成功后丢弃响应，重开与重放只能读到唯一生成的采购单。采购单必须关联该用料汇总及供应商，材料、单位和数量与审核结果一致，单价与金额保持待采购填写。响应丢失的保存、提交和财务审批请求同样必须匹配唯一的完成日志及 Trace，不因浏览器未收到响应而漏验。
 
-真实 PDF 验证要求本机 `pdfinfo`、`pdffonts` 和 `pdftotext`，默认范围在启动隔离资源前检查工具。文本型业务夹具的每一页都必须非空，同时核对 A4、字体嵌入、中文提取及编辑控件隔离；下载和全文有内容不能代替逐页检查。`--source-orders` 和 `--receiving` 不执行打印，不要求这三个工具。
+真实 PDF 验证要求本机 `pdfinfo`、`pdffonts` 和 `pdftotext`，默认范围在启动隔离资源前检查工具。文本型业务夹具的每一页都必须非空，同时核对 A4、字体嵌入、中文提取及编辑控件隔离；下载和全文有内容不能代替逐页检查。`--source-orders`、`--receiving` 和 `--desktop-variants` 不执行打印，不要求这三个工具。
 
 该专项保留 IQC 不合格与复检、采购入库、库存盘点过账和取消、应收应付结算、订单预收预付、客户与供应商的部分和全额退款，以及审批与资金事实分离、响应丢失恢复、幂等重放、越权拒绝、超额阻断和冲销后的余额断言。生产与出货另以独立 SKU 验证 PMC 创建发布、仓库委外发料、裁片回仓及检验、车缝及皮套检验、手工完工、仓库正式成品入库、成品 / 针检 / 抽检、业务确认包材、仓库包装、出货财务审批、实际出货和撤销恢复。正式入库后依次核对待检、待包装和可发货数量；待检时移交包装必须被拒绝，工序与质检重放不得重复扣料或入库，财务放行不得提前出库。样品、工程用料审批及加工合同通过正式 API 准备，生产和出货主动作由浏览器完成。应收结算链路仍通过盘点与出货 API 独立准备来源，避免与生产回归共享库存。
 
@@ -178,7 +182,11 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 手机回归使用 Chromium 的 390×844 触摸视口，进入 `/m/:roleKey/tasks` 和正式业务办理路由，实际完成审批、处理回执和上述业务表单，并检查页面横向溢出。质检更正当前没有页面动作，测试通过正式 API 创建复检，判定仍由浏览器完成。`browser/report.json` 保存各链路、手机任务、工序和真实出货来源结果，`postgres.jsonl` 保存真实数据库测试事件，`lifecycle.json` 绑定源码身份、镜像、迁移和清理结果；共享工作区后续变化不会覆盖快照身份。它不证明手机真机 / Safari、存量数据库升级或客户验收全部完成。
 
-请求观测复用现有服务端组件：按响应 `X-Request-Id` 核对正常、拒绝和丢失响应请求的唯一完成日志、method、code 与 outcome，并扫描本轮凭据泄漏；报告只保留关联计数与受控字段。浏览器待处理 RPC 以 Chromium 网络协议的开始、完成和失败事件为准，每个已分发请求必须达到终态，完成数量必须等于收集的业务响应数量；只有被新文档取代的 `workflow.get_workbench` 和 `workflow.get_task_board` 只读启动查询可单独记录为导航取消，写入不适用该分类，未注入的传输失败继续判为失败。`observability.jsonl` 保存现有 Go 日志、Trace 父子关系、异常分类、SQL 脱敏和审计 request ID 合同的实际结果。隔离服务不向共享 Jaeger 导出 Trace，不把合同测试写成目标平台已收到 Trace。
+请求观测复用现有服务端组件：按响应 `X-Request-Id` 核对正常、拒绝和丢失响应请求的唯一完成日志、method、code 与 outcome，并扫描本轮凭据泄漏；报告只保留关联计数与受控字段。`observability.jsonl` 保存现有 Go 日志、Trace 父子关系、异常分类、SQL 脱敏和审计 request ID 合同的实际结果。隔离服务不向共享 Jaeger 导出 Trace，不把合同测试写成目标平台已收到 Trace。
+
+浏览器待处理 RPC 以 Chromium 网络协议的开始、完成和失败事件为准，完成数量必须等于收集的业务响应数量，不把取消的读取记成业务成功。`transaction-browser-cancellation.mjs` 只审计 `workflow/get_workbench`、`workflow/get_task_board`、`workflow/explain_action_access`、`sales_order/list_sales_orders`、`sales_order/get_sales_order` 和 `outsourcing_order/list_outsourcing_order_items` 六组查询。原始 `canceled=true`、`net::ERR_ABORTED` 只有在请求 ID、domain / method、frame、loader 与实际页面生命周期证据一致时，才能单独计入 `navigationAborted` 或 `scopeAborted`。文档取消须有该读取的离页事件及新 loader；组件取消须有所属读取作用域的原生 `AbortError` 原因及合法代次。Chromium 整页切换可能不发送网络终止事件，此时还必须收到旧执行上下文的原生销毁事件、匹配离页时仍在进行的读取和新 loader，单列文档取消，并明确保存 `terminalEvidence`，不伪造 `ERR_ABORTED`。迟到的网络成功或失败仍按原请求身份覆盖文档销毁分类。只有新地址、loader、组件卸载或方法名称均不能代替这组证据；已先失败或读完、HTTP 错误、无证据取消、未知查询和写请求仍阻断。原始事件、分类和业务响应分别保留；有界历史之外仍须逐条完成计数核对。
+
+默认批次的 `transaction-request-cancellation-browser.mjs` 使用真实来源和后端响应，验证桌面新搜索取代列表 / 详情读取、文档重载，以及 390px / 320px 手机返回任务列表时释放权限读取。它另对当前页面的销售读取和手机权限读取各注入一次浏览器中断，要求报告保留唯一异常、页面显示必要提示、重试恢复且源单 / 事实内容不变；这些定向负例独立保存在 `requestCancellation.cases`，不会豁免主交易批次的异常。该脚本的合同测试拒绝缺场景、零执行、隐藏异常、未恢复或窄屏溢出的报告。
 
 移动 Workflow 和采购入库真实写入浏览器脚本使用 `browser-write-target.mjs` 复核明确提供的开发 / 隔离数据库身份，并将浏览器 RPC 绑定到该后端。前端与后端均限定 loopback HTTP(S)，不通过页面代理猜测写入目标。移动脚本必须传入 `--accept-persistent-test-data --database-name <库名>`（也可使用同名 `MOBILE_WORKFLOW_BROWSER_SMOKE_*` 环境变量）；采购入库脚本须提供 `PURCHASE_RECEIPT_E2E_DATABASE_NAME` 和现有持久测试数据确认。采购脚本附带 seed 时还须显式提供同库的 `POSTGRES_DSN`。远程试用沿用登记的 manual acceptance 目标流程。
 
@@ -200,6 +208,10 @@ Web 原生覆盖基线与 `pnpm test` 共用[源码测试入口](../../web/scrip
 - `output-retention-preview.mjs` 只扫描登记的 managed roots，按每组最近数量、最近 passed / failed / not_proven、显式 SHA 与 operation 引用给出 `keep / review_delete`；5GiB 是复核预算，不是自动删除阈值。未登记目录、符号链接和无效 metadata 均不得成为删除授权。
 - 脚本不得把真实密码、token、完整 DSN、URL userinfo、原始客户文件内容或未脱敏输出写入仓库。
 - 调整 QA 脚本后，至少运行对应 `node --check` / `node --test` 和 shell 语法检查；开发期按影响面运行专题命令，不因 QA 编排自身变化机械重跑 lifecycle。
+
+## 接口合同同步与样例执行 / RPC Contract Checks
+
+接口改动复用 `gen-public-contracts.mjs` 的生成、`--check`、只读 `--review` / `--staged` 比较与 `--verify-examples` 执行入口。`pre-commit` 只检查精确暂存快照；fast / affected 另运行登记样例的真实服务夹具，拒绝零执行、失败和跳过。工作台从同一链路读取差异、暂存文件和源码身份绑定的原始回执，未登记或历史结果不补成当前通过。维护步骤、命令与证明范围集中见[接口差异与执行证据](../../docs/engineering/跨层公共契约与生成规范.md#接口差异与执行证据--rpc-review)。
 
 ## 模拟系统接入验证 / Integration Consumers
 
@@ -622,6 +634,8 @@ MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
 ```
 
 打印工作台必须从同批采购订单、委外订单和 BOM 选择真实模拟记录。PDF 出现 4xx / 5xx、空文件、非 PDF 或缺少 `request_id` 都要失败，不能用页面打开代替带值打印证据。
+
+浏览器先等待工作台的真实字体集合加载完成，再计时 PDF 响应和预览窗口，产品的字体来源、大小和文件头校验继续执行。精确识别的 Cloudflare 注入分析脚本及其遥测上报网络故障单独保留在 `expectedRuntimeWarnings`；ERP 页面、接口、字体、未知脚本和 JavaScript 执行错误仍然阻断验收。 大数据工作台通过实际分页寻找本批任务；任务分类切换须等待新任务码和自定义加载提示结束，相邻分类数量相同不能作为数据已更新的证明。
 
 退出批次前必须先 dry-run。该入口只处理没有 active / blocked ProcessRuntime 阻断的源单；上一固定 V5 批次特意保留已启动、待办、阻塞和退回流程证据，不能用业务取消伪造流程撤销。需要连同这些流程证据完整清理时，本地应重建专用验收库，133 必须走受控数据库重建 / 恢复流程；不得让本脚本部分执行后冒充整批已退出。其余可处理源单进入取消 / 归档状态，主数据转为停用；已过账库存、出货和财务历史继续保留，不做物理删除。本地和 133 都走同一 target policy，133 仍要求精确确认和带外证明：
 

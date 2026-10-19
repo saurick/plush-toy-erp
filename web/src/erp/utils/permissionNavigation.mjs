@@ -4,10 +4,10 @@ import {
 } from '../config/seedData.mjs'
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import {
-  getBusinessModuleGroup,
-  getBusinessModuleSidebarKey,
   groupSidebarNavigationSections,
+  projectBusinessModuleSections,
 } from './businessModuleGroups.mjs'
+import { getSidebarNavigationSections } from '../config/customerMenuConfig.mjs'
 
 const navigationItems = [
   ...getNavigationSections(),
@@ -70,60 +70,34 @@ export function getPermissionPageAccessReason(page = {}) {
     : '尚未取得具体原因，请重新核对页面访问结果'
 }
 
-// Navigation saves still contain every authorized page path. A module contributes
-// one primary path; its other pages remain in the secondary list for validation.
-export function buildRoleNavigationModules({
-  options = [],
-  primaryMenuPaths = [],
-  secondaryMenuPaths = [],
+export function buildPermissionNavigationPlacement({
+  access = null,
+  navigationSections = [
+    ...getNavigationSections(),
+    ...getAuthenticatedNavigationSections(),
+  ],
 } = {}) {
-  const modules = new Map()
-  const optionByPath = new Map(options.map((option) => [option.value, option]))
-  for (const option of options) {
-    const page = getPermissionPageEntry({
-      ...option.menuItem,
-      path: option.value,
-      label: option.label,
-    })
-    const group = getBusinessModuleGroup(option.value)
-    const key = getBusinessModuleSidebarKey(option.value)
-    if (!modules.has(key)) {
-      modules.set(key, {
-        key,
-        label: group?.label || page.label,
-        sidebarArea: group ? 'business' : page.sidebarArea,
-        pages: [],
-      })
-    }
-    modules.get(key).pages.push({ ...option, label: page.label })
+  if (access?.is_final !== true) {
+    return { sections: [], pages: [] }
   }
-  const seen = new Set()
-  const pick = (paths) =>
-    paths.flatMap((path) => {
-      if (!optionByPath.has(path)) return []
-      const key = getBusinessModuleSidebarKey(path)
-      if (seen.has(key)) return []
-      seen.add(key)
-      return [{ ...modules.get(key), path }]
-    })
-  const primaryItems = pick(primaryMenuPaths)
-  const secondaryItems = pick([...secondaryMenuPaths, ...optionByPath.keys()])
-  return { primaryItems, secondaryItems }
-}
-
-export function serializeRoleNavigationModules({
-  primaryItems = [],
-  secondaryItems = [],
-} = {}) {
-  const primaryMenuPaths = primaryItems.map((item) => item.path)
-  const primary = new Set(primaryMenuPaths)
-  const secondaryMenuPaths = [
-    ...new Set(
-      [...secondaryItems, ...primaryItems].flatMap((item) => [
-        item.path,
-        ...item.pages.map((page) => page.value),
-      ])
+  const effectivePaths = new Set(
+    (Array.isArray(access.pages) ? access.pages : [])
+      .filter((page) => page?.effective === true)
+      .map((page) => page.path)
+  )
+  const visibleSections = getSidebarNavigationSections(
+    navigationSections.map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) =>
+          item.access === 'authenticated' || effectivePaths.has(item.path)
+      ),
+    }))
+  )
+  return {
+    sections: groupSidebarNavigationSections(
+      projectBusinessModuleSections(visibleSections)
     ),
-  ].filter((path) => !primary.has(path))
-  return { primaryMenuPaths, secondaryMenuPaths }
+    pages: visibleSections.flatMap((section) => section.items),
+  }
 }

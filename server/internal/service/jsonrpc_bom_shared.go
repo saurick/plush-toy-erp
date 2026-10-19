@@ -156,6 +156,9 @@ func bomVersionDetailResult(ctx context.Context, d *jsonrpcDispatcher, item *biz
 }
 
 func (d *jsonrpcDispatcher) mapBOMError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}

@@ -6,6 +6,8 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { readIntegrationRunEvidence } from './devIntegrationEvidence.mjs'
 import { INTEGRATION_EVIDENCE_API } from '../src/dev-workbench/config/devIntegration.mjs'
+import { readDevRPCContractReview } from './devRPCContractReview.mjs'
+import { RPC_CONTRACT_REVIEW_API } from '../src/dev-workbench/config/devRPCContractReview.mjs'
 
 import {
   DEV_QUALITY_GATE_ACTIVE_STATUSES,
@@ -1585,7 +1587,7 @@ export function createDevQualityGateService({
       return operation
     }
     context.timeoutTimer = setTimer(() => {
-      void requestStop(operation.id, 'timeout')
+      requestStop(operation.id, 'timeout')
     }, timeoutMs[operation.profile])
     return operation
   }
@@ -1881,7 +1883,10 @@ function validateReadQuery(requestUrl, kind) {
     if (
       !['relevant', 'all', 'attention'].includes(filter) ||
       q.length > 80 ||
-      /[\u0000-\u001f\u007f]/u.test(q)
+      [...q].some((character) => {
+        const codePoint = character.codePointAt(0)
+        return codePoint <= 31 || codePoint === 127
+      })
     ) {
       throw new Error('quality gate governance query is invalid')
     }
@@ -1901,6 +1906,7 @@ function validateReadQuery(requestUrl, kind) {
 export function createDevQualityGateMiddleware({
   projectRoot,
   service,
+  readRPCReview = readDevRPCContractReview,
   csrfToken = randomBytes(32).toString('base64url'),
 } = {}) {
   const qualityService = service || createDevQualityGateService({ projectRoot })
@@ -1928,6 +1934,13 @@ export function createDevQualityGateMiddleware({
       return
     }
     try {
+      if (request.method === 'GET' && requestPath === RPC_CONTRACT_REVIEW_API) {
+        const range = requestUrl.searchParams.get('range') || 'worktree'
+        if ([...requestUrl.searchParams.keys()].some((key) => key !== 'range') || requestUrl.searchParams.getAll('range').length > 1 || !['worktree', 'staged'].includes(range)) throw new Error('unsupported RPC contract review query')
+        const report = await readRPCReview(path.resolve(projectRoot || process.cwd()), { range })
+        if (!response.destroyed) sendJson(response, 200, report)
+        return
+      }
       if (request.method === 'GET' && requestPath === INTEGRATION_EVIDENCE_API) {
         if (requestUrl.search) throw new Error('integration evidence query is unsupported')
         sendJson(response, 200, await readIntegrationRunEvidence(path.resolve(projectRoot || process.cwd())))

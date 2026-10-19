@@ -27,11 +27,12 @@
   z-index: 1300;
   inset: 0;
   display: flex;
+  width: auto;
+  height: auto;
   flex-direction: column;
   margin: 0;
   border: 0;
   border-radius: 0;
-  background: #020617;
   padding: 18px;
 }
 
@@ -47,9 +48,9 @@
 .erp-markdown-mermaid--fullscreen .erp-markdown-mermaid__toolbar {
   flex: 0 0 auto;
   margin-bottom: 14px;
-  border: 1px solid rgb(148 163 184 / 24%);
+  border: 1px solid var(--erp-border, #dce8dd);
   border-radius: 12px;
-  background: rgb(15 23 42 / 84%);
+  background: var(--erp-surface-bg, #fff);
   padding: 10px;
 }
 
@@ -74,9 +75,6 @@
 .erp-markdown-mermaid--fullscreen .erp-markdown-mermaid__tool {
   width: 40px;
   height: 40px;
-  border-color: rgb(148 163 184 / 32%);
-  background: #111827;
-  color: #e5edf5;
   font-size: 18px;
 }
 
@@ -95,27 +93,11 @@
   opacity: 0.45;
 }
 
-.erp-markdown-mermaid--fullscreen .erp-markdown-mermaid__tool:hover {
-  border-color: #86efac;
-  background: rgb(22 101 52 / 34%);
-  color: #bbf7d0;
-}
-
 .erp-markdown-mermaid__tool[aria-pressed='true'] {
   border-color: var(--erp-primary, #2b8a3e);
   background: var(--erp-primary-soft, #eef7ef);
   color: var(--erp-primary, #2b8a3e);
   box-shadow: inset 0 0 0 1px currentColor;
-}
-
-.erp-markdown-mermaid--fullscreen .erp-markdown-mermaid__tool[aria-pressed='true'] {
-  border-color: #86efac;
-  background: rgb(22 101 52 / 50%);
-  color: #bbf7d0;
-}
-
-.erp-markdown-mermaid--fullscreen .erp-markdown-mermaid__tool:focus-visible {
-  outline-color: #86efac;
 }
 
 .erp-markdown-mermaid__zoom-label {
@@ -128,7 +110,6 @@
 
 .erp-markdown-mermaid--fullscreen .erp-markdown-mermaid__zoom-label {
   min-width: 56px;
-  color: #e5edf5;
   font-size: var(--erp-font-body);
 }
 
@@ -156,9 +137,9 @@
   height: auto;
   min-height: 0;
   max-height: none;
-  border: 1px solid rgb(148 163 184 / 18%);
+  border: 1px solid var(--erp-border, #dce8dd);
   border-radius: 14px;
-  background: #020617;
+  background: inherit;
   overscroll-behavior: contain;
 }
 
@@ -178,7 +159,8 @@
   padding: 28px 0;
 }
 
-.erp-markdown-mermaid[data-mermaid-native-size="true"] .erp-markdown-mermaid__canvas {
+.erp-markdown-mermaid[data-mermaid-native-size='true']
+  .erp-markdown-mermaid__canvas {
   width: calc(var(--mermaid-zoom, 1) * var(--mermaid-intrinsic-width, 100%));
 }
 

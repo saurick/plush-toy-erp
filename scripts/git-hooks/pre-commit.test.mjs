@@ -64,9 +64,19 @@ function installHookFixture(root) {
   for (const file of [
     "scripts/git-hooks/pre-commit.sh",
     "scripts/qa/gate-profiles.mjs",
+    "scripts/lib/rpc-contract-review.mjs",
   ]) {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     copyFileSync(path.join(ROOT, file), path.join(root, file));
   }
+  writeFileSync(path.join(root, 'scripts/gen-public-contracts.mjs'), `import fs from 'node:fs';
+const source = 'server/internal/service/contract_fixture.go';
+const generated = 'server/docs/contract_fixture.md';
+if (fs.existsSync(source) && fs.readFileSync(source, 'utf8') !== fs.readFileSync(generated, 'utf8')) {
+  console.error('fixture RPC contracts are not synchronized'); process.exitCode = 1;
+}
+`);
+  writeFileSync(path.join(root, 'scripts/qa/public-contract-consumers.mjs'), 'process.exitCode = 0\n');
   chmodSync(path.join(root, "scripts/git-hooks/pre-commit.sh"), 0o755);
   for (const name of ["error-code-sync.sh", "error-codes.sh"]) {
     const target = path.join(root, "scripts/qa", name);
@@ -474,6 +484,33 @@ test("pre-commit uses the indexed checker when its worktree copy is weakened", (
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("pre-commit rejects a staged RPC change even when the worktree generated document is fixed", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-rpc-"));
+  try {
+    git(root, ["init", "-q"]);
+    installHookFixture(root);
+    const source = "server/internal/service/contract_fixture.go";
+    const generated = "server/docs/contract_fixture.md";
+    mkdirSync(path.dirname(path.join(root, source)), { recursive: true });
+    mkdirSync(path.dirname(path.join(root, generated)), { recursive: true });
+    writeFileSync(path.join(root, source), "base\n");
+    writeFileSync(path.join(root, generated), "base\n");
+    commit(root, "base");
+    writeFileSync(path.join(root, source), "changed\n");
+    git(root, ["add", source]);
+    writeFileSync(path.join(root, generated), "changed\n");
+    const before = git(root, ["diff", "--cached"]);
+    const rejected = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], { cwd: root, encoding: "utf8" });
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /fixture RPC contracts are not synchronized/u);
+    assert.equal(git(root, ["diff", "--cached"]), before);
+    assert.equal(readFileSync(path.join(root, generated), "utf8"), "changed\n");
+    git(root, ["add", generated]);
+    const accepted = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], { cwd: root, encoding: "utf8" });
+    assert.equal(accepted.status, 0, accepted.stderr || accepted.stdout);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("pre-commit source contains no mutating formatter or git add", () => {

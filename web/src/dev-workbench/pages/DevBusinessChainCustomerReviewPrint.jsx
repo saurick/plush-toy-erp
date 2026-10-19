@@ -81,9 +81,9 @@ function OverviewContent({ overview }) {
         <p>{overview.purpose}</p>
       </section>
       <section className="erp-dev-flow-customer-review__step-table" data-customer-review-fulfillment>
-        <h2>订单全流程与岗位交接</h2>
+        <h2>正常办理与岗位交接</h2>
         <table>
-          <thead><tr><th scope="col">环节</th><th scope="col">岗位</th><th scope="col">交接、审批与异常</th></tr></thead>
+          <thead><tr><th scope="col">环节</th><th scope="col">岗位</th><th scope="col">交接与审批</th></tr></thead>
           <tbody>
             {overview.fulfillmentFlow.map((step, index) => (
               <tr key={step.stage}>
@@ -100,15 +100,32 @@ function OverviewContent({ overview }) {
                       <p>未通过：{approval.rejected}</p>
                     </div>
                   ))}
-                  {step.exception ? <p>异常：{step.exception}</p> : null}
+                  {!step.handling && step.exception ? <p>异常：{step.exception}</p> : null}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </section>
+      <section className="erp-dev-flow-customer-review__step-table" data-customer-review-handling-table>
+        <h2>异常处理与继续条件</h2>
+        <table>
+          <colgroup><col style={{ width: '17%' }} /><col style={{ width: '23%' }} /><col style={{ width: '32%' }} /><col style={{ width: '28%' }} /></colgroup>
+          <thead><tr><th scope="col">环节</th><th scope="col">异常情况</th><th scope="col">办理方式</th><th scope="col">继续前核对</th></tr></thead>
+          <tbody>
+            {overview.fulfillmentFlow.map((step, index) => step.handling ? (
+              <tr key={step.stage} data-customer-review-handling={step.stage}>
+                <th scope="row">{index + 1}. {step.label}</th>
+                <td>{step.handling.issues}</td>
+                <td>{step.handling.action}</td>
+                <td>{step.handling.resume}</td>
+              </tr>
+            ) : null)}
+          </tbody>
+        </table>
+      </section>
       <section className="erp-dev-flow-customer-review__all-exceptions">
-        <h2>异常来源与闭环条件</h2>
+        <h2>专项异常处置与闭环条件</h2>
         {overview.exceptionGuides.map((guide) => (
           <section key={guide.key} data-customer-review-exception={guide.key}>
             <h3>{guide.label}</h3><p>{guide.source}</p>

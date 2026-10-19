@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { expect } from 'playwright/test'
 
 export async function assertFulfillmentChainClickTargets(canvas) {
   const stages = await canvas.locator('[data-chain-stage]').all()
@@ -8,13 +9,13 @@ export async function assertFulfillmentChainClickTargets(canvas) {
     await card.scrollIntoViewIfNeeded()
     const target = await card.evaluate((node) => {
       const main = node.querySelector('.erp-dev-chain__stage-main')
-      const exception = node.querySelector('.erp-dev-chain__stage-foot > button')
+      const auxiliary = [...node.querySelectorAll('.erp-dev-chain__stage-foot > button')]
       const box = node.getBoundingClientRect()
       const misses = []
       for (const x of [6, box.width / 4, box.width / 2, box.width * 3 / 4, box.width - 6]) {
         for (const y of [6, box.height / 2, box.height - 6]) {
           const hit = document.elementFromPoint(box.left + x, box.top + y)
-          if (![main, exception].filter(Boolean).includes(hit?.closest('button')) || getComputedStyle(hit).cursor !== 'pointer') misses.push({ x, y, target: hit?.className })
+          if (![main, ...auxiliary].includes(hit?.closest('button')) || getComputedStyle(hit).cursor !== 'pointer') misses.push({ x, y, target: hit?.className })
         }
       }
       const hitCenter = (element) => {
@@ -24,7 +25,7 @@ export async function assertFulfillmentChainClickTargets(canvas) {
       return {
         stage: node.closest('[data-chain-stage]').dataset.chainStage,
         misses,
-        exceptionIndependent: !exception || hitCenter(exception) === exception,
+        exceptionIndependent: auxiliary.every((button) => hitCenter(button) === button),
         notesClickable: [...node.querySelectorAll('.erp-dev-chain__stage-foot > small')].every((note) => hitCenter(note) === main),
       }
     })
@@ -36,6 +37,7 @@ export async function assertFulfillmentChainClickTargets(canvas) {
     await stage.locator('.erp-dev-chain__stage-main[aria-expanded="true"]').waitFor()
   }
   await canvas.getByRole('button', { name: '收起环节', exact: true }).click()
+  await expect(canvas.locator('[data-stage-card][data-selected]')).toHaveCount(0)
   assert.equal(await canvas.locator('[data-stage-card][data-selected]').count(), 0)
 }
 

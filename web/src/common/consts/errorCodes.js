@@ -27,6 +27,7 @@ export function isAdminSessionUnavailableCode(code) {
 }
 
 export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
+  [RpcErrorCode.REQUEST_CANCELED]: '请求已取消，请刷新核对处理结果',
   [RpcErrorCode.ADMIN_REQUIRED]: '只有管理员才能操作',
   [RpcErrorCode.AUTH_REQUIRED]: '请先登录',
   [RpcErrorCode.ADMIN_DISABLED]: '账号已停用',

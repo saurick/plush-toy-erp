@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { createRequestScopeAbortReason, RequestScopeOwner, RequestScopeCancellationCause } from '../../common/utils/requestScopeCancellation.mjs'
 
 export function createLatestRequestCoordinator() {
   const requestControllers = {}
@@ -6,7 +7,13 @@ export function createLatestRequestCoordinator() {
 
   return {
     begin(key) {
-      requestControllers[key]?.abort()
+      const previousSequence = Number(requestSequences[key] || 0)
+      requestControllers[key]?.abort(createRequestScopeAbortReason({
+        owner: RequestScopeOwner.LATEST_REQUEST,
+        cause: RequestScopeCancellationCause.SUPERSEDED,
+        generation: previousSequence,
+        nextGeneration: previousSequence + 1,
+      }))
       const controller = new AbortController()
       const nextSequence = Number(requestSequences[key] || 0) + 1
       requestControllers[key] = controller
@@ -26,8 +33,12 @@ export function createLatestRequestCoordinator() {
       }
     },
     abortAll() {
-      Object.values(requestControllers).forEach((controller) => {
-        controller?.abort()
+      Object.entries(requestControllers).forEach(([key, controller]) => {
+        controller?.abort(createRequestScopeAbortReason({
+          owner: RequestScopeOwner.LATEST_REQUEST,
+          cause: RequestScopeCancellationCause.DISPOSED,
+          generation: requestSequences[key],
+        }))
       })
       Object.keys(requestControllers).forEach((key) => {
         delete requestControllers[key]

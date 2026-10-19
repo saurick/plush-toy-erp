@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
+import { writeFile } from 'node:fs/promises'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
@@ -96,6 +97,8 @@ export function createProductionCompactPagesScenarios({
         await drawer
           .getByRole('heading', { name: '待仓库确认成品入库', exact: true })
           .waitFor()
+        await drawer.getByText('PROD-FACT-L1', { exact: true }).waitFor()
+        assert.equal(await page.locator('.ant-table-column-sort').count(), 0, '选中导致行移动时，第二次点击不能误触表头排序')
         await drawer.getByText(/确认成功才增加成品库存/u).waitFor()
         assert.equal(
           await drawer
@@ -304,7 +307,15 @@ export function createProductionCompactPagesScenarios({
         const row = page.locator('.ant-table-tbody tr[data-row-key="1"]')
         await row.waitFor()
         await clickERPThemeOption(page, '暗色')
-        await row.dblclick()
+        await row.evaluate((element) => {
+          window.__productionRecordInteraction = []
+          const card = element.closest('.erp-business-data-table-card')
+          for (const type of ['pointerdown', 'click', 'dblclick']) { card.addEventListener(type, (event) => {
+            window.__productionRecordInteraction.push({ type, detail: event.detail, x: event.clientX, y: event.clientY, target: event.target.tagName, row: event.target.closest('tr')?.dataset.rowKey || null, rowTop: element.getBoundingClientRect().top })
+          }, true) }
+        })
+        await row.getByText('草稿', { exact: true }).dblclick()
+        await writeFile(path.join(outputDir, 'production-record-double-click.json'), JSON.stringify(await page.evaluate(() => window.__productionRecordInteraction), null, 2))
         const drawer = page.getByRole('dialog', {
           name: '生产记录详情',
           exact: true,

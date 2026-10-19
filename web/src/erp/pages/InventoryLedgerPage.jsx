@@ -20,7 +20,8 @@ import {
   Space,
   Tag,
 } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import {
   createInventoryLedgerColumns,
@@ -79,6 +80,7 @@ import {
 } from '../api/customerConfigApi.mjs'
 import {
   BusinessActionTooltip,
+  BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
   DateRangeFilter,
@@ -88,6 +90,7 @@ import {
   SelectionActionBar,
   SelectionClearAction,
   normalizeBusinessTableColumns,
+  useBusinessTableRecordOpen,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -156,9 +159,10 @@ const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
 export default function InventoryLedgerPage() {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const outletContext = useOutletContext()
+  const InventoryTable = outletContext?.mobileTaskBusiness ? BusinessDataTable : Table
   const taskStock = outletContext?.mobileTaskCommand?.kind === 'inventory' ? outletContext.mobileTaskCommand.selected : null
   const navigate = useBusinessNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -1181,6 +1185,12 @@ export default function InventoryLedgerPage() {
     (Number(currentOperation.created_by || 0) === currentAdminID ||
       (currentOperation.status === InventoryOperationStatus.POSTED &&
         Number(currentOperation.posted_by || 0) === currentAdminID))
+  const inventoryRecordOpen = useBusinessTableRecordOpen({
+    dataSource: rows,
+    rowKey: (record) => `${activeView}-${record.id}`,
+    onRow: (record) => ({ onClick: () => setSelectedRow(record) }),
+    onOpenRecord: openInventoryDetails,
+  })
 
   return (
     <BusinessPageLayout className="erp-inventory-ledger-page">
@@ -1643,6 +1653,7 @@ export default function InventoryLedgerPage() {
               icon={<EyeOutlined />}
               disabled={!selectedRow}
               onClick={() => openInventoryDetails(selectedRow)}
+              data-business-action-key="inventory-details"
               data-business-action-role="view"
             >
               查看详情
@@ -1683,7 +1694,7 @@ export default function InventoryLedgerPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <Card className="erp-business-data-table-card erp-business-module-table-card">
+      <Card className="erp-business-data-table-card erp-business-module-table-card" onClickCapture={inventoryRecordOpen.onClickCapture} onDoubleClickCapture={inventoryRecordOpen.onDoubleClickCapture}>
         {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
           <InventoryDistributionOverview
             balances={distributionData.rows}
@@ -1699,7 +1710,7 @@ export default function InventoryLedgerPage() {
             }}
           />
         ) : (
-          <Table
+          <InventoryTable
             scrollToolbar
             rowKey={(record) => `${activeView}-${record.id}`}
             loading={loading}
@@ -1722,21 +1733,7 @@ export default function InventoryLedgerPage() {
             rowClassName={(record) =>
               record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
             }
-            onRow={(record) => ({
-              onClick: () => setSelectedRow(record),
-              onDoubleClick: (event) => {
-                if (
-                  event.target?.closest?.(
-                    'a, button, input, textarea, select, label, [role="button"], [role="link"], .ant-table-selection-column, .ant-radio-wrapper, .ant-checkbox-wrapper'
-                  )
-                ) {
-                  return
-                }
-                openInventoryDetails(record)
-              },
-              style: { cursor: 'pointer' },
-              title: '单击选中，双击打开',
-            })}
+            onRow={inventoryRecordOpen.onRow}
             locale={{
               emptyText: <Empty description={`暂无${activeLabel}`} />,
             }}

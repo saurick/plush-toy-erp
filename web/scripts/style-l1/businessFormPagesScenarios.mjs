@@ -1,3 +1,4 @@
+import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import {
   assertBusinessFormPage,
@@ -10,6 +11,7 @@ import { assertBusinessFormSections } from './businessFormSectionAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 
 export function createBusinessFormPagesScenarios(deps) {
+  const longFormTask = { id: 99701, version: 1, task_name: '核对本单生产计划', task_group: 'business_followup', task_code: 'manual-long-production-form', task_status_key: 'ready', owner_role_key: 'boss', source_type: 'production_order', source_id: 71, source_no: 'MO-STYLE-L1-20260713' }
   const documents = [
     ['customers', '/erp/master/partners/customers', '新建客户', '新建客户档案'],
     [
@@ -991,13 +993,32 @@ export function createBusinessFormPagesScenarios(deps) {
     {
       ...scenarios.find((scenario) => scenario.name === 'business-form-page-production-desktop'),
       name: 'mobile-business-form-back-top',
-      path: '/m/boss/handle/production/orders',
+      path: '/m/boss/tasks',
+      workflowTaskFixtures: [longFormTask],
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/workflow', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          let data
+          if (method === 'get_task' && params.id === longFormTask.id) data = { task: longFormTask }
+          else if (method === 'explain_action_access' && params.task_id === longFormTask.id) data = { task_id: longFormTask.id, source_access: { applicable: true, resolved: true, allowed: true }, actions: ['complete', 'block', 'reject', 'resume', 'urge'].map((action_key) => ({ action_key, allowed: false })) }
+          else return route.fallback()
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data } } })
+        })
+      },
       viewport: { width: 432, height: 768 },
       deviceScaleFactor: 5,
       verify: async (page) => {
-        await page.getByRole('button', { name: '新建生产订单' }).click()
+        await page.getByTestId('mobile-role-nav-tasks').click()
+        const card = page.locator(`[data-mobile-task-id="${longFormTask.id}"]`)
+        await clickTaskCardContent(card, card.getByText(longFormTask.task_name, { exact: true }))
+        await page.getByTestId('mobile-task-detail-screen').getByRole('button', { name: '填写办理表单', exact: true }).click()
+        await page.locator('[data-testid="mobile-task-business-source"][data-record-id="71"]').waitFor()
+        const edit = page.locator('[data-business-action-key="edit"]:visible')
+        if (!(await edit.count())) await page.getByRole('button', { name: /^更多操作(?:，共 \d+ 项)?$/u }).click()
+        deps.assert.equal(await edit.count(), 1)
+        await edit.click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
-        await editor.getByRole('heading', { name: '新建生产订单', exact: true }).waitFor()
+        await editor.getByRole('heading', { name: '编辑生产订单', exact: true }).waitFor()
         await assertBusinessFormPage(page, editor)
         const body = editor.locator('.erp-business-form-page__body')
         const notes = body.getByRole('textbox', { name: '备注', exact: true })
@@ -1009,9 +1030,37 @@ export function createBusinessFormPagesScenarios(deps) {
         deps.assert.equal(await notes.inputValue(), '回顶后保留的模拟备注')
         await page.emulateMedia({ reducedMotion: 'reduce' })
         deps.assert(await assertMobileBackToTop(page, body), '减少动态效果下仍可回顶')
-        await closeBusinessFormPage(page, editor)
-        await page.getByRole('button', { name: '返回任务', exact: true }).click()
-        await page.waitForURL('**/m/boss/tasks')
+        await page.evaluate(() => {
+          const dialogs = new Set()
+          const observer = new MutationObserver((records) => {
+            for (const record of records) for (const node of record.addedNodes) {
+              if (!(node instanceof Element)) continue
+              if (node.matches('.ant-modal-confirm')) dialogs.add(node)
+              for (const dialog of node.querySelectorAll('.ant-modal-confirm')) dialogs.add(dialog)
+            }
+          })
+          observer.observe(document.body, { childList: true, subtree: true })
+          window.__styleL1DiscardDialogs = { dialogs, observer }
+        })
+        const returnToTask = page.getByTestId('mobile-task-action-screen').getByRole('button', { name: '返回任务详情', exact: true })
+        await returnToTask.click()
+        await page.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await editor.waitFor()
+        deps.assert.equal(await notes.inputValue(), '回顶后保留的模拟备注')
+        await returnToTask.click()
+        await page.getByRole('button', { name: '放弃修改', exact: true }).click()
+        await page.getByTestId('mobile-task-detail-screen').waitFor()
+        await page.waitForFunction(() => !Array.from(document.querySelectorAll('.ant-modal-confirm')).some((node) => node.getClientRects().length > 0))
+        deps.assert.equal(await page.locator('.ant-modal-confirm:visible').count(), 0, '任务返回只确认一次，不重新打开丢弃对话框')
+        await page.getByTestId('mobile-task-detail-screen').getByRole('button', { name: '返回任务列表', exact: true }).click()
+        await page.getByTestId('mobile-role-bottom-nav').waitFor()
+        deps.assert.equal(await page.evaluate(() => {
+          const { dialogs, observer } = window.__styleL1DiscardDialogs
+          observer.disconnect()
+          delete window.__styleL1DiscardDialogs
+          return dialogs.size
+        }), 2, '继续编辑与放弃修改各触发一次确认，不增加额外确认')
+        deps.assert.equal(new URL(page.url()).pathname, '/m/boss/tasks')
       },
     },
     {

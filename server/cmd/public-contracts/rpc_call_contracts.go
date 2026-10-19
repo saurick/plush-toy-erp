@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/ast"
@@ -12,12 +13,19 @@ import (
 )
 
 type rpcExample struct {
-	Params  map[string]any `json:"params"`
-	Data    any            `json:"data"`
-	Basis   string         `json:"basis"`
-	Test    string         `json:"test,omitempty"`
-	Source  *rpcSourceRef  `json:"source,omitempty"`
-	Message *string        `json:"message,omitempty"`
+	Params       map[string]any          `json:"params"`
+	Data         any                     `json:"data"`
+	Basis        string                  `json:"basis"`
+	Test         string                  `json:"test,omitempty"`
+	Source       *rpcSourceRef           `json:"source,omitempty"`
+	Message      *string                 `json:"message,omitempty"`
+	Verification *rpcExampleVerification `json:"verification,omitempty"`
+}
+
+type rpcExampleVerification struct {
+	Test   string        `json:"test"`
+	Case   string        `json:"case"`
+	Source *rpcSourceRef `json:"source,omitempty"`
 }
 
 type rpcCallContract struct {
@@ -27,7 +35,24 @@ type rpcCallContract struct {
 	Example    rpcExample       `json:"example"`
 }
 
-func rpcCallContracts(root string, methods map[string]map[string]string, index map[string]map[string]rpcSourceInspection) (map[string]map[string]rpcCallContract, error) {
+type rpcExampleIssue struct {
+	Key     string `json:"key"`
+	Message string `json:"message"`
+}
+
+// Review may retain parsed shapes alongside sample failures. Generation and
+// check mode never supply an issue sink and continue to fail closed.
+func rpcCallContracts(root string, methods map[string]map[string]string, index map[string]map[string]rpcSourceInspection, issues ...*[]rpcExampleIssue) (map[string]map[string]rpcCallContract, error) {
+	invalid := func(key string, err error) error {
+		if err == nil {
+			return nil
+		}
+		if len(issues) == 0 {
+			return err
+		}
+		*issues[0] = append(*issues[0], rpcExampleIssue{Key: key, Message: err.Error()})
+		return nil
+	}
 	r, err := newRPCShapeReader(root)
 	if err != nil {
 		return nil, err
@@ -38,6 +63,9 @@ func rpcCallContracts(root string, methods map[string]map[string]string, index m
 	}
 	var examples map[string]rpcExample
 	if err = json.Unmarshal(raw, &examples); err != nil {
+		return nil, err
+	}
+	if err := validateRPCExampleKeys(raw); err != nil {
 		return nil, err
 	}
 	tests := map[string]rpcSourceRef{}
@@ -54,23 +82,39 @@ func rpcCallContracts(root string, methods map[string]map[string]string, index m
 		}
 	}
 	out := map[string]map[string]rpcCallContract{}
-	count := 0
 	for domain, names := range methods {
 		out[domain] = map[string]rpcCallContract{}
 		for _, method := range names {
 			key := domain + "." + method
 			sample, ok := examples[key]
 			if !ok || sample.Params == nil || sample.Basis == "" {
-				return nil, fmt.Errorf("missing RPC example %s", key)
+				if err := invalid(key, fmt.Errorf("missing RPC example %s", key)); err != nil {
+					return nil, err
+				}
 			}
 			if sample.Basis == "handler-fixture" {
 				ref, ok := tests[sample.Test]
 				if !ok {
-					return nil, fmt.Errorf("%s: fixture test no longer exists: %s", key, sample.Test)
+					if err := invalid(key, fmt.Errorf("%s: fixture test no longer exists: %s", key, sample.Test)); err != nil {
+						return nil, err
+					}
+				} else {
+					sample.Source = &ref
 				}
-				sample.Source = &ref
-			} else if sample.Basis != "backend-wire-shape" {
-				return nil, fmt.Errorf("%s: unsupported example basis", key)
+			} else if sample.Basis != "backend-wire-shape" && sample.Basis != "" {
+				if err := invalid(key, fmt.Errorf("%s: unsupported example basis", key)); err != nil {
+					return nil, err
+				}
+			}
+			if sample.Verification != nil {
+				ref, exists := tests[sample.Verification.Test]
+				if !exists || !strings.HasPrefix(sample.Verification.Test, "TestRPCDocumented") || sample.Verification.Case != key {
+					if err := invalid(key, fmt.Errorf("%s: executable example test or case is invalid", key)); err != nil {
+						return nil, err
+					}
+				} else {
+					sample.Verification.Source = &ref
+				}
 			}
 			result := r.result(domain, method)
 			shape := result.Fields["data"]
@@ -80,7 +124,9 @@ func rpcCallContracts(root string, methods map[string]map[string]string, index m
 			if message := result.Fields["message"]; message != nil {
 				if value, known := message.Value.(string); known {
 					if sample.Message != nil && *sample.Message != value {
-						return nil, fmt.Errorf("%s: example message differs from success response", key)
+						if err := invalid(key, fmt.Errorf("%s: example message differs from success response", key)); err != nil {
+							return nil, err
+						}
 					}
 					sample.Message = &value
 				}
@@ -88,7 +134,7 @@ func rpcCallContracts(root string, methods map[string]map[string]string, index m
 			if shape.Type == "unresolved" {
 				return nil, fmt.Errorf("unresolved RPC response %s", key)
 			}
-			if err := validateRPCWireExample(shape, sample.Data, key+".result.data"); err != nil {
+			if err := invalid(key, validateRPCWireExample(shape, sample.Data, key+".result.data")); err != nil {
 				return nil, err
 			}
 			fields := rpcShapeFields(shape, "result.data")
@@ -98,17 +144,60 @@ func rpcCallContracts(root string, methods map[string]map[string]string, index m
 				}
 			}
 			parameters := index[domain][method].Parameters
-			if err := validateRPCParameterExample(parameters, sample.Params, key); err != nil {
+			if err := invalid(key, validateRPCParameterExample(parameters, sample.Params, key)); err != nil {
 				return nil, err
 			}
 			out[domain][method] = rpcCallContract{Parameters: parameters, Response: fields, DataType: shape.Type, Example: sample}
-			count++
 		}
 	}
-	if count != len(examples) {
-		return nil, fmt.Errorf("RPC examples contain unregistered methods: %d examples / %d methods", len(examples), count)
+	for key := range examples {
+		domain, method, found := strings.Cut(key, ".")
+		if !found || out[domain][method].DataType == "" {
+			if err := invalid(key, fmt.Errorf("RPC examples contain unregistered method %s", key)); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return out, nil
+}
+
+func validateRPCExampleKeys(raw []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	var visit func(string) error
+	visit = func(path string) error {
+		token, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		switch token {
+		case json.Delim('{'):
+			seen := map[string]bool{}
+			for decoder.More() {
+				name, err := decoder.Token()
+				if err != nil {
+					return err
+				}
+				key, ok := name.(string)
+				if !ok || seen[key] {
+					return fmt.Errorf("duplicate RPC example key %s.%v", path, name)
+				}
+				seen[key] = true
+				if err := visit(path + "." + key); err != nil {
+					return err
+				}
+			}
+			_, err = decoder.Token()
+		case json.Delim('['):
+			for index := 0; decoder.More(); index++ {
+				if err := visit(fmt.Sprintf("%s[%d]", path, index)); err != nil {
+					return err
+				}
+			}
+			_, err = decoder.Token()
+		}
+		return err
+	}
+	return visit("$")
 }
 
 func validateRPCWireExample(shape *rpcWireShape, value any, path string) error {

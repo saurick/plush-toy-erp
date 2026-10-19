@@ -1,4 +1,5 @@
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
+import { isDisplayOnlyWorkflowTask } from './processRuntimePresentation.mjs'
 
 export { catalog as workflowTaskDiscoveryCatalog }
 export const DISCOVERY_FILTER_KEYS = Object.freeze(['stageKey', 'assignee'])
@@ -22,6 +23,15 @@ export function taskStagePath(stageKey) {
   const stage = catalog.stages.find((entry) => entry.key === stageKey)
   if (!stage) return ''
   return `${catalog.chains.find((entry) => entry.key === stage.chain)?.label} / ${stage.group} / ${stage.label}`
+}
+
+export function taskClassificationPresentation(task = {}) {
+  const path = String(task?.discovery?.path || '').trim()
+  const stage = catalog.stages.find((entry) => entry.key === task?.discovery?.stage_key)
+  const label = isDisplayOnlyWorkflowTask(task)
+    ? '模拟任务'
+    : stage?.label || path.split('/').map((part) => part.trim()).filter(Boolean).at(-1) || ''
+  return { label, path }
 }
 
 export function taskDiscoveryFilterLabels(filters = {}, people = []) {

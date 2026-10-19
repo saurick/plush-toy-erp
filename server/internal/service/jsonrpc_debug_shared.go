@@ -19,6 +19,9 @@ func unknownDebugResult(method string) *v1.JsonrpcResult {
 }
 
 func (d *jsonrpcDispatcher) mapDebugError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 
 	switch {

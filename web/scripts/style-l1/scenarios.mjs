@@ -1,3 +1,4 @@
+import { createMobileTaskConsistencyScenarios } from './mobileTaskConsistencyScenarios.mjs'
 import { createGlobalDensityOptimizationScenarios } from './globalDensityOptimizationScenarios.mjs'
 import { createInformationDensityExtras } from './informationDensityExtras.mjs'
 import { createInformationDensityScenarios } from './informationDensityScenarios.mjs'
@@ -642,6 +643,7 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createMobileEntryAuditScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileTaskBusinessScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createMobileTaskConsistencyScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileScrollScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileWorkflowTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskLinkScenarios({ ...deps, customerRuntimeEffectiveSession }),

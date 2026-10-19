@@ -32,10 +32,10 @@ test('task navigation keeps account, source record and original history when ret
   }
 })
 
-test('mobile business routes stay inside the same role shell and recover without a history index', () => {
+test('mobile document targets stay in task management and recover without a history index', () => {
   const path = mobileBusinessPath('/erp/production/orders?production_order_id=7', 'warehouse')
-  assert.equal(path, '/m/warehouse/handle/production/orders?production_order_id=7')
-  assert.equal(canonicalBusinessPath(path), '/erp/production/orders?production_order_id=7')
+  assert.equal(path, '/m/warehouse/tasks')
+  assert.equal(canonicalBusinessPath(path), '/m/warehouse/tasks')
   assert.equal(mobileBusinessRole(path), 'warehouse')
   assert.equal(mobileBusinessRole('/m/warehouse'), 'warehouse')
   assert.equal(mobileBusinessRole('/m/warehouse/unavailable'), 'warehouse')
@@ -50,9 +50,9 @@ test('mobile business routes stay inside the same role shell and recover without
   assert.deepEqual(workflowTaskEntryNavigation({ id: 8 }, '//untrusted.example', '/m/warehouse/tasks', 1), {})
 })
 
-test('object navigation preserves the mobile role, search and hash without changing desktop navigation', () => {
+test('object navigation drops document filters on the phone and preserves desktop targets', () => {
   const target = { pathname: '/erp/production/progress', search: '?view=exceptions&source_id=7', hash: '#details' }
-  assert.deepEqual(mobileBusinessPath(target, 'production'), { pathname: '/m/production/handle/production/progress', search: target.search, hash: target.hash })
+  assert.deepEqual(mobileBusinessPath(target, 'production'), { pathname: '/m/production/tasks', search: '', hash: '' })
   assert.equal(mobileBusinessPath(target, ''), target)
   assert.deepEqual(mobileBusinessPath({ pathname: '/erp/task-board', search: '?tracking=visible&track_source_id=7' }, 'sales'), { pathname: '/m/sales/tasks', search: '?tracking=visible&track_source_id=7', hash: '' })
   assert.equal(mobileBusinessPath('/erp', 'warehouse'), '/m/warehouse/tasks')

@@ -23,10 +23,41 @@ import {
 } from "./transaction-flow-fields-browser.mjs";
 import {
   stopOwnedService,
+  ownedServiceIsListening,
+  transactionBrowserBudget,
   verifyTransactionRequestLogs,
 } from "./transaction-browser-isolated.mjs";
 
 const runID = "transaction_guard";
+test('完整任务链和窄范围使用各自有界预算，非法范围在创建资源前拒绝', () => {
+  assert.deepEqual(transactionBrowserBudget(), { browserTimeoutMS: 720000, runTimeoutMS: 1500000 });
+  for (const scope of [{ sourceOrdersOnly: true }, { receivingOnly: true }, { desktopVariantsOnly: true }]) {
+    assert.deepEqual(transactionBrowserBudget(scope), { browserTimeoutMS: 480000, runTimeoutMS: 900000 });
+  }
+  for (const scope of [{ sourceOrdersOnly: true, receivingOnly: true }, { sourceOrdersOnly: 'true' }, { receivingOnly: 1 }, { desktopVariantsOnly: 1 }, { sourceOrdersOnly: true, desktopVariantsOnly: true }, { receivingOnly: true, desktopVariantsOnly: true }]) assert.throws(() => transactionBrowserBudget(scope));
+});
+test('隔离入口复用平台端口表，仍只接受本轮实际监听PID', async () => {
+  const child = { pid: 123 };
+  const native = (pid) => `,state,\nowned.${pid},,\ntcp4 127.0.0.1:15401<->*:*,Listen,\n`;
+  const output = (pid) => process.platform === 'darwin' ? native(pid) : `p${pid}\n`;
+  const inspect = async (command, args) => {
+    if (process.platform === 'darwin') {
+      assert.equal(command, 'nettop');
+      assert.deepEqual(args, ['-L', '1', '-n', '-m', 'tcp', '-J', 'state']);
+    } else {
+      assert.equal(command, 'lsof');
+      assert.deepEqual(args, ['-nP', '-a', '-iTCP:15401', '-sTCP:LISTEN', '-Fp']);
+    }
+    return { stdout: output(123) };
+  };
+  assert.equal(await ownedServiceIsListening(child, 15401, inspect), true);
+  if (process.platform === 'darwin') assert.equal(await ownedServiceIsListening(child, 15401, async () => ({ stdout: ',state,\n' })), false);
+  await assert.rejects(ownedServiceIsListening(child, 15401, async () => ({ stdout: output(456) })), /exact owned service/u);
+  await assert.rejects(ownedServiceIsListening(child, 15401, async () => ({ stdout: 'unrecognized output' })), /无法识别/u);
+  await assert.rejects(ownedServiceIsListening(child, 15401, async () => { throw new Error('inspection timeout') }), /inspection timeout/u);
+  await assert.rejects(ownedServiceIsListening(child, 0, inspect));
+});
+
 const fulfillmentCatalog = JSON.parse(
   await fs.readFile(
     new URL(
@@ -56,12 +87,13 @@ test("document navigation and close drain attachment reads started by the mounte
   const downloads = [];
   let frames = 0;
   let closed = false;
-  const counts = { started: 0, completed: 0, failed: 0, navigationAborted: 0 };
+  const counts = { started: 0, completed: 0, failed: 0, navigationAborted: 0, scopeAborted: 0 };
+  let classified = 0;
   const page = {
     pendingRPC: pending,
     rpcResponses: responses,
     rpcRecorded: 0,
-    rpcNetwork: { counts },
+    rpcNetwork: { counts, unclassifiedCancellations: new Map(), flushCancellations: async () => { classified++; } },
     evaluate: (callback) => callback(),
     async waitForLoadState(state) {
       assert.equal(state, "networkidle");
@@ -108,6 +140,7 @@ test("document navigation and close drain attachment reads started by the mounte
   assert.equal(counts.completed, 3);
   assert.equal(page.rpcRecorded, 3);
   assert.equal(pending.size, 0);
+  assert.equal(classified, 6, 'both network drains on each side of navigation and context disposal must classify all canceled requests');
 });
 
 test("lost-response removal waits for the real abort and captures only one request", async () => {
@@ -119,6 +152,7 @@ test("lost-response removal waits for the real abort and captures only one reque
     .then(() => { recovered = true; });
   const page = {
     expectedRPCFailures: new Map(),
+    rpcNetwork: { flushCancellations: async () => {} },
     pendingRPC: new Set(["list_purchase_returns"]),
     rpcResponses: new Set([recovery]),
     evaluate: async () => {},
@@ -314,16 +348,22 @@ function completeReport() {
         stage: "finished_goods_inbound",
         stock: { quantity: 2, net: 2, txns: 1 },
         readiness: { pendingInspection: 2, pendingPackaging: 0, ready: 0 },
+        visibleReadiness: { pendingInspection: 2, pendingPackaging: 0, ready: 0 },
+        inventoryRecordID: 301,
       },
       {
         stage: "finished_quality_passed",
         stock: { quantity: 2, net: 2, txns: 1 },
         readiness: { pendingInspection: 0, pendingPackaging: 2, ready: 0 },
+        visibleReadiness: { pendingInspection: 0, pendingPackaging: 2, ready: 0 },
+        inventoryRecordID: 301,
       },
       {
         stage: "packaging_completed",
         stock: { quantity: 2, net: 2, txns: 1 },
         readiness: { pendingInspection: 0, pendingPackaging: 0, ready: 2 },
+        visibleReadiness: { pendingInspection: 0, pendingPackaging: 0, ready: 2 },
+        inventoryRecordID: 301,
       },
     ],
     qualityBlockedTransfer: true,
@@ -347,6 +387,24 @@ function completeReport() {
     ],
   };
   return {
+    requestCancellation: {
+      domainDataUnchanged: true,
+      cases: [
+        ['sales-superseded', [['list_sales_orders', 'scope_superseded'], ['get_sales_order', 'scope_superseded']]],
+        ['sales-document-reload', [['list_sales_orders', 'document_navigation']]],
+        ['sales-unexplained-abort-retry', undefined, 'list_sales_orders'],
+        ['mobile-quality-disposed-390', [['explain_action_access', 'scope_disposed']]],
+        ['mobile-quality-unexplained-abort-retry-390', undefined, 'explain_action_access'],
+        ['mobile-quality-disposed-320', [['explain_action_access', 'scope_disposed']]],
+        ['mobile-quality-unexplained-abort-retry-320', undefined, 'explain_action_access'],
+      ].map(([key, expectedCancellations, expectedFailure]) => ({
+        key, passed: true, expectedCancellations, expectedFailure, screenshots: ['verified.png'], viewport: { overflow: 0 },
+        browserRPC: [{ code: 0, http: 200 }],
+        networkPages: [{ cancellations: (expectedCancellations || []).map(([method, category]) => ({ requestId: 'normal', method, category })) }],
+        pageErrors: expectedFailure ? [{ method: expectedFailure, message: 'Unexpected RPC transport failure', failure: { requestID: 'failed', errorText: 'net::ERR_ABORTED', canceled: true }, cancellationClassification: 'cancellation_without_lifecycle_evidence' }] : [],
+        ...(expectedFailure ? { errorVisible: true, recovered: true } : {}),
+      })),
+    },
     fieldAudit: {
       tables: FLOW_FIELD_AUDIT_TABLES.length,
       columns: 1284,
@@ -389,6 +447,7 @@ function completeReport() {
       key,
       passed: true,
       transportFault: { injected: true, backendCode: 0 },
+      ...(key.endsWith("quality") ? { correctionSurface: "real browser", correctionCreatedInBrowser: true, correctionReasonRequired: true, correctionReplayAfterDecisionExact: true, transportFaults: [{ method: "correct_quality_inspection_result", injected: true, backendCode: 0, requestID: `correction-${key}` }] } : {}),
       ...(key.endsWith("production") ? structuredClone(productionFields) : {}),
       ...(key.endsWith("shipment")
         ? {
@@ -482,6 +541,8 @@ test("real request logs must correlate success, rejection and lost responses wit
 test("partial flows, zero execution, browser errors and failed real writes cannot become a green report", () => {
   assert.doesNotThrow(() => assertTransactionBrowserReport(completeReport()));
   for (const mutate of [
+    (report) => { delete report.requestCancellation; },
+    (report) => { report.requestCancellation.cases.pop(); },
     (report) => {
       report.fieldAudit.pages.pop();
     },
@@ -509,6 +570,10 @@ test("partial flows, zero execution, browser errors and failed real writes canno
     (report) => {
       report.mobileTasks = [];
     },
+    (report) => { report.flows.find(({ key }) => key === "quality").correctionCreatedInBrowser = false; },
+    (report) => { report.flows.find(({ key }) => key === "mobile_quality").correctionReasonRequired = false; },
+    (report) => { report.flows.find(({ key }) => key === "quality").transportFaults = []; },
+    (report) => { report.flows.find(({ key }) => key === "mobile_quality").correctionReplayAfterDecisionExact = false; },
     (report) => {
       report.flows.find(({ key }) => key === "production").actions.pop();
     },
@@ -521,6 +586,12 @@ test("partial flows, zero execution, browser errors and failed real writes canno
       report.flows.find(
         ({ key }) => key === "production",
       ).fulfillment[1].readiness.ready = 2;
+    },
+    (report) => {
+      report.flows.find(({ key }) => key === 'mobile_production').fulfillment[1].visibleReadiness.ready = 2;
+    },
+    (report) => {
+      delete report.flows.find(({ key }) => key === 'mobile_production').fulfillment[2].inventoryRecordID;
     },
     (report) => {
       report.flows.find(

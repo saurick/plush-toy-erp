@@ -196,7 +196,7 @@ test("manual acceptance projects all registered chain steps and legal scenarios"
   const contract = buildManualAcceptanceBusinessChainContract();
 
   assert.equal(contract.chainCount, 11);
-  assert.equal(contract.stepCount, 77);
+  assert.equal(contract.stepCount, 82);
   assert.equal(contract.scenarioCount, 66);
   assert.equal(contract.chains.length, 11);
   for (const chain of contract.chains) {
@@ -281,7 +281,7 @@ test("manual acceptance review plan is a readable projection of registered steps
   });
 
   assert.equal(review.chainCount, 11);
-  assert.equal(review.stepCount, 77);
+  assert.equal(review.stepCount, 82);
   assert.equal(review.scenarioCount, 66);
   assert.equal(review.dataStageCount, 9);
   assert.deepEqual(

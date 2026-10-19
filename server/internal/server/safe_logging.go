@@ -58,6 +58,8 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 				fields = append(fields, "rpc.service", route, "rpc.method", method)
 				outcome := requestOutcome(req, reply, err)
 				switch outcome {
+				case "canceled":
+					level = log.LevelInfo
 				case "error":
 					level = log.LevelError
 				case "rejected":

@@ -57,64 +57,45 @@ export function createUnifiedInteractionScenarios({
     ...createProductionTabStabilityScenarios({ common, outputDir, assertNoHorizontalOverflow, clickERPThemeOption }),
     {
       ...common,
-      name: 'unified-production-overview-details',
-      path: '/erp/production/orders',
+      name: 'unified-production-execution-details',
+      path: '/erp/production/progress?display=process',
       productionOrderReleased: true,
       verify: async (page) => {
-        await page
-          .getByRole('heading', { name: '生产管理', exact: true })
-          .waitFor()
-        await assertBusinessViewMotion(page, 'production-overview', outputDir)
-        const panel = page.getByRole('region', {
-          name: '生产总览',
-          exact: true,
-        })
-        await panel.locator('.erp-production-overview__row').first().waitFor()
+        await page.getByRole('heading', { name: '生产管理', exact: true }).waitFor()
+        const navigation = page.getByLabel('生产管理页面', { exact: true })
+        assert.deepEqual(await navigation.getByRole('tab').allTextContents(), ['生产订单', '生产执行', '生产记录', '异常处理'])
+        const strip = await navigation.locator('.ant-tabs-nav-list').elementHandle()
+        const panel = page.getByRole('region', { name: '生产执行', exact: true })
+        await panel.getByRole('table', { name: '当前生产事项' }).waitFor()
+        await assertBusinessViewMotion(page, 'production-execution', outputDir, { presentationSelector: '.erp-production-process__layout .ant-segmented-group' })
+        await panel.locator('.erp-production-process__lane').first().waitFor()
         assert.equal(await page.locator('.erp-business-operation-panel__selection').count(), 0)
         assert.equal(await page.getByRole('button', { name: /列设置|新建生产订单/ }).count(), 0)
-        assert.equal(await panel.locator('.erp-production-overview__status-rail').count(), 0)
-        assert.match(await panel.locator('.erp-business-visual-metrics').textContent(), /不限提醒.*张/u)
-        const overviewRefresh = page.waitForResponse((response) => {
+        const orderRefresh = page.waitForResponse((response) => {
           if (!response.url().endsWith('/rpc/production_order')) return false
-          const request = response.request()
-          const payload = request.postDataJSON()
-          return (
-            payload?.method === 'list_production_orders' &&
-            payload.params?.limit === 200
-          )
+          const { method, params } = response.request().postDataJSON() || {}
+          return method === 'list_production_orders' && params?.lifecycle_scope === 'all' && params?.sort_by === 'updated_at' && params?.sort_direction === 'desc'
         })
-        await page.getByRole('button', { name: '刷新当前页' }).click()
-        await overviewRefresh
-        await panel.locator('.erp-production-overview__row').first().waitFor()
+        const progressRefresh = page.waitForResponse((response) => response.url().endsWith('/rpc/production_wip') && response.request().postDataJSON()?.method === 'get_production_wip')
+        await page.getByRole('button', { name: '刷新当前页', exact: true }).click()
+        await Promise.all([orderRefresh, progressRefresh])
+        await panel.locator('.erp-production-process__lane').first().waitFor()
         for (const width of [1440, 820, 390]) {
           await page.setViewportSize({ width, height: 900 })
-          await assertNoHorizontalOverflow(page, `production-overview-${width}`)
-          await captureBusinessView(
-            page,
-            panel,
-            'production-overview',
-            width,
-            outputDir
-          )
+          await assertNoHorizontalOverflow(page, `production-execution-${width}`)
+          await captureBusinessView(page, panel, 'production-execution', width, outputDir)
         }
         await clickERPThemeOption(page, '暗色')
-        await captureBusinessView(
-          page,
-          panel,
-          'production-overview-dark',
-          390,
-          outputDir
-        )
-        await panel
-          .getByRole('button', { name: /查看工序/ })
-          .first()
-          .click()
-        await page.waitForURL(/\/erp\/production\/progress/)
-        await page
-          .getByRole('region', { name: '生产工序', exact: true })
-          .locator('.erp-production-process__lane')
-          .first()
-          .waitFor()
+        await captureBusinessView(page, panel, 'production-execution-dark', 390, outputDir)
+        await navigation.getByRole('tab', { name: '生产记录', exact: true }).click()
+        await page.locator('.erp-production-record-workspace .ant-table-wrapper').waitFor()
+        assert.equal(await strip.evaluate((node) => node.isConnected), true)
+        await navigation.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await panel.locator('.erp-production-process__lane').first().waitFor()
+        assert.equal(await strip.evaluate((node) => node.isConnected), true)
+        await panel.getByRole('button', { name: '打开生产订单', exact: true }).click()
+        await page.waitForURL((url) => url.pathname === '/erp/production/orders' && url.searchParams.get('production_order_id') === '71')
+        await page.getByRole('heading', { name: '生产管理', exact: true }).waitFor()
       },
     },
     {

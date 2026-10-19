@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import useBusinessSearchParams from '../../hooks/useBusinessSearchParams.js'
+
 import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import useBusinessPageState from '../../hooks/useBusinessPageState.js'
 import { message } from '@/common/utils/antdApp'
@@ -32,7 +33,7 @@ export function useOperationalFactQuery({
   viewOverrides,
   adminProfile,
 }) {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
 
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
 

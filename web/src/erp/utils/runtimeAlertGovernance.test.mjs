@@ -89,7 +89,6 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
     'PermissionAccessOverview',
     'PermissionChecklist',
     'RoleAssociatedAccounts',
-    'RoleNavigationEditor',
   ].map((name) => read(`web/src/erp/components/permission-center/${name}.jsx`))
   assert(
     [permissionCenter, ...permissionViews].reduce(
@@ -107,8 +106,8 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
 
   assert.match(production, /message="请先选择本次外发的材料/u)
   assert.match(
-    read('web/src/erp/components/permission-center/RoleNavigationEditor.jsx'),
-    /message="部分已保存页面当前不可进入"/u
+    read('web/src/erp/components/permission-center/PermissionAccessOverview.jsx'),
+    /message="暂不能生成岗位菜单"/u
   )
   assert.match(shipment, /message="预计总净重暂不可计算"/u)
   assert.match(financeViews[1], /message="当前没有可核销的应收或应付记录"/u)

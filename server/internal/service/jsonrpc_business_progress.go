@@ -84,6 +84,9 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 		result, err = d.businessProgressUC.List(ctx, q)
 	}
 	if err != nil {
+		if result := canceledRequestResult(ctx, err); result != nil {
+			return id, result, nil
+		}
 		switch {
 		case errors.Is(err, biz.ErrForbidden):
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil

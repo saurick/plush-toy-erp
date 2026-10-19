@@ -2,10 +2,6 @@ import {
   getRoleHelpGuide,
   getRoleHelpGuidesForProfile,
 } from './roleHelpContent.mjs'
-import {
-  getBusinessModuleSidebarKey,
-  projectRoleGuidedModuleNavigation,
-} from '../utils/businessModuleGroups.mjs'
 
 export const DEFAULT_ROLE_PRIMARY_LIMIT = 3
 export const MAX_ROLE_PRIMARY_LIMIT = 5
@@ -228,43 +224,6 @@ function consumeQueuesRoundRobin(queues, addPath) {
   }
 }
 
-export function reconcileRoleNavigationPaths({
-  effectivePaths = [],
-  primaryMenuPaths = [],
-  secondaryMenuPaths = [],
-} = {}) {
-  const orderedEffectivePaths = normalizeMenuPaths(effectivePaths)
-  const effectivePathSet = new Set(orderedEffectivePaths)
-  const primaryModules = new Set()
-  const primary = normalizeMenuPaths(primaryMenuPaths)
-    .filter((path) => effectivePathSet.has(path))
-    .filter((path) => {
-      const key = getBusinessModuleSidebarKey(path)
-      if (primaryModules.has(key)) return false
-      primaryModules.add(key)
-      return true
-    })
-    .slice(0, MAX_ROLE_PRIMARY_LIMIT)
-  if (primary.length === 0 && orderedEffectivePaths.length > 0) {
-    primary.push(orderedEffectivePaths[0])
-  }
-  const primaryPathSet = new Set(primary)
-  const secondary = normalizeMenuPaths(secondaryMenuPaths).filter(
-    (path) => effectivePathSet.has(path) && !primaryPathSet.has(path)
-  )
-  const secondaryPathSet = new Set(secondary)
-  orderedEffectivePaths.forEach((path) => {
-    if (!primaryPathSet.has(path) && !secondaryPathSet.has(path)) {
-      secondary.push(path)
-      secondaryPathSet.add(path)
-    }
-  })
-  return {
-    primaryMenuPaths: primary,
-    secondaryMenuPaths: secondary,
-  }
-}
-
 export function buildRoleGuidedNavigation({
   visibleSections = [],
   adminProfile = {},
@@ -408,53 +367,4 @@ export function buildRoleGuidedNavigation({
     secondarySections,
     secondaryItemCount: secondaryItems.length,
   }
-}
-
-export function buildRoleGuidedNavigationPreview({
-  navigationSections = [],
-  effectiveAccess = null,
-  roleKey = '',
-  navigationMode = ROLE_NAVIGATION_MODES.RECOMMENDED,
-  primaryMenuPaths = [],
-  secondaryMenuPaths = [],
-  primaryLimit,
-} = {}) {
-  const effectivePathSet = new Set(
-    (Array.isArray(effectiveAccess?.pages) ? effectiveAccess.pages : [])
-      .filter((page) => page?.effective === true)
-      .map((page) => String(page?.path || '').trim())
-      .filter(Boolean)
-  )
-  const visibleSections = normalizeSections(navigationSections)
-    .map((section) => ({
-      ...section,
-      items: section.items.filter(
-        (item) =>
-          item?.access === 'authenticated' || effectivePathSet.has(item?.path)
-      ),
-    }))
-    .filter((section) => section.items.length > 0)
-  const normalizedRoleKey = String(roleKey || '').trim()
-
-  return projectRoleGuidedModuleNavigation(
-    buildRoleGuidedNavigation({
-      visibleSections,
-      adminProfile: {
-        roles: normalizedRoleKey
-          ? [
-              {
-                role_key: normalizedRoleKey,
-                navigation_mode: navigationMode,
-                primary_menu_paths: primaryMenuPaths,
-                secondary_menu_paths: secondaryMenuPaths,
-              },
-            ]
-          : [],
-        effective_session: {
-          roles: normalizedRoleKey ? [normalizedRoleKey] : [],
-        },
-      },
-      primaryLimit,
-    })
-  )
 }

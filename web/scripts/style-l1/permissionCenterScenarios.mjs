@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import {
   assertBusinessFormPage,
   closeBusinessFormPage,
@@ -76,6 +77,70 @@ export function createPermissionCenterScenarios({
     assert.match(String(await tooltip.textContent()).trim(), expectedText)
     await trigger.evaluate((node) => node.blur())
     await tooltip.waitFor({ state: 'hidden', timeout: 10_000 })
+  }
+  const verifyCurrentRoleNavigation = async (page, { mobile = false } = {}) => {
+    let accessReads = 0
+    const writes = []
+    page.on('request', (request) => {
+      if (!request.url().endsWith('/rpc/admin')) return
+      const body = request.postDataJSON()
+      if (body?.method === 'get_effective_role_access') accessReads += 1
+      if (body?.method === 'set_role_settings') writes.push(body.params)
+    })
+    await expectHeading(page, '权限管理')
+    await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+    const save = page.getByRole('button', { name: '保存岗位设置', exact: true })
+    const preview = page.getByRole('region', { name: '岗位实际菜单' })
+    await preview.waitFor()
+    assert.equal(await save.isDisabled(), true)
+    assert.deepEqual(await preview.locator('.erp-role-navigation-preview__group > .ant-typography').allTextContents(), ['工作中心', '业务模块', '工具与查询', '系统与帮助'])
+    assert.equal(await page.getByRole('tab', { name: '菜单排列', exact: true }).count(), 0)
+    assert.equal(await page.locator('.erp-role-navigation-editor').count(), 0)
+    await assertTextAbsent(preview, '常用工作')
+    await assertTextAbsent(preview, '系统推荐')
+    const readCount = accessReads
+    const tabsBefore = await page.locator('.erp-role-navigation-workspace-tabs .ant-tabs-nav').boundingBox()
+    await page.getByRole('tab', { name: '页面访问', exact: true }).click()
+    await page.locator('.erp-role-effective-access__results').waitFor()
+    await page.getByRole('group', { name: '筛选页面访问' }).getByRole('button', { name: /不可进入/u }).click()
+    await page.getByRole('tab', { name: '实际菜单', exact: true }).click()
+    await preview.waitFor()
+    const tabsAfter = await page.locator('.erp-role-navigation-workspace-tabs .ant-tabs-nav').boundingBox()
+    assert(Math.abs(tabsAfter.y - tabsBefore.y) < 1 && Math.abs(tabsAfter.height - tabsBefore.height) < 1, '只读视图切换应保持页签条位置稳定')
+    assert.equal(accessReads, readCount, '切换菜单与页面访问不应重新读取权限解释')
+    assert.equal(await save.isDisabled(), true)
+    const geometry = await preview.evaluate((root) => ({
+      columns: getComputedStyle(root.querySelector('.erp-role-navigation-preview__grid')).gridTemplateColumns.split(' ').length,
+      overflow: root.scrollWidth > root.clientWidth + 1,
+    }))
+    assert.equal(geometry.columns, mobile ? 1 : 4)
+    assert.equal(geometry.overflow, false)
+    await assertNoHorizontalOverflow(page, '岗位实际菜单')
+    assert.equal(writes.length, 0, '只查看导航不得写入岗位设置')
+    if (mobile) return
+
+    await page.getByRole('tab', { name: '岗位设置', exact: true }).click()
+    await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).uncheck()
+    await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
+    await preview.getByText('未保存的功能草稿', { exact: true }).waitFor()
+    assert.equal(await save.isEnabled(), true)
+    await save.click()
+    await page.locator('.erp-role-center-save-status').getByText('当前设置已保存', { exact: true }).waitFor()
+    assert.equal(writes.length, 1)
+    assert.equal(writes[0].expected_version, 1)
+    assert.equal(writes[0].navigation_mode, 'recommended')
+    assert.deepEqual(writes[0].primary_menu_paths, [])
+    assert.deepEqual(writes[0].secondary_menu_paths, [])
+    assert.equal(writes[0].data_scopes.length, 1)
+    assert.equal(writes[0].data_scopes[0].resource_type, 'warehouse')
+    assert.equal(writes[0].permission_keys.includes(PermissionCode.SALES_ORDER_READ), false)
+    assert.equal(await save.isDisabled(), true)
+    await page.reload()
+    await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+    await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
+    await preview.waitFor()
+    assert.equal(await preview.getByText(/销售管理/u).count(), 0)
+    assert.equal(await save.isDisabled(), true)
   }
   return [
     ...createPermissionRoleSwitchScenarios(),
@@ -963,7 +1028,7 @@ export function createPermissionCenterScenarios({
         )
         assert.doesNotMatch(
           await receivablesMenuRow.getAttribute('title'),
-          /常用工作/u
+          /业务模块 \/ 财务管理/u
         )
         await assertTextAbsent(page, '预计显示')
         await assertTextAbsent(page, '草稿会显示')
@@ -989,7 +1054,7 @@ export function createPermissionCenterScenarios({
         )
         assert.match(
           await receivablesMenuRow.getAttribute('title'),
-          /常用工作/u
+          /业务模块 \/ 财务管理/u
         )
         await assertTextAbsent(page, '预计显示')
         const settledStatusBox = await receivablesMenuRow
@@ -1047,7 +1112,7 @@ export function createPermissionCenterScenarios({
           '.erp-role-navigation-workspace-tabs'
         )
         const navigationLayoutTab = navigationWorkspaceTabs.getByRole('tab', {
-          name: '菜单排列',
+          name: '实际菜单',
         })
         const pageAccessTab = navigationWorkspaceTabs.getByRole('tab', {
           name: /^页面访问$/u,
@@ -1058,11 +1123,9 @@ export function createPermissionCenterScenarios({
           '页面与导航应默认进入岗位导航'
         )
         await pageAccessTab.waitFor({ state: 'visible' })
-        await expectText(page, '设置岗位导航')
-        await expectText(page, '系统按岗位推荐常用模块')
-        await expectText(page, '导航位置预览')
+        await expectText(page, '侧栏入口')
         await expectText(page, '工作中心')
-        await expectText(page, '常用工作')
+        await assertTextAbsent(page, '常用工作')
         await expectText(page, '工具与查询')
         await expectText(page, '系统与帮助')
         await assertTextAbsent(page, '更多功能')
@@ -1119,8 +1182,8 @@ export function createPermissionCenterScenarios({
         })
         assert(
           navigationPreviewMetrics.hasPreview &&
-            navigationPreviewMetrics.groupCount === 5 &&
-            navigationPreviewMetrics.columns.split(' ').length === 3 &&
+            navigationPreviewMetrics.groupCount === 4 &&
+            navigationPreviewMetrics.columns.split(' ').length === 4 &&
             navigationPreviewMetrics.scrollWidth <=
               navigationPreviewMetrics.clientWidth + 1,
           `权限中心导航预览桌面布局异常: ${JSON.stringify(navigationPreviewMetrics)}`
@@ -1128,54 +1191,7 @@ export function createPermissionCenterScenarios({
         await page.locator('.erp-role-navigation-preview').screenshot({
           path: 'output/playwright/style-l1/permission-center-navigation-preview.png',
         })
-        await page
-          .locator(
-            '.erp-role-navigation-editor__head > .ant-select .ant-select-selector'
-          )
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '自定义布局' })
-          .click()
-        await page.keyboard.press('Escape')
-        await page.waitForTimeout(350)
-        const moveToSecondary = page.getByRole('button', {
-          name: '移到其他 库存管理',
-        })
-        await moveToSecondary.focus()
-        await page.keyboard.press('Enter')
-        await page.getByRole('button', { name: '移到常用 库存管理' }).focus()
-        await page.keyboard.press('Enter')
-        await page.getByRole('button', { name: '上移 库存管理' }).click()
-        await page.getByRole('button', { name: '上移 库存管理' }).click()
-        const customPrimaryOrder = await page.evaluate(() => {
-          const groups = Array.from(
-            document.querySelectorAll('.erp-role-navigation-preview__group')
-          )
-          const primaryGroup = groups.find((group) =>
-            String(group.textContent || '').includes('常用工作')
-          )
-          return Array.from(
-            primaryGroup?.querySelectorAll('.ant-tag') || []
-          ).map((item) =>
-            String(item.textContent || '')
-              .trim()
-              .replace(/^\d+\.\s*/u, '')
-          )
-        })
-        assert.deepEqual(
-          customPrimaryOrder,
-          ['库存管理', '基础资料', '销售管理'],
-          `权限中心应即时按自定义顺序预览常用入口: ${JSON.stringify(customPrimaryOrder)}`
-        )
-        await page.locator('.erp-role-navigation-editor').screenshot({
-          path: 'output/playwright/style-l1/permission-center-navigation-custom.png',
-        })
-        await page.getByRole('button', { name: '保存岗位设置' }).click()
-        await expectText(page, '岗位设置已更新，相关账号刷新后生效')
-        await expectText(page, '自定义布局')
-        await expectText(page, '已保存')
-        await page.waitForTimeout(350)
+        assert.equal(await page.getByRole('button', { name: '保存岗位设置' }).isDisabled(), true)
         await pageAccessTab.click()
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-permission-map.png',
@@ -1589,587 +1605,22 @@ export function createPermissionCenterScenarios({
         })
       },
     },
-    ...['light', 'dark'].map((themeMode) => ({
-      name: `permission-center-module-default-${themeMode}`,
-      path: '/erp/system/permissions',
-      auth: 'admin',
-      themeMode,
-      viewport:
-        themeMode === 'dark'
-          ? { width: 390, height: 844 }
-          : { width: 1486, height: 1000 },
-      verify: async (page) => {
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '财务' })
-          .click()
-        for (const name of [
-          '查看应收',
-          '查看应付',
-          '查看收付款',
-          '查看对账',
-          '查看发票',
-        ]) {
-          await page.getByRole('checkbox', { name, exact: true }).check()
-        }
-        await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
-        await page.locator('.erp-role-navigation-preview__grid').waitFor()
-        const modeDropdown = await openControlledAntSelectDropdown(page, page.locator('.erp-role-navigation-editor__head > .ant-select:not(.ant-select-disabled)'), '岗位导航排列方式')
-        await modeDropdown.locator('.ant-select-item-option').filter({ hasText: '自定义布局' }).click()
-        await page.keyboard.press('Escape')
-        const finance = page.locator(
-          '[data-navigation-module="module:finance"]'
-        )
-        assert.equal(await finance.count(), 1)
-        const defaultDropdown = await openControlledAntSelectDropdown(page, finance.locator('.ant-select'), '财务管理默认页面')
-        const choices = defaultDropdown.locator('.ant-select-item-option')
-        assert.equal(await choices.count(), 5)
-        await choices.filter({ hasText: '收付款核销' }).click()
-        await page.keyboard.press('Escape')
-        assert.equal(
-          await finance.getAttribute('data-navigation-path'),
-          '/erp/finance/payments'
-        )
-        await page.getByRole('tab', { name: '页面访问', exact: true }).click()
-        const moduleDropdown = await openControlledAntSelectDropdown(
-          page,
-          page.locator('.erp-role-effective-access__toolbar > .ant-select'),
-          '筛选业务模块'
-        )
-        await selectVirtualizedAntOption(page, moduleDropdown, {
-          label: '筛选业务模块',
-          optionLabel: '财务管理（5）',
-        })
-        await page.keyboard.press('Escape')
-        assert.equal(
-          await page.locator('.erp-role-effective-access__page').count(),
-          5
-        )
-        assert.equal(
-          await page.locator('.erp-role-effective-access__module').count(),
-          1
-        )
-        await page.getByRole('tab', { name: '菜单排列', exact: true }).click()
-        const save = page.waitForRequest(
-          (request) =>
-            request.url().includes('/rpc/admin') &&
-            request.postDataJSON()?.method === 'set_role_settings'
-        )
-        await page
-          .getByRole('button', { name: '保存岗位设置', exact: true })
-          .click()
-        const { params } = (await save).postDataJSON()
-        const allPaths = [
-          ...params.primary_menu_paths,
-          ...params.secondary_menu_paths,
-        ]
-        const financialPaths = allPaths.filter((value) =>
-          value.startsWith('/erp/finance/')
-        )
-        assert.equal(financialPaths.length, 5)
-        assert.equal(new Set(financialPaths).size, 5)
-        assert.deepEqual(
-          params.primary_menu_paths.filter((value) =>
-            value.startsWith('/erp/finance/')
-          ),
-          ['/erp/finance/payments']
-        )
-        await expectText(page, '岗位设置已更新，相关账号刷新后生效')
-        await page.reload()
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '财务' })
-          .click()
-        await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
-        await page
-          .locator(
-            '[data-navigation-module="module:finance"][data-navigation-path="/erp/finance/payments"]'
-          )
-          .waitFor()
-        assert.equal(await finance.count(), 1)
-        await assertNoHorizontalOverflow(
-          page,
-          `permission-center-module-default-${themeMode}`
-        )
-        await page.screenshot({
-          path: `output/playwright/style-l1/permission-center-module-default-${themeMode}.png`,
-          fullPage: true,
-        })
-      },
-    })),
     {
       name: 'permission-center-role-navigation-desktop',
-      path: '/erp/system/permissions',
+      path: '/erp/system/permissions?tab=navigation',
       auth: 'admin',
-      viewport: { width: 1486, height: 1058 },
-      verify: async (page) => {
-        let effectiveAccessRequestCount = 0
-        page.on('request', (request) => {
-          if (
-            request.url().includes('/rpc/admin') &&
-            request.postDataJSON()?.method === 'effective_role_access'
-          ) {
-            effectiveAccessRequestCount += 1
-          }
-        })
-        const readNavigationPreview = () =>
-          page.evaluate(() => {
-            return Array.from(
-              document.querySelectorAll('.erp-role-navigation-preview__group')
-            ).map((group) => ({
-              title: String(
-                group.querySelector('.ant-typography')?.textContent || ''
-              ).trim(),
-              items: Array.from(group.querySelectorAll('.ant-tag')).map(
-                (item) =>
-                  String(item.textContent || '')
-                    .trim()
-                    .replace(/^\d+\.\s*/u, '')
-              ),
-            }))
-          })
-
-        await expectHeading(page, '权限管理')
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '业务' })
-          .click()
-        await page.getByRole('tab', { name: /岗位导航/u }).click()
-        assert.equal(
-          await page
-            .getByRole('tab', { name: '菜单排列' })
-            .getAttribute('aria-selected'),
-          'true',
-          '页面与导航应默认进入岗位导航'
-        )
-        await page.getByRole('tab', { name: /页面访问/u }).waitFor({
-          state: 'visible',
-        })
-        await expectText(page, '设置岗位导航')
-        await expectText(page, '系统按岗位推荐常用模块')
-        await expectText(page, '导航位置预览')
-
-        await page
-          .locator(
-            '.erp-role-navigation-editor__head > .ant-select .ant-select-selector'
-          )
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '自定义布局' })
-          .click()
-        await page.keyboard.press('Escape')
-        await expectText(page, '常用工作需保留 1–5 个入口')
-
-        const customLayoutMetrics = await page.evaluate(() => {
-          const editor = document.querySelector('.erp-role-navigation-editor')
-          const columns = editor?.querySelector(
-            '.erp-role-navigation-editor__columns'
-          )
-          const columnItems = columns?.querySelectorAll(
-            '.erp-role-navigation-editor__column'
-          )
-          return {
-            columnCount: columnItems?.length || 0,
-            gridTemplateColumns: columns
-              ? window.getComputedStyle(columns).gridTemplateColumns
-              : '',
-            editorScrollWidth: editor?.scrollWidth || 0,
-            editorClientWidth: editor?.clientWidth || 0,
-          }
-        })
-        assert(
-          customLayoutMetrics.columnCount === 2 &&
-            customLayoutMetrics.gridTemplateColumns.split(' ').length === 2 &&
-            customLayoutMetrics.editorScrollWidth <=
-              customLayoutMetrics.editorClientWidth + 1,
-          `权限中心双列表桌面布局异常: ${JSON.stringify(customLayoutMetrics)}`
-        )
-
-        const moveSalesOrderToSecondary = page.getByRole('button', {
-          name: '移到其他 销售管理',
-        })
-        await moveSalesOrderToSecondary.focus()
-        await page.keyboard.press('Enter')
-        assert.equal(
-          await page
-            .getByRole('button', { name: '移到常用 销售管理' })
-            .evaluate((node) => node === document.activeElement),
-          true
-        )
-        await page.getByRole('button', { name: '移到其他 基础资料' }).click()
-        await page.getByRole('button', { name: '上移 基础资料' }).click()
-        await page.getByRole('button', { name: '上移 基础资料' }).click()
-        await page.getByRole('button', { name: '上移 销售管理' }).click()
-        assert.equal(
-          await page
-            .getByRole('button', { name: '上移 基础资料' })
-            .isDisabled(),
-          true,
-          '同一导航区中第一项不可继续上移'
-        )
-
-        const draftPreview = await readNavigationPreview()
-        assert.deepEqual(
-          draftPreview.map((group) => group.title),
-          ['工作中心', '常用工作', '业务模块', '工具与查询', '系统与帮助'],
-          `权限中心自定义预览分组异常: ${JSON.stringify(draftPreview)}`
-        )
-        assert.deepEqual(
-          draftPreview[1].items,
-          ['库存管理'],
-          `权限中心常用工作顺序异常: ${JSON.stringify(draftPreview)}`
-        )
-        assert.deepEqual(
-          draftPreview.slice(2),
-          [
-            { title: '业务模块', items: ['基础资料', '销售管理', '出货管理'] },
-            { title: '工具与查询', items: ['历史记录中心'] },
-            { title: '系统与帮助', items: ['帮助中心'] },
-          ],
-          `权限中心其余入口应按同级业务分组预览: ${JSON.stringify(draftPreview)}`
-        )
-        await page.waitForTimeout(250)
-        const accessRequestsBeforeTabSwitch = effectiveAccessRequestCount
-        await page.getByRole('tab', { name: /页面访问/u }).click()
-        await expectText(page, '显示')
-        assert.equal(
-          await page.getByText(/yoyoosun-customer-pack/u).count(),
-          0,
-          '配置版本不应继续占据页面访问主视觉'
-        )
-        await page.getByRole('button', { name: '查看配置版本' }).click()
-        await expectText(page, '当前配置版本')
-        await page.keyboard.press('Escape')
-        await page
-          .getByRole('group', { name: '筛选页面访问' })
-          .getByRole('button')
-          .filter({ hasText: '不可进入' })
-          .click()
-        const blockedRows = await page
-          .locator(
-            '.erp-role-effective-access__table .erp-role-effective-access__page'
-          )
-          .evaluateAll((rows) =>
-            rows.map((row) => String(row.textContent || '').trim())
-          )
-        assert(
-          blockedRows.length > 0 &&
-            blockedRows.every((row) => row.includes('不可进入')),
-          `页面访问筛选没有只保留不可进入页面: ${JSON.stringify(blockedRows)}`
-        )
-        await page.locator('.erp-role-effective-access').screenshot({
-          path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-access.png',
-        })
-        await page.getByRole('tab', { name: '菜单排列' }).click()
-        await page.waitForTimeout(250)
-        assert.equal(
-          effectiveAccessRequestCount,
-          accessRequestsBeforeTabSwitch,
-          '岗位导航与页面访问切换不应重复请求权限解释'
-        )
-        const draftPreviewAfterTabSwitch = await readNavigationPreview()
-        assert.deepEqual(
-          draftPreviewAfterTabSwitch,
-          draftPreview,
-          `二级 Tab 切换后不应丢失菜单草稿: ${JSON.stringify(draftPreviewAfterTabSwitch)}`
-        )
-        await page.locator('.erp-role-navigation-editor').screenshot({
-          path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-editor.png',
-        })
-
-        const saveRequestPromise = page.waitForRequest((request) => {
-          if (!request.url().includes('/rpc/admin')) return false
-          return request.postDataJSON()?.method === 'set_role_settings'
-        })
-        await page.getByRole('button', { name: '保存岗位设置' }).click()
-        const saveRequest = await saveRequestPromise
-        const saveParams = saveRequest.postDataJSON()?.params || {}
-        assert.equal(saveParams.role_key, 'sales')
-        assert.equal(saveParams.navigation_mode, 'custom')
-        assert.deepEqual(saveParams.primary_menu_paths, [
-          '/erp/warehouse/inventory',
-        ])
-        assert.deepEqual(saveParams.secondary_menu_paths, [
-          '/erp/master/partners/customers',
-          '/erp/sales/project-orders/sales-orders',
-          '/erp/warehouse/shipping-release',
-        ])
-        assert(
-          Array.isArray(saveParams.permission_keys) &&
-            saveParams.permission_keys.length > 0 &&
-            Array.isArray(saveParams.data_scopes) &&
-            saveParams.data_scopes.length === 1 &&
-            Number(saveParams.expected_version) > 0,
-          `岗位设置必须整包提交权限、范围、布局和版本: ${JSON.stringify(saveParams)}`
-        )
-        await expectText(page, '岗位设置已更新，相关账号刷新后生效')
-        await expectText(page, '已保存')
-
-        const reopenedRBACResponsePromise = page.waitForResponse((response) => {
-          if (!response.url().includes('/rpc/admin')) return false
-          return response.request().postDataJSON()?.method === 'rbac_options'
-        })
-        await page.reload()
-        const reopenedRBACResponse = await reopenedRBACResponsePromise
-        const reopenedRBACPayload = await reopenedRBACResponse.json()
-        const reopenedSalesRole =
-          reopenedRBACPayload?.result?.data?.roles?.find(
-            (role) => role?.role_key === 'sales'
-          ) || null
-        assert.equal(reopenedSalesRole?.navigation_mode, 'custom')
-        assert.deepEqual(reopenedSalesRole?.primary_menu_paths, [
-          '/erp/warehouse/inventory',
-        ])
-        assert.deepEqual(reopenedSalesRole?.secondary_menu_paths, [
-          '/erp/master/partners/customers',
-          '/erp/sales/project-orders/sales-orders',
-          '/erp/warehouse/shipping-release',
-        ])
-        await expectHeading(page, '权限管理')
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '业务' })
-          .click()
-        await page.getByRole('tab', { name: /岗位导航/u }).click()
-        assert.equal(
-          await page
-            .getByRole('tab', { name: '菜单排列' })
-            .getAttribute('aria-selected'),
-          'true',
-          '整页刷新后页面与导航仍应默认进入岗位导航'
-        )
-        await page
-          .locator('.erp-role-navigation-preview__head .ant-tag')
-          .filter({ hasText: '自定义布局' })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        const reopenedPreview = await readNavigationPreview()
-        assert.deepEqual(
-          reopenedPreview[1].items,
-          ['库存管理'],
-          `重新打开后常用工作顺序未读回: ${JSON.stringify(reopenedPreview)}`
-        )
-        assert.deepEqual(
-          reopenedPreview,
-          draftPreview,
-          `重新打开后完整导航位置未读回: ${JSON.stringify(reopenedPreview)}`
-        )
-        await assertNoHorizontalOverflow(
-          page,
-          'permission-center-role-navigation-desktop'
-        )
-        await page.screenshot({
-          path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-readback.png',
-          fullPage: true,
-        })
-      },
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => verifyCurrentRoleNavigation(page),
     },
     {
       name: 'permission-center-navigation-mobile-dark',
-      path: '/erp/system/permissions',
+      path: '/erp/system/permissions?tab=navigation',
       auth: 'admin',
       themeMode: 'dark',
       viewport: { width: 390, height: 844 },
-      verify: async (page) => {
-        await expectHeading(page, '权限管理')
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '财务' })
-          .click()
-        assert.equal(
-          await page.getByRole('textbox', { name: '搜索功能或页面' }).count(),
-          1,
-          '移动端权限中心应提供与桌面一致的功能搜索'
-        )
-        const mobileSearch = page.getByRole('textbox', {
-          name: '搜索功能或页面',
-        })
-        await mobileSearch.fill('生产执行')
-        assert.equal(
-          await page.locator('.erp-permission-checklist__section').count(),
-          1
-        )
-        await expectText(page.locator('.erp-permission-checklist'), '生产执行')
-        await mobileSearch.fill('')
-        const financePermissionSection = page.locator(
-          '.erp-permission-checklist__section[data-permission-module="finance"]'
-        )
-        await financePermissionSection.scrollIntoViewIfNeeded()
-        const financeMenuMetrics = await financePermissionSection.evaluate(
-          (section) => {
-            const list = section.querySelector('.erp-permission-matrix__row')
-            const rows = section.querySelectorAll('.erp-permission-row')
-            return {
-              display: list ? window.getComputedStyle(list).display : '',
-              rowCount: rows.length,
-              scrollWidth: list?.scrollWidth || 0,
-              clientWidth: list?.clientWidth || 0,
-            }
-          }
-        )
-        assert(
-          financeMenuMetrics.display === 'grid' &&
-            financeMenuMetrics.rowCount > 0 &&
-            financeMenuMetrics.scrollWidth <=
-              financeMenuMetrics.clientWidth + 1,
-          `权限中心权限行移动端布局异常: ${JSON.stringify(financeMenuMetrics)}`
-        )
-        await financePermissionSection.screenshot({
-          path: 'output/playwright/style-l1/permission-center-finance-inline-mobile-dark.png',
-        })
-        await page.getByRole('button', { name: '关联账号（3）' }).click()
-        const mobileAssociatedAccounts = page.locator(
-          '.erp-role-associated-accounts'
-        )
-        await expectText(mobileAssociatedAccounts, '当前岗位账号')
-        await expectText(mobileAssociatedAccounts, 'style-l1-admin')
-        await assertNoHorizontalOverflow(
-          page,
-          'permission-center-associated-accounts-mobile-dark'
-        )
-        await mobileAssociatedAccounts.screenshot({
-          path: 'output/playwright/style-l1/permission-center-associated-accounts-mobile-dark.png',
-        })
-        await page
-          .getByRole('dialog')
-          .getByRole('button', { name: '关闭', exact: true })
-          .click()
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '业务' })
-          .click()
-        await page.getByRole('tab', { name: /岗位导航/u }).click()
-        assert.equal(
-          await page
-            .getByRole('tab', { name: '菜单排列' })
-            .getAttribute('aria-selected'),
-          'true',
-          '移动端页面与导航应默认进入岗位导航'
-        )
-        await page.getByRole('tab', { name: /页面访问/u }).click()
-        await expectText(page, '显示')
-        await page
-          .getByRole('group', { name: '筛选页面访问' })
-          .getByRole('button')
-          .filter({ hasText: /^可进入/u })
-          .first()
-          .click()
-        const mobileAccessMetrics = await page.evaluate(() => {
-          const nestedTabs = document.querySelector(
-            '.erp-role-navigation-workspace-tabs > .ant-tabs-nav'
-          )
-          const filters = document.querySelector(
-            '.erp-role-effective-access__filters'
-          )
-          const table = document.querySelector(
-            '.erp-role-effective-access__table .ant-table-body, .erp-role-effective-access__table .ant-table-content'
-          )
-          return {
-            tabsScrollWidth: nestedTabs?.scrollWidth || 0,
-            tabsClientWidth: nestedTabs?.clientWidth || 0,
-            filtersScrollWidth: filters?.scrollWidth || 0,
-            filtersClientWidth: filters?.clientWidth || 0,
-            tableScrollWidth: table?.scrollWidth || 0,
-            tableClientWidth: table?.clientWidth || 0,
-            documentScrollWidth: document.documentElement.scrollWidth,
-            documentClientWidth: document.documentElement.clientWidth,
-          }
-        })
-        assert(
-          mobileAccessMetrics.tabsScrollWidth <=
-            mobileAccessMetrics.tabsClientWidth + 1 &&
-            mobileAccessMetrics.filtersClientWidth > 0 &&
-            mobileAccessMetrics.filtersScrollWidth <=
-              mobileAccessMetrics.filtersClientWidth + 1 &&
-            mobileAccessMetrics.tableClientWidth > 0 &&
-            mobileAccessMetrics.tableScrollWidth >=
-              mobileAccessMetrics.tableClientWidth &&
-            mobileAccessMetrics.documentScrollWidth <=
-              mobileAccessMetrics.documentClientWidth + 1,
-          `页面访问移动端布局异常: ${JSON.stringify(mobileAccessMetrics)}`
-        )
-        await page.locator('.erp-role-effective-access').screenshot({
-          path: 'output/playwright/style-l1/permission-center-navigation-mobile-dark-access.png',
-        })
-        await page.getByRole('tab', { name: '菜单排列' }).click()
-        await expectText(page, '设置岗位导航')
-        await expectText(page, '导航位置预览')
-        await expectText(page, '工具与查询')
-        await expectText(page, '系统与帮助')
-        await assertTextAbsent(page, '更多功能')
-        await expectText(page, '历史记录中心')
-        await expectText(page, '帮助中心')
-        await page
-          .locator(
-            '.erp-role-navigation-editor__head > .ant-select .ant-select-selector'
-          )
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '自定义布局' })
-          .click()
-        await page.keyboard.press('Escape')
-        await page.waitForTimeout(350)
-        await expectText(page, '常用工作需保留 1–5 个入口')
-        const metrics = await page.evaluate(() => {
-          const preview = document.querySelector('.erp-role-navigation-preview')
-          const editor = document.querySelector('.erp-role-navigation-editor')
-          const orderItem = editor?.querySelector(
-            '.erp-role-navigation-editor__order-item'
-          )
-          const grid = preview?.querySelector(
-            '.erp-role-navigation-preview__grid'
-          )
-          const previewRect = preview?.getBoundingClientRect()
-          return {
-            columns: grid
-              ? window.getComputedStyle(grid).gridTemplateColumns
-              : '',
-            previewScrollWidth: preview?.scrollWidth || 0,
-            previewClientWidth: preview?.clientWidth || 0,
-            previewLeft: previewRect?.left || 0,
-            previewRight: previewRect?.right || 0,
-            previewWidth: previewRect?.width || 0,
-            viewportWidth: window.innerWidth,
-            documentScrollWidth: document.documentElement.scrollWidth,
-            documentClientWidth: document.documentElement.clientWidth,
-            editorScrollWidth: editor?.scrollWidth || 0,
-            editorClientWidth: editor?.clientWidth || 0,
-            orderItemDirection: orderItem
-              ? window.getComputedStyle(orderItem).flexDirection
-              : '',
-          }
-        })
-        assert(
-          metrics.columns.split(' ').length === 1 &&
-            metrics.previewScrollWidth <= metrics.previewClientWidth + 1 &&
-            metrics.previewLeft >= -1 &&
-            metrics.previewRight <= metrics.viewportWidth + 1 &&
-            metrics.previewWidth <= metrics.viewportWidth + 1 &&
-            metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
-          `权限中心导航预览移动端布局异常: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.editorScrollWidth <= metrics.editorClientWidth + 1 &&
-            metrics.orderItemDirection === 'column',
-          `权限中心常用入口编辑器移动端布局异常: ${JSON.stringify(metrics)}`
-        )
-        await assertERPThemeMode(page, {
-          scenarioName: 'permission-center-navigation-mobile-dark',
-          expectedMode: 'dark',
-          expectedEffectiveTheme: 'dark',
-        })
-        await assertNoHorizontalOverflow(
-          page,
-          'permission-center-navigation-mobile-dark'
-        )
-        await page.locator('.erp-role-navigation-preview').screenshot({
-          path: 'output/playwright/style-l1/permission-center-navigation-mobile-dark-preview.png',
-        })
-        await page.locator('.erp-role-navigation-editor').screenshot({
-          path: 'output/playwright/style-l1/permission-center-navigation-mobile-dark-editor.png',
-        })
-      },
+      deviceScaleFactor: 2,
+      verify: async (page) => verifyCurrentRoleNavigation(page, { mobile: true }),
     },
   ]
 }

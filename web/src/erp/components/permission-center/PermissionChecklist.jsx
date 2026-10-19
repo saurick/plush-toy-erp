@@ -112,12 +112,18 @@ function describePermission({
     const effective =
       accessVerified && locallyVisible && accessPage?.effective === true
     const placement = effective
-      ? placementByPath.get(entryMenu.path) || '可从导航进入'
+      ? placementByPath.get(entryMenu.path) || '侧栏未显示'
       : ''
     summary = [
       '菜单入口',
       entryMenu.label +
-        (!accessVerified ? '待核对' : effective ? '显示' : '不显示'),
+        (!accessVerified
+          ? '待核对'
+          : effective
+            ? placementByPath.has(entryMenu.path)
+              ? '显示'
+              : '可进入'
+            : '不显示'),
       placement,
     ]
       .filter(Boolean)

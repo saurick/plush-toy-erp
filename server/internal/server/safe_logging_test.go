@@ -30,6 +30,7 @@ func TestSafeServerLoggingRecordsBusinessOutcomeWithoutPayloads(t *testing.T) {
 	}{
 		{name: "success", outcome: "success", level: "INFO", code: errcode.OK.Code},
 		{name: "business rejection", outcome: "rejected", level: "WARN", code: errcode.PermissionDenied.Code},
+		{name: "request canceled", outcome: "canceled", level: "INFO", code: errcode.RequestCanceled.Code},
 		{name: "internal error", outcome: "error", level: "ERROR", code: errcode.Internal.Code},
 		{name: "domain system error", outcome: "error", level: "ERROR", code: errcode.UserListFailed.Code},
 		{name: "reply error", outcome: "error", level: "ERROR", replyError: "private-reply-error"},
@@ -37,6 +38,8 @@ func TestSafeServerLoggingRecordsBusinessOutcomeWithoutPayloads(t *testing.T) {
 		{name: "transport bad request", outcome: "rejected", level: "WARN", err: kratoserrors.BadRequest("INVALID_INPUT", "private-message")},
 		{name: "transport rate limit", outcome: "rejected", level: "WARN", err: kratoserrors.New(429, "RATE_LIMIT", "private-message")},
 		{name: "transport unavailable", outcome: "error", level: "ERROR", err: kratoserrors.ServiceUnavailable("UNAVAILABLE", "private-message")},
+		{name: "transport canceled", outcome: "canceled", level: "INFO", err: kratoserrors.New(499, "CLIENT_CANCELED", "private-message")},
+		{name: "canceled result with transport failure", outcome: "error", level: "ERROR", code: errcode.RequestCanceled.Code, err: kratoserrors.ServiceUnavailable("UNAVAILABLE", "private-message")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var output bytes.Buffer

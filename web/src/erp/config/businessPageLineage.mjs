@@ -250,6 +250,7 @@ export const businessPageFlowDefinitions = Object.freeze(
       [
         // Explicit backend actions that create a downstream record or draft.
         ['material-bom', 'material-bom', 'copy_bom_version'],
+        ['quality-inspections', 'quality-inspections', 'correct_quality_inspection_result'],
         [
           'sales-orders',
           'accessories-purchase',
@@ -1054,6 +1055,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
       'add_purchase_receipt_item',
       'create_quality_inspection_draft',
       'create_quality_inspection_from_outsourcing_return',
+      'correct_quality_inspection_result',
       'execute_production_wip_action',
       'create_finished_goods_quality_inspection_draft',
     ],

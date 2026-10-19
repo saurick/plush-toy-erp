@@ -19,6 +19,7 @@ import { useOutsourcingOrderEditor } from '../components/outsourcing-orders/useO
 import { useOutsourcingOrderTasks } from '../components/outsourcing-orders/useOutsourcingOrderTasks.mjs'
 import { useOutsourcingOrderQuery } from '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
 import { useOutsourcingSourceFacts } from '../components/outsourcing-orders/useOutsourcingSourceFacts.jsx'
+import MobileOutsourcingTaskActions from '../mobile/components/MobileOutsourcingTaskActions.jsx'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
@@ -1015,6 +1016,9 @@ export default function OutsourcingOrdersPage() {
         </>
       )}
 
+      {outletContext?.mobileTaskBusiness ? (
+        <MobileOutsourcingTaskActions record={selectedRow} load={loadOutsourcingOrderDetailsItems} getItemFields={getOutsourcingOrderItemFields} refreshKey={outletContext.workflowTaskNavigation?.businessReceipt} />
+      ) : null}
       <BusinessDetailsModal
         descriptionInHelp
         columns={detailColumns}

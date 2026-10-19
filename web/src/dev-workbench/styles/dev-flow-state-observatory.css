@@ -2003,15 +2003,15 @@
     font-size: 7.8pt;
   }
 
-  .erp-dev-flow-customer-review__step-table th:nth-child(1) {
+  .erp-dev-flow-customer-review__step-table:not([data-customer-review-handling-table]) th:nth-child(1) {
     width: 28%;
   }
 
-  .erp-dev-flow-customer-review__step-table th:nth-child(2) {
+  .erp-dev-flow-customer-review__step-table:not([data-customer-review-handling-table]) th:nth-child(2) {
     width: 15%;
   }
 
-  .erp-dev-flow-customer-review__step-table th:nth-child(3) {
+  .erp-dev-flow-customer-review__step-table:not([data-customer-review-handling-table]) th:nth-child(3) {
     width: 57%;
   }
 

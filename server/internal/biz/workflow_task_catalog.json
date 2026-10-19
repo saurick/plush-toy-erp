@@ -890,6 +890,15 @@
             "label": "重新申请"
           }
         ]
+      },
+      "handling": {
+        "issues": "订单资料、样品或 BOM 未就绪，用料审核退回。",
+        "action": "业务与工程补齐来源资料；用料退回后修改重提。订单审批拒绝按原单规则结束本次申请。",
+        "resume": "订单生效、样品确认、BOM 启用且用料审核通过后再采购。",
+        "task_stages": [
+          "engineering"
+        ],
+        "guides": []
       }
     },
     {
@@ -1033,6 +1042,17 @@
             "label": "发生退款或错误"
           }
         ]
+      },
+      "handling": {
+        "issues": "首款未到账、到账金额有差异，或订单取消后需要退款。",
+        "action": "业务跟进付款约定，财务核对实际到账；已登记款项按退款、撤销抵扣或冲正分别处理。",
+        "resume": "实际到账和剩余余额核清；后续生产或发货仍按订单约定及放行规则办理。",
+        "task_stages": [
+          "payment"
+        ],
+        "guides": [
+          "finance_settlement"
+        ]
       }
     },
     {
@@ -1049,7 +1069,8 @@
       ],
       "handoffs": [
         "采购核对供应商、合同与到货安排并跟进供应商。",
-        "工程用料审批生成的采购单已经批准；独立人工采购单另行提交审批。"
+        "工程用料审批生成的采购单已经批准；独立人工采购单另行提交审批。",
+        "采购通过“补齐价格与交期”补缺价、维护交期，批准数量不变；补价可与到货跟进并行，缺价不阻止实物收货，财务生成应付前须有完整价格依据。"
       ],
       "approvals": [
         {
@@ -1061,7 +1082,7 @@
       ],
       "business_chain": "purchase_to_inventory",
       "subflow": {
-        "summary": "用料生成的采购单已经批准；只有独立人工采购单进入采购审批。",
+        "summary": "用料生成单不重复审批；独立人工单按配置审批。缺价与交期由采购补齐，可与到货跟进并行，生成应付前核对价格依据。",
         "nodes": [
           {
             "key": "source",
@@ -1093,6 +1114,16 @@
             "detail_refs": [
               "handoff:0",
               "result"
+            ],
+            "role_keys": [
+              "purchase"
+            ]
+          },
+          {
+            "key": "terms",
+            "label": "补齐价格与交期",
+            "detail_refs": [
+              "handoff:2"
             ],
             "role_keys": [
               "purchase"
@@ -1131,8 +1162,20 @@
             "from": "approval",
             "to": "rejected",
             "label": "未通过"
+          },
+          {
+            "from": "generated",
+            "to": "terms",
+            "label": "缺价或需维护交期"
           }
         ]
+      },
+      "handling": {
+        "issues": "采购审批拒绝、供应商延期、合同或供货安排不符。",
+        "action": "采购联系供应商并通过来源单据安排跟进；草稿有误先修改。审批拒绝结束本次已提交采购单，需要继续采购时另建草稿；已生效单据不直接改历史。",
+        "resume": "采购来源已批准，供应商、合同和到货安排核对完成后登记实际到货。",
+        "task_stages": [],
+        "guides": []
       }
     },
     {
@@ -1277,6 +1320,17 @@
             "label": "发生退款或错误"
           }
         ]
+      },
+      "handling": {
+        "issues": "预付款未支付、支付金额有差异，或退货取消后需要收回款项。",
+        "action": "采购或生产核实合同，财务核对实际付款；供应商退款到账、错误抵扣和错误登记各走对应正式动作。",
+        "resume": "款项、来源和余额核清；到货、检验及入库仍分别办理。",
+        "task_stages": [
+          "payment"
+        ],
+        "guides": [
+          "finance_settlement"
+        ]
       }
     },
     {
@@ -1291,7 +1345,14 @@
       "role_keys": [
         "warehouse"
       ],
-      "business_chain": "purchase_to_inventory"
+      "business_chain": "purchase_to_inventory",
+      "handling": {
+        "issues": "实收不足、超出可收数量、材料或来源不符。",
+        "action": "仓库按实物和采购来源分批登记，采购跟进未到部分；错料不冒充订购物料，超量由来源数量校验阻止。草稿登记有误按原单规则更正。",
+        "resume": "材料、单位、批次和来源一致，实收不超过可收量；检验通过后才可入库。",
+        "task_stages": [],
+        "guides": []
+      }
     },
     {
       "stage": "incoming_quality",
@@ -1367,12 +1428,24 @@
             "label": "补换后重新点数送检"
           }
         ]
+      },
+      "handling": {
+        "issues": "来料未检、不合格，或正式入库后发现数量及质量问题。",
+        "action": "品质记录检验结论；采购按来源行办理退厂或补换，仓库按实物交接。已入库数量通过退货、调整或冲正纠正。",
+        "resume": "未处置部分继续保留；补换重新点数和检验，符合条件的实际数量才可入库。",
+        "task_stages": [
+          "incoming_exception"
+        ],
+        "guides": [
+          "purchase_rejection",
+          "posted_purchase"
+        ]
       }
     },
     {
       "stage": "cutting_issue",
       "label": "发料外发裁片",
-      "role": "生产经理 / 财务兼采购 / 仓库",
+      "role": "PMC / 生产经理 / 财务兼采购 / 仓库",
       "stages": [
         "production_schedule",
         "outsourcing_contract",
@@ -1390,12 +1463,36 @@
       "handoffs": [
         "PMC 安排排期，生产经理提出加工材料、厂商及回货要求。",
         "有合同权限的财务兼采购经办人确认加工合同。",
-        "仓库核对可用材料、批次和数量，实际发料至委外厂商裁片。"
+        "仓库核对可用材料、批次和数量，实际发料至委外厂商裁片。",
+        "PMC 根据有效来源建立生产订单；PMC 或有权限的生产负责人核对样品、BOM 和用料审批后显式发布，冻结用料、工艺路线和检验条件，并生成排程任务。",
+        "发布不代表物料齐套或已经领料；排程与到货可按前置条件并行，实际发料前仍须核对合同、批次和可用量。"
       ],
       "business_chain": "production_to_inventory",
       "subflow": {
-        "summary": "排期、合同与材料准备满足后，由仓库实际发料至委外厂商裁片。",
+        "summary": "先建立并发布生产订单，冻结用料与路线并生成排程任务；排期、合同和可用材料满足后，仓库才实际发料。",
         "nodes": [
+          {
+            "key": "create",
+            "label": "PMC 建立生产订单",
+            "detail_refs": [
+              "handoff:3"
+            ],
+            "role_keys": [
+              "pmc"
+            ]
+          },
+          {
+            "key": "release",
+            "label": "核对条件并发布",
+            "detail_refs": [
+              "handoff:3",
+              "handoff:4"
+            ],
+            "role_keys": [
+              "pmc",
+              "production"
+            ]
+          },
           {
             "key": "plan",
             "label": "安排加工与回货要求",
@@ -1432,6 +1529,15 @@
         ],
         "edges": [
           {
+            "from": "create",
+            "to": "release"
+          },
+          {
+            "from": "release",
+            "to": "plan",
+            "label": "冻结用料与路线，生成排程任务"
+          },
+          {
             "from": "plan",
             "to": "contract"
           },
@@ -1440,6 +1546,17 @@
             "to": "issue",
             "label": "合同与材料满足条件"
           }
+        ]
+      },
+      "handling": {
+        "issues": "材料不足、批次不可用、加工合同未确认，或需要超领。",
+        "action": "核对来源合同、材料与可用批次；采购及生产跟进缺料。超出核定用量先申请超领额度，再通过正常领料实际出库。",
+        "resume": "合同、来源、批次、可用数量和超领额度满足校验后再发料；任务结束不代表已经出库。",
+        "task_stages": [
+          "production_exception"
+        ],
+        "guides": [
+          "over_issue"
         ]
       }
     },
@@ -1454,7 +1571,14 @@
       "role_keys": [
         "warehouse"
       ],
-      "business_chain": "production_to_inventory"
+      "business_chain": "production_to_inventory",
+      "handling": {
+        "issues": "回货数量与整批要求不符、来源合同或批次有误。",
+        "action": "仓库重新实点并核对合同与批次，采购联系加工方处理差额；本路线按整批回货，不以虚填数量或手工完成待办放行。",
+        "resume": "实际回货与受控批次数量一致，来源正确后登记并进入检验。",
+        "task_stages": [],
+        "guides": []
+      }
     },
     {
       "stage": "cutting_quality",
@@ -1513,6 +1637,18 @@
             "to": "exception",
             "label": "不合格"
           }
+        ]
+      },
+      "handling": {
+        "issues": "裁片颜色、尺寸或规格检验不合格，或检验记录有误。",
+        "action": "品质记录不合格，业务选择返工、换厂、重做、报废或允许的让步方案，按正式审批执行；判定纠正仍受下游依赖校验。",
+        "resume": "按获批方案执行并满足复检或让步条件后继续；报废结束原批，交付缺口另行安排。",
+        "task_stages": [
+          "cutting_exception",
+          "cutting_decision"
+        ],
+        "guides": [
+          "production_quality"
         ]
       }
     },
@@ -1632,6 +1768,17 @@
             "label": "实点完成"
           }
         ]
+      },
+      "handling": {
+        "issues": "排期或交接受阻、合同发料未就绪、回货数量不符。",
+        "action": "生产核对本厂或委外安排，按来源单据跟进；委外合同、发料及整批回货分别办理。质量问题交正式检验和处置，不直接修改批次数量。",
+        "resume": "前道验收、合同收发、实际完成或回货均符合条件后进入皮套检验。",
+        "task_stages": [
+          "sewing_return",
+          "sewing_exception",
+          "sewing_decision"
+        ],
+        "guides": []
       }
     },
     {
@@ -1691,6 +1838,18 @@
             "to": "exception",
             "label": "不合格"
           }
+        ]
+      },
+      "handling": {
+        "issues": "皮套检验不合格、返工后仍不合格，或原检验依据有误。",
+        "action": "品质记录问题，业务提出方案并经审批执行；原厂及换厂返工、补料重做、报废和让步保留各自结果与来源。",
+        "resume": "重新检验或获批让步满足条件后再进入手工；报废不恢复原批。",
+        "task_stages": [
+          "sewing_exception",
+          "sewing_decision"
+        ],
+        "guides": [
+          "production_quality"
         ]
       }
     },
@@ -1810,6 +1969,17 @@
             "label": "实点完成"
           }
         ]
+      },
+      "handling": {
+        "issues": "排期或交接受阻、委外准备不齐、回货不足或工序未完成。",
+        "action": "生产按本工序独立安排本厂或委外，相关岗位跟进合同与收发；数量不符先核实，不通过结束待办补造成品。",
+        "resume": "实际完成或整批回货符合要求，按规定交仓库登记收仓；需要的质量关口继续办理。",
+        "task_stages": [
+          "handwork_return",
+          "handwork_exception",
+          "handwork_decision"
+        ],
+        "guides": []
       }
     },
     {
@@ -1872,6 +2042,15 @@
             "label": "入库不等于可发货"
           }
         ]
+      },
+      "handling": {
+        "issues": "收仓数量、来源或批次不符，重复登记，或已入库后需要纠错。",
+        "action": "仓库核对手工产出与未入库量；草稿错误按单据规则修改，已生效收仓通过正式取消或冲正恢复，存在下游依赖时先处理依赖。",
+        "resume": "收仓来源及数量一致并正式入库后继续；待检、待包装的库存仍不能发货。",
+        "task_stages": [
+          "production_fact"
+        ],
+        "guides": []
       }
     },
     {
@@ -1885,19 +2064,19 @@
         "sampling_quality",
         "customer_quality"
       ],
-      "result": "按冻结工艺路线完成成品检验、针检、客户抽检等规定关口。",
+      "result": "按冻结路线依次完成成品检验、针检和抽检；订单要求时再完成客户验货。",
       "role_keys": [
         "quality",
         "sales"
       ],
       "handoffs": [
-        "IQC 按冻结工艺路线办理成品检验、针检和抽检。",
+        "IQC 按冻结路线依次完成成品检验、针检和抽检；上一关通过后才生成下一关。",
         "订单要求客户验货时由业务协调、品质记录结果；不要求时不补造通过记录。"
       ],
       "exception": "成品不合格进入正式处置，涉及已入库数量由仓库执行获批方案；保留原质检和库存轨迹。",
       "business_chain": "production_to_inventory",
       "subflow": {
-        "summary": "图中是需核对的关口，不固定它们的先后顺序；按冻结工艺路线及订单要求办理，不补造通过记录。",
+        "summary": "依次办理成品检验、针检、抽检；订单要求时再客户验货。适用关口全部通过后才能继续。",
         "nodes": [
           {
             "key": "route",
@@ -1908,10 +2087,30 @@
           },
           {
             "key": "quality",
-            "label": "成品检验与规定关口",
+            "label": "成品检验",
             "detail_refs": [
               "handoff:0",
               "result"
+            ],
+            "role_keys": [
+              "quality"
+            ]
+          },
+          {
+            "key": "needle",
+            "label": "针检",
+            "detail_refs": [
+              "handoff:0"
+            ],
+            "role_keys": [
+              "quality"
+            ]
+          },
+          {
+            "key": "sampling",
+            "label": "抽检",
+            "detail_refs": [
+              "handoff:0"
             ],
             "role_keys": [
               "quality"
@@ -1951,22 +2150,42 @@
             "label": "按冻结路线"
           },
           {
-            "from": "route",
+            "from": "quality",
+            "to": "needle",
+            "label": "合格"
+          },
+          {
+            "from": "needle",
+            "to": "sampling",
+            "label": "合格"
+          },
+          {
+            "from": "sampling",
             "to": "customer",
             "label": "订单要求时"
           },
           {
-            "from": "quality",
+            "from": "sampling",
             "to": "passed",
-            "label": "规定关口通过"
+            "label": "不要求客户验货"
           },
           {
             "from": "customer",
             "to": "passed",
-            "label": "要求验货时通过"
+            "label": "验货通过"
           },
           {
             "from": "quality",
+            "to": "exception",
+            "label": "不合格"
+          },
+          {
+            "from": "needle",
+            "to": "exception",
+            "label": "不合格"
+          },
+          {
+            "from": "sampling",
             "to": "exception",
             "label": "不合格"
           },
@@ -1975,6 +2194,18 @@
             "to": "exception",
             "label": "不合格"
           }
+        ]
+      },
+      "handling": {
+        "issues": "成品、针检、抽检或适用的客户验货未通过。",
+        "action": "按冻结路线和订单要求逐关办理；不合格走正式质量处置，涉及已入库库存时交仓库执行获批方案。无要求的关口不补造通过记录。",
+        "resume": "适用关口全部通过或获批处置后达到规定条件；报废部分终止，原质量和库存轨迹保留。",
+        "task_stages": [
+          "handwork_exception",
+          "handwork_decision"
+        ],
+        "guides": [
+          "production_quality"
         ]
       }
     },
@@ -2058,6 +2289,13 @@
             "label": "处理后重新核对"
           }
         ]
+      },
+      "handling": {
+        "issues": "包装版本未确认、查货或包装不符合已确认要求。",
+        "action": "业务核对并确认包装版本，仓库按该版本处理实物差异后办理包装；版本未确认或前置条件不足时不能开始，不能用跟进任务代替实际包装。",
+        "resume": "已入库来源、规定质量关口、确认的包装版本及实际包装结果均符合要求后再准备发货。",
+        "task_stages": [],
+        "guides": []
       }
     },
     {
@@ -2159,6 +2397,13 @@
             "label": "未通过或条件不足"
           }
         ]
+      },
+      "handling": {
+        "issues": "财务未放行，库存、质量或包装条件不足，或出货登记需要纠错。",
+        "action": "业务与财务核对未放行原因；补齐真实条件后按原单规则重办。未实际发货的单据按规则修改或取消；已发货错误走正式取消及冲正，受下游依赖限制。",
+        "resume": "取得有效放行且可发货数量、质量和包装均符合条件，再显式确认实际发货；放行或任务完成不代表已发货。",
+        "task_stages": [],
+        "guides": []
       }
     },
     {
@@ -2328,6 +2573,20 @@
             "to": "exception",
             "label": "发生多付、退款或错误"
           }
+        ]
+      },
+      "handling": {
+        "issues": "款项逾期、少收少付、多收多付、错误抵扣或错误登记。",
+        "action": "业务及采购跟进余额，财务分别办理实际收付、退款、撤销抵扣或冲正；审批未通过按规则重新申请，不强行结清差额。",
+        "resume": "相关应收应付及原款余额核清并保留实际收付结果后结清；未结余额继续跟进。",
+        "task_stages": [
+          "receivable_registration",
+          "payable_registration",
+          "reconciliation",
+          "invoice_registration"
+        ],
+        "guides": [
+          "finance_settlement"
         ]
       }
     }

@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { installAdminRpcMocks } from './adminRpcMocks.mjs'
@@ -1108,13 +1109,36 @@ export function createBusinessActionStabilityScenarios(deps) {
               .count(),
             20
           )
-          assert.ok((await popup.getByText(/待补：.*单价/u).count()) >= 21)
+          const checkedContracts = []
+          const verifyBlankPrice = async (number) => {
+            const orderNo = `PO-SUMMARY-${number}`
+            const document = popup.locator(`[data-purchase-order-no="${orderNo}"]`)
+            assert.equal(await document.count(), 1)
+            assert.equal(await document.getAttribute('data-purchase-order-id'), String(1399 + number))
+            const row = document.locator('tr[data-print-blank-row]').filter({ hasText: '模拟缺价材料' })
+            assert.equal(await row.count(), 1)
+            const value = async (key) => (await row.locator(`[data-print-blank-field="${key}"]`).innerText()).trim()
+            const fields = { orderNo, contractNo: await value('contractNo'), quantity: await value('quantity'), unitPrice: await value('unitPrice'), amount: await value('amount') }
+            assert.equal(fields.contractNo, orderNo)
+            assert.equal(fields.quantity, '20')
+            assert.equal(fields.unitPrice, '', '未知单价必须保持留白，不能被样例或零补齐')
+            assert.equal(fields.amount, '', '未知行金额必须保持留白')
+            assert.equal((await document.locator('.erp-contract-table__total-value').nth(1).innerText()).trim(), '')
+            assert.equal(await document.locator('[data-print-blank-notice]').count(), 0, '留白提示不得进入纸面')
+            checkedContracts.push(fields)
+          }
+          await popup.locator('[data-print-blank-notice]').waitFor({ state: 'visible' })
+          for (let number = 1; number <= 20; number++) await verifyBlankPrice(number)
           await popup
             .getByRole('combobox', { name: '输出批次', exact: true })
             .selectOption('1')
           await popup
             .locator('[data-purchase-order-no="PO-SUMMARY-21"]')
             .waitFor({ state: 'visible' })
+          assert.equal(await popup.locator('.erp-material-contract-batch__document').count(), 1)
+          await verifyBlankPrice(21)
+          assert.equal(new Set(checkedContracts.map((contract) => contract.orderNo)).size, 21)
+          await fs.writeFile(path.join(outputDir, 'engineering-summary-purchase-batch-print-values.json'), JSON.stringify({ selectedContracts: 21, batches: [20, 1], checkedContracts }, null, 2) + '\n')
           await assertNoHorizontalOverflow(
             popup,
             'engineering-summary-purchase-batch-print'

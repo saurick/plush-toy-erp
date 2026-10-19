@@ -54,6 +54,7 @@ test("affected: backend public declarations select readonly generation and consu
     const plan = buildAffectedPlan([file], { root: ROOT });
     assert(ids(plan).includes("public-contracts-sync"), file);
     assert(ids(plan).includes("public-contract-consumers"), file);
+    assert(ids(plan).includes("public-contract-examples"), file);
     assert(selectedTests(plan).includes("scripts/gen-public-contracts.test.mjs"), file);
     assert(selectedTests(plan).includes("web/src/erp/utils/businessStatusCoverage.test.mjs"), file);
     assert(plan.commands.find((item) => item.id === "public-contracts-sync").args.includes("--check"));

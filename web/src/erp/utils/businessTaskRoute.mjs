@@ -6,10 +6,10 @@ export function canonicalBusinessPath(path = '') {
   return String(path).replace(/^\/m\/[a-z_]+\/(?:tasks\/[1-9][0-9]*\/)?handle\//u, '/erp/')
 }
 
-export function mobileBusinessPath(path, roleKey, taskID = null) {
+export function mobileBusinessPath(path, roleKey) {
   if (path && typeof path === 'object' && typeof path.pathname === 'string' && path.pathname.startsWith('/erp')) {
     const original = `${path.pathname}${path.search || ''}${path.hash || ''}`
-    const mapped = mobileBusinessPath(original, roleKey, taskID)
+    const mapped = mobileBusinessPath(original, roleKey)
     if (mapped === original) return path
     const url = new URL(mapped, 'https://erp.invalid')
     return { ...path, pathname: url.pathname, search: url.search, hash: url.hash }
@@ -22,6 +22,6 @@ export function mobileBusinessPath(path, roleKey, taskID = null) {
       : url.searchParams.has('link_task') ? `?${new URLSearchParams({ link_task: url.searchParams.get('link_task') })}` : ''
     return `/m/${roleKey}/tasks${search}${url.hash}`
   }
-  const taskPrefix = Number.isSafeInteger(taskID) && taskID > 0 ? `tasks/${taskID}/` : ''
-  return path.startsWith('/erp/') ? `/m/${roleKey}/${taskPrefix}handle/${path.slice(5)}` : path
+  if (/^\/erp\/help-center(?:[?#]|$)/u.test(path)) return `/m/${roleKey}/handle/${path.slice(5)}`
+  return path.startsWith('/erp/') ? `/m/${roleKey}/tasks` : path
 }

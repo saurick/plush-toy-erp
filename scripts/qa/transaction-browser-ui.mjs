@@ -3,7 +3,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { browserRPCURL } from "./browser-write-target.mjs";
 import { consumeExpectedRPCFailure, trackBrowserRPCNetwork } from "./transaction-browser-network.mjs";
-import { mobileTaskBusinessPath } from "../../web/src/erp/mobile/utils/mobileTaskBusiness.mjs";
+import { resolveMobileTaskBusinessEntry } from "../../web/src/erp/mobile/utils/mobileTaskBusiness.mjs";
 import { waitForFiniteAnimations } from "../../web/scripts/style-l1/browserReadiness.mjs";
 
 const require = createRequire(
@@ -58,9 +58,22 @@ export async function openMobileSourceTask(page, options, client, role, sourceTy
   const candidates = tasks.filter(task => task.source_type === sourceType && task.source_id === sourceID && task.owner_role_key === role && groups.includes(task.task_group));
   assert.equal(candidates.length, 1, `${sourceType}:${sourceID} must have one authoritative task for ${groups.join(",")}`);
   const [task] = candidates;
-  const target = mobileTaskBusinessPath(task, role);
-  assert.ok(target, "the actual source task must resolve to an exact business form");
+  assert.ok(resolveMobileTaskBusinessEntry(task), "the actual source task must resolve to an exact task form");
   await navigate(page, `${options.baseURL}/m/${role}/tasks`);
+  // Reloading the same phone URL restores the current task screen. Return
+  // through its real controls before choosing a different source task.
+  const actionScreen = page.getByTestId("mobile-task-action-screen");
+  if (await actionScreen.isVisible()) {
+    await actionScreen.getByRole("button", { name: "返回任务详情", exact: true }).click();
+    await expect(page.getByTestId("mobile-task-detail-screen")).toBeVisible();
+    await settleRPCPage(page);
+  }
+  const receiptScreen = page.getByTestId("mobile-task-receipt-screen");
+  if (await receiptScreen.isVisible()) {
+    await receiptScreen.getByRole("button", { name: "返回任务列表", exact: true }).first().click();
+  } else if (await page.getByTestId("mobile-task-detail-screen").isVisible()) {
+    await page.getByTestId("mobile-task-detail-screen").getByRole("button", { name: "返回任务列表", exact: true }).first().click();
+  }
   await page.getByTestId("mobile-role-nav-tasks").click();
   await page.getByLabel("任务状态", { exact: true }).getByText(
     ["done", "withdrawn", "cancelled"].includes(task.task_status_key) ? "已办" : "待办",
@@ -73,17 +86,21 @@ export async function openMobileSourceTask(page, options, client, role, sourceTy
   await openMobileTaskCard(page, task.id);
   const detail = page.getByTestId("mobile-task-detail-screen");
   await expect(detail).toBeVisible();
-  const entry = detail.getByRole("button", { name: /^(办理业务|选择处理方式)$/u });
+  const entry = detail.getByRole("button", { name: /^(填写办理表单|选择处理方式)$/u });
   await expect(entry).toHaveCount(1);
   await expect(entry).toBeEnabled();
   if ((await entry.textContent()).trim() === "选择处理方式") {
     await entry.click();
-    await page.getByTestId("mobile-task-action-screen").getByRole("button", { name: "办理业务单据", exact: true }).click();
+    await page.getByTestId("mobile-task-action-screen").getByRole("button", { name: "填写办理表单", exact: true }).click();
   } else await entry.click();
-  await page.waitForURL(`${options.baseURL}${target}`);
-  await expect(page.getByTestId("mobile-task-business-screen")).toBeVisible();
+  assert.equal(new URL(page.url()).pathname, `/m/${role}/tasks`, "fact handling must remain inside the current mobile task screen");
+  const form = page.getByTestId("mobile-task-fact-form");
+  await expect(form).toBeVisible();
+  await expect(form).toHaveAttribute("data-source-type", sourceType);
+  await expect(form).toHaveAttribute("data-source-id", String(sourceID));
   await expect(page.getByTestId("mobile-task-flow-steps").locator("[data-step-key]")).toHaveCount(3);
   await assertMobileLayout(page, options);
+  await settleRPCPage(page);
   return task;
 }
 
@@ -138,7 +155,7 @@ export async function selectOption(page, control, label) {
   await expect(control).toHaveAttribute("aria-expanded", "false");
 }
 export async function selectRow(page, id) {
-  if (/^\/m\/[a-z_]+\/tasks\/[1-9][0-9]*\/handle\//u.test(new URL(page.url()).pathname)) {
+  if (/^\/m\/[a-z_]+\/tasks$/u.test(new URL(page.url()).pathname)) {
     const source = page.getByTestId("mobile-task-business-source");
     await expect(source).toHaveCount(1);
     await expect(source).toHaveAttribute("data-record-id", String(id));
@@ -152,16 +169,20 @@ export async function selectRow(page, id) {
 }
 export async function pageAction(page, label) {
   const direct = page.locator("button:visible").filter({ hasText: label });
-  if (await direct.isVisible()) return direct.click();
-  await page
-    .getByRole("button", { name: /^更多操作(?:，共 \d+ 项)?$/u })
-    .click();
+  const more = page.getByRole("button", { name: /^更多操作(?:，共 \d+ 项)?$/u });
+  await expect.poll(async () => (await direct.count()) > 0 || await more.isVisible()).toBe(true);
+  if ((await direct.count()) > 0) {
+    await expect(direct).toHaveCount(1);
+    return direct.click();
+  }
+  await more.click();
   await expect(direct).toHaveCount(1);
   await direct.click();
 }
 export async function modal(page, title) {
   const dialog = page
     .getByRole("dialog")
+    .filter({ has: page.locator(".ant-modal-title").filter({ hasText: title }) })
     .filter({ has: page.getByText(title, { exact: true }) });
   await expect(dialog).toBeVisible();
   await waitForFiniteAnimations(page, { selector: ".ant-modal" });
@@ -169,6 +190,7 @@ export async function modal(page, title) {
 }
 export async function settleRPCPage(page) {
   await page.waitForLoadState("networkidle");
+  if (page.rpcNetwork) await page.rpcNetwork.flushCancellations();
   await expect.poll(() => page.pendingRPC.size).toBe(0);
   await Promise.all([...page.rpcResponses]);
   // Let collected results mount views and deliver IntersectionObserver reads.
@@ -177,6 +199,7 @@ export async function settleRPCPage(page) {
     requestAnimationFrame(() => requestAnimationFrame(resolve)),
   ));
   await page.waitForLoadState("networkidle");
+  if (page.rpcNetwork) await page.rpcNetwork.flushCancellations();
   await expect.poll(() => page.pendingRPC.size).toBe(0);
   await Promise.all([...page.rpcResponses]);
 }
@@ -198,9 +221,11 @@ export async function closePage(page, context) {
     page.rpcNetwork.counts.started,
     page.rpcNetwork.counts.completed +
       page.rpcNetwork.counts.failed +
-      page.rpcNetwork.counts.navigationAborted,
-    "every dispatched RPC must complete, fail or be a startup read displaced by document navigation",
+      page.rpcNetwork.counts.navigationAborted +
+      page.rpcNetwork.counts.scopeAborted,
+    "every dispatched RPC must complete, fail or have proven read cancellation evidence",
   );
+  assert.equal(page.rpcNetwork.unclassifiedCancellations.size, 0, "unproven cancellations cannot be left out of the result");
   await context.close();
 }
 export async function clickRPC(page, method, action, code = 0) {
@@ -234,11 +259,18 @@ export async function login(browser, options, role, report) {
   page.expectedRPCFailures = new Map();
   page.rpcRecorded = 0;
   const transportFailure = (request, failure) => {
-    const { method } = request.postDataJSON();
+    const { method, params } = request.postDataJSON();
     if (consumeExpectedRPCFailure(request, page.expectedRPCFailures)) return;
     report.pageErrors.push({
       role,
+      surface: options.mobile ? "mobile" : "desktop",
       method,
+      taskID: params?.task_id,
+      timing: request.timing(),
+      url: page.url(),
+      responseStatus: request.response?.status,
+      serverRequestID: Object.entries(request.response?.headers || {}).find(([key]) => key.toLowerCase() === "x-request-id")?.[1],
+      cancellationClassification: request.cancellationDecision?.reason,
       message: "Unexpected RPC transport failure",
       failure,
     });
@@ -248,6 +280,7 @@ export async function login(browser, options, role, report) {
       transportFailure(request, {
         errorText: event.errorText,
         canceled: Boolean(event.canceled),
+        requestID: event.requestId,
       }),
     onComplete(request, readBody) {
       const collected = (async () => {
@@ -277,6 +310,7 @@ export async function login(browser, options, role, report) {
     role,
     surface: options.mobile ? "mobile" : "desktop",
     counts: page.rpcNetwork.counts,
+    cancellations: page.rpcNetwork.cancellations,
     history: page.rpcNetwork.history,
   });
   page.setDefaultTimeout(30000);

@@ -171,6 +171,9 @@ func salesOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.SalesOrder
 }
 
 func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if result := d.salesOrderErrorResult(ctx, err); result != nil {
 		return result
 	}

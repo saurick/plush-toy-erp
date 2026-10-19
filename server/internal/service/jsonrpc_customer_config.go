@@ -674,6 +674,9 @@ func runtimeCustomerConfigRequiresActiveRevision() bool {
 }
 
 func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}

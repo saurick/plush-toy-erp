@@ -29,6 +29,7 @@ type catalog struct {
 	RPCTransport  map[string]string                         `json:"rpcTransport"`
 	RPCInspection map[string]map[string]rpcSourceInspection `json:"rpcInspection"`
 	RPCCalls      map[string]map[string]rpcCallContract     `json:"rpcCalls"`
+	RPCIssues     []rpcExampleIssue                         `json:"rpcIssues,omitempty"`
 }
 
 var wordBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
@@ -478,6 +479,10 @@ func rpcMethods(root string) (map[string]map[string]string, error) {
 }
 
 func collect(root string) (catalog, error) {
+	return collectCatalog(root, false)
+}
+
+func collectCatalog(root string, review bool) (catalog, error) {
 	out := catalog{States: map[string]map[string]string{}, Attachments: map[string]any{}, Numeric: map[string]int64{}, Policies: map[string]map[string]int64{}}
 	rbac, err := parse(root, "server/internal/biz/rbac.go")
 	if err != nil {
@@ -670,14 +675,19 @@ func collect(root string) (catalog, error) {
 	if err != nil {
 		return out, err
 	}
-	out.RPCCalls, err = rpcCallContracts(root, out.RPC, out.RPCInspection)
+	if review {
+		out.RPCCalls, err = rpcCallContracts(root, out.RPC, out.RPCInspection, &out.RPCIssues)
+	} else {
+		out.RPCCalls, err = rpcCallContracts(root, out.RPC, out.RPCInspection)
+	}
 	return out, err
 }
 
 func main() {
 	root := flag.String("root", "..", "repository root")
+	review := flag.Bool("review", false, "read parsed contracts alongside example issues without generating outputs")
 	flag.Parse()
-	result, err := collect(*root)
+	result, err := collectCatalog(*root, *review)
 	if err == nil {
 		err = json.NewEncoder(os.Stdout).Encode(result)
 	}

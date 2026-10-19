@@ -15,19 +15,11 @@ import Table from '@/common/components/table/AppTable'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import { normalizeStringList } from '../../utils/permissionCenterAccess.mjs'
 import {
+  buildPermissionNavigationPlacement,
   getPermissionPageAccessReason,
   getPermissionPageEntry,
   groupPermissionPages,
 } from '../../utils/permissionNavigation.mjs'
-
-import {
-  getAuthenticatedNavigationSections,
-  getNavigationSections,
-} from '../../config/seedData.mjs'
-import {
-  buildRoleGuidedNavigationPreview,
-  ROLE_NAVIGATION_MODES,
-} from '../../config/roleGuidedNavigation.mjs'
 
 const ROLE_PAGE_ACCESS_FILTERS = {
   ALL: 'all',
@@ -365,115 +357,56 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
 function NavigationPlacementOverview({
   access = null,
   roleKey = '',
-  navigationMode = ROLE_NAVIGATION_MODES.RECOMMENDED,
-  primaryMenuPaths = [],
-  secondaryMenuPaths = [],
   dirty = false,
   loading = false,
 }) {
   const normalizedRoleKey = String(roleKey || '').trim()
   const accessRoleKey = String(access?.role_key || '').trim()
-  if (
-    loading ||
-    (normalizedRoleKey && accessRoleKey && normalizedRoleKey !== accessRoleKey)
-  ) {
+  if (loading) {
     return (
-      <Alert
-        type="info"
-        showIcon
-        message="正在读取已保存的导航位置"
-        description="读取完成后再按该岗位当前草稿的页面权限生成预览。"
-      />
+      <Text type="secondary" role="status">
+        正在读取岗位菜单…
+      </Text>
     )
   }
 
-  if (access?.is_final !== true) {
+  if (
+    access?.is_final !== true ||
+    (normalizedRoleKey && accessRoleKey !== normalizedRoleKey)
+  ) {
     return (
       <Alert
         type="warning"
         showIcon
-        message="暂不能生成岗位导航预览"
-        description="需要先核对公司当前启用范围，完成后会显示岗位导航预览。"
+        message="暂不能生成岗位菜单"
+        description="请先核对页面访问结果，读取完成后再查看菜单。"
       />
     )
   }
 
-  const placement = buildRoleGuidedNavigationPreview({
-    navigationSections: [
-      ...getNavigationSections(),
-      ...getAuthenticatedNavigationSections(),
-    ],
-    effectiveAccess: access,
-    roleKey,
-    navigationMode,
-    primaryMenuPaths,
-    secondaryMenuPaths,
-  })
-  const groups = [
-    {
-      key: 'dashboards',
-      title: '工作中心',
-      description: '每天开始工作的统一入口',
-      items: placement.dashboardItems,
-    },
-    {
-      key: 'primary',
-      title: '常用工作',
-      description: '岗位高频业务',
-      items: placement.primaryItems,
-    },
-    ...placement.secondarySections.map((section) => ({
-      ...section,
-      description: '侧栏直接显示',
-    })),
-  ].filter((group) => group.items.length > 0)
-
+  const { sections } = buildPermissionNavigationPlacement({ access })
   return (
-    <div className="erp-role-navigation-preview">
+    <section className="erp-role-navigation-preview" aria-label="岗位实际菜单">
       <div className="erp-role-navigation-preview__head">
         <div>
-          <Text strong>导航位置预览</Text>
+          <Text strong>侧栏入口</Text>
           <Paragraph type="secondary">
-            工作中心固定在最前，常用工作优先排列，其余入口按业务分组直接显示；模块内保留该岗位获准的页面。
+            菜单按岗位权限和业务模块生成，模块内只显示该岗位获准的页面。
           </Paragraph>
         </div>
-        <Tag
-          color={
-            navigationMode === ROLE_NAVIGATION_MODES.CUSTOM ? 'purple' : 'green'
-          }
-        >
-          {navigationMode === ROLE_NAVIGATION_MODES.CUSTOM
-            ? '自定义布局'
-            : '系统推荐'}
-        </Tag>
+        {dirty ? <Tag color="orange">未保存的功能草稿</Tag> : null}
       </div>
-      {dirty ? (
-        <Alert
-          type="warning"
-          showIcon
-          message="当前显示尚未保存的布局草稿"
-          description="功能权限、常用入口和顺序都会立即预览；保存岗位设置后才会对相关账号生效。"
-        />
-      ) : null}
       <div className="erp-role-navigation-preview__grid">
-        {groups.map((group) => (
+        {sections.map((section) => (
           <div
-            key={group.key}
+            key={section.key}
             className="erp-role-navigation-preview__group"
-            data-navigation-section={group.key}
+            data-navigation-section={section.key}
           >
-            <Text strong>{group.title}</Text>
-            <Text type="secondary">{group.description}</Text>
+            <Text strong>{section.title}</Text>
             <div className="erp-role-navigation-preview__items">
-              {group.items.map((item, index) => (
-                <Tag
-                  key={item.path}
-                  color={
-                    group.key === 'dashboards' || group.key === 'primary'
-                      ? 'blue'
-                      : undefined
-                  }
-                >
+              {section.items.map((item, index) => (
+                <Tag key={item.path}>
                   {index + 1}. {item.label}
                 </Tag>
               ))}
@@ -481,7 +414,7 @@ function NavigationPlacementOverview({
           </div>
         ))}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -551,8 +484,16 @@ function DataScopeOverview({
 function SensitiveFieldOverview({ permissionKeys = [] }) {
   const selected = new Set(normalizeStringList(permissionKeys))
   const groups = [
-    [PermissionCode.FIELD_PARTY_PRIVATE_READ, '客商隐私', '电话、地址、税号和账户'],
-    [PermissionCode.FIELD_SALES_COMMERCIAL_READ, '销售商业', '销售单价、折扣和金额'],
+    [
+      PermissionCode.FIELD_PARTY_PRIVATE_READ,
+      '客商隐私',
+      '电话、地址、税号和账户',
+    ],
+    [
+      PermissionCode.FIELD_SALES_COMMERCIAL_READ,
+      '销售商业',
+      '销售单价、折扣和金额',
+    ],
     [
       PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ,
       '采购商业',

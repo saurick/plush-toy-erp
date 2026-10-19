@@ -565,6 +565,10 @@
   font-size: var(--erp-font-caption);
 }
 
+.erp-business-selection-action-bar--loading {
+  visibility: hidden;
+}
+
 .erp-business-filter-panel:has(+ .erp-business-list-toolbar).ant-card,
 .erp-business-filter-panel:has(+ .erp-business-selection-action-bar).ant-card {
   border-bottom-right-radius: 8px;

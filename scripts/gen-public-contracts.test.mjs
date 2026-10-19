@@ -70,7 +70,7 @@ test('public contracts: RPC documentation preserves authored examples and descri
       list: { parameters: [], response: [{ name: 'result.data.orders', type: 'array', source: { path: 'server/internal/service/orders.go', line: 4 } }], dataType: 'object', example: { params: {}, data: { orders: [] }, basis: 'handler-fixture', test: 'TestOrders', source: { path: 'server/internal/service/orders_test.go', line: 5 } } },
     } },
   }
-  const original = `user-owned-before\n### 订单 \`orders\`\n\n| 方法 | 用途 |\n| --- | --- |\n| \`get\` | 查看订单 |\n| \`list\` | 查询订单 |\n\n#### 查看订单 \`orders.get\`\n\n##### 请求参数\n\n| 字段 | 类型 | 必填条件 | 说明 |\n| --- | --- | --- | --- |\n| \`id\` | integer | 必填 | 读取到的订单 ID。 |\n\n\`\`\`json\n{"jsonrpc":"2.0","method":"get","params":{"id":42},"id":"authored"}\n\`\`\`\n\n##### 返回结果\n\n| 返回字段 | 类型 | 说明 |\n| --- | --- | --- |\n| \`result.code\` | integer | 业务结果码。 |\n| \`result.data\` | object / null | 业务投影。 |\n\n\`\`\`json\n{"result":{"code":0,"data":{"order":{"id":42}}}}\n\`\`\`\nuser-owned-after\n`
+  const original = `user-owned-before\n### 订单 \`orders\`\n\n| 方法 | 中文名称 | 用途 |\n| --- | --- | --- |\n| \`get\` | 查看订单 | 查看订单用途 |\n| \`list\` | 查询订单 | 查询订单用途 |\n\n#### 查看订单 \`orders.get\`\n\n##### 请求参数\n\n| 字段 | 类型 | 必填条件 | 说明 |\n| --- | --- | --- | --- |\n| \`id\` | integer | 必填 | 读取到的订单 ID。 |\n\n\`\`\`json\n{"jsonrpc":"2.0","method":"get","params":{"id":42},"id":"authored"}\n\`\`\`\n\n##### 返回结果\n\n| 返回字段 | 类型 | 说明 |\n| --- | --- | --- |\n| \`result.code\` | integer | 业务结果码。 |\n| \`result.data\` | object / null | 业务投影。 |\n\n\`\`\`json\n{"result":{"code":0,"data":{"order":{"id":42}}}}\n\`\`\`\nuser-owned-after\n`
   const generated = renderRPCDocumentation(catalog, original)
   assert.match(generated, /\| `id` \| integer \| 必填 \| 读取到的订单 ID。/u)
   assert(generated.includes('| `note` | string &#124; null | 可选 |'))
@@ -95,7 +95,7 @@ test('public contracts: RPC documentation checks never write and reject invalid 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'public-contract-rpc-'))
   const file = path.join(directory, 'server/docs/api.md')
   const catalog = { rpc: { orders: { LIST: 'list' } }, rpcCalls: { orders: { list: { parameters: [], response: [], dataType: 'null', example: { params: {}, data: null, basis: 'backend-wire-shape' } } } } }
-  const original = '### 订单 `orders`\n\n| 方法 | 用途 |\n| --- | --- |\n| `list` | 查询订单 |\n'
+  const original = '### 订单 `orders`\n\n| 方法 | 中文名称 | 用途 |\n| --- | --- | --- |\n| `list` | 查询订单 | 查询订单用途 |\n'
   const start = '<!-- BEGIN GENERATED RPC FIELD CONTRACTS -->'
   const end = '<!-- END GENERATED RPC FIELD CONTRACTS -->'
   try {
@@ -113,7 +113,7 @@ test('public contracts: RPC documentation checks never write and reject invalid 
       assert.throws(() => syncRPCDocumentation(catalog, { repositoryRoot: directory }), /生成标记/u)
       assert.equal(fs.readFileSync(file, 'utf8'), original + invalid)
     }
-    assert.throws(() => renderRPCDocumentation(catalog, ''), /中文名称缺失/u)
+    assert.throws(() => renderRPCDocumentation(catalog, ''), /中文名称或用途缺失/u)
     assert.throws(() => renderRPCDocumentation({ ...catalog, rpcCalls: {} }, original), /合同或中文名称缺失/u)
   } finally { fs.rmSync(directory, { recursive: true, force: true }) }
 })
@@ -124,7 +124,7 @@ test('public contracts: authored result.data tables gain all nested fields and d
     response: [{ name: 'result.data.order', type: 'object' }, { name: 'result.data.order.id', type: 'integer' }],
     dataType: 'object', example: { params: { route: 'route' }, data: { order: { id: 1 } } },
   } } } }
-  const source = '### 订单 `orders`\n| 方法 | 用途 |\n| --- | --- |\n| `save` | 保存订单 |\n\n#### 保存订单 `orders.save`\n\n##### 请求参数\n\n| 字段 | 类型 | 必填条件 | 约束 |\n| --- | --- | --- | --- |\n| `route` | string | 必填 | 领域校验要求显式指定路线。 |\n\n##### 返回结果\n\n| result.data 字段 | 类型 | 说明 |\n| --- | --- | --- |\n| order | object | 当前订单投影。 |\n'
+  const source = '### 订单 `orders`\n| 方法 | 中文名称 | 用途 |\n| --- | --- | --- |\n| `save` | 保存订单 | 保存订单用途 |\n\n#### 保存订单 `orders.save`\n\n##### 请求参数\n\n| 字段 | 类型 | 必填条件 | 约束 |\n| --- | --- | --- | --- |\n| `route` | string | 必填 | 领域校验要求显式指定路线。 |\n\n##### 返回结果\n\n| result.data 字段 | 类型 | 说明 |\n| --- | --- | --- |\n| order | object | 当前订单投影。 |\n'
   const result = renderRPCDocumentation(catalog, source)
   assert(result.includes('| `route` | string | 必填 | 领域校验要求显式指定路线。 |'))
   assert(result.includes('| `result.data.order` | object | 当前订单投影。 |'))
@@ -193,6 +193,16 @@ test('public contracts: generated references, comments and fixture text are dist
 test('public contracts: production consumers use valid generated permission and RPC references', () => {
   assert.deepEqual(checkConsumers(), [])
   assert.deepEqual(checkScriptConsumers(), [])
+})
+
+test('public contracts: consumer impact retains removed methods through the baseline and ignores lexical shadows', () => {
+  const references = []
+  const source = `import { RpcMethod as Methods } from './rpcMethods.generated.mjs';
+const old = Methods.orders.REMOVED;
+function local() { const Methods = { orders: { REMOVED: 'unrelated' } }; return Methods.orders.REMOVED; }
+void old; void local;`
+  checkConsumerSource(source, 'consumer.mjs', { references, rpcCatalog: { orders: { REMOVED: 'removed_method' } } })
+  assert.deepEqual(references.map(({ key, path }) => ({ key, path })), [{ key: 'orders.removed_method', path: 'consumer.mjs' }])
 })
 
 test('public contracts: portable deployment RPC envelopes and local wrappers follow the dispatcher', () => {

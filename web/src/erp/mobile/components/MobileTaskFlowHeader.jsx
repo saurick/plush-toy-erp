@@ -1,3 +1,4 @@
+import '../mobileTaskPresentation.css'
 import MobileDetailHeader from './MobileDetailHeader.jsx'
 
 const MOBILE_TASK_FLOW_STEPS = Object.freeze([

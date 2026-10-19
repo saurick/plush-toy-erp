@@ -7,11 +7,8 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Space } from 'antd'
-import {
-  useOutletContext,
-  useLocation,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext, useLocation } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { InventoryLotStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
@@ -237,7 +234,7 @@ export default function SalesOrdersPage() {
   const outletContext = useOutletContext()
   const location = useLocation()
   const navigate = useBusinessNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]

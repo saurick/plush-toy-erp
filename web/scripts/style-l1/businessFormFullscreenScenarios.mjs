@@ -116,11 +116,10 @@ export function createBusinessFormFullscreenScenarios({ assert, outputDir }, sce
         await editor.getByRole('button', { name: '全屏编辑', exact: true }).waitFor()
         assert.equal((await metrics(editor)).fullscreen, undefined)
         await closeBusinessFormPage(page, editor)
-        await page.goto(new URL('/m/boss/handle/production/orders', page.url()).href)
-        await page.getByRole('button', { name: '新建生产订单' }).click()
-        await editor.getByRole('heading', { name: '新建生产订单', exact: true }).waitFor()
-        assert.equal(await editor.getByRole('button', { name: /全屏/u }).count(), 0, 'mobile routes remain without fullscreen at desktop width')
-        await closeBusinessFormPage(page, editor)
+        await page.goto(new URL('/m/boss/tasks', page.url()).href)
+        await page.locator('.mobile-role-tasks-page').waitFor({ state: 'visible' })
+        assert.equal(await editor.count(), 0, 'the mobile task workspace must not mount a desktop source document')
+        assert.equal(await page.getByRole('button', { name: /全屏/u }).count(), 0, 'the mobile task workspace remains without desktop fullscreen controls at desktop width')
       },
     },
     {

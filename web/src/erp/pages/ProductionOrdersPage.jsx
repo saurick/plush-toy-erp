@@ -1,11 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
-import {
-  useOutletContext,
-  useLocation,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext, useLocation } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { InventoryLotStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
@@ -270,7 +267,7 @@ export default function ProductionOrdersPage() {
   const location = useLocation()
   const processReturn = location.state?.productionProcessReturn
   const canReturnToExecution = processReturn?.pathname === BUSINESS_ROUTE_PATHS.productionProgress && new URLSearchParams(processReturn.search || '').get('display') === 'process'
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const routeProductionOrderID = searchParamPositiveInt(
     searchParams,
     'production_order_id'

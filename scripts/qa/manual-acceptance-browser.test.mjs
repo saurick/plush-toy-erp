@@ -407,8 +407,19 @@ async function datasetApplyEvidenceFixture({
     ),
   };
   reports.task.schedule = taskSchedule;
-  const taskPlan = buildManualAcceptanceTaskDataPlan({ ...printInput, nowSec: taskSchedule.anchorUnix });
-  for (const key of ["sourceID", "sourceType", "prefix", "batchRunId", "copyRevision", "taskProfile"]) reports.task[key] = taskPlan[key];
+  const taskPlan = buildManualAcceptanceTaskDataPlan({
+    ...printInput,
+    nowSec: taskSchedule.anchorUnix,
+  });
+  for (const key of [
+    "sourceID",
+    "sourceType",
+    "prefix",
+    "batchRunId",
+    "copyRevision",
+    "taskProfile",
+  ])
+    reports.task[key] = taskPlan[key];
   reports.task.summary.persisted = taskPlan.tasks.length;
   reports.facts.referenceRecords = {
     shipments: Array.from({ length: 47 }, (_, index) => ({
@@ -1211,7 +1222,10 @@ test("CLI help and active docs keep isolated defaults and explicit shared browse
   const [isolatedHelp, sharedHelp] = help.split(
     "  node scripts/qa/manual-acceptance-browser.mjs --plan --scenario-demo-shared-local",
   );
-  assert.doesNotMatch(isolatedHelp, /--backend-url http:\/\/127\.0\.0\.1:8300/u);
+  assert.doesNotMatch(
+    isolatedHelp,
+    /--backend-url http:\/\/127\.0\.0\.1:8300/u,
+  );
   assert.match(sharedHelp, /--backend-url http:\/\/127\.0\.0\.1:8300/u);
   assert.match(help, /2026\.09\.27-v8\/local\/dataset\/apply-report\.json/u);
   assert.match(help, /--dataset-report/u);
@@ -1227,8 +1241,10 @@ test("CLI help and active docs keep isolated defaults and explicit shared browse
     /manual-acceptance-browser\.mjs[\s\S]{0,900}--task-report/u,
   );
   for (const [, command] of readme.matchAll(/```bash\n([\s\S]*?)```/gu)) {
-    if (command.includes("manual-acceptance-browser.mjs") &&
-      command.includes("--backend-url http://127.0.0.1:8300")) {
+    if (
+      command.includes("manual-acceptance-browser.mjs") &&
+      command.includes("--backend-url http://127.0.0.1:8300")
+    ) {
       assert.match(command, /--scenario-demo-shared-local/u);
     }
   }
@@ -1745,8 +1761,9 @@ test("default browser rejects stale recipes and unregistered profiles before run
       fixture.datasetReport.chainVerificationDigest = "a".repeat(64);
     },
     (fixture) => {
-      fixture.datasetReport.stages.find((stage) => stage.key === "facts")
-        .references.runner.logicFingerprint = "a".repeat(64);
+      fixture.datasetReport.stages.find(
+        (stage) => stage.key === "facts",
+      ).references.runner.logicFingerprint = "a".repeat(64);
     },
     (fixture) => {
       delete fixture.datasetReport.sourceScaleProfile;
@@ -2327,12 +2344,23 @@ test("formal login retries only bounded pure HTTP 429 failures", async () => {
 });
 
 test("scoped totals accept current pagination units and reject unrelated or contradictory counts", () => {
-  for (const label of ["第 1–20 单，共 45 单", "第 1-10 条 / 共 45 条", "共 45 条", "不限状态，共 45 条"]) {
+  for (const label of [
+    "第 1–20 单，共 45 单",
+    "第 1-10 条 / 共 45 条",
+    "共 45 条",
+    "不限状态，共 45 条",
+  ]) {
     assert.deepEqual(readScopedPageTotal([label]).total, 45);
   }
   assert.equal(readScopedPageTotal(["第 1–10 项，共 20 项"]).total, 20);
-  assert.equal(readScopedPageTotal(["合同金额45 库存100 当前页20"]).total, null);
-  assert.equal(readScopedPageTotal(["共45条", "不限状态，共44条"]).consistent, false);
+  assert.equal(
+    readScopedPageTotal(["合同金额45 库存100 当前页20"]).total,
+    null,
+  );
+  assert.equal(
+    readScopedPageTotal(["共45条", "不限状态，共44条"]).consistent,
+    false,
+  );
   assert.equal(readScopedPageTotal([]).total, null);
 });
 
@@ -2342,7 +2370,9 @@ test("shipment list readiness waits for its selected current status scope and re
     let label = "不限状态，共 47 条";
     let rows = [{}];
     globalThis.document = {
-      querySelector: () => ({ querySelector: () => ({ getAttribute: () => label }) }),
+      querySelector: () => ({
+        querySelector: () => ({ getAttribute: () => label }),
+      }),
       querySelectorAll: () => rows,
     };
     assert.equal(shipmentListReady(47), true);
@@ -2355,6 +2385,91 @@ test("shipment list readiness waits for its selected current status scope and re
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;
+  }
+});
+
+test("compact status totals remain scoped to the selected unrestricted option", () => {
+  assert.equal(readScopedPageTotal(["不限状态 1,234"]).total, 1234);
+  assert.equal(readScopedPageTotal(["全部状态 47", "共 47 条"]).total, 47);
+  assert.equal(readScopedPageTotal(["不限状态 —"]).total, null);
+  assert.equal(readScopedPageTotal(["已出货 47"]).total, null);
+  assert.equal(
+    readScopedPageTotal(["不限状态 46", "共 47 条"]).consistent,
+    false,
+  );
+});
+
+test("shipment compact readiness requires the exact unrestricted total, loaded group and actual rows", () => {
+  const originalDocument = globalThis.document;
+  let label = "不限状态 47";
+  let loading = false;
+  let rows = [{}];
+  globalThis.document = {
+    querySelector(selector) {
+      assert.match(selector, /\[aria-label="出货单状态"\]/u);
+      assert.match(selector, /\[aria-busy="false"\]/u);
+      return loading
+        ? null
+        : {
+            querySelector: () => ({
+              getAttribute: () => null,
+              get textContent() {
+                return label;
+              },
+            }),
+          };
+    },
+    querySelectorAll: () => rows,
+  };
+  try {
+    assert.equal(shipmentListReady(47), true);
+    assert.equal(shipmentListReady(46), false);
+    label = "已出货 47";
+    assert.equal(shipmentListReady(47), false);
+    label = "不限状态 —";
+    assert.equal(shipmentListReady(47), false);
+    label = "不限状态 47";
+    loading = true;
+    assert.equal(shipmentListReady(47), false);
+    loading = false;
+    rows = [];
+    assert.equal(shipmentListReady(47), false);
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
+});
+
+test("compact status DOM totals exclude adjacent selectors and unselected dropdown options", () => {
+  const saved = { document: globalThis.document, window: globalThis.window };
+  const node = (text) => ({
+    textContent: text,
+    getAttribute: () => null,
+    getBoundingClientRect: () => ({ width: 100, height: 20 }),
+  });
+  globalThis.window = { getComputedStyle: () => ({ visibility: "visible" }) };
+  globalThis.document = {
+    querySelectorAll(selector) {
+      if (selector.includes(".ant-pagination-total-text"))
+        return [node("共 47 条")];
+      if (selector.includes(".erp-business-status-filters")) {
+        return selector.includes(
+          '.erp-business-status-filter-compact-wrap[aria-busy="false"] .ant-select-selection-item',
+        )
+          ? [node("不限状态 47")]
+          : [];
+      }
+      return [];
+    },
+  };
+  try {
+    const snapshot = readListDOMSnapshot();
+    assert.deepEqual(snapshot.totalTexts, ["共 47 条", "不限状态 47"]);
+    assert.equal(readScopedPageTotal(snapshot.totalTexts).total, 47);
+  } finally {
+    for (const [key, value] of Object.entries(saved))
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
   }
 });
 
@@ -3245,7 +3360,10 @@ test("business print proof searches canonical current-batch records before exact
   assert.match(source, /buildPrintWorkspaceDataEvidence/u);
   assert.match(source, /recordQuery/u);
   assert.match(source, /search\.fill\(recordQuery\)/u);
-  assert.doesNotMatch(source.slice(currentBatchMinimumIndex, exactRecordIndex + 60), /search\.press\("Enter"\)/u);
+  assert.doesNotMatch(
+    source.slice(currentBatchMinimumIndex, exactRecordIndex + 60),
+    /search\.press\("Enter"\)/u,
+  );
   assert.match(
     source,
     /rows\.every\(\(candidate\) => candidate\.innerText\.includes\(query\)\)/u,
@@ -3467,14 +3585,53 @@ test("historical readiness evidence cannot override a current DOM minimum failur
 });
 
 test("readiness binding cannot replace canonical DOM minimum proof", () => {
-  const records = Array.from({ length: 45 }, (_, offset) => ({ key: String(offset + 1), identifier: `F-${offset + 1}` }));
-  const rows = [{ key: "1", cells: ["F-1"] }, { key: "999", cells: ["F-2"] }, { key: "2", cells: ["OLD-F-2"] }];
+  const records = Array.from({ length: 45 }, (_, offset) => ({
+    key: String(offset + 1),
+    identifier: `F-${offset + 1}`,
+  }));
+  const rows = [
+    { key: "1", cells: ["F-1"] },
+    { key: "999", cells: ["F-2"] },
+    { key: "2", cells: ["OLD-F-2"] },
+  ];
   assert.deepEqual(matchCanonicalDOMRows(rows, records), ["F-1"]);
-  assert.deepEqual(matchCanonicalDOMRows([{ key: "2", cells: ["任务：F-2（来源）"] }], records), ["F-2"]);
-  assert.deepEqual(matchCanonicalDOMRows([{ key: "2", cells: ["F-20"] }], records), []);
-  const base = { currentBatch: { dataStatus: "pass", actual: 45 }, currentBatchDOM: { mode: "exact_business_number", matchingCurrentBatchItems: 1 }, renderedItems: 20, pageReportedTotal: 999, minimumRecords: 45 };
+  assert.deepEqual(
+    matchCanonicalDOMRows(
+      [{ key: "2", cells: ["任务：F-2（来源）"] }],
+      records,
+    ),
+    ["F-2"],
+  );
+  assert.deepEqual(
+    matchCanonicalDOMRows([{ key: "2", cells: ["F-20"] }], records),
+    [],
+  );
+  const base = {
+    currentBatch: { dataStatus: "pass", actual: 45 },
+    currentBatchDOM: {
+      mode: "exact_business_number",
+      matchingCurrentBatchItems: 1,
+    },
+    renderedItems: 20,
+    pageReportedTotal: 999,
+    minimumRecords: 45,
+  };
   assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, false);
-  assert.equal(evaluateCurrentBatchListEvidence({ ...base, quantityScope: { mode: "canonical_records", unit: "records", scopeVerified: true, total: 999, totalConsistent: true, canonicalMembershipVerified: true, matchedIdentifiers: matchCanonicalDOMRows(rows, records) } }).minimumSatisfied, false);
+  assert.equal(
+    evaluateCurrentBatchListEvidence({
+      ...base,
+      quantityScope: {
+        mode: "canonical_records",
+        unit: "records",
+        scopeVerified: true,
+        total: 999,
+        totalConsistent: true,
+        canonicalMembershipVerified: true,
+        matchedIdentifiers: matchCanonicalDOMRows(rows, records),
+      },
+    }).minimumSatisfied,
+    false,
+  );
 });
 
 test("missing password starts zero browsers and performs zero probes", async () => {
@@ -3670,6 +3827,7 @@ test("canonical quantity traversal reads actual DOM pagination and stops when th
       if (
         selector.includes(".ant-table-thead") ||
         selector.includes(".erp-business-status-filters") ||
+        selector.includes(".erp-task-pagination") ||
         selector.includes(".ant-spin-spinning")
       )
         return [];
@@ -4358,4 +4516,83 @@ test("bound dataset rejects incomplete source document pools before any browser 
   } finally {
     await fs.rm(fixture.outputRoot, { recursive: true, force: true });
   }
+});
+
+test("injected telemetry network failures stay separate from ERP failures", () => {
+  const optional = [
+    {
+      type: "request",
+      sourceURL:
+        "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301",
+      message: "GET beacon net::ERR_CONNECTION_CLOSED",
+    },
+    {
+      type: "console",
+      sourceURL:
+        "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301",
+      message: "Failed to load resource: net::ERR_CONNECTION_CLOSED",
+    },
+    {
+      type: "response",
+      sourceURL: "https://demo.yoyoosun.net/cdn-cgi/rum",
+      message: "503 telemetry",
+    },
+  ];
+  const business = {
+    type: "response",
+    sourceURL: "https://demo.yoyoosun.net/rpc/auth",
+    message: "503 auth",
+  };
+  const result = partitionTargetRuntimeEvents({ group: "desktop" }, [
+    ...optional,
+    business,
+  ]);
+  assert.deepEqual(result.expected, optional);
+  assert.deepEqual(result.blocking, [business]);
+});
+
+test("telemetry classification never relaxes application, font, script or unknown console errors", () => {
+  const events = [
+    {
+      type: "request",
+      sourceURL: "https://demo.yoyoosun.net/assets/font.woff2",
+      message: "font connection closed",
+    },
+    {
+      type: "page",
+      sourceURL:
+        "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301",
+      message: "script execution error",
+    },
+    {
+      type: "console",
+      sourceURL:
+        "https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301",
+      message: "TypeError: wrong state",
+    },
+    {
+      type: "request",
+      sourceURL:
+        "https://static.cloudflareinsights.com.evil.invalid/beacon.min.js/vce701823e78c4301",
+      message: "connection closed",
+    },
+    {
+      type: "request",
+      sourceURL:
+        "https://static.cloudflareinsights.com:8443/beacon.min.js/vce701823e78c4301",
+      message: "connection closed",
+    },
+    {
+      type: "request",
+      sourceURL: "https://static.cloudflareinsights.com/application.js",
+      message: "connection closed",
+    },
+    {
+      type: "console",
+      message: "Failed to load resource: net::ERR_CONNECTION_CLOSED",
+    },
+  ];
+  const result = partitionTargetRuntimeEvents({ group: "mobile" }, events);
+  assert.deepEqual(result.blocking, events);
+  assert.deepEqual(result.expected, []);
 });

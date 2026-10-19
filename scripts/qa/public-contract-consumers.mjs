@@ -28,7 +28,7 @@ function propertyName(node) {
   return node.computed ? (node.property.type === 'Literal' ? node.property.value : null) : node.property.name
 }
 
-export function checkConsumerSource(source, filename = 'consumer.mjs') {
+export function checkConsumerSource(source, filename = 'consumer.mjs', { references, rpcCatalog = RpcMethod } = {}) {
   const rule = {
     create(context) {
       const clients = new Map()
@@ -52,13 +52,14 @@ export function checkConsumerSource(source, filename = 'consumer.mjs') {
           const variable = variableOf(node)
           const binding = imported(node)
           if (binding) {
-            const module = contractModules[path.posix.basename(binding.source)]
+            const basename = path.posix.basename(binding.source)
+            const module = basename === 'rpcMethods.generated.mjs' ? { RpcDomain, RpcMethod: rpcCatalog, RpcTransport } : contractModules[basename]
             if (!module) return null
             if (binding.specifier.type === 'ImportNamespaceSpecifier') return { value: module, keys: [] }
             const name = binding.specifier.imported?.name
             return Object.hasOwn(module, name) ? { value: module[name], name, keys: [] } : null
           }
-          if (!variable && Object.hasOwn(tables, node.name)) return { value: tables[node.name], name: node.name, keys: [] }
+          if (!variable && Object.hasOwn(tables, node.name)) return { value: node.name === 'RpcMethod' ? rpcCatalog : tables[node.name], name: node.name, keys: [] }
           const definition = variable?.defs[0]
           if (seen.has(variable) || definition?.node.type !== 'VariableDeclarator' || definition.node.id.type !== 'Identifier' || definition.parent.kind !== 'const') return null
           seen.add(variable)
@@ -99,6 +100,9 @@ export function checkConsumerSource(source, filename = 'consumer.mjs') {
         MemberExpression(node) {
           const contract = contractOf(node)
           if (contract?.invalid) report(node, `未定义的公共契约 ${[contract.name, ...contract.keys].join('.')}`)
+          if (references && contract?.name === 'RpcMethod' && !contract.invalid && contract.keys.length === 2 && typeof contract.value === 'string') {
+            references.push({ key: `${contract.keys[0]}.${contract.value}`, path: filename, line: node.loc.start.line })
+          }
         },
         ImportDeclaration(node) {
           for (const specifier of node.specifiers) {
@@ -156,6 +160,21 @@ export function checkConsumers(directory = path.join(root, 'web/src')) {
     }
   }
   return errors
+}
+
+export function collectRPCConsumerReferences(repositoryRoot = root, { rpcCatalog = RpcMethod } = {}) {
+  const references = []
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const target = path.join(directory, entry.name)
+      if (entry.isDirectory()) walk(target)
+      else if (/\.(?:js|mjs|jsx)$/u.test(entry.name) && !/\.(?:test|generated)\./u.test(entry.name)) {
+        checkConsumerSource(fs.readFileSync(target, 'utf8'), path.relative(repositoryRoot, target).split(path.sep).join('/'), { references, rpcCatalog })
+      }
+    }
+  }
+  walk(path.join(repositoryRoot, 'web/src'))
+  return [...new Map(references.map((row) => [`${row.key}:${row.path}:${row.line}`, row])).values()]
 }
 
 // Deployment scripts remain portable: check their actual RPC envelopes and

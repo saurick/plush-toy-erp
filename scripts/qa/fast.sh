@@ -118,6 +118,8 @@ qa_fast_repository_guards() {
 
   bash "$ROOT_DIR/scripts/qa/error-code-sync.sh"
   node "$ROOT_DIR/scripts/gen-public-contracts.mjs" --check
+  echo "[qa:fast] 核对已登记接口文档样例的实际执行结果"
+  node "$ROOT_DIR/scripts/gen-public-contracts.mjs" --verify-examples
 
   echo "[qa:fast] 运行错误码魔法数字检查"
   bash "$ROOT_DIR/scripts/qa/error-codes.sh"

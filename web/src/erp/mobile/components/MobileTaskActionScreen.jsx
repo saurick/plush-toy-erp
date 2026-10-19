@@ -5,13 +5,10 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import { BusinessHelpLabel } from '../../components/help/BusinessContextHelp.jsx'
-import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import {
   MOBILE_TASK_ACTION_ACCESS_STATES,
-  getMobileRoleLabel,
   resolveMobileActionLabel,
   resolveMobileTaskStatusLabel,
-  resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import {
   getWorkflowProcessDecisionApprovalProfile,
@@ -25,6 +22,9 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 import { getWorkflowTaskActionOutcomeHint } from '../../utils/workflowTaskProcessingHint.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
+import MobileTaskContextCard, { mobileTaskAssigneeLabel } from './MobileTaskContextCard.jsx'
+import MobileTaskAttachments from './MobileTaskAttachments.jsx'
+import { WorkflowTaskCopySummary } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { orderWorkflowTaskActions } from '../../utils/workflowTaskActionFlow.mjs'
 
@@ -58,6 +58,12 @@ const REASON_REQUIRED_ACTIONS = new Set([
   'resume',
   'urge',
 ])
+
+function hasOpenTaskOverlay() {
+  return [...document.querySelectorAll('[role="dialog"], [role="menu"], [role="tooltip"]')].some(
+    (node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden'
+  )
+}
 
 function resolveAccessCopy(accessState, accessMessage) {
   if (accessMessage) return accessMessage
@@ -131,11 +137,12 @@ function MobileWorkflowTaskActionScreen({
   availableActions = [],
   busy = false,
   canViewReceipt = false,
+  canManageAttachments = false,
   hasActionCapability = false,
   onActionChange = () => {},
   onApprovedQuantityChange = () => {},
   onBack = () => {},
-  onOpenBusiness = null,
+  onOpenTaskForm = null,
   onReasonChange = () => {},
   onRetryAccess = null,
   onSubmit = () => {},
@@ -193,11 +200,9 @@ function MobileWorkflowTaskActionScreen({
   const showDisabledSubmit =
     !canSubmit && !showFooterRetry && hasActionCapability === true
   const accessCopy = resolveAccessCopy(accessState, accessMessage)
-  const taskName = getWorkflowTaskDisplayName(task)
   const taskStatus = task
     ? resolveMobileTaskStatusLabel(task)
     : '任务状态暂不可用'
-  const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
   const approvalTask = isWorkflowApprovalTask(task)
   const visibleActionKeys = orderWorkflowTaskActions({
     actions: visibleActions.map((option) => option.key),
@@ -360,7 +365,7 @@ function MobileWorkflowTaskActionScreen({
     const screen = screenRef.current
     if (!screen) return undefined
     const handleKeyboardShortcut = (event) => {
-      if (busy) return
+      if (busy || event.defaultPrevented || hasOpenTaskOverlay()) return
       if (event.key === 'Escape') {
         event.preventDefault()
         onBack()
@@ -414,7 +419,7 @@ function MobileWorkflowTaskActionScreen({
   return (
     <form
       ref={screenRef}
-      className="mobile-role-tasks-page mobile-role-tasks-page--detail md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      className="mobile-role-tasks-page mobile-role-tasks-page--detail mobile-role-tasks-page--task-info mobile-task-screen md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
       aria-busy={busy}
       data-testid="mobile-task-action-screen"
       noValidate
@@ -430,28 +435,11 @@ function MobileWorkflowTaskActionScreen({
         onOpenReceipt={onViewReceipt}
         receiptUnavailableLabel="提交后开放"
         title="任务办理"
-        trailing={
-          <span className="mobile-task-flow-status max-w-[112px] break-words rounded-full bg-slate-100 px-3 py-2 text-center text-sm font-semibold text-slate-600">
-            {taskStatus}
-          </span>
-        }
+        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={mobileTaskAssigneeLabel(task)} compact />}
       />
 
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
-        <section
-          className="erp-mobile-card mobile-detail-section"
-          data-testid="mobile-task-action-context"
-        >
-          <h2 className="break-words text-base font-semibold leading-6 text-slate-950 [overflow-wrap:anywhere]">
-            {taskName}
-          </h2>
-          <p className="mobile-detail-identity">
-            {taskSource}
-            {task?.owner_role_key
-              ? ` · ${getMobileRoleLabel(task.owner_role_key)}`
-              : ''}
-          </p>
-        </section>
+        <div data-testid="mobile-task-action-context"><MobileTaskContextCard task={task} status={taskStatus} /></div>
 
         {accessCopy ? (
           <section
@@ -512,10 +500,10 @@ function MobileWorkflowTaskActionScreen({
                 ) : null}
               </section>
             ) : null}
-            {onOpenBusiness ? (
+            {onOpenTaskForm ? (
               <section className="erp-mobile-card mobile-detail-section">
-                <button type="button" className="mobile-detail-secondary min-h-11 w-full rounded-xl px-4 py-3 text-base font-semibold" disabled={busy} onClick={onOpenBusiness}>
-                  办理业务单据
+                <button type="button" className="mobile-detail-secondary min-h-11 w-full rounded-xl px-4 py-3 text-base font-semibold" disabled={busy} onClick={onOpenTaskForm}>
+                  填写办理表单
                 </button>
               </section>
             ) : null}
@@ -584,6 +572,7 @@ function MobileWorkflowTaskActionScreen({
                   <textarea
                     ref={reasonRef}
                     id={`${fieldID}-reason`}
+                    aria-label={resolveReasonLabel(effectiveAction, approvalTask)}
                     className="mobile-task-action-input"
                     aria-describedby={
                       validationErrors.reason
@@ -673,8 +662,9 @@ function MobileWorkflowTaskActionScreen({
         <MobileBackToTop />
       </main>
 
-      {accessAllowsSubmit || showFooterRetry || showDisabledSubmit ? (
+      {task?.id || accessAllowsSubmit || showFooterRetry || showDisabledSubmit ? (
         <div className="mobile-role-action-bar mobile-task-action-footer">
+          <MobileTaskAttachments task={task} canManage={canManageAttachments} busy={busy} />
           {accessAllowsSubmit ? (
             <button
               type="submit"
@@ -711,17 +701,17 @@ function MobileWorkflowTaskActionScreen({
 }
 
 export default function MobileTaskActionScreen(props) {
-  const { renderSourceAction, onBack, task } = props
+  const { renderSourceAction, onBack, task, canManageAttachments } = props
   if (!renderSourceAction) {
     return <MobileWorkflowTaskActionScreen {...props} />
   }
-  return renderSourceAction(({ content, footer, saving }) => (
+  return renderSourceAction(({ content, footer, saving, canViewReceipt, onViewReceipt, taskForm, actionHostRef }) => (
     <div
-      className="mobile-role-tasks-page mobile-role-tasks-page--detail md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      className={`mobile-role-tasks-page mobile-role-tasks-page--detail mobile-role-tasks-page--task-info mobile-task-screen md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl${taskForm ? ' mobile-task-business' : ''}`}
       aria-busy={saving}
       data-testid="mobile-task-action-screen"
       onKeyDown={(event) => {
-        if (saving) return
+        if (saving || event.defaultPrevented || !event.currentTarget.contains(event.target) || hasOpenTaskOverlay()) return
         if (event.key === 'Escape') onBack?.()
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
           event.preventDefault()
@@ -733,30 +723,26 @@ export default function MobileTaskActionScreen(props) {
         backLabel="返回任务详情"
         busy={saving}
         currentStep="process"
+        canOpenReceipt={canViewReceipt}
+        onOpenReceipt={onViewReceipt}
         onBack={onBack}
         onOpenDetail={onBack}
         receiptUnavailableLabel="提交后开放"
         title="任务办理"
+        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={mobileTaskAssigneeLabel(task)} compact />}
       />
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
-        <section className="erp-mobile-card mobile-detail-section">
-          <h2 className="break-words text-base font-semibold leading-6 text-slate-950">
-            {getWorkflowTaskDisplayName(task)}
-          </h2>
-          <p className="mt-1 break-words text-sm leading-5 text-slate-500">
-            {resolveTaskSourceLabel(task)}
-          </p>
-        </section>
+        <MobileTaskContextCard task={task} />
         <div className="erp-material-task-action erp-material-task-action--mobile">
           {content}
         </div>
         <MobileBackToTop />
       </main>
-      {footer ? (
-        <div className="mobile-role-action-bar mobile-task-action-footer">
-          {footer}
-        </div>
-      ) : null}
+      <div className="mobile-role-action-bar mobile-task-action-footer">
+        <MobileTaskAttachments task={task} canManage={canManageAttachments} busy={saving} />
+        <div className="mobile-task-business-action-host" ref={actionHostRef} />
+        {footer}
+      </div>
     </div>
   ))
 }

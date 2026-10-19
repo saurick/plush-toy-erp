@@ -9,6 +9,19 @@ import {
   DEFAULT_RPC_ERROR_MESSAGES,
 } from './errorCodes.js'
 
+test('request cancellation has a distinct code and never requests relogin or implies a completed write', () => {
+  assert.equal(RpcErrorCode.REQUEST_CANCELED, 49900)
+  assert.equal(isAuthFailureCode(RpcErrorCode.REQUEST_CANCELED), false)
+  assert.equal(
+    isAdminSessionUnavailableCode(RpcErrorCode.REQUEST_CANCELED),
+    false
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.REQUEST_CANCELED],
+    '请求已取消，请刷新核对处理结果'
+  )
+})
+
 test('errorCodes: 所有错误码保持唯一', () => {
   const values = Object.values(RpcErrorCode)
   assert.equal(new Set(values).size, values.length)

@@ -75,22 +75,30 @@ const permissions = [
 
 test('permission menu projection: 导航位置按直接显示的业务分组标注', () => {
   const placement = getMenuPlacementMap({
-    dashboardItems: [{ path: '/erp/dashboard' }],
-    primaryItems: [{ path: '/erp/finance/receivables' }],
-    secondarySections: [
-      { title: '业务模块', items: [{ path: '/erp/warehouse/inventory' }] },
-      { title: '工具与查询', items: [{ path: '/erp/history-center' }] },
+    sections: [
+      { title: '工作中心', items: [{ path: '/erp/dashboard' }] },
+      {
+        key: 'business',
+        title: '业务模块',
+        items: [
+          { path: '/erp/finance/receivables', label: '财务管理' },
+          { path: '/erp/warehouse/inventory', label: '库存管理' },
+        ],
+      },
+      { title: '工具与查询', items: [{ path: '/erp/history' }] },
       { title: '系统与帮助', items: [{ path: '/erp/help-center' }] },
     ],
+    pages: [{ path: '/erp/finance/payables' }],
   })
   assert.deepEqual(
     [...placement],
     [
       ['/erp/dashboard', '工作中心'],
-      ['/erp/finance/receivables', '常用工作'],
-      ['/erp/warehouse/inventory', '业务模块'],
-      ['/erp/history-center', '工具与查询'],
+      ['/erp/finance/receivables', '业务模块 / 财务管理'],
+      ['/erp/warehouse/inventory', '业务模块 / 库存管理'],
+      ['/erp/history', '工具与查询'],
       ['/erp/help-center', '系统与帮助'],
+      ['/erp/finance/payables', '业务模块 / 财务管理'],
     ]
   )
 })

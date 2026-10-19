@@ -12,7 +12,7 @@ const request = (requestId, method, wallTime = 0) => ({
   wallTime,
   request: {
     url: "http://127.0.0.1:15201/rpc/workflow",
-    postData: JSON.stringify({ method }),
+    postData: JSON.stringify({ id: requestId, method }),
   },
 });
 
@@ -49,6 +49,7 @@ test("actual RPCs stay pending until their own protocol terminal event, includin
     completed: 2,
     failed: 0,
     navigationAborted: 0,
+    scopeAborted: 0,
   });
 });
 
@@ -70,6 +71,7 @@ test("non-RPC resources cannot create or complete a business request", () => {
     completed: 1,
     failed: 0,
     navigationAborted: 0,
+    scopeAborted: 0,
   });
 });
 
@@ -78,7 +80,7 @@ test("browser tracking attaches before network enable and handles both completio
   const session = {
     on: (name, handler) => handlers.set(name, handler),
     send: async (method, params) => {
-      if (method === "Page.enable") return;
+      if (["Page.enable", "Runtime.addBinding", "Runtime.enable", "Page.addScriptToEvaluateOnNewDocument"].includes(method)) return;
       if (method === "Network.configureDurableMessages") {
         assert.deepEqual(params, { maxTotalBufferSize: 16 * 1024 * 1024, maxResourceBufferSize: 4 * 1024 * 1024 });
         return;
@@ -125,11 +127,13 @@ test("browser tracking attaches before network enable and handles both completio
     completed: 1,
     failed: 1,
     navigationAborted: 0,
+    scopeAborted: 0,
   });
 });
 
-test("document navigation terminates only displaced startup reads and retains unfinished writes and current reads", () => {
-  const tracker = createRPCNetworkTracker();
+test("navigation never supplies a terminal event or a cancellation allowance for writes and unsupported reads", () => {
+  const failures = [];
+  const tracker = createRPCNetworkTracker({ onFailure: record => failures.push(record.postDataJSON().id) });
   const inDocument = (id, method, loaderId) => ({
     ...request(id, method),
     frameId: "main",
@@ -146,27 +150,98 @@ test("document navigation terminates only displaced startup reads and retains un
     ...inDocument("wrong-domain", "get_workbench", "old"),
     request: {
       url: "http://127.0.0.1:15201/rpc/operational_fact",
-      postData: JSON.stringify({ method: "get_workbench" }),
+      postData: JSON.stringify({ id: "wrong-domain", method: "get_workbench" }),
     },
   });
   tracker.navigated({ frame: { id: "main", loaderId: "new" } });
-  assert.equal(tracker.pending.size, 3);
+  assert.equal(tracker.pending.size, 4);
   tracker.started(inDocument("late", "get_task_board", "old"));
   tracker.started(inDocument("current", "get_task_board", "new"));
-  assert.equal(tracker.pending.size, 4);
-  assert.equal(tracker.counts.navigationAborted, 2);
+  assert.equal(tracker.pending.size, 6, "loader replacement cannot synthesize a request outcome");
+  assert.equal(tracker.counts.navigationAborted, 0);
   tracker.finished({ requestId: "read" });
-  assert.equal(tracker.counts.navigationAborted, 1);
+  assert.equal(tracker.counts.navigationAborted, 0);
   assert.equal(tracker.counts.completed, 1);
+  tracker.failed({ requestId: 'write', errorText: 'net::ERR_ABORTED', canceled: true });
+  tracker.failed({ requestId: 'wrong-domain', errorText: 'net::ERR_ABORTED', canceled: true });
+  assert.deepEqual(failures, ['write', 'wrong-domain']);
   assert.deepEqual(
     [...tracker.pending].map((record) => record.postDataJSON().method).sort(),
     [
-      "create_finance_payment",
       "get_task_board",
       "get_task_board",
-      "get_workbench",
+      "get_task_board",
     ],
   );
+});
+
+const release = (rpcID, type = 'scope-release', extra = {}) => ({
+  type, rpcID, domain: 'workflow', method: 'get_task_board', frameId: 'main', loaderId: 'old', bootstrapAt: 1,
+  requestState: 'pending', reasonName: 'AbortError', scope: { owner: 'latest-request', cause: 'superseded', generation: 1, nextGeneration: 2 }, ...extra,
+});
+const startedInOldDocument = id => ({ ...request(id, 'get_task_board', 2), frameId: 'main', loaderId: 'old' });
+const aborted = requestId => ({ requestId, errorText: 'net::ERR_ABORTED', canceled: true });
+
+test('proven read cancellation remains a raw failed event and is counted separately from completed business results', () => {
+  const failures = [];
+  const completions = [];
+  const tracker = createRPCNetworkTracker({ onFailure: record => failures.push(record), onComplete: record => completions.push(record) });
+  tracker.navigated({ frame: { id: 'main', loaderId: 'old' } });
+  tracker.started(startedInOldDocument('scope'));
+  tracker.started(startedInOldDocument('navigation'));
+  tracker.observedRelease(release('scope'));
+  tracker.observedRelease(release('navigation', 'document-release'));
+  tracker.navigated({ frame: { id: 'main', loaderId: 'new' } });
+  assert.equal(tracker.pending.size, 2);
+  tracker.failed(aborted('scope'));
+  tracker.failed(aborted('navigation'));
+  assert.equal(tracker.counts.failed, 2, 'unclassified cancellation is a failure until evidence is checked');
+  tracker.flushCancellations();
+  assert.deepEqual(tracker.counts, { started: 2, completed: 0, failed: 0, navigationAborted: 1, scopeAborted: 1 });
+  assert.deepEqual(failures, []);
+  assert.deepEqual(completions, [], 'no business response may be fabricated for a canceled read');
+  assert.deepEqual(tracker.cancellations.map(entry => entry.category), ['scope_superseded', 'document_navigation']);
+  assert.ok(tracker.cancellations.every(entry => entry.errorText === 'net::ERR_ABORTED'));
+});
+
+test('out-of-order lifecycle messages use request identity and the last known phase; late evidence cannot erase a reported failure', () => {
+  const failures = [];
+  const tracker = createRPCNetworkTracker({ onFailure: record => failures.push(record.cancellationDecision.reason) });
+  tracker.observedRelease(release('old', 'document-release'));
+  tracker.observedRelease(release('old', 'document-release', { requestState: 'failed' }));
+  tracker.started(startedInOldDocument('old'));
+  tracker.navigated({ frame: { id: 'main', loaderId: 'new' } });
+  tracker.failed(aborted('old'));
+  tracker.flushCancellations();
+  assert.deepEqual(failures, ['cancellation_without_lifecycle_evidence']);
+  tracker.observedRelease(release('old'));
+  tracker.flushCancellations();
+  assert.equal(tracker.counts.failed, 1);
+  assert.equal(tracker.counts.scopeAborted, 0);
+  assert.equal(tracker.unclassifiedCancellations.size, 0);
+});
+
+test('native document destruction retires only evidenced reads; late network completion or genuine failure takes precedence', () => {
+  for (const late of ['completed', 'failed']) {
+    const completions = [], failures = [];
+    const tracker = createRPCNetworkTracker({ onComplete: record => completions.push(record), onFailure: record => failures.push(record) });
+    tracker.started(startedInOldDocument('read'));
+    tracker.started({ ...startedInOldDocument('write'), request: { url: 'http://127.0.0.1/rpc/workflow', postData: JSON.stringify({ id: 'write', method: 'complete_task_action' }) } });
+    tracker.observedRelease(release('read', 'document-release'));
+    tracker.observedRelease({ type: 'document-destroyed', frameId: 'main', loaderId: 'old', bootstrapAt: 1, source: 'Runtime.executionContextsCleared' });
+    tracker.navigated({ frame: { id: 'main', loaderId: 'new' } });
+    tracker.flushCancellations();
+    assert.equal(tracker.pending.size, 1, 'a write cannot be retired by document destruction');
+    assert.equal(tracker.counts.navigationAborted, 1);
+    assert.equal(tracker.cancellations[0].errorText, undefined, 'a missing network event must not fabricate ERR_ABORTED');
+    if (late === 'completed') tracker.finished({ requestId: 'read' });
+    else tracker.failed({ requestId: 'read', errorText: 'net::ERR_CONNECTION_RESET', canceled: false });
+    tracker.flushCancellations();
+    assert.equal(tracker.counts.navigationAborted, 0);
+    assert.equal(tracker.cancellations.length, 0);
+    assert.equal(completions.length, late === 'completed' ? 1 : 0);
+    assert.equal(failures.length, late === 'failed' ? 1 : 0, 'actual errors after disposal must remain visible');
+  }
 });
 
 test("network diagnostics retain bounded request identities without RPC bodies, tokens or attachment contents", async () => {
@@ -180,9 +255,16 @@ test("network diagnostics retain bounded request identities without RPC bodies, 
   assert.equal(tracker.history.find(entry => entry.event === "response").serverRequestID, "image-result");
   assert.doesNotMatch(JSON.stringify(tracker.history), /private-image-data|private-token|Authorization|content_base64/);
   for (let index = 0; index < 600; index++) session.emit("Network.loadingFinished", { requestId: `asset-${index}` });
-  assert.equal(tracker.history.length, 512);
-  assert.equal(tracker.history.at(-1).requestId, "asset-599");
+  assert.equal(tracker.history.length, 3, "asset completions cannot displace RPC diagnostics");
   assert.equal(tracker.counts.completed, 1);
+  for (let index = 0; index < 600; index++) {
+    session.emit("Network.requestWillBeSent", request(`rpc-${index}`, "get_task"));
+    session.emit("Network.loadingFinished", { requestId: `rpc-${index}` });
+  }
+  assert.equal(tracker.history.length, 512);
+  assert.equal(tracker.history.at(-1).requestId, "rpc-599");
+  assert.equal(tracker.counts.completed, 601);
+  assert.equal(tracker.pending.size, 0);
 });
 
 test("completed browser bodies use the same protocol request identity and cannot be substituted by headers, duplicate events or failures", async () => {

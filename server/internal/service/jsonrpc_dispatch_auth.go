@@ -204,6 +204,9 @@ func (d *jsonrpcDispatcher) handleAuth(
 }
 
 func (d *jsonrpcDispatcher) mapAdminPasswordLoginError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	logger := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrUserNotFound), errors.Is(err, biz.ErrInvalidPassword):
@@ -221,6 +224,9 @@ func (d *jsonrpcDispatcher) mapAdminPasswordLoginError(ctx context.Context, err 
 }
 
 func (d *jsonrpcDispatcher) mapAdminLoginError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	reason := ""
 	switch {
 	case errors.Is(err, biz.ErrUserNotFound):
@@ -252,6 +258,9 @@ func (d *jsonrpcDispatcher) mapAdminLoginError(ctx context.Context, err error) *
 }
 
 func (d *jsonrpcDispatcher) mapAuthError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	logger := d.log.WithContext(ctx)
 
 	switch {

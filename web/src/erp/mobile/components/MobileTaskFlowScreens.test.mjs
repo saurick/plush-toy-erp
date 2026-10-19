@@ -27,6 +27,7 @@ test('mobile detail always exposes three steps and keeps gated receipt navigatio
   await render({ currentStep: 'detail', canOpenReceipt: true, onOpenReceipt: () => {} })
   assert.equal(container.querySelector('[data-step-key="result"]').disabled, false)
 })
+const attachmentSource = readFileSync(new URL('./MobileTaskAttachments.jsx', import.meta.url), 'utf8')
 const detailScreenSource = readFileSync(
   new URL('./MobileTaskDetailScreen.jsx', import.meta.url),
   'utf8'
@@ -384,7 +385,7 @@ test('mobile task detail loads current-task records for every task and keeps the
 
 test('mobile task detail separates real attachments from historical text references', () => {
   assert.match(
-    detailScreenSource,
+    attachmentSource,
     /'data-testid': 'mobile-task-attachment-action'/u
   )
   assert.match(detailScreenSource, />\s*历史处理线索\s*</u)
@@ -392,10 +393,10 @@ test('mobile task detail separates real attachments from historical text referen
     detailScreenSource,
     /data-testid="mobile-role-historical-evidence"/u
   )
-  assert.match(detailScreenSource, /buttonText="查看附件"/u)
-  assert.match(detailScreenSource, /panelTitle="附件内容"/u)
-  assert.match(detailScreenSource, /showAttachmentCount/u)
-  assert.match(detailScreenSource, /canUpload=\{canManageAttachments\}/u)
+  assert.match(attachmentSource, /buttonText="查看附件"/u)
+  assert.match(attachmentSource, /panelTitle="附件内容"/u)
+  assert.match(attachmentSource, /showAttachmentCount/u)
+  assert.match(attachmentSource, /canUpload=\{canManage\}/u)
   assert.doesNotMatch(detailScreenSource, /PaperClipOutlined/u)
   assert.doesNotMatch(detailScreenSource, /查看与补充附件|查看任务附件/u)
   assert.doesNotMatch(detailScreenSource, /附件只记录任务办理情况/u)

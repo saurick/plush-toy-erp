@@ -39,8 +39,12 @@ export function createProductionProcessScenarios({
           { ...accepted, id: 99002, batch_no: 'WIP-MIXED-PLANNED', quantity: '5', status: 'PLANNED', execution_mode: null }
         )
         data.quality_inspections.push({
-          id: 99003, inspection_no: 'QI-MIXED-REJECTED', production_wip_batch_id: 99001,
-          gate_code: 'FINISHED_GOODS', status: 'REJECTED', result: 'REJECT',
+          id: 99003,
+inspection_no: 'QI-MIXED-REJECTED',
+production_wip_batch_id: 99001,
+          gate_code: 'FINISHED_GOODS',
+status: 'REJECTED',
+result: 'REJECT',
         })
         await page.route('**/rpc/production_wip', async (route) => {
           const { id, method } = route.request().postDataJSON()
@@ -120,7 +124,8 @@ export function createProductionProcessScenarios({
         await assertBusinessViewMotion(
           page,
           'production-toolbar-matrix',
-          outputDir
+          outputDir,
+          { presentationSelector: '.erp-production-process__layout .ant-segmented-group' }
         )
         await panel.locator('.erp-production-process__lanes').waitFor()
         assert.equal(await query.inputValue(), 'SKU-STYLE-L1-LONG')
@@ -372,7 +377,8 @@ export function createProductionProcessScenarios({
         await assertBusinessViewMotion(
           page,
           'production-current-matrix',
-          outputDir
+          outputDir,
+          { presentationSelector: '.erp-production-process__layout .ant-segmented-group' }
         )
         const matrix = panel.locator('.erp-production-process__lanes')
         await matrix.waitFor()
@@ -509,7 +515,7 @@ export function createProductionProcessScenarios({
         await page.route('**/rpc/production_wip', async (route) => {
           const { id, method } = route.request().postDataJSON()
           if (method !== 'get_production_wip' || failures > 0)
-            return route.fallback()
+            { return route.fallback() }
           failures += 1
           return route.fulfill({
             json: {

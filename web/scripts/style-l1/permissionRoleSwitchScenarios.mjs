@@ -121,18 +121,13 @@ export function createPermissionRoleSwitchScenarios() {
         page.on('request', (request) => {
           if (
             request.url().endsWith('/rpc/admin') &&
-            request.postDataJSON()?.method === 'set_role_permissions'
+            request.postDataJSON()?.method === 'set_role_settings'
           ) {
             writes += 1
           }
         })
         await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
-        await page.waitForFunction(() => {
-          const input = document.querySelector(
-            '[aria-label="岗位导航排列方式"]'
-          )
-          return input && !input.disabled
-        })
+        await page.locator('.erp-role-navigation-preview').waitFor()
         await assertClean()
         for (const name of ['财务', '业务', '财务', '业务']) {
           await roleCard(name).click()
@@ -140,12 +135,7 @@ export function createPermissionRoleSwitchScenarios() {
             await roleCard(name).getAttribute('aria-pressed'),
             'true'
           )
-          await page.waitForFunction(() => {
-            const input = document.querySelector(
-              '[aria-label="岗位导航排列方式"]'
-            )
-            return input && !input.disabled
-          })
+          await page.locator('.erp-role-navigation-preview').waitFor()
           await assertClean()
         }
         await page
@@ -200,21 +190,8 @@ export function createPermissionRoleSwitchScenarios() {
         )
 
         await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
-        await page
-          .locator(
-            '.erp-role-navigation-editor__head > .ant-select .ant-select-selector'
-          )
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '系统推荐' })
-          .click()
-        await roleCard('财务').click()
-        await discard.waitFor()
-        await discard
-          .getByRole('button', { name: '放弃修改', exact: true })
-          .click()
-        await discard.waitFor({ state: 'hidden' })
+        await page.locator('.erp-role-navigation-preview').waitFor()
+        assert.equal(await page.getByText('常用工作', { exact: true }).count(), 0)
         await assertClean()
         assert.equal(writes, 0, '查看、编辑后放弃均不应写入岗位权限')
       },

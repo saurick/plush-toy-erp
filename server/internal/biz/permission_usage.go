@@ -478,6 +478,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 	addMenu(PermissionQualityInspectionUpdate, "quality-inspections", "quality-actions", "质检动作", "decide-quality-inspection", "提交、判定或取消质检", permissionControlButton, "显示并允许处理", permissionMethods("quality", "submit_quality_inspection", "pass_quality_inspection", "reject_quality_inspection", "cancel_quality_inspection"), businessUsageConditions)
 	add(PermissionQualityExceptionHandle,
+		menuPermissionSurface("quality-inspections", "quality-actions", "质量检验", "correct-quality-inspection-result", "发起纠正复检", permissionControlButton, "显示并允许处理", permissionMethods("quality", "correct_quality_inspection_result"), append(append([]string{}, businessUsageConditions...), "保留原判定证据，无生效下游事实时生成独立复检单")),
 		menuPermissionSurface("production-exceptions", "quality-exceptions", "品质异常", "handle-quality-exception", "处理品质异常", permissionControlButton, "显示并允许处理", permissionMethods("quality", "correct_quality_inspection_result"), append(append([]string{}, businessUsageConditions...), "仅允许撤销无已生效下游事实的判定，并生成新的待检单")),
 		menuPermissionSurface("processing-contracts", "outsourcing-related-records", "委外订单", "create-outsourcing-return-disposition", "登记委外不合格返厂处置", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "create_outsourcing_return_disposition"), businessUsageConditions),
 	)

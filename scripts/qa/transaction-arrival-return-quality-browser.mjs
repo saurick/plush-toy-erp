@@ -11,6 +11,7 @@ import {
 } from "./transaction-real-backend-fixture.mjs";
 import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-process.mjs";
 import { runPartialReceiving, assertPartialReceivingEvidence } from "./transaction-receiving-partial-browser.mjs";
+import { correctQualityThroughBrowser } from "./transaction-quality-correction-browser.mjs";
 import { warehouseOptionFromRecord } from "../../web/src/erp/utils/referenceSelectOptions.mjs";
 import { BUSINESS_ROUTE_PATHS } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 import {
@@ -77,6 +78,9 @@ export function assertReceivingEvidence(report) {
     } else {
       assert.equal(flow.correctionPreservesEvidence, true);
       assert.equal(flow.dependentCancelBlocked, true);
+      assert.equal(flow.correctionCreatedInBrowser, true);
+      assert.equal(flow.correctionReasonRequired, true);
+      assert.equal(flow.correctionReplayAfterDecisionExact, true);
     }
   }
 }
@@ -934,11 +938,17 @@ async function run(options) {
         "production/processing-contracts",
         order.id,
       );
-      await pageAction(page, "查看详情");
-      const detail = await modal(page, "加工合同详情");
-      await detail
-        .getByRole("button", { name: "登记回货", exact: true })
-        .click();
+      let detail;
+      if (mobile) {
+        const actions = page.getByTestId("mobile-outsourcing-task-actions");
+        await expect(actions).toBeVisible();
+        await expect(page.getByRole("button", { name: "查看完整单据", exact: true })).toHaveCount(0);
+        await actions.getByRole("button", { name: "登记回货", exact: true }).click();
+      } else {
+        await pageAction(page, "查看详情");
+        detail = await modal(page, "加工合同详情");
+        await detail.getByRole("button", { name: "登记回货", exact: true }).click();
+      }
       const returnDialog = page.getByRole("dialog", {
         name: "登记回货",
         exact: true,
@@ -1024,7 +1034,8 @@ async function run(options) {
       assert.equal(fact.source_id, order.id);
       assert.equal(fact.source_line_id, line.id);
       assert.equal(stock(lot.id).txns, 0);
-      await detail.getByRole("button", { name: "关闭", exact: true }).click();
+      if (detail) await detail.getByRole("button", { name: "关闭", exact: true }).click();
+      else await expect(page.getByRole("dialog", { name: "加工合同详情", exact: true })).toHaveCount(0);
       await rejected(
         "quality",
         "quality",
@@ -1195,7 +1206,10 @@ async function run(options) {
       await records
         .getByRole("button", { name: "继续质检", exact: true })
         .click();
-      await quality.waitForURL((url) => url.pathname.endsWith("/production/quality-inspections") && url.searchParams.get("quality_inspection_id") === String(inspection.id));
+      if (mobile) {
+        await expect(quality.getByTestId("mobile-task-fact-form")).toHaveAttribute("data-source-type", "quality_inspection");
+        await expect(quality.getByTestId("mobile-task-fact-form")).toHaveAttribute("data-source-id", String(inspection.id));
+      } else await quality.waitForURL((url) => url.pathname.endsWith("/production/quality-inspections") && url.searchParams.get("quality_inspection_id") === String(inspection.id));
       if (mobile) await expect(quality.getByTestId("mobile-task-business-source")).toHaveAttribute("data-record-id", String(inspection.id));
       await pageAction(quality, "提交质检");
       await popup(quality, "submit_quality_inspection");
@@ -1217,20 +1231,25 @@ async function run(options) {
       );
       assert.deepEqual(state(), rejectedState);
       flow.dependentCancelBlocked = true;
-      const { quality_inspection: correction } = await client.rpc(
-        "quality",
-        "quality",
-        "correct_quality_inspection_result",
-        {
+      const correctionResult = await correctQualityThroughBrowser(quality, { ...options, mobile }, report, {
+        request: {
           id: inspection.id,
           correction_inspection_no: `${prefix}-RECHECK`,
           reason: "模拟量具复核，保留原判定",
         },
-      );
+        readState: state,
+        key: flow.key,
+      });
+      const correction = correctionResult.inspection;
+      flow.transportFaults.push(correctionResult.transportFault);
+      flow.correctionCreatedInBrowser = flow.correctionReasonRequired = true;
       assert.equal(correction.correction_of_inspection_id, inspection.id);
       assert.equal(stock(lot.id).lot, "HOLD");
       await decide(correction.id, mobile, false, "OUTSOURCING_RETURN");
       const completed = state();
+      await client.rpc("quality", "quality", "correct_quality_inspection_result", { id: inspection.id, correction_inspection_no: `${prefix}-RECHECK`, reason: "模拟量具复核，保留原判定" });
+      assert.deepEqual(state(), completed, "a completed correction still replays its immutable original intent");
+      flow.correctionReplayAfterDecisionExact = true;
       assert.equal(completed.inspections.length, 2);
       assert.equal(completed.inspections[0].status, "REJECTED");
       assert.ok(completed.inspections[0].superseded_at);
@@ -1258,7 +1277,7 @@ async function run(options) {
           true;
       await screenshot(activePage, flow.key);
     }
-    await runPartialReceiving({ client, fixture, options, report, open, pageFor, snapshot, stock, rejected, lost, decide, popup, screenshot, expect });
+    await runPartialReceiving({ client, fixture, options, report, open, pageFor, snapshot, stock, rejected, lost, decide, popup, screenshot, expect, auditForm });
     for (const { page, context } of sessions.values())
       await closePage(page, context);
     sessions.clear();

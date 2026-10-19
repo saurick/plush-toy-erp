@@ -16,6 +16,7 @@ import DevPageNav from '../components/DevPageNav.jsx'
 import DevProjectGraphView from '../components/DevProjectGraphView.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevIntegrationCallDetails from '../components/DevIntegrationCallDetails.jsx'
+import DevRPCContractReview from '../components/DevRPCContractReview.jsx'
 import DevIntegrationRelationshipExamples, {
   DevIntegrationAccess,
 } from '../components/DevIntegrationRelationships.jsx'
@@ -58,6 +59,7 @@ const identityContractLocation = buildDevDocsLocation({
 const emptyPermissions = new Map()
 const views = [
   ['inventory', '接口清单'],
+  ['changes', '本轮变更'],
   ['guide', '接入指引'],
 ]
 const domains = [...new Map(entries.map((entry) => [entry.domain, {
@@ -225,7 +227,9 @@ export default function DevIntegrationPage() {
     updateQuery({ rpc: entry.key, detail: section ? 'governance' : '', section })
   }
   const closeDetails = () => updateQuery({ rpc: '', detail: '', section: '' })
-  const clearFilters = () => updateQuery({ domain: '', q: '', page: '', rpc: '', detail: '', section: '' })
+  const updateFilters = (values, replace = false) =>
+    updateQuery({ ...values, page: query.rpc ? 1 : '' }, replace)
+  const clearFilters = () => updateFilters({ domain: '', q: '' })
   const permissionMap = permissionState.data?.associations || emptyPermissions
   const filtered = filterIntegrationEntries(entries, query)
   const selected = query.view === 'inventory'
@@ -233,7 +237,8 @@ export default function DevIntegrationPage() {
     : undefined
   const selectedPosition = selected ? filtered.findIndex((entry) => entry.key === selected.key) : -1
   const page = Math.min(
-    selectedPosition >= 0 ? Math.floor(selectedPosition / INTEGRATION_PAGE_SIZE) + 1 : query.page,
+    selectedPosition >= 0 && !params.has('page')
+      ? Math.floor(selectedPosition / INTEGRATION_PAGE_SIZE) + 1 : query.page,
     Math.max(1, Math.ceil(filtered.length / INTEGRATION_PAGE_SIZE))
   )
   useEffect(() => {
@@ -413,42 +418,50 @@ export default function DevIntegrationPage() {
           {query.view === 'inventory' ? (
             <>
               <div className="erp-dev-integration__filters">
-                <div className="erp-dev-integration__filter">
-                  <label htmlFor="integration-domain">业务域</label>
-                  <Select
-                    id="integration-domain"
-                    aria-label="筛选业务域"
-                    showSearch
-                    virtual={false}
-                    filterOption={(input, option) => `${option.label} ${option.value}`.toLowerCase().includes(input.toLowerCase())}
-                    value={query.domain}
-                    options={[{ label: '全部业务域', value: '' }, ...domains]}
-                    onChange={(domain) => updateQuery({ domain, page: '', rpc: '', detail: '', section: '' })}
-                  />
+                <div className="erp-dev-integration__filter-controls">
+                  <div className="erp-dev-integration__filter">
+                    <label htmlFor="integration-domain">业务域</label>
+                    <Select
+                      id="integration-domain"
+                      aria-label="筛选业务域"
+                      allowClear
+                      showSearch
+                      virtual={false}
+                      filterOption={(input, option) => `${option.label} ${option.value}`.toLowerCase().includes(input.toLowerCase())}
+                      value={query.domain || undefined}
+                      placeholder="全部业务域"
+                      options={[{ label: '全部业务域', value: '' }, ...domains]}
+                      onChange={(domain) => updateFilters({ domain })}
+                    />
+                  </div>
+                  <div className="erp-dev-integration__filter erp-dev-integration__filter--search">
+                    <SearchInput
+                      id="integration-search"
+                      aria-label="搜索接口名称、方法名或用途"
+                      placeholder="搜索接口名称、方法名或用途"
+                      allowClear
+                      value={query.q}
+                      onChange={(event) =>
+                        updateFilters({ q: event.target.value }, true)
+                      }
+                    />
+                  </div>
                 </div>
-                <div className="erp-dev-integration__filter erp-dev-integration__filter--search">
-                  <label htmlFor="integration-search">搜索接口</label>
-                  <SearchInput
-                    id="integration-search"
-                    aria-label="搜索业务域或方法"
-                    placeholder="用途、业务域或方法名"
-                    allowClear
-                    value={query.q}
-                    onChange={(event) =>
-                      updateQuery({ q: event.target.value, page: '', rpc: '', detail: '', section: '' }, true)
-                    }
-                  />
-                </div>
-                <span className="erp-dev-integration__count" role="status">
-                  {filtered.length} / {entries.length} 个接口
-                </span>
-                {query.domain || query.q ? (
+                <div className="erp-dev-integration__filter-summary">
+                  <span className="erp-dev-integration__count" role="status">
+                    {query.domain || query.q
+                      ? `找到 ${filtered.length} 个接口 · 共 ${entries.length} 个`
+                      : `共 ${entries.length} 个接口`}
+                  </span>
                   <Button
+                    type="text"
+                    aria-label="重置筛选"
+                    disabled={!query.domain && !query.q}
                     onClick={clearFilters}
                   >
-                    清除筛选
+                    重置
                   </Button>
-                ) : null}
+                </div>
               </div>
               <div className={`erp-dev-integration__inventory-surface${selected ? ' erp-dev-integration__inventory-surface--open' : ''}`} ref={inventorySurface}>
                 <section aria-label="接口清单" className="erp-dev-integration__table">
@@ -466,7 +479,7 @@ export default function DevIntegrationPage() {
                     current: page,
                     pageSize: INTEGRATION_PAGE_SIZE,
                     showSizeChanger: false,
-                    onChange: (nextPage) => updateQuery({ page: nextPage === 1 ? '' : nextPage }),
+                    onChange: (nextPage) => updateQuery({ page: nextPage === 1 && !query.rpc ? '' : nextPage }),
                   }}
                     locale={{
                     emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的接口，请调整或清除筛选"><Button onClick={clearFilters}>重置并查看全部接口</Button></Empty>,
@@ -515,6 +528,7 @@ export default function DevIntegrationPage() {
                   footer={<Button icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={closeDetails}>返回接口清单</Button>}
                   onClose={closeDetails}
                   afterOpenChange={(open) => {
+                    if (document.activeElement?.closest('.erp-dev-integration__filters')) return
                     if (open) {
                       const target = query.detail === 'governance' && query.section
                         ? inventorySurface.current?.querySelector(`[data-integration-section="${query.section}"]`)
@@ -718,6 +732,8 @@ export default function DevIntegrationPage() {
                 </p>
               ) : null}
             </>
+          ) : query.view === 'changes' ? (
+            <DevRPCContractReview />
           ) : (
             <>
               <section className="erp-dev-integration__table erp-dev-integration__guide" aria-label="接入方式选择" ref={guideSurface}>

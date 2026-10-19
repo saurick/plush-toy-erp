@@ -94,6 +94,8 @@ export async function exerciseTableScrollPagination(
         scrollLeft: scroller.scrollLeft,
         sliderValue: Number(current?.querySelector('input').value),
         scrollTops: ancestors.map((parent) => parent.scrollTop),
+        wrapperHeight: node.clientHeight,
+        selectionHeight: node.closest('.erp-business-page-layout')?.querySelector('.erp-business-operation-panel__selection')?.getBoundingClientRect().height,
         visible: Boolean(
           current && getComputedStyle(current).visibility === 'visible'
         ),
@@ -155,7 +157,7 @@ export async function exerciseTableScrollPagination(
           (top, index) => Math.abs(top - initial.scrollTops[index]) <= 1
         )
       ),
-      '清空加载数据不能把外层滚动位置拉回顶部'
+      `清空加载数据不能把外层滚动位置拉回顶部: ${JSON.stringify({ initial: { scrollTops: initial.scrollTops, wrapperHeight: initial.wrapperHeight, selectionHeight: initial.selectionHeight }, loading: loading.map(({ scrollTops, wrapperHeight, selectionHeight }) => ({ scrollTops, wrapperHeight, selectionHeight })) })}`
     )
     assert(
       loading.every((frame) => !frame.visible),

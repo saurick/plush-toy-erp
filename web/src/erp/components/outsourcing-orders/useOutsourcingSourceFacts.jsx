@@ -827,16 +827,18 @@ export function useOutsourcingSourceFacts({
               {
                 label: '材料名称',
                 value: item?.material_name_snapshot,
+                taskSummary: true,
                 strong: true,
               },
-              { label: '材料编码', value: item?.material_code_snapshot },
+              { label: '材料编码', value: item?.material_code_snapshot, taskSummary: true },
             ]
           : [
-              { label: '产品编号', value: item?.product_no_snapshot },
-              { label: '产品规格', value: item?.sku_code_snapshot },
+              { label: '产品编号', value: item?.product_no_snapshot, taskSummary: true },
+              { label: '产品规格', value: item?.sku_code_snapshot, taskSummary: true },
               {
                 label: '产品名称',
                 strong: true,
+                taskSummary: true,
                 value: (
                   <ProductIdentity
                     productId={item?.product_id}
@@ -850,11 +852,13 @@ export function useOutsourcingSourceFacts({
         { label: '工序分类', value: item?.process_category_snapshot },
         {
           label: '加工数量',
+          taskSummary: true,
           value: item?.outsourcing_quantity,
           rowStart: true,
         },
         {
           label: '单位',
+          taskSummary: true,
           value:
             item?.unit_name_snapshot ||
             referenceLabel(unitOptions, item?.unit_id, '单位'),
@@ -867,6 +871,7 @@ export function useOutsourcingSourceFacts({
         },
         {
           label: '行状态',
+          taskSummary: true,
           tone: SOURCE_DOCUMENT_ITEM_STATUS_TONES[item?.line_status],
           value: statusText(
             item?.line_status,
@@ -876,7 +881,7 @@ export function useOutsourcingSourceFacts({
         },
         { label: '备注', value: item?.note, fullWidth: true },
         ...(sourceAction
-          ? [{ label: '业务操作', value: sourceAction, fullWidth: true }]
+          ? [{ label: '业务操作', value: sourceAction, fullWidth: true, taskSummary: true }]
           : []),
       ]
     },

@@ -1,4 +1,5 @@
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
 async function verifyStableMermaidScroll(page, diagram, assert, action) {
   const watcher = await diagram.evaluateHandle((root) => {
@@ -277,14 +278,72 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   await waitForFiniteAnimations(page)
   await assertWidth()
   const inlineZoom = await canvas.getAttribute('data-mermaid-zoom')
+  const appearance = () =>
+    diagram.evaluate((root) => {
+      const tool = getComputedStyle(
+        root.querySelector('[data-mermaid-zoom-action="zoom-out"]')
+      )
+      return {
+        theme: root.dataset.mermaidTheme,
+        background: getComputedStyle(root).backgroundColor,
+        toolBackground: tool.backgroundColor,
+        toolColor: tool.color,
+        toolBorder: tool.borderColor,
+        labelColor: getComputedStyle(
+          root.querySelector('[data-mermaid-zoom-label]')
+        ).color,
+      }
+    })
+  const inlineAppearance = await appearance()
+  assert(
+    getContrastRatio(
+      parseRgb(inlineAppearance.toolColor),
+      parseRgb(inlineAppearance.toolBackground)
+    ) >= 3,
+    '图表控件的图标与背景须有足够对比度'
+  )
   await diagram.locator('[data-mermaid-fullscreen-action="open"]').click()
+  assert.deepEqual(
+    await appearance(),
+    inlineAppearance,
+    '全屏沿用当前主题的画布与控件配色'
+  )
+  assert.equal(
+    await diagram
+      .locator('.erp-markdown-mermaid__viewport')
+      .evaluate((node) => getComputedStyle(node).backgroundColor),
+    inlineAppearance.background,
+    '全屏画布与当前主题背景保持一致'
+  )
   await assertMermaidZoomMode(diagram, assert, 'fit-all')
+  await page.setViewportSize({ width: 900, height: 500 })
+  await waitForFiniteAnimations(page)
+  const close = diagram.locator('[data-mermaid-fullscreen-action="close"]')
+  assert(
+    await close.evaluate((node) => {
+      const rect = node.getBoundingClientRect()
+      return node.contains(
+        document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        )
+      )
+    }),
+    '窄窗口的全屏工具栏不能被页面导航或父级层叠遮挡'
+  )
   await button('reset').click()
   await assertMermaidZoomMode(diagram, assert, 'reset')
+  await page.setViewportSize(initialViewport)
+  await waitForFiniteAnimations(page)
   await diagram
     .locator('[data-mermaid-fullscreen-action="close"]')
     .press('Escape')
   await assertMermaidZoomMode(diagram, assert, 'fit')
+  assert.deepEqual(
+    await appearance(),
+    inlineAppearance,
+    '退出全屏恢复原有主题外观'
+  )
   assert.equal(
     await canvas.getAttribute('data-mermaid-zoom'),
     inlineZoom,
@@ -292,6 +351,32 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   )
   await fitMermaidDiagram(diagram, assert)
   await assertMermaidZoomMode(diagram, assert, 'fit-all')
+}
+
+export async function verifyMermaidDarkTheme(page, diagram, assert) {
+  const trigger = page.getByRole('button', { name: '外观与密度', exact: true })
+  const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
+  await trigger.click()
+  const previousMode = await dialog
+    .getByRole('radiogroup', { name: '主题模式', exact: true })
+    .evaluate((node) => node.querySelector('input:checked').closest('label').textContent.trim())
+  await dialog.getByText('暗色', { exact: true }).click()
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  try {
+    await page.waitForFunction(
+      (root) => root.dataset.mermaidTheme === 'dark' && root.dataset.mermaidStatus === 'rendered',
+      await diagram.elementHandle()
+    )
+    await waitForMermaidFit(page, diagram)
+    await verifyMermaidZoomModes(page, diagram, assert)
+  } finally {
+    const close = diagram.locator('[data-mermaid-fullscreen-action="close"]')
+    if (await close.count()) await close.press('Escape')
+    await trigger.click()
+    await dialog.getByText(previousMode, { exact: true }).click()
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+    await waitForMermaidFit(page, diagram)
+  }
 }
 
 export async function verifyMermaidViewer(page, diagram, assert) {

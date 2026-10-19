@@ -20,6 +20,8 @@
 }
 
 .erp-dev-integration__filters,
+.erp-dev-integration__filter-controls,
+.erp-dev-integration__filter-summary,
 .erp-dev-integration__source,
 .erp-dev-integration__section-heading,
 .erp-dev-integration__current-relation,
@@ -29,6 +31,17 @@
   flex-wrap: wrap;
   gap: 8px 12px;
   min-width: 0;
+}
+
+.erp-dev-integration__filter-controls {
+  flex: 1 1 544px;
+}
+
+.erp-dev-integration__filter-summary {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  min-width: 252px;
+  margin-inline-start: auto;
 }
 
 .erp-dev-integration__filter {
@@ -46,8 +59,8 @@
 }
 
 .erp-dev-integration__filter--search {
-  flex: 1 1 320px;
-  max-width: 520px;
+  flex: 1 1 280px;
+  max-width: 420px;
 }
 
 .erp-dev-integration__filter .ant-select,
@@ -61,6 +74,7 @@
   align-items: center;
   min-height: 34px;
   color: var(--erp-text-muted);
+  white-space: nowrap;
 }
 
 .erp-dev-integration__source {

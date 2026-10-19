@@ -33,6 +33,7 @@ import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
+import DevRPCContractReview from '../components/DevRPCContractReview.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COMMAND_PAGE_QUERY_KEY,
@@ -91,12 +92,14 @@ const VIEW_COMMANDS = 'commands'
 const VIEW_CLOSEOUT = 'closeout'
 const VIEW_COVERAGE = 'coverage'
 const VIEW_PRESSURE = 'pressure'
+const VIEW_CONTRACTS = 'contracts'
 const VIEW_QUERY_KEY = 'view'
 const DOCUMENT_ROLE_QUERY_KEY = 'role'
 const COMMAND_QUERY_KEY = 'q'
 
 const VIEW_OPTIONS = [
   { label: '本轮验证', value: VIEW_TIERS },
+  { label: '接口合同', value: VIEW_CONTRACTS },
   { label: '证据与覆盖', value: VIEW_COVERAGE },
   { label: '压力测试', value: VIEW_PRESSURE },
 ]
@@ -111,6 +114,7 @@ const EMPTY_TESTING_OPERATIONS = Object.freeze({
   fast: null,
   'role-access': null,
   'field-linkage': null,
+  'rpc-examples': null,
   'pressure-quick': null,
   'pressure-capacity': null,
 })
@@ -2265,6 +2269,17 @@ export default function DevTestingPage() {
                 </div>
               </details>
             </div>
+          ) : null}
+
+          {view === VIEW_CONTRACTS ? (
+            <DevRPCContractReview
+              mode="checks"
+              onRunExamples={() => runTestingAction('rpc-examples')}
+              runningExamples={testingActionStarting === 'rpc-examples' || isDevTestingOperationActive(testingOperations['rpc-examples'])}
+              examplesDisabled={!testingSummary || Boolean(testingSummaryError) || testingBusy.active || testingHasActive || Boolean(testingActionStarting)}
+              executionOperation={testingOperations['rpc-examples']}
+              refreshKey={testingOperations['rpc-examples']?.finishedAt || ''}
+            />
           ) : null}
 
           {view === VIEW_COMMANDS ? (

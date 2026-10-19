@@ -310,7 +310,7 @@ test('server-paginated tables label function sorters as current-page sorting', (
   const dataTable = sourceSlice(
     businessListLayoutSource,
     'export function BusinessDataTable({',
-    'export function ToolbarButton'
+    'export const ToolbarButton ='
   )
   assert.match(
     dataTable,

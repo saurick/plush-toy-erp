@@ -730,8 +730,8 @@ export default function DevPermissionRelationshipsPage() {
                         <div className="erp-permission-relationship__legend">
                           <Text type="secondary">图例</Text>
                           <Space wrap size={[6, 6]}>
-                            <Tag color="blue">账号</Tag>
-                            <Tag color="purple">岗位</Tag>
+                            <Tag color="blue">账号（actor）</Tag>
+                            <Tag color="purple">岗位（role）</Tag>
                             <Tag color="green">最终可用</Tag>
                             <Tag color="orange">岗位已选但受限</Tag>
                             <Tag color="cyan">数据范围</Tag>
@@ -872,7 +872,13 @@ export default function DevPermissionRelationshipsPage() {
         <DevStaticGuidance title="查看与配置">
           <div role="note">
             <Paragraph>
-              统计按当前对象的全部功能计算，模块筛选只影响图与明细。图、菜单和明细使用同一份权限结果。
+              图、菜单和明细共用权限结果；统计包含当前对象的全部功能，模块筛选只影响图与明细。
+            </Paragraph>
+            <Paragraph>
+              员工账号在实际请求中对应操作主体（actor），岗位对应业务角色（role）；功能权限（permission）描述允许的动作，数据范围（data scope）限定可查看、办理的数据。
+            </Paragraph>
+            <Paragraph>
+              “按岗位”的关联账号是汇总，不代表当前操作人。actor 由后端从已验证的登录身份确定；查看账号不切换 ERP 登录身份，工作台访问身份独立。
             </Paragraph>
             <Paragraph>
               本页只读。修改权限请进入权限配置；单据能否操作还需满足业务状态与责任条件。

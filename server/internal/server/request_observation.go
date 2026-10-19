@@ -13,6 +13,9 @@ import (
 // because a failed RPC can still be a successful HTTP exchange.
 func requestOutcome(req, reply any, err error) string {
 	if err != nil {
+		if kratoserrors.Code(err) == 499 {
+			return "canceled"
+		}
 		if code := kratoserrors.Code(err); code >= 400 && code < 500 {
 			return "rejected"
 		}
@@ -24,6 +27,9 @@ func requestOutcome(req, reply any, err error) string {
 	response, _ := reply.(*v1.PostJsonrpcReply)
 	if response == nil || response.GetResult() == nil || response.GetError() != "" || response.GetResult().GetCode() >= errcode.Internal.Code {
 		return "error"
+	}
+	if response.GetResult().GetCode() == errcode.RequestCanceled.Code {
+		return "canceled"
 	}
 	if response.GetResult().GetCode() != errcode.OK.Code {
 		return "rejected"

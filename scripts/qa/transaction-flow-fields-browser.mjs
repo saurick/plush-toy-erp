@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { openBusinessTableTool } from "../../web/scripts/style-l1/businessTableTools.mjs";
 import { BUSINESS_ROUTE_PATHS as routes } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 import {
   login,
@@ -506,10 +507,12 @@ export async function captureTransactionFieldResults(
           !captured.headers.includes(header),
           `${key}: ${header} must be optional`,
         );
-      const download = page.waitForEvent("download");
-      await page.getByRole("button", { name: /导出筛选结果/u }).click();
+      const [download] = await Promise.all([
+        page.waitForEvent("download"),
+        openBusinessTableTool(page, '导出筛选结果'),
+      ]);
       const csvPath = path.join(directory, `${key}.csv`);
-      await (await download).saveAs(csvPath);
+      await download.saveAs(csvPath);
       const csv = await fs.readFile(csvPath, "utf8");
       const header = csv.split(/\r?\n/u)[0];
       for (const title of key === "quality" ? ["状态", "判定"] : hidden)
@@ -523,7 +526,7 @@ export async function captureTransactionFieldResults(
         path: csvPath,
         retainedFields: key === "quality" ? ["状态", "判定"] : hidden,
       });
-      await pageAction(page, "列设置");
+      await openBusinessTableTool(page, "列设置");
       let settings = await modal(page, "列设置");
       for (const title of hidden)
         await expect(
@@ -550,7 +553,7 @@ export async function captureTransactionFieldResults(
         await expect(page.locator(".ant-table-thead:visible")).toContainText(
           title,
         );
-      await pageAction(page, "列设置");
+      await openBusinessTableTool(page, "列设置");
       settings = await modal(page, "列设置");
       await settings
         .getByRole("button", { name: "恢复默认", exact: true })

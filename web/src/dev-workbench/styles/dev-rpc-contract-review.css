@@ -1,0 +1,184 @@
+.erp-dev-rpc-review {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.erp-dev-rpc-review__toolbar,
+.erp-dev-rpc-review__section-head,
+.erp-dev-rpc-review__identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.erp-dev-rpc-review__toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.erp-dev-rpc-review__toolbar .ant-select {
+  width: 185px;
+}
+.erp-dev-rpc-review__identity {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  justify-content: flex-start;
+  gap: 16px;
+}
+.erp-dev-rpc-review__workspace {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.7fr) minmax(0, 1.6fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+.erp-dev-rpc-review__methods,
+.erp-dev-rpc-review__detail {
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
+}
+.erp-dev-rpc-review__section-head {
+  padding: 12px;
+}
+.erp-dev-rpc-review__section-head > span {
+  font-size: 12px;
+  color: var(--erp-text-muted);
+}
+.erp-dev-rpc-review__method {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--erp-border);
+  background: transparent;
+  padding: 12px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.erp-dev-rpc-review__method[aria-pressed='true'] {
+  background: var(--erp-primary-soft);
+  border-color: var(--erp-primary-strong);
+}
+.erp-dev-rpc-review__method code {
+  color: var(--erp-primary-strong);
+}
+.erp-dev-rpc-review__method > span {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-dev-rpc-review__methods > .ant-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  margin: 0;
+  border-top: 1px solid var(--erp-border);
+}
+.erp-dev-rpc-review code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: 12px;
+}
+.erp-dev-rpc-review__detail-heading {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+.erp-dev-rpc-review__detail-heading > strong {
+  font-size: 16px;
+}
+.erp-dev-rpc-review__detail-heading > a {
+  justify-self: start;
+  font-size: 12px;
+}
+.erp-dev-rpc-review__tabs {
+  display: flex;
+  gap: 20px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--erp-border);
+}
+.erp-dev-rpc-review #rpc-review-detail {
+  min-width: 0;
+  padding: 14px;
+}
+.erp-dev-rpc-review .ant-table-wrapper {
+  min-width: 0;
+}
+.erp-dev-rpc-review .ant-table-cell {
+  overflow-wrap: anywhere;
+}
+.erp-dev-rpc-review__consumers {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  font-size: 12px;
+}
+.erp-dev-rpc-review details {
+  margin-top: 12px;
+}
+.erp-dev-rpc-review details > code,
+.erp-dev-rpc-review details > span {
+  display: block;
+  margin-top: 8px;
+}
+.erp-dev-rpc-review summary {
+  cursor: pointer;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-dev-rpc-review__checks {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
+}
+.erp-dev-rpc-review__checks > section {
+  padding: 12px;
+  border-bottom: 1px solid var(--erp-border);
+}
+.erp-dev-rpc-review__checks > section:last-child {
+  border-bottom: 0;
+}
+.erp-dev-rpc-review__checks > section > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.erp-dev-rpc-review__checks p {
+  font-size: 12px;
+  margin: 5px 0 0;
+}
+.erp-dev-rpc-review__checks ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+.erp-dev-rpc-review__examples {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.erp-dev-rpc-review__examples > p {
+  margin: 0;
+}
+.erp-dev-rpc-review__examples .erp-dev-rpc-review__section-head {
+  padding: 0;
+}
+.erp-dev-rpc-review__case-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.erp-dev-rpc-review__files summary {
+  font-size: 14px;
+  padding: 0 0 10px;
+}
+@media (width <= 1100px) {
+  .erp-dev-rpc-review__workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -240,16 +240,19 @@ export default function BusinessFormPage({
     triggerRef.current = document.activeElement
     const scroller = pageRef.current?.closest('.erp-admin-content, .mobile-business-layout__content, .mobile-task-business__content')
     const layout = pageRef.current?.closest('.erp-business-page-layout')
+    const taskLayout = pageRef.current?.closest('.mobile-task-business')
     scrollPositionRef.current = scroller
       ? { node: scroller, top: scroller.scrollTop }
       : null
     // Bind the editor layout once per open, avoiding ancestor :has() invalidation on input.
     scroller?.setAttribute('data-business-form-editing', 'true')
     layout?.setAttribute('data-business-form-editing', 'true')
+    taskLayout?.setAttribute('data-business-form-editing', 'true')
     if (scroller) scroller.scrollTop = 0
     return () => {
       scroller?.removeAttribute('data-business-form-editing')
       layout?.removeAttribute('data-business-form-editing')
+      taskLayout?.removeAttribute('data-business-form-editing')
       if (leavingRef.current) return
       const position = scrollPositionRef.current
       const trigger = triggerRef.current
@@ -384,6 +387,38 @@ export default function BusinessFormPage({
     }
   }
 
+  const taskFooter = (
+    <footer className={outletContext?.mobileTaskBusiness ? 'mobile-task-business-form-footer' : 'erp-business-form-page__footer'}>
+      <span className="erp-business-form-page__status" role="status">
+        {readOnly
+          ? '只读查看'
+          : attachmentBusy
+            ? '正在处理附件…'
+            : confirmLoading
+              ? '正在保存…'
+              : dirty
+                ? '有未保存修改'
+                : '尚未修改'}
+      </span>
+      <div className="erp-business-form-page__actions">
+        <Button onClick={close} disabled={busy}>
+          {outletContext?.mobileTaskBusiness ? '返回办理' : '返回列表'}
+        </Button>
+        {!readOnly && onOk ? (
+          <Button
+            {...okButtonProps}
+            type="primary"
+            loading={confirmLoading}
+            disabled={busy || loading || okButtonProps.disabled}
+            onClick={save}
+          >
+            {okText}
+          </Button>
+        ) : null}
+      </div>
+    </footer>
+  )
+
   const editor = (
     <section
       ref={pageRef}
@@ -434,35 +469,9 @@ export default function BusinessFormPage({
           </BusinessFormPendingAttachmentsContext.Provider>
         </Spin>
       </BusinessFormBody>
-      <footer className="erp-business-form-page__footer">
-        <span className="erp-business-form-page__status" role="status">
-          {readOnly
-            ? '只读查看'
-            : attachmentBusy
-              ? '正在处理附件…'
-              : confirmLoading
-                ? '正在保存…'
-                : dirty
-                  ? '有未保存修改'
-                  : '尚未修改'}
-        </span>
-        <div className="erp-business-form-page__actions">
-          <Button onClick={close} disabled={busy}>
-            {outletContext?.mobileTaskBusiness ? '返回办理' : '返回列表'}
-          </Button>
-          {!readOnly && onOk ? (
-            <Button
-              {...okButtonProps}
-              type="primary"
-              loading={confirmLoading}
-              disabled={busy || loading || okButtonProps.disabled}
-              onClick={save}
-            >
-              {okText}
-            </Button>
-          ) : null}
-        </div>
-      </footer>
+      {outletContext?.mobileTaskBusiness?.actionHost && open
+        ? createPortal(taskFooter, outletContext.mobileTaskBusiness.actionHost)
+        : taskFooter}
     </section>
   )
   return container ? createPortal(editor, container) : editor

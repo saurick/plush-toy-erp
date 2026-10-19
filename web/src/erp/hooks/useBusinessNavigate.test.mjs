@@ -34,15 +34,16 @@ test('mobile reference links carry the task return context along with a phone hr
   assert.equal(page.observed().state.fromHelp, true)
 })
 
-test('mobile business tabs, object routes and reference links keep the phone shell and task context', async (t) => {
+test('phone document links and object targets return to tasks without exposing document filters', async (t) => {
   const taskNavigation = { taskID: 8, adminID: 1, entryPath: '/m/sales/handle/warehouse/shipments?shipment_id=7', returnPath: '/m/sales/tasks' }
   const target = { pathname: '/erp/production/progress', search: '?view=exceptions', hash: '#records' }
   const page = await mount(t, { entries: [{ pathname: '/m/sales/handle/warehouse/shipments', search: '?shipment_id=7', state: { workflowTaskNavigation: taskNavigation } }], target, options: { state: { fromTab: 'shipment' } } })
-  assert.equal(page.container.querySelector('a').getAttribute('href'), '/m/sales/handle/production/progress?view=exceptions#records')
+  assert.equal(page.container.querySelector('a').getAttribute('href'), '/m/sales/tasks')
   await page.click()
-  assert.equal(page.observed().pathname, '/m/sales/handle/production/progress')
-  assert.equal(page.observed().state.workflowTaskNavigation.entryPath, '/m/sales/handle/production/progress?view=exceptions#records')
-  assert.equal(page.observed().state.workflowTaskNavigation.returnPath, '/m/sales/tasks')
+  assert.equal(page.observed().pathname, '/m/sales/tasks')
+  assert.equal(page.observed().search, '')
+  assert.equal(page.observed().hash, '')
+  assert.equal(page.observed().state.workflowTaskNavigation, undefined)
   assert.equal(page.observed().state.fromTab, 'shipment')
 })
 

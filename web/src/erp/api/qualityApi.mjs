@@ -3,6 +3,7 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
+import { QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 
 const qualityRpc = new JsonRpc({
   url: RpcDomain.QUALITY,
@@ -158,6 +159,26 @@ export async function rejectQualityInspection(params = {}) {
 export async function cancelQualityInspection(params = {}) {
   const result = await qualityRpc.call(RpcMethod.quality.CANCEL_QUALITY_INSPECTION, params)
   return dataOf(result)?.quality_inspection || null
+}
+
+export async function correctQualityInspectionResult(params = {}) {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) throw new Error('请核对原质检单、复检单号和纠正原因')
+  const request = {
+    ...(params.customer_key ? { customer_key: params.customer_key } : {}),
+    id: params.id,
+    correction_inspection_no: typeof params.correction_inspection_no === 'string' ? params.correction_inspection_no.trim() : '',
+    reason: typeof params.reason === 'string' ? params.reason.trim() : '',
+  }
+  if (!Number.isSafeInteger(request.id) || request.id <= 0 || !request.correction_inspection_no || !request.reason) throw new Error('请核对原质检单、复检单号和纠正原因')
+  const result = await qualityRpc.call(RpcMethod.quality.CORRECT_QUALITY_INSPECTION_RESULT, request)
+  const inspection = dataOf(result)?.quality_inspection
+  if (!Number.isSafeInteger(inspection?.id) || inspection.id <= 0 || inspection.id === request.id || inspection.correction_of_inspection_id !== request.id || inspection.inspection_no !== request.correction_inspection_no ||
+      ![QualityInspectionStatus.SUBMITTED, QualityInspectionStatus.PASSED, QualityInspectionStatus.REJECTED].includes(inspection.status)) {
+    const error = new Error('纠正复检返回结果与原质检单不一致，请重新核对')
+    error.isInvalidResponse = true
+    throw error
+  }
+  return inspection
 }
 
 export async function getQualityInspection(params = {}) {

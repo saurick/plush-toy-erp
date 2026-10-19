@@ -54,6 +54,28 @@ func TestWorkflowFollowupLifecycleReceiptAndCreatorVisibility(t *testing.T) {
 	status := func(reason, key string) *biz.WorkflowTaskStatusUpdate {
 		return &biz.WorkflowTaskStatusUpdate{ID: task.ID, ExpectedVersion: task.Version, CommandKey: "complete_task_action", IdempotencyKey: key, TaskStatusKey: "done", Reason: reason}
 	}
+	blocked, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID: task.ID, ExpectedVersion: task.Version, CommandKey: "block_task_action", IdempotencyKey: "followup-awaiting-evidence",
+		TaskStatusKey: "blocked", Reason: "等待业务核对包装稿",
+	}, assignee, biz.QualityRoleKey)
+	if err != nil || blocked.TaskStatusKey != "blocked" || blocked.BlockedReason == nil || *blocked.BlockedReason != "等待业务核对包装稿" {
+		t.Fatalf("block followup=%#v err=%v", blocked, err)
+	}
+	task = blocked
+	if _, err := uc.UpdateTaskStatus(ctx, status("尚未核实", "followup-blocked-complete"), assignee, biz.QualityRoleKey); err == nil {
+		t.Fatal("blocked followup completed without resuming")
+	}
+	resumed, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID: task.ID, ExpectedVersion: task.Version, CommandKey: "resume_task_action", IdempotencyKey: "followup-evidence-received",
+		TaskStatusKey: "ready", Reason: "业务已补齐核对依据",
+	}, assignee, biz.QualityRoleKey)
+	if err != nil || resumed.TaskStatusKey != "ready" || resumed.BlockedReason != nil || resumed.Payload["blocked_reason"] != nil {
+		t.Fatalf("resume followup=%#v err=%v", resumed, err)
+	}
+	if client.InventoryTxn.Query().CountX(ctx) != 0 || client.Shipment.Query().CountX(ctx) != 0 || client.SalesOrder.GetX(ctx, order.ID).LifecycleStatus != "draft" {
+		t.Fatal("followup handling changed the source or posted facts")
+	}
+	task = resumed
 	if _, err = uc.UpdateTaskStatus(ctx, status("", "followup-empty-feedback"), assignee, biz.QualityRoleKey); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("empty feedback=%v", err)
 	}

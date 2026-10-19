@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Form } from 'antd'
-import {
-  useOutletContext,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
@@ -141,7 +139,7 @@ import {
 export default function PurchaseOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useBusinessNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]

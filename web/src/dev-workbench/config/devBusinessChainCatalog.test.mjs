@@ -40,6 +40,30 @@ const EXPECTED_CHAIN_KEYS = [
   'purchase_posting_corrections',
 ]
 
+test('sales preparation records approved material demand and keeps stock reservation explicit', () => {
+  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find((item) => item.key === 'sales_to_production')
+  const material = chain.nodes.find((node) => node.key === 'material_request')
+  assert(material.machineKeys.includes('source.engineering_material_request'))
+  assert(chain.edges.some((edge) => edge.from === material.key && edge.to === 'generated_purchase_order' && edge.kind === 'creates_source'))
+  assert(chain.edges.some((edge) => edge.from === material.key && edge.to === 'production_order' && edge.kind === 'requires'))
+  assert(!chain.edges.some((edge) => edge.from === 'sales_acceptance' && edge.to === 'stock_reservation'))
+  const reservation = chain.steps.find((item) => item.key === 'sales_order:posts_fact:stock_reservation')
+  assert.equal(reservation.responsibility.mode, 'human')
+  assert.match(chain.edges.find((edge) => edge.to === 'stock_reservation').condition, /不作为生产前置/u)
+  assert(DEV_FLOW_STATE_CATALOG.businessChainOverview.relations.some((relation) => relation.fromChainKey === chain.key && relation.toChainKey === 'purchase_to_inventory' && /用料批准/u.test(relation.label)))
+})
+
+test('inventory keeps direct count and transfer posting separate from manual adjustment approval', () => {
+  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find((item) => item.key === 'inventory_adjustment')
+  assert.match(chain.label, /盘点、调拨/u)
+  const direct = chain.steps.find((item) => item.key === 'inventory_operation:posts_fact:adjusted_inventory_lot')
+  assert(direct.stateTransitionRefs.some((ref) => ref.transitionKey === 'DRAFT->POSTED'))
+  assert.equal(direct.processNodeRefs.length, 0)
+  const approval = chain.edges.find((edge) => edge.from === 'inventory_operation' && edge.kind === 'starts_process')
+  assert.match(approval.condition, /仅人工调整/u)
+  assert(chain.edges.some((edge) => edge.kind === 'reverses' && edge.action === 'InventoryUsecase.CancelInventoryOperation'))
+})
+
 test('unposted rejected purchases have vendor-return and replacement paths, never posted-stock corrections', () => {
   const chain = DEV_FLOW_STATE_CATALOG.businessChains.find(
     (item) => item.key === 'purchase_quality_disposition'
@@ -203,7 +227,7 @@ test('business chain catalog covers every business machine and process variant',
   assert.equal(catalog.businessChainCoverage.overviewComplete, true)
   assert.equal(catalog.businessChainCoverage.overviewKey, 'all')
   assert.equal(catalog.businessChainCoverage.overviewLaneCount, 4)
-  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 16)
+  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 17)
   assert.deepEqual(
     new Set(catalog.businessChainCoverage.overviewChainKeys),
     new Set(EXPECTED_CHAIN_KEYS)
@@ -434,7 +458,7 @@ test('business chain steps bind formal responsibility, state, action, process, F
   )
   const roleProfiles = yoyoosunRoleFlowMatrix.roles
 
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 77)
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 82)
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount, 66)
   assert.equal(
     DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepContractComplete,

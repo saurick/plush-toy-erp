@@ -165,6 +165,9 @@ func inventoryTxnFilterFromParams(pm map[string]any) (biz.InventoryTxnFilter, bo
 }
 
 func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if result := d.inventoryErrorResult(ctx, err); result != nil {
 		return result
 	}

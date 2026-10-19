@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
+import { createRequestScopeAbortReason, getRequestScopeCancellation, RequestScopeOwner, RequestScopeCancellationCause } from '../../common/utils/requestScopeCancellation.mjs'
 import {
   DEFAULT_WORKFLOW_ACTION_MODES,
   resolveWorkflowActionAccessRequestOutcome,
@@ -152,6 +153,7 @@ function loadHookRuntime(explainWorkflowActionAccess) {
       __modules__: {
         react,
         '@/common/utils/jsonRpc': { isRpcAbortError: () => false },
+        '../../common/utils/requestScopeCancellation.mjs': { createRequestScopeAbortReason, RequestScopeOwner, RequestScopeCancellationCause },
         '../api/workflowApi.mjs': { explainWorkflowActionAccess },
         '../utils/workflowTaskActionAccess.mjs': {
           DEFAULT_WORKFLOW_ACTION_MODES,
@@ -210,6 +212,11 @@ test('useWorkflowTaskActionAccess: revision changes re-request and stale respons
   runtime.render({ adminProfile: nextProfile, task })
   assert.equal(requests.length, 2)
   assert.equal(requests[0].options.signal.aborted, true)
+  assert.deepEqual(getRequestScopeCancellation(requests[0].options.signal.reason), {
+    owner: RequestScopeOwner.WORKFLOW_ACTION_ACCESS,
+    cause: RequestScopeCancellationCause.DISPOSED,
+    generation: 1,
+  })
 
   requests[0].deferred.resolve({
     actions: [{ action_key: 'complete', allowed: true }],

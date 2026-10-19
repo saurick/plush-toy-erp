@@ -29,6 +29,7 @@ var (
 
 	PayloadTooLarge    = Definition{Name: "PayloadTooLarge", Code: 41300, Message: "请求体过大"}
 	TemplateRenderBusy = Definition{Name: "TemplateRenderBusy", Code: 42953, Message: "当前 PDF 预览人数较多，请稍后重试"}
+	RequestCanceled    = Definition{Name: "RequestCanceled", Code: 49900, Message: "请求已取消，请刷新核对处理结果"}
 
 	AuthUserNotFound                     = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "账号不存在"}
 	AuthInvalidPassword                  = Definition{Name: "AuthInvalidPassword", Code: 10002, Message: "密码错误"}
@@ -79,6 +80,7 @@ var definitions = []Definition{
 	MethodNotAllowed,
 	PayloadTooLarge,
 	TemplateRenderBusy,
+	RequestCanceled,
 	AuthUserNotFound,
 	AuthInvalidPassword,
 	AuthUserDisabled,

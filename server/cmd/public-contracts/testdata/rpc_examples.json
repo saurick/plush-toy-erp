@@ -64,7 +64,11 @@
       "target_key": "demo_debug",
       "target_type": "admin_user"
     },
-    "test": "TestJsonrpcDispatcher_AdminAuditLogsReturnsEvents"
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "test": "TestRPCDocumentedExamples",
+      "case": "admin.audit_logs"
+    }
   },
   "admin.change_password": {
     "basis": "handler-fixture",
@@ -390,7 +394,11 @@
     },
     "message": "OK",
     "params": {},
-    "test": "TestJsonrpcDispatcher_AdminSetERPAppearance"
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "test": "TestRPCDocumentedExamples",
+      "case": "admin.me"
+    }
   },
   "admin.menu_options": {
     "basis": "backend-wire-shape",
@@ -818,7 +826,11 @@
       "role_key": "warehouse",
       "secondary_menu_paths": []
     },
-    "test": "TestJsonrpcDispatcher_AdminSetRoleSettingsIsAtomicAndVersioned"
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "test": "TestRPCDocumentedExamples",
+      "case": "admin.set_role_settings"
+    }
   },
   "admin.set_roles": {
     "basis": "handler-fixture",
@@ -13221,7 +13233,7 @@
           "subject_id": 1,
           "subject_type": "PRODUCT",
           "unit_id": 1,
-          "updated_at": 1792394183,
+          "updated_at": 1781683200,
           "warehouse_id": 2
         }
       ],
@@ -13235,7 +13247,11 @@
       "subject_type": "PRODUCT",
       "warehouse_id": 2
     },
-    "test": "TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists"
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "test": "TestRPCDocumentedExamples",
+      "case": "inventory.list_inventory_balances"
+    }
   },
   "inventory.list_inventory_lots": {
     "basis": "handler-fixture",
@@ -13243,7 +13259,7 @@
       "inventory_lots": [
         {
           "color_no": null,
-          "created_at": 1792394183,
+          "created_at": 1781683200,
           "dye_lot_no": null,
           "id": 1,
           "lot_no": "INV-LEDGER-LOT-001",
@@ -13259,7 +13275,7 @@
           "subject_id": 1,
           "subject_type": "MATERIAL",
           "supplier_lot_no": "SUP-LOT-001",
-          "updated_at": 1792394183,
+          "updated_at": 1781683200,
           "version": 1
         }
       ],
@@ -13275,7 +13291,11 @@
       "status": "ACTIVE",
       "warehouse_id": 1
     },
-    "test": "TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists"
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "test": "TestRPCDocumentedExamples",
+      "case": "inventory.list_inventory_lots"
+    }
   },
   "inventory.list_inventory_operations": {
     "basis": "backend-wire-shape",
@@ -13292,7 +13312,7 @@
     "data": {
       "inventory_txns": [
         {
-          "created_at": 1792394183,
+          "created_at": 1781683200,
           "created_by": 9,
           "direction": 1,
           "id": 1,
@@ -13328,7 +13348,11 @@
       "txn_type": "IN",
       "warehouse_id": 1
     },
-    "test": "TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists"
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "test": "TestRPCDocumentedExamples",
+      "case": "inventory.list_inventory_txns"
+    }
   },
   "inventory.post_inventory_operation": {
     "basis": "backend-wire-shape",

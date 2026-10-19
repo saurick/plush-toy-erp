@@ -93,6 +93,8 @@ const MobileAppLayout = lazyRoute(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazyRoute(
   () => import('./mobile/pages/MobileRoleTasksPage')
 )
+const MobileTaskFactLayout = lazyRoute(() => import('./mobile/components/MobileTaskFactLayout.jsx'))
+const MobileTaskFactPage = lazyRoute(() => import('./mobile/components/MobileTaskFactPage.jsx'))
 const DevWorkbenchBridge = import.meta.env.DEV
   ? lazyRoute(() => import('@/dev-workbench/DevWorkbenchBridge.jsx'))
   : null
@@ -464,7 +466,11 @@ export default function ERPRouter() {
 
           <Route path="/m/:roleKey" element={<MobileShellRoute />}>
             <Route index element={<Navigate to="tasks" replace />} />
-            <Route path="tasks" element={<MobileRoleTasksPage />} />
+            <Route path="tasks" element={<MobileRoleTasksPage />}>
+              <Route element={<MobileTaskFactLayout />}>
+                <Route index element={<MobileTaskFactPage />} />
+              </Route>
+            </Route>
             <Route path="handle" element={<MobileBusinessLayout />}>
               <Route path="help-center" element={<HelpCenterPage />} />
             </Route>

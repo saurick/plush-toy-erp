@@ -2,13 +2,14 @@ import React from 'react'
 import { Button, Drawer, Select } from 'antd'
 import { BranchesOutlined, LeftOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
+import SlidingSegmented from '../../../common/components/navigation/SlidingSegmented.jsx'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
-import { fulfillmentExceptionPath, fulfillmentRoleOptions, fulfillmentStepMatchesRole, fulfillmentTaskLinks, normalizeFulfillmentRole } from '../../../erp/utils/workflowFulfillment.mjs'
+import { fulfillmentExceptionPath, fulfillmentHandling, fulfillmentRoleOptions, fulfillmentStepMatchesRole, fulfillmentTaskLinks, normalizeFulfillmentRole } from '../../../erp/utils/workflowFulfillment.mjs'
 import './taskFulfillmentGuide.css'
 import FulfillmentSubflow from './FulfillmentSubflow.jsx'
 import FulfillmentChainCanvas from './FulfillmentChainCanvas.jsx'
-import { buildFulfillmentExceptionDirectory, getFulfillmentStageContext, getFulfillmentSubstepCopy, getFulfillmentSupplement } from '../../config/devFulfillmentPresentation.mjs'
+import { buildFulfillmentExceptionDirectory, getFulfillmentStageContext, getFulfillmentStageCopy, getFulfillmentSubstepCopy, getFulfillmentSupplement } from '../../config/devFulfillmentPresentation.mjs'
 
 function ApprovalDetails({ approval }) {
   return (
@@ -35,12 +36,26 @@ function ScopedStageOverview({ steps, role, selectedStage, detailID, overviewRef
   )
 }
 
-function ExceptionFlowDirectory({ open, onClose, onSelect, role, stage, roleLabel }) {
-  const items = buildFulfillmentExceptionDirectory(catalog.exception_guides, role, stage)
+function ExceptionFlowDirectory({ open, onClose, onSelect, onSelectHandling, steps, role, stage, roleLabel, showAll, onChangeScope }) {
+  const current = steps.find((step) => step.stage === stage && step.handling)
+  const guides = current && !showAll ? fulfillmentHandling(current).guides : catalog.exception_guides
+  const items = buildFulfillmentExceptionDirectory(guides, role, stage)
   const matchingCount = items.filter((item) => item.roleMatch).length
+  const handlingStages = current && !showAll ? [current] : steps.filter((step) => step.handling)
   return (
-    <Drawer rootClassName="erp-dev-exception-directory" title="异常流程" width={640} open={open} onClose={onClose} closable={{ placement: 'start' }} closeIcon={<LeftOutlined />}>
-      <p className="erp-dev-exception-directory__scope">{role === 'all' ? `全部 ${items.length} 类异常` : matchingCount ? `${roleLabel}参与 ${matchingCount} / ${items.length} 类异常` : `未登记${roleLabel}固定职责 · 全部 ${items.length} 类可查看`}</p>
+    <Drawer rootClassName="erp-dev-exception-directory" title="异常情况与处理" width={640} open={open} onClose={onClose} closable={{ placement: 'start' }} closeIcon={<LeftOutlined />}>
+      {current ? <div className="erp-dev-exception-directory__heading"><h3>{showAll ? '全部环节异常情况' : '当前环节异常情况'}</h3><Button onClick={() => onChangeScope(!showAll)}>{showAll ? '返回当前环节' : '查看全部环节与异常分支'}</Button></div> : <h3>各环节异常情况</h3>}
+      {handlingStages.length ? (
+        <ol className="erp-dev-exception-directory__stages" data-current={Boolean(current && !showAll) || undefined}>
+          {handlingStages.map((step) => (
+            <li key={step.stage} data-handling-entry={step.stage} data-role-match={role === 'all' ? undefined : fulfillmentStepMatchesRole(step, role)}>
+              <button type="button" onClick={() => onSelectHandling(step.stage)}><span>{catalog.fulfillment_flow.findIndex((item) => item.stage === step.stage) + 1}</span><span className="erp-dev-exception-directory__stage-copy"><strong>{getFulfillmentStageCopy(step).label}</strong><small>{step.handling.issues}</small></span></button>
+            </li>
+            ))}
+        </ol>
+      ) : null}
+      {items.length ? <h3>{current && !showAll ? '相关异常分支' : '已登记的异常分支'}</h3> : null}
+      {items.length > 0 && role !== 'all' ? <p className="erp-dev-exception-directory__scope">{matchingCount ? `${roleLabel}参与 ${matchingCount} / ${items.length} 类专项处置` : `未登记${roleLabel}固定职责，仍可查看处理说明。`}</p> : null}
       <ul className="erp-dev-exception-directory__list">
         {items.map(({ guide, related, roleMatch }) => (
           <li key={guide.key} data-exception-entry={guide.key} data-role-match={role === 'all' ? undefined : roleMatch}>
@@ -51,6 +66,7 @@ function ExceptionFlowDirectory({ open, onClose, onSelect, role, stage, roleLabe
           </li>
         ))}
       </ul>
+      <p className="erp-dev-exception-directory__boundary">未列出的问题，可关联来源单据安排跟进、记录受阻原因与处理反馈。正式业务待办由来源单据更新；任务结束不代替实物、检验或款项结果。</p>
     </Drawer>
   )
 }
@@ -64,6 +80,7 @@ export default function TaskFulfillmentGuide({
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [exceptionDirectoryOpen, setExceptionDirectoryOpen] = React.useState(false)
+  const [exceptionDirectoryAll, setExceptionDirectoryAll] = React.useState(false)
   const role = normalizeFulfillmentRole(searchParams.get('flow_role'))
   const roleSelectID = React.useId()
   const detailID = React.useId()
@@ -86,8 +103,9 @@ export default function TaskFulfillmentGuide({
   const requestedStep = steps.find((step) => step.stage === searchParams.get('flow_stage'))
   const current = requestedStep || steps.find((step) => fulfillmentStepMatchesRole(step, role)) || steps[0]
   const detailOpen = scoped || Boolean(requestedStep)
+  const handlingOpen = detailOpen && Boolean(current.handling) && searchParams.get(queryKeys.roleHandling) === '1'
   React.useEffect(() => {
-    if (!scoped || view !== 'main' || !pendingDetailScroll.current) return
+    if (view !== 'main' || exceptionDirectoryOpen || !pendingDetailScroll.current) return
     if (pendingDetailScroll.current === 'overview') {
       pendingDetailScroll.current = null
       overviewRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
@@ -96,12 +114,11 @@ export default function TaskFulfillmentGuide({
     if (!detailOpen || pendingDetailScroll.current !== current.stage) return
     pendingDetailScroll.current = null
     detailRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-  }, [scoped, view, current.stage, detailOpen])
+  }, [scoped, view, current.stage, detailOpen, handlingOpen, exceptionDirectoryOpen])
   const context = scoped ? null : getFulfillmentStageContext(steps, current.stage)
   const currentRoleLabel = fulfillmentRoleOptions.find((option) => option.value === role).label
   const currentDuties = current.subflow?.nodes.filter((node) => fulfillmentStepMatchesRole(node, role)) || []
   const currentExceptions = catalog.exception_guides.filter((guide) => guide.entry_stages.includes(current.stage))
-  const currentException = currentExceptions[0]
   const supplement = getFulfillmentSupplement(current)
   const hasSupplement = Boolean(supplement.handoffs.length || supplement.approvals.length || supplement.exception)
   const returnLabel = !scoped && requestedView === 'topics' ? '业务目录' : detailOpen ? current.label : '订单全流程'
@@ -154,8 +171,9 @@ export default function TaskFulfillmentGuide({
     }
     return next
   })
-  const selectStage = (stage) => {
-    if (scoped && view === 'main' && window.matchMedia('(max-width: 800px)').matches) pendingDetailScroll.current = stage
+  const selectStage = (stage, handling = false) => {
+    setExceptionDirectoryOpen(false)
+    if (handling || scoped && view === 'main' && window.matchMedia('(max-width: 800px)').matches) pendingDetailScroll.current = stage
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous)
       if (scoped && view === 'exception') {
@@ -164,6 +182,8 @@ export default function TaskFulfillmentGuide({
       }
       next.delete(queryKeys.roleTab)
       next.set(queryKeys.roleStage, stage)
+      if (handling) next.set(queryKeys.roleHandling, '1')
+      else next.delete(queryKeys.roleHandling)
       next.delete(queryKeys.roleSubstep)
       next.delete(queryKeys.exception)
       next.delete(queryKeys.exceptionOrigin)
@@ -177,6 +197,7 @@ export default function TaskFulfillmentGuide({
       const next = new URLSearchParams(previous)
       next.delete(queryKeys.roleStage)
       next.delete(queryKeys.roleSubstep)
+      next.delete(queryKeys.roleHandling)
       return next
     })
     requestAnimationFrame(() => {
@@ -184,16 +205,23 @@ export default function TaskFulfillmentGuide({
       overviewRef.current?.querySelector(`[data-fulfillment-stage="${current.stage}"] button`)?.scrollIntoView({ block: 'nearest' })
     })
   }
-  const links = fulfillmentTaskLinks(current)
+  const handling = current.handling ? fulfillmentHandling(current) : null
+  const links = handling && handlingOpen ? handling.taskLinks : fulfillmentTaskLinks(current)
+  const changeHandling = (value) => setSearchParams((previous) => {
+    const next = new URLSearchParams(previous)
+    next.set(queryKeys.roleStage, current.stage)
+    if (value === 'handling') next.set(queryKeys.roleHandling, '1')
+    else next.delete(queryKeys.roleHandling)
+    return next
+  })
   const canvasVisible = view === 'exception' || (!scoped && view === 'main')
   const displaySteps = canvasVisible ? catalog.fulfillment_flow : steps
   const visibleMatches = displaySteps.filter((step) => fulfillmentStepMatchesRole(step, role))
   const stageDetail = detailOpen ? (
-    <div className="erp-dev-fulfillment-guide__result" id={detailID} ref={detailRef} aria-live="polite">
+    <div className="erp-dev-fulfillment-guide__result" id={detailID} ref={detailRef} aria-live="polite" data-stage-mode={handlingOpen ? 'handling' : 'normal'}>
       <div className="erp-dev-fulfillment-guide__detail-heading">
         <div><p>{scoped ? '当前业务' : '总链位置'} · 第 {steps.indexOf(current) + 1} / {steps.length} 环节{current.branch ? ' · 条件分支' : ''}</p><h3>{current.label}</h3></div>
         <div className="erp-dev-fulfillment-guide__navigation">
-          {currentException ? <Button icon={<BranchesOutlined />} aria-label={currentExceptions.length > 1 ? '本环节异常' : `本环节异常：${currentException.label}`} onClick={() => currentExceptions.length > 1 ? setExceptionDirectoryOpen(true) : openException(currentException)}>本环节异常{currentExceptions.length > 1 ? `（${currentExceptions.length}）` : ''}</Button> : null}
           {!scoped ? <Button onClick={closeDetail}>收起环节</Button> : null}
         </div>
         {scoped ? (
@@ -209,14 +237,25 @@ export default function TaskFulfillmentGuide({
       ) : null}
       </div>
       <p className="erp-dev-fulfillment-guide__owner">{role === 'all' ? `办理岗位：${current.role}` : currentDuties.length ? `${currentRoleLabel}负责：${currentDuties.map(getFulfillmentSubstepCopy).join('、')}` : fulfillmentStepMatchesRole(current, role) ? `办理岗位：${current.role}` : `本环节未登记${currentRoleLabel}职责，保留交接上下文。`}</p>
-      {context?.related.length ? (
+      {handling ? <SlidingSegmented className="erp-dev-fulfillment-guide__mode" aria-label="环节办理方式" hierarchy="secondary" value={handlingOpen ? 'handling' : 'normal'} options={[{ value: 'normal', label: '正常办理' }, { value: 'handling', label: '异常处理' }]} onChange={changeHandling} /> : null}
+      {handling && handlingOpen ? (
+        <section className="erp-dev-fulfillment-guide__handling" data-stage-handling={current.stage}>
+          <dl className="erp-dev-fulfillment-guide__node-facts">
+            <dt>异常情况</dt><dd>{handling.issues}</dd>
+            <dt>办理方式</dt><dd>{handling.action}</dd>
+            <dt>继续前核对</dt><dd>{handling.resume}</dd>
+          </dl>
+          {handling.guides.length ? <div className="erp-dev-fulfillment-guide__navigation">{handling.guides.map((guide) => <Button key={guide.key} onClick={() => openException(guide, null, guide.entry_stages.includes(current.stage) ? current.stage : null)}>{guide.label}</Button>)}</div> : null}
+        </section>
+      ) : null}
+      {!handlingOpen && context?.related.length ? (
         <div className="erp-dev-fulfillment-guide__stage-context">
           <span className="erp-dev-fulfillment-guide__related">按约定关联 {context.related.map(({ step, label }) => <Button size="small" key={step.stage} title={step.label} onClick={() => selectStage(step.stage)}>{steps.indexOf(step) + 1} {label}</Button>)}</span>
         </div>
     ) : null}
-      {current.subflow ? <FulfillmentSubflow step={current} role={role} searchParams={searchParams} setSearchParams={setSearchParams} onOpenException={(substep, guideKey) => { const related = currentExceptions.find((item) => item.key === guideKey); if (related) openException(related, substep) }} /> : null}
-      {!current.subflow || hasSupplement ? (
-        <div className="erp-dev-fulfillment-guide__detail-content">
+      {!handlingOpen && current.subflow ? <FulfillmentSubflow step={current} role={role} searchParams={searchParams} setSearchParams={setSearchParams} onOpenException={(substep, guideKey) => { const related = currentExceptions.find((item) => item.key === guideKey); if (related) openException(related, substep) }} /> : null}
+      {!handlingOpen && (!current.subflow || hasSupplement) ? (
+        <div className="erp-dev-fulfillment-guide__detail-content" data-stage-normal={current.stage}>
           {!current.subflow ? <section><h4>完成条件与结果</h4><p>{current.result}</p></section> : null}
           {hasSupplement ? (
             <details className="erp-dev-fulfillment-guide__instructions" key={current.stage}>
@@ -241,7 +280,7 @@ export default function TaskFulfillmentGuide({
         <h2>{canvasVisible ? '订单全流程' : scoped ? '岗位分工与交接' : '按业务查阅'}</h2>
         <div className="erp-dev-fulfillment-guide__navigation">
           <div className="erp-dev-fulfillment-guide__role"><label htmlFor={roleSelectID}>关注岗位</label><Select id={roleSelectID} aria-label="关注岗位" value={role} options={fulfillmentRoleOptions} onChange={changeRole} virtual={false} /></div>
-          <Button aria-label="异常流程" icon={<BranchesOutlined />} onClick={() => setExceptionDirectoryOpen(true)}>异常流程</Button>
+          <Button aria-label="异常情况" icon={<BranchesOutlined />} onClick={() => { setExceptionDirectoryAll(!detailOpen || !handling); setExceptionDirectoryOpen(true) }}>异常情况</Button>
           {view === 'exception' && (scoped || requestedView === 'topics') ? <Button aria-label={`返回${returnLabel}`} icon={<LeftOutlined />} onClick={() => closeException()}>返回{returnLabel}</Button>
             : !scoped && topics ? <Button onClick={() => setView(view === 'topics' ? 'main' : 'topics')}>{view === 'topics' ? '返回完整流程' : '按业务查阅'}</Button> : null}
         </div>
@@ -252,8 +291,8 @@ export default function TaskFulfillmentGuide({
       ) : view === 'topics' ? topics : (
         <div className="erp-dev-fulfillment-guide__body"><ScopedStageOverview steps={steps} role={role} selectedStage={current.stage} detailID={detailID} overviewRef={overviewRef} onSelect={selectStage} />{stageDetail}</div>
       )}
-      <p className="erp-dev-fulfillment-guide__boundary">岗位职责示意 · 非实际办理进度；岗位筛选不改变权限。</p>
-      <ExceptionFlowDirectory open={exceptionDirectoryOpen} onClose={() => setExceptionDirectoryOpen(false)} onSelect={openException} role={role} stage={detailOpen ? current.stage : undefined} roleLabel={currentRoleLabel} />
+      <p className="erp-dev-fulfillment-guide__boundary">岗位职责示意，非实际办理进度；岗位筛选不改变权限，任务完成不代替正式业务结果。</p>
+      <ExceptionFlowDirectory open={exceptionDirectoryOpen} onClose={() => setExceptionDirectoryOpen(false)} onSelect={openException} onSelectHandling={(stage) => selectStage(stage, true)} steps={steps} role={role} stage={detailOpen ? current.stage : undefined} roleLabel={currentRoleLabel} showAll={exceptionDirectoryAll} onChangeScope={setExceptionDirectoryAll} />
     </section>
   )
 }

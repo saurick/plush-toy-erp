@@ -1,5 +1,4 @@
 import { resolveWorkflowTaskEntryPath } from '../../utils/dashboardTaskDisplay.mjs'
-import { canonicalBusinessPath } from '../../utils/businessTaskRoute.mjs'
 import { canOpenWorkflowTaskEntry } from '../../utils/workflowTaskEntryAccess.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { BUSINESS_ROUTE_PATHS, hasActionPermission } from '../../utils/masterDataOrderView.mjs'
@@ -14,11 +13,6 @@ const RELATED = Object.freeze([
 export function mobileTaskRelatedCommands(task, profile, sourceAccess) {
   return RELATED.filter((command) => task?.source_type === command.sourceType &&
     hasActionPermission(profile, command.permission) && canOpenWorkflowTaskEntry(profile, command.path, sourceAccess))
-}
-
-export function mobileTaskRelatedCommand(path, task) {
-  const match = /^\/m\/[a-z_]+\/tasks\/([1-9][0-9]*)\/handle\/related\/(production_plan|shipment|inventory)$/u.exec(path)
-  return match && Number(match[1]) === task?.id ? RELATED.find((command) => command.kind === match[2] && command.sourceType === task.source_type) || null : null
 }
 
 const FOLLOWUP_TARGETS = Object.freeze({
@@ -53,28 +47,6 @@ export function canOpenMobileTaskBusiness(task, profile, sourceAccess) {
   return canOpenWorkflowTaskEntry(profile, resolveMobileTaskBusinessEntry(task), sourceAccess)
 }
 
-export function mobileTaskBusinessPath(task, roleKey) {
-  const entry = resolveMobileTaskBusinessEntry(task)
-  if (!entry || !/^[a-z_]+$/u.test(roleKey || '')) return ''
-  return `/m/${roleKey}/tasks/${task.id}/handle/${entry.slice(5)}`
-}
-
-function sourceIdentity(path) {
-  const canonical = canonicalBusinessPath(path)
-  if (!canonical.startsWith('/erp/')) return ''
-  const url = new URL(canonical, 'https://erp.invalid')
-  url.searchParams.delete('link_source')
-  url.searchParams.sort()
-  return `${url.pathname}${url.search}`
-}
-
-export function matchesMobileTaskBusinessEntry(path, task) {
-  const expected = resolveMobileTaskBusinessEntry(task)
-  if (!expected) return false
-  if (mobileTaskRelatedCommand(path, task)) return true
-  return Boolean(expected && sourceIdentity(path) === sourceIdentity(expected))
-}
-
 export function selectMobileRelatedBusinessTask(page, source, roleKey) {
   if (!source || !Array.isArray(page?.tasks) || !Number.isSafeInteger(page.total) || page.total < 0 || page.total > page.tasks.length ||
       page.tasks.some((task) => !Number.isSafeInteger(task.id) || task.id <= 0 || !Number.isSafeInteger(task.version) || task.version <= 0 || task.source_type !== source.source_type || task.source_id !== source.source_id)) {
@@ -85,4 +57,10 @@ export function selectMobileRelatedBusinessTask(page, source, roleKey) {
   const active = owned.filter((task) => ['ready', 'blocked'].includes(task.task_status_key))
   const choices = active.length ? active : owned.length ? owned : candidates
   return choices.length === 1 ? choices[0] : null
+}
+
+export function taskScopedSearchParams(anchors, value) {
+  const next = new URLSearchParams(value)
+  for (const [key, expected] of anchors) next.set(key, expected)
+  return next
 }

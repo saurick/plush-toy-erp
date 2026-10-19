@@ -6,7 +6,6 @@ import {
   businessNavigationSections,
   getBusinessModule,
 } from '../config/businessModules.mjs'
-import { buildRoleGuidedNavigationPreview } from '../config/roleGuidedNavigation.mjs'
 import {
   getBusinessModuleGroup,
   groupSidebarNavigationSections,
@@ -141,28 +140,6 @@ test('出货来源深链和页签查询可恢复，失去权限后不重开旧�
     ),
     item.path
   )
-})
-
-test('岗位导航预览使用同一模块投影且不改变自定义默认页面', () => {
-  const visible = [section('receivables', 'payables', 'invoices')]
-  const result = buildRoleGuidedNavigationPreview({
-    navigationSections: visible,
-    effectiveAccess: {
-      pages: visible[0].items.map((item) => ({
-        path: item.path,
-        effective: true,
-      })),
-    },
-    roleKey: 'finance',
-    navigationMode: 'custom',
-    primaryMenuPaths: ['/erp/finance/payables'],
-    secondaryMenuPaths: ['/erp/finance/receivables', '/erp/finance/invoices'],
-  })
-  assert.deepEqual(
-    result.primaryItems.map((item) => [item.label, item.path]),
-    [['财务管理', '/erp/finance/payables']]
-  )
-  assert.equal(result.secondaryItemCount, 0)
 })
 
 test('模块入口只归并已有可访问页面，默认路径仍是已授权页面', () => {

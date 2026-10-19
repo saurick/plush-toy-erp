@@ -41,8 +41,30 @@ test('approval, parallel preparation, internal work and outsourced work keep the
   assert(!shipping.edges.some((edge) => edge.from === 'approval' && edge.to === 'fact'), '放行不直接成为实际发货')
   assert(shipping.edges.some((edge) => edge.from === 'actual' && edge.to === 'fact'))
   const quality = buildFulfillmentSubflow(step('finished_quality'))
-  assert(quality.edges.some((edge) => edge.to === 'customer' && edge.label === '订单要求时'))
-  assert.match(quality.summary, /不固定.*先后顺序/u)
+  assert.deepEqual(quality.edges.filter((edge) => edge.to !== 'exception').map(({ from, to }) => [from, to]), [
+    ['route', 'quality'], ['quality', 'needle'], ['needle', 'sampling'],
+    ['sampling', 'customer'], ['sampling', 'passed'], ['customer', 'passed'],
+  ])
+  assert(quality.edges.some((edge) => edge.from === 'sampling' && edge.to === 'customer' && edge.label === '订单要求时'))
+  assert(quality.edges.some((edge) => edge.from === 'sampling' && edge.to === 'passed' && edge.label === '不要求客户验货'))
+  assert.deepEqual(quality.edges.filter((edge) => edge.to === 'exception').map((edge) => edge.from), ['quality', 'needle', 'sampling', 'customer'])
+  assert.doesNotMatch(quality.summary, /不固定.*先后顺序/u)
+})
+
+test('production release precedes scheduling and pricing never blocks counting physical arrivals', () => {
+  const production = buildFulfillmentSubflow(step('cutting_issue'))
+  assert.deepEqual(production.edges.filter((edge) => ['create', 'release'].includes(edge.from)).map(({ from, to }) => [from, to]), [['create', 'release'], ['release', 'plan']])
+  assert.deepEqual(production.nodes.find((node) => node.key === 'create').role_keys, ['pmc'])
+  const release = production.nodes.find((node) => node.key === 'release')
+  assert(release.details.some(({ text }) => /冻结用料、工艺路线和检验条件/u.test(text)))
+  assert(release.details.some(({ text }) => /不代表物料齐套或已经领料/u.test(text)))
+  const purchase = buildFulfillmentSubflow(step('purchasing'))
+  const terms = purchase.nodes.find((node) => node.key === 'terms')
+  assert.deepEqual(terms.role_keys, ['purchase'])
+  assert(terms.details.some(({ text }) => /缺价不阻止实物收货/u.test(text) && /生成应付前/u.test(text)))
+  assert(purchase.edges.some((edge) => edge.from === 'generated' && edge.to === 'terms'))
+  assert(purchase.edges.some((edge) => edge.from === 'generated' && edge.to === 'follow'), '到货跟进不能被补价分支串行阻断')
+  assert(!purchase.edges.some((edge) => edge.from === 'terms' && edge.to === 'approval'))
 })
 
 test('node details always read the existing handoff and approval text', () => {

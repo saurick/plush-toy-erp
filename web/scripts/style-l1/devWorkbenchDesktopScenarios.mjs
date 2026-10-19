@@ -1,7 +1,7 @@
 import { installIntegrationWorkspaceMock, verifyIntegrationWorkspace, verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
 import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
-import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
+import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, verifyMermaidDarkTheme, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
 import {
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
@@ -74,6 +74,8 @@ export function createDevWorkbenchDesktopScenarios({
             /console error.*net::ERR_FAILED.*\/__dev\/api\/qa\/coverage/u,
           ],
         }
+      : item.route === DEV_INTEGRATION_ROUTE
+        ? { expectedConsoleErrorPatterns: [/console error.*status of 500.*\/__dev\/api\/qa\/quality-gates\/rpc-contract-review\?range=worktree/u] }
       : {}),
     verify: async (page) => {
       await expectHeading(page, item.title)
@@ -731,6 +733,7 @@ export function createDevWorkbenchDesktopScenarios({
           '.erp-dev-docs-markdown .erp-markdown-mermaid'
         )
         await verifyMermaidViewer(page, diagrams.first(), assert)
+        await verifyMermaidDarkTheme(page, diagrams.first(), assert)
         // The second diagram is much taller; its preview stays bounded without losing content.
         const tallViewport = diagrams
           .nth(1)

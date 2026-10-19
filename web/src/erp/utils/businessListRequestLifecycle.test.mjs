@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { createLatestRequestCoordinator } from '../hooks/useLatestRequestCoordinator.js'
+import { getRequestScopeCancellation, RequestScopeOwner, RequestScopeCancellationCause } from '../../common/utils/requestScopeCancellation.mjs'
 
 function createDeferred() {
   let resolve
@@ -114,6 +115,12 @@ test('business list request lifecycle: delayed stale response cannot overwrite l
   const secondRun = runRequest(secondRequest, secondDeferred)
 
   assert.equal(firstRequest.signal.aborted, true)
+  assert.deepEqual(getRequestScopeCancellation(firstRequest.signal.reason), {
+    owner: RequestScopeOwner.LATEST_REQUEST,
+    cause: RequestScopeCancellationCause.SUPERSEDED,
+    generation: 1,
+    nextGeneration: 2,
+  })
   assert.equal(firstRequest.isCurrent(), false)
   assert.equal(secondRequest.isCurrent(), true)
 
@@ -132,6 +139,8 @@ test('business list request lifecycle: delayed stale response cannot overwrite l
   coordinator.abortAll()
   assert.equal(refreshRequest.signal.aborted, true)
   assert.equal(anotherKeyRequest.signal.aborted, true)
+  assert.equal(getRequestScopeCancellation(refreshRequest.signal.reason).cause, RequestScopeCancellationCause.DISPOSED)
+  assert.equal(getRequestScopeCancellation(anotherKeyRequest.signal.reason).cause, RequestScopeCancellationCause.DISPOSED)
   assert.equal(refreshRequest.isCurrent(), false)
 })
 

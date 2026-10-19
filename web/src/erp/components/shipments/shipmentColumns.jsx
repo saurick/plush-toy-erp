@@ -83,6 +83,18 @@ function freightText(record = {}, fallback = '-') {
   )}`.trim()
 }
 
+function shipmentWeightText(value, record) {
+  const weight = String(value ?? '').trim()
+  if (!weight) {
+    if (record?.status === ShipmentStatus.DRAFT) return '待确认'
+    if (hasFinalShipmentWeight(record?.status)) return '未记录'
+    return '-'
+  }
+  if (hasFinalShipmentWeight(record?.status)) return `最终 ${weight} 克`
+  if (record?.status === ShipmentStatus.DRAFT) return `实际 ${weight} 克`
+  return `${weight} 克`
+}
+
 export function buildShipmentColumns({ salesOrdersByID }) {
   return applyBusinessColumnSorters([
     {
@@ -171,17 +183,8 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       dataIndex: 'total_net_weight_g',
       width: 190,
       sortable: false,
-      render: (value, record) => {
-        const weight = String(value ?? '').trim()
-        if (!weight) {
-          if (record?.status === ShipmentStatus.DRAFT) return '待确认'
-          if (hasFinalShipmentWeight(record?.status)) return '未记录'
-          return '-'
-        }
-        if (hasFinalShipmentWeight(record?.status)) return `最终 ${weight} 克`
-        if (record?.status === ShipmentStatus.DRAFT) return `实际 ${weight} 克`
-        return `${weight} 克`
-      },
+      render: shipmentWeightText,
+      detailValue: (record) => shipmentWeightText(record?.total_net_weight_g, record),
       exportValue: (record) => String(record?.total_net_weight_g ?? '').trim(),
     },
     {

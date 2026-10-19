@@ -7,6 +7,24 @@
   height: 100dvh;
 }
 
+.mobile-task-business > .mobile-role-tasks-page__detail-main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mobile-task-business > .mobile-role-tasks-page__detail-main > .mobile-detail-section {
+  flex-shrink: 0;
+}
+
+.mobile-task-business > .mobile-role-tasks-page__detail-main > .erp-material-task-action {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .mobile-task-business__content {
   position: relative;
   flex: 1;
@@ -14,15 +32,11 @@
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 12px;
+  padding: 0;
 }
 
 .mobile-task-business__content[data-business-form-editing='true'] {
   overflow: hidden;
-}
-
-.mobile-task-business__loading {
-  min-height: 120px;
 }
 
 .mobile-task-business-actions {
@@ -33,15 +47,11 @@
 }
 
 .mobile-task-business-actions > .ant-btn,
-.mobile-task-related-business > .ant-btn {
+.mobile-outsourcing-task-actions .erp-action-button {
   min-height: 44px;
 }
 
-.mobile-task-related-business > p {
-  overflow-wrap: anywhere;
-}
-
-.mobile-task-related-business > label,
+.mobile-task-business__content > label,
 .mobile-task-payment-kind {
   display: grid;
   gap: 8px;
@@ -50,29 +60,158 @@
 }
 
 .mobile-task-payment-kind > .ant-select,
-.mobile-task-related-business > label > .ant-select {
+.mobile-task-business__content > label > .ant-select {
   min-height: 44px;
 }
 
-.mobile-task-business__record {
+.mobile-task-business > .mobile-role-tasks-page__detail-main > .workflow-task-info-card {
+  flex-shrink: 0;
+}
+
+
+.mobile-task-business-source {
+  padding: 14px;
+  border: 1px solid var(--erp-border);
+  border-radius: 12px;
+  background: var(--erp-surface-bg);
+}
+
+.mobile-task-facts h3 {
+  margin: 0 0 12px;
+  color: var(--erp-text);
+  font-size: var(--erp-font-body);
+}
+
+.mobile-task-facts__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
   margin: 0;
 }
 
-.mobile-task-business__record > div {
-  display: grid;
-  grid-template-columns: minmax(80px, 35%) minmax(0, 1fr);
-  gap: 12px;
-}
-
-.mobile-task-business__record dt {
-  color: var(--erp-text-secondary);
-}
-
-.mobile-task-business__record dd {
+.mobile-task-facts__field {
   min-width: 0;
-  margin: 0;
   overflow-wrap: anywhere;
+}
+
+.mobile-task-facts__field--wide {
+  grid-column: 1 / -1;
+}
+
+.mobile-task-facts__field dt {
+  margin-bottom: 3px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.mobile-task-facts__field dd {
+  margin: 0;
+  color: var(--erp-text);
+  font-size: var(--erp-font-body);
+}
+
+.mobile-task-facts__empty {
+  margin-top: 12px;
+  border-top: 1px solid var(--erp-border);
+}
+
+.mobile-task-facts__empty > summary {
+  justify-content: space-between;
+  gap: 8px;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.mobile-task-business-action-host {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mobile-task-business-action-host:empty {
+  display: none;
+}
+
+.mobile-task-business-primary .erp-business-selection-action-bar__actions {
+  width: 100%;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.mobile-task-business-primary .ant-btn {
+  padding: 9px 8px;
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+}
+
+.mobile-task-business-primary .erp-business-selection-action-bar__compact-visible {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mobile-task-business-primary .erp-business-selection-action-bar__action-item,
+.mobile-task-business-primary .erp-business-action-tooltip-anchor {
+  min-width: 0;
+}
+
+.mobile-task-business-primary .erp-business-selection-action-bar__compact-more {
+  flex: 0 0 auto;
+  min-width: 44px;
+  width: 44px;
+  padding: 8px;
+}
+
+
+.mobile-task-business-primary .erp-business-selection-action-bar__compact-visible > div,
+.mobile-task-business-primary .erp-business-selection-action-bar__compact-visible .erp-business-action-tooltip-anchor,
+.mobile-task-business-primary .erp-business-selection-action-bar__compact-visible .ant-btn {
+  width: 100%;
+}
+
+.mobile-task-facts__empty[open] > summary > .anticon {
+  transform: rotate(180deg);
+}
+
+.mobile-task-business-form-footer {
+  display: grid;
+  gap: 4px;
+}
+
+.mobile-task-business-form-footer .erp-business-form-page__status {
+  font-size: var(--erp-font-caption);
+}
+
+.mobile-task-business-form-footer .erp-business-form-page__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mobile-task-business .mobile-task-business-form-footer .ant-btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  height: auto;
+  padding-inline: 8px;
+  white-space: normal;
+}
+
+.mobile-task-business[data-business-form-editing='true'] .mobile-task-business-primary {
+  display: none;
+}
+
+.mobile-task-business-primary .erp-business-selection-action-bar__compact-visible .ant-btn:not(:disabled):not(.ant-btn-dangerous) {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary);
+  color: #fff;
+}
+
+.mobile-task-business[data-business-form-editing='true'] > .mobile-role-action-bar {
+  align-items: flex-end;
+}
+
+.mobile-task-business .mobile-task-business-form-footer .erp-business-form-page__actions > .ant-btn:first-child {
+  flex: 0 0 auto;
+  min-width: max-content;
 }

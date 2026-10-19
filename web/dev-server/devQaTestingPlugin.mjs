@@ -51,7 +51,7 @@ const OPERATION_PATH_PATTERN = new RegExp(
   'u'
 )
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|pressure-quick|pressure-capacity):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  /^testing:(fast|role-access|field-linkage|rpc-examples|pressure-quick|pressure-capacity):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const ACTION_MESSAGES = Object.freeze({
   fast: Object.freeze({
     running: '正在运行开发门禁',
@@ -68,6 +68,11 @@ const ACTION_MESSAGES = Object.freeze({
     running: '正在运行字段联动专项',
     passed: '字段联动专项完成，新报告已原子发布',
     failed: '字段联动专项未通过，上一份报告保持不变',
+  }),
+  'rpc-examples': Object.freeze({
+    running: '正在核对接口文档样例与实际服务响应',
+    passed: '已登记接口样例执行通过，回执已绑定本次源码身份',
+    failed: '接口样例核对未通过，请到接口合同查看执行回执',
   }),
   'pressure-quick': Object.freeze({
     running: '正在构建隔离环境并运行短档业务压力测试',
@@ -256,6 +261,7 @@ export function buildDevQaTestingCommand({
       'output/qa/yoyoosun-role-jsonrpc-access/report.json',
     ],
     'field-linkage': ['scripts/qa/erp-field-linkage.mjs'],
+    'rpc-examples': ['scripts/gen-public-contracts.mjs', '--verify-examples'],
     'pressure-quick': [
       'scripts/qa/pressure-isolated-lifecycle.mjs',
       '--run',

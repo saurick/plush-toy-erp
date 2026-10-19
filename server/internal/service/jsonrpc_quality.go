@@ -128,6 +128,9 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityExceptionHandle); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
+			return id, res, nil
+		}
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "correction_inspection_no", "reason") {
 			return id, invalidParamResult(), nil
 		}
@@ -508,6 +511,9 @@ func qualityInspectionResult(ctx context.Context, d *jsonrpcDispatcher, item *bi
 }
 
 func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if result := d.qualityErrorResult(ctx, err); result != nil {
 		return result
 	}

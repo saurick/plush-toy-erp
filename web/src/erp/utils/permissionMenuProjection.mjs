@@ -1,4 +1,5 @@
 import { getPermissionPageEntry } from './permissionNavigation.mjs'
+import { getBusinessModuleSidebarKey } from './businessModuleGroups.mjs'
 
 function normalizeString(value = '') {
   return String(value || '').trim()
@@ -260,47 +261,22 @@ export function reconcilePermissionSelection({
 
 export function getMenuPlacementMap(placement = {}) {
   const out = new Map()
-  ;(Array.isArray(placement?.dashboardItems)
-    ? placement.dashboardItems
-    : []
-  ).forEach((item) => {
-    if (item?.path) out.set(item.path, '工作中心')
-  })
-  ;(Array.isArray(placement?.primaryItems)
-    ? placement.primaryItems
-    : []
-  ).forEach((item) => {
-    if (item?.path) out.set(item.path, '常用工作')
-  })
-  const secondarySections = Array.isArray(placement?.secondarySections)
-    ? placement.secondarySections
-    : []
-  secondarySections.forEach((section) => {
-    const items = Array.isArray(section?.items) ? section.items : []
-    items.forEach((item) => {
-      if (item?.path) out.set(item.path, section.title)
-    })
-  })
-  return out
-}
-
-export function getMenuPlacementOrderMap(placement = {}) {
-  const out = new Map()
-  let order = 0
-  const addItems = (items = []) => {
-    const normalizedItems = Array.isArray(items) ? items : []
-    normalizedItems.forEach((item) => {
-      if (item?.path && !out.has(item.path)) {
-        out.set(item.path, order)
-        order += 1
-      }
-    })
+  const locationByModule = new Map()
+  for (const section of placement.sections || []) {
+    for (const item of section.items || []) {
+      const location =
+        section.key === 'business'
+          ? `${section.title} / ${item.label}`
+          : section.title
+      out.set(item.path, location)
+      locationByModule.set(getBusinessModuleSidebarKey(item.path), location)
+    }
   }
-  addItems(placement?.dashboardItems)
-  addItems(placement?.primaryItems)
-  const secondarySections = Array.isArray(placement?.secondarySections)
-    ? placement.secondarySections
-    : []
-  secondarySections.forEach((section) => addItems(section?.items))
+  for (const page of placement.pages || []) {
+    const location = locationByModule.get(
+      getBusinessModuleSidebarKey(page.path)
+    )
+    if (location) out.set(page.path, location)
+  }
   return out
 }

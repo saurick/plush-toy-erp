@@ -227,6 +227,7 @@ export async function prepareTransactionSalesOrder(client, options, fixture) {
       product_id: product.id,
       sku_code: `${fixture.prefix}-SKU`,
       sku_name: "模拟浏览器规格",
+      default_unit_id: product.default_unit_id,
       color: "白色",
     },
   );
@@ -874,4 +875,38 @@ export async function assignTransactionWarehouseScopes(
     );
     await client.login(roleKey);
   }
+}
+
+export async function prepareTransactionProductOutsourcingContract(client, source, operationCode) {
+  assert.ok(['SEWING', 'HANDWORK'].includes(operationCode));
+  const { processes } = await client.rpc('admin', 'masterdata', 'list_processes', { limit: 100 });
+  const process = processes.find(row => row.is_active && row.production_route_operation_code === operationCode);
+  assert.ok(process, `${operationCode} requires an active route-bound process`);
+  let contract = (await client.rpc('purchase', 'outsourcing_order', 'save_outsourcing_order_with_items', {
+    outsourcing_order_no: `${source.prefix}-${operationCode}`,
+    supplier_id: source.supplier.id,
+    supplier_snapshot: source.contract.supplier_snapshot,
+    contract_party_snapshot: source.contract.contract_party_snapshot,
+    expected_return_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    currency: 'CNY',
+    order_date: new Date().toISOString().slice(0, 10),
+    source_order_no: source.salesOrder.order_no,
+    note: '模拟车缝或手工委外，非客户事实',
+    items: [{
+      line_no: 1, subject_type: 'PRODUCT', product_id: source.salesItem.product_id,
+      product_sku_id: source.salesItem.product_sku_id, process_id: process.id,
+      unit_id: source.salesItem.unit_id, outsourcing_quantity: String(source.quantity),
+      processing_item: `模拟${operationCode}加工`, unit_price: '1', amount: String(source.quantity),
+    }],
+  })).outsourcing_order;
+  for (const [method, status] of [['submit_outsourcing_order', OutsourcingOrderStatus.SUBMITTED], ['confirm_outsourcing_order', OutsourcingOrderStatus.CONFIRMED]]) {
+    contract = (await client.rpc('purchase', 'outsourcing_order', method, { id: contract.id, expected_version: contract.version, idempotency_key: `${source.prefix}:${operationCode}:${method}` })).outsourcing_order;
+    assert.equal(contract.lifecycle_status, status);
+  }
+  const { outsourcing_order_items: items } = await client.rpc('purchase', 'outsourcing_order', 'list_outsourcing_order_items', { outsourcing_order_id: contract.id, limit: 100 });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].product_sku_id, source.salesItem.product_sku_id);
+  assert.equal(items[0].process_id, process.id);
+  assert.equal(Number(items[0].outsourcing_quantity), source.quantity);
+  return { contract, item: items[0] };
 }

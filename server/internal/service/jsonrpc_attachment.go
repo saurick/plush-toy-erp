@@ -578,6 +578,9 @@ func businessAttachmentsToAny(items []*biz.BusinessAttachment, includeContent bo
 }
 
 func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if err == nil {
 		return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message}
 	}

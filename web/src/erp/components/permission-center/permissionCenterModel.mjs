@@ -10,14 +10,6 @@ import {
   UNCLASSIFIED_PERMISSION_MODULE_TITLE,
 } from '../../utils/permissionModuleLabels.mjs'
 import { getPermissionMenuLinks } from '../../utils/permissionMenuProjection.mjs'
-import {
-  getAuthenticatedNavigationSections,
-  getNavigationSections,
-} from '../../config/seedData.mjs'
-import {
-  isRoleNavigationCustomizablePath,
-  ROLE_NAVIGATION_MODES,
-} from '../../config/roleGuidedNavigation.mjs'
 
 const TABLE_PAGE_SIZE_OPTIONS = [8, 10, 20, 50, 100]
 
@@ -31,9 +23,11 @@ const READ_PERMISSION_PERMISSION = PermissionCode.SYSTEM_PERMISSION_READ
 
 const READ_CUSTOMER_CONFIG_PERMISSION = PermissionCode.CUSTOMER_CONFIG_READ
 
-const PUBLISH_CUSTOMER_CONFIG_PERMISSION = PermissionCode.CUSTOMER_CONFIG_PUBLISH
+const PUBLISH_CUSTOMER_CONFIG_PERMISSION =
+  PermissionCode.CUSTOMER_CONFIG_PUBLISH
 
-const ACTIVATE_CUSTOMER_CONFIG_PERMISSION = PermissionCode.CUSTOMER_CONFIG_ACTIVATE
+const ACTIVATE_CUSTOMER_CONFIG_PERMISSION =
+  PermissionCode.CUSTOMER_CONFIG_ACTIVATE
 
 const MANAGE_ROLE_PERMISSION = PermissionCode.SYSTEM_ROLE_PERMISSION_MANAGE
 
@@ -55,7 +49,7 @@ const PERMISSION_CENTER_TAB_KEYS = {
 }
 
 const ROLE_NAVIGATION_VIEW_KEYS = {
-  LAYOUT: 'layout',
+  MENU: 'menu',
   ACCESS: 'access',
 }
 
@@ -97,83 +91,6 @@ function buildWarehouseScopeSignature(mode, warehouseIds = []) {
     .join(',')}`
 }
 
-function buildRoleNavigationSignature(
-  mode,
-  primaryMenuPaths = [],
-  secondaryMenuPaths = []
-) {
-  const normalizedMode =
-    mode === ROLE_NAVIGATION_MODES.CUSTOM
-      ? ROLE_NAVIGATION_MODES.CUSTOM
-      : ROLE_NAVIGATION_MODES.RECOMMENDED
-  const normalizedPaths =
-    normalizedMode === ROLE_NAVIGATION_MODES.CUSTOM
-      ? normalizeStringList(primaryMenuPaths)
-      : []
-  const normalizedSecondaryPaths =
-    normalizedMode === ROLE_NAVIGATION_MODES.CUSTOM
-      ? normalizeStringList(secondaryMenuPaths)
-      : []
-  return `${normalizedMode}:${normalizedPaths.join('\n')}:${normalizedSecondaryPaths.join('\n')}`
-}
-
-function getEffectiveRoleNavigationPathSet(access = null) {
-  return new Set(
-    (Array.isArray(access?.pages) ? access.pages : [])
-      .filter(
-        (page) =>
-          page?.effective === true &&
-          isRoleNavigationCustomizablePath(page?.path)
-      )
-      .map((page) => String(page?.path || '').trim())
-      .filter(Boolean)
-  )
-}
-
-function buildRoleNavigationOptions(access = null, selectedPaths = []) {
-  const navigationItems = [
-    ...getNavigationSections(),
-    ...getAuthenticatedNavigationSections(),
-  ].flatMap((section, sectionIndex) =>
-    (Array.isArray(section?.items) ? section.items : []).map((item) => ({
-      ...item,
-      navigationSectionKey:
-        String(section?.key || '').trim() ||
-        String(item?.navigationSectionKey || item?.sectionKey || '').trim(),
-      navigationSectionTitle:
-        String(section?.title || '').trim() ||
-        String(item?.navigationSectionTitle || item?.sectionTitle || '').trim(),
-      navigationSectionOrder: sectionIndex,
-    }))
-  )
-  const itemByPath = new Map(
-    navigationItems
-      .filter((item) => isRoleNavigationCustomizablePath(item?.path))
-      .map((item) => [item.path, item])
-  )
-  const effectivePaths = getEffectiveRoleNavigationPathSet(access)
-  const paths = [
-    ...effectivePaths,
-    ...normalizeStringList(selectedPaths).filter(
-      (path) => !effectivePaths.has(path)
-    ),
-  ]
-  return paths.map((path) => {
-    const item = itemByPath.get(path)
-    const effective = effectivePaths.has(path)
-    return {
-      value: path,
-      label: item?.label || path,
-      effective,
-      menuItem: item || {
-        path,
-        label: path,
-        navigationSectionTitle: '其他功能',
-      },
-    }
-  })
-}
-
 function getPermissionKey(permission = {}) {
   return String(
     permission?.permission_key || permission?.key || permission || ''
@@ -201,8 +118,12 @@ function hasPermission(admin = {}, permissionKey = '') {
 }
 
 export function canReadApprovalResponsibilities(admin) {
-  return [READ_USER_PERMISSION, READ_ROLE_PERMISSION, READ_PERMISSION_PERMISSION, READ_CUSTOMER_CONFIG_PERMISSION]
-    .every((permission) => hasPermission(admin, permission))
+  return [
+    READ_USER_PERMISSION,
+    READ_ROLE_PERMISSION,
+    READ_PERMISSION_PERMISSION,
+    READ_CUSTOMER_CONFIG_PERMISSION,
+  ].every((permission) => hasPermission(admin, permission))
 }
 
 function buildPermissionGroups(permissions = [], menuOptions = []) {
@@ -306,9 +227,6 @@ export {
   buildPermissionSignature,
   getRoleWarehouseScope,
   buildWarehouseScopeSignature,
-  buildRoleNavigationSignature,
-  getEffectiveRoleNavigationPathSet,
-  buildRoleNavigationOptions,
   getPermissionKey,
   roleKeysForAdmin,
   permissionKeysForRole,

@@ -75,6 +75,15 @@ export async function assertBusinessFormPage(page, editor) {
       },
       bodyOverflow: body ? body.scrollWidth - body.clientWidth : -1,
       footer: footer ? { top: footer.top, bottom: footer.bottom } : null,
+      ancestors: (() => {
+        const entries = []
+        for (let parent = node; parent && entries.length < 8; parent = parent.parentElement) {
+          const style = getComputedStyle(parent)
+          const bounds = parent.getBoundingClientRect()
+          entries.push({ className: parent.className, height: bounds.height, display: style.display, flex: style.flex, minHeight: style.minHeight, overflow: style.overflow, rows: style.gridTemplateRows })
+        }
+        return entries
+      })(),
       visibleList: [...node.parentElement.children].some(
         (child) =>
           child !== node &&
@@ -101,13 +110,15 @@ export async function assertBusinessFormPage(page, editor) {
       metrics.footer.bottom <= metrics.viewport.height + 1,
     JSON.stringify(metrics)
   )
-  await editor.getByRole('button', { name: '返回列表', exact: true }).waitFor()
+  const inTask = /^\/m\/[a-z_]+\/tasks$/u.test(new URL(page.url()).pathname)
+  await editor.getByRole('button', { name: inTask ? '返回办理' : '返回列表', exact: true }).waitFor()
 }
 
 export async function closeBusinessFormPage(page, editor) {
   const dirty = (await editor.getAttribute('data-unsaved')) === 'true'
-  await editor.getByRole('button', { name: '返回列表', exact: true }).click()
+  const inTask = /^\/m\/[a-z_]+\/tasks$/u.test(new URL(page.url()).pathname)
+  await editor.getByRole('button', { name: inTask ? '返回办理' : '返回列表', exact: true }).click()
   if (dirty)
-    await page.getByRole('button', { name: '放弃修改', exact: true }).click()
+    { await page.getByRole('button', { name: '放弃修改', exact: true }).click() }
   await editor.waitFor({ state: 'hidden' })
 }

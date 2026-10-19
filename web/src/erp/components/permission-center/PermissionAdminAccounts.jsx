@@ -975,7 +975,7 @@ export default function PermissionAdminAccounts({
           : null
         : accountToolbar}
       <Paragraph type="secondary" className="erp-permission-account-note">
-        新账号分配岗位后才能进入业务页面；多个岗位的有效权限合并，仍受公司设置和业务状态限制。
+        操作记录归属实际登录账号。新账号分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。
       </Paragraph>
       <Table
         rowKey="id"

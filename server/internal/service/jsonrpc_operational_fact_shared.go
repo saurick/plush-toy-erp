@@ -150,6 +150,9 @@ func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
 }
 
 func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	if result := d.operationalFactErrorResult(ctx, err); result != nil {
 		return result
 	}

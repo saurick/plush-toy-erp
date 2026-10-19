@@ -213,6 +213,7 @@ test('customer review overview shares the order flow and keeps technical chain i
   assert.equal(review.overview.compactOnly, true)
   assert.equal(review.documentTitle, '业务链甲方校对版｜订单全流程')
   assert.deepEqual(review.overview.fulfillmentFlow, taskCatalog.fulfillment_flow)
+  assert(review.overview.fulfillmentFlow.every((step) => step.handling?.action && step.handling.resume), '校对稿保留每个环节的处理与继续条件')
   assert.deepEqual(review.overview.exceptionGuides, taskCatalog.exception_guides)
   assert.equal(Object.hasOwn(review, 'chain'), false)
   assert.equal(review.overview.lanes.length, 4)

@@ -136,14 +136,13 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'sales_to_production',
     '销售受理到生产准备',
     'primary',
-    '销售订单经审批、工程资料和 PMC 评审后，关联有效 BOM、形成库存预留并进入生产准备。',
+    '订单审批与工程、BOM、打样可并行准备；条件满足后用料经老板和财务两级审核，按厂商生成采购单。生产订单另行建立并发布；现有成品库存按需显式预留。',
     [
       chainNode('sales_order', '销售订单与订单行', 'source_document', {
         machineKeys: [
           'source.sales_order',
           'source.order_item',
           'source.sales_order_engineering',
-          'source.engineering_material_request',
         ],
         sourceRefs: ['server/internal/biz/sales_order.go'],
       }),
@@ -161,6 +160,21 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['master.bom'],
         sourceRefs: ['server/internal/biz/inventory.go'],
       }),
+      chainNode('material_request', '工程用料审核', 'source_document', {
+        machineKeys: ['source.engineering_material_request'],
+        sourceRefs: ['server/internal/biz/engineering_material_request.go'],
+      }),
+      chainNode(
+        'generated_purchase_order',
+        '按厂商生成的已批准采购单',
+        'source_document',
+        {
+          machineKeys: ['source.purchase_order'],
+          sourceRefs: [
+            'server/internal/data/engineering_material_request_repo.go',
+          ],
+        }
+      ),
       chainNode('stock_reservation', '销售库存预留', 'fact_ledger', {
         machineKeys: ['fact.stock_reservation'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
@@ -222,23 +236,68 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         }
       ),
       chainEdge(
-        'sales_acceptance',
+        'sales_order',
         'stock_reservation',
-        '按销售来源建立预留',
+        '按需显式预留现有成品',
         'posts_fact',
         {
           action: 'OperationalFactUsecase.CreateStockReservationFromSalesOrder',
+          condition:
+            '订单已生效且有可预留成品；不作为生产前置，不由审批自动创建。',
           factBoundary: 'stock_reservation_fact',
           sourceRefs: ['server/internal/biz/operational_fact.go'],
         }
       ),
       chainEdge(
         'effective_bom',
+        'material_request',
+        '工程提交用料并完成两级审核',
+        'calls_domain_command',
+        {
+          action:
+            'SalesOrderUsecase.SubmitEngineeringMaterialRequest / ReviewEngineeringMaterialRequest',
+          condition:
+            '订单已生效、样品已确认、BOM 已启用；老板通过后由另一位财务复核。',
+          factBoundary: 'engineering_material_source_only',
+          sourceRefs: ['server/internal/biz/engineering_material_request.go'],
+        }
+      ),
+      chainEdge(
+        'material_request',
+        'generated_purchase_order',
+        '财务通过后按厂商生成采购单',
+        'creates_source',
+        {
+          action: 'SalesOrderUsecase.ReviewEngineeringMaterialRequest',
+          condition:
+            '用料财务审核通过；批准数量冻结，采购补齐价格与交期，不重复审批。',
+          factBoundary: 'approved_purchase_source_only',
+          sourceRefs: [
+            'server/internal/data/engineering_material_request_repo.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'material_request',
         'production_order',
-        '形成生产来源单',
+        '发布前核对用料与工程版本',
+        'requires',
+        {
+          action: 'ProductionOrderUsecase.Release',
+          condition: '样品及 BOM 指纹仍一致，工程用料已批准。',
+          factBoundary: 'source_document_precondition_only',
+          sourceRefs: ['server/internal/data/production_order_repo.go'],
+        }
+      ),
+      chainEdge(
+        'effective_bom',
+        'production_order',
+        'PMC 建单并显式发布，冻结 BOM 与路线',
         'creates_source',
         {
           action: 'ProductionOrderUsecase.CreateDraft / Release',
+          condition:
+            '有效来源与工程用料条件满足；发布生成排程任务，不代表齐料或领料。',
           factBoundary: 'source_document_only',
           sourceRefs: ['server/internal/biz/production_order.go'],
         }
@@ -261,7 +320,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'purchase_to_inventory',
     '采购下单到入库应付',
     'primary',
-    '采购订单经审批后，仓库登记到货并清点数量，IQC 检验颜色等质量项目；检验允许接收后，由仓库确认入库。',
+    '用料生成的采购单已经批准，独立人工单另行审批；采购补齐价格与交期，可与实际到货并行。仓库点数、IQC 检验、仓库入库各自办理，生成应付前核对价格依据。',
     [
       chainNode('purchase_order', '采购订单与订单行', 'source_document', {
         machineKeys: ['source.purchase_order', 'source.order_item'],
@@ -927,9 +986,9 @@ const BUSINESS_CHAIN_DEFINITIONS = [
   ),
   chain(
     'inventory_adjustment',
-    '人工库存调整',
+    '盘点、调拨与库存调整',
     'supporting',
-    '人工库存操作单经审批和领域命令过账后，才产生库存交易与批次余额变化。',
+    '仓库登记盘点实数或调拨来源与目标仓后显式过账；人工调整另走审批。只有正式过账才改变库存，已过账纠错追加反向流水。',
     [
       chainNode(
         'inventory_operation',
@@ -969,10 +1028,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'inventory_operation',
         'inventory_adjustment_process',
-        '提交后启动审批',
+        '人工调整提交后启动审批',
         'starts_process',
         {
           action: 'InventoryUsecase.SubmitInventoryOperation',
+          condition: '仅人工调整；盘点和调拨不经过本审批分支。',
           factBoundary: 'inventory_operation_source_only',
           sourceRefs: ['server/internal/biz/inventory_operation.go'],
         }
@@ -1007,7 +1067,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'inventory_adjustment_process',
         'adjusted_inventory_lot',
-        '领域命令执行过账',
+        '人工调整批准后确认过账',
         'posts_fact',
         {
           action: 'InventoryUsecase.PostInventoryOperationForProcessCommand',
@@ -1016,6 +1076,32 @@ const BUSINESS_CHAIN_DEFINITIONS = [
             'server/internal/biz/inventory_adjustment_process_command.go',
             'server/internal/biz/inventory.go',
           ],
+        }
+      ),
+      chainEdge(
+        'inventory_operation',
+        'adjusted_inventory_lot',
+        '盘点或调拨确认过账',
+        'posts_fact',
+        {
+          action: 'InventoryUsecase.PostInventoryOperation',
+          condition:
+            '仅盘点或调拨草稿；盘点差异按实时库存复核，调拨校验来源、目标仓及可用量。',
+          factBoundary: 'inventory_txn_and_lot',
+          sourceRefs: ['server/internal/data/inventory_operation_repo.go'],
+        }
+      ),
+      chainEdge(
+        'adjusted_inventory_lot',
+        'inventory_operation',
+        '取消已过账操作，保留反向流水',
+        'reverses',
+        {
+          action: 'InventoryUsecase.CancelInventoryOperation',
+          condition:
+            '提供原因，核对来源状态、版本、经办资格与可用量；不删除或覆盖原记录。',
+          factBoundary: 'inventory_reversal',
+          sourceRefs: ['server/internal/data/inventory_operation_repo.go'],
         }
       ),
       chainEdge(
@@ -1606,6 +1692,12 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     },
   ],
   relations: [
+    {
+      fromChainKey: 'sales_to_production',
+      toChainKey: 'purchase_to_inventory',
+      label: '用料批准后按厂商生成采购单',
+      kind: 'continues',
+    },
     {
       fromChainKey: 'sales_to_production',
       toChainKey: 'production_to_inventory',

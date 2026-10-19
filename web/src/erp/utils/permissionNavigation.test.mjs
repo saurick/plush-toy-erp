@@ -1,131 +1,81 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
-import { getNavigationSections } from '../config/seedData.mjs'
 import {
-  buildRoleGuidedNavigationPreview,
-  reconcileRoleNavigationPaths,
-} from '../config/roleGuidedNavigation.mjs'
-import {
-  buildRoleNavigationModules,
-  serializeRoleNavigationModules,
+  buildPermissionNavigationPlacement,
   groupPermissionPages,
   getPermissionPageAccessReason,
 } from './permissionNavigation.mjs'
 
-const definitions = businessModuleDefinitions.filter(
-  (item) =>
-    ['finance', 'sales', 'master', 'shipment'].includes(item.sectionKey) &&
-    item.sidebarVisible !== false
-)
-const options = definitions.map((menuItem) => ({
-  value: menuItem.path,
-  label: menuItem.label,
-  menuItem,
-  effective: true,
-}))
-const path = (key) => definitions.find((item) => item.key === key).path
-const finance = options.filter((item) => item.menuItem.sectionKey === 'finance')
+const path = (key) =>
+  businessModuleDefinitions.find((item) => item.key === key).path
 
-test('同一模块多个页面只占一个常用入口，完整保存所有授权页面', () => {
-  const modules = buildRoleNavigationModules({
-    options,
-    primaryMenuPaths: finance.map((page) => page.value),
-    secondaryMenuPaths: [path('sales-orders')],
-  })
-  assert.equal(modules.primaryItems.length, 1)
-  assert.equal(modules.primaryItems[0].label, '财务管理')
-  assert.equal(modules.primaryItems[0].pages.length, 5)
-  const saved = serializeRoleNavigationModules(modules)
-  assert.equal(saved.primaryMenuPaths.length, 1)
-  assert.equal(
-    new Set([...saved.primaryMenuPaths, ...saved.secondaryMenuPaths]).size,
-    options.length
-  )
-  assert.equal(saved.secondaryMenuPaths.length, options.length - 1)
-})
-
-test('模块默认页面、位置与顺序在保存读回和实际导航预览中一致', () => {
-  const initial = buildRoleNavigationModules({
-    options,
-    primaryMenuPaths: [path('receivables')],
-    secondaryMenuPaths: [
-      path('sales-orders'),
-      path('customers'),
-      path('shipments'),
-    ],
-  })
-  const financeModule = { ...initial.primaryItems[0], path: path('payables') }
-  const sales = initial.secondaryItems.find((item) => item.label === '销售管理')
-  const next = {
-    primaryItems: [sales],
-    secondaryItems: [
-      financeModule,
-      ...initial.secondaryItems.filter((item) => item !== sales),
-    ],
-  }
-  const saved = serializeRoleNavigationModules(next)
-  assert.equal(saved.secondaryMenuPaths[0], path('payables'))
-  const restored = buildRoleNavigationModules({ options, ...saved })
-  assert.deepEqual(
-    restored.primaryItems.map((item) => item.key),
-    next.primaryItems.map((item) => item.key)
-  )
-  assert.deepEqual(
-    restored.secondaryItems.map((item) => [item.key, item.path]),
-    next.secondaryItems.map((item) => [item.key, item.path])
-  )
-  const preview = buildRoleGuidedNavigationPreview({
-    navigationSections: getNavigationSections(),
-    effectiveAccess: {
+test('岗位实际菜单沿用四区导航，财务多页面合并且默认入口只取获准页面', () => {
+  const result = buildPermissionNavigationPlacement({
+    access: {
       is_final: true,
-      pages: options.map((item) => ({
-        key: item.menuItem.key,
-        path: item.value,
-        effective: true,
-      })),
+      pages: [
+        { path: '/erp/dashboard', effective: true },
+        { path: path('payables'), effective: true },
+        { path: path('invoices'), effective: true },
+        { path: path('receivables'), effective: false },
+        { path: '/erp/print-center', effective: true },
+      ],
     },
-    roleKey: 'finance',
-    navigationMode: 'custom',
-    ...saved,
   })
   assert.deepEqual(
-    preview.primaryItems.map((item) => item.label),
-    ['销售管理']
+    result.sections.map((section) => section.title),
+    ['工作中心', '业务模块', '工具与查询', '系统与帮助']
   )
-  assert.equal(preview.secondaryItems[0].label, '财务管理')
-  assert.equal(preview.secondaryItems[0].path, path('payables'))
+  const finance = result.sections.find(
+    (section) => section.key === 'business'
+  ).items
+  assert.deepEqual(
+    finance.map((item) => [item.label, item.path]),
+    [['财务管理', path('payables')]]
+  )
+  assert.equal(
+    result.pages.some((item) => item.path === path('receivables')),
+    false
+  )
+  assert.ok(result.pages.some((item) => item.path === '/erp/history'))
+  assert.ok(result.pages.some((item) => item.path === '/erp/help-center'))
 })
 
-test('权限收窄后剔除无权页面，保留同模块有效入口和其他模块', () => {
-  const availableMenuPaths = [
-    path('receivables'),
-    path('payables'),
-    path('sales-orders'),
-  ]
-  const reconciled = reconcileRoleNavigationPaths({
-    primaryMenuPaths: [
-      path('invoices'),
-      path('receivables'),
-      path('payables'),
-      path('sales-orders'),
-    ],
-    secondaryMenuPaths: [],
-    effectivePaths: availableMenuPaths,
-  })
-  assert.deepEqual(reconciled.primaryMenuPaths, [
-    path('receivables'),
-    path('sales-orders'),
-  ])
-  assert.deepEqual(reconciled.secondaryMenuPaths, [path('payables')])
-  const visible = buildRoleNavigationModules({
-    options: options.filter((item) => availableMenuPaths.includes(item.value)),
-    ...reconciled,
+test('岗位菜单不显示仅路由入口，权限收窄后移除整个无权模块', () => {
+  const result = buildPermissionNavigationPlacement({
+    access: {
+      is_final: true,
+      pages: [
+        { path: path('production-exceptions'), effective: true },
+        { path: path('sales-orders'), effective: false },
+        { path: path('payables'), effective: true },
+      ],
+    },
   })
   assert.deepEqual(
-    visible.primaryItems[0].pages.map((item) => item.value).sort(),
-    [path('receivables'), path('payables')].sort()
+    result.sections
+      .find((section) => section.key === 'business')
+      .items.map((item) => item.label),
+    ['财务管理']
   )
+  assert.equal(
+    result.pages.some((item) => item.path === path('production-exceptions')),
+    false
+  )
+  assert.deepEqual(
+    buildPermissionNavigationPlacement({
+      access: {
+        is_final: false,
+        pages: [{ path: path('payables'), effective: true }],
+      },
+    }),
+    { sections: [], pages: [] }
+  )
+  assert.deepEqual(buildPermissionNavigationPlacement(), {
+    sections: [],
+    pages: [],
+  })
 })
 
 test('页面按正式模块归属分组并保留逐页访问结果，未知页面不丢失', () => {

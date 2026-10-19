@@ -920,44 +920,12 @@ body
     max-height: 65vh;
   }
 
-  .erp-role-navigation-editor__head,
-  .erp-role-navigation-editor__order-item {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
   .erp-role-associated-accounts__head {
     align-items: stretch;
     flex-direction: column;
   }
 
   .erp-role-associated-accounts__head .ant-btn {
-    width: 100%;
-  }
-
-  .erp-role-navigation-editor__head > .ant-select {
-    width: 100%;
-  }
-
-  .erp-role-navigation-editor__identity {
-    flex-basis: auto;
-  }
-
-  .erp-role-navigation-editor__columns {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-role-navigation-editor__order {
-    max-height: none;
-  }
-
-  .erp-role-navigation-editor__order-item > .ant-space {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
-  }
-
-  .erp-role-navigation-editor__order-item .ant-btn {
     width: 100%;
   }
 
@@ -1172,7 +1140,7 @@ body
     flex-basis: 100%;
   }
   .erp-role-navigation-workspace-tabs,
-  .erp-role-navigation-layout-tab,
+  .erp-role-navigation-menu-tab,
   .erp-role-navigation-workspace-tabs > .ant-tabs-content-holder {
     overflow: visible;
   }

@@ -31,7 +31,7 @@ import {
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import { getWorkflowTaskExceptionContactPresentation } from '../../utils/workflowTaskProcessingHint.mjs'
-import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
+import MobileTaskAttachments from './MobileTaskAttachments.jsx'
 import ProductionRouteExecutionModal from '../../components/production-orders/ProductionRouteExecutionModal.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
@@ -60,7 +60,7 @@ export default function MobileTaskDetailScreen({
   onOpenLinkedTask,
   processingComplete = false,
   onOpenAction,
-  onOpenBusiness = null,
+  onOpenTaskForm = null,
   onViewReceipt,
   savedEvidenceRefs,
   selectedCanManageAttachments,
@@ -211,7 +211,7 @@ export default function MobileTaskDetailScreen({
     : resolveMobileTaskStatusLabel(selectedTask)
   const completeCondition = selectedTask.complete_condition
   const canManageAttachments = selectedCanManageAttachments === true
-  const canOpenBusiness = typeof onOpenBusiness === 'function'
+  const canOpenBusiness = typeof onOpenTaskForm === 'function'
   const canOpenProcess = canOpenBusiness || (materialContext
     ? canProcessMaterial || selectedCanUrge
     : selectedCanOperate || selectedCanUrge)
@@ -243,25 +243,11 @@ export default function MobileTaskDetailScreen({
       <EngineeringMaterialTaskSummaryEntry key={selectedTask.id} task={selectedTask} profile={adminProfile} mobile compact buttonText="材料汇总" />
     </div>
   ) : null
-  const taskAttachments = (
-    <BusinessAttachmentModalButton
-      ownerType="workflow_task"
-      ownerId={selectedTask.id}
-      ownerVersion={selectedTask.version}
-      buttonText="查看附件"
-      modalTitle="任务附件"
-      panelTitle="附件内容"
-      description={canManageAttachments ? '上传照片、异常截图或处理凭证。' : '查看照片、异常截图或处理凭证。'}
-      canUpload={canManageAttachments}
-      canWithdraw={canManageAttachments}
-      showAttachmentCount
-      buttonProps={{ className: 'mobile-detail-attachment-button', 'data-testid': 'mobile-task-attachment-action', size: 'middle' }}
-    />
-  )
+  const taskAttachments = <MobileTaskAttachments task={selectedTask} canManage={canManageAttachments} />
 
   return (
     <div
-      className="mobile-role-tasks-page mobile-role-tasks-page--detail mobile-role-tasks-page--task-info md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      className="mobile-role-tasks-page mobile-role-tasks-page--detail mobile-role-tasks-page--task-info mobile-task-screen md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
       data-testid="mobile-task-detail-screen"
     >
       <MobileTaskFlowHeader
@@ -271,7 +257,7 @@ export default function MobileTaskDetailScreen({
         currentStep="detail"
         onBack={onBack}
         onOpenProcess={() =>
-          canOpenBusiness ? onOpenBusiness() : canProcessMaterial
+          canOpenBusiness ? onOpenTaskForm() : canProcessMaterial
             ? onOpenAction?.()
             : onOpenAction?.(
                 selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
@@ -293,7 +279,7 @@ export default function MobileTaskDetailScreen({
           assigneeLabel={assigneeLabel}
           events={taskEventsState === 'ready' ? taskEvents : []}
           summary={<WorkflowTaskCurrentSummary appearance="facts" task={selectedTask} roleLabel={ownerRoleLabel} assigneeLabel={assigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={isTaskRisk(selectedTask) ? taskReason : ''} reasonLabel={taskReasonLabel} contact={exceptionContact} guidance={actionGuidance} />}
-          businessInfo={
+          businessInfo={factRows.length > 0 || completeCondition || selectedTask.task_group === 'business_followup' ? (
             <>
               <dl className="mobile-detail-facts">
                 {factRows.map(([label, value]) => <div key={label} className="mobile-detail-fact"><dt>{label}</dt><dd>{mobileFactValueText(value)}</dd></div>)}
@@ -301,7 +287,7 @@ export default function MobileTaskDetailScreen({
               </dl>
               <WorkflowFollowupDetails task={selectedTask} />
             </>
-          }
+          ) : null}
         />
 
         <section className="workflow-task-info-card">
@@ -427,8 +413,8 @@ export default function MobileTaskDetailScreen({
             处理任务
           </button>
         ) : canOpenBusiness ? (
-          <button type="button" className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white" onClick={onOpenBusiness}>
-            办理业务
+          <button type="button" className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white" onClick={onOpenTaskForm}>
+            填写办理表单
           </button>
         ) : canOpenProcess ? (
           <button

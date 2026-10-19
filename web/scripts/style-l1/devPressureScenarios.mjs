@@ -233,6 +233,7 @@ export function createDevPressureScenarios({
               fast: null,
               'role-access': null,
               'field-linkage': null,
+              'rpc-examples': null,
               'pressure-quick': operation,
               'pressure-capacity': null,
             },

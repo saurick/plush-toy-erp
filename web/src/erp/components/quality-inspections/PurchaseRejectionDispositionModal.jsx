@@ -416,7 +416,7 @@ export default function PurchaseRejectionDispositionModal({
             : []),
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <Form form={form} name="purchase-rejection-disposition" layout="vertical" preserve={false} disabled={loading}>
         <Form.Item
           name="disposition_no"
           label="处置单号"

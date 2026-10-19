@@ -652,6 +652,9 @@ func rejectUnknownAdminParams(pm map[string]any, allowedKeys ...string) *v1.Json
 }
 
 func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 
 	switch {

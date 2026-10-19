@@ -22,10 +22,12 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { PurchaseReceiptStatus, PurchaseReturnStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import QualityInspectionCorrectionModal from '../components/quality-inspections/QualityInspectionCorrectionModal.jsx'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -251,7 +253,7 @@ export default function QualityInspectionsPage() {
   const taskEntryRef = useRef(0)
   const [qualityTaskFocusOpen, setQualityTaskFocusOpen] = useState(false)
   const navigate = useBusinessNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || EMPTY_ADMIN_PROFILE,
     [outletContext?.adminProfile]
@@ -274,6 +276,7 @@ export default function QualityInspectionsPage() {
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [detailInspection, setDetailInspection] = useState(null)
+  const [correctionInspection, setCorrectionInspection] = useState(null)
   const [purchaseReturnModal, setPurchaseReturnModal] = useState(null)
   const [rejectionDispositionOpen, setRejectionDispositionOpen] =
     useState(false)
@@ -305,6 +308,7 @@ export default function QualityInspectionsPage() {
     saving, inspectionModal, inspectionForm, decisionForm, inspectionAttachmentRef,
     openCreate, openDecision, closeModal, handleReceiptChange,
   } = inspectionEditor
+  const correctionDisabled = saving || !selectedRow || Boolean(selectedRow?.superseded_at || selectedRow?.production_wip_batch_id) || ![QualityInspectionStatus.PASSED, QualityInspectionStatus.REJECTED].includes(selectedRow?.status)
   const purchaseReturnInFlightRef = useRef(false)
   const purchaseReturnAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
@@ -1695,6 +1699,11 @@ export default function QualityInspectionsPage() {
               </BusinessActionTooltip>
             </Space>
           ) : null}
+          {canHandleQualityException && [QualityInspectionStatus.PASSED, QualityInspectionStatus.REJECTED].includes(selectedQualityStatus) ? (
+            <BusinessActionTooltip disabled={correctionDisabled} disabledReason="仅未被替代且无生效下游业务的已判定质检可发起纠正；工序质量按原异常处理流程办理。">
+              <Button data-business-action-key="quality-correction" data-business-action-role="secondary" disabled={correctionDisabled} onClick={() => setCorrectionInspection(selectedRow)}>发起纠正复检</Button>
+            </BusinessActionTooltip>
+          ) : null}
           {showQualityDispositionAction ? (
             <BusinessActionTooltip
               disabled={qualityDispositionDisabled}
@@ -1817,6 +1826,17 @@ export default function QualityInspectionsPage() {
         emptyDescription="暂无质量检验单"
       />
 
+      <QualityInspectionCorrectionModal
+        inspection={correctionInspection}
+        customerKey={activeCustomerKey}
+        onClose={() => setCorrectionInspection(null)}
+        onCreated={async (record) => {
+        setCorrectionInspection(null)
+        reportBusinessResult('纠正复检结果已确认，原判定和证据保留', record)
+        await loadRows()
+        navigate(relatedDocumentRoute(BUSINESS_ROUTE_PATHS.qualityInspections, { quality_inspection_id: record.id }))
+      }}
+      />
       <BusinessModal
         title="办理本次质检"
         open={qualityTaskFocusOpen}

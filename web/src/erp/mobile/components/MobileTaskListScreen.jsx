@@ -188,16 +188,9 @@ export default function MobileTaskListScreen({
     !history && !activeCalendar && taskSortKey !== 'newest' && { key: 'sortKey', label: `排序：${MOBILE_TASK_SORT_OPTIONS.find(({ value }) => value === taskSortKey)?.label}` },
     calendarMode && calendarMode !== 'date' && { key: 'calendar', label: TASK_CALENDAR_SELECTION_OPTIONS.find(({ value }) => value === calendarMode)?.label },
   ]
-  const quickFilterActive = !activeCalendar && (
-    (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO && activeFilterKey !== MOBILE_TASK_FILTER_KEYS.ALL) ||
-    (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES && activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.NOTICE)
-  )
-  const filterCount = appliedFilters.filter(Boolean).length + Number(history && Boolean(taskHistoryOptions.period)) + Number(quickFilterActive)
-  const filterSummary = [
-    ...appliedFilters.filter(Boolean).map(({ label }) => label),
-    history && taskHistoryOptions.period && `处理时间：${WORKFLOW_HISTORY_PERIOD_OPTIONS.find(({ value }) => value === taskHistoryOptions.period)?.label}`,
-    quickFilterActive && (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES ? '超时' : filterItems.find(({ key }) => key === activeFilterKey)?.label),
-  ].filter(Boolean)
+  // Visible shortcuts already show their selection and clear action.
+  const filterCount = appliedFilters.filter(Boolean).length
+  const filterSummary = appliedFilters.filter(Boolean).map(({ label }) => label)
   const layoutToggle = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO ? (
     <Button
       className="mobile-task-layout-toggle"

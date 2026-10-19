@@ -110,8 +110,8 @@ function readBusinessDataTablePages() {
 test('BusinessDataTable 把正式记录打开动作合并进页面 onRow', () => {
   const componentSource = sliceBetween(
     businessListLayoutSource,
-    'export function BusinessDataTable(',
-    'export const ToolbarButton ='
+    'export function useBusinessTableRecordOpen(',
+    'export function BusinessDataTable('
   )
 
   assert.match(componentSource, /\bonOpenRecord\b/u)
@@ -129,6 +129,10 @@ test('BusinessDataTable 把正式记录打开动作合并进页面 onRow', () =>
     componentSource,
     /onOpenRecord(?:\?\.)?\(\s*record\s*,\s*event\s*\)/u
   )
+  const tableSource = sliceBetween(businessListLayoutSource, 'export function BusinessDataTable(', 'export const ToolbarButton =')
+  assert.match(tableSource, /useBusinessTableRecordOpen\(\{ dataSource, rowKey, onRow, onOpenRecord \}\)/u)
+  assert.match(tableSource, /onRow=\{resolvedOnRow\}/u)
+  assert.match(tableSource, /onClickCapture=\{captureRowClick\}/u)
 })
 
 test('BusinessDataTable 双击打开前过滤表格内交互元素', () => {
@@ -164,8 +168,8 @@ test('BusinessDataTable 双击打开前过滤表格内交互元素', () => {
 
   const componentSource = sliceBetween(
     businessListLayoutSource,
-    'export function BusinessDataTable(',
-    'export const ToolbarButton ='
+    'export function useBusinessTableRecordOpen(',
+    'export function BusinessDataTable('
   )
   assert.match(
     componentSource,
@@ -196,13 +200,16 @@ test('当前正式 BusinessDataTable 主表都声明双击打开合同', () => {
 test('库存台账主表双击打开当前记录主操作面', () => {
   const filePath = resolve(pagesRoot, 'InventoryLedgerPage.jsx')
   const source = readFileSync(filePath, 'utf8')
-  const tags = extractSelfClosingTags(source, 'Table')
+  const tags = extractSelfClosingTags(source, 'InventoryTable')
 
   assert.equal(
     tags.length,
     1,
-    `${basename(filePath)} must keep one primary Table`
+    `${basename(filePath)} must keep one primary inventory table`
   )
-  assert.match(tags[0], /\bonRow\s*=/u)
-  assert.match(tags[0], /\bonDoubleClick\s*:/u)
+  assert.match(source, /mobileTaskBusiness \? BusinessDataTable : Table/u)
+  assert.match(source, /const inventoryRecordOpen = useBusinessTableRecordOpen\(\{/u)
+  assert.match(source, /onOpenRecord: openInventoryDetails/u)
+  assert.match(tags[0], /onRow=\{inventoryRecordOpen\.onRow\}/u)
+  assert.match(source, /onClickCapture=\{inventoryRecordOpen\.onClickCapture\}/u)
 })

@@ -728,12 +728,43 @@ async function verifyRuntimePreflight({ baseURL, backendURL, fetchImpl }) {
   };
 }
 
+function runtimeResourceURL(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.username || url.password ? "" : url.origin + url.pathname;
+  } catch {
+    return "";
+  }
+}
+
+function isOptionalInjectedTelemetryEvent(event) {
+  if (!["request", "response", "console"].includes(event.type)) return false;
+  if (
+    event.type === "console" &&
+    !/^Failed to load resource:/u.test(event.message || "")
+  )
+    return false;
+  try {
+    const url = new URL(event.sourceURL || "");
+    if (url.username || url.password) return false;
+    return (
+      (url.origin === "https://static.cloudflareinsights.com" &&
+        /^\/beacon\.min\.js(?:\/[a-zA-Z0-9_-]{8,128})?$/u.test(url.pathname)) ||
+      (url.origin === "https://demo.yoyoosun.net" &&
+        url.pathname === "/cdn-cgi/rum")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function attachRuntimeCollectors(page) {
   const events = [];
   page.on("console", (message) => {
     if (message.type() === "error") {
       events.push({
         type: "console",
+        sourceURL: runtimeResourceURL(message.location().url),
         message: sanitizeDiagnostic(message.text()),
       });
     }
@@ -746,6 +777,7 @@ function attachRuntimeCollectors(page) {
     if (failure && failure !== "net::ERR_ABORTED") {
       events.push({
         type: "request",
+        sourceURL: runtimeResourceURL(request.url()),
         message: sanitizeDiagnostic(
           `${request.method()} ${request.url()} ${failure}`,
         ),
@@ -756,6 +788,7 @@ function attachRuntimeCollectors(page) {
     if (response.status() >= 400) {
       events.push({
         type: "response",
+        sourceURL: runtimeResourceURL(response.url()),
         message: sanitizeDiagnostic(`${response.status()} ${response.url()}`),
       });
     }
@@ -917,11 +950,15 @@ async function loginFormalAccountAttempt(
         timeout: PAGE_TIMEOUT_MS,
       });
     }
-    if (events.length > 0) {
+    const runtimeEvents = partitionTargetRuntimeEvents(
+      { group: "auth" },
+      events,
+    );
+    if (runtimeEvents.blocking.length > 0) {
       const error = new BrowserAcceptanceError(
-        `${account.username} 登录出现浏览器错误：${events.map((item) => item.message).join("；")}`,
+        `${account.username} 登录出现浏览器错误：${runtimeEvents.blocking.map((item) => item.message).join("；")}`,
       );
-      error.runtimeErrors = events.map((item) => ({ ...item }));
+      error.runtimeErrors = runtimeEvents.blocking.map((item) => ({ ...item }));
       throw error;
     }
     return {
@@ -934,13 +971,19 @@ async function loginFormalAccountAttempt(
         landingPath,
         verificationPath: new URL(page.url()).pathname,
         legalNoticeAcknowledged,
+        expectedRuntimeWarnings: runtimeEvents.expected,
         customerBrandVisible:
           visibleText.includes(COMPANY_NAME) ||
           visibleText.includes(SYSTEM_NAME),
       },
     };
   } catch (error) {
-    error.runtimeErrors = events.map((item) => ({ ...item }));
+    const runtimeEvents = partitionTargetRuntimeEvents(
+      { group: "auth" },
+      events,
+    );
+    error.runtimeErrors = runtimeEvents.blocking.map((item) => ({ ...item }));
+    error.expectedRuntimeWarnings = runtimeEvents.expected;
     throw error;
   } finally {
     await context.close();
@@ -1142,8 +1185,9 @@ export function readScopedPageTotal(texts = []) {
       /^(?:第\s*\d+\s*[-–]\s*\d+\s*(?:条|项|单)\s*[/，]\s*共|共|不限状态，\s*共|全部状态，\s*共)\s*(\d+)\s*(?:条|项|单|个员工账号)$/u,
     );
     const filteredAccounts = value.match(/^命中\s*(\d+)\/\d+\s*个员工账号$/u);
-    return match || filteredAccounts
-      ? [Number((match || filteredAccounts)[1])]
+    const compactStatus = value.match(/^(?:不限状态|全部状态)\s+(\d+)$/u);
+    return match || filteredAccounts || compactStatus
+      ? [Number((match || filteredAccounts || compactStatus)[1])]
       : [];
   });
   return {
@@ -1155,15 +1199,21 @@ export function readScopedPageTotal(texts = []) {
 
 export function shipmentListReady(expectedCount) {
   const group = document.querySelector(
-    '.erp-business-status-filters[aria-label="出货单状态"]',
+    '[role="group"][aria-label="出货单状态"][aria-busy="false"]',
   );
   const all = group?.querySelector(
-    'button[aria-pressed="true"][aria-label^="不限状态，"]',
+    'button[aria-pressed="true"],.ant-select-selection-item',
   );
-  const label = all?.getAttribute("aria-label") || "";
-  const match = label.match(/^不限状态，\s*共\s*([\d,]+)\s*条$/u);
+  const label =
+    all?.getAttribute("aria-label") || all?.textContent?.trim() || "";
+  const match = label.match(
+    /^不限状态(?:，\s*共\s*([\d,]+)\s*条|\s+([\d,]+))$/u,
+  );
+  const total = match
+    ? Number((match[1] || match[2]).replaceAll(",", ""))
+    : null;
   return (
-    Number(match?.[1]?.replaceAll(",", "")) === Number(expectedCount) &&
+    total === Number(expectedCount) &&
     document.querySelectorAll(".ant-table-tbody > tr.ant-table-row").length > 0
   );
 }
@@ -1249,11 +1299,11 @@ export function readListDOMSnapshot() {
     .map((node) => node.textContent || "");
   const selectedStatusLabels = [
     ...document.querySelectorAll(
-      '.erp-business-status-filters[aria-busy="false"] button[aria-pressed="true"]',
+      '.erp-business-status-filters[aria-busy="false"] button[aria-pressed="true"],.erp-business-status-filter-compact-wrap[aria-busy="false"] .ant-select-selection-item',
     ),
   ]
     .filter(visible)
-    .map((node) => node.getAttribute("aria-label") || "");
+    .map((node) => node.getAttribute("aria-label") || node.textContent || "");
   const headers = [...document.querySelectorAll(".ant-table-thead th")]
     .filter(visible)
     .map((node) => node.textContent?.replace(/\s+/gu, " ").trim() || "");
@@ -1488,6 +1538,63 @@ async function readDashboardEvidence(page, target, datasetBinding) {
       null,
       { timeout: PAGE_TIMEOUT_MS },
     );
+    const visitedQueuePages = new Set();
+    for (;;) {
+      const visible = await page.evaluate(
+        (prefix) =>
+          [
+            ...document.querySelectorAll(
+              ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
+            ),
+          ].some(
+            (row) =>
+              row.getBoundingClientRect().height > 0 &&
+              (row.getAttribute("data-task-code") || "").startsWith(
+                prefix + "-",
+              ),
+          ),
+        taskCodePrefix,
+      );
+      if (visible) break;
+      const pager = page.getByRole("navigation", {
+        name: "任务分页",
+        exact: true,
+      });
+      const next = pager.locator(
+        ".ant-pagination-next:not(.ant-pagination-disabled)",
+      );
+      if (!(await next.count())) break;
+      const previous = await page
+        .locator(
+          ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
+        )
+        .evaluateAll((rows) =>
+          rows.map((row) => row.getAttribute("data-task-code")).join("|"),
+        );
+      if (visitedQueuePages.has(previous))
+        throw new BrowserAcceptanceError("工作台分页重复，无法证明本批任务");
+      visitedQueuePages.add(previous);
+      await next.click();
+      await page.waitForFunction(
+        (previous) => {
+          const loading = [
+            ...document.querySelectorAll(
+              '.erp-task-pagination [role="status"]',
+            ),
+          ].some((node) => (node.textContent || "").includes("正在加载"));
+          const codes = [
+            ...document.querySelectorAll(
+              ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
+            ),
+          ]
+            .filter((row) => row.getBoundingClientRect().height > 0)
+            .map((row) => row.getAttribute("data-task-code"));
+          return !loading && codes.length > 0 && codes.join("|") !== previous;
+        },
+        previous,
+        { timeout: PAGE_TIMEOUT_MS },
+      );
+    }
     await page.waitForFunction(
       ({ taskCodePrefix, expectedCount }) => {
         const exactCodes = [
@@ -2571,20 +2678,39 @@ async function prepareListQuantityScope(page, target) {
     await search.fill("");
     await search.press("Enter");
   }
+  const compactStatus = page
+    .locator(".erp-business-status-filter-compact-wrap")
+    .filter({ visible: true })
+    .first();
+  const hasCompactStatus = (await compactStatus.count()) > 0;
+  if (hasCompactStatus) {
+    const unrestricted = /^(?:不限状态|全部状态)\s+[\d,]+$/u;
+    const selected = compactStatus.locator(".ant-select-selection-item");
+    if (!unrestricted.test((await selected.textContent())?.trim() || "")) {
+      await compactStatus.locator(".ant-select-selector").click();
+      await page
+        .locator(".ant-select-dropdown:visible .ant-select-item-option-content")
+        .filter({ hasText: unrestricted })
+        .click();
+    }
+    await selected.filter({ hasText: unrestricted }).waitFor({
+      state: "visible",
+      timeout: PAGE_TIMEOUT_MS,
+    });
+  }
   const status = page
     .locator(
       '.erp-business-status-filters button[aria-label^="不限状态，"],.erp-business-status-filters button[aria-label^="全部状态，"]',
     )
     .filter({ visible: true })
     .first();
-  if (
-    (await status.count()) &&
-    (await status.getAttribute("aria-pressed")) !== "true"
-  )
+  const hasButtonStatus = (await status.count()) > 0;
+  if (hasButtonStatus && (await status.getAttribute("aria-pressed")) !== "true")
     await status.click();
   return {
     lifecycle: hasLifecycle ? "all" : "not_applicable",
-    status: (await status.count()) ? "unrestricted" : "page_default",
+    status:
+      hasCompactStatus || hasButtonStatus ? "unrestricted" : "page_default",
     search: "",
     ...(target.key === "system-audit-logs" ? { filters: "cleared" } : {}),
   };
@@ -2593,6 +2719,9 @@ async function prepareListQuantityScope(page, target) {
 async function readStableListSnapshot(page) {
   await page.waitForFunction(
     () =>
+      ![
+        ...document.querySelectorAll('.erp-task-pagination [role="status"]'),
+      ].some((node) => (node.textContent || "").includes("正在加载")) &&
       ![
         ...document.querySelectorAll('.ant-spin-spinning,[aria-busy="true"]'),
       ].some(
@@ -2811,8 +2940,31 @@ async function readTaskBoardQuantity(
       groups.push({ lane: key, total: 0, pages: [] });
       continue;
     }
-    if ((await button.getAttribute("aria-pressed")) !== "true")
+    if ((await button.getAttribute("aria-pressed")) !== "true") {
+      const previous = await page
+        .locator(".erp-task-table-row[data-task-code]")
+        .evaluateAll((rows) =>
+          rows.map((row) => row.getAttribute("data-task-code")).join("|"),
+        );
       await button.click();
+      await page.waitForFunction(
+        (previous) => {
+          const loading = [
+            ...document.querySelectorAll(
+              '.erp-task-pagination [role="status"]',
+            ),
+          ].some((node) => (node.textContent || "").includes("正在加载"));
+          const codes = [
+            ...document.querySelectorAll(".erp-task-table-row[data-task-code]"),
+          ]
+            .filter((row) => row.getBoundingClientRect().height > 0)
+            .map((row) => row.getAttribute("data-task-code"));
+          return !loading && codes.length > 0 && codes.join("|") !== previous;
+        },
+        previous,
+        { timeout: PAGE_TIMEOUT_MS },
+      );
+    }
     const navigation = page.getByRole("navigation", {
       name: "任务分页",
       exact: true,
@@ -3712,7 +3864,9 @@ function assertCurrentBrowserDatasetPlan({ dataset, source, printInput }) {
     dataset.chainDataDigest !== expected.chainDataDigest ||
     dataset.chainVerificationDigest !== expected.chainVerificationDigest ||
     Object.keys(source?.scale || {}).length !== Object.keys(scale).length ||
-    Object.entries(scale).some(([key, value]) => source.scale?.[key] !== value) ||
+    Object.entries(scale).some(
+      ([key, value]) => source.scale?.[key] !== value,
+    ) ||
     !Array.isArray(dataset.stages) ||
     dataset.stages.length !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
     dataset.stages.some(
@@ -4377,7 +4531,10 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
         dataset?.databaseRebuildProof == null;
   const persistentBaseline = scenarioDemoSharedLocal
     ? assertScenarioDemoBrowserDataset({
-        dataset, components, componentDigests, printInput,
+        dataset,
+        components,
+        componentDigests,
+        printInput,
       })
     : null;
   if (!scenarioDemoSharedLocal) {
@@ -4387,7 +4544,10 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
       printInput,
     });
   }
-  if (!persistentBaseline && (!emptyBaselineProven || !runtimeBaselineMatches)) {
+  if (
+    !persistentBaseline &&
+    (!emptyBaselineProven || !runtimeBaselineMatches)
+  ) {
     throw new BrowserAcceptanceError(
       "dataset apply 报告没有绑定当前运行态的 fresh empty baseline",
     );
@@ -4496,7 +4656,12 @@ export function assertManualAcceptanceBrowserReportPathBinding(
   reportPath,
   printInput,
 ) {
-  if (![CUSTOMER_TRIAL_133_TARGET, SCENARIO_DEMO_TARGET].includes(printInput.target)) return reportPath;
+  if (
+    ![CUSTOMER_TRIAL_133_TARGET, SCENARIO_DEMO_TARGET].includes(
+      printInput.target,
+    )
+  )
+    return reportPath;
   const expected = path.resolve(
     DATASET_REPORT_ROOT,
     printInput.dataVersion,
@@ -4606,7 +4771,9 @@ export async function verifyManualAcceptanceBrowserDatasetBinding({
       release: runtimeIdentity.release ?? null,
       migration: runtimeIdentity.migration ?? null,
       proof: runtimeIdentity.proof,
-      ...(scenarioDemoSharedLocal ? { sharedScenarioDemo: runtimeIdentity } : {}),
+      ...(scenarioDemoSharedLocal
+        ? { sharedScenarioDemo: runtimeIdentity }
+        : {}),
     },
   };
 }
@@ -4944,6 +5111,11 @@ async function verifyBusinessPrintTemplate(browser, options) {
       new URL(workspace.url()).searchParams.get("source"),
       "business",
     );
+    await workspace.waitForFunction(
+      () => !document.fonts || document.fonts.status === "loaded",
+      null,
+      { timeout: 60_000 },
+    );
     const responsePromise = pdfResponses.length
       ? Promise.resolve(pdfResponses.at(-1))
       : workspace.waitForResponse(
@@ -5189,7 +5361,12 @@ async function verifyBusinessPrintEvidence(
 
 export function partitionTargetRuntimeEvents(target, events) {
   void target;
-  return { blocking: events, expected: [] };
+  return {
+    blocking: events.filter(
+      (event) => !isOptionalInjectedTelemetryEvent(event),
+    ),
+    expected: events.filter(isOptionalInjectedTelemetryEvent),
+  };
 }
 
 export function isRetryableTargetRateLimitFailure(result) {

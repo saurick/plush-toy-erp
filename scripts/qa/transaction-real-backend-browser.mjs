@@ -16,6 +16,7 @@ import {
   pageAction,
   modal,
   navigate,
+  settleRPCPage,
   closePage,
   clickRPC,
   login,
@@ -24,6 +25,9 @@ import {
   faultEvidence,
 } from "./transaction-browser-ui.mjs";
 import { resolveMobileActionLabel } from "../../web/src/erp/mobile/utils/mobileRoleTaskModel.mjs";
+import { waitForFiniteAnimations } from "../../web/scripts/style-l1/browserReadiness.mjs";
+import { correctQualityThroughBrowser } from "./transaction-quality-correction-browser.mjs";
+import { assertRequestCancellationEvidence, runRequestCancellationBrowser } from './transaction-request-cancellation-browser.mjs';
 import {
   captureTransactionFlowFields,
   captureTransactionFieldResults,
@@ -77,6 +81,7 @@ export const TRANSACTION_FLOW_KEYS = Object.freeze([
 ]);
 
 export function assertTransactionBrowserReport(report) {
+  assertRequestCancellationEvidence(report.requestCancellation);
   assertFlowFieldAuditEvidence(report.fieldAudit);
   assert.equal(report.fieldResults.optionalColumnsRestored, true);
   assert.equal(report.fieldResults.detailsPreserved, true);
@@ -120,6 +125,17 @@ export function assertTransactionBrowserReport(report) {
       0,
       "fault injection must follow a real successful backend mutation",
     );
+  }
+  for (const flow of report.flows.filter(({ key }) => key.endsWith("quality"))) {
+    assert.equal(flow.correctionSurface, "real browser");
+    assert.equal(flow.correctionCreatedInBrowser, true);
+    assert.equal(flow.correctionReasonRequired, true);
+    assert.equal(flow.correctionReplayAfterDecisionExact, true);
+    assert.equal(flow.transportFaults.length, 1);
+    assert.equal(flow.transportFaults[0].method, "correct_quality_inspection_result");
+    assert.equal(flow.transportFaults[0].injected, true);
+    assert.equal(flow.transportFaults[0].backendCode, 0);
+    assert.ok(flow.transportFaults[0].requestID);
   }
   assert.equal(
     report.mobileTasks?.length,
@@ -178,6 +194,8 @@ export async function completePaymentTask(
       await expect(
         detail.getByRole("button", { name: "选择处理方式", exact: true }),
       ).toBeVisible();
+      await settleRPCPage(page);
+      await waitForFiniteAnimations(page, { selector: ".mobile-role-action-bar" });
       const entryLayout = await detail.evaluate((element) => ({
         width: window.innerWidth,
         height: window.innerHeight,
@@ -210,7 +228,7 @@ export async function completePaymentTask(
             button.bottom <= entryLayout.height,
         ),
       );
-      assert.match(entryLayout.buttons[0].label, /^查看附件/u);
+      assert.equal(entryLayout.buttons[0].label, "添加附件");
       assert.equal(entryLayout.buttons[1].label, "选择处理方式");
       const [attachmentButton, processButton] = entryLayout.buttons;
       assert.equal(attachmentButton.y, processButton.y, JSON.stringify(entryLayout));
@@ -349,6 +367,10 @@ export async function financeFlow(
     (scenario.kind || (direction === "RECEIPT" ? "ADVANCE" : "SETTLEMENT")) ===
     "ADVANCE";
   const receipt = direction === "RECEIPT";
+  const advanceAmount = scenario.amount ?? 20;
+  const advanceSourceType = receipt ? "sales_order" : scenario.sourceType || "purchase_order";
+  const advanceSource = receipt ? fixture.salesOrder : scenario.source || fixture.order;
+  if (advance) assert.ok(["sales_order", "purchase_order", "outsourcing_order"].includes(advanceSourceType));
   const key = flowKey(
     options,
     scenario.key || `finance_${direction.toLowerCase()}`,
@@ -424,12 +446,12 @@ export async function financeFlow(
       await selectOption(
         page,
         dialog.getByLabel("关联单据", { exact: true }),
-        receipt ? "销售订单" : "采购订单",
+        receipt ? "销售订单" : advanceSourceType === "outsourcing_order" ? "委外合同" : "采购订单",
       );
       await selectOption(
         page,
         dialog.getByLabel("订单 / 合同", { exact: true }),
-        `${receipt ? fixture.salesOrder.order_no : fixture.order.purchase_order_no} · CNY`,
+        `${receipt ? advanceSource.order_no : advanceSourceType === "outsourcing_order" ? advanceSource.outsourcing_order_no : advanceSource.purchase_order_no} · CNY`,
       );
     } else
       await selectOption(
@@ -462,7 +484,7 @@ export async function financeFlow(
     );
     await dialog
       .getByLabel("实收 / 实付金额", { exact: true })
-      .fill(advance ? "20" : "35");
+      .fill(String(advance ? advanceAmount : 35));
     const created = (
       await clickRPC(page, "create_finance_payment", () => submit.click())
     ).payment;
@@ -471,8 +493,8 @@ export async function financeFlow(
     assert.equal(created.direction, direction);
     assert.equal(created.kind, advance ? 'ADVANCE' : 'SETTLEMENT');
     if (advance) {
-      assert.equal(created.source_type, receipt ? 'sales_order' : 'purchase_order');
-      assert.equal(created.source_id, receipt ? fixture.salesOrder.id : fixture.order.id);
+      assert.equal(created.source_type, advanceSourceType);
+      assert.equal(created.source_id, advanceSource.id);
     }
     await expect(dialog).toBeHidden();
     await completePaymentTask(
@@ -543,6 +565,7 @@ export async function financeFlow(
     assert.equal(posted.status, "POSTED");
     assert.equal(posted.kind, advance ? "ADVANCE" : "SETTLEMENT");
     assert.equal(posted.direction, direction);
+    assert.equal(Number(posted.amount), advance ? advanceAmount : 35);
     assert.equal(posted.distinctActors, true);
     assert.equal(posted.posted, true);
     assert.equal(posted.allocations, advance ? 0 : 1);
@@ -552,7 +575,7 @@ export async function financeFlow(
         id: created.id,
       })
     ).payment;
-    assert.equal(Number(readback.available_amount), advance ? 20 : 0);
+    assert.equal(Number(readback.available_amount), advance ? advanceAmount : 0);
     if (fact)
       assert.equal(
         client.query(
@@ -920,8 +943,8 @@ async function refundFlow(
   });
 }
 
-async function qualityFlow(browser, options, client, fixture, report) {
-  const { page, context } = await login(browser, options, "quality", report);
+export async function qualityFlow(browser, options, client, fixture, report) {
+  const { page, context } = await login(browser, { ...options, fourK: true }, "quality", report);
   const { rpc, raw, query } = client;
   const id = fixture.inspection.id;
   const lotID = fixture.receipt.items[0].lot_id;
@@ -1032,12 +1055,8 @@ async function qualityFlow(browser, options, client, fixture, report) {
       rejectedLedger,
       "permission rejection must not change evidence",
     );
-    const { quality_inspection: recheck } = await rpc(
-      "quality",
-      "quality",
-      "correct_quality_inspection_result",
-      correction,
-    );
+    const correctionResult = await correctQualityThroughBrowser(page, options, report, { request: correction, readState: ledger, key: flowKey(options, "quality") });
+    const recheck = correctionResult.inspection;
     assert.equal(recheck.status, "SUBMITTED");
     assert.equal(recheck.correction_of_inspection_id, id);
     const held = ledger();
@@ -1100,6 +1119,8 @@ async function qualityFlow(browser, options, client, fixture, report) {
     assert.equal(ready.lot, "ACTIVE");
     assert.equal(ready.txns, 0, "quality must not post inventory");
     assert.equal(ready.inspections.length, 2);
+    await rpc("quality", "quality", "correct_quality_inspection_result", correction);
+    assert.deepEqual(ledger(), ready, "completed correction replay must preserve the new verdict and ledger");
     report.flows.push({
       key: flowKey(options, "quality"),
       passed: true,
@@ -1108,7 +1129,11 @@ async function qualityFlow(browser, options, client, fixture, report) {
       rejected: rejectedLedger,
       corrected: held,
       passedReadback: ready,
-      correctionSurface: "formal API; current page has no correction action",
+      correctionSurface: "real browser",
+      correctionCreatedInBrowser: true,
+      correctionReasonRequired: correctionResult.reasonRequired,
+      correctionReplayAfterDecisionExact: true,
+      transportFaults: [correctionResult.transportFault],
     });
     await page.screenshot({
       path: path.join(options.outputDir, `${flowKey(options, "quality")}.png`),
@@ -1122,7 +1147,7 @@ async function qualityFlow(browser, options, client, fixture, report) {
   }
 }
 
-async function inventoryFlow(browser, options, client, fixture, report) {
+export async function inventoryFlow(browser, options, client, fixture, report) {
   const { page, context } = await login(browser, options, "warehouse", report);
   const lotID = fixture.receipt.items[0].lot_id;
   const ledger = () =>
@@ -1145,19 +1170,20 @@ async function inventoryFlow(browser, options, client, fixture, report) {
     assert.deepEqual(ledger(), { balance: 10, txns: 1, net: 10 });
     if (options.mobile) {
       await page.getByRole('button', { name: '核对已入库批次', exact: true }).click();
-      await expect(page.getByTestId('mobile-task-related-business')).toBeVisible();
+      await expect(page.getByTestId('mobile-task-fact-form')).toHaveAttribute('data-handler-mode', 'inventory');
     } else await navigate(page, businessURL(options, "warehouse", "warehouse/inventory"));
     const balanceID = client.query(
       `SELECT to_json(id) FROM inventory_balances WHERE lot_id=${lotID}`,
     );
-    if (options.mobile) await selectRow(page, balanceID);
-    else {
-    const row = page.locator(
-      `.ant-table-row[data-row-key="balances-${balanceID}"]:visible`,
-    );
-    await expect(row).toHaveCount(1);
-    await row.getByRole("radio").check();
-    await expect(row.getByRole("radio")).toBeChecked();
+    if (options.mobile) {
+      await selectRow(page, balanceID);
+    } else {
+      const row = page.locator(
+        `.ant-table-row[data-row-key="balances-${balanceID}"]:visible`,
+      );
+      await expect(row).toHaveCount(1);
+      await row.getByRole("radio").check();
+      await expect(row.getByRole("radio")).toBeChecked();
     }
     await page.getByRole("button", { name: /盘\s*点/u }).click();
     const dialog = await modal(page, "登记库存盘点");
@@ -1399,6 +1425,13 @@ export async function runTransactionBrowser(options, preparedFixture) {
       }
     }
     await captureTransactionFieldResults(browser, options, client, report);
+    const cancellationFixture = await prepareTransactionPurchase(
+      client,
+      { ...options, runID: `${options.runID}c` },
+      fixture.configHash,
+    );
+    cancellationFixture.salesOrder = await prepareTransactionSalesOrder(client, options, cancellationFixture);
+    await runRequestCancellationBrowser(browser, options, client, cancellationFixture, report);
     assertTransactionBrowserReport(report);
     report.status = "passed";
   } catch (error) {

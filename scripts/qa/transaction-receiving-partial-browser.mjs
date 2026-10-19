@@ -26,7 +26,7 @@ export function assertPartialReceivingEvidence(flows) {
 
 // Engineering approval is fixture preparation. Counting, quality decisions,
 // partial inbound, rejection disposition and late pricing use real product UI.
-export async function runPartialReceiving({ client, fixture, options, report, open, pageFor, snapshot, stock, rejected, lost, decide, popup, screenshot, expect }) {
+export async function runPartialReceiving({ client, fixture, options, report, open, pageFor, snapshot, stock, rejected, lost, decide, popup, screenshot, expect, auditForm }) {
   report.partialReceiving = [];
   for (const mobile of [false, true]) {
     const prefix = `${fixture.prefix}-${mobile ? 'MPART' : 'DPART'}`;
@@ -89,6 +89,7 @@ export async function runPartialReceiving({ client, fixture, options, report, op
     await disposition.getByLabel('处置单号', { exact: true }).fill(`${prefix}-REJECT`);
     await disposition.getByLabel('处置数量', { exact: true }).fill('6');
     await disposition.getByLabel('处置原因', { exact: true }).fill('模拟不合格卷退厂，未曾入库');
+    await auditForm(disposition, flow, 'purchase-rejection-disposition');
     const { purchase_rejection_disposition: draft } = await clickRPC(page, 'create_purchase_rejection_disposition', () => disposition.getByRole('button', { name: '生成处置草稿', exact: true }).click());
     await disposition.getByRole('button', { name: '确认处置', exact: true }).click();
     await popup(page, 'post_purchase_rejection_disposition', '确认处置');

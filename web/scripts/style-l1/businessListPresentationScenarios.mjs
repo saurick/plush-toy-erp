@@ -23,8 +23,10 @@ export function createBusinessRecordNavigationScenarios(deps) {
           titleText: '库存余额详情',
           scenarioName: 'business-row-double-click-inventory',
           screenshotName: 'business-formal-inventory-double-click-details',
-          afterModalOpen: async () => {
+          afterModalOpen: async (modal) => {
+            await modal.getByRole('button', { name: '查看库存余额详情说明', exact: true }).click()
             await expectText(page, '当前弹窗只用于库存查询和追溯')
+            await page.keyboard.press('Escape')
             await expectText(page, 'SKU-STYLE-L1')
           },
         })

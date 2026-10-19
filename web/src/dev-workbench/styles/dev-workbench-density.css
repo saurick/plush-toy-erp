@@ -404,6 +404,10 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   padding-block: 6px;
 }
 
+.erp-dev-workspace-page .erp-dev-chain__stage-foot {
+  padding-block-end: 2px;
+}
+
 .erp-dev-workspace-page .erp-dev-chain__independent-path {
   padding-block: 8px;
 }

@@ -48,6 +48,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "purchase", Method: "create_purchase_rejection_disposition", Rules: sourceReadRules(PermissionQualityInspectionRead, PermissionPurchaseReceiptRead)},
 	{Domain: "purchase", Method: "create_purchase_receipt_adjustment_from_receipt", Rules: sourceReadRules(PermissionPurchaseReceiptRead)},
 	{Domain: "quality", Method: "create_quality_inspection_draft", Rules: sourceReadRules(PermissionPurchaseReceiptRead)},
+	{Domain: "quality", Method: "correct_quality_inspection_result", Rules: sourceReadRules(PermissionQualityInspectionRead)},
 	{Domain: "quality", Method: "create_quality_inspection_from_outsourcing_return", Rules: sourceReadRules(PermissionOutsourcingFactRead, PermissionOutsourcingOrderRead)},
 	{Domain: "quality", Method: "create_finished_goods_quality_inspection_draft", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "quality", Method: "list_outsourcing_return_quality_inspections", Rules: sourceReadRules(PermissionOutsourcingFactRead)},

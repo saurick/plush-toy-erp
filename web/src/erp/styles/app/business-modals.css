@@ -1364,7 +1364,7 @@
   min-height: 0;
 }
 
-.erp-role-navigation-layout-tab {
+.erp-role-navigation-menu-tab {
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1936,143 +1936,6 @@
   min-width: 0;
 }
 
-.erp-role-navigation-editor {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--erp-border);
-  border-radius: 12px;
-  background: var(--erp-surface-bg);
-}
-
-.erp-role-navigation-editor__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.erp-role-navigation-editor__head > div {
-  min-width: 0;
-}
-
-.erp-role-navigation-editor__head .ant-typography {
-  margin: 0;
-}
-
-.erp-role-navigation-editor__head .ant-typography-secondary {
-  margin-top: 4px;
-}
-
-.erp-role-navigation-editor__head > .ant-select {
-  width: 180px;
-}
-
-.erp-role-navigation-editor__columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  min-width: 0;
-}
-
-.erp-role-navigation-editor__column {
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: var(--erp-surface-bg);
-}
-
-.erp-role-navigation-editor__column-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.erp-role-navigation-editor__column-head > div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.erp-role-navigation-editor__column-head .ant-typography {
-  margin: 0;
-}
-
-.erp-role-navigation-editor__order {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  max-height: 430px;
-  overflow-y: auto;
-  padding-right: 2px;
-  scrollbar-width: thin;
-}
-
-.erp-role-navigation-editor__order-group {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.erp-role-navigation-editor__order-group
-  + .erp-role-navigation-editor__order-group {
-  margin-top: 4px;
-  padding-top: 10px;
-  border-top: 1px solid var(--erp-border);
-}
-
-.erp-role-navigation-editor__order-group-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-inline: 2px;
-}
-
-.erp-role-navigation-editor__order-group-title .ant-typography {
-  margin: 0;
-}
-
-.erp-role-navigation-editor__order-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid var(--erp-border);
-  border-radius: 9px;
-  background: var(--erp-surface-bg);
-}
-
-.erp-role-navigation-editor__identity {
-  display: grid;
-  flex: 1 1 180px;
-  gap: 4px;
-  min-width: 0;
-}
-
-.erp-role-navigation-editor__default {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.erp-role-navigation-editor__default .ant-select {
-  width: 100%;
-  min-width: 0;
-}
-
 .erp-role-navigation-preview {
   display: grid;
   gap: 12px;
@@ -2096,7 +1959,7 @@
 
 .erp-role-navigation-preview__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 

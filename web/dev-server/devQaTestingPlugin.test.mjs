@@ -10,8 +10,8 @@ import {
   acquireDevQaExecutionLock,
   releaseDevQaExecutionLock,
 } from '../../scripts/qa/dev-qa-execution-lock.mjs'
-import { resolveDevTestingOperationStore } from '../../scripts/qa/dev-testing-operation-store.mjs'
-import { normalizeDevTestingPlan, normalizeDevTestingSummary } from '../src/dev-workbench/config/devTestingOperation.mjs'
+import { DEV_TESTING_ACTIONS, resolveDevTestingOperationStore } from '../../scripts/qa/dev-testing-operation-store.mjs'
+import { DEV_PRESSURE_ACTIONS, DEV_TESTING_FIXED_ACTIONS, normalizeDevTestingPlan, normalizeDevTestingSummary } from '../src/dev-workbench/config/devTestingOperation.mjs'
 import {
   buildDevQaTestingCommand,
   DEV_QA_PRESSURE_REPORTS_API_PATH,
@@ -23,6 +23,9 @@ import {
 } from './devQaTestingPlugin.mjs'
 
 const ID = '123e4567-e89b-42d3-a456-426614174000'
+test('testing action keys stay aligned between the authoritative store and frontend consumers', () => {
+  assert.deepEqual([...DEV_TESTING_FIXED_ACTIONS, ...DEV_PRESSURE_ACTIONS].map((action) => action.key).sort(), [...DEV_TESTING_ACTIONS].sort())
+})
 const ID_TWO = '123e4567-e89b-42d3-a456-426614174001'
 const REPOSITORY = Object.freeze({
   commit: 'a'.repeat(40),
@@ -137,6 +140,12 @@ test('testing command registry maps actions to fixed repository scripts', () => 
     buildDevQaTestingCommand({ ...common, action: 'field-linkage' }).args,
     ['scripts/qa/erp-field-linkage.mjs']
   )
+  assert.deepEqual(
+    buildDevQaTestingCommand({ ...common, action: 'rpc-examples' }).args,
+    ['scripts/gen-public-contracts.mjs', '--verify-examples']
+  )
+  assert.equal(validateDevQaTestingAction({ action: 'rpc-examples', payload: { idempotencyKey: `testing:rpc-examples:${ID}` } }).action, 'rpc-examples')
+  assert.throws(() => validateDevQaTestingAction({ action: 'rpc-examples', payload: { idempotencyKey: `testing:rpc-examples:${ID}`, command: 'arbitrary' } }))
 })
 
 test('testing hook governance reports wiring only and fails closed', async (t) => {
@@ -396,6 +405,7 @@ test('testing middleware is loopback-only and plugin is serve-only', async () =>
           fast: null,
           'role-access': null,
           'field-linkage': null,
+      'rpc-examples': null,
       'pressure-quick': null,
       'pressure-capacity': null,
         },

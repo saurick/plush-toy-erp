@@ -19,6 +19,23 @@ export function fulfillmentTaskLinks(step) {
     .filter(Boolean).map((stage) => ({ key: stage.key, label: stage.label, pathLabel: [stage.group, stage.label].filter(Boolean).join(' · '), href: `/erp/task-board?stage_key=${encodeURIComponent(stage.key)}` }))
 }
 
+// This catalog explains existing business actions; it is not an executable flow.
+export function fulfillmentHandling(step) {
+  const { handling } = step
+  if (!handling?.issues || !handling.action || !handling.resume || !Array.isArray(handling.task_stages) || !Array.isArray(handling.guides)) {
+    throw new Error(`Missing fulfillment handling: ${step.stage}`)
+  }
+  const guides = handling.guides.map((key) => {
+    const guide = catalog.exception_guides.find((item) => item.key === key)
+    if (!guide || (guide.entry_stages.length && !guide.entry_stages.includes(step.stage))) throw new Error(`Invalid handling guide: ${step.stage}/${key}`)
+    return guide
+  })
+  const stages = [...new Set([...step.stages, ...handling.task_stages])]
+  const taskLinks = fulfillmentTaskLinks({ stages })
+  if (taskLinks.length !== stages.length) throw new Error(`Invalid handling tasks: ${step.stage}`)
+  return { ...handling, guides, taskLinks }
+}
+
 export function fulfillmentExceptionPath(guide, planKey) {
   const plan = guide.plans.find((item) => item.key === planKey) || guide.plans[0]
   const steps = [

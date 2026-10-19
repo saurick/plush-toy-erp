@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { Alert, Button } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
 import {
@@ -76,7 +77,7 @@ import { FinanceCreditEditor } from '../components/finance/FinanceCreditEditor.j
 import { FinancePaymentDetails } from '../components/finance/FinancePaymentDetails.jsx'
 
 export default function FinancePaymentsPage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams] = useBusinessSearchParams()
   const outletContext = useOutletContext()
   const adminProfile = outletContext?.adminProfile || {}
   const customerKey = adminProfile?.effective_session?.customer?.key || ''

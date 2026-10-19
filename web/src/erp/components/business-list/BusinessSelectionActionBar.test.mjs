@@ -11,7 +11,7 @@ import { resolveBusinessActionAvailability } from '../../utils/businessActionAva
 const dom = installTestDOM()
 function installActionSpace(t, initialWidth = 420) {
   let availableWidth = initialWidth
-  const prototype = dom.runtimeWindow.HTMLElement.prototype
+  const { prototype } = dom.runtimeWindow.HTMLElement
   const originalRect = prototype.getBoundingClientRect
   prototype.getBoundingClientRect = function getActionRect() {
     let width
@@ -47,6 +47,40 @@ after(() => {
     channel.port2.close()
   }
   globalThis.MessageChannel = NativeMessageChannel
+})
+
+test('手机任务保留办理动作和来源摘要，完整单据详情仅在电脑提供', async (t) => {
+  const [{ MemoryRouter, Routes, Route, Outlet }, { SelectionActionBar, BusinessActionTooltip, BusinessDataTable }, { Button }] = await Promise.all([
+    import('react-router-dom'), import('./BusinessListLayout.jsx'), import('antd'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  let mobile = true
+  let posted = 0
+  let details = 0
+  const actionHost = document.createElement('div')
+  document.body.appendChild(actionHost)
+  function Frame() { return createElement(Outlet, { context: mobile ? { mobileTaskBusiness: { taskID: 31, actionHost } } : {} }) }
+  function Page() {
+    return createElement(Fragment, null, createElement(SelectionActionBar, { selectedCount: 1 }, createElement(BusinessActionTooltip, { disabled: false }, createElement(Button, { 'data-business-action-key': 'view-details', onClick: () => { details += 1 } }, '查看详情')), createElement(Button, { 'data-business-action-key': 'post', onClick: () => { posted += 1 } }, '确认入库')), createElement(BusinessDataTable, { rowKey: 'id', columns: [{ key: 'no', title: '单号', dataIndex: 'no' }], dataSource: [{ id: 91, no: 'PR-SIM-91' }], rowSelection: { type: 'radio', selectedRowKeys: [91] }, onOpenRecord: () => { details += 1 }, pagination: false }))
+  }
+  const render = () => act(async () => root.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Routes, null, createElement(Route, { element: createElement(Frame) }, createElement(Route, { path: '*', element: createElement(Page) }))))))
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); actionHost.remove() })
+  await render()
+  assert.match(container.textContent, /PR-SIM-91/u)
+  assert.doesNotMatch(container.textContent, /查看详情|查看完整单据/u)
+  const post = [...actionHost.querySelectorAll('button')].find((button) => button.textContent === '确认入库')
+  assert.equal(post.disabled, false)
+  await act(async () => post.click())
+  assert.equal(posted, 1)
+  assert.equal(details, 0)
+  mobile = false
+  await render()
+  const detail = [...container.querySelectorAll('button')].find((button) => button.textContent === '查看详情')
+  assert.ok(detail)
+  await act(async () => detail.click())
+  assert.equal(details, 1)
 })
 
 test('未选和清空选择时收起记录操作，选中后按权限展示办理动作', async (t) => {
@@ -205,12 +239,7 @@ test('空间变大展开少量动作，变窄收纳，确认中不迁移触发�
   let related = true
   let writable = true
   let handled = 0
-  const render = () => act(async () => root.render(createElement(ConfigProvider, { theme: { token: { motion: false } } },
-    createElement(SelectionActionBar, { selectedCount: 1 },
-      createElement(Button, { 'data-business-action-role': 'view' }, '查看明细'),
-      related ? createElement(Button, { 'data-business-action-role': 'related' }, '相关单据') : null,
-      writable ? createElement(Popconfirm, { title: '确认撤销测试出货？', okText: '确认撤销', cancelText: '保留出货', onConfirm: () => { handled += 1 } },
-        createElement(Button, { danger: true, 'data-business-action-role': 'danger' }, '撤销出货')) : null
+  const render = () => act(async () => root.render(createElement(ConfigProvider, { theme: { token: { motion: false } } }, createElement(SelectionActionBar, { selectedCount: 1 }, createElement(Button, { 'data-business-action-role': 'view' }, '查看明细'), related ? createElement(Button, { 'data-business-action-role': 'related' }, '相关单据') : null, writable ? createElement(Popconfirm, { title: '确认撤销测试出货？', okText: '确认撤销', cancelText: '保留出货', onConfirm: () => { handled += 1 } }, createElement(Button, { danger: true, 'data-business-action-role': 'danger' }, '撤销出货')) : null
     ))))
   const more = () => container.querySelector('.erp-business-selection-action-bar__compact-more')
   const button = (label) => [...document.querySelectorAll('button')].find((node) => node.textContent.replace(/\s+/gu, '') === label)

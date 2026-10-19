@@ -49,6 +49,19 @@ bash "$INDEX_ROOT/scripts/qa/error-code-sync.sh"
 echo "[pre-commit] 检查暂存错误码"
 ERROR_CODE_GUARD_STAGED_ONLY=1 bash "$INDEX_ROOT/scripts/qa/error-codes.sh"
 
+RPC_CONTRACTS_REQUIRED="$(
+  node --input-type=module - "${STAGED_FILES[@]}" <<'NODE'
+import { requiresRPCContractCheck } from './scripts/lib/rpc-contract-review.mjs'
+process.stdout.write(requiresRPCContractCheck(process.argv.slice(2)) ? 'yes' : 'no')
+NODE
+)"
+if [[ "$RPC_CONTRACTS_REQUIRED" == "yes" ]]; then
+  echo "[pre-commit] 检查暂存接口目录、字段合同、样例与生成物同步"
+  node "$INDEX_ROOT/scripts/gen-public-contracts.mjs" --check
+  echo "[pre-commit] 检查暂存接口消费者引用"
+  NODE_PATH="$ROOT_DIR/web/node_modules${NODE_PATH:+:$NODE_PATH}" node "$INDEX_ROOT/scripts/qa/public-contract-consumers.mjs"
+fi
+
 echo "[pre-commit] 扫描暂存内容中的密钥"
 SECRETS_STRICT=1 SECRETS_STAGED_ONLY=1 bash "$INDEX_ROOT/scripts/qa/secrets.sh"
 

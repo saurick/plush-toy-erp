@@ -7,7 +7,8 @@ import {
   LinkOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { PurchaseReceiptAdjustmentStatus, PurchaseReceiptStatus, PurchaseReturnStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
@@ -179,7 +180,7 @@ export default function PurchaseReceiptsPage() {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const outletContext = useOutletContext()
   const navigate = useBusinessNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]

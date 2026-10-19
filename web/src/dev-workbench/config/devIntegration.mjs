@@ -550,7 +550,7 @@ export function parseIntegrationSearch(search) {
   const view = value('view')
   const defaultView = value('node') ? 'guide' : 'inventory'
   return {
-    view: ['inventory', 'guide'].includes(view) ? view : defaultView,
+    view: ['inventory', 'changes', 'guide'].includes(view) ? view : defaultView,
     domain: value('domain'),
     q: value('q'),
     rpc: value('rpc'),

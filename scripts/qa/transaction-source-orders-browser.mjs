@@ -7,9 +7,10 @@ import { RpcErrorCode as CODE } from "../../web/src/common/consts/errorCodes.gen
 import { createTransactionClient, prepareTransactionFixture } from "./transaction-real-backend-fixture.mjs";
 import { BUSINESS_ROUTE_PATHS } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 import { resolveMobileActionLabel } from "../../web/src/erp/mobile/utils/mobileRoleTaskModel.mjs";
+import { getEngineeringMaterialTaskContext } from "../../web/src/erp/utils/engineeringMaterialTask.mjs";
 import { advanceSalesOrderLifecycleThroughProcess } from "./manual-acceptance-source-data.mjs";
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
-import { login, navigate, closePage, businessURL, selectRow, pageAction, openDesktopTaskRow, openMobileTaskCard, openMobileSourceTask, dropRealResponse, faultEvidence, captureFailure, clickRPC } from "./transaction-browser-ui.mjs";
+import { login, navigate, closePage, settleRPCPage, businessURL, selectRow, pageAction, openDesktopTaskRow, openMobileTaskCard, openMobileSourceTask, dropRealResponse, faultEvidence, captureFailure, clickRPC } from "./transaction-browser-ui.mjs";
 
 const require = createRequire(new URL("../../web/package.json", import.meta.url));
 const { chromium, expect } = require("playwright/test");
@@ -201,7 +202,9 @@ async function run(options) {
         await page.waitForLoadState("networkidle");
         await expect.poll(() => page.pendingRPC.size).toBe(0);
         await page.screenshot({ path: path.join(options.outputDir, `mobile-${orderNo}-${action}.png`), fullPage: false });
-        const back = page.getByTestId("mobile-task-receipt-screen").locator("button.mobile-detail-primary").filter({ hasText: /^返回任务列表$/u });
+        const back = page.getByTestId("mobile-task-receipt-screen")
+          .locator(".mobile-role-action-bar")
+          .getByRole("button", { name: "返回任务列表", exact: true });
         await expect(back).toHaveCount(1);
         await back.click();
         await expect(page.getByTestId("mobile-role-task-list")).toBeVisible();
@@ -419,6 +422,40 @@ async function run(options) {
       entry.staleSourceRejected = true;
       const openMaterial = async actor => {
         const page = await getPage(actor, mobile);
+        if (mobile && actor !== "engineering") {
+          const current = await getRequest();
+          const group = actor === "boss" ? "engineering_material_boss_review" : "engineering_material_finance_review";
+          const { tasks } = await client.rpc(actor, "workflow", "list_tasks", {
+            source_type: "engineering_material_request", source_id: current.id, limit: 100,
+          });
+          const candidates = tasks.filter(task => task.task_group === group && task.owner_role_key === actor && getEngineeringMaterialTaskContext(task)?.requestID === current.id);
+          assert.equal(candidates.length, 1, "engineering approval must use its authoritative source task");
+          const [task] = candidates;
+          (entry.approvalTasks ??= []).push({ actor, taskID: task.id, requestID: current.id, group: task.task_group, status: task.task_status_key });
+          await navigate(page, `${options.baseURL}/m/${actor}/tasks`);
+          const actionScreen = page.getByTestId("mobile-task-action-screen");
+          if (await actionScreen.isVisible()) await actionScreen.getByRole("button", { name: "返回任务详情", exact: true }).click();
+          const receipt = page.getByTestId("mobile-task-receipt-screen");
+          if (await receipt.isVisible()) await receipt.getByRole("button", { name: "返回任务列表", exact: true }).first().click();
+          else if (await page.getByTestId("mobile-task-detail-screen").isVisible()) await page.getByTestId("mobile-task-detail-screen").getByRole("button", { name: "返回任务列表", exact: true }).click();
+          await page.getByTestId("mobile-role-nav-tasks").click();
+          await page.getByLabel("任务状态", { exact: true }).getByText(["done", "withdrawn", "cancelled"].includes(task.task_status_key) ? "已办" : "待办", { exact: true }).click();
+          await page.getByRole("searchbox").fill(source.order_no);
+          await page.getByRole("searchbox").press("Enter");
+          await openMobileTaskCard(page, task.id);
+          const detail = page.getByTestId("mobile-task-detail-screen");
+          await expect(detail).toBeVisible();
+          if (task.task_status_key !== "ready") {
+            await detail.getByRole("button", { name: "查看材料汇总", exact: true }).click();
+            const dialog = page.locator('.erp-material-summary-modal:visible');
+            await expect(dialog).toBeVisible();
+            return { page, dialog, readonlyTask: true };
+          }
+          await detail.getByRole("button", { name: "处理任务", exact: true }).click();
+          const dialog = page.getByTestId("mobile-task-action-screen");
+          await expect(dialog.locator('.erp-material-task-action__footer')).toBeVisible();
+          return { page, dialog, taskForm: true };
+        }
         if (mobile) {
           await prepareFollowup("sales_order", source.id, actor);
           await openMobileSourceTask(page, { ...options, mobile }, client, actor, "sales_order", source.id, ["business_followup"]);
@@ -435,6 +472,27 @@ async function run(options) {
         await expect(dialog).toBeVisible();
         return { page, dialog };
       };
+      const closeMaterial = async ui => {
+        if (ui.readonlyTask) {
+          await ui.dialog.locator('.ant-modal-close').click();
+          return;
+        }
+        if (!ui.taskForm) {
+          await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
+          return;
+        }
+        const receipt = ui.page.getByTestId("mobile-task-receipt-screen");
+        if (await receipt.isVisible()) await receipt.getByRole("button", { name: "返回任务列表", exact: true }).first().click();
+        else {
+          await ui.page.getByTestId("mobile-task-action-screen").getByRole("button", { name: "返回任务详情", exact: true }).click();
+          await ui.page.getByTestId("mobile-task-detail-screen").getByRole("button", { name: "返回任务列表", exact: true }).click();
+        }
+        await expect(ui.page.getByTestId("mobile-role-task-list")).toBeVisible();
+      };
+      const reviewButton = async (ui, decision) => {
+        if (ui.taskForm) await ui.dialog.getByRole("radio", { name: decision === "reject" ? "退回工程" : "审批通过", exact: true }).check();
+        return ui.dialog.getByRole("button", { name: decision === "reject" ? ui.taskForm ? "确认退回工程" : "退回工程" : ui.taskForm ? "确认通过，交财务" : "审核通过，交财务", exact: true });
+      };
       let ui = await openMaterial("engineering");
       await clickRPC(ui.page, "submit_engineering_material_request", () => ui.dialog.getByRole("button", { name: "提交老板审核", exact: true }).click());
       await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
@@ -447,13 +505,14 @@ async function run(options) {
       entry.permissionDenied = entry.approvalOrdered = true;
       ui = await openMaterial("boss");
       const beforeReject = report.browserRPC.filter(call => call.method === "boss_review_engineering_material_request").length;
-      await ui.dialog.getByRole("button", { name: "退回工程", exact: true }).click();
+      const reject = await reviewButton(ui, "reject");
+      await reject.click();
       await expect(ui.dialog.getByText("请填写退回原因", { exact: true })).toBeVisible();
       assert.equal(report.browserRPC.filter(call => call.method === "boss_review_engineering_material_request").length, beforeReject);
       assert.equal((await getRequest()).status, "SUBMITTED");
       await ui.dialog.locator("textarea").fill("模拟退回：补充用料核对说明");
-      await clickRPC(ui.page, "boss_review_engineering_material_request", () => ui.dialog.getByRole("button", { name: "退回工程", exact: true }).click());
-      await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
+      await clickRPC(ui.page, "boss_review_engineering_material_request", () => reject.click());
+      await closeMaterial(ui);
       assert.equal((await getRequest()).status, "REJECTED");
       entry.rejectReasonRequired = true;
       ui = await openMaterial("engineering");
@@ -466,8 +525,9 @@ async function run(options) {
       assert.equal(countRequests(), 2);
       entry.rejectedResubmitted = true;
       ui = await openMaterial("boss");
-      await clickRPC(ui.page, "boss_review_engineering_material_request", () => ui.dialog.getByRole("button", { name: "审核通过，交财务", exact: true }).click());
-      await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
+      const approve = await reviewButton(ui, "approve");
+      await clickRPC(ui.page, "boss_review_engineering_material_request", () => approve.click());
+      await closeMaterial(ui);
       assert.equal((await getRequest()).status, "BOSS_APPROVED");
       const purchasesBefore = client.query("SELECT to_json(count(*)) FROM purchase_orders");
       ui = await openMaterial("finance");
@@ -476,8 +536,8 @@ async function run(options) {
       await expect.poll(() => Boolean(fault.state.captured)).toBe(true);
       await fault.remove();
       entry.financeFault = faultEvidence(fault.state);
-      await expect(ui.dialog.getByRole("button", { name: "关闭", exact: true })).toBeEnabled();
-      await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
+      if (!ui.taskForm) await expect(ui.dialog.getByRole("button", { name: "关闭", exact: true })).toBeEnabled();
+      await closeMaterial(ui);
       ui = await openMaterial("finance");
       const approved = await getRequest();
       assert.equal(approved.status, "APPROVED");
@@ -507,8 +567,9 @@ async function run(options) {
       entry.changedReviewRejected = true;
       entry.purchaseOrders = 1;
       entry.financeRecovered = entry.replayExact = true;
-      await ui.page.screenshot({ path: path.join(options.outputDir, `${surface}_engineering.png`), fullPage: false });
-      await ui.dialog.getByRole("button", { name: "关闭", exact: true }).click();
+      await settleRPCPage(ui.page);
+      await ui.page.screenshot({ path: path.join(options.outputDir, `${surface}_engineering.png`), fullPage: false, animations: "disabled" });
+      await closeMaterial(ui);
       assert.deepEqual(facts(), beforeFacts);
       entry.factsUnchanged = entry.passed = true;
     }

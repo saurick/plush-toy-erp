@@ -853,7 +853,7 @@ export function createBusinessModuleNavigationScenarios({
     },
     {
       name: 'module-navigation-deeplink-race',
-      path: '/erp/production/exceptions?view=decisions',
+      path: '/erp/production/progress',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },

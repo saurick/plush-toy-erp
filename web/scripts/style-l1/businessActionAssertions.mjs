@@ -11,6 +11,7 @@ import {
   assertVisibleInputTextVerticalRhythm,
 } from './inputControlAssertions.mjs'
 import assert from 'node:assert/strict'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 export function createBusinessActionAssertions({ outputDir }) {
@@ -645,6 +646,13 @@ export function createBusinessActionAssertions({ outputDir }) {
       .filter({ hasText: rowText })
       .first()
     await row.waitFor({ timeout: 10_000 })
+    await row.evaluate((element) => {
+      window.__businessRecordInteraction = []
+      const card = element.closest('.erp-business-data-table-card')
+      for (const type of ['pointerdown', 'click', 'dblclick']) card.addEventListener(type, (event) => {
+        window.__businessRecordInteraction.push({ type, detail: event.detail, x: event.clientX, y: event.clientY, target: event.target.tagName, row: event.target.closest('tr')?.dataset.rowKey || null, rowTop: element.getBoundingClientRect().top })
+      }, true)
+    })
     const copyableCellContent = row
       .locator('.erp-business-table-copyable-cell__content')
       .first()
@@ -653,6 +661,7 @@ export function createBusinessActionAssertions({ outputDir }) {
     } else {
       await row.dblclick()
     }
+    await writeFile(path.join(outputDir, `${scenarioName}-interaction.json`), JSON.stringify(await page.evaluate(() => window.__businessRecordInteraction), null, 2))
 
     const modal = page
       .locator(

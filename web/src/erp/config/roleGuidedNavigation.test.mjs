@@ -3,10 +3,7 @@ import test from 'node:test'
 
 import {
   buildRoleGuidedNavigation,
-  buildRoleGuidedNavigationPreview,
   buildRoleGuidedSecondarySections,
-  normalizeRoleNavigationSettings,
-  reconcileRoleNavigationPaths,
 } from './roleGuidedNavigation.mjs'
 
 const sections = [
@@ -229,35 +226,6 @@ test('roleGuidedNavigation: 单岗位自定义常用与其他入口都保持保�
   )
 })
 
-test('roleGuidedNavigation: 双列表标准化拒绝跨组重复并把新增有效页追加到其他入口', () => {
-  assert.equal(
-    normalizeRoleNavigationSettings({
-      navigation_mode: 'custom',
-      primary_menu_paths: ['/erp/warehouse/inventory'],
-      secondary_menu_paths: ['/erp/warehouse/inventory'],
-    }).mode,
-    'recommended'
-  )
-  assert.deepEqual(
-    reconcileRoleNavigationPaths({
-      effectivePaths: [
-        '/erp/warehouse/inventory',
-        '/erp/warehouse/shipments',
-        '/erp/master/partners/customers',
-      ],
-      primaryMenuPaths: ['/erp/warehouse/inventory'],
-      secondaryMenuPaths: ['/erp/warehouse/shipments'],
-    }),
-    {
-      primaryMenuPaths: ['/erp/warehouse/inventory'],
-      secondaryMenuPaths: [
-        '/erp/warehouse/shipments',
-        '/erp/master/partners/customers',
-      ],
-    }
-  )
-})
-
 test('roleGuidedNavigation: 老板优先项全是看板时仍补足三个电脑端常用业务', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: [
@@ -371,82 +339,6 @@ test('roleGuidedNavigation: 未知岗位使用安全回退且不丢失其他页�
     ]
   )
   assert.equal(result.secondaryItemCount, 2)
-})
-
-test('roleGuidedNavigation: 权限中心预览只使用最终可进入页面并将岗位帮助放入其他入口', () => {
-  const result = buildRoleGuidedNavigationPreview({
-    navigationSections: sections,
-    effectiveAccess: {
-      pages: [
-        { path: '/erp/dashboard', effective: true },
-        { path: '/erp/task-board', effective: true },
-        { path: '/erp/business-dashboard', effective: false },
-        { path: '/erp/master/partners/customers', effective: true },
-        {
-          path: '/erp/sales/project-orders/sales-orders',
-          effective: false,
-        },
-        { path: '/erp/warehouse/shipments', effective: true },
-        { path: '/erp/warehouse/inventory', effective: true },
-      ],
-    },
-    roleKey: 'sales',
-  })
-
-  assert.deepEqual(
-    result.dashboardItems.map((item) => item.path),
-    ['/erp/dashboard', '/erp/task-board']
-  )
-  assert.deepEqual(
-    result.primaryItems.map((item) => item.path),
-    [
-      '/erp/master/partners/customers',
-      '/erp/warehouse/shipments',
-      '/erp/warehouse/inventory',
-    ]
-  )
-  assert.deepEqual(
-    result.secondarySections.flatMap((section) =>
-      section.items.map((item) => item.path)
-    ),
-    ['/erp/help-center']
-  )
-})
-
-test('roleGuidedNavigation: 权限中心预览使用尚未保存的自定义顺序但不越权', () => {
-  const result = buildRoleGuidedNavigationPreview({
-    navigationSections: sections,
-    effectiveAccess: {
-      pages: [
-        { path: '/erp/dashboard', effective: true },
-        { path: '/erp/task-board', effective: true },
-        { path: '/erp/master/partners/customers', effective: true },
-        {
-          path: '/erp/sales/project-orders/sales-orders',
-          effective: true,
-        },
-        { path: '/erp/warehouse/inventory', effective: false },
-      ],
-    },
-    roleKey: 'sales',
-    navigationMode: 'custom',
-    primaryMenuPaths: [
-      '/erp/warehouse/inventory',
-      '/erp/sales/project-orders/sales-orders',
-      '/erp/master/partners/customers',
-    ],
-  })
-
-  assert.deepEqual(
-    result.primaryItems.map((item) => item.path),
-    ['/erp/sales/project-orders/sales-orders', '/erp/master/partners/customers']
-  )
-  assert.equal(
-    result.primaryItems.some(
-      (item) => item.path === '/erp/warehouse/inventory'
-    ),
-    false
-  )
 })
 
 test('roleGuidedNavigation: 其他入口沿用 Admin 菜单分组且保留原始配置成员合同', () => {
@@ -687,25 +579,4 @@ test('roleGuidedNavigation: 客户扩展、工具和帮助保持各自 Admin 菜
     grouped.at(-1).items.map((item) => item.path),
     ['/erp/help-center']
   )
-})
-
-test('removed primary permissions promote one surviving entry without duplicates', () => {
-  const input = {
-    effectivePaths: ['/erp/warehouse/inventory'],
-    primaryMenuPaths: ['/erp/sales/orders'],
-    secondaryMenuPaths: ['/erp/warehouse/inventory'],
-  }
-  const result = reconcileRoleNavigationPaths(input)
-  assert.deepEqual(result, {
-    primaryMenuPaths: ['/erp/warehouse/inventory'],
-    secondaryMenuPaths: [],
-  })
-  assert.deepEqual(
-    reconcileRoleNavigationPaths({ ...input, ...result }),
-    result
-  )
-  assert.deepEqual(reconcileRoleNavigationPaths(), {
-    primaryMenuPaths: [],
-    secondaryMenuPaths: [],
-  })
 })

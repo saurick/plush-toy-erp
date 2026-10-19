@@ -62,8 +62,8 @@ export function createFilterConflictScenarios(deps) {
         if (expected.due_status) {
           const label = { all: '不限交期', overdue: '已逾期', due_soon: '7天内到期', undated: '未定交期' }[expected.due_status]
           if (expected.due_status === 'undated') {
-            const applied = document.querySelector(phone ? '.mobile-applied-filters' : '.erp-progress-active-filters')
-            if (!applied?.textContent.includes(label)) return false
+            const applied = document.querySelector(phone ? '.mobile-progress-panel .mobile-filter-trigger' : '.erp-progress-active-filters')
+            if (!applied?.textContent.includes(label) || (phone && !applied.getAttribute('title')?.includes(label))) return false
           } else if (buttons.find((node) => node.getAttribute('aria-label')?.startsWith(label))?.getAttribute('aria-pressed') !== 'true') return false
         }
         return true
@@ -145,7 +145,7 @@ export function createFilterConflictScenarios(deps) {
     }
     await page.keyboard.press('Escape')
     await page.reload()
-    await panel.locator(phone ? '.mobile-applied-filters' : '.erp-progress-active-filters').getByText('未定交期', { exact: true }).waitFor()
+    await panel.locator(phone ? '.mobile-filter-trigger__label' : '.erp-progress-active-filters').getByText('未定交期', { exact: true }).waitFor()
     await waitQuery({ due_status: 'undated' })
     assert.equal(await due(quick, '未定交期').count(), 0, '少用条件留在更多筛选，当前条件持续可见')
     await trigger.click()
@@ -219,22 +219,26 @@ export function createFilterConflictScenarios(deps) {
       else await panel.getByRole('button', { name: /^筛选/ }).click()
       await waitForFilters(page, filters)
       await choose(page, filters, '当前岗位', '工程')
-      const endedRequest = page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.status === 'completed')
-      if (phone) {
-        await filters.getByText('只看逾期', { exact: true }).click()
-        await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-        await panel.getByRole('button', { name: '清除当前岗位：工程', exact: true }).click()
-        await panel.getByRole('button', { name: '清除关注事项：只看逾期', exact: true }).waitFor()
-        assert.equal(await panel.getByRole('button', { name: '清除当前岗位：工程', exact: true }).count(), 0)
-        await panel.getByRole('button', { name: /^已结束，/ }).click()
-        await panel.getByRole('button', { name: /筛选流程/ }).click()
-      } else {
-        await choose(page, filters, '关注事项', '只看逾期')
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
-        await panel.getByRole('button', { name: /^已结束，/ }).click()
-        await panel.getByRole('button', { name: /^筛选/ }).click()
-      }
-      await endedRequest
+      await Promise.all([
+        page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.status === 'completed'),
+        (async () => {
+          if (phone) {
+            await filters.getByText('只看逾期', { exact: true }).click()
+            await choose(page, filters, '当前岗位', '全部当前岗位')
+            assert.equal(await filters.getByRole('button', { name: '工程', exact: true }).getAttribute('aria-pressed'), 'false')
+            assert.equal(await filters.getByRole('button', { name: '只看逾期', exact: true }).getAttribute('aria-pressed'), 'true')
+            await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
+            assert.equal(await panel.getByRole('button', { name: /筛选流程/ }).getAttribute('title'), '关注事项：只看逾期')
+            await panel.getByRole('button', { name: /^已结束，/ }).click()
+            await panel.getByRole('button', { name: /筛选流程/ }).click()
+          } else {
+            await choose(page, filters, '关注事项', '只看逾期')
+            await filters.getByRole('button', { name: '完成', exact: true }).click()
+            await panel.getByRole('button', { name: /^已结束，/ }).click()
+            await panel.getByRole('button', { name: /^筛选/ }).click()
+          }
+        })(),
+      ])
       await waitForFilters(page, filters)
       assert.equal(await filters.getByRole('combobox', { name: '当前岗位', exact: true }).count(), 0)
       assert.equal(await filters.getByRole('textbox', { name: '搜索当前岗位', exact: true }).count(), 0)
@@ -351,14 +355,24 @@ export function createFilterConflictScenarios(deps) {
         await choose(page, filters, '记录范围', '全部记录')
         await filters.getByRole('button', { name: '完成', exact: true }).click()
         const group = page.getByRole('group', { name: config.group, exact: true })
-        await Promise.all([response(), group.getByRole('button', { name: /^已关闭/ }).click()])
+        const selectedStatus = group.locator('.ant-select-selection-item')
+        const selectStatus = async (label) => {
+          await page.waitForFunction((name) => [...document.querySelectorAll('[role="group"]')].some((element) => element.getAttribute('aria-label') === name && element.getAttribute('aria-busy') === 'false'), config.group)
+          const control = group.getByRole('combobox', { name: config.group, exact: true })
+          await control.press('ArrowDown')
+          const listbox = await control.getAttribute('aria-controls')
+          assert(listbox, '状态选择框须关联自己的选项列表')
+          const dropdown = page.locator(`[id=${JSON.stringify(listbox)}]`).locator('xpath=ancestor::div[contains(@class,"ant-select-dropdown")][1]')
+          await dropdown.locator('.ant-select-item-option-content').filter({ hasText: new RegExp(`^${label}\\s+\\d+$`, 'u') }).click()
+        }
+        await Promise.all([response(), selectStatus('已关闭')])
         assert.equal(page.filterQueries.at(-1)[config.field], 'closed')
         const start = page.filterQueries.length
         await reopen()
-        await group.getByRole('button', { name: /^不限状态/ }).waitFor()
-        assert.equal(await group.getByRole('button', { name: /^不限状态/ }).getAttribute('aria-pressed'), 'true')
+        await selectedStatus.filter({ hasText: /^不限状态\s+\d+$/u }).waitFor()
+        assert.match(await selectedStatus.textContent(), /^不限状态\s+\d+$/u)
         assert(page.filterQueries.slice(start).every((query) => !query[config.field]), '恢复当前范围时不能发送残留已关闭状态')
-        await Promise.all([response(), group.getByRole('button', { name: /^草稿/ }).click()])
+        await Promise.all([response(), selectStatus('草稿')])
         await reopen()
         assert.equal(page.filterQueries.at(-1)[config.field], 'draft', '合法缓存状态仍需保留')
       } else {

@@ -138,7 +138,7 @@ export default function FulfillmentChainCanvas({ role, searchParams, setSearchPa
         <div className="erp-dev-chain__stage-card" data-stage-card data-selected={!exceptionKey && selectedStage === step.stage || undefined}>
           <button className="erp-dev-chain__stage-main" type="button" aria-label={`${number} ${step.label}`} aria-expanded={!exceptionKey && selectedStage === step.stage} aria-controls={!exceptionKey && selectedStage === step.stage ? detailID : undefined} onClick={() => onSelectStage(step.stage)}><span>{number}</span><strong>{label}</strong></button>
           <div className="erp-dev-chain__stage-foot">
-            {guides.length ? <button type="button" aria-label={`查看第${number}环节异常分支`} aria-expanded={origin} onClick={() => onOpenException(guides.find((guide) => guide.key === exceptionKey) || guides[0], null, step.stage)}>↳ 异常{guides.length > 1 ? ` ${guides.length}` : ''}</button> : reentry ? <small>{graph.plan.continuation.original_terminal ? '新批重开' : '重新进入'}</small> : null}
+            {guides.length ? <button type="button" title={`${guides.length} 类已登记异常分支，并非异常发生次数`} aria-label={`查看第${number}环节异常分支`} aria-expanded={origin} onClick={() => onOpenException(guides.find((guide) => guide.key === exceptionKey) || guides[0], null, step.stage)}>↳ 异常分支{guides.length > 1 ? ` ${guides.length}` : ''}</button> : reentry ? <small>{graph.plan.continuation.original_terminal ? '新批重开' : '重新进入'}</small> : null}
             {step.branch ? <small>· 按约定</small> : null}
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function FulfillmentChainCanvas({ role, searchParams, setSearchPa
   }
   return (
     <div className="erp-dev-chain" data-fulfillment-chain>
-      <div className="erp-dev-chain__legend"><span>实线为总链定位 · 虚线为约定分支</span><span><i className="erp-dev-chain__branch-key" />异常往返{graph?.repeat.length ? <><i className="erp-dev-chain__repeat-key" />{graph.plan.continuation.original_terminal ? '新批路径' : '重新进入主链'}</> : null}</span></div>
+      <div className="erp-dev-chain__legend"><span>实线为总链定位 · 虚线为约定分支</span><span><i className="erp-dev-chain__branch-key" />异常处理往返{graph?.repeat.length ? <><i className="erp-dev-chain__repeat-key" />{graph.plan.continuation.original_terminal ? '新批路径' : '重新进入主链'}</> : null}</span></div>
       <div className="erp-dev-chain__map" ref={bindMap}>
         <svg className="erp-dev-chain__wires" width={geometry.width || '100%'} height={geometry.height || '100%'} role="img" aria-label={graph?.origin ? `17环节总链；从第${flow.indexOf(graph.origin) + 1}环节分出，${graph.plan.label}；${graph.resume ? `${graph.reentryStage ? '重新进入' : '满足条件后接回'}第${flow.indexOf(graph.resume) + 1}环节` : '该分支终止，不连接后续环节'}` : '17环节总链与约定分支'}>
           <defs>{['main', 'branch', 'repeat'].map((kind) => <marker key={kind} id={`${markerID}-${kind}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path className={`erp-dev-chain__arrow--${kind}`} d="M 0 0 L 8 4 L 0 8 Z" /></marker>)}</defs>

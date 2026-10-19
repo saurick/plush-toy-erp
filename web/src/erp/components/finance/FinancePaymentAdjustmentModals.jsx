@@ -1,5 +1,5 @@
 import React from 'react'
-import { Alert, Form, Input, Select } from 'antd'
+import { Form, Input, Select } from 'antd'
 
 import { FinanceAllocationStatus } from '../../../common/consts/statuses.generated.mjs'
 
@@ -78,11 +78,6 @@ export function FinancePaymentCancelModal({
       onCancel={() => !loading && setCancelOpen(false)}
       onOk={cancelPayment}
     >
-      <Alert
-        type="warning"
-        showIcon
-        message="取消不会删除收付款记录；已发生的流程效果会保留补偿和恢复审计。"
-      />
       <Form
         form={cancelForm}
         name="finance-payment-cancel"

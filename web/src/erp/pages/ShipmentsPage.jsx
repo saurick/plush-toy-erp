@@ -17,7 +17,8 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { sourceBusinessActionUUID,
   createSourceBusinessActionAttemptStore,
@@ -268,7 +269,7 @@ export default function ShipmentsPage() {
   const navigate = useBusinessNavigate()
   const outletContext = useOutletContext()
   const taskSource = outletContext?.mobileTaskCommand?.kind === 'shipment' ? outletContext.mobileTaskCommand : null
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
