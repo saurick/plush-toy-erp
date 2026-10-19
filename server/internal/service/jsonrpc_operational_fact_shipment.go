@@ -103,7 +103,10 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory", "workflow_tasks"); res != nil {
 			return id, res, nil
 		}
-		shipmentID := getInt(pm, "id", 0)
+		shipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
 		pkglogger.SetRequestObject(ctx, "shipment", shipmentID)
 		item, err := d.operationalFactUC.ShipShipmentWithActor(ctx, shipmentID, actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil

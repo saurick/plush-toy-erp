@@ -36,6 +36,7 @@
 - 本地 Core profile 固定执行当前数据合同的角色账号、8 个标准单位与 4 个仓库引用，只允许登记的长期开发库和服务端生成的精确确认；它不再从工作台调用旧 `SIM-PLUSH-CORE` 全量 seed，材料、产品、工序、BOM、Source、Task 与 Fact 由同一 Scenario 数据合同补齐并独立读回。旧批次回执只作历史追溯，不参与当前执行、恢复选择或环境结论。
 - 数据版本、批次和基础数量取自 `server/internal/manualacceptance/contract.json`；Bridge 使用已验证的合同模块，工作台浏览器校验读取同一公开模拟合同，避免前端保留旧版本常量而拒绝当前回执。流程数量按已验证的正式流程实例 ID 去重，不由岗位数或展示任务数推导。
 - 133 Scenario 只能在对应目标卡中准备和二次确认；执行前重新读取固定 target attestation，并创建绑定 exact release / database / migration 的新备份回滚点。备份通过 `erp_backup` 只读角色生成并校验，只向页面返回 alias、hash、大小和时间。
+- 接口与集成复用质量门禁的只读 `GET /__dev/api/qa/quality-gates/integration-evidence`；`devIntegrationEvidence.mjs` 只投影既有隔离数据库运行回执和 digest 绑定的 Go JSON。场景与方法关联读取正式 API 文档，源码身份不一致显示历史；缺失、失败、跳过、损坏报告分别保留边界，不接受浏览器传入路径、报告或执行参数。
 - 质量门禁没有显式 database base 时只允许本机 Docker 的固定 `postgres:18.6` 托管模式：每次随机凭据、仅绑定 `127.0.0.1` 动态端口、按 operation 与 repository label 精确清理；不得删除外部容器或占用者。
 - ERP production build、production preview 和业务部署不包含本目录模块、`/__dev` 路由或本机私有路径。独立工具部署使用单独的工作台制品与服务，见 [部署合同](../../server/deploy/workbench/README.md)。
 - `devDatabaseMigrationRuntime.mjs` 的 source identity 包含迁移 Bridge、高层 CLI 与安全真源；路径或内容变化后，既有迁移 plan 必须失效并重新准备，不保留旧路径兼容。execute 在 apply 前还必须重新验证 operation 绑定的备份文件身份。

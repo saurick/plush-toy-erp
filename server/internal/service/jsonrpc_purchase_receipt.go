@@ -75,6 +75,10 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
+		receiptID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
 			return id, res, nil
 		}
@@ -82,8 +86,8 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res != nil {
 			return id, res, nil
 		}
-		pkglogger.SetRequestObject(ctx, "purchase_receipt", getInt(pm, "id", 0))
-		item, err := d.inventoryUC.PostPurchaseReceiptForAccess(ctx, getInt(pm, "id", 0), scope)
+		pkglogger.SetRequestObject(ctx, "purchase_receipt", receiptID)
+		item, err := d.inventoryUC.PostPurchaseReceiptForAccess(ctx, receiptID, scope)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "cancel_purchase_receipt_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCancelDraft); res != nil {
@@ -115,11 +119,15 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
 			return id, res, nil
 		}
+		receiptID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
 		scope, res := d.currentWarehouseDataScope(ctx)
 		if res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.GetPurchaseReceiptForAccess(ctx, getInt(pm, "id", 0), scope)
+		item, err := d.inventoryUC.GetPurchaseReceiptForAccess(ctx, receiptID, scope)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "list_purchase_receipts":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {

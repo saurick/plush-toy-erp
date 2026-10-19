@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -13,6 +14,7 @@ import {
   replaceDatabaseName,
 } from "./database-target.mjs";
 import { normalizeAtlasMigrationStatus } from "./database-inventory.mjs";
+import { readRepositoryIdentity } from "./lib/repository-identity.mjs";
 
 export const DISPOSABLE_DATABASE_RUN_SCHEMA =
   "plush-disposable-database-run/v1";
@@ -133,7 +135,7 @@ export function summarizeCriticalPostgresFailure({
   return `process_exit=${Number.isInteger(status) ? status : "unknown"} structured_failure=absent`;
 }
 
-function defaultRuntime(repoRoot) {
+function defaultRuntime(repoRoot, onCriticalResult = () => {}) {
   const serverRoot = path.join(repoRoot, "server");
   const queryExists = (adminURL, databaseName) => {
     const output = commandResult(
@@ -238,6 +240,7 @@ function defaultRuntime(repoRoot) {
           stdio: ["ignore", "pipe", "pipe"],
         },
       );
+      onCriticalResult(String(result.stdout || ""));
       if (result.error || result.status !== 0) {
         throw new Error(
           `critical PostgreSQL verification failed: ${summarizeCriticalPostgresFailure(result)}`,
@@ -275,6 +278,7 @@ export function runDisposableDatabaseLifecycle({
   repoRoot = path.resolve(import.meta.dirname, "../.."),
   runID = createDatabaseRunID(generatedAt),
   runtime,
+  onCriticalResult,
   workflow = "migration-smoke",
 }) {
   const workflowContract = validateDisposableWorkflow(profile, workflow);
@@ -284,7 +288,7 @@ export function runDisposableDatabaseLifecycle({
     runID,
   });
   const adminURL = replaceDatabaseName(baseDatabaseURL, "postgres");
-  const executor = runtime || defaultRuntime(repoRoot);
+  const executor = runtime || defaultRuntime(repoRoot, onCriticalResult);
   const stages = [];
   let created = false;
   let failure = "";
@@ -452,6 +456,7 @@ if (isDirectRun) {
   const cancellation = installDisposableDatabaseCancellationHandlers();
   try {
     const options = parseArgs(process.argv.slice(2));
+    const repoRoot = path.resolve(import.meta.dirname, "../..");
     const baseDatabaseURL = String(
       process.env[DISPOSABLE_DATABASE_BASE_URL_ENV] || "",
     );
@@ -459,19 +464,58 @@ if (isDirectRun) {
       throw new Error(`${DISPOSABLE_DATABASE_BASE_URL_ENV} is required`);
     }
     parseLoopbackDatabaseURL(baseDatabaseURL);
+    const repository =
+      options.workflow === "critical-postgres"
+        ? await readRepositoryIdentity(repoRoot)
+        : null;
+    let criticalOutput = "";
     const report = runDisposableDatabaseLifecycle({
       baseDatabaseURL,
       profile: options.profile,
+      repoRoot,
       runID: options.runID || undefined,
       workflow: options.workflow,
+      onCriticalResult: (output) => {
+        criticalOutput = output;
+      },
     });
     const defaultOut = path.join(
+      repoRoot,
       "output",
       "dev-workbench",
       "database",
       `${report.profile}-${report.databaseRunIdentity.split(":")[1]}.json`,
     );
-    const outPath = writeReport(options.out || defaultOut, report);
+    let evidence = report;
+    if (repository) {
+      // Preserve the original execution even if another writer prevents a
+      // stable final identity read; it can only be shown as historical evidence.
+      const repositoryAfter = await readRepositoryIdentity(repoRoot).catch(
+        () => null,
+      );
+      const json =
+        criticalOutput
+          .split(/\r?\n/u)
+          .filter((line) => line.startsWith("{"))
+          .join("\n") + "\n";
+      const testPath = defaultOut.replace(/\.json$/u, ".go.jsonl");
+      mkdirSync(path.dirname(testPath), { recursive: true });
+      writeFileSync(testPath, json, { mode: 0o600 });
+      evidence = {
+        ...report,
+        repository,
+        repositoryAfter,
+        finishedAt: new Date().toISOString(),
+        testReport: {
+          path: path.relative(repoRoot, testPath).split(path.sep).join("/"),
+          digest: createHash("sha256").update(json).digest("hex"),
+        },
+      };
+      // The canonical lifecycle and its original Go events stay together. A
+      // caller's optional report path is an additional receipt, not a registry.
+      writeReport(defaultOut, evidence);
+    }
+    const outPath = writeReport(options.out || defaultOut, evidence);
     process.stdout.write(
       `[disposable-database] status=${report.status} run=${report.databaseRunIdentity} cleanup=${report.cleanup.residualDatabase ? "failed" : "complete"} report=${path.relative(process.cwd(), outPath)}\n`,
     );

@@ -52,6 +52,23 @@ func IntegrationReceivable(t *testing.T, d *Data, client *ent.Client) *biz.Finan
 	return createPostedFinanceFactForCreditType(t, t.Context(), d, client, biz.FinanceFactReceivable)
 }
 
+func IntegrationSaleStock(t *testing.T, d *Data, client *ent.Client, unitID int) (int, int) {
+	t.Helper()
+	ctx := t.Context()
+	suffix := postgresTestSuffix()
+	product := createTestProduct(t, ctx, client, unitID, "SIM-P-"+suffix)
+	warehouse := createTestProductWarehouse(t, ctx, client, "SIM-FG-"+suffix)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(d, log.NewStdLogger(io.Discard)))
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: product.ID, WarehouseID: warehouse.ID,
+		UnitID: unitID, TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(10),
+		SourceType: "TEST_INTEGRATION_OPENING", IdempotencyKey: "sim-sale-opening-" + suffix,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return product.ID, warehouse.ID
+}
+
 func IntegrationPostedPayment(t *testing.T, d *Data, client *ent.Client, fact *biz.FinanceFact, actorID int) *biz.FinancePayment {
 	t.Helper()
 	suffix := postgresTestSuffix()

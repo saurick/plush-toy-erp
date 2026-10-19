@@ -264,9 +264,13 @@ func financeReceivableFromShipmentCreateFromParams(pm map[string]any) (*biz.Fina
 	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_no", "shipment_id", "idempotency_key", "note") {
 		return nil, false
 	}
+	shipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "shipment_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.FinanceFactFromShipmentCreate{
 		FactNo:         getString(pm, "fact_no"),
-		ShipmentID:     getInt(pm, "shipment_id", 0),
+		ShipmentID:     shipmentID,
 		IdempotencyKey: getString(pm, "idempotency_key"),
 		Note:           getWorkflowStringPtr(pm, "note"),
 	}, true

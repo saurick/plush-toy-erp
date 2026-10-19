@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -166,4 +171,76 @@ test("critical PostgreSQL failure summary rejects raw unstructured output", () =
     summarizeCriticalPostgresFailure({ signal: "SIGKILL" }),
     "process_signal=SIGKILL",
   );
+});
+
+test("critical CLI keeps canonical evidence in the checkout when invoked from server", async (t) => {
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "plush-database-cli-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "server"));
+  await mkdir(path.join(root, "scripts/qa/lib"), { recursive: true });
+  for (const file of [
+    "disposable-database-runner.mjs",
+    "database-target.mjs",
+    "database-inventory.mjs",
+    "lib/repository-identity.mjs",
+  ]) {
+    await copyFile(new URL(file, import.meta.url), path.join(root, "scripts/qa", file));
+  }
+  const bin = path.join(root, "bin");
+  await mkdir(bin);
+  // Only external commands are simulated; run the actual CLI, identity reader
+  // and artifact writer in an independent checkout-shaped directory.
+  const command = `#!${process.execPath}
+const fs = require('node:fs');
+const name = require('node:path').basename(process.argv[1]);
+const args = process.argv.slice(2);
+const state = process.env.TEST_DATABASE_STATE;
+if (name === 'git' && args.includes('rev-parse')) console.log('a'.repeat(40));
+if (name === 'psql') {
+  const sql = args.at(-1);
+  if (sql.startsWith('CREATE DATABASE')) fs.writeFileSync(state, 'created');
+  else if (sql.startsWith('DROP DATABASE')) fs.unlinkSync(state);
+  else console.log(fs.existsSync(state) ? '1' : '0');
+}
+if (name === 'atlas' && args.includes('status')) console.log(JSON.stringify({Current: '20261017094049'}));
+if (name === 'bash') {
+  for (const Action of ['run', process.env.TEST_CRITICAL_FAIL ? 'fail' : 'pass'])
+    console.log(JSON.stringify({Action, Package: 'server/internal/data', Test: 'TestSourceDocumentPostgresIntegrationSupplierDelivery'}));
+  process.exitCode = process.env.TEST_CRITICAL_FAIL ? 1 : 0;
+}
+`;
+  for (const name of ["git", "psql", "atlas", "bash"]) {
+    const file = path.join(bin, name);
+    await writeFile(file, command);
+    await chmod(file, 0o700);
+  }
+  for (const failed of [false, true]) {
+    const runID = failed ? "20261018_failure" : "20261018_success";
+    const execution = spawnSync(process.execPath, [
+      path.join(root, "scripts/qa/disposable-database-runner.mjs"),
+      "--profile", "ci", "--workflow", "critical-postgres", "--run-id", runID,
+      "--out", "extra-receipt.json",
+    ], {
+      cwd: path.join(root, "server"),
+      env: {
+        ...process.env, GIT_OPTIONAL_LOCKS: "0", PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+        DISPOSABLE_DATABASE_BASE_URL: BASE_URL,
+        TEST_DATABASE_STATE: path.join(root, "database-state"),
+        TEST_CRITICAL_FAIL: failed ? "1" : "",
+      },
+      encoding: "utf8", timeout: 20_000,
+    });
+    assert.equal(execution.status, failed ? 1 : 0, execution.stderr);
+    assert.match(execution.stdout, /\[disposable-database\] status=/u);
+    const relative = `output/dev-workbench/database/ci-${runID}.json`;
+    const report = JSON.parse(await readFile(path.join(root, relative), "utf8"));
+    assert.equal(report.status, failed ? "failed" : "passed");
+    assert.equal(report.cleanup.residualDatabase, "");
+    assert.equal(report.testReport.path, relative.replace(/\.json$/u, ".go.jsonl"));
+    const events = await readFile(path.join(root, report.testReport.path));
+    assert.equal(report.testReport.digest, createHash("sha256").update(events).digest("hex"));
+    assert.match(events.toString(), failed ? /"Action":"fail"/u : /"Action":"pass"/u);
+    assert.deepEqual(JSON.parse(await readFile(path.join(root, "server/extra-receipt.json"), "utf8")), report);
+    await assert.rejects(readFile(path.join(root, "server", relative)), { code: "ENOENT" });
+  }
 });

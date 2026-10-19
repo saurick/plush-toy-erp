@@ -227,6 +227,8 @@ node ../scripts/qa/verify-go-test-json.mjs \
   --require-prefix TestSourceDocumentPostgresIntegration
 ```
 
+CLI 的 `critical-postgres` 运行还会在仓库根的既有 `output/dev-workbench/database/` 保留原始 Go JSON 与同名生命周期回执；从 `server/` 调用的正式门禁使用相同落点，源码身份也取当前脚本所属仓库。回执绑定报告 digest、运行前后源码身份、完成时间及清理结果；工作台从这份原始证据投影场景结果。运行中工作区变化时只作为历史证据，不能补成当前通过。`--out` 可额外指定相对调用目录的生命周期回执位置，不改变工作台读取的 canonical 证据。
+
 该家族已由 `critical-postgres-tests.sh` 的 `TestSourceDocumentPostgres` 范围覆盖，无需新增独立 gate、接入台账、后台任务或执行入口。普通无数据库 `go test` 的 skip 不构成接入通过；专项结果只覆盖报告内的消费者与代码，不能补成全部 RPC、合作方身份、真实第三方联调或客户验收通过。页面只关联正式合同及既有门禁，不导入手工绿色状态。
 
 ## 全页面试用验收数据

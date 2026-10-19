@@ -114,8 +114,22 @@ func newIntegrationHTTP(t *testing.T) *integrationHTTPFixture {
 	configRepo := data.NewCustomerConfigRepo(db, logger)
 	customerConfig := biz.NewCustomerConfigUsecaseForWire(configRepo, adminRepo)
 	process := biz.NewProcessRuntimeUsecaseForWire(data.NewProcessRuntimeRepo(db, logger), workflowRepo, customerConfig)
-	input := biz.CustomerConfigPublishInput{CustomerKey: customerKey, Revision: "integration-fixture", ProductVersion: "product-v1", CompiledSnapshot: map[string]any{"customer": map[string]any{"key": customerKey}, "pages": []any{"global-dashboard"}}}
-	for _, key := range []string{"customers", "suppliers", "products", "materials", "sales_orders", "purchase_orders", "purchase_receipts", "quality_inspections", "inventory", "finance", "finance_payments", "workflow_tasks"} {
+	input := biz.CustomerConfigPublishInput{CustomerKey: customerKey, Revision: "integration-fixture", ProductVersion: "product-v1", CompiledSnapshot: map[string]any{
+		"customer": map[string]any{"key": customerKey}, "pages": []any{"global-dashboard"},
+		"manifest_schema_version":  biz.CustomerConfigManifestSchemaVersionCurrent,
+		"process_contract_version": biz.CustomerProcessContractVersionCurrent,
+		"manifest_status":          "runtime_compile_ready", "runtime_enabled": true, "publishable": true,
+		"runtimeProcessSelections": []any{
+			map[string]any{"process_key": biz.ProcessKeySalesOrderAcceptance, "process_version": "v1", "variant_key": biz.CustomerProcessVariantSalesApprovalPMC, "business_ref_type": "sales_order"},
+			map[string]any{"process_key": biz.ProcessKeyFinishedGoodsDelivery, "process_version": "v1", "variant_key": biz.CustomerProcessVariantShipmentFinanceApproval, "business_ref_type": "shipment"},
+		},
+		"approval_settings": map[string]any{"schema_version": biz.ApprovalSettingsSchemaVersion, "items": []any{
+			map[string]any{"approval_key": biz.ApprovalSettingSalesOrder, "enabled": true},
+			map[string]any{"approval_key": biz.ApprovalSettingPurchaseOrder, "enabled": false},
+			map[string]any{"approval_key": biz.ApprovalSettingShipmentFinance, "enabled": true},
+		}},
+	}}
+	for _, key := range []string{"customers", "suppliers", "products", "materials", "sales_orders", "purchase_orders", "purchase_receipts", "quality_inspections", "inventory", "finance", "finance_payments", "workflow_tasks", "shipments"} {
 		input.ModuleStates = append(input.ModuleStates, biz.DeploymentModuleStateInput{ModuleKey: key, ContractVersion: "v1", State: "enabled"})
 	}
 	for _, registered := range biz.BuiltinRoles() {
@@ -126,10 +140,22 @@ func newIntegrationHTTP(t *testing.T) *integrationHTTPFixture {
 		input.WorkPools = append(input.WorkPools, biz.WorkPoolInput{PoolKey: registered.Key, ModuleKey: "system", DisplayName: registered.Name})
 		input.WorkPoolMemberships = append(input.WorkPoolMemberships, biz.WorkPoolMembershipInput{PoolKey: registered.Key, RoleKey: registered.Key, Strategy: "role_pool", Enabled: true})
 	}
-	if _, err := configRepo.PublishCustomerConfig(t.Context(), input, "integration-fixture-hash", 1, time.Now()); err != nil {
+	for pool, roleKey := range map[string]string{"order_review": biz.PMCRoleKey, "shipment_finance_release": biz.FinanceRoleKey, "approval.sales_order": biz.BossRoleKey, "approval.shipment_finance": biz.FinanceRoleKey} {
+		module := "system"
+		if pool == "approval.sales_order" {
+			module = "sales_orders"
+		}
+		if pool == "approval.shipment_finance" {
+			module = "shipments"
+		}
+		input.WorkPools = append(input.WorkPools, biz.WorkPoolInput{PoolKey: pool, ModuleKey: module, DisplayName: pool})
+		input.WorkPoolMemberships = append(input.WorkPoolMemberships, biz.WorkPoolMembershipInput{PoolKey: pool, RoleKey: roleKey, Strategy: "primary", Priority: 100, Enabled: true})
+	}
+	revision, err := customerConfig.PublishCustomerConfig(t.Context(), input, 1)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := configRepo.ActivateCustomerConfig(t.Context(), customerKey, input.Revision, "integration-fixture-hash", input.ProductVersion, "", 1, time.Now()); err != nil {
+	if _, err := customerConfig.ActivateCustomerConfig(t.Context(), customerKey, input.Revision, revision.ConfigHash, input.ProductVersion, "", 1); err != nil {
 		t.Fatal(err)
 	}
 	sales := biz.NewSalesOrderUsecase(data.NewSalesOrderRepo(db, logger))
@@ -191,6 +217,33 @@ func requireIntegrationCode(t *testing.T, c *integrationRPC, domain, method stri
 		t.Fatalf("%s.%s code=%d want=%d message=%s", domain, method, reply.Result.Code, code, reply.Result.Message)
 	}
 	return reply
+}
+
+func concurrentIntegrationCalls(t *testing.T, c *integrationRPC, domain, method string, params map[string]any) []*v1.PostJsonrpcReply {
+	t.Helper()
+	start := make(chan struct{})
+	results := make([]*v1.PostJsonrpcReply, 2)
+	errors := make([]error, 2)
+	var wg sync.WaitGroup
+	for index := range results {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			results[index], errors[index] = c.call(t.Context(), domain, method, params)
+		}()
+	}
+	close(start)
+	wg.Wait()
+	for index, result := range results {
+		if errors[index] != nil {
+			t.Fatalf("%s.%s concurrent transport: %v", domain, method, errors[index])
+		}
+		if result == nil || result.Result == nil || result.GetResult().GetCode() != errcode.OK.Code {
+			t.Fatalf("%s.%s concurrent code=%d", domain, method, result.GetResult().GetCode())
+		}
+	}
+	return results
 }
 
 func integrationResult(t *testing.T, reply *v1.PostJsonrpcReply, key string) map[string]any {
@@ -270,27 +323,7 @@ func TestSourceDocumentPostgresIntegrationOrderConsumers(t *testing.T) {
 		bad[field] = "spoof"
 		requireIntegrationCode(t, caller, "sales_order", "cancel_sales_order", bad, errcode.InvalidParam.Code)
 	}
-	var wg sync.WaitGroup
-	results := make(chan *v1.PostJsonrpcReply, 2)
-	failures := make(chan error, 2)
-	for range 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			result, err := caller.call(ctx, "sales_order", "cancel_sales_order", intent)
-			results <- result
-			failures <- err
-		}()
-	}
-	wg.Wait()
-	for range 2 {
-		if err := <-failures; err != nil {
-			t.Fatal(err)
-		}
-		if result := <-results; result.Result.Code != 0 {
-			t.Fatalf("duplicate cancel rejected: %s", result.Result.Message)
-		}
-	}
+	concurrentIntegrationCalls(t, caller, "sales_order", "cancel_sales_order", intent)
 	requireIntegrationCode(t, caller, "sales_order", "cancel_sales_order", intent, errcode.OK.Code)
 	event := f.client.SourceOrderLifecycleEvent.Query().Where(sourceorderlifecycleevent.SourceType("sales_order"), sourceorderlifecycleevent.SourceID(order.ID)).OnlyX(ctx)
 	if event.ActorID != actorID || event.SourceVersion != order.Version+1 {
@@ -326,14 +359,18 @@ func TestSourceDocumentPostgresIntegrationOrderConsumers(t *testing.T) {
 
 func TestSourceDocumentPostgresIntegrationSupplierDelivery(t *testing.T) {
 	f := newIntegrationHTTP(t)
-	caller, _ := f.actor(t, biz.WarehouseRoleKey, biz.PurchaseRoleKey)
+	caller, _ := f.actor(t, biz.WarehouseRoleKey)
 	line, warehouseID := data.IntegrationPurchaseLine(t, f.client)
 	for _, value := range []any{float64(line.PurchaseOrderID) + .25, fmt.Sprint(line.PurchaseOrderID), true} {
 		requireIntegrationCode(t, caller, "purchase_order", "get_purchase_order", map[string]any{"id": value}, errcode.InvalidParam.Code)
 	}
 	request := map[string]any{"purchase_order_id": line.PurchaseOrderID, "receipt_no": "SIM-ASN-" + uuid.NewString(), "idempotency_key": "sim-asn-" + uuid.NewString(), "received_at": "2026-10-18T09:00:00+08:00", "items": []any{map[string]any{"purchase_order_item_id": line.ID, "warehouse_id": warehouseID, "quantity": "3", "declared_quantity": "4", "lot_no": "SIM-LOT"}}}
-	created := requireIntegrationCode(t, caller, "purchase", "create_purchase_receipt_from_purchase_order", request, errcode.OK.Code)
+	createdPair := concurrentIntegrationCalls(t, caller, "purchase", "create_purchase_receipt_from_purchase_order", request)
+	created := createdPair[0]
 	receipt := integrationResult(t, created, "purchase_receipt")
+	if integrationResult(t, createdPair[1], "purchase_receipt")["id"] != receipt["id"] {
+		t.Fatal("concurrent delivery created different receipt identities")
+	}
 	items := receipt["items"].([]any)
 	item := items[0].(map[string]any)
 	if item["quantity"] != "3" || item["declared_quantity"] != "4" {
@@ -365,6 +402,43 @@ func TestSourceDocumentPostgresIntegrationSupplierDelivery(t *testing.T) {
 	if f.client.PurchaseReceipt.Query().Where(purchasereceipt.IdempotencyKey(changed["idempotency_key"].(string))).CountX(t.Context()) != 0 {
 		t.Fatal("over-delivery left a partial receipt")
 	}
+	quality, _ := f.actor(t, biz.QualityRoleKey)
+	inspections := receipt["quality_inspections"].([]any)
+	if len(inspections) != 1 {
+		t.Fatal("arrival must create one canonical incoming inspection")
+	}
+	inspection := inspections[0].(map[string]any)
+	requireIntegrationCode(t, caller, "quality", "pass_quality_inspection", map[string]any{"id": inspection["id"], "result": biz.QualityInspectionResultPass}, errcode.PermissionDenied.Code)
+	decision := map[string]any{
+		"id": inspection["id"], "result": biz.QualityInspectionResultPass, "decision_note": "模拟到货检验合格",
+		"defect_rate_operator": "approx", "defect_rate_percent": "0",
+		"check_items": []any{map[string]any{"name": "外观", "requirement": "符合样品", "observation": "模拟逐件检验符合约定", "result": "PASS", "scope": "FULL"}},
+	}
+	for _, bad := range []any{inspection["id"].(float64) + .5, fmt.Sprint(inspection["id"]), true, nil} {
+		decision["id"] = bad
+		requireIntegrationCode(t, quality, "quality", "pass_quality_inspection", decision, errcode.InvalidParam.Code)
+	}
+	decision["id"] = inspection["id"]
+	concurrentIntegrationCalls(t, quality, "quality", "pass_quality_inspection", decision)
+	for _, bad := range []any{receipt["id"].(float64) + .5, fmt.Sprint(receipt["id"]), true, nil} {
+		requireIntegrationCode(t, caller, "purchase", "post_purchase_receipt", map[string]any{"id": bad}, errcode.InvalidParam.Code)
+	}
+	concurrentIntegrationCalls(t, caller, "purchase", "post_purchase_receipt", map[string]any{"id": receipt["id"]})
+	storedItem := f.client.PurchaseReceiptItem.GetX(t.Context(), int(item["id"].(float64)))
+	balance := f.client.InventoryBalance.Query().Where(inventorybalance.SubjectType(biz.InventorySubjectMaterial), inventorybalance.SubjectID(storedItem.MaterialID), inventorybalance.WarehouseID(warehouseID)).OnlyX(t.Context())
+	if !balance.Quantity.Equal(decimal.NewFromInt(3)) || f.client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.PurchaseReceiptSourceType), inventorytxn.SourceID(int(receipt["id"].(float64)))).CountX(t.Context()) != 1 {
+		t.Fatal("accepted arrival did not post exactly the counted quantity once")
+	}
+	readBack := integrationResult(t, requireIntegrationCode(t, caller, "purchase", "get_purchase_receipt", map[string]any{"id": receipt["id"]}, errcode.OK.Code), "purchase_receipt")
+	if readBack["status"] != biz.PurchaseReceiptStatusPosted || readBack["items"].([]any)[0].(map[string]any)["declared_quantity"] != "4" {
+		t.Fatal("posted receipt lost its source or declaration")
+	}
+	// Current authorization is checked even when the business result already exists.
+	warehouseRole := f.client.Role.Query().Where(role.RoleKey(biz.WarehouseRoleKey)).OnlyX(t.Context())
+	f.client.RoleDataScope.Update().Where(roledatascope.RoleID(warehouseRole.ID), roledatascope.ResourceType("warehouse")).SetMode("NONE").SetResourceIds([]int{}).ExecX(t.Context())
+	requireIntegrationCode(t, caller, "purchase", "create_purchase_receipt_from_purchase_order", request, errcode.PermissionDenied.Code)
+	requireIntegrationCode(t, caller, "purchase", "post_purchase_receipt", map[string]any{"id": receipt["id"]}, errcode.PermissionDenied.Code)
+	requireIntegrationCode(t, caller, "purchase", "get_purchase_receipt", map[string]any{"id": receipt["id"]}, errcode.PermissionDenied.Code)
 }
 
 func TestSourceDocumentPostgresIntegrationDraftDataCorrection(t *testing.T) {
@@ -372,7 +446,8 @@ func TestSourceDocumentPostgresIntegrationDraftDataCorrection(t *testing.T) {
 	caller, _ := f.actor(t, biz.SalesRoleKey)
 	customer := f.client.Customer.Create().SetCode("SIM-CHECK-" + uuid.NewString()).SetName("模拟订单校对客户").SaveX(t.Context())
 	unit := f.client.Unit.Create().SetCode("SIMU" + uuid.NewString()[:8]).SetName("个").SetPrecision(0).SaveX(t.Context())
-	line := map[string]any{"line_no": 1, "requested_product_name": "模拟毛绒兔", "unit_id": unit.ID, "ordered_quantity": "10", "unit_price": "1.23", "amount": "12.30"}
+	productID, warehouseID := data.IntegrationSaleStock(t, f.db, f.client, unit.ID)
+	line := map[string]any{"line_no": 1, "product_id": productID, "requested_product_name": "模拟毛绒兔", "unit_id": unit.ID, "ordered_quantity": "10", "unit_price": "1.23", "amount": "12.30"}
 	request := map[string]any{"order_no": "SIM-WEB-" + uuid.NewString(), "customer_id": customer.ID, "customer_order_no": "SIM-UPSTREAM-19", "order_date": "2026-10-18T09:00:00+08:00", "currency": "CNY", "payment_term_days": 30, "tax_mode": biz.SalesOrderTaxModeNone, "freight_terms": biz.SalesOrderFreightTermsExcluded, "quoted_freight_amount": "0", "note": "待校对颜色", "items": []any{line}}
 	created := requireIntegrationCode(t, caller, "sales_order", "save_sales_order_with_items", request, errcode.OK.Code)
 	order := integrationResult(t, created, "sales_order")
@@ -401,6 +476,7 @@ func TestSourceDocumentPostgresIntegrationDraftDataCorrection(t *testing.T) {
 	if f.client.SalesOrder.GetX(t.Context(), int(order["id"].(float64))).Version != int(next["version"].(float64)) {
 		t.Fatal("invalid adapter payload changed the draft")
 	}
+	integrationDownstreamFulfillment(t, f, caller, next, items[0].(map[string]any), productID, unit.ID, warehouseID)
 }
 
 func TestSourceDocumentPostgresIntegrationWarehouseTransfer(t *testing.T) {

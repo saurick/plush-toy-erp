@@ -830,9 +830,15 @@ func requiredProcessSourceRefNo(value string) (*string, error) {
 }
 
 func salesOrderAcceptanceProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
-	salesOrderID := getInt(pm, "sales_order_id", 0)
+	salesOrderID, valid := getOptionalJSONRPCID(pm, "sales_order_id")
+	if !valid {
+		return biz.ProcessInstanceFromCustomerConfigInput{}, false
+	}
 	if salesOrderID <= 0 {
-		salesOrderID = getInt(pm, "business_ref_id", 0)
+		salesOrderID, valid = getRequiredJSONRPCPositiveInt(pm, "business_ref_id")
+		if !valid {
+			return biz.ProcessInstanceFromCustomerConfigInput{}, false
+		}
 	}
 	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
 	if salesOrderID <= 0 || idempotencyKey == "" {
@@ -850,10 +856,13 @@ func salesOrderAcceptanceProcessInputFromParams(pm map[string]any) (biz.ProcessI
 }
 
 func salesOrderAcceptanceSubmitExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
-	processInstanceID := getInt(pm, "process_instance_id", 0)
-	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
-	expectedVersion := getInt(pm, "expected_version", 0)
-	salesOrderID := getInt(pm, "sales_order_id", 0)
+	processInstanceID, instanceOK := getRequiredJSONRPCPositiveInt(pm, "process_instance_id")
+	processNodeInstanceID, nodeOK := getRequiredJSONRPCPositiveInt(pm, "process_node_instance_id")
+	expectedVersion, versionOK := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+	salesOrderID, orderOK := getRequiredJSONRPCPositiveInt(pm, "sales_order_id")
+	if !instanceOK || !nodeOK || !versionOK || !orderOK {
+		return nil, false
+	}
 	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
 	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || salesOrderID <= 0 || idempotencyKey == "" {
 		return nil, false
@@ -912,9 +921,15 @@ func materialSupplyPurchaseOrderSubmitExecutionFromParams(pm map[string]any) (*b
 }
 
 func finishedGoodsDeliveryProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
-	shipmentID := getInt(pm, "shipment_id", 0)
+	shipmentID, valid := getOptionalJSONRPCID(pm, "shipment_id")
+	if !valid {
+		return biz.ProcessInstanceFromCustomerConfigInput{}, false
+	}
 	if shipmentID <= 0 {
-		shipmentID = getInt(pm, "business_ref_id", 0)
+		shipmentID, valid = getRequiredJSONRPCPositiveInt(pm, "business_ref_id")
+		if !valid {
+			return biz.ProcessInstanceFromCustomerConfigInput{}, false
+		}
 	}
 	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
 	if shipmentID <= 0 || idempotencyKey == "" {

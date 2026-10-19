@@ -328,6 +328,10 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 	) {
 		return nil, false
 	}
+	inspectionID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+	if !ok {
+		return nil, false
+	}
 	inspectedAt, ok := getOptionalJSONRPCTime(pm, "inspected_at")
 	if !ok {
 		return nil, false
@@ -342,7 +346,7 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 	}
 	return &biz.QualityInspectionDecision{
 		CheckItems:         checkItems,
-		InspectionID:       getInt(pm, "id", 0),
+		InspectionID:       inspectionID,
 		Result:             getString(pm, "result"),
 		InspectedAt:        optionalTimeValue(inspectedAt),
 		InspectorID:        getOptionalInt(pm, "inspector_id"),
