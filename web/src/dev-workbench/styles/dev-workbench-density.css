@@ -159,10 +159,6 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   font-size: var(--erp-font-small);
 }
 
-.erp-dev-workspace-nav__route span {
-  font-weight: 600;
-}
-
 .erp-dev-workspace-nav__secondary-route {
   font-size: var(--erp-font-small);
   line-height: 20px;

@@ -7,6 +7,44 @@ import { installPermissionRelationshipMock } from './permissionRelationshipScena
 import { assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 
+async function assertSidebarSelection(page, assert) {
+  const selection = await page.locator('.erp-dev-workspace-nav').evaluate(async (nav) => {
+    const current = nav.querySelector('[aria-current="page"]')
+    await Promise.all(current.getAnimations().map((animation) => animation.finished.catch(() => {})))
+    const idle = nav.querySelector('a:not([aria-current])')
+    const style = getComputedStyle(current)
+    const idleStyle = getComputedStyle(idle)
+    const label = current.querySelector(':scope > span:last-child') || current
+    return {
+      count: nav.querySelectorAll('[aria-current="page"]').length,
+      label: current.textContent.trim(),
+      distinct:
+        style.backgroundColor !== idleStyle.backgroundColor &&
+        style.color !== idleStyle.color,
+      visibleBorder: ['Top', 'Right', 'Bottom', 'Left'].some(
+        (side) =>
+          parseFloat(style[`border${side}Width`]) > 0 &&
+          style[`border${side}Style`] !== 'none' &&
+          style[`border${side}Color`] !== 'rgba(0, 0, 0, 0)'
+      ),
+      appearance: {
+        background: style.backgroundColor,
+        color: style.color,
+        radius: style.borderRadius,
+        shadow: style.boxShadow,
+        weight: getComputedStyle(label).fontWeight,
+      },
+    }
+  })
+  assert.equal(selection.count, 1, '侧栏应只标记一个当前页面')
+  assert(selection.distinct, `${selection.label}应以主题浅底和文字突出`)
+  assert.equal(selection.visibleBorder, false, '侧栏选中项不应有描边')
+  assert.equal(selection.appearance.shadow, 'none', '侧栏选中项不应有底部粗线')
+  assert.equal(selection.appearance.radius, '8px', '侧栏沿用电脑版圆角')
+  assert.equal(selection.appearance.weight, '650', '侧栏沿用电脑版选中文字字重')
+  return selection
+}
+
 export function createDevWorkbenchDensityScenarios({
   assert,
   assertNoHorizontalOverflow,
@@ -14,6 +52,43 @@ export function createDevWorkbenchDensityScenarios({
   path,
 }) {
   return [
+    {
+      name: 'dev-workbench-sidebar-selection-desktop-light',
+      path: '/__dev/product-engineering',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const nav = page.locator('.erp-dev-workspace-nav')
+        const primary = nav.getByRole('link', { name: '产品工程', exact: true })
+        const secondary = nav.getByRole('link', { name: '产品内核', exact: true })
+        await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
+        const initial = await assertSidebarSelection(page, assert)
+        assert.equal(initial.label, '产品工程')
+        const originalBox = await secondary.boundingBox()
+        await secondary.click()
+        await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
+        const selected = await assertSidebarSelection(page, assert)
+        assert.equal(selected.label, '产品内核')
+        assert.deepEqual(selected.appearance, initial.appearance, '两级侧栏共用选中外观')
+        assert.deepEqual(await secondary.boundingBox(), originalBox, '切换不改变菜单位置或尺寸')
+        await secondary.press('Shift+Tab')
+        const focus = await primary.evaluate((element) => ({
+          visible: element.matches(':focus-visible'),
+          outline: getComputedStyle(element).outlineWidth,
+        }))
+        assert(focus.visible && focus.outline === '2px', '键盘聚焦仍有清晰边框')
+        await primary.press('Enter')
+        await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
+        assert.equal((await assertSidebarSelection(page, assert)).label, '产品工程')
+        await page.goBack()
+        await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
+        assert.equal((await assertSidebarSelection(page, assert)).label, '产品内核')
+        await page.reload()
+        await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
+        await assertSidebarSelection(page, assert)
+        await assertNoHorizontalOverflow(page, '效能工作台侧栏选中样式')
+      },
+    },
     {
       name: 'dev-workbench-density-desktop-light',
       path: '/__dev',
@@ -70,7 +145,6 @@ export function createDevWorkbenchDensityScenarios({
                     )
                   })()
                 : true,
-              currentRouteMarker: currentStyle?.boxShadow.includes('inset'),
               currentRouteColor: currentStyle?.color,
               currentRouteBackground: currentStyle?.backgroundColor,
               gap: content.getBoundingClientRect().top - headerBox.bottom,
@@ -128,10 +202,8 @@ export function createDevWorkbenchDensityScenarios({
           )
           assert(geometry.themedHeader, `${label}页头应有主题浅底层次`)
           if (geometry.hasExactRoute) {
-            assert(
-              geometry.currentRouteMarker && geometry.currentRouteDistinct,
-              `${label}当前导航应有主题色与位置标记`
-            )
+            assert(geometry.currentRouteDistinct, `${label}当前导航应有主题浅底和文字强调`)
+            await assertSidebarSelection(page, assert)
           }
           const headerControls = {
             '/__dev': '.erp-dev-overview-library__toolbar',
