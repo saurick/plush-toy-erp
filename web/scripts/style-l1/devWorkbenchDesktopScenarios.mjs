@@ -390,19 +390,22 @@ export function createDevWorkbenchDesktopScenarios({
         const evidenceTabs = coverage.getByRole('tablist', {
           name: '覆盖证据类型',
         })
-        assert.equal(await evidenceTabs.getByRole('tab').count(), 4)
-        assert.match(
-          await evidenceTabs.getByRole('tab').nth(0).innerText(),
-          /失败/
-        )
-        assert.match(
-          await evidenceTabs.getByRole('tab').nth(1).innerText(),
-          /失败/
-        )
-        assert.match(
-          await evidenceTabs.getByRole('tab').nth(3).innerText(),
-          /部分覆盖/
-        )
+        const evidenceTab = (label) => evidenceTabs.getByRole('tab', {
+          name: new RegExp(`^${label}`, 'u'),
+        })
+        const labels = ['代码覆盖', '业务场景', '关键规则', '验证门禁', '运行与验收']
+        assert.equal(await evidenceTabs.getByRole('tab').count(), labels.length)
+        for (const label of labels) assert.equal(await evidenceTab(label).count(), 1)
+        assert.match(await evidenceTab('代码覆盖').innerText(), /失败/u)
+        assert.match(await evidenceTab('业务场景').innerText(), /失败/u)
+        assert.match(await evidenceTab('运行与验收').innerText(), /部分覆盖/u)
+        const switchEvidence = async (label, reduced = false) => {
+          const text = await evidenceTabs.getByRole('tab').allTextContents()
+          const index = text.findIndex((value) => value.trim().startsWith(label))
+          assert(index >= 0, `缺少证据页签：${label}`)
+          await verifySlidingMotion(page, assert, '.erp-dev-testing-coverage-tabs', index, reduced)
+          assert.equal(await evidenceTab(label).getAttribute('aria-selected'), 'true')
+        }
         assert.equal(
           await coverage.locator('.erp-dev-testing-coverage-section').count(),
           1
@@ -432,12 +435,7 @@ export function createDevWorkbenchDesktopScenarios({
           .getByText('隔离源码快照', { exact: true })
           .waitFor({ state: 'visible' })
         const readsBeforeTabs = { workspaceReads, snapshotReads }
-        await verifySlidingMotion(
-          page,
-          assert,
-          '.erp-dev-testing-coverage-tabs',
-          1
-        )
+        await switchEvidence('业务场景')
         assert.equal(
           new URL(page.url()).searchParams.get('coverage'),
           'business'
@@ -477,22 +475,14 @@ export function createDevWorkbenchDesktopScenarios({
           )
           .waitFor({ state: 'visible' })
         await assertNoHorizontalOverflow(page, '覆盖报告长场景名')
-        await verifySlidingMotion(
-          page,
-          assert,
-          '.erp-dev-testing-coverage-tabs',
-          2,
-          true
-        )
+        await switchEvidence('关键规则', true)
+        await coverage.getByRole('region', { name: '关键规则与发布门禁', exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('coverage'), 'rules')
+        await switchEvidence('验证门禁', true)
         await coverage
           .getByText('本轮 T0-T8 门禁 / Required Gates', { exact: true })
           .waitFor()
-        await verifySlidingMotion(
-          page,
-          assert,
-          '.erp-dev-testing-coverage-tabs',
-          3
-        )
+        await switchEvidence('运行与验收')
         assert((await coverage.innerText()).includes('RPC 夹具只证明页面协作'))
         await page.goBack()
         await coverage
@@ -503,10 +493,10 @@ export function createDevWorkbenchDesktopScenarios({
         await coverage
           .getByText('运行态与验收 / Runtime & Acceptance', { exact: true })
           .waitFor()
-        await evidenceTabs.getByRole('tab').nth(3).press('Home')
+        await evidenceTab('运行与验收').press('Home')
         await coverage.getByText('文件监听资源不足', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.has('coverage'), false)
-        await evidenceTabs.getByRole('tab').nth(0).press('ArrowRight')
+        await evidenceTab('代码覆盖').press('ArrowRight')
         await business.waitFor()
         assert.deepEqual(
           { workspaceReads, snapshotReads },
@@ -541,11 +531,11 @@ export function createDevWorkbenchDesktopScenarios({
         await coverage
           .getByText('按供应商生成采购结果', { exact: true })
           .waitFor()
-        await evidenceTabs.getByRole('tab').nth(1).press('End')
+        await evidenceTab('业务场景').press('End')
         await coverage
           .getByText('运行态与验收 / Runtime & Acceptance', { exact: true })
           .waitFor()
-        await assertNoHorizontalOverflow(page, '覆盖证据四类标签与业务域详情')
+        await assertNoHorizontalOverflow(page, '覆盖证据五类标签与业务域详情')
         const finalBox = await source.boundingBox()
         assert(
           Math.abs(initialBox.x - finalBox.x) < 1 &&

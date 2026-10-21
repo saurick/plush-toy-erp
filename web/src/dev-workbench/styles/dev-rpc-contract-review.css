@@ -5,12 +5,21 @@
 }
 .erp-dev-rpc-review__toolbar,
 .erp-dev-rpc-review__section-head,
+.erp-dev-rpc-review__summary,
 .erp-dev-rpc-review__identity {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
+}
+.erp-dev-rpc-review__summary {
+  justify-content: flex-start;
+  gap: 8px 16px;
+}
+.erp-dev-rpc-review__summary > span {
+  color: var(--erp-text-muted);
+  font-size: 12px;
 }
 .erp-dev-rpc-review__toolbar label {
   display: flex;
@@ -25,6 +34,9 @@
   font-size: 12px;
   justify-content: flex-start;
   gap: 16px;
+}
+.erp-dev-rpc-review__summary .erp-dev-rpc-review__identity {
+  margin-left: auto;
 }
 .erp-dev-rpc-review__workspace {
   display: grid;
@@ -94,13 +106,7 @@
   justify-self: start;
   font-size: 12px;
 }
-.erp-dev-rpc-review__tabs {
-  display: flex;
-  gap: 20px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--erp-border);
-}
-.erp-dev-rpc-review #rpc-review-detail {
+.erp-dev-rpc-review__diff {
   min-width: 0;
   padding: 14px;
 }
@@ -137,36 +143,49 @@
   background: var(--erp-surface-bg);
 }
 .erp-dev-rpc-review__checks > section {
-  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.65fr) 110px minmax(0, 2fr);
+  align-items: baseline;
+  gap: 6px 12px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--erp-border);
 }
 .erp-dev-rpc-review__checks > section:last-child {
   border-bottom: 0;
 }
-.erp-dev-rpc-review__checks > section > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.erp-dev-rpc-review__checks .ant-tag {
+  justify-self: start;
+  margin: 0;
 }
 .erp-dev-rpc-review__checks p {
   font-size: 12px;
-  margin: 5px 0 0;
+  color: var(--erp-text-muted);
+  margin: 0;
 }
 .erp-dev-rpc-review__checks ul {
-  margin: 8px 0 0;
+  grid-column: 1 / -1;
+  margin: 0;
   padding-left: 20px;
 }
 .erp-dev-rpc-review__examples {
   min-width: 0;
   display: grid;
   gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
 }
 .erp-dev-rpc-review__examples > p {
   margin: 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
 }
 .erp-dev-rpc-review__examples .erp-dev-rpc-review__section-head {
   padding: 0;
+}
+.erp-dev-rpc-review__examples details {
+  margin: 0;
 }
 .erp-dev-rpc-review__case-list {
   display: flex;
@@ -180,5 +199,16 @@
 @media (width <= 1100px) {
   .erp-dev-rpc-review__workspace {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (width <= 720px) {
+  .erp-dev-rpc-review__checks > section {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .erp-dev-rpc-review__checks p {
+    grid-column: 1 / -1;
+  }
+  .erp-dev-rpc-review__summary .erp-dev-rpc-review__identity {
+    margin-left: 0;
   }
 }

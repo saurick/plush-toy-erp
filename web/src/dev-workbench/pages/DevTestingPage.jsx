@@ -33,7 +33,6 @@ import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
-import DevRPCContractReview from '../components/DevRPCContractReview.jsx'
 import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
@@ -63,6 +62,7 @@ import {
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_DELIVERY_ROUTE,
   DEV_DOCS_ROUTE,
+  DEV_INTEGRATION_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
 } from '../config/devRoutes.mjs'
 import {
@@ -78,13 +78,12 @@ import {
   DEV_TESTING_GIT_HOOK_PATH_COMMAND,
   DEV_TESTING_FIXED_ACTIONS,
   DEV_TESTING_PREPARE_PUSH_COMMAND,
-  createDevTestingIdempotencyKey,
-  createDevTestingOperationClient,
   getDevTestingGitHookStatusMeta,
   getDevTestingOperationPresentation,
   isDevTestingOperationActive,
 } from '../config/devTestingOperation.mjs'
 import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
+import useDevTestingOperations, { EMPTY_TESTING_OPERATIONS } from '../hooks/useDevTestingOperations.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -93,14 +92,12 @@ const VIEW_COMMANDS = 'commands'
 const VIEW_CLOSEOUT = 'closeout'
 const VIEW_COVERAGE = 'coverage'
 const VIEW_PRESSURE = 'pressure'
-const VIEW_CONTRACTS = 'contracts'
 const VIEW_QUERY_KEY = 'view'
 const DOCUMENT_ROLE_QUERY_KEY = 'role'
 const COMMAND_QUERY_KEY = 'q'
 
 const VIEW_OPTIONS = [
   { label: '本轮验证', value: VIEW_TIERS },
-  { label: '接口合同', value: VIEW_CONTRACTS },
   { label: '证据与覆盖', value: VIEW_COVERAGE },
   { label: '压力测试', value: VIEW_PRESSURE },
 ]
@@ -111,14 +108,6 @@ const VIEW_VALUES = new Set([
 ])
 
 const COPY_MESSAGE_KEY = 'dev-testing-command-copy'
-const EMPTY_TESTING_OPERATIONS = Object.freeze({
-  fast: null,
-  'role-access': null,
-  'field-linkage': null,
-  'rpc-examples': null,
-  'pressure-quick': null,
-  'pressure-capacity': null,
-})
 
 const markdownModules = import.meta.glob(
   [
@@ -1009,8 +998,10 @@ function ValidationActionRow({ action, operation, disabled, starting, onRun }) {
         <Tag color={action.priority === 'P0' ? 'blue' : 'default'}>
           {action.priority === 'P0' ? '优先' : '按需'}
         </Tag>
-        <Tag color={tagColor}>{presentation.label}</Tag>
-        {operation?.message ? <p role="status">{operation.message}</p> : null}
+        <Tag color={tagColor}>{action.key === 'rpc-examples' && operation
+          ? `最近执行 · ${presentation.label}` : presentation.label}
+        </Tag>
+        {operation?.message && action.key !== 'rpc-examples' ? <p role="status">{operation.message}</p> : null}
       </td>
       <td>
         <details className="erp-dev-testing-validation-row__details">
@@ -1035,15 +1026,19 @@ function ValidationActionRow({ action, operation, disabled, starting, onRun }) {
         </details>
       </td>
       <td>
-        <Button
-          icon={<PlayCircleOutlined />}
-          loading={starting || presentation.active}
-          disabled={disabled || presentation.active}
-          aria-label={action.label}
-          onClick={() => onRun(action.key)}
-        >
-          {presentation.active ? '运行中…' : '运行检查'}
-        </Button>
+        {action.key === 'rpc-examples' ? (
+          <Link to={`${DEV_INTEGRATION_ROUTE}?view=changes`}>查看并运行</Link>
+        ) : (
+          <Button
+            icon={<PlayCircleOutlined />}
+            loading={starting || presentation.active}
+            disabled={disabled || presentation.active}
+            aria-label={action.label}
+            onClick={() => onRun(action.key)}
+          >
+            {presentation.active ? '运行中…' : '运行检查'}
+          </Button>
+        )}
       </td>
     </tr>
   )
@@ -1519,20 +1514,13 @@ function CoverageReportView({
 export default function DevTestingPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const testingSummaryRequestSequence = React.useRef(0)
-  const testingIdempotencyKeys = React.useRef({})
-  const handledTestingTerminals = React.useRef(new Set())
   const coverageRequestSequence = React.useRef(0)
   const coverageStartInFlight = React.useRef(false)
   const coverageIdempotencyKey = React.useRef('')
   const handledCoverageTerminal = React.useRef('')
-  const [testingSummaryReloadKey, setTestingSummaryReloadKey] = useState(0)
-  const [testingSummary, setTestingSummary] = useState(null)
-  const [testingSummaryError, setTestingSummaryError] = useState('')
   const [testingPlan, setTestingPlan] = useState(null)
   const [testingPlanLoading, setTestingPlanLoading] = useState(false)
   const [testingPlanError, setTestingPlanError] = useState('')
-  const [testingActionStarting, setTestingActionStarting] = useState('')
   const [coverageReloadKey, setCoverageReloadKey] = useState(0)
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageState, setCoverageState] = useState(null)
@@ -1545,10 +1533,16 @@ export default function DevTestingPage() {
     () => createDevCoverageOperationClient(),
     []
   )
-  const testingOperationClient = useMemo(
-    () => createDevTestingOperationClient(),
-    []
-  )
+  const {
+    testingOperationClient,
+    testingSummary,
+    testingSummaryError,
+    testingBusy,
+    testingHasActive,
+    testingActionStarting,
+    reloadTestingSummary,
+    runTestingAction: startTestingAction,
+  } = useDevTestingOperations()
   const docs = useMemo(() => buildDevTestingDocs(markdownModules), [])
   const strategySource =
     docs.find((item) => item.path === DEV_TESTING_STRATEGY_SOURCE_PATH)
@@ -1609,126 +1603,6 @@ export default function DevTestingPage() {
   const coverageOperationId = coverageOperation?.id || ''
   const coverageOperationIsActive =
     isDevCoverageOperationActive(coverageOperation)
-  const testingOperations =
-    testingSummary?.operations || EMPTY_TESTING_OPERATIONS
-  const testingActiveOperations = Object.values(testingOperations).filter(
-    isDevTestingOperationActive
-  )
-  const testingActiveOperationIds = testingActiveOperations
-    .map((operation) => operation.id)
-    .sort()
-    .join(',')
-  const testingHasActive = testingActiveOperations.length > 0
-  const testingBusy = testingSummary?.busy || {
-    active: false,
-    kind: '',
-    profile: '',
-  }
-
-  React.useEffect(() => {
-    const controller = new AbortController()
-    const requestSequence = testingSummaryRequestSequence.current + 1
-    testingSummaryRequestSequence.current = requestSequence
-
-    const loadTestingSummary = async () => {
-      try {
-        const nextSummary = await testingOperationClient.summary({
-          signal: controller.signal,
-        })
-        if (
-          controller.signal.aborted ||
-          requestSequence !== testingSummaryRequestSequence.current
-        ) {
-          return
-        }
-        setTestingSummary(nextSummary)
-        setTestingSummaryError('')
-      } catch (_error) {
-        if (
-          controller.signal.aborted ||
-          requestSequence !== testingSummaryRequestSequence.current
-        ) {
-          return
-        }
-        setTestingSummaryError('固定验证状态读取失败，请检查本地开发服务。')
-      }
-    }
-
-    loadTestingSummary()
-    return () => controller.abort()
-  }, [testingOperationClient, testingSummaryReloadKey])
-
-  const handleTestingTerminal = React.useCallback((operation) => {
-    if (!operation || isDevTestingOperationActive(operation)) return
-    const terminalKey = `${operation.id}:${operation.revision}`
-    if (handledTestingTerminals.current.has(terminalKey)) return
-    handledTestingTerminals.current.add(terminalKey)
-    delete testingIdempotencyKeys.current[operation.action]
-    setTestingSummaryReloadKey((current) => current + 1)
-    const toastKey = `dev-testing-${operation.action}`
-    if (operation.status === 'completed') {
-      message.success({ content: operation.message, key: toastKey })
-    } else if (operation.status === 'failed') {
-      message.error({ content: operation.message, key: toastKey })
-    } else {
-      message.warning({ content: operation.message, key: toastKey })
-    }
-  }, [])
-
-  React.useEffect(() => {
-    if (!testingActiveOperationIds) return undefined
-    const operationIds = testingActiveOperationIds.split(',')
-    const controller = new AbortController()
-    let timer = null
-
-    const poll = async () => {
-      try {
-        const nextOperations = await Promise.all(
-          operationIds.map((operationId) =>
-            testingOperationClient.read(operationId, {
-              signal: controller.signal,
-            })
-          )
-        )
-        if (controller.signal.aborted) return
-        setTestingSummary((current) => {
-          if (!current) return current
-          const operations = { ...current.operations }
-          for (const operation of nextOperations) {
-            const previous = operations[operation.action]
-            if (
-              !previous ||
-              previous.id !== operation.id ||
-              previous.revision <= operation.revision
-            ) {
-              operations[operation.action] = operation
-            }
-          }
-          return { ...current, operations }
-        })
-        setTestingSummaryError('')
-        for (const operation of nextOperations) {
-          handleTestingTerminal(operation)
-        }
-        if (nextOperations.some(isDevTestingOperationActive)) {
-          timer = window.setTimeout(poll, 1200)
-        }
-      } catch (_error) {
-        if (controller.signal.aborted) return
-        setTestingSummaryError(
-          '固定验证进度读取暂时失败，后台任务可能仍在执行。'
-        )
-        timer = window.setTimeout(poll, 1800)
-      }
-    }
-
-    timer = window.setTimeout(poll, 800)
-    return () => {
-      controller.abort()
-      if (timer !== null) window.clearTimeout(timer)
-    }
-  }, [handleTestingTerminal, testingActiveOperationIds, testingOperationClient])
-
   React.useEffect(() => {
     if (!isCoverageView) return undefined
 
@@ -1829,7 +1703,7 @@ export default function DevTestingPage() {
     handledCoverageTerminal.current = terminalKey
     coverageIdempotencyKey.current = ''
     setCoverageReloadKey((current) => current + 1)
-    setTestingSummaryReloadKey((current) => current + 1)
+    reloadTestingSummary()
     if (operation.status === 'completed' && operation.outcome === 'passed') {
       message.success({ content: operation.message, key: 'coverage-collect' })
     } else if (operation.status === 'completed') {
@@ -1839,7 +1713,7 @@ export default function DevTestingPage() {
     } else {
       message.warning({ content: operation.message, key: 'coverage-collect' })
     }
-  }, [])
+  }, [reloadTestingSummary])
 
   React.useEffect(() => {
     if (!isCoverageView || !coverageOperationIsActive) {
@@ -2008,12 +1882,7 @@ export default function DevTestingPage() {
 
   const reloadCoverage = () => {
     setCoverageReloadKey((current) => current + 1)
-    setTestingSummaryReloadKey((current) => current + 1)
-  }
-
-  const reloadTestingSummary = () => {
-    setTestingSummaryError('')
-    setTestingSummaryReloadKey((current) => current + 1)
+    reloadTestingSummary()
   }
 
   const generateTestingPlan = async () => {
@@ -2031,56 +1900,9 @@ export default function DevTestingPage() {
     }
   }
 
-  const runTestingAction = async (action, dataScale) => {
-    if (
-      (action === 'role-access' && !customerReady) ||
-      testingActionStarting ||
-      !testingSummary ||
-      testingSummaryError ||
-      testingBusy.active ||
-      testingHasActive
-    ) {
-      return
-    }
-    setTestingActionStarting(action)
-    setTestingSummaryError('')
-    try {
-      if (!testingIdempotencyKeys.current[action]) {
-        testingIdempotencyKeys.current[action] =
-          { key: createDevTestingIdempotencyKey(action), dataScale }
-      }
-      const operation = await testingOperationClient.start(
-        action,
-        testingIdempotencyKeys.current[action].key,
-        { dataScale: testingIdempotencyKeys.current[action].dataScale }
-      )
-      setTestingSummary((current) => ({
-        ...(current || {
-          kind: 'plush.dev-qa-testing-summary',
-          operations: { ...EMPTY_TESTING_OPERATIONS },
-        }),
-        busy: isDevTestingOperationActive(operation)
-          ? { active: true, kind: 'testing', profile: action }
-          : { active: false, kind: '', profile: '' },
-        operations: {
-          ...(current?.operations || EMPTY_TESTING_OPERATIONS),
-          [action]: operation,
-        },
-      }))
-      if (!isDevTestingOperationActive(operation)) {
-        handleTestingTerminal(operation)
-      }
-    } catch (_error) {
-      setTestingSummaryError(
-        '固定验证请求暂时未确认；再次点击会复用同一请求，不会重复启动。'
-      )
-      message.error({
-        content: '固定验证暂时无法确认，请检查本地开发服务',
-        key: `dev-testing-${action}`,
-      })
-    } finally {
-      setTestingActionStarting('')
-    }
+  const runTestingAction = (action, dataScale) => {
+    if (action === 'role-access' && !customerReady) return
+    return startTestingAction(action, dataScale)
   }
 
   const collectCoverage = async () => {
@@ -2106,7 +1928,7 @@ export default function DevTestingPage() {
         coverageIdempotencyKey.current
       )
       setCoverageOperation(operation)
-      setTestingSummaryReloadKey((current) => current + 1)
+      reloadTestingSummary()
       if (!isDevCoverageOperationActive(operation)) {
         handleCoverageTerminal(operation)
       }
@@ -2271,17 +2093,6 @@ export default function DevTestingPage() {
                 </div>
               </details>
             </div>
-          ) : null}
-
-          {view === VIEW_CONTRACTS ? (
-            <DevRPCContractReview
-              mode="checks"
-              onRunExamples={() => runTestingAction('rpc-examples')}
-              runningExamples={testingActionStarting === 'rpc-examples' || isDevTestingOperationActive(testingOperations['rpc-examples'])}
-              examplesDisabled={!testingSummary || Boolean(testingSummaryError) || testingBusy.active || testingHasActive || Boolean(testingActionStarting)}
-              executionOperation={testingOperations['rpc-examples']}
-              refreshKey={testingOperations['rpc-examples']?.finishedAt || ''}
-            />
           ) : null}
 
           {view === VIEW_COMMANDS ? (

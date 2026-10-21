@@ -408,6 +408,15 @@ test("feedback sample modal dependencies remain presentation-only", () => {
   );
 });
 
+test("work-center presentation samples cannot import copy action modules", () => {
+  for (const file of [
+    "web/src/dev-workbench/components/DevWorkCenterDesign.jsx",
+    "web/src/dev-workbench/config/devWorkCenterDesign.mjs",
+  ]) {
+    assert.equal(isAllowedERPImport(file, "@/erp/components/workflow/WorkflowTaskCopy.jsx"), false);
+  }
+});
+
 test("dev workbench boundary: resolved imports preserve module and file scope", () => {
   assert.equal(
     isAllowedERPImport("web/src/dev-workbench/config/devUIDesign.test.mjs", "../../erp/config/businessHandbook.mjs"),

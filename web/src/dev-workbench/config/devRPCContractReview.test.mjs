@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   normalizeRPCContractReview,
+  getRPCExecutionPresentation,
   parseRPCReviewSearch,
   readRPCContractReview,
 } from './devRPCContractReview.mjs'
@@ -45,19 +46,39 @@ const report = () => ({
   execution: { status: 'missing', current: false, methods: [], registered: [] },
 })
 
-test('RPC review query restores range, method and tab without accepting duplicates or invalid selectors', () => {
+test('RPC review query restores range and method without accepting duplicates or invalid selectors', () => {
   assert.deepEqual(
     parseRPCReviewSearch(
-      'contractRange=staged&change=orders.list&contractDetail=sample'
+      'contractRange=staged&change=orders.list'
     ),
-    { range: 'staged', method: 'orders.list', detail: 'sample' }
+    { range: 'staged', method: 'orders.list' }
   )
   assert.deepEqual(
     parseRPCReviewSearch(
-      'contractRange=staged&contractRange=worktree&change=../bad&contractDetail=unknown'
+      'contractRange=staged&contractRange=worktree&change=../bad'
     ),
-    { range: 'worktree', method: '', detail: 'diff' }
+    { range: 'worktree', method: '' }
   )
+})
+
+test('RPC execution only presents current receipt as current success and keeps historical outcomes separate', () => {
+  const value = report()
+  value.execution = {
+    status: 'passed', current: false, methods: [], registered: [],
+    receipt: 'output/dev-workbench/contracts/examples.json',
+  }
+  assert.deepEqual(getRPCExecutionPresentation(value), {
+    current: false, status: 'missing', label: '本轮未验证', historical: true,
+    message: '历史回执未覆盖当前比较对象。',
+  })
+  value.execution.current = true
+  assert.equal(getRPCExecutionPresentation(value).label, '通过')
+  value.current = false
+  assert.equal(getRPCExecutionPresentation(value).label, '本轮未验证')
+  value.execution.message = '样例回执内容损坏'
+  assert.equal(getRPCExecutionPresentation(value).status, 'failed')
+  assert.equal(getRPCExecutionPresentation(value).label, '回执读取失败')
+  assert.equal(getRPCExecutionPresentation(value).message, '样例回执内容损坏')
 })
 
 test('RPC review validates source identity, directory, diff, consumers, status uniqueness and safe paths', () => {

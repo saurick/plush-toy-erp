@@ -18,9 +18,24 @@ export function parseRPCReviewSearch(search) {
     method: /^[a-z_]+\.[a-z_]+$/u.test(value('change') || '')
       ? value('change')
       : '',
-    detail: ['diff', 'checks', 'sample'].includes(value('contractDetail'))
-      ? value('contractDetail')
-      : 'diff',
+  }
+}
+
+export function getRPCExecutionPresentation(report) {
+  const evidence = report.execution
+  const error = typeof evidence.message === 'string' ? evidence.message : ''
+  const current = Boolean(report.current && evidence.current && evidence.receipt && !error)
+  const status = error ? 'failed' : current ? evidence.status : 'missing'
+  return {
+    current,
+    status,
+    label: error ? '回执读取失败' : current ? RPC_REVIEW_STATUS[status][0] : '本轮未验证',
+    historical: Boolean(evidence.receipt && !current),
+    message: error || (!evidence.receipt
+      ? '尚无样例执行回执。'
+      : !current
+        ? '历史回执未覆盖当前比较对象。'
+        : '本次回执覆盖当前比较对象，结果仅适用于已登记的样例。'),
   }
 }
 

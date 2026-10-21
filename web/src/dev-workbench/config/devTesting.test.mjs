@@ -1367,7 +1367,7 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_API_PATH/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_COLLECT_COMMAND/)
   assert.match(testingPageSource, /createDevCoverageOperationClient/)
-  assert.match(testingPageSource, /createDevTestingOperationClient/)
+  assert.match(testingPageSource, /useDevTestingOperations/)
   assert.match(testingPageSource, /生成本轮验证计划/)
   assert.match(testingPageSource, /可运行检查/)
   assert.match(testingPageSource, /固定检查与独立证据/)
