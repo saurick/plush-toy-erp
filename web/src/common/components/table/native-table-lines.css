@@ -1,0 +1,13 @@
+/* 原生数据表只绘制真实单元格之间的屏幕列线，不改变尺寸或纸面。 */
+@media screen {
+  [data-erp-table-lines='grid']
+    table[data-table-lines='appearance']
+    > :is(thead, tbody, tfoot)
+    > tr
+    > :is(th, td):not(:last-child) {
+    box-shadow: var(
+      --erp-table-column-shadow,
+      inset -1px 0 0 var(--erp-border)
+    );
+  }
+}

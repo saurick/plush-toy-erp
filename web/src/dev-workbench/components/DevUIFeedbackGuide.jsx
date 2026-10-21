@@ -214,7 +214,7 @@ function ContainerChoice({ rationale }) {
         {options.find((item) => item.key === selected).reason}
       </p>
       {rationale ? (
-        <table className="erp-feedback-comparison">
+        <table className="erp-feedback-comparison" data-table-lines="fixed">
           <thead>
             <tr>
               <th>同一任务</th>
@@ -349,7 +349,7 @@ function FeedbackChoice({ rationale }) {
         </div>
       </dl>
       {rationale ? (
-        <table className="erp-feedback-comparison">
+        <table className="erp-feedback-comparison" data-table-lines="fixed">
           <thead>
             <tr>
               <th>内容</th>

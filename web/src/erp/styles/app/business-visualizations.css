@@ -960,6 +960,10 @@
 }
 
 @container production-process (max-width: 760px) {
+  .erp-production-process__current table {
+    --erp-table-column-shadow: none;
+  }
+
   .erp-production-process__current table,
   .erp-production-process__current tbody {
     display: block;

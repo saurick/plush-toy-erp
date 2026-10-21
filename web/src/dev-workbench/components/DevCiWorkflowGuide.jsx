@@ -36,7 +36,7 @@ function CiWorkflowSectionContent({ section }) {
           role="region"
           aria-label={`${section.label}明细表`}
         >
-          <table>
+          <table data-table-lines="appearance">
             <caption>{section.label} · 当前合同</caption>
             <thead>
               <tr>

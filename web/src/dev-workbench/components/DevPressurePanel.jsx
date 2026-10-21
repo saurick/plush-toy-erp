@@ -107,7 +107,7 @@ function StageChart({ levels }) {
         ))}
       </div>
       <div className="erp-dev-tool-table-wrap">
-        <table className="erp-dev-tool-table" aria-label="业务负载阶段明细">
+        <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="业务负载阶段明细">
           <thead>
             <tr>
               <th>阶段</th>
@@ -165,6 +165,7 @@ function MethodLatency({ level }) {
       <div className="erp-dev-tool-table-wrap">
         <table
           className="erp-dev-tool-table erp-dev-pressure-methods"
+          data-table-lines="appearance"
           aria-label="每方法延迟与样本"
         >
           <thead>
@@ -393,7 +394,7 @@ function PressureReport({ report, reports }) {
         <details>
           <summary>查看数据库对账和资源采样</summary>
           <div className="erp-dev-tool-table-wrap">
-            <table className="erp-dev-tool-table" aria-label="数据库前后对账">
+            <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="数据库前后对账">
               <thead>
                 <tr>
                   <th>核对项</th>

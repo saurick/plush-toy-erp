@@ -39,7 +39,7 @@ const SAMPLE_ROWS = [
 
 function SampleTable() {
   return (
-    <table className="erp-design-sample-table" aria-label="虚构订单布局样例">
+    <table className="erp-design-sample-table" data-table-lines="fixed" aria-label="虚构订单布局样例">
       <thead>
         <tr>
           <th>订单</th>

@@ -312,6 +312,8 @@
   }
 
   .erp-dev-product-core-table {
+    --erp-table-column-shadow: none;
+
     display: block;
     min-width: 0;
   }

@@ -31,7 +31,7 @@ export function MigrationRuntimePanel({
         aria-label="数据库迁移状态摘要"
       >
         <div className="erp-dev-tool-table-wrap">
-          <table className="erp-dev-tool-table">
+          <table className="erp-dev-tool-table" data-table-lines="appearance">
             <thead>
               <tr>
                 <th scope="col">核对项</th>

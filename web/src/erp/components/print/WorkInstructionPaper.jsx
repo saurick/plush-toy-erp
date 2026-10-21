@@ -522,7 +522,7 @@ function WorkInstructionPaper({
       className="erp-engineering-print-paper erp-work-instruction-paper"
       ref={paperRef}
     >
-      <table className="erp-work-instruction-paper__sheet">
+      <table className="erp-work-instruction-paper__sheet" data-table-lines="fixed">
         <colgroup>
           {WORK_INSTRUCTION_COLUMN_CLASSES.map((className) => (
             <col className={className} key={className} />
@@ -1026,6 +1026,7 @@ function WorkInstructionContinuationPage({
 
   return (
     <table
+      data-table-lines="fixed"
       className={[
         'erp-work-instruction-paper__sheet',
         'erp-work-instruction-paper__sheet--continuation',

@@ -214,7 +214,7 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
             <Link to={DEV_VERSION_CENTER_ROUTE}>查看版本发布</Link>
           </Space>
           <div className="erp-dev-business-rules__tests">
-            <table aria-label={`${selected.label}测试对应关系`}>
+            <table data-table-lines="appearance" aria-label={`${selected.label}测试对应关系`}>
               <thead>
                 <tr>
                   <th scope="col">测试与来源</th>

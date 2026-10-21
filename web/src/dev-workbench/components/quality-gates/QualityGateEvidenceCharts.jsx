@@ -86,7 +86,7 @@ export function QualityGateCoverageMatrix({ categories }) {
         </div>
       </div>
       <div className="erp-dev-quality-coverage__table-wrap">
-        <table>
+        <table data-table-lines="appearance">
           <caption>当前筛选范围内的风险与门禁覆盖关系</caption>
           <thead>
             <tr>

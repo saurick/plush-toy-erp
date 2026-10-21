@@ -171,6 +171,7 @@ export default function DevHubPage() {
             <div className="erp-dev-tool-table-wrap">
               <table
                 className="erp-dev-tool-table"
+                data-table-lines="appearance"
                 aria-label="开发工具使用指南"
               >
                 <thead>

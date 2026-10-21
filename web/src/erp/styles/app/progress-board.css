@@ -303,6 +303,10 @@
   color: var(--erp-warning-text);
 }
 @container progress-list (max-width: 720px) {
+  .erp-progress-table {
+    --erp-table-column-shadow: none;
+  }
+
   .erp-progress-table,
   .erp-progress-table tbody {
     display: block;

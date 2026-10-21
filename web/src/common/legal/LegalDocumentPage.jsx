@@ -116,7 +116,7 @@ function PrivacyDocument({ bundle }) {
 
       <RuleSection title="2. 处理的信息、目的和方式">
         <div className="legal-document-table-wrap">
-          <table>
+          <table data-table-lines="fixed">
             <thead>
               <tr>
                 <th>信息类别</th>
@@ -176,7 +176,7 @@ function PrivacyDocument({ bundle }) {
         </p>
         {bundle.processors.length > 0 ? (
           <div className="legal-document-table-wrap">
-            <table>
+            <table data-table-lines="fixed">
               <thead>
                 <tr>
                   <th>处理方</th>

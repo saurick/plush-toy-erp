@@ -37,7 +37,7 @@ export default function DevPressureDataset({ report, reports }) {
     >
       <Title level={3}>数据规模 · {pressureScaleLabel(data.dataScale)}</Title>
       <div className="erp-dev-tool-table-wrap">
-        <table className="erp-dev-tool-table" aria-label="历史背景与当轮订单池">
+        <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="历史背景与当轮订单池">
           <thead>
             <tr>
               <th>数据范围</th>
@@ -85,6 +85,7 @@ export default function DevPressureDataset({ report, reports }) {
         <div className="erp-dev-tool-table-wrap">
           <table
             className="erp-dev-tool-table"
+            data-table-lines="appearance"
             aria-label="查询背景计划与实际数量"
           >
             <thead>
@@ -187,6 +188,7 @@ export default function DevPressureDataset({ report, reports }) {
           <div className="erp-dev-tool-table-wrap">
             <table
               className="erp-dev-tool-table erp-dev-pressure-methods"
+              data-table-lines="appearance"
               aria-label="不同数据规模的 API 延迟变化"
             >
               <thead>

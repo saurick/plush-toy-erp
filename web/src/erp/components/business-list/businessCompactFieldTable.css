@@ -140,6 +140,10 @@
 }
 
 @container (max-width: 720px) {
+  .erp-compact-field-table > table {
+    --erp-table-column-shadow: none;
+  }
+
   .erp-inventory-operation-source-label {
     display: block;
     margin-bottom: 5px;

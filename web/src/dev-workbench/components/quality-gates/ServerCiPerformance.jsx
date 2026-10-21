@@ -18,6 +18,7 @@ function ServerJobPerformanceTable({ rows, label }) {
     <div className="erp-dev-quality-server-performance__table-wrap">
       <table
         className="erp-dev-quality-server-performance__table"
+        data-table-lines="appearance"
         aria-label={label}
       >
         <thead>

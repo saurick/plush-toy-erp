@@ -63,7 +63,7 @@ export function PreflightPanel({
             <Text strong>配置包检查与能力范围</Text>
           </div>
           <div className="erp-dev-tool-table-wrap">
-            <table className="erp-dev-tool-table" aria-label="客户配置预检步骤">
+            <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="客户配置预检步骤">
               <thead>
                 <tr>
                   <th scope="col">核对项</th>

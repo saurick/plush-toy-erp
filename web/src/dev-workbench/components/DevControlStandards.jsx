@@ -467,7 +467,7 @@ function FiltersExample() {
       </p>
       {rows.length ? (
         <div className="erp-control-table-scroll">
-          <table className="erp-control-table">
+          <table className="erp-control-table" data-table-lines="appearance">
             <thead>
               <tr>
                 <th>单号</th>
@@ -737,7 +737,7 @@ export default function DevControlStandards() {
         <section className="erp-control-library-rules">
           <h3>什么时候用，为什么这样设计</h3>
           <div className="erp-control-table-scroll">
-            <table className="erp-control-table">
+            <table className="erp-control-table" data-table-lines="fixed">
               <thead>
                 <tr>
                   <th>场景</th>

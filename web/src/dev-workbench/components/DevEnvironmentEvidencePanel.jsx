@@ -317,6 +317,7 @@ export default function DevEnvironmentEvidencePanel() {
       <div className="erp-dev-environment-evidence__table-wrap">
         <table
           className="erp-dev-environment-evidence__table"
+          data-table-lines="appearance"
           aria-label="环境证据对照表"
         >
           <thead>

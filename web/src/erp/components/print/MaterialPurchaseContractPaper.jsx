@@ -339,7 +339,7 @@ export default function MaterialPurchaseContractPaper({
         />
       </section>
 
-      <table className="erp-material-contract-table">
+      <table className="erp-material-contract-table" data-table-lines="fixed">
         <colgroup>
           <col style={{ width: '10.5%' }} />
           <col style={{ width: '11%' }} />

@@ -31,7 +31,7 @@ export function VersionOverview({
     <Card className="erp-dev-version-overview">
       <div className="erp-dev-version-overview__main">
         <div className="erp-dev-version-facts-wrap">
-          <table className="erp-dev-version-facts" aria-label="发布状态摘要">
+          <table className="erp-dev-version-facts" data-table-lines="appearance" aria-label="发布状态摘要">
             <thead>
               <tr>
                 <th scope="col">核对项</th>

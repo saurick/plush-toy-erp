@@ -31,6 +31,7 @@ export function SecurityPanel({ activeView, overview }) {
         <div className="erp-dev-tool-table-wrap">
           <table
             className="erp-dev-tool-table erp-dev-security-table"
+            data-table-lines="appearance"
             aria-label="安全检查"
           >
             <thead>

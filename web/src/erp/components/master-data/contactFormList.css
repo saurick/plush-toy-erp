@@ -123,6 +123,10 @@
 }
 
 @container (max-width: 820px) {
+  .erp-contact-editor__table {
+    --erp-table-column-shadow: none;
+  }
+
   .erp-contact-editor__table,
   .erp-contact-editor .erp-master-contact-list__row {
     display: block;

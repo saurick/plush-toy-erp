@@ -59,6 +59,7 @@ function ColorCardPaper({
           <React.Fragment key={`color-card-side-${sideIndex}`}>
             <table
               className="erp-color-card-paper__side"
+              data-table-lines="fixed"
               aria-label={sideIndex === 0 ? '左侧色卡表' : '右侧色卡表'}
             >
               <colgroup>

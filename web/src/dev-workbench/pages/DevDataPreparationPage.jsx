@@ -267,7 +267,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
       <details className="erp-dev-data-reuse-rules" onToggle={(event) => setReuseRulesOpen(event.currentTarget.open)}>
         <summary>代码变化后，旧数据怎么处理</summary>
         <div className="erp-dev-data-table-wrap">
-          <table>
+          <table data-table-lines="fixed">
             <thead>
               <tr>
                 <th scope="col">结论</th>
@@ -1528,6 +1528,7 @@ export default function DevDataPreparationPage() {
                   <div className="erp-dev-tool-table-wrap">
                     <table
                       className="erp-dev-tool-table erp-dev-data-profile-table"
+                      data-table-lines="appearance"
                       aria-label="数据准备方式"
                     >
                       <thead>

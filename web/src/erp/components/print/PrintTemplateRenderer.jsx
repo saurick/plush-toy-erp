@@ -197,7 +197,7 @@ function ContractTemplate({ data: rawData, kind }) {
           />
         </section>
 
-        <table className="erp-material-contract-table">
+        <table className="erp-material-contract-table" data-table-lines="fixed">
           <colgroup>
             <col style={{ width: '9.5%' }} />
             <col style={{ width: '10%' }} />
@@ -356,7 +356,7 @@ function ContractTemplate({ data: rawData, kind }) {
 
       <PrintMetaGrid leftItems={leftItems} rightItems={rightItems} />
 
-      <table className="erp-print-table">
+      <table className="erp-print-table" data-table-lines="fixed">
         <thead>
           <tr>
             {columns.map((column) => (
@@ -466,7 +466,7 @@ function EngineeringTemplatePreview({ template }) {
         ]}
       />
       {detailLines.length > 0 ? (
-        <table className="erp-print-table">
+        <table className="erp-print-table" data-table-lines="fixed">
           <thead>
             <tr>
               <th>物料 / 步骤</th>

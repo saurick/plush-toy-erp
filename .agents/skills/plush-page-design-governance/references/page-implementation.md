@@ -7,6 +7,7 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
 ## Implement with the existing design system.
    - Reuse current page shells, shared business-page components, theme tokens, CSS variables, and existing interaction patterns before adding new abstractions.
    - Keep the themes actually supported by the changed page readable. Printing/PDF previews remain fixed light unless a separate design explicitly changes screen preview behavior.
+   - 新增或调整页面、表格及自定义组件时，按[全局外观合同](../../../../docs/engineering/前端实现与交互约定.md#主题模式--theme-mode)核对本次涉及的主题、密度、表格线条等偏好在组件及实际调用页面生效；专用版式的例外沿用正式合同，并按影响验证切换、恢复和响应式行为。
    - 菜单主列表的新增 / 编辑（含客户、供应商、材料、产品、产品规格、加工环节、BOM、业务单据、事实草稿与员工资料）使用 `BusinessFormPage` 在模块主内容区整页编辑，底部固定返回列表和保存；新建、编辑与已支持的只读查看复用同一骨架。返回保留列表筛选、选择与滚动位置，未保存内容离开前提示；保存中阻止离开和重复提交。Drawer 继续用于任务、导航和上下文侧栏。
    - 编辑中的快捷新建、局部确认、来源选择、附件预览与审批、核销、冲销等专项动作继续使用适当宽度的 Modal；展示容器由入口任务决定，不按是否带 items 决定。不新增后端未支持的新建 / 编辑动作。完整单据明细留在同一编辑页，横向滚动收口到明细容器。BOM 共用一块表头，同物料和单位合并身份栏，部位支持行内添加、复制与粘贴。
    - Preserve accessibility and keyboard behavior for interactive surfaces: opening focus, logical Tab order, Escape/close behavior, disabled/loading states, aria labels for icon-only controls, focus return after modal close, and keyboard access for draggable/resizable or overflow controls.

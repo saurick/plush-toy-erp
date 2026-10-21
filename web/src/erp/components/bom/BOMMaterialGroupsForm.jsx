@@ -334,7 +334,7 @@ export default function BOMMaterialGroupsForm({
                 aria-label="物料和部位明细"
                 tabIndex={0}
               >
-                <table className="erp-bom-parts-table">
+                <table className="erp-bom-parts-table" data-table-lines="fixed">
                   <colgroup>
                     <col className="erp-bom-col-material" />
                     <col className="erp-bom-col-supplier-item" />

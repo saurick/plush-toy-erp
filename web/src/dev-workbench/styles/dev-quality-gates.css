@@ -1520,6 +1520,8 @@
   }
 
   .erp-dev-quality-server-performance__table {
+    --erp-table-column-shadow: none;
+
     min-width: 0;
   }
 
@@ -1572,6 +1574,8 @@
   }
 
   .erp-dev-quality-server-history__table {
+    --erp-table-column-shadow: none;
+
     min-width: 0;
   }
 

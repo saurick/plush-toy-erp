@@ -90,7 +90,7 @@ export default function DevIntegrationCallDetails({ entry, view, format, onForma
         </p>
       ) : null}
       {fields?.length ? (
-        <table className="erp-dev-integration__fields">
+        <table className="erp-dev-integration__fields" data-table-lines="appearance">
           <thead>
             <tr><th scope="col">{part?.fieldHeader || '字段'}</th><th scope="col">{part ? '类型 / 必填' : '读取类型'}</th><th scope="col">{part ? '说明' : '实际读取点'}</th></tr>
           </thead>

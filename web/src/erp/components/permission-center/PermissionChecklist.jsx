@@ -352,7 +352,7 @@ function PermissionChecklist({
       </div>
       <TableScrollRegion className="erp-permission-checklist">
         {visibleGroups.length > 0 ? (
-          <table className="erp-permission-matrix" aria-label="岗位功能权限">
+          <table className="erp-permission-matrix" data-table-lines="appearance" aria-label="岗位功能权限">
             <colgroup>
               <col className="erp-permission-matrix__object-column" />
               {PERMISSION_MATRIX_COLUMNS.map((column) => (

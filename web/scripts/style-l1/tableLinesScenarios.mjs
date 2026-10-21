@@ -5,6 +5,7 @@ import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
+import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 
 async function selectSegment(dialog, name, label) {
   const control = dialog.getByRole('radiogroup', { name })
@@ -41,7 +42,11 @@ async function measure(table) {
       }
     }
     const cells = [
-      ...node.querySelectorAll('.ant-table-tbody > .ant-table-row > td'),
+      ...node.querySelectorAll(
+        node.matches('table')
+          ? ':scope > :is(thead, tbody, tfoot) > tr > :is(th, td)'
+          : '.ant-table-tbody > .ant-table-row > td'
+      ),
     ]
     return {
       text: cells.map((cell) => cell.textContent),
@@ -150,6 +155,7 @@ export function createTableLinesScenarios(deps) {
       const business = page.locator('#business-table .app-table')
       const plain = page.locator('#plain-table .app-table')
       await business.locator('tr[data-row-key="1"]').waitFor()
+      await setTableLines(page, '简洁')
       assert.equal(
         await page.locator('html').getAttribute('data-erp-table-lines'),
         'simple'
@@ -158,6 +164,12 @@ export function createTableLinesScenarios(deps) {
       const nativeBefore = await page
         .locator('#native-table')
         .evaluate((node) => node.innerHTML)
+      const nativeTables = page.locator('table[data-table-lines="appearance"]')
+      const nativeMetricsBefore = await Promise.all(
+        (await nativeTables.all()).map(measure)
+      )
+      const fixedTable = page.locator('#nested-fixed-table')
+      const nestedFixedBefore = await measure(fixedTable)
       const borderedBefore = await measure(
         page.locator('#material-table .app-table')
       )
@@ -175,6 +187,30 @@ export function createTableLinesScenarios(deps) {
       const grid = await measure(business)
       assertGrid(grid)
       assertGrid(await measure(plain))
+      for (const [index, table] of (await nativeTables.all()).entries()) {
+        const metric = await measure(table)
+        assertGrid(metric)
+        assert.deepEqual(metric.text, nativeMetricsBefore[index].text)
+        assert.deepEqual(
+          metric.cells.map(({ width, height }) => [width, height]),
+          nativeMetricsBefore[index].cells.map(({ width, height }) => [width, height]),
+          '原生表格切换网格保留列宽、行高与合并单元格'
+        )
+      }
+      assert.deepEqual(await measure(fixedTable), nestedFixedBefore, '嵌套固定表不继承外层列线')
+      await page.getByRole('textbox', { name: '紧凑品名', exact: true }).fill('手工输入的长名称产品')
+      await page.setViewportSize({ width: 700, height: 1000 })
+      for (const selector of ['#compact-table table', '#contact-table table']) {
+        assert(
+          await page.locator(selector).evaluate((node) =>
+            [...node.querySelectorAll('tbody td')].every((cell) => getComputedStyle(cell).boxShadow === 'none')
+          ),
+          '窄容器转为卡片后不绘制表格列线'
+        )
+      }
+      await page.setViewportSize({ width: 960, height: 1000 })
+      assert.equal(await page.getByRole('textbox', { name: '紧凑品名', exact: true }).inputValue(), '手工输入的长名称产品')
+      for (const table of await nativeTables.all()) assertGrid(await measure(table))
       assert.deepEqual(
         await measure(page.locator('#material-table .app-table')),
         borderedBefore,
@@ -221,6 +257,14 @@ export function createTableLinesScenarios(deps) {
         '编辑明细沿用自身版式'
       )
       await page.emulateMedia({ media: 'print' })
+      for (const [index, table] of (await nativeTables.all()).entries()) {
+        const metric = await measure(table)
+        assert.deepEqual(
+          metric.cells.map(({ verticalLine }) => verticalLine),
+          nativeMetricsBefore[index].cells.map(({ verticalLine }) => verticalLine),
+          '屏幕偏好不增加原生表格打印线条'
+        )
+      }
       assert(
         (await measure(business)).cells.every(
           (cell) => cell.verticalLine === '0px'
@@ -238,6 +282,9 @@ export function createTableLinesScenarios(deps) {
       assertGrid(await measure(business))
       await setTableLines(page, '简洁')
       assert.deepEqual(await measure(business), before, '关闭网格恢复原样式')
+      for (const [index, table] of (await nativeTables.all()).entries()) {
+        assert.deepEqual(await measure(table), nativeMetricsBefore[index], '原生表格关闭网格后完整恢复')
+      }
       assert.deepEqual(
         await measure(page.locator('#material-table .app-table')),
         borderedBefore,
@@ -271,8 +318,45 @@ export function createTableLinesScenarios(deps) {
     },
   }))
   const version = createDevVersionCenterScenarios(deps)[0]
+  const progressFixture = createBusinessProgressScenarios({ ...deps, assert })
+    .find(({ name }) => name === 'erp-business-dashboard-desktop')
+  assert(progressFixture, '需要进度看板的基础浏览器夹具')
+  const progressScenarios = [
+    { ...progressFixture, name: 'table-lines-progress-desktop' },
+    { ...progressFixture, name: 'table-lines-progress-dark-desktop', themeMode: 'dark' },
+    { ...progressFixture, name: 'table-lines-progress-narrow', viewport: { width: 390, height: 844 }, deviceScaleFactor: 3 },
+  ]
+    .map((scenario) => ({
+      ...scenario,
+      verify: async (page) => {
+        const narrow = scenario.viewport.width < 720
+        for (const [view, label] of [['orders', '订单交付'], ['production', '生产执行']]) {
+          await page.getByRole('tab', { name: label, exact: true }).click()
+          const table = page.getByRole('table', { name: `${label}紧凑总览`, exact: true })
+          await table.locator('tbody tr').first().waitFor()
+          await setTableLines(page, '简洁')
+          const before = await measure(table)
+          await setTableLines(page, '网格')
+          const grid = await measure(table)
+          if (narrow) assert(grid.cells.every((cell) => cell.verticalLine === '0px'), '卡片保留自身布局')
+          else assertGrid(grid)
+          assert.deepEqual(
+            grid.cells.map(({ width, height }) => [width, height]),
+            before.cells.map(({ width, height }) => [width, height]),
+            '进度看板切换线条不挤动列宽和行高'
+          )
+          assert.deepEqual(grid.text, before.text)
+          if (scenario.name === 'table-lines-progress-desktop') {
+            await page.screenshot({ path: path.join(outputDir, `table-lines-progress-${view}.png`) })
+          }
+          await setTableLines(page, '简洁')
+          assert.deepEqual(await measure(table), before, '切回简洁恢复进度看板')
+        }
+      },
+    }))
   return [
     ...fixtures,
+    ...progressScenarios,
     {
       name: 'table-lines-business',
       path: '/erp/sales/project-orders/sales-orders',
@@ -379,6 +463,7 @@ export function createTableLinesScenarios(deps) {
           .locator('.erp-dev-version-workspace .app-table')
           .first()
         await table.locator('.ant-table-row').first().waitFor()
+        await setTableLines(page, '简洁')
         const before = await measure(table)
         await setTableLines(page, '网格')
         assertGrid(await measure(table))

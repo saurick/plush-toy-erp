@@ -124,7 +124,7 @@ function MaterialDetailPaper({
         })}
       </section>
 
-      <table className="erp-engineering-print-table erp-material-detail-table">
+      <table className="erp-engineering-print-table erp-material-detail-table" data-table-lines="fixed">
         <colgroup>
           {MATERIAL_DETAIL_COLUMNS.map((column, index) => (
             <col

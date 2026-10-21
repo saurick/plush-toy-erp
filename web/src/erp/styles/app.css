@@ -1,4 +1,5 @@
 @import './app/design-tokens.css';
+@import '../../common/components/table/native-table-lines.css';
 @import './app/shell-admin.css';
 @import './app/tabs-motion.css';
 @import './app/dashboard-surface.css';

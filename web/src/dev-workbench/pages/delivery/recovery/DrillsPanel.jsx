@@ -46,6 +46,7 @@ export function DrillsPanel({
         <div className="erp-dev-tool-table-wrap">
           <table
             className="erp-dev-tool-table erp-dev-recovery-table"
+            data-table-lines="appearance"
             aria-label="演练清单"
           >
             <thead>

@@ -5,7 +5,7 @@ const letters = ['A', 'B', 'C']
 function ExampleTable({ headings, rows }) {
   return (
     <div className="erp-help-example__table">
-      <table>
+      <table data-table-lines="fixed">
         <thead>
           <tr>
             {headings.map((heading) => (

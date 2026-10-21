@@ -33,7 +33,7 @@ export default function DevToolTable({
   }
   return (
     <div className="erp-dev-tool-table-wrap erp-dev-tool-directory">
-      <table className="erp-dev-tool-table" aria-label={ariaLabel}>
+      <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label={ariaLabel}>
         <thead>
           <tr>
             <th scope="col">工具</th>

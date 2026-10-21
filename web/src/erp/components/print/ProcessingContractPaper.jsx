@@ -247,7 +247,7 @@ export default function ProcessingContractPaper({
         </div>
       </section>
 
-      <table className="erp-processing-contract-table">
+      <table className="erp-processing-contract-table" data-table-lines="fixed">
         <colgroup>
           <col style={{ width: '11.5%' }} />
           <col style={{ width: '10.5%' }} />

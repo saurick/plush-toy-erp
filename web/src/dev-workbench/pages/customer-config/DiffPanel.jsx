@@ -18,6 +18,7 @@ export function DiffPanel({ consoleSummary }) {
         <div className="erp-dev-tool-table-wrap">
           <table
             className="erp-dev-tool-table erp-dev-customer-diff-table"
+            data-table-lines="appearance"
             aria-label="客户配置变化对比"
           >
             <thead>

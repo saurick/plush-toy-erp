@@ -82,7 +82,7 @@ function OverviewContent({ overview }) {
       </section>
       <section className="erp-dev-flow-customer-review__step-table" data-customer-review-fulfillment>
         <h2>正常办理与岗位交接</h2>
-        <table>
+        <table data-table-lines="fixed">
           <thead><tr><th scope="col">环节</th><th scope="col">岗位</th><th scope="col">交接与审批</th></tr></thead>
           <tbody>
             {overview.fulfillmentFlow.map((step, index) => (
@@ -109,7 +109,7 @@ function OverviewContent({ overview }) {
       </section>
       <section className="erp-dev-flow-customer-review__step-table" data-customer-review-handling-table>
         <h2>异常处理与继续条件</h2>
-        <table>
+        <table data-table-lines="fixed">
           <colgroup><col style={{ width: '17%' }} /><col style={{ width: '23%' }} /><col style={{ width: '32%' }} /><col style={{ width: '28%' }} /></colgroup>
           <thead><tr><th scope="col">环节</th><th scope="col">异常情况</th><th scope="col">办理方式</th><th scope="col">继续前核对</th></tr></thead>
           <tbody>
@@ -130,7 +130,7 @@ function OverviewContent({ overview }) {
           <section key={guide.key} data-customer-review-exception={guide.key}>
             <h3>{guide.label}</h3><p>{guide.source}</p>
             {guide.approval ? <p>审批：{guide.approval.condition} 未通过：{guide.approval.rejected}</p> : null}
-            <table>
+            <table data-table-lines="fixed">
               <colgroup><col style={{ width: '18%' }} /><col style={{ width: '38%' }} /><col style={{ width: '44%' }} /></colgroup>
               <thead><tr><th scope="col">处理方案</th><th scope="col">岗位交接</th><th scope="col">闭环与恢复</th></tr></thead>
               <tbody>
@@ -175,7 +175,7 @@ function ChainContent({ chain }) {
       />
       <section className="erp-dev-flow-customer-review__step-table">
         <h2>岗位与完成条件</h2>
-        <table>
+        <table data-table-lines="fixed">
           <thead>
             <tr>
               <th scope="col">环节</th>

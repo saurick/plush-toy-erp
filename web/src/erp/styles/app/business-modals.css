@@ -773,6 +773,8 @@
 }
 
 .erp-line-item-table th:not(:last-child) {
+  --erp-table-column-shadow: none;
+
   border-inline-end: 1px solid var(--erp-border-strong);
 }
 

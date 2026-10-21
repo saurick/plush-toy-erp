@@ -11,6 +11,11 @@ import BusinessLineItemsTable, {
   BusinessLineItemRow,
 } from '../../src/erp/components/business-list/BusinessLineItemsTable'
 import EngineeringMaterialSummarySheet from '../../src/erp/components/sales-orders/EngineeringMaterialSummarySheet'
+import BusinessCompactFieldTable, {
+  BusinessCompactFieldRow,
+} from '../../src/erp/components/business-list/BusinessCompactFieldTable'
+import ContactFormList from '../../src/erp/components/master-data/ContactFormList'
+import DevToolTable from '../../src/dev-workbench/components/DevToolTable'
 import { applyModuleColumnOrder } from '../../src/erp/utils/moduleTableColumns.mjs'
 import 'antd/dist/reset.css'
 import '../../src/erp/styles/app.css'
@@ -111,6 +116,7 @@ const request = {
 }
 
 function Fixture() {
+  const [contactForm] = Form.useForm()
   const { isDark: dark, setThemeMode } = useERPTheme()
   const [mobile, setMobile] = useState(false)
   const [empty, setEmpty] = useState(false)
@@ -257,6 +263,66 @@ function Fixture() {
               </BusinessLineItemRow>
             </BusinessLineItemsTable>
           </Form>
+        </section>
+        <section id="compact-table" style={{ minWidth: 0 }}>
+          <h2>紧凑录入明细</h2>
+          <Form className="erp-business-form">
+            <BusinessCompactFieldTable
+              label="紧凑录入明细"
+              showSequence
+              columns={[{ label: '品名' }, { label: '数量' }, { label: '操作' }]}
+            >
+              <BusinessCompactFieldRow
+                sequence={1}
+                cells={[
+                  <Form.Item key="name" name="compactName" initialValue="森林系列长名称毛绒产品">
+                    <Input aria-label="紧凑品名" />
+                  </Form.Item>,
+                  <Form.Item key="quantity" name="compactQuantity" initialValue="123456789.1234">
+                    <Input aria-label="紧凑数量" inputMode="decimal" />
+                  </Form.Item>,
+                ]}
+                actions={<Button>移除</Button>}
+              >
+                <p>跨列说明只保留真实边界。</p>
+              </BusinessCompactFieldRow>
+            </BusinessCompactFieldTable>
+          </Form>
+        </section>
+        <section id="contact-table" style={{ minWidth: 0 }}>
+          <h2>联系人明细</h2>
+          <Form form={contactForm} initialValues={{ contacts: [{ name: '模拟联系人', is_primary: true }] }}>
+            <ContactFormList form={contactForm} entityLabel="模拟客户" />
+          </Form>
+        </section>
+        <section id="dev-native-table" style={{ minWidth: 0 }}>
+          <h2>研发工具明细</h2>
+          <DevToolTable
+            ariaLabel="研发工具明细"
+            items={[{
+              key: 'sample',
+              route: '/__dev/ui-design',
+              title: '模拟研发工具',
+              description: '查看共享控件、使用边界与长说明。',
+              source: '模拟验证数据',
+              truthSource: '共享组件',
+              guardrails: [],
+            }]}
+          />
+        </section>
+        <section id="merged-table" style={{ minWidth: 0 }}>
+          <h2>合并与嵌套单元格</h2>
+          <table data-table-lines="appearance" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th>对象</th><th>记录</th><th>结果</th></tr></thead>
+            <tbody>
+              <tr><th scope="row" rowSpan={2}>模拟物料</th><td>123456789.1234</td><td>长名称与数值保持可读</td></tr>
+              <tr><td colSpan={2}>合并两列</td></tr>
+              <tr><td colSpan={3}>
+                <table data-table-lines="fixed" id="nested-fixed-table"><tbody><tr><td>固定版式</td><td>独立内容</td></tr></tbody></table>
+              </td></tr>
+            </tbody>
+            <tfoot><tr><th scope="row" colSpan={2}>合计</th><td>123456789.1234</td></tr></tfoot>
+          </table>
         </section>
       </main>
     </ConfigProvider>

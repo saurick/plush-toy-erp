@@ -479,6 +479,7 @@ export default function BusinessDashboardPage() {
                 {data?.rows.length ? (
                   <table
                     className="erp-progress-table"
+                    data-table-lines="appearance"
                     aria-label={
                       view === 'orders'
                         ? '订单交付紧凑总览'

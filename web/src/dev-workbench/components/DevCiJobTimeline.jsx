@@ -27,7 +27,7 @@ export default function DevCiJobTimeline({ jobs }) {
             <DevTimestamp value={timeline.origin} />
           </Typography.Paragraph>
           <div className="erp-dev-ci-timeline__scroll">
-            <table aria-label="本次 CI Job 运行时间轴">
+            <table data-table-lines="appearance" aria-label="本次 CI Job 运行时间轴">
               <thead>
                 <tr>
                   <th scope="col">Job</th>

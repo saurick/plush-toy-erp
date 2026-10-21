@@ -62,6 +62,7 @@ export function ServerCiHistory({ evidence, currentCommit }) {
         <div className="erp-dev-quality-server-history__table-wrap">
           <table
             className="erp-dev-quality-server-history__table"
+            data-table-lines="appearance"
             aria-label="最近 GitLab CI 历史"
           >
             <thead>

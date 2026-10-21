@@ -436,7 +436,7 @@ function CoverageEvidenceCard({ item }) {
           </Checkbox>
           {visibleScenarios.length > 0 ? (
             <div className="erp-dev-testing-coverage-scenarios__table">
-              <table>
+              <table data-table-lines="appearance">
                 <thead>
                   <tr>
                     <th>规则 / 场景</th>
@@ -1113,7 +1113,7 @@ function ValidationWorkspace({
         />
       </div>
       <div className="erp-dev-testing-validation__actions erp-dev-tool-table-wrap">
-        <table className="erp-dev-tool-table" aria-label="固定检查与独立证据">
+        <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="固定检查与独立证据">
           <thead>
             <tr>
               <th scope="col">检查与用途</th>
@@ -1416,6 +1416,7 @@ function CoverageReportView({
                       <div className="erp-dev-testing-coverage-domain-table-wrap">
                         <table
                           className="erp-dev-testing-coverage-domain-table"
+                          data-table-lines="appearance"
                           aria-label="业务域覆盖总览"
                         >
                           <thead>

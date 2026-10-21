@@ -36,6 +36,7 @@ export default function BusinessLineItemsTable({
     >
       <table
         className="erp-line-item-table"
+        data-table-lines="appearance"
         style={{
           minWidth: columns.reduce(
             (total, column) => total + column.width,

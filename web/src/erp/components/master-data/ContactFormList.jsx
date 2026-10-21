@@ -194,6 +194,7 @@ export default function ContactFormList({ form, entityLabel }) {
           <TableScrollRegion className="erp-master-contact-list__items">
             <table
               className="erp-contact-editor__table"
+              data-table-lines="appearance"
               aria-label={`${entityLabel}联系人`}
             >
               <colgroup>

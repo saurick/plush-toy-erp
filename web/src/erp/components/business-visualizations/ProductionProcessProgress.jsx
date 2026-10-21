@@ -229,7 +229,7 @@ export default function ProductionProcessProgress({
           <VisualizationState empty={filtered.length === 0} />
           {layout === 'current' && pagination.rows.length > 0 ? (
             <div className="erp-production-process__current">
-              <table aria-label="当前生产事项">
+              <table data-table-lines="appearance" aria-label="当前生产事项">
                 <thead>
                   <tr>
                     <th>产品 / 规格</th>

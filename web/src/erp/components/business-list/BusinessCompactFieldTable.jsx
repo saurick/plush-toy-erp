@@ -12,7 +12,7 @@ export default function BusinessCompactFieldTable({
 }) {
   return (
     <TableScrollRegion className={`erp-compact-field-table ${className}`.trim()}>
-      <table aria-label={label}>
+      <table data-table-lines="appearance" aria-label={label}>
         <colgroup>
           {showSequence ? <col style={{ width: 44 }} /> : null}
           {columns.map((column, index) => (

@@ -7,6 +7,11 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 })
 
+const nativeTableRestriction = {
+  selector: 'JSXOpeningElement[name.name="table"]:not(:has(JSXAttribute[name.name="data-table-lines"][value.value=/^(appearance|fixed)$/])), CallExpression[callee.name="createElement"][arguments.0.value="table"], CallExpression[callee.property.name="createElement"][arguments.0.value="table"]',
+  message: '原生数据表使用 data-table-lines="appearance" 跟随账号网格设置；纸面、图解和有固定线框的专用表使用 "fixed"。',
+}
+
 export default [
   ...compat.config({
     env: {
@@ -132,6 +137,7 @@ export default [
       ],
       'no-restricted-syntax': [
         'error',
+        nativeTableRestriction,
         {
           selector:
             'JSXOpeningElement[name.name=/^[a-z]/]:has(JSXAttribute[name.name="role"][value.value="tablist"])',

@@ -383,7 +383,7 @@ function AuditEventDetail({ event }) {
         <Title level={5}>字段变化</Title>
         {changes.length ? (
           <TableScrollRegion className="erp-audit-record-detail__changes">
-            <table>
+            <table data-table-lines="appearance">
               <thead>
                 <tr>
                   <th>字段</th>

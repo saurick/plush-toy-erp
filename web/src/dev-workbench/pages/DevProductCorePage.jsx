@@ -243,7 +243,7 @@ export default function DevProductCorePage() {
           >
             {filteredCapabilities.length > 0 ? (
               <div className="erp-dev-product-core-table-wrap">
-                <table className="erp-dev-product-core-table">
+                <table className="erp-dev-product-core-table" data-table-lines="appearance">
                   <caption>当前 Product Core 能力与边界</caption>
                   <thead>
                     <tr>
