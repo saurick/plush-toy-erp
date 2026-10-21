@@ -59,11 +59,11 @@ async function fixture(t) {
     await put(name);
     await copyFile(path.join(root, name), path.join(project, name));
   }
-  await put(".n-node-version", "24.21.0\n");
+  await put(".n-node-version", "24.22.1\n");
   await put(
     "web/package.json",
     JSON.stringify({
-      engines: { node: "24.21.x" },
+      engines: { node: "24.22.x" },
       packageManager: "pnpm@10.34.5",
     }),
   );
@@ -93,7 +93,7 @@ async function fixture(t) {
         PATH: `${bin}:/usr/bin:/bin`,
         PNPM_BIN: path.join(bin, "pnpm"),
         FIXTURE_ROOT: project,
-        FIXTURE_NODE_VERSION: "24.21.0",
+        FIXTURE_NODE_VERSION: "24.22.1",
         ...extraEnv,
       },
     });
@@ -106,7 +106,7 @@ test("doctor accepts n and the sole exact Node pin", async (t) => {
   const { run } = await fixture(t);
   const result = run();
   assert.equal(result.status, 0, result.output);
-  assert.match(result.output, /Node: 24.21.0（n \/ .n-node-version）/u);
+  assert.match(result.output, /Node: 24.22.1（n \/ .n-node-version）/u);
 });
 
 test("doctor rejects a different runtime with an actionable n command", async (t) => {
@@ -130,7 +130,7 @@ test("doctor and bootstrap reject a missing n before installing dependencies", a
 for (const name of [".node-version", ".nvmrc"]) {
   test(`doctor rejects a duplicate ${name} even when its version matches`, async (t) => {
     const { put, run } = await fixture(t);
-    await put(name, "24.21.0\n");
+    await put(name, "24.22.1\n");
     const result = run();
     assert.equal(result.status, 1, result.output);
     assert.match(result.output, /存在重复的 Node 版本配置/u);
@@ -140,7 +140,7 @@ for (const name of [".node-version", ".nvmrc"]) {
 test("doctor requires the n pin instead of falling back to another manager", async (t) => {
   const { project, put, run } = await fixture(t);
   await rm(path.join(project, ".n-node-version"));
-  await put(".nvmrc", "24.21.0\n");
+  await put(".nvmrc", "24.22.1\n");
   const result = run();
   assert.equal(result.status, 1, result.output);
   assert.match(result.output, /缺失\] Node 版本锁文件 .n-node-version/u);
@@ -148,19 +148,19 @@ test("doctor requires the n pin instead of falling back to another manager", asy
 
 test("doctor rejects a non-exact pin and a conflicting package engine", async (t) => {
   const { put, run } = await fixture(t);
-  await put(".n-node-version", "24.21.x\n");
+  await put(".n-node-version", "24.22.x\n");
   let result = run();
   assert.equal(result.status, 1, result.output);
   assert.match(result.output, /必须固定完整的 Node 版本/u);
-  await put(".n-node-version", "24.21.0\n");
+  await put(".n-node-version", "24.22.1\n");
   await put(
     "web/package.json",
     JSON.stringify({
-      engines: { node: "24.22.x" },
+      engines: { node: "24.23.x" },
       packageManager: "pnpm@10.34.5",
     }),
   );
   result = run();
   assert.equal(result.status, 1, result.output);
-  assert.match(result.output, /engines.node=24.22.x，期望 24.21.x/u);
+  assert.match(result.output, /engines.node=24.23.x，期望 24.22.x/u);
 });

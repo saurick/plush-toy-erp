@@ -68,9 +68,9 @@ test('coverage uses the current runtime and the n version file', async (t) => {
   await writeFile(path.join(projectRoot, '.n-node-version'), process.versions.node)
   assert.equal(resolveProjectNodeRuntime(projectRoot), process.execPath)
 
-  await writeFile(path.join(projectRoot, '.n-node-version'), '24.21.999')
+  await writeFile(path.join(projectRoot, '.n-node-version'), '24.22.999')
   assert.throws(() => resolveProjectNodeRuntime(projectRoot), /run n auto/u)
-  await writeFile(path.join(projectRoot, '.n-node-version'), '24.21.x')
+  await writeFile(path.join(projectRoot, '.n-node-version'), '24.22.x')
   assert.throws(
     () => resolveProjectNodeRuntime(projectRoot),
     /version lock is invalid/u

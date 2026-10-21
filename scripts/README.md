@@ -72,7 +72,7 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 ## 版本锁定
 
-Node 统一由 `n` 管理，`.n-node-version` 是唯一精确版本真源；当前为 `24.21.0`，`web/package.json#engines.node` 声明同一 `24.21.x` 系列。安装、切换和升级都在仓库根目录使用 `n auto`；升级补丁版本时同步该文件、构建镜像与 Runner 的固定版本及校验值。
+Node 统一由 `n` 管理，`.n-node-version` 是唯一精确版本真源；当前为 `24.22.1`，`web/package.json#engines.node` 声明同一 `24.22.x` 系列。安装、切换和升级都在仓库根目录使用 `n auto`；升级 Node 版本时同步该文件、构建镜像与 Runner 的固定版本及校验值。
 
 macOS 首次安装：
 

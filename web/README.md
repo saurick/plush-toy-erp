@@ -13,7 +13,7 @@
 
 ## 环境版本
 
-Node.js 统一由 `n` 管理，唯一版本文件为根目录 `.n-node-version`，当前精确锁定 `24.21.0`；`web/package.json#engines.node` 声明 `24.21.x`。pnpm 由 `web/package.json#packageManager` 固定为 `pnpm@10.34.5`。首次安装见 [工具链安装](../scripts/README.md#版本锁定)。
+Node.js 统一由 `n` 管理，唯一版本文件为根目录 `.n-node-version`，当前精确锁定 `24.22.1`；`web/package.json#engines.node` 声明 `24.22.x`。pnpm 由 `web/package.json#packageManager` 固定为 `pnpm@10.34.5`。首次安装见 [工具链安装](../scripts/README.md#版本锁定)。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"

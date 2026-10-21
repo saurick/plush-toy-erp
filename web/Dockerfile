@@ -3,8 +3,8 @@
 # Build from the repository root:
 # docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 
-ARG NODE_BUILDER_IMAGE=node:24.21.0
-ARG RUNTIME_BASE_IMAGE=node:24.21.0-slim
+ARG NODE_BUILDER_IMAGE=node:24.22.1
+ARG RUNTIME_BASE_IMAGE=node:24.22.1-slim
 
 FROM ${NODE_BUILDER_IMAGE} AS builder
 

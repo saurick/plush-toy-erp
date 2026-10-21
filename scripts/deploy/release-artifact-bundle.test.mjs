@@ -330,7 +330,7 @@ test("release artifact builds a non-empty CycloneDX dependency inventory", () =>
     "web/pnpm-lock.yaml":
       "lockfileVersion: '9.0'\npackages:\n\n  '@scope/pkg@2.0.0':\n    resolution: {}\n\n  plain@1.0.0:\n    resolution: {}\n\nsnapshots:\n",
     "server/Dockerfile":
-      "ARG NODE_BUILDER_IMAGE=node:24.21.0\nARG GO_BUILDER_IMAGE=golang:1.26.8\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
+      "ARG NODE_BUILDER_IMAGE=node:24.22.1\nARG GO_BUILDER_IMAGE=golang:1.26.8\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
     "web/Dockerfile": "ARG UNUSED_DEVELOPMENT_IMAGE=example.invalid/unused:1\n",
   };
   const sbom = buildDependencySbom({
@@ -592,7 +592,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
     "server/Dockerfile":
       "ARG GO_BUILDER_IMAGE=golang:1.26.8\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
     "web/Dockerfile":
-      "ARG NODE_BUILDER_IMAGE=node:24.21.0\nARG RUNTIME_BASE_IMAGE=node:24.21.0-slim\n",
+      "ARG NODE_BUILDER_IMAGE=node:24.22.1\nARG RUNTIME_BASE_IMAGE=node:24.22.1-slim\n",
     "web/package.json":
       '{"packageManager":"pnpm@10.34.5","name":"fixture","version":"1.0.0"}\n',
   };

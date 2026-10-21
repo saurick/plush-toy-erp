@@ -478,7 +478,7 @@ image_gc:
 
 # 仅供本地/开发环境额外打固定 tag；正式部署必须使用 manifest 固定的不可变镜像，禁止 dev/latest。
 FIXED_TAG ?= dev
-NODE_BUILDER_IMAGE ?= node:24.21.0
+NODE_BUILDER_IMAGE ?= node:24.22.1
 GO_BUILDER_IMAGE ?= golang:1.26.8
 RUNTIME_BASE_IMAGE ?= debian:bookworm-slim
 

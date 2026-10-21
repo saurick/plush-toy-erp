@@ -252,7 +252,7 @@ write_files:
 
       arch=linux-x64
       n_version=10.2.0
-      node_version=24.21.0
+      node_version=24.22.1
       node_cache="/usr/local/n/versions/node/${node_version}"
       go_version=1.26.9
       pnpm_version=10.34.5
@@ -337,7 +337,7 @@ write_files:
       if ! node_ready; then
         node_archive="node-v${node_version}-${arch}.tar.xz"
         download_file "https://nodejs.org/dist/v${node_version}/${node_archive}" "$work/$node_archive"
-        echo "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6  $work/$node_archive" | sha256sum --check --strict
+        echo "6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6  $work/$node_archive" | sha256sum --check --strict
         rm -rf "$node_cache"
         install -d -m 0755 "$node_cache"
         tar -xJf "$work/$node_archive" --strip-components=1 -C "$node_cache"
@@ -392,7 +392,7 @@ write_files:
         echo "9b642c14742b5db8622352c85f809ae6a588b6885a7d1a24caf8547e73eea7c9  $work/gitlab-runner-linux-amd64" | sha256sum --check --strict
         install -o root -g root -m 0755 "$work/gitlab-runner-linux-amd64" /usr/local/bin/gitlab-runner
       fi
-      test "$(node --version)" = v24.21.0
+      test "$(node --version)" = v24.22.1
       test "$(go env GOVERSION)" = go1.26.9
       test "$(pnpm --version)" = 10.34.5
   - path: /usr/local/sbin/plush-verify-runner-bootstrap
@@ -415,7 +415,7 @@ write_files:
         test "$(runuser -l "$user" -s /bin/bash -c '/usr/local/bin/go env CGO_ENABLED')" = 1
       }
 
-      test "$(node --version)" = v24.21.0
+      test "$(node --version)" = v24.22.1
       test "$(go env GOVERSION)" = go1.26.9
       test "$(pnpm --version)" = 10.34.5
       test "$(runuser -u gitlab-runner -- /usr/local/bin/pnpm --version)" = 10.34.5
