@@ -1536,6 +1536,7 @@ test('coverage tabs expose failures in hidden groups and do not infer success fr
   assert.deepEqual(statuses(null), {
     code: 'not_collected',
     business: 'not_collected',
+    rules: null,
     gates: 'not_collected',
     acceptance: 'not_collected',
   })
@@ -1552,6 +1553,7 @@ test('coverage tabs expose failures in hidden groups and do not infer success fr
     {
       code: 'failed',
       business: 'blocked',
+      rules: null,
       gates: 'skipped',
       acceptance: 'stale',
     }
@@ -1623,6 +1625,7 @@ test('coverage tabs inherit normalized fail-closed evidence rather than raw succ
   assert.deepEqual(statuses, {
     code: 'partial',
     business: 'partial',
+    rules: null,
     gates: 'skipped',
     acceptance: 'partial',
   })

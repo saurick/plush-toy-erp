@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { verifyGoTestJson } from "./verify-go-test-json.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
+import { businessRuleTests } from "./lib/business-rule-catalog.mjs";
 
 export function evaluateTestGate({
   kind,
@@ -14,6 +15,7 @@ export function evaluateTestGate({
   stderr = "",
   error,
   excludedSkipPattern = "",
+  businessRules = "",
 }) {
   if (error) throw error;
   let result = null;
@@ -22,7 +24,7 @@ export function evaluateTestGate({
       kind === "node"
         ? verifyNodeTestSummary(`${stdout}\n${stderr}`)
         : kind === "go"
-          ? verifyGoTestJson(stdout, [], { excludedSkipPattern })
+          ? verifyGoTestJson(stdout, [], { excludedSkipPattern, businessRules })
           : null;
   } catch (summaryError) {
     if (status !== 0) {
@@ -59,7 +61,7 @@ export function formatIncompleteSummary(kind, result, output = "") {
     const failures = failedTests.length
       ? ` failedTests=${JSON.stringify(failedTests)}`
       : "";
-    return `run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip} excluded=${result.excluded ?? 0} unresolved=${result.unresolvedTests.length}${failures}`;
+    return `run=${result.run} pass=${result.pass} fail=${result.fail} skip=${result.skip} excluded=${result.excluded ?? 0} unresolved=${result.unresolvedTests.length}${failures}${result.missingBusinessTests?.length ? ` missingBusinessTests=${JSON.stringify(result.missingBusinessTests)}` : ''}`;
   }
   throw new Error(`unsupported test kind: ${kind}`);
 }
@@ -96,6 +98,12 @@ export function parseArgs(argv) {
       excludedSkipPatternSeen = true;
       continue;
     }
+    if (arg === "--business-rules") {
+      if (options.businessRules) throw new Error('--business-rules may be provided only once');
+      options.businessRules = argv[++index];
+      businessRuleTests(options.businessRules);
+      continue;
+    }
     if (arg === "--output-mode") {
       if (outputModeSeen) {
         throw new Error("--output-mode may be provided only once");
@@ -124,6 +132,7 @@ export function parseArgs(argv) {
     throw new Error("--kind must be node or go");
   }
   if (!options.label) throw new Error("--label is required");
+  if (options.businessRules && options.kind !== 'go') throw new Error('--business-rules requires --kind go');
   if (!new Set(["full", "summary"]).has(options.outputMode)) {
     throw new Error("--output-mode must be full or summary");
   }
@@ -227,6 +236,7 @@ async function main() {
     stderr: child.stderr,
     error: child.error,
     excludedSkipPattern: options.excludedSkipPattern,
+    businessRules: options.businessRules,
   });
   if (!outcome.ok) {
     const summary = outcome.result

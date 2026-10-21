@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { BUSINESS_RULES, businessTestKey } from "./lib/business-rule-catalog.mjs";
 
 import {
   getEnvironmentFingerprint,
@@ -79,7 +80,7 @@ export const BUSINESS_DOMAIN_KEYS = Object.freeze([
 const goScenario = (id, packageName, testPrefix, label = id) =>
   Object.freeze({ id, label, package: packageName, testPrefix });
 
-export const GO_BUSINESS_SCENARIOS = Object.freeze({
+const BASE_GO_BUSINESS_SCENARIOS = Object.freeze({
   "master-data": Object.freeze([
     goScenario(
       "masterdata-input-normalization",
@@ -555,6 +556,20 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
     ),
   ]),
 });
+
+export const GO_BUSINESS_SCENARIOS = Object.freeze(Object.fromEntries(
+  Object.entries(BASE_GO_BUSINESS_SCENARIOS).map(([domain, scenarios]) => {
+    const registered = new Set(scenarios.map((item) => `${item.package}:${item.testPrefix}`));
+    const extra = BUSINESS_RULES.filter((entry) => entry.domain === domain).flatMap((entry) =>
+      entry.tests.filter((test) => test.gate === 'server').flatMap((test) => {
+        const key = businessTestKey(test);
+        if (registered.has(key)) return [];
+        registered.add(key);
+        return [goScenario(key, test.package, test.name, entry.label)];
+      }));
+    return [domain, Object.freeze([...scenarios, ...extra])];
+  }),
+));
 
 export const FIELD_LINKAGE_PRINT_CASE_IDS = Object.freeze([
   "FL_processing_contract_table_headers__paper_uses_shared_subject_aware_columns",

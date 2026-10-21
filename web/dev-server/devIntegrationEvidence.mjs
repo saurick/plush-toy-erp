@@ -7,7 +7,8 @@ import {
   normalizeRepositoryIdentity,
   repositoryIdentitiesEqual,
 } from '../../scripts/qa/lib/repository-identity.mjs'
-import { verifyGoTestJson } from '../../scripts/qa/verify-go-test-json.mjs'
+import { businessRuleTestResults, verifyGoTestJson } from '../../scripts/qa/verify-go-test-json.mjs'
+import { businessRuleTests, businessTestKey } from '../../scripts/qa/lib/business-rule-catalog.mjs'
 import { DISPOSABLE_DATABASE_RUN_SCHEMA } from '../../scripts/qa/disposable-database-runner.mjs'
 import { readIntegrationScenarios } from '../src/dev-workbench/config/devIntegration.mjs'
 
@@ -68,6 +69,7 @@ export async function readIntegrationRunEvidence(
     current: false,
     run: null,
     scenarios: scenarios.map((row) => ({ ...row, status: 'missing' })),
+    ruleTests: businessRuleTests('postgres').map((test) => ({ id: businessTestKey(test), status: 'missing' })),
   }
   let files
   const directory = path.join(root, DIRECTORY)
@@ -155,6 +157,7 @@ export async function readIntegrationRunEvidence(
   return {
     ...empty,
     run,
+    ruleTests: businessRuleTestResults(events, 'postgres'),
     current:
       repositoryIdentitiesEqual(report.repository, report.repositoryAfter) &&
       repositoryIdentitiesEqual(report.repository, repository),

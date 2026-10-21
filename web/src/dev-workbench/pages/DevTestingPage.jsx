@@ -34,6 +34,7 @@ import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import DevRPCContractReview from '../components/DevRPCContractReview.jsx'
+import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COMMAND_PAGE_QUERY_KEY,
@@ -1286,13 +1287,11 @@ function CoverageReportView({
           label: (
             <>
               {label}
-              <Tag
-                color={coverageTagColor(
-                  getDevTestingCoverageStatusMeta(status).tone
-                )}
-              >
-                {getDevTestingCoverageStatusMeta(status).label.split(' / ')[0]}
-              </Tag>
+              {status ? (
+                <Tag color={coverageTagColor(getDevTestingCoverageStatusMeta(status).tone)}>
+                  {getDevTestingCoverageStatusMeta(status).label.split(' / ')[0]}
+                </Tag>
+              ) : null}
             </>
           ),
         }))}
@@ -1306,7 +1305,9 @@ function CoverageReportView({
         className="erp-dev-testing-coverage-panel"
         tabIndex={0}
       >
-        {loading && !report ? (
+        {section === 'rules' ? <DevBusinessRulesPanel report={report} reportCurrent={source === 'workspace' && activeState?.status === 'current'} /> : null}
+
+        {loading && !report && section !== 'rules' ? (
           <section
             className="erp-dev-testing-coverage-loading"
             aria-label="覆盖报告加载中"
@@ -1315,7 +1316,7 @@ function CoverageReportView({
           </section>
         ) : null}
 
-        {!loading && !report ? (
+        {!loading && !report && section !== 'rules' ? (
           <div className="erp-dev-testing-coverage-empty">
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -1324,7 +1325,7 @@ function CoverageReportView({
           </div>
         ) : null}
 
-        {report ? (
+        {report && section !== 'rules' ? (
           <>
             <section className="erp-dev-testing-coverage-identity">
               <span>

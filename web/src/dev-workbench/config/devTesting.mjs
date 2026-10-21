@@ -12,6 +12,7 @@ export const DEV_TESTING_COMMAND_PAGE_SIZE = 10
 export const DEV_TESTING_COVERAGE_SECTIONS = Object.freeze([
   Object.freeze({ value: 'code', label: '代码覆盖' }),
   Object.freeze({ value: 'business', label: '业务场景' }),
+  Object.freeze({ value: 'rules', label: '关键规则' }),
   Object.freeze({ value: 'gates', label: '验证门禁' }),
   Object.freeze({ value: 'acceptance', label: '运行与验收' }),
 ])
@@ -73,6 +74,7 @@ export function buildDevTestingCoverageSectionSummaries(report) {
     ),
   }
   return DEV_TESTING_COVERAGE_SECTIONS.map((section) => {
+    if (section.value === 'rules') return { ...section, status: null }
     const statuses = groups[section.value]
       .map((item) => item?.status || 'not_collected')
       .filter((status) => status !== 'not_applicable')

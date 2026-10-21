@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { businessRuleTests, businessTestKey } from "./lib/business-rule-catalog.mjs";
 
 function compileExcludedSkipPattern(source) {
   if (!source) return null;
@@ -14,7 +15,7 @@ function compileExcludedSkipPattern(source) {
 export function verifyGoTestJson(
   content,
   requiredPrefixes = [],
-  { excludedSkipPattern = "" } = {},
+  { excludedSkipPattern = "", businessRules = "" } = {},
 ) {
   const excludedSkipRegex = compileExcludedSkipPattern(excludedSkipPattern);
   const events = [];
@@ -71,6 +72,12 @@ export function verifyGoTestJson(
     const selected = eligibleRunEvents.filter((event) => event.Test.startsWith(prefix));
     return selected.length > 0 && !selected.some((event) => passedTests.has(identity(event)));
   });
+  const missingBusinessTests = businessRules
+    ? businessRuleTests(businessRules).filter((test) => {
+        const key = `${test.package}\0${test.name}`;
+        return !eligibleRunTests.has(key) || !passedTests.has(key);
+      }).map(businessTestKey)
+    : [];
 
   return {
     ok:
@@ -79,7 +86,9 @@ export function verifyGoTestJson(
       prefixesWithoutPass.length === 0 &&
       skippedTests.length === 0 &&
       failedTests.length === 0 &&
-      unresolvedTests.length === 0,
+      unresolvedTests.length === 0 &&
+      missingBusinessTests.length === 0,
+    ...(businessRules ? { missingBusinessTests } : {}),
     run: eligibleRunTests.size,
     pass: passedRunCount,
     skip: skippedTests.length,
@@ -94,16 +103,36 @@ export function verifyGoTestJson(
   };
 }
 
+export function businessRuleTestResults(events, gate) {
+  return businessRuleTests(gate).map((test) => {
+    const selected = events.filter((event) => event.Package === test.package &&
+      (event.Test === test.name || event.Test?.startsWith(`${test.name}/`)));
+    const result = verifyGoTestJson(selected.map((event) => JSON.stringify(event)).join('\n'));
+    const parentPassed = selected.some((event) => event.Test === test.name && event.Action === 'pass');
+    const parentRan = selected.some((event) => event.Test === test.name && event.Action === 'run');
+    return {
+      id: businessTestKey(test),
+      status: result.fail ? 'failed' : result.skip ? 'skipped' : result.ok && parentRan && parentPassed ? 'passed' : 'missing',
+      counts: { executed: result.run, passed: result.pass, failed: result.fail, skipped: result.skip },
+    };
+  });
+}
+
 function parseArgs(argv) {
-  const options = { report: "", requiredPrefixes: [], json: false };
+  const options = { report: "", requiredPrefixes: [], json: false, businessRules: "" };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--report") options.report = argv[++index] || "";
     else if (arg === "--require-prefix") options.requiredPrefixes.push(argv[++index] || "");
     else if (arg === "--json") options.json = true;
+    else if (arg === "--business-rules" && !options.businessRules) {
+      options.businessRules = argv[++index] || "";
+      businessRuleTests(options.businessRules);
+    }
     else throw new Error(`[qa:go-test-json] unsupported argument: ${arg}`);
   }
   if (!options.report) throw new Error("[qa:go-test-json] --report is required");
+  if (options.businessRules) businessRuleTests(options.businessRules);
   if (options.requiredPrefixes.some((prefix) => !prefix)) {
     throw new Error("[qa:go-test-json] --require-prefix needs a non-empty value");
   }
@@ -112,7 +141,7 @@ function parseArgs(argv) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const result = verifyGoTestJson(readFileSync(options.report, "utf8"), options.requiredPrefixes);
+  const result = verifyGoTestJson(readFileSync(options.report, "utf8"), options.requiredPrefixes, { businessRules: options.businessRules });
   if (options.json) console.log(JSON.stringify(result));
   else {
     console.log(
@@ -132,6 +161,9 @@ function main() {
     }
     for (const testName of result.unresolvedTests) {
       console.error(`[qa:go-test-json] missing terminal summary: ${testName}`);
+    }
+    for (const testName of result.missingBusinessTests || []) {
+      console.error(`[qa:go-test-json] required business test did not pass: ${testName}`);
     }
   }
   if (!result.ok) process.exitCode = 1;

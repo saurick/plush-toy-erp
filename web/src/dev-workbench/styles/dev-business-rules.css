@@ -1,0 +1,76 @@
+.erp-dev-business-rules {
+  min-width: 0;
+}
+
+.erp-dev-business-rules__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-block: 16px;
+}
+
+.erp-dev-business-rules__toolbar > .ant-select {
+  width: 165px;
+}
+
+.erp-dev-business-rules__toolbar > .ant-input-affix-wrapper {
+  flex: 1;
+  min-width: 220px;
+  max-width: 480px;
+}
+
+.erp-dev-business-rules__standard,
+.erp-dev-business-rules__count {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+
+.erp-dev-business-rules__run {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.erp-dev-business-rules__detail,
+.erp-dev-business-rules__policy {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+}
+
+.erp-dev-business-rules summary {
+  cursor: pointer;
+}
+
+.erp-dev-business-rules__tests {
+  margin-block: 16px;
+  overflow-x: auto;
+}
+
+.erp-dev-business-rules__tests table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.erp-dev-business-rules__tests th,
+.erp-dev-business-rules__tests td {
+  padding: 10px;
+  border-bottom: 1px solid var(--erp-border);
+  vertical-align: top;
+}
+
+.erp-dev-business-rules__tests code {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-business-rules__tests small {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}

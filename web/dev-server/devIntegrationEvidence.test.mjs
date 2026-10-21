@@ -6,6 +6,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { readIntegrationRunEvidence } from './devIntegrationEvidence.mjs'
 import { DISPOSABLE_DATABASE_RUN_SCHEMA } from '../../scripts/qa/disposable-database-runner.mjs'
+import { businessRuleTests, businessTestKey } from '../../scripts/qa/lib/business-rule-catalog.mjs'
 
 const identity = {
   commit: 'a'.repeat(40),
@@ -67,6 +68,19 @@ async function report(
 }
 const read = (root, current = identity) =>
   readIntegrationRunEvidence(root, { readIdentity: async () => current })
+
+test('critical rule evidence reuses the original digest-bound scenario events', async (t) => {
+  const root = await fixture(t)
+  const target = businessRuleTests('postgres')[0]
+  const empty = await read(root)
+  assert.equal(empty.ruleTests.length, businessRuleTests('postgres').length)
+  assert(empty.ruleTests.every((entry) => entry.status === 'missing'))
+  await report(root, { content: ['run', 'pass'].map((Action) => JSON.stringify({ Action, Package: target.package, Test: target.name })).join('\n') })
+  const evidence = await read(root)
+  assert.equal(evidence.ruleTests.find((entry) => entry.id === businessTestKey(target)).status, 'passed')
+  assert.equal(evidence.current, true)
+  assert.equal((await read(root, { ...identity, fingerprint: 'c'.repeat(64) })).current, false)
+})
 
 test('integration evidence uses formal associations and original bound Go results', async (t) => {
   const root = await fixture(t)

@@ -35,6 +35,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/observability.test.mjs",
     "scripts/project-scan.test.mjs",
     "scripts/qa/affected.test.mjs",
+    "scripts/qa/business-rule-catalog.test.mjs",
     "scripts/qa/candidate-sha-freeze.test.mjs",
     "scripts/qa/canonical-runtime-audit-contract.test.mjs",
     "scripts/qa/ci-job-guide.test.mjs",

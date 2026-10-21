@@ -2,10 +2,47 @@ package biz
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/shopspring/decimal"
 )
+
+// Integer division is an independent oracle for quantities expressed in millionths.
+// The bounded input stays below the storage maximum; overflow has explicit examples below.
+func FuzzRoundRequiredUnitQuantity(f *testing.F) {
+	for _, coefficient := range []int64{0, -1, 1, 26_400_000, 1_001_001, math.MaxInt64, math.MinInt64} {
+		for precision := uint8(0); precision < 9; precision++ {
+			f.Add(coefficient, precision)
+		}
+	}
+	f.Fuzz(func(t *testing.T, coefficient int64, scale uint8) {
+		precision := int(scale%9) - 1
+		quantity := decimal.New(coefficient, -6)
+		got, err := RoundRequiredUnitQuantity(quantity, precision)
+		if precision < 0 || precision > 6 || coefficient <= 0 {
+			if !errors.Is(err, ErrBadParam) {
+				t.Fatalf("invalid demand accepted: coefficient=%d precision=%d err=%v", coefficient, precision, err)
+			}
+			return
+		}
+		step := int64(1)
+		for digit := precision; digit < 6; digit++ {
+			step *= 10
+		}
+		units := coefficient / step
+		if coefficient%step != 0 {
+			units++
+		}
+		want := decimal.New(units, -int32(precision))
+		if err != nil || !got.Equal(want) {
+			t.Fatalf("coefficient=%d precision=%d got=%s want=%s err=%v", coefficient, precision, got, want, err)
+		}
+		if valid := ValidateUnitQuantity(quantity, precision) == nil; valid != (coefficient%step == 0) {
+			t.Fatalf("quantity precision changed silently: coefficient=%d precision=%d valid=%v", coefficient, precision, valid)
+		}
+	})
+}
 
 func TestValidateUnitQuantity(t *testing.T) {
 	for _, tt := range []struct {

@@ -21,6 +21,17 @@ const passingNodeSummary = [
   "# todo 0",
 ].join("\n");
 
+test('formal business gate options reject wrong kinds, unknown gates and duplicates', () => {
+  const valid = ['--kind', 'go', '--label', 'focused', '--business-rules', 'server', '--', 'go', 'test']
+  assert.equal(parseArgs(valid).businessRules, 'server')
+  assert.throws(() => parseArgs(valid.map((part) => part === 'server' ? 'other' : part)))
+  assert.throws(() => parseArgs(valid.map((part) => part === 'go' ? 'node' : part)))
+  assert.throws(() => parseArgs(['--kind', 'go', '--label', 'x', '--business-rules', 'server', '--business-rules', 'server', '--', 'go']))
+  const outcome = evaluateTestGate({ kind: 'go', status: 0, stdout: JSON.stringify({ Action: 'pass', Package: 'server/internal/biz' }), businessRules: 'server' })
+  assert.equal(outcome.ok, false)
+  assert(outcome.result.missingBusinessTests.length > 0)
+})
+
 test("test gate preserves child failure before summary proof", () => {
   assert.deepEqual(
     evaluateTestGate({ kind: "node", status: 7, stdout: passingNodeSummary }),

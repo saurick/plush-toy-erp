@@ -141,7 +141,7 @@ test-critical)
   for test_prefix in "${CRITICAL_POSTGRES_REQUIRED_PREFIXES[@]}"; do
     verify_args+=(--require-prefix "$test_prefix")
   done
-  node ../scripts/qa/verify-go-test-json.mjs "${verify_args[@]}"
+  node ../scripts/qa/verify-go-test-json.mjs "${verify_args[@]}" --business-rules postgres
   ;;
 test-critical-disposable)
   run_disposable_critical_gate

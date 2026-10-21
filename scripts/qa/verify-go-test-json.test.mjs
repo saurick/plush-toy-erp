@@ -1,7 +1,43 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { verifyGoTestJson } from "./verify-go-test-json.mjs";
+import { businessRuleTestResults, verifyGoTestJson } from "./verify-go-test-json.mjs";
+import { businessRuleTests } from "./lib/business-rule-catalog.mjs";
+
+test('named business scenarios cannot disappear behind a passing test family', () => {
+  for (const gate of ['server', 'postgres']) {
+    const tests = businessRuleTests(gate)
+    const events = tests.flatMap((target) => ['run', 'pass'].map((Action) => ({ Action, Package: target.package, Test: target.name })))
+    assert.equal(verifyGoTestJson(lines(events), [], { businessRules: gate }).ok, true)
+    const victim = tests[0]
+    for (const change of ['removed', 'renamed', 'wrong-package', 'skip', 'child-only']) {
+      const changed = events.flatMap((event) => {
+        if (event.Test !== victim.name || event.Package !== victim.package) return [event]
+        if (change === 'removed') return []
+        if (change === 'renamed') return [{ ...event, Test: `${event.Test}Extra` }]
+        if (change === 'wrong-package') return [{ ...event, Package: 'other/package' }]
+        if (change === 'child-only') return [{ ...event, Test: `${event.Test}/child` }]
+        return [{ ...event, Action: event.Action === 'pass' ? 'skip' : event.Action }]
+      })
+      const result = verifyGoTestJson(lines(changed), [], { businessRules: gate, excludedSkipPattern: change === 'skip' ? victim.name : '' })
+      assert.equal(result.ok, false, `${gate}: ${change}`)
+      assert(result.missingBusinessTests.includes(`${victim.package}:${victim.name}`))
+    }
+  }
+})
+
+test('per-scenario evidence requires the parent terminal and rejects skipped or failed children', () => {
+  const target = businessRuleTests('postgres')[0]
+  for (const [parent, child, expected] of [['pass', 'pass', 'passed'], ['', 'pass', 'missing'], ['pass', 'skip', 'skipped'], ['fail', 'pass', 'failed']]) {
+    const events = [
+      { Action: 'run', Package: target.package, Test: target.name },
+      ...(parent ? [{ Action: parent, Package: target.package, Test: target.name }] : []),
+      { Action: 'run', Package: target.package, Test: `${target.name}/child` },
+      { Action: child, Package: target.package, Test: `${target.name}/child` },
+    ]
+    assert.equal(businessRuleTestResults(events, 'postgres')[0].status, expected)
+  }
+})
 
 function lines(events) {
   return events.map((event) => JSON.stringify(event)).join("\n");
