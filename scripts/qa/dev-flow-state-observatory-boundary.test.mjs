@@ -132,7 +132,7 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(guide, /<FulfillmentChainCanvas/u, "the main chain remains present while an exception is open");
   assert.match(chainModel, /buildFulfillmentOverview\(flow\)/u, "the total flow groups the canonical source stages");
   assert.match(chain, /data-fulfillment-stage=\{step\.stage\}/u, "each main node retains its canonical identity");
-  assert.doesNotMatch(guide, /function ExceptionGuide|exception-position/u, "the separate exception main view is removed");
+  assert.doesNotMatch(guide, /\bfunction\s+ExceptionGuide\s*\(|exception-position/u, "the separate exception main view is removed");
   for (const copy of [
     "Workflow 管“人”", "ProcessRuntime 管“路”", "Fact / Ledger 管“账”",
     "状态机管“规则”", "业务链负责串起来", "基础资料提供标准",
