@@ -1725,13 +1725,14 @@ automatically retried. The browser-facing Bridge chooses all local paths.`);
       process.exit(0);
     }
     const { runRecordedDeployment } = await import("./gitlab-deployment-records.mjs");
+    const operationStore = consumeDeliveryOperationStore(process.cwd());
     const report = await runRecordedDeployment({
-      store: consumeDeliveryOperationStore(process.cwd()),
+      store: operationStore,
       operationId: options.operationId,
       confirmation: options.confirmation,
       execute: () => executePromotion({
         repoRoot: process.cwd(),
-        operationStore: consumeDeliveryOperationStore(process.cwd()),
+        operationStore,
         operationId: options.operationId,
         bundleDir: options.bundleDir,
         releaseManifestPath: options.releaseManifest,

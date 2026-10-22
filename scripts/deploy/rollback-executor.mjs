@@ -1203,13 +1203,14 @@ or automatically retries a terminal or unknown operation.`);
       process.exit(0);
     }
     const { runRecordedDeployment } = await import("./gitlab-deployment-records.mjs");
+    const operationStore = consumeDeliveryOperationStore(process.cwd());
     const report = await runRecordedDeployment({
-      store: consumeDeliveryOperationStore(process.cwd()),
+      store: operationStore,
       operationId: options.operationId,
       confirmation: options.confirmation,
       execute: () => executeRollback({
         repoRoot: process.cwd(),
-        operationStore: consumeDeliveryOperationStore(process.cwd()),
+        operationStore,
         operationId: options.operationId,
         currentReleaseManifestPath: options.currentManifest,
         targetBundleDir: options.targetBundleDir,
