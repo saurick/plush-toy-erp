@@ -100,7 +100,12 @@ test('dev flow task lookup builds the existing visible keyword query contract', 
       offset: 0,
     }
   )
-  assert.throws(() => buildDevFlowStateTaskLookupQuery(''), /请输入任务名称/u)
+  for (const empty of ['', '   ', '\t\n　']) {
+    assert.throws(
+      () => buildDevFlowStateTaskLookupQuery(empty),
+      { name: 'TypeError', message: '请输入来源单号、任务名称或编号' }
+    )
+  }
   assert.throws(
     () => buildDevFlowStateTaskLookupQuery('任'.repeat(201)),
     /不能超过 200 个字符/u

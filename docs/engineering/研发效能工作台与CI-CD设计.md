@@ -498,7 +498,7 @@ Tab 条持续挂载；`batch`、`view`、`chain`、`status`、`q` 保存选择�
 
 - 主导航保持“业务结构 / 实例跟踪”两个稳定 Tab。业务结构默认 `view=chain&chain=all`，先展示订单全流程和一个关注岗位下拉框；选择岗位保留主链骨架，突出相关环节。技术专题和关系图在次级入口按需查看。实例跟踪为 `view=tracking`，按来源单号、任务名称或编号查找可见任务，再按业务环节展示关联任务；异常分支独立可见，可直接筛选待处理、异常或具体环节。
 
-  搜索保持常驻，搜索定义移到侧栏，客户选择仅在导出客户校对稿时出现。Workflow、ProcessRuntime、Fact 与状态规则保留原 `view`，从技术详情或上下文动作进入；内部 key、代码和完整合同按需查看。
+  “定位业务”搜索框及查询反馈仅在实例跟踪展示；离开该视图取消未完成查询。搜索定义放在侧栏，客户选择仅在导出客户校对稿时出现。Workflow、ProcessRuntime、Fact 与状态规则保留原 `view`，从技术详情或上下文动作进入；内部 key、代码和完整合同按需查看。
 #### 定义目录与状态规则
 
 - `devFlowStateCatalog.mjs` 汇总状态机和流程 variant，`devBusinessChainCatalog.mjs` 是业务链目录，`devFactLedgerCatalog.mjs` 是 Fact / Ledger 定义目录。三者都是 dev-only 只读投影，不是新的业务真源；构建器校验唯一 key、引用、覆盖和图可达，未知引用或缺失覆盖 fail closed。

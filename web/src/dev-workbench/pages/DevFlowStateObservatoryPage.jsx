@@ -1075,7 +1075,7 @@ export default function DevFlowStateObservatoryPage() {
         </Space>
       </header>
 
-      {valid && catalog && ['chain', 'tracking', 'workflow', 'runtime'].includes(view) ? (
+      {valid && catalog && view === 'tracking' ? (
         <TaskFinder key={`finder-${sessionRevision}`} draft={taskDraft} onDraftChange={setTaskDraft} onClearTask={clearTask} onSelectTask={(id, task) => selectTask(id, task, 'tracking')} taskId={taskId} />
       ) : null}
       <Drawer title="搜索定义" width={860} open={definitionSearchOpen} onClose={() => setDefinitionSearchOpen(false)} destroyOnHidden>

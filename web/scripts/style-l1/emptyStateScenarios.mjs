@@ -259,18 +259,19 @@ export function createEmptyStateScenarios({
           .getByRole('button', { name: '交付运行', exact: true })
           .click()
         for (const task of [
-          { tab: '客户配置', expected: '试跑与发布' },
-          { tab: '数据库迁移', summary: '正式页面的任务标签', expected: '运行检查' },
-          { tab: '版本发布', summary: '正式页面的任务标签', expected: '发布检查' },
-          { tab: '安全与恢复', summary: '安全核验、恢复演练与应急指引', expected: '应急指引' },
+          { tool: '客户配置', expected: '试跑与发布' },
+          { tool: '数据库迁移', summary: '正式页面的任务标签', expected: '运行检查' },
+          { tool: '版本发布', summary: '正式页面的任务标签', expected: '发布检查' },
+          { tool: '安全与恢复', summary: '安全核验、恢复演练与应急指引', expected: '应急指引' },
         ]) {
-          await frame.getByRole('tab', { name: task.tab, exact: true }).click()
+          await sidebar.getByRole('button', { name: task.tool, exact: true }).click()
+          await frame.getByRole('heading', { name: task.tool, level: 1, exact: true }).waitFor()
           if (task.summary) {
             await frame.locator('.dev-design-settings > summary').filter({ hasText: task.summary }).click()
           }
           await frame.getByRole('table', { name: '正式交付页面任务' }).getByRole('row', { name: new RegExp(task.expected, 'u') }).waitFor()
         }
-        await frame.getByRole('tab', { name: '版本发布', exact: true }).click()
+        await sidebar.getByRole('button', { name: '版本发布', exact: true }).click()
         assert.ok(
           await frame.getByRole('button', { name: '核对并准备' }).isDisabled()
         )
@@ -305,7 +306,11 @@ export function createEmptyStateScenarios({
           await frame.locator(':focus').getAttribute('data-action'),
           'dev-lock-flow'
         )
-        const tabs = await frame.locator('.dev-design-tabs').elementHandle()
+        await sidebar.getByRole('button', { name: '交付运行', exact: true }).click()
+        const deliveryTabs = frame.getByRole('tablist', { name: '交付运行视图' })
+        await deliveryTabs.getByRole('tab', { name: '环境证据', exact: true }).click()
+        await frame.getByRole('table', { name: '环境证据样例' }).waitFor()
+        const tabs = await deliveryTabs.elementHandle()
         const motion = tabs.evaluate(async (node) => {
           const samples = []
           const start = performance.now()
@@ -321,8 +326,8 @@ export function createEmptyStateScenarios({
           }
           return samples
         })
-        await frame
-          .getByRole('tab', { name: '数据库迁移', exact: true })
+        await deliveryTabs
+          .getByRole('tab', { name: '交付任务', exact: true })
           .click()
         const samples = await motion
         const first = samples[0]
@@ -354,32 +359,38 @@ export function createEmptyStateScenarios({
           ),
           'none'
         )
-        await frame
-          .getByRole('tab', { name: '数据库迁移', exact: true })
+        await deliveryTabs
+          .getByRole('tab', { name: '交付任务', exact: true })
           .press('End')
         assert.equal(
-          await frame
-            .getByRole('tab', { name: '安全与恢复', exact: true })
+          await deliveryTabs
+            .getByRole('tab', { name: '环境证据', exact: true })
             .getAttribute('aria-selected'),
           'true'
         )
-        await frame
-          .getByRole('tab', { name: '安全与恢复', exact: true })
+        await deliveryTabs
+          .getByRole('tab', { name: '环境证据', exact: true })
           .press('ArrowLeft')
+        assert.equal(
+          await deliveryTabs
+            .getByRole('tab', { name: '交付任务', exact: true })
+            .getAttribute('aria-selected'),
+          'true'
+        )
         await page.emulateMedia({ reducedMotion: 'no-preference' })
-        await frame.getByRole('tab', { name: '数据库迁移', exact: true }).click()
         await sidebar
           .getByRole('button', { name: '质量验证', exact: true })
           .click()
+        await frame.getByRole('button', { name: '开始验证', exact: true }).click()
         await frame
           .getByRole('button', { name: '演示本轮验证', exact: true })
           .click()
-        await frame.getByRole('tab', { name: '执行记录', exact: true }).click()
+        await frame.getByRole('tab', { name: '证据与覆盖', exact: true }).click()
         await frame
           .getByText('定向页面检查 · 样例完成', { exact: true })
           .waitFor()
         await sidebar
-          .getByRole('button', { name: '交付运行', exact: true })
+          .getByRole('button', { name: '数据库迁移', exact: true })
           .click()
         assert.ok(
           await frame.getByRole('button', { name: '核对并准备' }).isDisabled()
@@ -409,8 +420,8 @@ export function createEmptyStateScenarios({
         assert.ok(
           await frame.getByRole('button', { name: '核对并准备' }).isDisabled()
         )
-        await frame
-          .getByRole('tab', { name: '安全与恢复', exact: true })
+        await sidebar
+          .getByRole('button', { name: '安全与恢复', exact: true })
           .click()
         await frame.getByRole('button', { name: '读取演示结果' }).waitFor()
         await frame

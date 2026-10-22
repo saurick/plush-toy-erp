@@ -97,7 +97,7 @@ export function isDevFlowStateTaskUnlinkedRuntimeError(error) {
 export function buildDevFlowStateTaskLookupQuery(value) {
   const keyword = cleanText(value)
   if (!keyword) {
-    throw new TypeError('请输入任务名称、任务编号、来源单号或 task_id')
+    throw new TypeError('请输入来源单号、任务名称或编号')
   }
   if (Array.from(keyword).length > MAX_TASK_LOOKUP_LENGTH) {
     throw new TypeError('任务查询内容不能超过 200 个字符')

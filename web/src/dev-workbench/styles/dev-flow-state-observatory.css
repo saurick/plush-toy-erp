@@ -1094,6 +1094,10 @@
   min-height: 40px;
 }
 
+.erp-dev-flow-task-input-error {
+  grid-column: 2 / -1;
+}
+
 .erp-dev-flow-task-results {
   display: grid;
   gap: 9px;
@@ -2234,6 +2238,11 @@
   .erp-dev-flow-definition-selector,
   .erp-dev-flow-selected-state {
     grid-template-columns: 1fr;
+  }
+
+  .erp-dev-flow-task-input-error {
+    grid-column: 1;
+    grid-row: 3;
   }
 
   .erp-dev-flow-state-list ul {

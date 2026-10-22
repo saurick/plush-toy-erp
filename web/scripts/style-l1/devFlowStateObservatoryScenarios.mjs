@@ -1,3 +1,4 @@
+import { expect } from 'playwright/test'
 import { assertFulfillmentChainClickTargets, assertFulfillmentChainGeometry, assertFulfillmentDetailGeometry, openFulfillmentExceptionDirectory } from './fulfillmentChainAssertions.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
 import {
@@ -46,6 +47,7 @@ export function createDevFlowStateObservatoryScenarios({
         await expectText(page, '业务链观察')
         const root = page.locator('[data-dev-flow-state-observatory]')
         await root.waitFor({ state: 'visible', timeout: 10_000 })
+        await expect(page.locator('#dev-flow-task-search')).toHaveCount(0)
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0,
@@ -66,8 +68,16 @@ export function createDevFlowStateObservatoryScenarios({
         const guide = page.locator('#task-fulfillment-guide')
         const chooseRole = async (label) => {
           const control = guide.locator('.erp-dev-fulfillment-guide__role .ant-select')
-          if (label === '全部岗位') { await control.hover(); await control.locator('.ant-select-clear').click() }
-          else { await control.locator('.ant-select-selector').click(); await page.locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click() }
+          if (label === '全部岗位') {
+            await control.hover()
+            await control.locator('.ant-select-clear').click()
+            await expect(control.locator('.ant-select-selection-item')).toHaveCount(0)
+          } else {
+            await control.locator('.ant-select-selector').click()
+            await page.locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
+            await expect(control.locator('.ant-select-selection-item')).toHaveText(label)
+          }
+          await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
         }
         const exceptionDirectory = guide.locator('.erp-dev-exception-directory')
         await assertFulfillmentChainClickTargets(guide.locator('[data-fulfillment-chain]'))
@@ -146,6 +156,36 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(await tabs.getByRole('tab').count(), 2)
         await tabs.getByRole('tab', { name: '实例跟踪' }).click()
         await expectText(page, '输入单号或任务，查看实际进度与异常')
+        const taskSearch = page.locator('#dev-flow-task-search')
+        const inputError = page.locator('#dev-flow-task-input-error')
+        const taskFinder = page.locator('.erp-dev-flow-task-finder')
+        for (const empty of ['', '   ']) {
+          await taskSearch.fill(empty)
+          await taskFinder.getByRole('button', { name: '定位', exact: true }).click()
+          await expect(inputError).toHaveText('请输入来源单号、任务名称或编号')
+          await expect(taskSearch).toHaveAttribute('aria-invalid', 'true')
+          await expect(taskSearch).toBeFocused()
+          assert.equal(await taskFinder.locator('.ant-alert-error').count(), 0)
+        }
+        const inputBox = await taskSearch.boundingBox()
+        const errorBox = await inputError.boundingBox()
+        assert(errorBox.y >= inputBox.y + inputBox.height, '校验提示应位于输入框下方')
+        await taskSearch.fill('来源单号')
+        await expect(inputError).toHaveCount(0)
+        assert.equal(await taskSearch.getAttribute('aria-invalid'), null)
+        await tabs.getByRole('tab', { name: '业务结构' }).click()
+        await expect(taskSearch).toHaveCount(0)
+        for (const [name, view] of [['查责任与任务', 'workflow'], ['看运行路径', 'runtime']]) {
+          await page.getByRole('button', { name: '技术详情' }).click()
+          await page.getByRole('menuitem', { name, exact: true }).click()
+          await expect(page).toHaveURL((url) => url.searchParams.get('view') === view)
+          await expect(taskSearch).toHaveCount(0)
+        }
+        await tabs.getByRole('tab', { name: '业务结构' }).click()
+        await tabs.getByRole('tab', { name: '实例跟踪' }).click()
+        await expect(taskSearch).toHaveValue('来源单号')
+        await expect(inputError).toHaveCount(0)
+        await taskSearch.fill('')
         await tabs.getByRole('tab', { name: '业务结构' }).click()
         await topics.waitFor({ state: 'visible' })
         await root.getByRole('button', { name: '返回完整流程', exact: true }).click()
@@ -159,6 +199,7 @@ export function createDevFlowStateObservatoryScenarios({
           .getByRole('dialog', { name: '搜索定义' })
           .locator('.ant-drawer-close')
           .click()
+        await page.getByRole('dialog', { name: '搜索定义' }).waitFor({ state: 'hidden' })
         const exportButton = page.getByRole('button', {
           name: '导出',
           exact: true,
@@ -341,7 +382,7 @@ export function createDevFlowStateObservatoryScenarios({
         )
         await guide.getByRole('button', { name: '1 接单、工程与用料审批', exact: true }).click()
         await result
-          .getByRole('heading', { name: '接单、工程与用料审批', exact: true })
+          .getByRole('heading', { name: '接单与用料审批', exact: true })
           .waitFor()
         await result.getByRole('button', { name: '单据与规则' }).click()
         await guide
@@ -424,7 +465,7 @@ export function createDevFlowStateObservatoryScenarios({
           await openFulfillmentExceptionDirectory(guide)
           await exceptionDirectory.waitFor()
           await exceptionDirectory.locator('[data-handling-entry="sales_order"]').waitFor()
-          assert.equal(await exceptionDirectory.locator('[data-exception-entry]').count(), 6)
+          await expect(exceptionDirectory.locator('[data-exception-entry]')).toHaveCount(6)
           await assertNoHorizontalOverflow(page, `directory-responsive-${width}`)
           await exceptionDirectory.locator('[data-handling-entry="packaging"] button').click()
           await guide.locator('[data-stage-handling="packaging"]').waitFor()

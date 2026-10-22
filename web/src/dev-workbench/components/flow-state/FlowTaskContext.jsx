@@ -168,10 +168,10 @@ function TaskFinder({
     onSelectTask(task.id, task)
   }
 
-  const submit = async () => {
+  const submit = async (form) => {
+    controllerRef.current?.abort()
     const directTaskId = parseDevFlowStateTaskIDReference(draft)
     if (directTaskId) {
-      controllerRef.current?.abort()
       setLookup((current) => ({
         ...current,
         status: 'selected',
@@ -186,16 +186,16 @@ function TaskFinder({
       query = buildDevFlowStateTaskLookupQuery(draft)
     } catch (error) {
       setLookup({
-        status: 'error',
+        status: 'invalid',
         candidates: [],
         complete: true,
         loadedCount: 0,
         serverMatchCount: 0,
         error: error.message,
       })
+      form.elements.namedItem('dev-flow-task-search')?.focus()
       return
     }
-    controllerRef.current?.abort()
     const controller = new AbortController()
     controllerRef.current = controller
     setLookup({
@@ -236,7 +236,7 @@ function TaskFinder({
       <form
         onSubmit={(event) => {
           event.preventDefault()
-          submit()
+          submit(event.currentTarget)
         }}
       >
         <label htmlFor="dev-flow-task-search">定位业务</label>
@@ -247,6 +247,9 @@ function TaskFinder({
           value={draft}
           placeholder="订单 / 来源单号 / 任务名称或编号"
           searchHint="查询当前账号可见任务；数字任务 ID 可用于开发排障"
+          status={lookup.status === 'invalid' ? 'error' : undefined}
+          aria-invalid={lookup.status === 'invalid' || undefined}
+          aria-describedby={lookup.status === 'invalid' ? 'dev-flow-task-input-error' : undefined}
           onChange={(event) => {
             controllerRef.current?.abort()
             setLookup((current) => ({
@@ -266,6 +269,16 @@ function TaskFinder({
           定位
         </Button>
         {taskId ? <Button onClick={onClearTask}>清除当前任务</Button> : null}
+        {lookup.status === 'invalid' ? (
+          <Text
+            type="danger"
+            id="dev-flow-task-input-error"
+            className="erp-dev-flow-task-input-error"
+            role="alert"
+          >
+            {lookup.error}
+          </Text>
+        ) : null}
       </form>
       <TaskLookupResults lookup={lookup} onSelectTask={selectTask} />
     </div>
