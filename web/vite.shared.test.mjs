@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import http from 'node:http'
@@ -33,6 +34,34 @@ test('Vite CLI bundles its shared browser policy from the actual config file', a
   }, 'serve', 'development')
   assert(config.plugins.some((plugin) => plugin.name === 'plush-dev-browser-policy'))
   assert.equal(config.server.open, false)
+})
+
+test('Vite build resolves without the development browser launcher', () => {
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+    import assert from 'node:assert/strict'
+    import { registerHooks } from 'node:module'
+    registerHooks({
+      resolve(specifier, context, nextResolve) {
+        if (specifier.endsWith('/openDevBrowser.js')) {
+          throw new Error('The release builder excludes the development browser launcher')
+        }
+        return nextResolve(specifier, context)
+      }
+    })
+    const { resolveConfig } = await import('vite')
+    const browser = process.env.BROWSER
+    for (const mode of ['production', 'development']) {
+      const config = await resolveConfig({
+        configFile: './vite.config.mjs',
+        root: process.cwd(),
+        logLevel: 'silent',
+      }, 'build', mode)
+      assert.equal(config.server.open, false)
+      assert.equal(config.preview.open, false)
+      assert.equal(process.env.BROWSER, browser)
+    }
+  `], { cwd: import.meta.dirname, encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr || result.error?.message)
 })
 
 test('isolated Vite serves linked dependency assets while rejecting unrelated and denied files', async (t) => {

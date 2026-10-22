@@ -183,12 +183,13 @@ export function createERPViteConfig(appId) {
     const env = loadEnv(mode, process.cwd(), '')
     const isProd = mode === 'production'
     const isDev = mode === 'development'
-    const { resolveDevBrowserLaunchEnv, shouldSuppressDevBrowser } =
-      await import(DEV_BROWSER_MODULE)
-    if (command === 'serve') {
-      Object.assign(process.env, resolveDevBrowserLaunchEnv())
+    const devBrowser = command === 'serve'
+      ? await import(DEV_BROWSER_MODULE)
+      : null
+    if (devBrowser) {
+      Object.assign(process.env, devBrowser.resolveDevBrowserLaunchEnv())
     }
-    const suppressBrowserOpen = shouldSuppressDevBrowser()
+    const suppressBrowserOpen = devBrowser?.shouldSuppressDevBrowser() ?? true
 
     if (!isProd) {
       console.log(`[vite] erp app=${app.id} command=${command} mode=${mode}`)
