@@ -1,3 +1,5 @@
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+
 export function createProductPaginationScenarios({
   assert,
   assertNoHorizontalOverflow,
@@ -9,6 +11,13 @@ export function createProductPaginationScenarios({
 }) {
   let products = []
   let listRequests = []
+  let nextListRead = null
+
+  const holdNextListRead = () => {
+    let release
+    nextListRead = new Promise((resolve) => { release = resolve })
+    return release
+  }
 
   const resetProducts = () => {
     products = Array.from({ length: 1245 }, (_, index) => {
@@ -26,6 +35,7 @@ export function createProductPaginationScenarios({
       }
     })
     listRequests = []
+    nextListRead = null
   }
 
   const fulfill = (route, id, data) =>
@@ -55,6 +65,18 @@ export function createProductPaginationScenarios({
             const limit = Number(params.limit)
             const offset = Number(params.offset || 0)
             listRequests.push({ limit, offset })
+            const pendingRead = nextListRead
+            nextListRead = null
+            if (await pendingRead === 'fail') {
+              await route.fulfill({
+                json: {
+                  jsonrpc: '2.0',
+                  id,
+                  result: { code: RpcErrorCode.INTERNAL, message: '产品列表暂时无法读取', data: {} },
+                },
+              })
+              return
+            }
             await fulfill(route, id, {
               products: products.slice(offset, offset + limit),
               total: products.length,
@@ -228,11 +250,71 @@ export function createProductPaginationScenarios({
         await firstPageRequest
         await expectText(page, '第 1-500 条 / 共 1246 条')
         await sizeSelect.click()
+        const releaseSizeRead = holdNextListRead()
         const defaultPageRequest = waitForPageRequest(50, 0)
         await options.getByText('50 条/页', { exact: true }).click()
         await defaultPageRequest
+        try {
+          await page.locator('.erp-business-data-table-card .ant-spin-spinning').waitFor()
+          await expectText(page, '第 1-500 条 / 共 1246 条')
+          assert.equal(await page.locator(rowSelector).count(), 500, '读取新条数期间保留上一批完整数据')
+          assert.equal(await sizeSelect.locator('.ant-select-selection-item').innerText(), '500 条/页', '显示条数应与保留的数据一致')
+        } finally {
+          releaseSizeRead()
+        }
         await expectText(page, '第 1-50 条 / 共 1246 条')
         assert.equal(await page.locator(rowSelector).count(), 50)
+
+        const releasePageRead = holdNextListRead()
+        const nextPageRequest = waitForPageRequest(50, 50)
+        await page.locator('.ant-pagination-next button').click()
+        await nextPageRequest
+        try {
+          await page.locator('.erp-business-data-table-card .ant-spin-spinning').waitFor()
+          assert.equal(await page.locator('.ant-pagination-item-active').innerText(), '1', '翻页读取期间保留已显示的页码')
+          await expectText(page, '第 1-50 条 / 共 1246 条')
+          assert.match(await page.locator(rowSelector).first().innerText(), /分页最新产品/u)
+        } finally {
+          releasePageRead()
+        }
+        await expectText(page, '第 51-100 条 / 共 1246 条')
+        assert.equal(await page.locator('.ant-pagination-item-active').innerText(), '2')
+        assert.equal(await page.locator(rowSelector).count(), 50)
+        assert.match(await page.locator(rowSelector).first().innerText(), /PROD-PAGE-1196/u)
+
+        const releaseFailedRead = holdNextListRead()
+        const failedSizeRequest = waitForPageRequest(500, 0)
+        await sizeSelect.click()
+        await options.getByText('500 条/页', { exact: true }).click()
+        await failedSizeRequest
+        releaseFailedRead('fail')
+        await page.locator('.ant-message-error').waitFor()
+        await page.locator('.erp-business-data-table-card .ant-spin-spinning').waitFor({ state: 'hidden' })
+        await expectText(page, '第 51-100 条 / 共 1246 条')
+        assert.equal(await page.locator('.ant-pagination-item-active').innerText(), '2')
+        assert.equal(await sizeSelect.locator('.ant-select-selection-item').innerText(), '50 条/页')
+        assert.equal(await page.locator(rowSelector).count(), 50)
+        assert.match(await page.locator(rowSelector).first().innerText(), /PROD-PAGE-1196/u)
+
+        const retrySizeRequest = waitForPageRequest(500, 0)
+        await sizeSelect.click()
+        await options.getByText('500 条/页', { exact: true }).click()
+        await retrySizeRequest
+        await expectText(page, '第 1-500 条 / 共 1246 条')
+        assert.equal(await page.locator(rowSelector).count(), 500)
+
+        const retryLastPageRequest = waitForPageRequest(500, 1000)
+        await page.locator('.ant-pagination-item-3').click()
+        await retryLastPageRequest
+        await expectText(page, '第 1001-1246 条 / 共 1246 条')
+        const resetSizeRequest = waitForPageRequest(50, 0)
+        await sizeSelect.click()
+        await options.getByText('50 条/页', { exact: true }).click()
+        await resetSizeRequest
+        await expectText(page, '第 1-50 条 / 共 1246 条')
+        assert.equal(await page.locator('.ant-pagination-item-active').innerText(), '1')
+        assert.equal(await page.locator(rowSelector).count(), 50)
+        assert.match(await page.locator(rowSelector).first().innerText(), /分页最新产品/u)
 
         await page.screenshot({
           path: path.join(

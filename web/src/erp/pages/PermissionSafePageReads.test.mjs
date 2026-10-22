@@ -31,7 +31,7 @@ test('master data main reads and optional dictionaries use separate exact permis
 
   assert.match(
     masterDataPage,
-    /if \(!canReadCurrentRecord\) \{[\s\S]*setRecords\(\[\]\)[\s\S]*return true[\s\S]*config\.list/u
+    /if \(!canReadCurrentRecord\) \{[\s\S]*setRecordPage\(\{ records: \[\], total: 0, pagination \}\)[\s\S]*setSelectedRecord\(null\)[\s\S]*return true[\s\S]*config\.list/u
   )
   assert.match(
     masterDataPage,

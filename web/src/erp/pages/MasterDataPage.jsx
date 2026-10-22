@@ -187,12 +187,17 @@ export default function MasterDataPage({ type }) {
         : ''
     }
   )
-  const [records, setRecords] = useState([])
-  const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
     pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
+  // 表格数据与已完成读取的分页一起呈现，避免新条数配置套用旧页数据。
+  const [recordPage, setRecordPage] = useState(() => ({
+    records: [],
+    total: 0,
+    pagination,
+  }))
+  const { records, total, pagination: displayedPagination } = recordPage
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [, setContacts] = useState([])
   const [productReferences, setProductReferences] = useState([])
@@ -551,8 +556,7 @@ export default function MasterDataPage({ type }) {
     const request = beginLatestRequest('records')
     if (!canReadCurrentRecord) {
       if (request.isCurrent()) {
-        setRecords([])
-        setTotal(0)
+        setRecordPage({ records: [], total: 0, pagination })
         setSelectedRecord(null)
       }
       request.finish()
@@ -573,8 +577,11 @@ export default function MasterDataPage({ type }) {
       const nextRecords = Array.isArray(result?.[config.recordKey])
         ? result[config.recordKey]
         : []
-      setRecords(nextRecords)
-      setTotal(Number(result?.total || nextRecords.length || 0))
+      setRecordPage({
+        records: nextRecords,
+        total: Number(result?.total || nextRecords.length || 0),
+        pagination,
+      })
       setSelectedRecord((current) => {
         if (!current?.id) return null
         return nextRecords.find((item) => item.id === current.id) || null
@@ -1177,13 +1184,9 @@ export default function MasterDataPage({ type }) {
         dataSource={records}
         scroll={isProcessDictionaryPage ? { x: 1000 } : undefined}
         pagination={createBusinessTablePagination({
-          pagination,
+          pagination: displayedPagination,
           total,
-          onChange: (current, pageSize) => {
-            setLoading(true)
-            setRecords([])
-            setPagination({ current, pageSize })
-          },
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
         })}
         emptyDescription={`暂无${entityLabel}记录`}
         rowSelection={{
