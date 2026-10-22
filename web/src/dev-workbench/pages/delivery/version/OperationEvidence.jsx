@@ -19,7 +19,7 @@ const CHECK_LABELS = {
 }
 
 export function OperationEvidence({ operation, loading }) {
-  const { evidence, trace } = operation
+  const { evidence, trace, gitlabRecord } = operation
   return (
     <Card size="small" title="检查结果与追溯" loading={loading}>
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -39,6 +39,17 @@ export function OperationEvidence({ operation, loading }) {
                 本次发布流水线
               </Link>
             ) : null}
+          </Space>
+        ) : null}
+        {gitlabRecord ? (
+          <Space direction="vertical" size={4}>
+            <Space wrap>
+              {gitlabRecord.deploymentUrl ? <Link href={gitlabRecord.deploymentUrl} rel="noreferrer">GitLab 部署 #{gitlabRecord.deploymentId}</Link> : null}
+              {gitlabRecord.evidenceUrl ? <Link href={gitlabRecord.evidenceUrl} rel="noreferrer">GitLab 项目回执归档</Link> : null}
+              <Tag color={gitlabRecord.status === 'recorded' ? 'success' : 'warning'}>{gitlabRecord.status === 'recorded' ? '已登记 GitLab' : 'GitLab 登记待核对'}</Tag>
+            </Space>
+            {gitlabRecord.mode === 'historical' ? <Text type="secondary">历史补录：本页保留实际执行时间，GitLab 中的创建时间是登记时间。</Text> : null}
+            {gitlabRecord.status !== 'recorded' ? <Text type="secondary">原始执行结果和回执仍保留；补录登记不会再次部署。</Text> : null}
           </Space>
         ) : null}
         {evidence ? (

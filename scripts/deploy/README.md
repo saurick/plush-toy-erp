@@ -41,6 +41,7 @@
 | `promotion-executor.mjs` | 执行已确认的固定 target promotion 并读回公网 exact SHA | 写单一目标；失败按 operation 回滚 |
 | `rollback-controller.mjs` | 校验旧 manifest、migration 与客户配置兼容性 | 不写目标 |
 | `rollback-executor.mjs` | 回滚 Compose / 公网入口到兼容旧版本 | 不 down migration，不自动恢复数据库 |
+| `gitlab-deployment-records-cli.mjs` | 计划、补录与核验 GitLab 部署登记和项目回执 | `plan` / `verify` 只读；`sync --execute` / `reconcile --execute` 只登记 GitLab，不操作目标 |
 | `database-rebuild-controller.mjs` | 仅为 demo/test 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
 | `database-rebuild-executor.mjs` | 执行 ready rebuild operation | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
 | `bootstrap-production-admin.sh` | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC | 只允许 fresh target 的一次性确认窗口 |
@@ -117,6 +118,30 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 文件必须为当前用户所有的普通文件、权限 `0400 / 0600`，拒绝符号链接。显式 `PLUSH_GITLAB_TOKEN` 仍沿用既有服务端输入合同；命令参数不接受 token，凭据不进入公开输出或仓库。
 
 专用身份使用本项目带到期日的 Maintainer API token，并受当前 protected-main 与流水线变量规则约束；不复用或提升 CI 发布机器人的权限。到期前通过正式 GitLab 凭据维护轮换此专用身份，并重新运行 `check-credentials`。只读查询继续沿用 `PLUSH_GITLAB_READ_TOKEN`、Mac 的 `plush-toy-erp.gitlab-read-api` 或既有受控只读文件。
+
+## GitLab 部署登记与回执归档
+
+GitLab 原生 Environments / Deployments 管理 `demo`、`test`、`erp` 的部署身份与结果；环境名、公网入口和 tier 从 `deployment-targets.json` 派生。正式 promotion / rollback CLI 在目标写入前登记 running，执行后回写 success / failed / canceled，并把项目检查证据归档到 Generic Package `plush-deployment-evidence`，版本键为 `<target>-<operation UUID>`。项目原始 operation 与 receipt 继续负责步骤、迁移、备份恢复及结果未证明等细分事实，GitLab 登记由这些事实自动投影，不手工维护另一套结果。
+
+原生状态映射：passed → success，blocked → canceled，failed / not_proven → failed。最后一种仅表示未通过部署验证；原始 not_proven 和检查缺口完整保留，不能推断目标已回滚或业务不可用。重建、制品发布及退役 `test-133` 只归档项目回执，不伪装成现役环境的部署。预检准备记录仍由原 operation 保存；未进入执行的终态可在操作记录中补录。
+
+Generic Package 保存 `operation.json`、已有的 `receipt.json`、`link.json` 和部署创建前的 `intent.json`。每次上传回读 SHA-256；相同 UUID 幂等复用，内容冲突立即失败。缺失的历史回执和检查证据不补造。历史补录按原始完成时间升序登记，原始开始 / 结束时间不变；GitLab API 不支持回填 created_at，原生登记时间不能用于历史部署频率或耗时统计。
+
+本地 `gitlab/<operation UUID>.json` 只缓存 GitLab 引用和同步进度，历史列表不等待 GitLab；原 operation、计划、回执不因同步被改写或删除。完整远端归档可恢复丢失的引用缓存。创建 Deployment 响应丢失时保留本地及远端 intent，禁止自动重复 POST；明确读回精确部署 ID 后才 reconcile。GitLab 登记失败阻止新的目标写入；目标完成后的归档失败保留真实结果，显示待补录。执行器结束仅尝试一次补录，其余通过页面“补录 GitLab”或下列 CLI 显式恢复，不建后台轮询。
+
+在仓库根目录执行：
+
+```bash
+node scripts/deploy/gitlab-deployment-records-cli.mjs plan
+node scripts/deploy/gitlab-deployment-records-cli.mjs sync --execute
+node scripts/deploy/gitlab-deployment-records-cli.mjs verify
+# 单条补录；不执行部署
+node scripts/deploy/gitlab-deployment-records-cli.mjs sync --execute --operation-id <UUID>
+# 仅在创建响应丢失且核对 GitLab 精确 ID 后执行
+node scripts/deploy/gitlab-deployment-records-cli.mjs reconcile --execute --operation-id <UUID> --deployment-id <ID>
+```
+
+登记复用 `gitlab-release-cli.mjs` 的项目级 API 写凭据解析与权限核验，不使用只读 token；凭据仅留在登记进程，不进入浏览器、operation、Package 或目标 SSH 环境。`sync` 只处理终态，保留未结束操作。清理原始记录前必须独立完成备份恢复验证；GitLab 归档不授权删除本地证据。该包纳入 GitLab 原有应用备份，不能称为已完成异地恢复验证。
 
 ## Operation 真源
 

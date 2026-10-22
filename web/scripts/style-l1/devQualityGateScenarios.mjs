@@ -1053,14 +1053,10 @@ export function createDevQualityGateScenarios({
         await page.reload()
         await expectHeading(page, '质量门禁')
         await serverPanel.locator('[data-server-view="history"]').waitFor()
-        const firstHistoryDetails = serverPanel
-          .locator('.erp-dev-quality-server-history__jobs')
-          .first()
-        await firstHistoryDetails.locator('summary').click()
-        await firstHistoryDetails
-          .getByText('quality_node_release_preflight_a', { exact: true })
-          .waitFor()
-        await firstHistoryDetails.locator('summary').click()
+        const firstHistoryLink = serverPanel.locator('.erp-dev-quality-server-history__pipeline-link').first()
+        await firstHistoryLink.waitFor()
+        assert.match(await firstHistoryLink.getAttribute('href'), /^https:\/\/gitlab[.]saurick[.]me\/saurick\/plush-toy-erp\/-\/pipelines\/[0-9]+$/u)
+        assert.equal(await serverPanel.locator('.erp-dev-quality-server-history__jobs').count(), 0)
 
         await viewSwitch.getByText('本次流水线', { exact: true }).click()
         await page.waitForFunction(

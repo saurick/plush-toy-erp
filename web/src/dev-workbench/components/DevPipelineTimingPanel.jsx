@@ -262,6 +262,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
     (job) => job.name === 'Publish immutable artifact set'
   )
   const analysisJobs = analysisRun?.jobs || []
+  const nativeGitlabDetails = analysisRun?.url?.startsWith('https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/')
   const [expandedJobIds, setExpandedJobIds] = React.useState([])
 
   React.useEffect(() => {
@@ -426,7 +427,12 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
             />
           </div>
 
-          {analysisJobs.length > 0 ? (
+          {nativeGitlabDetails ? (
+            <Space className="erp-dev-pipeline-native-details" direction="vertical">
+              <Link href={analysisRun.url} rel="noreferrer">在 GitLab 查看全部任务与日志</Link>
+              <Text type="secondary">此处保留发布复用、关键路径与耗时汇总；原始任务记录由 GitLab 管理。</Text>
+            </Space>
+          ) : analysisJobs.length > 0 ? (
             <details className="erp-dev-pipeline-timing__details">
               <summary>
                 查看全部任务与步骤（{String(analysisJobs.length)} 个任务）

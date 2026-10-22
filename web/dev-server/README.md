@@ -106,3 +106,5 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 此配置显式信任服务器本机的代理进程，不替代所选工作台访问模式；`operator` 经代理仍要求独立运维身份。代理 TLS 终止后到本机 Vite 使用 HTTP。删除 origin 配置及对应代理入口可撤回域名访问；该配置只用于 development serve，不进入浏览器 env 或生产构建。
 
 `/__dev/api/web-instance` 和 `/__dev/api/runtime-status` 仅保留已有进程归属 / 可用性读取合同，不提供操作会话、CSRF 或写动作；前者继续限制 loopback，后者在业务预检失败时仍可为恢复等待页提供脱敏状态。其他工作台读取、执行与取消均经过所选访问模式检查。生产不注册认证插件或开发工作台。HTTP 页面生成操作标识继续使用安全随机源，缺失时拒绝提交。
+
+Delivery Bridge 的固定 `sync-gitlab-record` 动作只接收 operation ID，仅归档终态，不启动目标执行器；沿用同源、会话与 CSRF 校验。GitLab 引用从本地缓存读取，远端登记中断不影响原始历史查询。恢复协议见 [部署登记](../../scripts/deploy/README.md#gitlab-部署登记与回执归档)。

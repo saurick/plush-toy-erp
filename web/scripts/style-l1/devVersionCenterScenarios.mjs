@@ -510,6 +510,7 @@ export async function installSummaryRoute(page, onRequest = () => {}) {
       ),
     })
   })
+  return summary
 }
 
 async function waitForView(page, view) {
@@ -631,6 +632,28 @@ async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOv
         await history.getByRole('button', { name: '刷新记录', exact: true }).waitFor()
         await history.getByText('共 2 条记录', { exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, 'dev-version-history-isolation-recovery-desktop')
+
+        const gitlabSummary = await installSummaryRoute(page)
+        gitlabSummary.boundaries.provider = 'gitlab'
+        gitlabSummary.timings.runs[0].url = 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/9001'
+        const archived = gitlabSummary.operations.find((item) => item.target === 'demo-133' && item.status === 'passed')
+        archived.gitlabRecord = { status: 'recorded', mode: 'historical', deploymentId: 77, environmentUrl: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments/2', deploymentUrl: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments/2', evidenceUrl: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/packages/99' }
+        await page.goto(new URL('/__dev/version-center?view=pipeline&target=demo-133&customer=yoyoosun', page.url()).href)
+        const nativeLink = page.getByRole('link', { name: '在 GitLab 查看全部任务与日志', exact: true })
+        await nativeLink.waitFor()
+        assert.equal(await nativeLink.getAttribute('href'), gitlabSummary.timings.runs[0].url)
+        assert.equal(await page.locator('.erp-dev-pipeline-timing__details').count(), 0)
+        await page.getByRole('tab', { name: '操作记录', exact: true }).click()
+        const recordLink = history.getByRole('link', { name: 'GitLab #77', exact: true })
+        await recordLink.waitFor()
+        assert.equal(await recordLink.getAttribute('href'), archived.gitlabRecord.deploymentUrl)
+        const row = history.getByRole('row').filter({ hasText: 'GitLab #77' })
+        assert.equal(await row.getByRole('button', { name: '补录 GitLab', exact: true }).count(), 0)
+        await row.getByRole('button', { name: '查看详情', exact: true }).click()
+        await page.getByRole('dialog').getByText('已登记 GitLab', { exact: true }).waitFor()
+        await page.getByRole('dialog').getByText(/历史补录：本页保留实际执行时间/u).waitFor()
+        await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
+
 }
 
 export function createDevVersionCenterScenarios({

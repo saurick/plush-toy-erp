@@ -1724,13 +1724,19 @@ The operation must already be ready. A terminal or unknown operation is never
 automatically retried. The browser-facing Bridge chooses all local paths.`);
       process.exit(0);
     }
-    const report = executePromotion({
-      repoRoot: process.cwd(),
-      operationStore: consumeDeliveryOperationStore(process.cwd()),
+    const { runRecordedDeployment } = await import("./gitlab-deployment-records.mjs");
+    const report = await runRecordedDeployment({
+      store: consumeDeliveryOperationStore(process.cwd()),
       operationId: options.operationId,
-      bundleDir: options.bundleDir,
-      releaseManifestPath: options.releaseManifest,
       confirmation: options.confirmation,
+      execute: () => executePromotion({
+        repoRoot: process.cwd(),
+        operationStore: consumeDeliveryOperationStore(process.cwd()),
+        operationId: options.operationId,
+        bundleDir: options.bundleDir,
+        releaseManifestPath: options.releaseManifest,
+        confirmation: options.confirmation,
+      }),
     });
     console.log(
       options.json

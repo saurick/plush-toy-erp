@@ -2560,3 +2560,33 @@ test('large version summaries yield to local history and share ancestry work for
   assert.equal(summary.versions.length, versions.length)
   assert.equal(summary.versions[0].actionsByTarget['production-133'].actionClass, 'promote')
 })
+
+test('GitLab record repair is terminal-only and cannot spawn a deployment or mutate its original result', async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'plush-record-repair-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const store = resolveDeliveryOperationStore(root)
+  const { operation } = createOrReuseDeliveryOperation(store, {
+    action: 'promote', target: 'demo-133', gitSha: SHA,
+    version: '2026.10.22-1', idempotencyKey: IDEMPOTENCY_KEY,
+  })
+  let recordings = 0
+  const service = createDevDeliveryService({
+    projectRoot: root, operationStore: store, provider: { provider: 'gitlab' },
+    spawnProcess: () => { throw new Error('recording must never spawn target execution') },
+    syncDeploymentRecord: async ({ operationId, store: source }) => {
+      assert.equal(operationId, operation.id)
+      assert.equal(source, store)
+      recordings++
+    },
+  })
+  const request = { action: 'sync-gitlab-record', payload: { operationId: operation.id } }
+  assert.throws(() => validateDevDeliveryAction({ ...request, payload: { ...request.payload, command: 'deploy' } }), /unsupported fields/u)
+  await assert.rejects(service.act(request), /terminal/u)
+  assert.equal(recordings, 0)
+  transitionDeliveryOperation(store, operation.id, { status: 'blocked', message: 'preflight blocked' })
+  const before = readDeliveryOperation(store, operation.id)
+  const result = await service.act(request)
+  assert.equal(result.operation.status, 'blocked')
+  assert.equal(recordings, 1)
+  assert.deepEqual(readDeliveryOperation(store, operation.id), before)
+})

@@ -5,39 +5,10 @@ import { formatQualityGateDuration } from '../../config/devQualityGates.mjs'
 import {
   shortCommit,
   SERVER_HISTORY_STATUS,
-  SERVER_JOB_ROLE,
   serverHistoryFailureLabel,
-  serverHistoryJobStatusLabel,
 } from '../../config/qualityGatePresentation.mjs'
 
 const { Link, Text, Title } = Typography
-
-function ServerHistoryJobList({ jobs }) {
-  return (
-    <ol className="erp-dev-quality-server-history__jobs-list">
-      {jobs.map((job) => (
-        <li key={job.id}>
-          <Space size={6} wrap>
-            <Link href={job.url} target="_blank" rel="noreferrer">
-              <Text code>{job.name}</Text>
-            </Link>
-            <Tag color={SERVER_JOB_ROLE[job.role]?.color || 'default'}>
-              {SERVER_JOB_ROLE[job.role]?.label || '执行'}
-            </Tag>
-            {job.attemptCount > 1 ? (
-              <Tag color="warning">重试 {job.attemptCount - 1} 次</Tag>
-            ) : null}
-          </Space>
-          <Text type={job.conclusion === 'failure' ? 'danger' : 'secondary'}>
-            {serverHistoryJobStatusLabel(job)} · 运行{' '}
-            {formatQualityGateDuration(job.durationMs)} · 等待{' '}
-            {formatQualityGateDuration(job.queueMs)}
-          </Text>
-        </li>
-      ))}
-    </ol>
-  )
-}
 
 export function ServerCiHistory({ evidence, currentCommit }) {
   const history = Array.isArray(evidence?.history) ? evidence.history : []
@@ -53,10 +24,13 @@ export function ServerCiHistory({ evidence, currentCommit }) {
           </Title>
           <Text type="secondary">
             GitLab 最近读取到的 push 与手动完整
-            CI；文档通过与完整通过分别标示，历史结果不代表当前提交已通过。
+            CI 摘要；任务、日志与重试记录直接在 GitLab 查看。历史通过不代表当前提交已通过。
           </Text>
         </div>
-        <Tag>{history.length} 条</Tag>
+        <Space wrap>
+          <Tag>{history.length} 条</Tag>
+          <Link href="https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines" rel="noreferrer">全部流水线</Link>
+        </Space>
       </div>
       {history.length ? (
         <div className="erp-dev-quality-server-history__table-wrap">
@@ -111,13 +85,9 @@ export function ServerCiHistory({ evidence, currentCommit }) {
                       </Text>
                     </td>
                     <td data-label="详情">
-                      <details className="erp-dev-quality-server-history__jobs">
-                        <summary>展开 {run.jobs.length} 个 Job</summary>
-                        <Link href={run.url} target="_blank" rel="noreferrer">
-                          在 GitLab 查看 #{run.id}
-                        </Link>
-                        <ServerHistoryJobList jobs={run.jobs} />
-                      </details>
+                      <Link className="erp-dev-quality-server-history__pipeline-link" href={run.url} rel="noreferrer">
+                        GitLab 任务与日志 #{run.id}
+                      </Link>
                     </td>
                   </tr>
                 )

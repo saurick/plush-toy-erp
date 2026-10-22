@@ -27,7 +27,7 @@ import {
 import FilterSelect from '@/common/components/select/FilterSelect'
 import AppSelect from '@/common/components/select/AppSelect'
 
-const { Text } = Typography
+const { Text, Link } = Typography
 
 export function buildVersionWorkspace({
   changeTablePage,
@@ -175,6 +175,11 @@ export function buildVersionWorkspace({
               </Tag>
             }
           >
+            <Space wrap style={{ marginBottom: 12 }}>
+              <Link href={historyResult?.operations?.find((operation) => operation.gitlabRecord?.environmentUrl)?.gitlabRecord.environmentUrl || 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments'} rel="noreferrer">GitLab 环境与部署</Link>
+              <Link href="https://gitlab.saurick.me/saurick/plush-toy-erp/-/packages" rel="noreferrer">回执归档</Link>
+              <Text type="secondary">此处保留项目检查、原始时间和恢复操作。</Text>
+            </Space>
             {operationHistoryFilters.target === 'test-133' ? (
               <Alert type="info" showIcon message="原始目标已退役；此处仅保留当时的部署记录，不计入当前 demo、test 或 erp，也不能再次执行。" />
             ) : null}

@@ -13,7 +13,7 @@ import {
   shortGitSha,
 } from '../../../config/devDelivery.mjs'
 
-const { Text } = Typography
+const { Text, Link } = Typography
 
 export function buildOperationColumns({ renderOperationActions }) {
   return [
@@ -58,6 +58,10 @@ export function buildOperationColumns({ renderOperationActions }) {
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
           <StatusTag status={record.status} />
+          {record.gitlabRecord?.deploymentUrl ? (
+            <Link href={record.gitlabRecord.deploymentUrl} rel="noreferrer">GitLab #{record.gitlabRecord.deploymentId}</Link>
+          ) : null}
+          {record.gitlabRecord && record.gitlabRecord.status !== 'recorded' ? <Text type="warning">GitLab 待核对</Text> : null}
           {record.issues.length > 0 ? (
             <Text type="danger">{issueDescription(record.issues)}</Text>
           ) : record.status !== 'passed' ? (

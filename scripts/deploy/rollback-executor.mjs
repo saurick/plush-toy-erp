@@ -1202,14 +1202,20 @@ only; it never builds, performs a database down migration, restores a database
 or automatically retries a terminal or unknown operation.`);
       process.exit(0);
     }
-    const report = executeRollback({
-      repoRoot: process.cwd(),
-      operationStore: consumeDeliveryOperationStore(process.cwd()),
+    const { runRecordedDeployment } = await import("./gitlab-deployment-records.mjs");
+    const report = await runRecordedDeployment({
+      store: consumeDeliveryOperationStore(process.cwd()),
       operationId: options.operationId,
-      currentReleaseManifestPath: options.currentManifest,
-      targetBundleDir: options.targetBundleDir,
-      targetReleaseManifestPath: options.targetManifest,
       confirmation: options.confirmation,
+      execute: () => executeRollback({
+        repoRoot: process.cwd(),
+        operationStore: consumeDeliveryOperationStore(process.cwd()),
+        operationId: options.operationId,
+        currentReleaseManifestPath: options.currentManifest,
+        targetBundleDir: options.targetBundleDir,
+        targetReleaseManifestPath: options.targetManifest,
+        confirmation: options.confirmation,
+      }),
     });
     console.log(
       options.json

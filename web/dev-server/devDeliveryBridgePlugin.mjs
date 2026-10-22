@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { readGitlabDeploymentRecord, syncGitlabDeploymentRecord } from '../../scripts/deploy/gitlab-deployment-records.mjs'
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import process from 'node:process'
@@ -308,6 +309,11 @@ export function validateDevDeliveryAction(value) {
     ) {
       throw new Error('rollback execution payload is invalid')
     }
+  } else if (action === 'sync-gitlab-record') {
+    assertExactKeys(value.payload, ['operationId'], 'GitLab recording payload')
+    if (!UUID_V4_PATTERN.test(String(value.payload.operationId || ''))) {
+      throw new Error('GitLab recording payload is invalid')
+    }
   } else if (action === 'retry-operation') {
     assertExactKeys(
       value.payload,
@@ -328,7 +334,7 @@ export function validateDevDeliveryAction(value) {
 
 function publicOperation(
   operation,
-  { eventLimit = 20, requestCount = 1, evidence = null } = {}
+  { eventLimit = 20, requestCount = 1, evidence = null, gitlabRecord = null } = {}
 ) {
   const readyConfirmation =
     operation.status !== 'ready'
@@ -534,6 +540,7 @@ function publicOperation(
     createdAt: operation.createdAt,
     updatedAt: operation.updatedAt,
     evidence,
+    gitlabRecord,
     trace: {
       commitUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/commit/${operation.gitSha}`,
       pipelinesUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/commit/${operation.gitSha}/pipelines`,
@@ -710,6 +717,7 @@ export function createDevDeliveryService({
   probeCache = probeTargetReleaseCache,
   readRecoveryEvidence = readLatestBackupRestoreEvidence,
   spawnProcess = spawn,
+  syncDeploymentRecord = syncGitlabDeploymentRecord,
   now = () => new Date().toISOString(),
   preflightTtlMs = 30_000,
   pipelineTimingTtlMs = 60_000,
@@ -796,6 +804,11 @@ export function createDevDeliveryService({
     return childEnv
   }
 
+  function gitlabRecordForOperation(operation) {
+    try { return readGitlabDeploymentRecord(store, operation) }
+    catch { return { status: 'unavailable' } }
+  }
+
   function presentOperation(operation, options = {}) {
     const indexed = operationReadIndex.read()
     const requestCount = indexed.requestCounts.get(operation.id) || 1
@@ -875,7 +888,7 @@ export function createDevDeliveryService({
         }
       }
     }
-    const presented = publicOperation(operation, { ...options, requestCount, evidence })
+    const presented = publicOperation(operation, { ...options, requestCount, evidence, gitlabRecord: gitlabRecordForOperation(operation) })
     if (indexed.unreadableRequests > 0) {
       presented.issues = [...presented.issues, {
         code: 'operation_request_index_incomplete',
@@ -1204,6 +1217,7 @@ level: 'warning',
           .map((operation) =>
             publicOperation(operation, {
               requestCount: requestCounts.get(operation.id) || 1,
+              gitlabRecord: gitlabRecordForOperation(operation),
             })
           )
       })(),
@@ -1810,6 +1824,12 @@ level: 'warning',
       } catch {
         // The operation store remains the only user-visible outcome source.
       }
+      const current = readDeliveryOperation(store, operationId)
+      if (TERMINAL_STATUSES.has(current.status) && gitlabRecordForOperation(current)?.status === 'pending') {
+        // A single completion attempt closes interrupted executors. Recording
+        // outages stay visible and are retried explicitly, never by redeploying.
+        Promise.resolve(syncDeploymentRecord({ store, operationId })).catch(() => {})
+      }
     }
     child.once('error', finish)
     child.once('close', (status, signal) => {
@@ -2209,6 +2229,7 @@ level: 'warning',
           .map((operation) =>
             publicOperation(operation, {
               requestCount: requestCounts.get(operation.id) || 1,
+              gitlabRecord: gitlabRecordForOperation(operation),
             })
           ),
       }
@@ -2228,6 +2249,12 @@ level: 'warning',
     async act(request) {
       recoverOperations()
       const validated = validateDevDeliveryAction(request)
+      if (validated.action === 'sync-gitlab-record') {
+        const operation = readDeliveryOperation(store, validated.payload.operationId)
+        if (!TERMINAL_STATUSES.has(operation.status)) throw new Error('only terminal operations can be archived')
+        await syncDeploymentRecord({ store, operationId: operation.id })
+        return { kind: 'plush.dev-delivery-action-result', action: validated.action, operation: presentOperation(operation) }
+      }
       if (validated.action === 'dispatch-release') {
         return {
           kind: 'plush.dev-delivery-action-result',

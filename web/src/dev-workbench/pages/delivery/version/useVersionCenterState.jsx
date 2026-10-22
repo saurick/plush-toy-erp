@@ -308,7 +308,9 @@ export function useVersionCenterState() {
           return false
         }
         message.success(
-          action === 'dispatch-release'
+          action === 'sync-gitlab-record'
+            ? 'GitLab 记录已补齐，未执行部署'
+            : action === 'dispatch-release'
             ? `${deliveryProviderName}发布任务已登记`
             : action === 'retry-operation'
               ? '已创建关联的新尝试'

@@ -23,7 +23,7 @@ export function createOperationActions({
   summaryFresh,
 }) {
   return (record) => {
-    const { status, action, retry, promotionMode, id } = record
+    const { status, action, retry, promotionMode, id, gitlabRecord } = record
     const readyToExecute =
       status === 'ready' &&
       ['promote', 'rollback', 'rebuild-database'].includes(action)
@@ -38,6 +38,17 @@ export function createOperationActions({
         >
           查看详情
         </Button>
+        {['passed', 'failed', 'blocked', 'not_proven'].includes(status) && gitlabRecord?.status !== 'recorded' ? (
+          <Tooltip title="仅登记原始记录和项目回执，不执行部署或回滚">
+            <Button
+              disabled={!summaryFresh || isMutationRunning}
+              loading={actionKey === `gitlab-record:${id}`}
+              onClick={() => performAction(`gitlab-record:${id}`, 'sync-gitlab-record', { operationId: id })}
+            >
+              补录 GitLab
+            </Button>
+          </Tooltip>
+        ) : null}
         {executable ? (
           <Button
             type="primary"

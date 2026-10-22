@@ -762,6 +762,15 @@ function validateOperation(operation) {
       throw new Error('delivery trace links are invalid')
     }
   }
+  if (operation.gitlabRecord) {
+    const record = operation.gitlabRecord
+    if (!['recorded', 'pending', 'unavailable'].includes(record.status) ||
+      (record.environmentUrl && !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/environments\/[1-9][0-9]*$/u.test(record.environmentUrl)) ||
+      (record.deploymentUrl && record.deploymentUrl !== record.environmentUrl) ||
+      (record.evidenceUrl && !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/packages\/[1-9][0-9]*$/u.test(record.evidenceUrl))) {
+      throw new Error('GitLab deployment record links are invalid')
+    }
+  }
   if (operation.evidence) {
     const { evidence } = operation
     const migrationVersion = (value) =>
