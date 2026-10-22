@@ -254,7 +254,7 @@ write_files:
       n_version=10.2.0
       node_version=24.22.1
       node_cache="/usr/local/n/versions/node/${node_version}"
-      go_version=1.26.9
+      go_version=1.26.10
       pnpm_version=10.34.5
       runner_version=19.3.0
 
@@ -360,7 +360,7 @@ write_files:
       if ! go_ready; then
         go_archive="go${go_version}.linux-amd64.tar.gz"
         download_file "https://go.dev/dl/${go_archive}" "$work/$go_archive"
-        echo "d0f743b33e8d8945e6b1f432edd15785c70507121d6e2a723b21285eddf8b57b  $work/$go_archive" | sha256sum --check --strict
+        echo "ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5  $work/$go_archive" | sha256sum --check --strict
         rm -rf /usr/local/go
         tar -xzf "$work/$go_archive" -C /usr/local
         ln -sfn /usr/local/go/bin/go /usr/local/bin/go
@@ -393,7 +393,7 @@ write_files:
         install -o root -g root -m 0755 "$work/gitlab-runner-linux-amd64" /usr/local/bin/gitlab-runner
       fi
       test "$(node --version)" = v24.22.1
-      test "$(go env GOVERSION)" = go1.26.9
+      test "$(go env GOVERSION)" = go1.26.10
       test "$(pnpm --version)" = 10.34.5
   - path: /usr/local/sbin/plush-verify-runner-bootstrap
     permissions: '0755'
@@ -416,7 +416,7 @@ write_files:
       }
 
       test "$(node --version)" = v24.22.1
-      test "$(go env GOVERSION)" = go1.26.9
+      test "$(go env GOVERSION)" = go1.26.10
       test "$(pnpm --version)" = 10.34.5
       test "$(runuser -u gitlab-runner -- /usr/local/bin/pnpm --version)" = 10.34.5
       test "$(dpkg-query -W -f='${Status} ${Version} ${Architecture}' docker-buildx)" = 'install ok installed 0.30.1-0ubuntu1~24.04.1 amd64'

@@ -67,7 +67,7 @@ async function fixture(t) {
       packageManager: "pnpm@10.34.5",
     }),
   );
-  await put("server/go.mod", "module fixture\ngo 1.26.0\ntoolchain go1.26.9\n");
+  await put("server/go.mod", "module fixture\ngo 1.26.0\ntoolchain go1.26.10\n");
   await symlink(bash, path.join(bin, "bash"));
   await put(
     "bin/git",
@@ -81,7 +81,7 @@ async function fixture(t) {
   );
   await put("bin/n", "#!/bin/sh\necho 10.2.0\n", 0o700);
   await put("bin/pnpm", "#!/bin/sh\necho 10.34.5\n", 0o700);
-  await put("bin/go", "#!/bin/sh\necho 'go version go1.26.9 fixture'\n", 0o700);
+  await put("bin/go", "#!/bin/sh\necho 'go version go1.26.10 fixture'\n", 0o700);
   await put("bin/lsof", "#!/bin/sh\nexit 0\n", 0o700);
   const run = (extraEnv = {}, script = "scripts/doctor.sh") => {
     const result = spawnSync(bash, [path.join(project, script)], {

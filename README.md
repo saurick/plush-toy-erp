@@ -34,7 +34,7 @@
 | Bash | `>= 4` | `scripts/lib/bash.sh`；QA 当前解释器与 `PATH` 子进程均须满足 |
 | Node.js | `24.22.x`，精确锁定 `24.22.1` | `n` 管理，唯一版本文件 `.n-node-version` |
 | pnpm | `10.34.5` | `web/package.json` 的 `packageManager` |
-| Go | `>= 1.26.9` | `server/go.mod` 的 `toolchain go1.26.9` |
+| Go | `>= 1.26.10` | `server/go.mod` 的 `toolchain go1.26.10` |
 | PostgreSQL | 本地开发默认 `192.168.0.133:5432/plush_erp` | `server/configs/dev/config.yaml` / `config.local.yaml` 和 `make print_db_url` |
 
 首次安装 `n` 和 pnpm 见 [工具链安装](scripts/README.md#版本锁定)。已安装工具的初始化顺序：
