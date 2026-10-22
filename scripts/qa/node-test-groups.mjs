@@ -168,6 +168,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/attachment-console.test.mjs",
     "scripts/deploy/backup-replica.test.mjs",
     "scripts/deploy/backup-restore-rehearsal-script.test.mjs",
+    "scripts/deploy/backup-set-business-smoke.test.mjs",
     "scripts/deploy/backup-set.test.mjs",
     "scripts/deploy/collect-evidence-script.test.mjs",
     "scripts/deploy/credential-contract.test.mjs",
