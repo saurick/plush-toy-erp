@@ -1,5 +1,5 @@
-import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { writeFile } from 'node:fs/promises'
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { measureEmptyEditorHints } from './printEmptyEditorAssertions.mjs'
 import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
@@ -214,8 +214,13 @@ export function createPrintWorkspaceControlScenarios({
             '.erp-print-shell__zoom-control .ant-select'
           )
           // 非编辑控件承接真实焦点和失焦事件，避免自动滚回工具栏或恢复编辑焦点。
-          const blurEditor = () =>
-            zoomControl.evaluate((node) => node.focus({ preventScroll: true }))
+          const blurEditor = async () => {
+            const focused = await zoomControl.getByRole('combobox').evaluate((node) => {
+              node.focus({ preventScroll: true })
+              return node.ownerDocument.activeElement === node
+            })
+            assert(focused, `${template.key} 显示比例控件必须承接真实焦点`)
+          }
           for (const scale of ['1', '0.75', '1.25', '1.5']) {
             await chooseSelectOption(zoomControl, scale)
             await assertEditorInventory(`${scale} 缩放清空前`)
@@ -269,7 +274,7 @@ export function createPrintWorkspaceControlScenarios({
               ({ empty, focused, state }) =>
                 empty && focused === (state === 'focused')
             ),
-            `${template.key} 清空后必须保持空值和预期焦点，不能回填或退出编辑`
+            `${template.key} 清空后必须保持空值和预期焦点，不能回填或退出编辑: ${JSON.stringify(report.states.filter(({ empty, focused, state }) => !empty || focused !== (state === 'focused')).slice(0, 8))}`
           )
           await page.emulateMedia({ media: 'print' })
           const printHints = await editors.evaluateAll(
@@ -405,7 +410,7 @@ export function createPrintWorkspaceControlScenarios({
               )
             }
           }
-          const zoom = page.getByRole('combobox', { name: "显示比例", exact: true })
+          const zoom = page.getByRole('combobox', { name: '显示比例', exact: true })
           assert(
             await zoom.evaluate((node) =>
               Boolean(node.closest('.erp-print-shell__toolbar-actions'))
