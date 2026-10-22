@@ -251,20 +251,19 @@ test('business-core detail and lineage checks are scoped to their surfaces', () 
   assert.doesNotMatch(source, /协同任务附件/u)
 })
 
-test('shipment table assertions lock the combined visible headers', () => {
+test('shipment table assertions lock the concise visible headers', () => {
   const source = readScenarioSource('businessCoreShipmentChecks')
 
-  assert.match(source, /实际 \/ 最终总净重（克）/u)
-  assert.match(source, /计划出货日期 \/ 实际出货日期/u)
+  assert.match(source, /'总净重（克）'/u)
+  assert.match(source, /'出货日期'/u)
   assert.match(source, /ant-table-thead th/u)
   assert.match(source, /getByText\(headerText, \{ exact: true \}\)/u)
   assert.match(
     source,
-    /unsortableHeaders:\s*\[\s*'实际 \/ 最终总净重（克）',\s*'包装 \/ 毛重 \/ 体积',\s*'实际运费',\s*'唛头',\s*'备注',?\s*\]/u
+    /unsortableHeaders:\s*\[\s*'总净重（克）',\s*'包装信息',\s*'实际运费',\s*'唛头',\s*'备注',?\s*\]/u
   )
   assert.match(readScenarioSource('businessCoreMasterDataChecks'), /unsortableHeaders: \['SKU 单重（净重）'\]/u)
-  assert.doesNotMatch(source, /expectText\(page, '总净重（克）'\)/u)
-  assert.doesNotMatch(source, /unsortableHeaders: \['总净重（克）'/u)
+  assert.doesNotMatch(source, /实际 \/ 最终总净重（克）|计划出货日期 \/ 实际出货日期/u)
 })
 
 test('shipment cancellation selects the business row before invoking the action', () => {

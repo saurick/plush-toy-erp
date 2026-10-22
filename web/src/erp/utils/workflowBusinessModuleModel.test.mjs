@@ -18,7 +18,7 @@ test('workflow business query sends every filter and the second-page offset to t
       dueTo: 1_752_873_599,
       sourceType: ' production-orders ',
       sourceID: 42,
-      pagination: { current: 2, pageSize: 10 },
+      pagination: { current: 2, pageSize: 100 },
     }),
     {
       task_group: 'production_scheduling',
@@ -29,8 +29,8 @@ test('workflow business query sends every filter and the second-page offset to t
       due_to: 1_752_873_599,
       source_type: 'production-orders',
       source_id: 42,
-      limit: 10,
-      offset: 10,
+      limit: 100,
+      offset: 100,
     }
   )
 })

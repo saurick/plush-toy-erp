@@ -38,7 +38,9 @@ test('audit logs preserve drawer focus return, request recovery and honest page-
   assert.match(source, /setSelectedEventId\(null\)/u)
   assert.match(source, /message="操作记录加载失败"/u)
   assert.match(source, /onClick=\{loadData\}/u)
-  assert.match(source, /风险仅筛选本页/u)
+  assert.match(source, /aria-label="本页风险"/u)
+  assert.match(source, /本页风险：\{riskLabelMap\[riskFilter\]\}/u)
+  assert.match(source, /翻页后按新一页筛选/u)
   assert.match(source, /清空本页风险条件后，可导出完整筛选结果/u)
 })
 

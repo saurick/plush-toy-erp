@@ -101,6 +101,9 @@ test(
       'NODE_ENV',
       'NODE_TEST_CONTEXT',
       'BROWSER',
+      'DISPLAY',
+      'WAYLAND_DISPLAY',
+      'ERP_DEV_BROWSER_POWERSHELL',
       'ERP_VITE_PORT',
       'ERP_VITE_HMR_CLIENT_PORT',
       'ERP_VITE_HMR_HOST',
@@ -139,7 +142,8 @@ test(
       await t.test(name, async (t) => {
         for (const key of envKeys) delete process.env[key]
         const port = await findAvailableDevAuxPort(ports)
-        Object.assign(process.env, env, { ERP_VITE_PORT: String(port) })
+        // Manual browser cases model a desktop session even on a headless CI host.
+        Object.assign(process.env, { DISPLAY: ':0' }, env, { ERP_VITE_PORT: String(port) })
         const config = await createERPViteConfig('desktop')({
           command: 'serve',
           mode: 'development',
@@ -361,10 +365,10 @@ test(
       assert.equal(response.status, 200)
       const client = response.body
       const socketURL = runInNewContext(
-        client.slice(
+        `${client.slice(
           client.indexOf('const serverHost ='),
           client.indexOf('const transport =')
-        ) + '\n(socketProtocol + "://" + socketHost + "?token=" + wsToken)',
+        )}\n(socketProtocol + "://" + socketHost + "?token=" + wsToken)`,
         { importMetaUrl: new URL(`${origin}/@vite/client`) }
       )
       assert.equal(new URL(socketURL).host, new URL(origin).host)

@@ -29,7 +29,5 @@ const AppSelect = React.forwardRef(({
 ))
 
 AppSelect.displayName = 'AppSelect'
-AppSelect.Option = Select.Option
-AppSelect.OptGroup = Select.OptGroup
 
 export default AppSelect

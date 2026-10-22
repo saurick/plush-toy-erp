@@ -108,7 +108,7 @@ test('entry session: 手机待办和电脑端都通过入口选择页对称切�
   assert.doesNotMatch(screenSource, /mobile-role-desktop-entry|进入电脑端/u)
   assert.match(desktopSource, /getAllowedMobileRoleKeys/u)
   assert.match(desktopSource, /const canSwitchToMobileTasks = useMemo/u)
-  assert.match(desktopSource, /data-testid="desktop-account-menu-trigger"/u)
+  assert.match(desktopSource, /data-testid=\{collapsible \? 'desktop-account-menu-trigger' : 'drawer-account-menu-trigger'\}/u)
   assert.match(desktopSource, /data-testid="desktop-work-entry-switch"/u)
   assert.match(
     desktopSource,

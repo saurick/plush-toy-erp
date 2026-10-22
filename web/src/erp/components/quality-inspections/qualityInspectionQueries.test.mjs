@@ -9,7 +9,7 @@ let loadQualityInspectionExport
 function query(filters = {}, context = {}) {
   return {
     customerKey: 'query-fixture',
-    pagination: { current: 2, pageSize: 20 },
+    pagination: { current: 2, pageSize: 100 },
     filters: {
       dateFilterEnd: '',
       dateFilterField: 'inspected_at',
@@ -86,8 +86,8 @@ test('incoming exact-source lists retain structured filters without adding a con
     result: 'PASS',
     date_from: '2026-10-01',
     date_to: '2026-10-17',
-    limit: 20,
-    offset: 20,
+    limit: 100,
+    offset: 100,
     warehouse_id: 4,
     inventory_lot_id: 5,
     inspection_type: 'INCOMING',

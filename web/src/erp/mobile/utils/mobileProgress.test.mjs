@@ -203,9 +203,16 @@ test('多任务展示首要事项和责任，仍由关联任务列表选择', ()
     ),
     {
       title: '2 项待处理',
-      detail: '首要：确认面料交期 · 采购岗待领取',
+      detail: '首要：确认面料交期 · 采购岗 · 办理人未提供',
       taskID: null,
     }
+  )
+  assert.equal(
+    mobileProgressTaskSummary(
+      { open_tasks: 2, unassigned_tasks: 2, attention_task: '确认面料交期', attention_role: 'purchase' },
+      () => '采购岗'
+    ).detail,
+    '首要：确认面料交期 · 采购岗 · 待领取'
   )
 })
 test('已无待办时不残留上一任务名称或直达 ID', () => {

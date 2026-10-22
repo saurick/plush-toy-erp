@@ -50,6 +50,7 @@ function apiMethodActions(relativePaths) {
 const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   // These methods only read the owning page or a raw fact list. Source-specific
   // candidate/projection reads are intentionally not allowed in this list.
+  'export_sales_orders',
   'get_bom_version',
   'get_customer',
   'get_material',
