@@ -2,6 +2,8 @@
 
 本文是 `scripts/deploy/` 的入口。Compose、环境与运行边界以 [server/deploy/README.md](../../server/deploy/README.md)、[Compose 部署说明](../../server/deploy/compose/prod/README.md) 和 [部署约定](../../docs/部署约定.md) 为准。
 
+下载资源缓慢时，先按[来源与代理选择](../../docs/部署约定.md#下载缓慢时的来源与代理选择--download-routing)比较实际吞吐，再使用校验通过且最快的方式下载。
+
 存储查看入口为 `node scripts/deploy/attachment-console.mjs --target demo-133|customer-test-133|production-133`：只核对登记目标并建立本机 SSH 通道，使用 SeaweedFS 原生只读账号，不启动或部署远端服务。凭据与访问边界见 [只读查看存储](../../server/deploy/compose/prod/README.md#只读查看存储)。
 
 ## 当前环境合同

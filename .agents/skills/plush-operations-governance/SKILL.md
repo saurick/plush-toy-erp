@@ -20,6 +20,7 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 - 关键链路保留可检索的 `request_id / trace_id / task_id / domain id`；用户提示使用场景化中文，不透传原始异常。
 - 发布绑定 commit、image、migration、目标环境、health/ready、业务 smoke 和 rollback point。
 - 低配目标机只加载本地或 CI 构建产物，不执行重构建；Atlas 及发布流程遵循项目正式部署文档。
+- 下载资源缓慢或停滞时，先按[来源与代理选择](../../../docs/部署约定.md#下载缓慢时的来源与代理选择--download-routing)比较可信来源、直连与已授权代理的实际吞吐，选择最快且稳定、校验通过的组合，再继续发布。
 - `full/strict`、本地 hook、仓库 workflow、历史 release note 都不是当前目标运行态；backup 存在也不等于 restore 已演练。
 - 客户配置运行态必须走 validate / publish / transition check / activate / effective-session readback 的正式链路；不直接改数据库或只改 live config。
 
