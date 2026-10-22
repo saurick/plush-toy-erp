@@ -1,9 +1,9 @@
 import React from 'react'
-import { Button, Grid, Select } from 'antd'
+import { Grid, Select } from 'antd'
 import { MermaidDiagram } from '@/common/components/markdown'
 import { buildFulfillmentSubflow, buildSubflowMermaid } from '../../config/devFulfillmentSubflow.mjs'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
-import { getFulfillmentSubstepCopy, selectFulfillmentSubstep } from '../../config/devFulfillmentPresentation.mjs'
+import { selectFulfillmentSubstep } from '../../config/devFulfillmentPresentation.mjs'
 
 export default function FulfillmentSubflow({ step, role, searchParams, setSearchParams, onOpenException }) {
   const screens = Grid.useBreakpoint()
@@ -30,23 +30,14 @@ export default function FulfillmentSubflow({ step, role, searchParams, setSearch
       return next
     })
   }
-  const renderHandoffs = (label, edges, target) => edges.length ? (
-    <div className="erp-dev-fulfillment-guide__substep-relation">
-      <span className="erp-dev-fulfillment-guide__substep-relation-label">{label}</span>
-      {edges.map((edge) => {
-        const node = flow.nodes.find((item) => item.key === edge[target])
-        return <span className="erp-dev-fulfillment-guide__substep-handoff" key={`${edge.from}-${edge.to}`}><Button size="small" onClick={() => selectNode(diagram.nodes.find((item) => item.key === node.key).id)}>{getFulfillmentSubstepCopy(node)}</Button>{edge.label ? <span>{edge.label}</span> : null}</span>
-      })}
-    </div>
-  ) : null
   return (
     <section className="erp-dev-fulfillment-guide__subflow" aria-label="当前环节的子流程">
-      <p className="erp-dev-fulfillment-guide__subflow-summary">{flow.summary}</p>
       <div className="erp-dev-fulfillment-guide__subflow-workspace">
         <MermaidDiagram
           chart={diagram.chart}
           label={`${step.label}子流程`}
           nativeSize
+          toolbar="compact"
           interactiveNodes={diagram.nodes}
           selectedNodeId={selectedId}
           onNodeSelect={selectNode}
@@ -59,9 +50,6 @@ export default function FulfillmentSubflow({ step, role, searchParams, setSearch
             {selected.role ? <span className="erp-dev-fulfillment-guide__owner">{selected.role}</span> : null}
           </div>
           {details.length === 1 ? <p data-substep-instruction>{details[0].text}</p> : details.length ? <dl className="erp-dev-fulfillment-guide__node-facts">{details.map((detail) => <React.Fragment key={`${detail.label}-${detail.text}`}><dt>{detail.label}</dt><dd>{detail.text}</dd></React.Fragment>)}</dl> : <p data-substep-instruction>{step.result}</p>}
-          {renderHandoffs('接自', flow.edges.filter((edge) => edge.to === selected.key), 'from')}
-          {renderHandoffs('交给', flow.edges.filter((edge) => edge.from === selected.key), 'to')}
-          {details.length ? <details className="erp-dev-fulfillment-guide__instructions" key={step.stage}><summary>环节完成条件</summary><p>{step.result}</p></details> : null}
         </div>
       </div>
     </section>

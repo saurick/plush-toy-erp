@@ -5,8 +5,9 @@ import {
   DownOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Dropdown, Empty, Modal, Popover, Space, Tag, message } from 'antd'
+import { Alert, Button, Drawer, Dropdown, Empty, Modal, Popover, Space, Tag } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import { message } from '@/common/utils/antdApp'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
 import { FactsView } from '../components/flow-state/FactsView.jsx'
 import { RuntimeView } from '../components/flow-state/RuntimeView.jsx'
@@ -887,19 +888,22 @@ export default function DevFlowStateObservatoryPage() {
     await new Promise((resolve) => {
       window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
     })
+    const diagramStatus = () => {
+      const root = document.querySelector('[data-customer-review-print-root]')
+      if (!root) return 'pending'
+      const diagrams = [...root.querySelectorAll('[data-customer-review-diagram] .erp-markdown-mermaid')]
+      if (diagrams.some((diagram) => diagram.dataset.mermaidStatus === 'error')) return 'error'
+      return diagrams.every((diagram) => diagram.dataset.mermaidStatus === 'rendered') ? 'rendered' : 'pending'
+    }
     await new Promise((resolve) => {
       const startedAt = window.performance.now()
       const checkDiagram = () => {
-        const status = document
-          .querySelector(
-            '[data-customer-review-print-root] [data-customer-review-diagram] .erp-markdown-mermaid'
-          )
-          ?.getAttribute('data-mermaid-status')
+        const status = diagramStatus()
         if (
           request !== printRequestRef.current ||
           status === 'rendered' ||
           status === 'error' ||
-          window.performance.now() - startedAt >= 5_000
+          window.performance.now() - startedAt >= 15_000
         ) {
           resolve()
           return
@@ -909,7 +913,7 @@ export default function DevFlowStateObservatoryPage() {
       checkDiagram()
     })
     if (request !== printRequestRef.current) return
-    if (document.querySelector('[data-customer-review-diagram] .erp-markdown-mermaid')?.getAttribute('data-mermaid-status') !== 'rendered') {
+    if (diagramStatus() !== 'rendered') {
       setPrintingCustomer(false)
       setCustomerReviewPrintSnapshot(null)
       message.error('业务链图尚未生成，请稍后重新导出')

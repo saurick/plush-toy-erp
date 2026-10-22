@@ -14,7 +14,7 @@ import {
 
 const generatedAt = '2026-08-08T08:00:00.000Z'
 
-function visibleReviewText(review) {
+function reviewProjectionText(review) {
   const common = [
     review.documentTitle,
     review.designScope,
@@ -28,17 +28,8 @@ function visibleReviewText(review) {
   if (review.overview) {
     return [
       ...common,
-      review.overview.overviewName,
-      review.overview.purpose,
-      review.overview.detailBoundary,
-      review.overview.diagram.title,
-      review.overview.diagram.description,
-      ...review.overview.diagram.legend.map((item) => item.label),
-      ...review.overview.lanes.flatMap((lane) => [
-        lane.name,
-        lane.purpose,
-        ...lane.chains.flatMap((chain) => [chain.name, chain.purpose]),
-      ]),
+      ...review.overview.phases.flatMap((phase) => [phase.label, ...[...phase.stages, ...phase.branches].flatMap(({ step, label }) => [label, step.role, step.result])]),
+      ...review.overview.exceptionGuides.flatMap((guide) => [guide.label, ...guide.plans.flatMap((plan) => [plan.label, plan.continuation.label, plan.continuation.original_terminal, plan.continuation.reentry?.label])]),
     ].join('\n')
   }
   return [
@@ -70,9 +61,7 @@ function visibleReviewText(review) {
 }
 
 function customerDiagramSources(review) {
-  return [review.overview?.diagram, review.chain?.diagram]
-    .filter(Boolean)
-    .map((diagram) => diagram.mermaidSource)
+  return [review.chain?.diagram].filter(Boolean).map((diagram) => diagram.mermaidSource)
 }
 
 test('customer review exports only the selected business chain with complete business questions', () => {
@@ -82,7 +71,7 @@ test('customer review exports only the selected business chain with complete bus
     generatedAt,
   })
 
-  assert.equal(review.documentTitle, '业务链甲方校对版｜生产异常决策与执行')
+  assert.equal(review.documentTitle, '生产异常决策与执行')
   assert.equal(review.generatedAt, generatedAt)
   assert.equal(review.designScope, '产品通用设计校对稿')
   assert.equal(review.customerBinding, '未绑定客户发布版本')
@@ -91,13 +80,14 @@ test('customer review exports only the selected business chain with complete bus
   assert.equal(review.chain.steps.length, 9)
   assert.equal(Object.hasOwn(review, 'overview'), false)
   assert.equal(
-    visibleReviewText(review).includes('采购下单到合格入库'),
+    reviewProjectionText(review).includes('采购下单到合格入库'),
     false,
     '单链导出不得夹带其他业务链'
   )
 
   for (const step of review.chain.steps) {
     assert(step.number > 0)
+    assert(review.chain.diagram.mermaidSource.includes(step.responsibleRole), '单链流程图直接保留岗位，避免另表重复节点')
     for (const field of [
       'name',
       'action',
@@ -162,7 +152,7 @@ test('customer review retains separate partial and settled outcomes instead of o
   assert(settled.results.some((value) => value.includes('结清')))
 })
 
-test('printed exception summary prioritizes business outcomes and omits QA-only checks', () => {
+test('exception projection prioritizes business outcomes and omits QA-only checks', () => {
   const review = buildDevBusinessChainCustomerReview({
     catalog: DEV_FLOW_STATE_CATALOG,
     chainKey: 'production_to_inventory',
@@ -203,41 +193,43 @@ test('customer review binds a registered preview without claiming release or acc
   )
 })
 
-test('customer review overview shares the order flow and keeps technical chain internals compact', () => {
-  const review = buildDevBusinessChainCustomerReview({
-    catalog: DEV_FLOW_STATE_CATALOG,
-    chainKey: 'all',
-    generatedAt,
-  })
-
-  assert.equal(review.overview.compactOnly, true)
-  assert.equal(review.documentTitle, '业务链甲方校对版｜订单全流程')
-  assert.deepEqual(review.overview.fulfillmentFlow, taskCatalog.fulfillment_flow)
-  assert(review.overview.fulfillmentFlow.every((step) => step.handling?.action && step.handling.resume), '校对稿保留每个环节的处理与继续条件')
-  assert.deepEqual(review.overview.exceptionGuides, taskCatalog.exception_guides)
-  assert.equal(Object.hasOwn(review, 'chain'), false)
-  assert.equal(review.overview.lanes.length, 4)
-  assert.equal(review.overview.lanes.flatMap((lane) => lane.chains).length, 11)
-  assert(
-    review.overview.lanes
-      .flatMap((lane) => lane.chains)
-      .every((chain) => !Object.hasOwn(chain, 'steps'))
-  )
-  assert.match(review.overview.detailBoundary, /不展开每条链的内部步骤/u)
-  const overviewDiagram = review.overview.diagram.mermaidSource
-  for (const chain of review.overview.lanes.flatMap((lane) => lane.chains)) {
-    assert(overviewDiagram.includes(`${chain.number}. ${chain.name}`))
+test('customer review overview keeps the core order flow and registered exception exits', () => {
+  const { overview, documentTitle } = buildDevBusinessChainCustomerReview({ catalog: DEV_FLOW_STATE_CATALOG, chainKey: 'all', generatedAt })
+  assert.equal(documentTitle, '订单全流程')
+  assert.deepEqual(overview.phases.map((phase) => phase.label), ['接单与备料', '加工生产', '入库与交付'])
+  const entries = overview.phases.flatMap((phase) => [...phase.stages, ...phase.branches]).sort((a, b) => a.number - b.number)
+  assert.deepEqual(entries.map((entry) => entry.step), taskCatalog.fulfillment_flow)
+  assert.deepEqual(entries.map((entry) => entry.number), taskCatalog.fulfillment_flow.map((_, index) => index + 1))
+  for (const entry of entries) {
+    assert.equal(entry.step, taskCatalog.fulfillment_flow[entry.number - 1], '岗位与结果直接引用同一目录，不截断或另写摘要')
   }
-  assert.doesNotMatch(overviewDiagram, /生产异常决策单/u)
+  assert.deepEqual(overview.exceptionGuides, taskCatalog.exception_guides)
+  const plans = overview.exceptionGuides.flatMap((guide) => guide.plans)
+  assert(plans.every((plan) => plan.continuation.label), '异常必须保留明确出口')
+  const remake = plans.find((plan) => plan.key === 'remake').continuation
+  assert.equal(remake.original_terminal, '原问题批次终止')
+  assert.equal(remake.reentry.stage, 'cutting_issue')
+  assert.match(plans.find((plan) => plan.key === 'scrap').continuation.label, /终止/u)
+  assert.match(plans.find((plan) => plan.key === 'concession').continuation.label, /其余关口满足/u)
+  assert.deepEqual(Object.keys(overview).sort(), ['exceptionGuides', 'phases'], '导出不再生成重复专题和跨业务附录')
 })
 
-test('customer review visible content excludes developer evidence and keeps completion layers separate', () => {
+test('core flow keeps agreed payments outside the mandatory main path', () => {
+  const { overview } = buildDevBusinessChainCustomerReview({ catalog: DEV_FLOW_STATE_CATALOG, chainKey: 'all', generatedAt })
+  const preparation = overview.phases[0]
+  assert.deepEqual(preparation.stages.map((entry) => entry.number), [1, 3, 5, 6])
+  assert.deepEqual(preparation.branches.map((entry) => entry.number), [2, 4])
+  assert(preparation.branches.every((entry) => entry.step.branch))
+  assert(overview.phases.flatMap((phase) => phase.stages).every((entry) => !entry.step.branch))
+})
+
+test('customer review projection excludes developer evidence and keeps completion layers separate', () => {
   const review = buildDevBusinessChainCustomerReview({
     catalog: DEV_FLOW_STATE_CATALOG,
     chainKey: 'production_exception',
     generatedAt,
   })
-  const text = visibleReviewText(review)
+  const text = reviewProjectionText(review)
 
   assert.equal(
     review.completionBoundary,
@@ -269,7 +261,7 @@ test('customer review visible content excludes developer evidence and keeps comp
     chainKey: 'sales_to_production',
     generatedAt,
   })
-  const salesText = visibleReviewText(salesReview)
+  const salesText = reviewProjectionText(salesReview)
   assert.match(salesText, /老板|具有对应业务权限的岗位/u)
   assert.doesNotMatch(
     salesText,
@@ -286,7 +278,7 @@ test('customer review visible content excludes developer evidence and keeps comp
       generatedAt,
     })
   )
-  const allCustomerVisibleTexts = allReviews.map(visibleReviewText)
+  const allCustomerVisibleTexts = allReviews.map(reviewProjectionText)
   for (const projectionText of allCustomerVisibleTexts) {
     for (const forbidden of [
       /\b(?:variant|shipped|hold)\b/iu,

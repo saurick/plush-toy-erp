@@ -244,7 +244,8 @@
   }
 }
 
-.erp-markdown-mermaid .erp-markdown-mermaid__tool--layout {
+.erp-markdown-mermaid .erp-markdown-mermaid__tool--layout,
+.erp-markdown-mermaid .erp-markdown-mermaid__tool--menu {
   width: auto;
   gap: 6px;
   padding: 0 10px;

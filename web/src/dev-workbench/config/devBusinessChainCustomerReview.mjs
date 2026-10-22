@@ -4,6 +4,7 @@ import {
   describeDevBusinessChainResponsibility,
 } from './devBusinessChainProjection.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
+import { buildFulfillmentOverview } from './devFulfillmentPresentation.mjs'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 
@@ -69,13 +70,6 @@ const DIAGRAM_LEGEND = freezeList([
   { tone: 'person', label: '需要人员办理' },
   { tone: 'attention', label: '关键条件与异常分支' },
   { tone: 'result', label: '正式业务结果' },
-])
-
-const OVERVIEW_DIAGRAM_LEGEND = freezeList([
-  { tone: 'normal', label: '销售、生产与出货' },
-  { tone: 'person', label: '采购、委外与库存' },
-  { tone: 'attention', label: '异常与返工' },
-  { tone: 'result', label: '收付款与业务纠正' },
 ])
 
 const asArray = (value) => (Array.isArray(value) ? value : [])
@@ -221,14 +215,14 @@ function appendDiagramStyles(lines) {
   )
 }
 
-function buildChainDiagram(chain) {
+function buildChainDiagram(chain, steps) {
   const ids = new Map(
     chain.nodes.map((node, index) => [node.key, `N${index + 1}`])
   )
-  const lines = ['flowchart TB']
+  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 24', '---', 'flowchart TB']
   chain.nodes.forEach((node, index) => {
     lines.push(
-      `  ${ids.get(node.key)}["${index + 1}. ${escapeMermaid(node.label)}"]`
+      `  ${ids.get(node.key)}["${index + 1}. ${escapeMermaid(node.label)}<br/>${escapeMermaid(steps[index].responsibleRole)}"]`
     )
   })
   chain.edges.forEach((edge, index) => {
@@ -252,53 +246,6 @@ function buildChainDiagram(chain) {
     description: '按箭头看主路径；有分支时按箭头文字选择去向。',
     mermaidSource: lines.join('\n'),
     legend: DIAGRAM_LEGEND,
-  })
-}
-
-function buildOverviewDiagram(catalog) {
-  const chainByKey = new Map(
-    asArray(catalog.businessChains).map((chain) => [chain.key, chain])
-  )
-  const idByChainKey = new Map()
-  const lines = ['flowchart LR']
-  let sequence = 0
-
-  asArray(catalog.businessChainOverview?.lanes).forEach((lane, laneIndex) => {
-    lines.push(`  subgraph L${laneIndex + 1}["${escapeMermaid(lane.label)}"]`)
-    lines.push('    direction TB')
-    asArray(lane.chainKeys).forEach((chainKey) => {
-      const chain = chainByKey.get(chainKey)
-      sequence += 1
-      const id = `C${sequence}`
-      idByChainKey.set(chainKey, id)
-      lines.push(`    ${id}["${sequence}. ${escapeMermaid(chain?.label)}"]`)
-    })
-    lines.push('  end')
-  })
-
-  asArray(catalog.businessChainOverview?.relations).forEach((relation) => {
-    lines.push(
-      `  ${idByChainKey.get(relation.fromChainKey)} -->|"${escapeMermaid(relation.label)}"| ${idByChainKey.get(relation.toChainKey)}`
-    )
-  })
-  appendDiagramStyles(lines)
-  asArray(catalog.businessChains).forEach((chain) => {
-    const tone =
-      chain.kind === 'primary'
-        ? 'normal'
-        : chain.kind === 'supporting'
-          ? 'person'
-          : chain.kind === 'reversal'
-            ? 'result'
-            : 'attention'
-    lines.push(`  class ${idByChainKey.get(chain.key)} ${tone}`)
-  })
-
-  return Object.freeze({
-    title: '业务链总览',
-    description: '四个分区只展示链与链的关系，不展开每条链的内部步骤。',
-    mermaidSource: lines.join('\n'),
-    legend: OVERVIEW_DIAGRAM_LEGEND,
   })
 }
 
@@ -452,48 +399,17 @@ function buildChainReview(catalog, chain) {
     chainName: chain.label,
     chainKind: CHAIN_KIND_LABELS[chain.kind] || '业务链',
     purpose: chain.summary,
-    diagram: buildChainDiagram(chain),
+    diagram: buildChainDiagram(chain, steps),
     steps: freezeList(steps),
     displayExceptionPaths: compactExceptionPaths(exceptionEntries),
     exceptionPaths: Object.freeze(normalizedExceptionPaths),
   })
 }
 
-function buildOverviewReview(catalog) {
-  const chainByKey = new Map(
-    asArray(catalog.businessChains).map((chain) => [chain.key, chain])
-  )
-  let sequence = 0
-  const lanes = asArray(catalog.businessChainOverview?.lanes).map((lane) => ({
-    name: lane.label,
-    purpose: lane.summary,
-    chains: freezeList(
-      asArray(lane.chainKeys).map((chainKey) => {
-        const chain = chainByKey.get(chainKey)
-        if (!chain) {
-          throw new Error(
-            'customer review overview references an unknown chain'
-          )
-        }
-        sequence += 1
-        return {
-          number: sequence,
-          name: chain.label,
-          purpose: chain.summary,
-        }
-      })
-    ),
-  }))
+function buildOverviewReview() {
   return Object.freeze({
-    overviewName: '订单全流程',
-    purpose: catalog.businessChainOverview.summary,
-    compactOnly: true,
-    detailBoundary:
-      '先按实际顺序列岗位交接、审批和异常，再附业务专题关系；不展开每条链的内部步骤、系统规则或开发证据。',
-    fulfillmentFlow: taskCatalog.fulfillment_flow,
+    phases: freezeList(buildFulfillmentOverview(taskCatalog.fulfillment_flow)),
     exceptionGuides: taskCatalog.exception_guides,
-    lanes: freezeList(lanes),
-    diagram: buildOverviewDiagram(catalog),
   })
 }
 
@@ -520,13 +436,13 @@ export function buildDevBusinessChainCustomerReview({
   }
 
   const reviewContent = overviewSelected
-    ? { overview: buildOverviewReview(catalog) }
+    ? { overview: buildOverviewReview() }
     : { chain: buildChainReview(catalog, chain) }
   const subjectName = overviewSelected ? '订单全流程' : chain.label
   const reviewScope = resolveCustomerReviewScope(customerOverlay)
 
   return Object.freeze({
-    documentTitle: `业务链甲方校对版｜${subjectName}`,
+    documentTitle: subjectName,
     ...reviewScope,
     generatedAt: formatGeneratedAt(generatedAt),
     applicableScope:

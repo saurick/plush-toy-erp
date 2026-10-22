@@ -5279,7 +5279,7 @@ active = new Set()
       if(action==='dev-flow-export') {
         const result=target.closest('[data-dev-flow-preview]').querySelector('[data-flow-export-result]');
         result.hidden=false;
-        result.textContent=target.dataset.value==='当前视图'?'导出当前已显示内容；正式页面可打印或保存 PDF。':'正式页面先选择客户，再生成关系图与环节、岗位、完成条件三列表。';
+        result.textContent=target.dataset.value==='当前视图'?'导出当前已显示内容；正式页面可打印或保存 PDF。':'正式页面选择客户后，导出主流程与关键异常分支；节点直接显示岗位和关键结果，单业务只输出所选流程。';
         target.closest('details').open=false;
         return true;
       }

@@ -2,7 +2,7 @@ import React from 'react'
 import { Button, Select } from 'antd'
 import { CloseOutlined } from '@ant-design/icons'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
-import { fulfillmentRoleOptions, fulfillmentStepMatchesRole, fulfillmentTaskLinks } from '../../../erp/utils/workflowFulfillment.mjs'
+import { fulfillmentHandling, fulfillmentRoleOptions, fulfillmentStepMatchesRole, fulfillmentTaskLinks } from '../../../erp/utils/workflowFulfillment.mjs'
 import { buildFulfillmentChain, buildFulfillmentChainWires, fulfillmentChainColumns, fulfillmentChainInsertion } from '../../config/devFulfillmentChain.mjs'
 import { getFulfillmentStageCopy } from '../../config/devFulfillmentPresentation.mjs'
 import { DEV_FLOW_STATE_QUERY_KEYS as keys } from '../../pages/devFlowStateQuery.mjs'
@@ -78,6 +78,7 @@ export default function FulfillmentChainCanvas({ role, searchParams, setSearchPa
         width: map.clientWidth,
         height: map.clientHeight,
         stages: Object.fromEntries([...map.querySelectorAll('[data-chain-stage]')].map((node) => [node.dataset.chainStage, relativeRect(node.querySelector('[data-stage-card]'), base)])),
+        exceptionEntries: Object.fromEntries([...map.querySelectorAll('[data-stage-exception]')].map((node) => [node.dataset.stageException, relativeRect(node, base)])),
         lane: lane ? relativeRect(lane, base) : null,
         workHeight: lane?.querySelector('[data-chain-work]')?.getBoundingClientRect().height || 74,
         terminalHeight: lane?.querySelector('[data-chain-terminal]')?.getBoundingClientRect().height || 40,
@@ -129,19 +130,19 @@ export default function FulfillmentChainCanvas({ role, searchParams, setSearchPa
     </div>
   ) : null
   const renderStage = ({ step, number, label }) => {
-    const guides = catalog.exception_guides.filter((guide) => guide.entry_stages.includes(step.stage))
+    const guides = step.handling ? fulfillmentHandling(step).guides : []
+    const guide = guides.find((item) => item.key === exceptionKey) || guides[0]
     const origin = graph?.origin?.stage === step.stage
     const returned = graph?.returnStage?.stage === step.stage
     const reentry = graph?.reentryStage?.stage === step.stage
     return (
       <div className="erp-dev-chain__stage" key={step.stage} data-chain-stage={step.stage} data-fulfillment-stage={step.stage} data-role-match={role === 'all' ? undefined : fulfillmentStepMatchesRole(step, role)} data-conditional={step.branch || undefined} data-origin={origin || undefined} data-return={returned || undefined} data-reentry={reentry || undefined} data-repeat={graph?.repeat.includes(step.stage) || undefined}>
-        <div className="erp-dev-chain__stage-card" data-stage-card data-selected={!exceptionKey && selectedStage === step.stage || undefined}>
-          <button className="erp-dev-chain__stage-main" type="button" aria-label={`${number} ${step.label}`} aria-expanded={!exceptionKey && selectedStage === step.stage} aria-controls={!exceptionKey && selectedStage === step.stage ? detailID : undefined} onClick={() => onSelectStage(step.stage)}><span>{number}</span><strong>{label}</strong></button>
-          <div className="erp-dev-chain__stage-foot">
-            {guides.length ? <button type="button" title={`${guides.length} 类已登记异常分支，并非异常发生次数`} aria-label={`查看第${number}环节异常分支`} aria-expanded={origin} onClick={() => onOpenException(guides.find((guide) => guide.key === exceptionKey) || guides[0], null, step.stage)}>↳ 异常分支{guides.length > 1 ? ` ${guides.length}` : ''}</button> : reentry ? <small>{graph.plan.continuation.original_terminal ? '新批重开' : '重新进入'}</small> : null}
-            {step.branch ? <small>· 按约定</small> : null}
-          </div>
-        </div>
+        <button className="erp-dev-chain__stage-card erp-dev-chain__stage-main" data-stage-card data-selected={!exceptionKey && selectedStage === step.stage || undefined} type="button" title={step.label} aria-label={`${number} ${step.label}`} aria-expanded={!exceptionKey && selectedStage === step.stage} aria-controls={!exceptionKey && selectedStage === step.stage ? detailID : undefined} onClick={() => onSelectStage(step.stage)}>
+          <span>{number}</span><strong>{label}</strong>
+          {step.branch ? <small>按约定</small> : null}
+          {reentry ? <small>{graph.plan.continuation.original_terminal ? '新批重开' : '重新进入'}</small> : null}
+        </button>
+        {guide ? <div className="erp-dev-chain__stage-branch"><button className="erp-dev-chain__exception-trigger" data-stage-exception={step.stage} type="button" title={`${guides.length} 类已登记异常处理，并非异常发生次数`} aria-label={`查看第${number}环节异常分支`} aria-expanded={Boolean(graph?.guide.key === guide.key && (origin || !graph.origin))} onClick={() => onOpenException(guide, null, guide.entry_stages.includes(step.stage) ? step.stage : null)}>↳ 查看异常{guides.length > 1 ? ` · ${guides.length} 类` : ''}</button></div> : null}
       </div>
     )
   }

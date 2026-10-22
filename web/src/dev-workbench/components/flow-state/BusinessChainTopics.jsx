@@ -15,7 +15,7 @@ function describeRoleDuties(roleName, steps) {
     : `${roleName}参与 ${steps.length} 个办理环节`
 }
 
-export default function BusinessChainTopics({ catalog, mermaid, currentChainKey, onSelectChain }) {
+export default function BusinessChainTopics({ catalog, mermaid, currentChainKey, onSelectChain, onOpenExceptionDirectory }) {
   const [searchParams] = useSearchParams()
   const [mapOpen, setMapOpen] = useState(false)
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
@@ -28,7 +28,10 @@ export default function BusinessChainTopics({ catalog, mermaid, currentChainKey,
     <div className="erp-dev-chain-topics" data-business-chain-topics>
       <div className="erp-dev-chain-topics__toolbar">
         <p role="status">{role === 'all' ? `全部 ${count} 条业务流程` : `${roleName}参与 ${count} 条业务流程`}</p>
-        <Button onClick={() => setMapOpen(true)}>系统衔接图</Button>
+        <div className="erp-dev-chain-topics__actions">
+          <Button aria-label="异常目录" onClick={onOpenExceptionDirectory}>异常目录</Button>
+          <Button onClick={() => setMapOpen(true)}>系统衔接图</Button>
+        </div>
       </div>
       {count === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未登记该岗位的业务职责，可切换全部岗位查看。" /> : null}
       {lanes.map((lane) => (

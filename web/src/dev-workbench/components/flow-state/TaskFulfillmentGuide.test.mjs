@@ -3,6 +3,52 @@ import test from 'node:test'
 import { createElement as h } from 'react'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
+import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
+
+test('external exception entries stay separate from main buttons and preserve independent sources', async (t) => {
+  const harness = await createReactTestHarness(t)
+  const { default: TaskFulfillmentGuide } = await import('./TaskFulfillmentGuide.jsx')
+  let navigation
+  function Probe() {
+    navigation = { location: useLocation() }
+    return h(TaskFulfillmentGuide)
+  }
+  await harness.render(h(MemoryRouter, {
+    initialEntries: ['/__dev/status-flows?view=chain&chain=all'],
+    future: { v7_startTransition: true, v7_relativeSplatPath: true },
+  }, h(Probe)))
+  const root = harness.container
+  for (const [index, step] of catalog.fulfillment_flow.entries()) {
+    const stage = root.querySelector(`[data-chain-stage="${step.stage}"]`)
+    const main = stage.querySelector('[data-stage-card]')
+    const entry = stage.querySelector('[data-stage-exception]')
+    assert.equal(main.tagName, 'BUTTON')
+    assert.equal(main.querySelector('button'), null)
+    assert.equal(Boolean(entry), Boolean(step.handling.guides.length), 'entries follow the handling catalog, including independently handled issues')
+    if (entry) {
+      assert.equal(main.contains(entry), false)
+      assert.equal(entry.getAttribute('aria-label'), `查看第${index + 1}环节异常分支`)
+      assert(entry.textContent.includes('查看异常'))
+    }
+    if (step.branch) assert(main.textContent.includes('按约定'))
+  }
+  const independent = root.querySelector('[data-stage-exception="cutting_issue"]')
+  await harness.act(() => { independent.focus(); independent.click() })
+  assert.equal(new URLSearchParams(navigation.location.search).get('flow_exception'), 'over_issue')
+  assert.equal(new URLSearchParams(navigation.location.search).has('flow_exception_origin'), false)
+  assert.equal(root.querySelectorAll('[data-chain-stage][data-origin]').length, 0)
+  assert.equal(root.querySelectorAll('[data-chain-wire="exception-out"]').length, 0)
+  await harness.act(() => root.querySelector('button[aria-label="收起异常分支"]').click())
+  await harness.flush()
+  assert.equal(harness.runtimeWindow.document.activeElement, independent, 'closing the independent issue returns focus to its external opener')
+  const incoming = root.querySelector('[data-stage-exception="incoming_quality"]')
+  await harness.act(() => incoming.click())
+  assert.equal(new URLSearchParams(navigation.location.search).get('flow_exception_origin'), 'incoming_quality')
+  assert.equal(root.querySelector('[data-stage-mode]'), null, 'opening an exception does not open the normal stage detail')
+  await harness.act(() => root.querySelector('[data-chain-stage="incoming_quality"] [data-stage-card]').click())
+  assert.equal(new URLSearchParams(navigation.location.search).has('flow_exception'), false)
+  assert(root.querySelector('[data-stage-mode="normal"]'), 'the main button opens normal work and clears the exception selection')
+})
 
 test('refresh restores an explicitly selected exception step across role boundaries', async (t) => {
   const harness = await createReactTestHarness(t)

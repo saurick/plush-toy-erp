@@ -11,11 +11,13 @@ import {
   ColumnWidthOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
+  MoreOutlined,
   OneToOneOutlined,
   SwapOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
 } from '@ant-design/icons'
+import { Dropdown } from 'antd'
 import { Remarkable } from 'remarkable'
 import RemarkableReactRenderer from 'remarkable-react'
 
@@ -121,6 +123,7 @@ export function MermaidDiagram({
   flowchartHtmlLabels = true,
   initialZoom = 'fit',
   nativeSize = false,
+  toolbar = 'full',
   interactiveNodes,
   selectedNodeId,
   onNodeSelect,
@@ -156,6 +159,7 @@ export function MermaidDiagram({
   const dragRef = useRef(null)
   const [panning, setPanning] = useState(false)
   const fullscreenOpenRef = useRef(null)
+  const toolbarMenuRef = useRef(null)
   const fullscreenExitRef = useRef(null)
   const fullscreenReturnFocusRef = useRef(null)
   const viewportRef = useRef(null)
@@ -177,6 +181,7 @@ export function MermaidDiagram({
   const activeZoom = fullscreenOpen ? fullscreenZoom : zoom
   const activeZoomMode = zoomModes[fullscreenOpen ? 'fullscreen' : 'inline']
   const zoomPercent = Math.round(activeZoom * 100)
+  const compactToolbar = toolbar === 'compact' && !fullscreenOpen
 
   const setNextZoom = useCallback(
     (nextZoom, { mode = 'manual' } = {}) => {
@@ -493,6 +498,11 @@ export function MermaidDiagram({
     setFullscreenOpen(true)
   }
 
+  const runToolbarAction = (action) => {
+    action()
+    toolbarMenuRef.current?.focus({ preventScroll: true })
+  }
+
   const diagram = (
     <div
       ref={diagramRef}
@@ -509,6 +519,8 @@ export function MermaidDiagram({
       data-mermaid-direction={activeDirection || undefined}
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}
       data-mermaid-native-size={nativeSize || undefined}
+      data-mermaid-toolbar={compactToolbar ? 'compact' : 'full'}
+      data-mermaid-zoom-mode={activeZoomMode}
       popover={fullscreenOpen ? 'manual' : undefined}
       aria-busy={renderState.status === 'loading'}
       role={fullscreenOpen ? 'dialog' : undefined}
@@ -529,83 +541,106 @@ export function MermaidDiagram({
             className="erp-markdown-mermaid__toolbar"
             aria-label={`${displayLabel}工具`}
           >
-            {nextDirection ? (
-              <button
-                type="button"
-                className="erp-markdown-mermaid__tool erp-markdown-mermaid__tool--layout"
-                data-mermaid-layout-action="toggle"
-                title={`切换为${['LR', 'RL'].includes(nextDirection) ? '左右' : '上下'}布局`}
-                aria-label={`切换${displayLabel}为${['LR', 'RL'].includes(nextDirection) ? '左右' : '上下'}布局`}
-                onClick={switchLayout}
+            {compactToolbar ? (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  selectable: true,
+                  selectedKeys: activeZoomMode === 'fit-all' ? ['fit-all'] : activeZoomMode === 'fit-width' ? ['fit'] : activeZoom === MERMAID_ZOOM.defaultValue ? ['reset'] : [],
+                  items: [
+                  ...(nextDirection ? [{ key: 'layout', label: '切换布局', onClick: () => runToolbarAction(switchLayout) }] : []),
+                  { key: 'fit-all', label: '适应全图', onClick: () => runToolbarAction(() => fitToView('fit-all')) },
+                  { key: 'fit', label: '适配宽度', onClick: () => runToolbarAction(() => fitToView('fit-width')) },
+                  { type: 'divider' },
+                  { key: 'zoom-out', label: '缩小', disabled: activeZoom <= MERMAID_ZOOM.min, onClick: () => runToolbarAction(() => setNextZoom(activeZoom - MERMAID_ZOOM.step)) },
+                  { key: 'zoom-in', label: '放大', disabled: activeZoom >= MERMAID_ZOOM.max, onClick: () => runToolbarAction(() => setNextZoom(activeZoom + MERMAID_ZOOM.step)) },
+                  { key: 'reset', label: '原始大小（100%）', onClick: () => runToolbarAction(() => setNextZoom(MERMAID_ZOOM.defaultValue)) },
+                  ],
+                }}
               >
-                <SwapOutlined />
-                <span>切换布局</span>
-              </button>
+                <button ref={toolbarMenuRef} type="button" className="erp-markdown-mermaid__tool erp-markdown-mermaid__tool--menu" data-mermaid-menu-trigger aria-label={`${displayLabel}显示设置`} title={`图表设置 · 当前 ${zoomPercent}%`}><MoreOutlined /><span>图表设置</span></button>
+              </Dropdown>
+            ) : (
+              <>
+                {nextDirection ? (
+                  <button
+                    type="button"
+                    className="erp-markdown-mermaid__tool erp-markdown-mermaid__tool--layout"
+                    data-mermaid-layout-action="toggle"
+                    title={`切换为${['LR', 'RL'].includes(nextDirection) ? '左右' : '上下'}布局`}
+                    aria-label={`切换${displayLabel}为${['LR', 'RL'].includes(nextDirection) ? '左右' : '上下'}布局`}
+                    onClick={switchLayout}
+                  >
+                    <SwapOutlined />
+                    <span>切换布局</span>
+                  </button>
             ) : null}
-            <button
-              type="button"
-              className="erp-markdown-mermaid__tool"
-              data-mermaid-zoom-action="fit-all"
-              title="适应全图"
-              aria-label={`适应${displayLabel}全图`}
-              aria-pressed={activeZoomMode === 'fit-all'}
-              onClick={() => fitToView('fit-all')}
-            >
-              <FullscreenOutlined />
-            </button>
-            <button
-              type="button"
-              className="erp-markdown-mermaid__tool"
-              data-mermaid-zoom-action="fit"
-              title="适配宽度"
-              aria-label={`适配${displayLabel}宽度`}
-              aria-pressed={activeZoomMode === 'fit-width'}
-              onClick={() => fitToView('fit-width')}
-            >
-              <ColumnWidthOutlined />
-            </button>
-            <button
-              type="button"
-              className="erp-markdown-mermaid__tool"
-              data-mermaid-zoom-action="zoom-out"
-              title="缩小"
-              aria-label={`缩小${displayLabel}`}
-              disabled={activeZoom <= MERMAID_ZOOM.min}
-              onClick={() => setNextZoom(activeZoom - MERMAID_ZOOM.step)}
-            >
-              <ZoomOutOutlined />
-            </button>
-            <span
-              className="erp-markdown-mermaid__zoom-label"
-              data-mermaid-zoom-label
-            >
-              {zoomPercent}%
-            </span>
-            <button
-              type="button"
-              className="erp-markdown-mermaid__tool"
-              data-mermaid-zoom-action="zoom-in"
-              title="放大"
-              aria-label={`放大${displayLabel}`}
-              disabled={activeZoom >= MERMAID_ZOOM.max}
-              onClick={() => setNextZoom(activeZoom + MERMAID_ZOOM.step)}
-            >
-              <ZoomInOutlined />
-            </button>
-            <button
-              type="button"
-              className="erp-markdown-mermaid__tool"
-              data-mermaid-zoom-action="reset"
-              title="重置 100%"
-              aria-label={`重置${displayLabel}为 100%`}
-              aria-pressed={
+                <button
+                  type="button"
+                  className="erp-markdown-mermaid__tool"
+                  data-mermaid-zoom-action="fit-all"
+                  title="适应全图"
+                  aria-label={`适应${displayLabel}全图`}
+                  aria-pressed={activeZoomMode === 'fit-all'}
+                  onClick={() => fitToView('fit-all')}
+                >
+                  <FullscreenOutlined />
+                </button>
+                <button
+                  type="button"
+                  className="erp-markdown-mermaid__tool"
+                  data-mermaid-zoom-action="fit"
+                  title="适配宽度"
+                  aria-label={`适配${displayLabel}宽度`}
+                  aria-pressed={activeZoomMode === 'fit-width'}
+                  onClick={() => fitToView('fit-width')}
+                >
+                  <ColumnWidthOutlined />
+                </button>
+                <button
+                  type="button"
+                  className="erp-markdown-mermaid__tool"
+                  data-mermaid-zoom-action="zoom-out"
+                  title="缩小"
+                  aria-label={`缩小${displayLabel}`}
+                  disabled={activeZoom <= MERMAID_ZOOM.min}
+                  onClick={() => setNextZoom(activeZoom - MERMAID_ZOOM.step)}
+                >
+                  <ZoomOutOutlined />
+                </button>
+                <span
+                  className="erp-markdown-mermaid__zoom-label"
+                  data-mermaid-zoom-label
+                >
+                  {zoomPercent}%
+                </span>
+                <button
+                  type="button"
+                  className="erp-markdown-mermaid__tool"
+                  data-mermaid-zoom-action="zoom-in"
+                  title="放大"
+                  aria-label={`放大${displayLabel}`}
+                  disabled={activeZoom >= MERMAID_ZOOM.max}
+                  onClick={() => setNextZoom(activeZoom + MERMAID_ZOOM.step)}
+                >
+                  <ZoomInOutlined />
+                </button>
+                <button
+                  type="button"
+                  className="erp-markdown-mermaid__tool"
+                  data-mermaid-zoom-action="reset"
+                  title="重置 100%"
+                  aria-label={`重置${displayLabel}为 100%`}
+                  aria-pressed={
                 activeZoomMode === 'manual' &&
                 activeZoom === MERMAID_ZOOM.defaultValue
               }
-              onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
-            >
-              <OneToOneOutlined />
-            </button>
+                  onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
+                >
+                  <OneToOneOutlined />
+                </button>
+              </>
+            )}
             {fullscreenOpen ? (
               <button
                 ref={fullscreenExitRef}

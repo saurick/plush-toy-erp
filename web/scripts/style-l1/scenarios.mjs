@@ -57,6 +57,7 @@ import { createWorkflowModuleSelectionScenarios } from './workflowModuleSelectio
 import { createBusinessDetailsScenarios } from './businessDetailsScenarios.mjs'
 import { createDevBusinessUsabilityScenarios } from './devBusinessUsabilityScenarios.mjs'
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
+import { createDevBusinessChainPrintScenarios } from './devBusinessChainPrintScenarios.mjs'
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
@@ -501,6 +502,13 @@ export function createStyleL1Scenarios(deps) {
       assertNoHorizontalOverflow,
       clickERPThemeOption,
       expectHeading,
+      outputDir,
+      path,
+    }),
+    ...createDevBusinessChainPrintScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      expectText,
       outputDir,
       path,
     }),

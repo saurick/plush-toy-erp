@@ -1,6 +1,6 @@
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
-import { assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
-import { switchMermaidLayout, verifyMermaidZoomModes } from './mermaidViewerAssertions.mjs'
+import { assertFulfillmentChainGeometry, openFulfillmentExceptionDirectory } from './fulfillmentChainAssertions.mjs'
+import { clickMermaidControl, verifyCompactMermaidViewer } from './mermaidViewerAssertions.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../src/common/consts/workflowTaskDiscovery.generated.mjs'
 import { fulfillmentExceptionPath } from '../../src/erp/utils/workflowFulfillment.mjs'
 import { getFulfillmentSupplement } from '../../src/dev-workbench/config/devFulfillmentPresentation.mjs'
@@ -19,7 +19,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       const stageButton = (stage) => guide.locator(`[data-fulfillment-stage="${stage}"]`).locator(':scope > button, .erp-dev-chain__stage-main')
       const verifySubflowPreview = async ({ fit = false } = {}) => {
         await subflow.locator('[data-mermaid-status="rendered"]').waitFor()
-        if (fit) await subflowDiagram.locator('[data-mermaid-zoom-action="fit"]').click()
+        if (fit) await clickMermaidControl(subflowDiagram, 'fit')
         const metrics = await subflowDiagram.evaluate((root) => {
           const viewport = root.querySelector('.erp-markdown-mermaid__viewport')
           const svg = root.querySelector('.erp-markdown-mermaid__canvas > svg')
@@ -84,7 +84,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       await page.screenshot({ path: path.join(outputDir, `order-flow-overview-${mobile ? 'mobile' : 'desktop'}-4k.png`), fullPage: mobile, scale: 'device' })
       await stageButton('sales_order').click()
       await verifySubflowPreview()
-      await verifyMermaidZoomModes(page, subflowDiagram, assert)
+      await verifyCompactMermaidViewer(page, subflowDiagram, assert)
       if (!mobile) {
         for (const viewport of [{ width: 1440, height: 900 }, { width: 1366, height: 768 }]) {
           await page.setViewportSize(viewport)
@@ -114,7 +114,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
         }))
         assert(fontSizes.length && fontSizes.every((size) => size >= 14), `子流程保持正常字号: ${fontSizes}`)
       }
-      await subflowDiagram.locator('[data-mermaid-zoom-action="reset"]').click()
+      await clickMermaidControl(subflowDiagram, 'reset')
       await subflowDiagram.getByRole('button', { name: '仓库确认材料入库', exact: true }).click()
       await verifyDiagramFont()
       await page.waitForURL(/flow_substep=inbound/u)
@@ -126,15 +126,15 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       await verifySubflowPreview()
       if (mobile) {
         await verifySubflowPreview({ fit: true })
-        await subflowDiagram.locator('[data-mermaid-zoom-action="reset"]').click()
+        await clickMermaidControl(subflowDiagram, 'reset')
         await verifyDiagramFont()
         await subflow.scrollIntoViewIfNeeded()
         await page.screenshot({ path: path.join(outputDir, 'order-subflow-incoming-mobile.png'), scale: 'device' })
       }
       if (!mobile) {
-        await switchMermaidLayout(page, subflowDiagram, assert)
+        await clickMermaidControl(subflowDiagram, 'layout')
         await verifySubflowPreview()
-        await switchMermaidLayout(page, subflowDiagram, assert)
+        await clickMermaidControl(subflowDiagram, 'layout')
         await verifySubflowPreview()
         await subflowDiagram.getByRole('button', { name: 'IQC 来料检验', exact: true }).click()
         await subflow.locator('[data-selected-substep="inspect"]').waitFor()
@@ -194,7 +194,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
         assert(step, `必须能从正式目录定位当前环节：${stage}`)
         const supplement = getFulfillmentSupplement(step)
         const hasSupplement = Boolean(supplement.handoffs.length || supplement.approvals.length || supplement.exception)
-        if (!hasSupplement) {
+        if (!step.subflow && !hasSupplement) {
           assert.equal(await details.count(), 0, '已归属子步骤的说明不重复展示')
           return
         }
@@ -211,24 +211,18 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       assert.equal(await result.locator('a[href$="stage_key=engineering"]').count(), 1)
       await stageButton('shipment').click()
       await result.getByRole('heading', { name: '放行与实际发货', exact: true }).waitFor()
-      assert.equal(await result.locator('.erp-dev-fulfillment-guide__detail-content > .erp-dev-fulfillment-guide__instructions').count(), 0, '交接条件已全部归属子步骤时，不重复展示交接说明')
+      assert.equal(await result.locator('.erp-dev-fulfillment-guide__detail-content > .erp-dev-fulfillment-guide__instructions').count(), 1, '背景与完整环节条件合为一个按需入口')
       await result.getByRole('region', { name: '当前环节的子流程', exact: true }).getByText('出货财务放行', { exact: true }).waitFor()
       assert.match(await result.innerText(), /不算已经发货/u)
       await stageButton('incoming_quality').click()
       const stageExceptions = taskCatalog.exception_guides.filter((item) => item.entry_stages.includes('incoming_quality'))
       const incomingException = stageExceptions.find((item) => item.label === '首次来料不合格')
       assert(incomingException, '来料环节必须登记首次来料不合格分支')
-      await result.getByRole('button', { name: stageExceptions.length > 1 ? '本环节异常' : `本环节异常：${incomingException.label}`, exact: true }).click()
+      await guide.getByRole('button', { name: '查看第6环节异常分支', exact: true }).click()
       if (stageExceptions.length > 1) {
-        const directory = page.locator('.erp-dev-exception-directory:visible')
-        await directory.waitFor()
-        assert.equal(await directory.locator('[data-exception-entry]').count(), taskCatalog.exception_guides.length, '目录必须保留全部正式异常流程')
-        const entry = directory.locator(`[data-exception-entry="${incomingException.key}"]`)
-        assert.equal(await entry.count(), 1)
-        assert.match(await entry.innerText(), /本环节/u)
-        await entry.getByRole('button').click()
-        await page.getByRole('dialog', { name: '异常流程', exact: true }).waitFor({ state: 'hidden' })
-        assert.equal(await page.locator('.erp-dev-exception-directory.ant-drawer-open').count(), 0)
+        const source = guide.getByRole('combobox', { name: '异常来源', exact: true })
+        await source.locator('xpath=ancestor::div[contains(@class,"ant-select-selector")][1]').click()
+        await page.getByRole('option', { name: incomingException.label, exact: true }).click()
       }
       const exception = guide
       const activeGuide = guide.locator('[data-exception-guide]')
@@ -295,8 +289,8 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       const chooseSource = async (name) => {
         const definition = taskCatalog.exception_guides.find((item) => item.label === name)
         assert(definition, name)
-        await guide.getByRole('button', { name: '异常流程', exact: true }).click()
-        const directory = page.getByRole('dialog', { name: '异常流程', exact: true })
+        await openFulfillmentExceptionDirectory(guide)
+        const directory = page.getByRole('dialog', { name: '异常目录', exact: true })
         await directory.waitFor()
         assert.equal(await directory.locator('[data-exception-entry]').count(), taskCatalog.exception_guides.length)
         await directory.locator(`[data-exception-entry="${definition.key}"]`).getByRole('button').click()
@@ -410,6 +404,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       assert.equal(new URL(page.url()).searchParams.has('flow_view'), false)
       assert.equal(new URL(page.url()).searchParams.has('flow_exception'), false)
       assert.equal(new URL(page.url()).searchParams.has('flow_decision'), false)
+      await guide.getByRole('button', { name: '返回完整流程', exact: true }).click()
       await stageButton('customer_advance').click()
       await result.getByRole('heading', { name: '客户首款与分期收款', exact: true }).waitFor()
       await openInstructions()
@@ -461,7 +456,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
             await subflow.locator(`[data-selected-substep="${node.key}"]`).waitFor()
           }
           assert.equal(await subflowDiagram.locator('[data-mermaid-node-id]').count(), step.subflow.nodes.length)
-          await subflowDiagram.locator('[data-mermaid-zoom-action="reset"]').click()
+          await clickMermaidControl(subflowDiagram, 'reset')
           await verifyDiagramFont()
         }
         await stageButton('sewing_execute').click()

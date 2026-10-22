@@ -63,6 +63,17 @@ test('replacement reentry avoids the earlier order, purchase and offset payment 
   assert.deepEqual(fulfillmentWireCollisions({ boxes, paths: paths.filter((path) => path.kind === 'branch'), source: 'incoming_quality', target: 'purchase_count' }), [])
 })
 
+test('an open exception leaves from its external entry without crossing either button', () => {
+  const chain = make('production_quality', 'original_rework', 'shell_quality')
+  const stage = { x: 300, y: 50, width: 140, height: 64 }
+  const entry = { x: 320, y: 126, width: 100, height: 32 }
+  const geometry = { width: 900, height: 500, stages: { shell_quality: stage }, exceptionEntries: { shell_quality: entry }, lane: { x: 22, y: 180, width: 856, height: 198 } }
+  const { paths } = buildFulfillmentChainWires(chain, geometry)
+  const outbound = paths.find((path) => path.key === 'exception-out')
+  assert(outbound.d.startsWith('M 370 161 '), 'the branch starts below the separately measured exception entry')
+  assert.deepEqual(fulfillmentWireCollisions({ boxes: [{ key: 'main', ...stage }, { key: 'entry', ...entry }], paths: paths.filter((path) => path.kind === 'branch') }), [])
+})
+
 test('all registered exception schemes use measured anchors, preserve the catalog, and fit narrow geometry', () => {
   const before = JSON.stringify(catalog)
   for (const guide of catalog.exception_guides) {

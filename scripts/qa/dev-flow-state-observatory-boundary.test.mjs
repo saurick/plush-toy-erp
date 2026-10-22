@@ -116,7 +116,7 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
   assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
-  assert.match(page, /topics=\{<BusinessChainTopics/u);
+  assert.match(page, /renderTopics=\{\(onOpenExceptionDirectory\) => <BusinessChainTopics/u);
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /按业务查阅/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
@@ -355,19 +355,18 @@ test("dev flow state observatory: customer review print is generated from the sh
   assert.doesNotMatch(model, /EXCEPTION_PATTERN|EXCEPTION_GROUPS/u);
   assert.doesNotMatch(model, /const BUSINESS_CHAIN_DEFINITIONS/u);
   assert.match(printView, /data-customer-review-print-root/u);
-  for (const copy of [
-    "生成时间",
-    "适用范围",
-    "岗位与完成条件",
-    "处理与完成条件",
-    "下一步",
-    "异常与纠正",
-    "完成边界",
-  ]) {
-    assert(printView.includes(copy), `missing customer review copy: ${copy}`);
+  for (const copy of ["订单主流程", "按约定办理", "关键条件", "关键异常分支"]) {
+    assert(printView.includes(copy), `missing core flow copy: ${copy}`);
   }
-  for (const field of ["trigger", "responsibleRole", "completion", "actionOutcomes", "next"]) {
+  for (const copy of ["按问题查阅", "图册阅读顺序", "适用范围", "完成边界", "正常办理与岗位交接"]) {
+    assert(!printView.includes(copy), `redundant export copy: ${copy}`);
+  }
+  assert.match(model, /steps\[index\]\.responsibleRole/u, "流程图节点保留负责岗位");
+  for (const field of ["actionOutcomes"]) {
     assert(printView.includes(`step.${field}`), `customer review must retain step ${field}`);
+  }
+  for (const field of ["entry.step.role", "entry.step.result", "plan.continuation.original_terminal", "plan.continuation.reentry?.label", "plan.continuation.label", "action.condition"]) {
+    assert(printView.includes(field), `customer review must retain core condition ${field}`);
   }
   assert.match(styles, /@media print/u);
   assert.match(styles, /size: A4 portrait/u);

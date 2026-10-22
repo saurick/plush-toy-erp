@@ -271,7 +271,7 @@ function BusinessChainOverviewView({
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
       <TaskFulfillmentGuide
         onExploreStage={onSelectChain}
-        topics={<BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} onSelectChain={onSelectChain} />}
+        renderTopics={(onOpenExceptionDirectory) => <BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} onSelectChain={onSelectChain} onOpenExceptionDirectory={onOpenExceptionDirectory} />}
       />
       {taskId ? (
         <section

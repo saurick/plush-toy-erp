@@ -39,7 +39,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(value, high))
 
 // Rectangles are measured from the rendered grid; paths never infer execution progress.
 export function buildFulfillmentChainWires(model, geometry) {
-  const { width = 0, height = 0, stages = {}, lane, workHeight = 74, terminalHeight = 40 } = geometry
+  const { width = 0, height = 0, stages = {}, exceptionEntries = {}, lane, workHeight = 74, terminalHeight = 40 } = geometry
   const paths = []
   const labels = []
   if (!width || !height) return { paths, labels, placement: null }
@@ -67,13 +67,14 @@ export function buildFulfillmentChainWires(model, geometry) {
   }
   if (!exception?.origin || !lane || !boxes.has(exception.origin.stage)) return { paths, labels, placement: null }
   const source = boxes.get(exception.origin.stage)
+  const branchSource = exceptionEntries[exception.origin.stage] ? point(exceptionEntries[exception.origin.stage]) : source
   const workWidth = Math.min(244, lane.width * (exception.terminal ? 0.5 : 0.65))
   const terminalWidth = Math.min(152, lane.width * 0.32)
   const leftMax = exception.terminal ? lane.width - workWidth - terminalWidth - 24 : lane.width - workWidth - 4
   const left = clamp(source.cx - lane.x - workWidth / 2, 4, leftMax)
   const a = point({ x: lane.x + left, y: lane.y + 80, width: workWidth, height: workHeight })
   const placement = { left: round(left), width: round(workWidth), terminalWidth: round(terminalWidth) }
-  add('exception-out', `M ${source.cx - 13} ${source.bottom + 3} V ${a.y - 20} H ${a.cx} V ${a.y - 3}`, 'branch', { from: exception.origin.stage })
+  add('exception-out', `M ${branchSource.cx} ${branchSource.bottom + 3} V ${a.y - 20} H ${a.cx} V ${a.y - 3}`, 'branch', { from: exception.origin.stage })
   label('branch-condition', exception.guide.diagram.branch_label, source.cx + 32, a.y - 38)
   const target = exception.resume && boxes.get(exception.resume.stage)
   if (target) {
@@ -98,8 +99,8 @@ export function buildFulfillmentChainWires(model, geometry) {
       label('return-condition', text, width / 2, a.bottom + 6)
     } else {
       const right = Math.min(width - 14, Math.max(a.right + 24, target.cx + 28))
-      d = `M ${a.right} ${a.cy} H ${right} V ${target.bottom + 18} H ${target.cx + 14} V ${target.bottom + 3}`
-      label('return-condition', text, (right + target.cx + 14) / 2, target.bottom + 4)
+      d = `M ${a.right} ${a.cy} H ${right} V ${target.bottom + 6} H ${target.cx + 14} V ${target.bottom + 3}`
+      label('return-condition', text, width / 2, a.bottom + 6)
     }
     add('exception-return', d, 'branch', { to: exception.resume.stage, reentry: Boolean(exception.reentryStage) })
   }

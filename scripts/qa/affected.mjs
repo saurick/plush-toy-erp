@@ -592,7 +592,7 @@ function isDevPageGovernancePath(file) {
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|BusinessChainCustomerReview|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
@@ -615,6 +615,14 @@ function isDevQualityGateProviderBoundaryPath(file) {
 
 function devBrowserScenarioNames(file) {
   const mappings = [
+    [
+      /BusinessChainCustomerReview|devBusinessChainPrint/u,
+      ["dev-business-chain-customer-review-print"],
+    ],
+    [
+      /pages\/DevFlowStateObservatoryPage\.jsx$|styles\/dev-flow-state-observatory\.css$/u,
+      ["dev-business-chain-customer-review-print", "dev-flow-state-observatory-desktop-light"],
+    ],
     [
       /BusinessUsability|business-usability/u,
       ["dev-business-usability-desktop-light"],

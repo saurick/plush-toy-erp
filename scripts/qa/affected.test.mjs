@@ -771,6 +771,23 @@ test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", 
   }
 });
 
+test("affected: 业务链导出改动选择专用 PDF 回归", () => {
+  for (const file of [
+    "web/src/dev-workbench/pages/DevBusinessChainCustomerReviewPrint.jsx",
+    "web/src/dev-workbench/config/devBusinessChainCustomerReview.mjs",
+    "web/scripts/style-l1/devBusinessChainPrintScenarios.mjs",
+    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+    "web/src/dev-workbench/styles/dev-flow-state-observatory.css",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const browser = plan.followUps.find((item) => item.id === "browser-regression");
+    assert(browser, file);
+    assert.match(browser.text, /dev-business-chain-customer-review-print/u, file);
+    assert.doesNotMatch(browser.text, /dev-quality-gates-desktop-light/u, file);
+    assert(plan.commands.some((item) => item.args.includes("scripts/qa/dev-page-governance.test.mjs")), file);
+  }
+});
+
 test("affected: 接口清单模型复用同名测试并选择对应浏览器场景", () => {
   const plan = buildAffectedPlan(
     ["web/src/dev-workbench/config/devIntegration.mjs"],
