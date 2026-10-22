@@ -757,7 +757,10 @@ export default function MasterDataPage({ type }) {
     ) {
       return
     }
-    if (recordForm.getFieldValue('default_unit_id')) {
+    if (
+      recordForm.getFieldValue('default_unit_id') ||
+      recordForm.isFieldTouched('default_unit_id')
+    ) {
       return
     }
     const inferUnitID = ['products', 'product_skus'].includes(effectiveType)

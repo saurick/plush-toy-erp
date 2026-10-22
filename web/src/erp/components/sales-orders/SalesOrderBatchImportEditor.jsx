@@ -371,6 +371,7 @@ export default function SalesOrderBatchImportEditor({
         />
       ) : null}
       <Form
+        name="sales-order-import"
         form={form}
         layout="vertical"
         className="erp-business-action-form"

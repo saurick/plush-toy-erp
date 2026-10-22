@@ -91,5 +91,5 @@ test('清空关注岗位只取消岗位条件，保留已选方案和明确步�
   assert.equal(ui.params().get('flow_decision'), 'replacement')
   assert.equal(ui.params().get('flow_exception_step'), 'arrival')
   assert.equal(ui.root.querySelector('[data-selected-exception-node]').dataset.selectedExceptionNode, 'arrival')
-  assert.equal(ui.picker('关注岗位').querySelector('.ant-select-selection-placeholder').textContent, '全部岗位')
+  assert.equal(ui.picker('关注岗位').querySelector('.ant-select-selection-placeholder').textContent, '选择关注岗位')
 })

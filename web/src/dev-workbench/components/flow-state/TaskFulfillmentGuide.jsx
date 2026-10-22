@@ -361,7 +361,7 @@ export default function TaskFulfillmentGuide({
             <label htmlFor={roleSelectID}>关注岗位</label>
             <FilterSelect
               emptyValue="all"
-              placeholder="全部岗位"
+              placeholder="选择关注岗位"
               id={roleSelectID}
               aria-label="关注岗位"
               value={role}

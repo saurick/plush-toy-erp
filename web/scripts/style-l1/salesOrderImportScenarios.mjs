@@ -263,6 +263,15 @@ export function createSalesOrderImportScenarios(deps) {
           assert.equal(await previewRecords.count(), 0)
         }
         await picker.locator('img').first().waitFor()
+        const customerSelect = picker.locator('.ant-select').filter({
+          has: page.getByRole('combobox', { name: `订单 ${parsed.orders[0].order_no} 的客户`, exact: true }),
+        })
+        await customerSelect.locator('.ant-select-clear').click()
+        await customerSelect.getByText('请选择对应客户', { exact: true }).waitFor()
+        assert.equal(await customerSelect.locator('.ant-select-selection-item').count(), 0, '清空匹配客户后不得自动选回')
+        await customerSelect.getByRole('combobox').click()
+        await page.locator('.ant-select-dropdown:visible').getByText(`${customers[0].code} - ${customers[0].name}`, { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
         await picker
           .getByRole('combobox', { name: '原表缺少单位时使用' })
           .click()
@@ -322,7 +331,7 @@ export function createSalesOrderImportScenarios(deps) {
           await page.waitForFunction(
             (number) =>
               document.querySelector(
-                '.erp-business-form-page:not([hidden]) #order_no'
+                '.erp-business-form-page:not([hidden]) #sales-order-import_order_no'
               )?.value === number,
             parsed.orders[position].order_no
           )
@@ -330,6 +339,15 @@ export function createSalesOrderImportScenarios(deps) {
         for (const [position, order] of parsed.orders.entries()) {
           if (position > 0) await chooseOrder(position)
           await checkPaymentRecords(order)
+          // 原表未提供税费与运费口径，核对人须明确选择后才能保存。
+          for (const [field, option] of [['计税方式', '不计税'], ['报价是否含运费', '报价含运费']]) {
+            const control = editor.getByLabel(field, { exact: true })
+            assert.equal(await control.count(), 1, '下拉标签只关联当前导入表单')
+            await control.focus()
+            await page.keyboard.press('ArrowDown')
+            await page.locator('.ant-select-dropdown:visible').getByText(option, { exact: true }).click()
+            await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+          }
           assert.equal(
             await editor.locator('.erp-sales-order-lines-form__row').count(),
             order.lines.length
@@ -345,7 +363,7 @@ export function createSalesOrderImportScenarios(deps) {
               'note',
             ]) {
               assert.equal(
-                await editor.locator(`#items_${i}_${key}`).inputValue(),
+                await editor.locator(`#sales-order-import_items_${i}_${key}`).inputValue(),
                 line.item[key] || '',
                 `order ${position + 1}, line ${i + 1}: ${key}`
               )
@@ -368,18 +386,18 @@ export function createSalesOrderImportScenarios(deps) {
         if (!process.env.SALES_ORDER_IMPORT_TEST_FILE) {
           const originalNote = parsed.orders[0].lines[0].item.note || ''
           await editor.locator('.erp-line-item-details > summary').first().click()
-          await editor.locator('#items_0_note').fill('模拟逐单编辑保留校验')
-          await editor.locator('#contact_email').fill('invalid-email')
+          await editor.locator('#sales-order-import_items_0_note').fill('模拟逐单编辑保留校验')
+          await editor.locator('#sales-order-import_contact_email').fill('invalid-email')
           await chooseOrder(1)
           await editor.getByRole('button', { name: `保存全部 ${parsed.orders.length} 张草稿`, exact: true }).click()
           await editor.getByRole('alert').getByText('待补齐', { exact: true }).waitFor()
-          await page.waitForFunction((number) => document.querySelector('.erp-business-form-page:not([hidden]) #order_no')?.value === number, parsed.orders[0].order_no)
+          await page.waitForFunction((number) => document.querySelector('.erp-business-form-page:not([hidden]) #sales-order-import_order_no')?.value === number, parsed.orders[0].order_no)
           assert.equal(mutations.length, 0)
-          assert.equal(await editor.locator('#items_0_note').inputValue(), '模拟逐单编辑保留校验')
-          await editor.locator('#contact_email').fill('')
+          assert.equal(await editor.locator('#sales-order-import_items_0_note').inputValue(), '模拟逐单编辑保留校验')
+          await editor.locator('#sales-order-import_contact_email').fill('')
           const noteDetails = editor.locator('.erp-line-item-details').first()
           if ((await noteDetails.getAttribute('open')) === null) await noteDetails.locator('summary').click()
-          await editor.locator('#items_0_note').fill(originalNote)
+          await editor.locator('#sales-order-import_items_0_note').fill(originalNote)
           await noteDetails.locator('summary').click()
         }
         await editor
@@ -494,7 +512,7 @@ export function createSalesOrderImportScenarios(deps) {
         const sourceButton = editor.getByRole('button', { name: `核对原表：${parsed.orders[0].lines[0].sheetName} 第 ${parsed.orders[0].lines[0].rowNumber} 行`, exact: true })
         await page.setViewportSize({ width: 390, height: 844 })
         await sourceButton.scrollIntoViewIfNeeded()
-        const sourceBounds = await editor.locator('.erp-sales-order-source-evidence').first().evaluate(node => ({ width: node.clientWidth, scrollWidth: node.scrollWidth }))
+        const sourceBounds = await editor.locator('.erp-sales-order-source-evidence').first().evaluate((node) => ({ width: node.clientWidth, scrollWidth: node.scrollWidth }))
         assert.ok(sourceBounds.scrollWidth <= sourceBounds.width + 1, JSON.stringify(sourceBounds))
         await assertNoHorizontalOverflow(page, 'sales-order-import-source-narrow')
         await page.setViewportSize({ width: 1440, height: 900 })

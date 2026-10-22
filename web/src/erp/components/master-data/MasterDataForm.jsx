@@ -60,7 +60,6 @@ function DefaultUnitSelect({
       rules={rules}
     >
       <Select
-        allowClear={!required}
         showSearch
         loading={unitLoading}
         options={unitOptions}

@@ -1,4 +1,5 @@
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
+import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 
 export function createMasterDataFieldScenarios(deps) {
   const {
@@ -34,8 +35,7 @@ export function createMasterDataFieldScenarios(deps) {
               result: {
                 code: 0,
                 message: 'OK',
-                data: {
-                  units: [
+                data: stylePaginatedRpcData([
                     {
                       id: 1,
                       code: 'KG',
@@ -50,11 +50,7 @@ export function createMasterDataFieldScenarios(deps) {
                       precision: 0,
                       is_active: true,
                     },
-                  ],
-                  total: 2,
-                  limit: 100,
-                  offset: 0,
-                },
+                  ], 'units', body.params),
               },
             }),
           })
@@ -102,6 +98,15 @@ export function createMasterDataFieldScenarios(deps) {
           '',
           '默认单位变更后应清除旧产品单重'
         )
+        const unitSelect = modal.locator('.ant-select:has(#default_unit_id)')
+        await weightInput.fill('500')
+        await unitSelect.locator('.ant-select-clear').click()
+        assert.equal(await weightInput.inputValue(), '', '清空默认单位也清除依赖单重')
+        await unitSelect.getByText('请选择默认单位', { exact: true }).waitFor()
+        await modal.locator('.ant-form-item-explain-error').filter({ hasText: '请选择默认单位' }).waitFor()
+        await modal.locator('#default_unit_id').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: '千克' }).click()
+        await modal.locator('.ant-form-item-explain-error').filter({ hasText: '请选择默认单位' }).waitFor({ state: 'hidden' })
         const suffixMetrics = await suffix.evaluate((node) => {
           const wrapper = node.closest('.ant-input-number-affix-wrapper')
           const input = wrapper?.querySelector('.ant-input-number')

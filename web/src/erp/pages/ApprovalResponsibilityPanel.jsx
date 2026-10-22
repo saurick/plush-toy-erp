@@ -1253,7 +1253,6 @@ export default function ApprovalResponsibilityPanel({
                 ]}
               >
                 <Select
-                  allowClear={key !== 'primary'}
                   options={roleOptionsForStrategy(key)}
                   placeholder="选择岗位"
                   notFoundContent="没有可选审批岗位"
@@ -1265,7 +1264,7 @@ export default function ApprovalResponsibilityPanel({
                       userID > 0 &&
                       !adminHasRole(adminByID.get(userID), roleKey)
                     ) {
-                      form.setFieldValue(`${key}_user`, undefined)
+                      form.setFieldsValue({ [`${key}_user`]: undefined })
                       setEditorValues({
                         ...form.getFieldsValue(true),
                         [`${key}_role`]: roleKey,
@@ -1281,6 +1280,7 @@ export default function ApprovalResponsibilityPanel({
                 initialValue="role"
               >
                 <Select
+                  allowClear={false}
                   placeholder="请选择由谁承接"
                   options={[
                     { value: 'role', label: '岗位内任一员工' },
@@ -1372,6 +1372,7 @@ export default function ApprovalResponsibilityPanel({
                       ]}
                     >
                       <Select
+                        disabled={!getFieldValue(`${key}_role`)}
                         showSearch
                         optionFilterProp="label"
                         options={usersForRole(
@@ -1379,7 +1380,9 @@ export default function ApprovalResponsibilityPanel({
                           Number(getFieldValue(`${key}_user`) || 0),
                           key
                         )}
-                        placeholder="显示该岗位员工；不可用账号会标明原因"
+                        placeholder={getFieldValue(`${key}_role`)
+                          ? '显示该岗位员工；不可用账号会标明原因'
+                          : '请先选择审批岗位'}
                       />
                     </Form.Item>
                   ) : (

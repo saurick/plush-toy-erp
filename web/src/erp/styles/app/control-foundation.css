@@ -83,6 +83,18 @@ body
   font: inherit;
 }
 
+/* 自动补全与级联选择保留各自输入能力，清空入口与 AppSelect 一致。 */
+:where(#root, .ant-modal, .ant-drawer, .ant-popover)
+  :is(.ant-select-auto-complete, .ant-cascader) .ant-select-clear {
+  color: var(--erp-text-muted, #4d5d53);
+  opacity: 1;
+}
+
+:where(#root, .ant-modal, .ant-drawer, .ant-popover)
+  :is(.ant-select-auto-complete, .ant-cascader):has(.ant-select-clear) .ant-select-arrow {
+  opacity: 0;
+}
+
 /* 手机输入与组合外壳的字号即时生效，避免 iPhone 聚焦时缩放页面。 */
 @media screen and (max-width: 767px) {
   #root,

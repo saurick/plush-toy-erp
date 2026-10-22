@@ -1,5 +1,5 @@
-import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import assert from 'node:assert/strict'
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const fixturePath = '/__delivery-address-fixture'
@@ -69,6 +69,21 @@ export function createDeliveryAddressScenarios({
         name: '所在地区',
         exact: true,
       })
+      const regionControl = editor.locator('.ant-cascader').filter({ has: region })
+      assert.equal(await regionControl.locator('.ant-select-clear').evaluate((node) => getComputedStyle(node).opacity), '1', '地区选择有值时应直接显示清空入口')
+      await regionControl.locator('.ant-select-clear').click()
+      await regionControl.getByText('选择省 / 市 / 区县', { exact: true }).waitFor()
+      assert.equal(await detail.inputValue(), '科技园 8 号\n二楼仓库', '清空地区保留独立填写的详细地址')
+      await selectShenzhen(page)
+      if (key === 'sales') {
+        const contact = editor.getByLabel('联系人', { exact: true })
+        await contact.fill('模拟联系人')
+        await detail.click()
+        const suggestions = editor.locator('.ant-select-auto-complete').filter({ has: page.getByLabel('联系人', { exact: true }) })
+        assert.equal(await suggestions.locator('.ant-select-clear').evaluate((node) => getComputedStyle(node).opacity), '1', '可输入的下拉控件也应直接显示清空入口')
+        await suggestions.locator('.ant-select-clear').click()
+        assert.equal(await contact.inputValue(), '')
+      }
       const regionBox = await region.boundingBox()
       const detailBox = await detail.boundingBox()
       assert.ok(

@@ -189,6 +189,24 @@ test('matches only unique active customer and unit records and never replaces an
   assert.equal(draft.values.items[0].unit_id, undefined)
 })
 
+test('explicit customer clearing and invalid mappings do not fall back to automatic matching', async () => {
+  const { orders: [order] } = await parseSalesOrderXlsx(createSalesOrderWorkbook())
+  const options = [...customers, { id: 2, code: 'OTHER', name: '另一个客户', is_active: true }]
+  assert.equal(buildSalesOrderImportDraft(order, { customers: options }).values.customer_id, 1)
+  const build = (value, records = options) => buildSalesOrderImportDraft(order, {
+    customers: records,
+    customerMappings: { [order.customer]: value },
+  })
+  for (const value of [undefined, null, '', 999]) {
+    const draft = build(value)
+    assert.equal(draft.values.customer_id, undefined)
+    assert.equal(draft.review.missingCustomer, true)
+  }
+  assert.equal(build(2).values.customer_id, 2)
+  assert.equal(build(2, [customers[0], { ...options[1], is_active: false }]).values.customer_id, undefined)
+  assert.equal(build(1).values.customer_id, 1)
+})
+
 test('only explicit merged cells carry source values; header conflicts and orphan details fail closed', async () => {
   const rows = salesOrderFixtureRows()
   rows[4][2] = null

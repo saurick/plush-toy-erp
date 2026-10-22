@@ -513,13 +513,14 @@ export function buildSalesOrderImportDraft(
   } = {}
 ) {
   if (!order?.lines?.length) fail('请先选择一张包含明细的订单')
-  const customer =
-    customers.find(
-      (record) =>
-        record.id === customerMappings[order.customer] &&
-        record.is_active !== false
-    ) ||
-    matchingRecord(order.customer, customers, ['code', 'name', 'short_name'])
+  // An explicit choice, including clearing it, takes precedence over name matching.
+  const customer = Object.hasOwn(customerMappings, order.customer)
+    ? customers.find(
+        (record) =>
+          record.id === customerMappings[order.customer] &&
+          record.is_active !== false
+      )
+    : matchingRecord(order.customer, customers, ['code', 'name', 'short_name'])
   const defaultUnit = units.find(
     (unit) => unit.id === defaultUnitID && unit.is_active !== false
   )

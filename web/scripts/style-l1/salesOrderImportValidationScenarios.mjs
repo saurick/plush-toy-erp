@@ -151,10 +151,10 @@ export function createSalesOrderImportValidationScenarios(deps) {
           exact: true,
         })
         const select = async (id, text) => {
-          const input = editor.locator(`input#${id}`)
+          const input = editor.locator(`input#sales-order-import_${id}`)
           await input.press('ArrowDown')
           await input.press('Enter')
-          await editor.locator(`.ant-select:has(input#${id}) .ant-select-selection-item`)
+          await editor.locator(`.ant-select:has(input#sales-order-import_${id}) .ant-select-selection-item`)
             .filter({ hasText: text }).waitFor()
         }
         const waitForCount = (count) =>
@@ -162,14 +162,14 @@ export function createSalesOrderImportValidationScenarios(deps) {
         const waitForFocus = async (id) => {
           try {
             await page.waitForFunction(
-              (expected) => document.activeElement?.id === expected,
+              (expected) => document.activeElement?.id === `sales-order-import_${expected}`,
               id,
               { timeout: 5000 }
             )
           } catch (error) {
             const state = await editor.evaluate((node) => ({
               active: document.activeElement?.id || document.activeElement?.tagName,
-              order: node.querySelector('#order_no')?.value,
+              order: node.querySelector('#sales-order-import_order_no')?.value,
               busy: node.getAttribute('aria-busy'),
               errors: [...node.querySelectorAll('.ant-form-item-has-error')].map((field) => ({
                 id: field.querySelector('input,textarea')?.id,
@@ -179,44 +179,57 @@ export function createSalesOrderImportValidationScenarios(deps) {
             throw new Error(`Expected focus ${id}: ${JSON.stringify(state)}`, { cause: error })
           }
         }
+        const completeCommercialConditions = async () => {
+          for (const [label, option] of [['计税方式', '不计税'], ['报价是否含运费', '报价含运费']]) {
+            await editor.getByLabel(label, { exact: true }).focus()
+            await page.keyboard.press('ArrowDown')
+            await page.locator('.ant-select-dropdown:visible').getByText(option, { exact: true }).click()
+            await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+          }
+        }
+        await waitForCount(6)
+        await completeCommercialConditions()
         await waitForCount(4)
         await save.click()
         await waitForFocus('customer_id')
         assert.equal(
           await issues.getAttribute('data-sales-import-issue-count'),
-          '4'
+          '6'
         )
         const initialText = await issues.innerText()
         assert.equal((initialText.match(/客户/gu) || []).length, 1)
         assert.equal((initialText.match(/币种/gu) || []).length, 1)
         assert.equal((initialText.match(/请选择单位/gu) || []).length, 2)
+        assert.equal((initialText.match(/请先选择已配置精度的单位/gu) || []).length, 2)
         assert.equal(saves.length, 0)
         await issues.screenshot({
           path: `${deps.outputDir}/sales-import-missing-fields.png`,
         })
 
         await select('customer_id', 'CUS-IMPORT-TARGET')
-        await waitForCount(3)
+        await waitForCount(5)
         await select('currency', '人民币')
         await select('items_0_unit_id', '件')
         await select('items_1_unit_id', '件')
         await issues.waitFor({ state: 'hidden' })
         await editor
-          .locator('.ant-select:has(input#customer_id) .ant-select-clear')
-          .click({ force: true })
+          .locator('.ant-select:has(input#sales-order-import_customer_id) .ant-select-clear')
+          .click()
         await waitForCount(1)
         await select('customer_id', 'CUS-IMPORT-TARGET')
         await issues.waitFor({ state: 'hidden' })
 
-        await editor.locator('#contact_email').fill('invalid-email')
+        await editor.locator('#sales-order-import_contact_email').fill('invalid-email')
         await editor
           .getByRole('button', { name: '下一单', exact: true })
           .click()
+        await waitForCount(5)
+        await completeCommercialConditions()
         await waitForCount(3)
         await save.click()
         await waitForFocus('contact_email')
         assert.equal(
-          await editor.locator('#order_no').inputValue(),
+          await editor.locator('#sales-order-import_order_no').inputValue(),
           'SO-REVIEW-001'
         )
         assert.equal(
@@ -224,12 +237,12 @@ export function createSalesOrderImportValidationScenarios(deps) {
           '1'
         )
         assert.equal(saves.length, 0)
-        await editor.locator('#contact_email').fill('')
+        await editor.locator('#sales-order-import_contact_email').fill('')
         await issues.waitFor({ state: 'hidden' })
         await save.click()
         await waitForFocus('customer_id')
         assert.equal(
-          await editor.locator('#order_no').inputValue(),
+          await editor.locator('#sales-order-import_order_no').inputValue(),
           'SO-REVIEW-002'
         )
         assert.equal(saves.length, 0)
@@ -238,7 +251,7 @@ export function createSalesOrderImportValidationScenarios(deps) {
         await select('currency', '人民币')
         await select('items_0_unit_id', '件')
         await issues.waitFor({ state: 'hidden' })
-        await editor.locator('#items_0_ordered_quantity').fill('0')
+        await editor.locator('#sales-order-import_items_0_ordered_quantity').fill('0')
         await save.click()
         await waitForFocus('items_0_ordered_quantity')
         assert.equal(
@@ -246,17 +259,17 @@ export function createSalesOrderImportValidationScenarios(deps) {
           '1'
         )
         assert.equal(saves.length, 0)
-        await editor.locator('#items_0_ordered_quantity').fill('4')
+        await editor.locator('#sales-order-import_items_0_ordered_quantity').fill('4')
         await issues.waitFor({ state: 'hidden' })
         const details = editor.locator('.erp-line-item-details').first()
         await details.locator('summary').click()
-        await editor.locator('#items_0_pre_shipment_sample_quantity').fill('0.5')
+        await editor.locator('#sales-order-import_items_0_pre_shipment_sample_quantity').fill('0.5')
         await details.locator('summary').click()
         await save.click()
         await waitForFocus('items_0_pre_shipment_sample_quantity')
         assert.equal(await details.getAttribute('open'), '')
         assert.equal(saves.length, 0)
-        await editor.locator('#items_0_pre_shipment_sample_quantity').fill('0')
+        await editor.locator('#sales-order-import_items_0_pre_shipment_sample_quantity').fill('0')
         await issues.waitFor({ state: 'hidden' })
         await save.click()
         await editor
