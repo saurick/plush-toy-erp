@@ -1,8 +1,9 @@
-import { normalizeWorkflowTaskPageSize } from './workflowTaskBoard.mjs'
 import {
   numeric20Scale6AggregateUnits,
   numeric20Scale6TextFromUnits,
 } from './numeric20Scale6.mjs'
+
+export const STATISTICS_PAGE_SIZE_OPTIONS = Object.freeze([8, 20, 50])
 
 export const STATISTICS_AGES = [
   ['not_due', '未到期'],
@@ -220,9 +221,10 @@ export function statisticsPaginationFromURL(
   { source = false, fallbackSize } = {}
 ) {
   const prefix = source ? 'source' : 'stats'
-  const limit = normalizeWorkflowTaskPageSize(
+  const requestedLimit = Number(
     params.get(`${prefix}_size`) || fallbackSize
   )
+  const limit = STATISTICS_PAGE_SIZE_OPTIONS.includes(requestedLimit) ? requestedLimit : 8
   const value = Number(params.get(`${prefix}_page`))
   const page = Number.isFinite(value)
     ? Math.max(1, Math.min(Math.floor(1000000 / limit) + 1, Math.floor(value)))

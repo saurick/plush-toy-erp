@@ -23,7 +23,7 @@ import {
   listAllSuppliers,
 } from '../../api/masterDataOrderApi.mjs'
 
-import { getBusinessPaginationParams } from '../../utils/businessPagination.mjs'
+import { DEFAULT_BUSINESS_PAGE_SIZE, getBusinessPaginationParams } from '../../utils/businessPagination.mjs'
 
 import { compactParams } from '../../utils/sourceDocumentValues.mjs'
 
@@ -71,12 +71,12 @@ export default function useFinancePaymentRecords({
 
   const [paymentPagination, setPaymentPagination] = useBusinessPageState(
     'paymentPagination',
-    { current: 1, pageSize: 20 }
+    { current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE }
   )
 
   const [creditPagination, setCreditPagination] = useBusinessPageState(
     'creditPagination',
-    { current: 1, pageSize: 20 }
+    { current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE }
   )
 
   const [paymentKeyword, setPaymentKeyword] = useBusinessPageState(

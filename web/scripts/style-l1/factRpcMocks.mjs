@@ -1,3 +1,4 @@
+import { WorkCenterPaginationPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { setTimeout as delay } from 'node:timers/promises'
 import { getAllowedMobileRoleKeys } from '../../src/erp/utils/mobileRolePermissions.mjs'
 import { requireWorkflowTaskExplainParams } from '../../src/erp/utils/workflowTaskActionAccess.mjs'
@@ -2461,7 +2462,7 @@ export async function installFactRpcMocks(page, context) {
           !['actionable', 'risk', 'approval'].includes(queueKey) ||
           !Number.isSafeInteger(limit) ||
           limit < 1 ||
-          limit > 50 ||
+          limit > WorkCenterPaginationPolicy.maxPageSize ||
           !Number.isSafeInteger(offset) ||
           offset < 0
         ) {

@@ -37,6 +37,7 @@ import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingS
 import { createTaskLinkScenarios } from './taskLinkScenarios.mjs'
 import { createMobileInputScenarios } from './mobileInputScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
+import { createWorkCenterPaginationScenarios } from './workCenterPaginationScenarios.mjs'
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
 import { createProductIdentityScenarios } from './productIdentityScenarios.mjs'
 import { createCustomerSessionScenarios } from './customerSessionScenarios.mjs'
@@ -621,6 +622,7 @@ export function createStyleL1Scenarios(deps) {
     ...createTaskFusedFlowScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createInformationDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createInformationDensityExtras({ ...deps, customerRuntimeEffectiveSession }),
+    ...createWorkCenterPaginationScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDashboardTaskScenarios({
       expectText,
       expectHeading,

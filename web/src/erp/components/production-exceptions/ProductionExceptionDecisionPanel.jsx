@@ -46,6 +46,7 @@ import { resolveProductionExceptionActionAvailability } from '../../utils/operat
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   resetBusinessPaginationCurrent,
 } from '../../utils/businessPagination.mjs'
@@ -135,7 +136,7 @@ export default function ProductionExceptionDecisionPanel({
   const beginLatestRequest = useLatestRequestCoordinator()
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
-  const [pagination, setPagination] = useBusinessPageState('exceptionPagination', { current: 1, pageSize: 20 })
+  const [pagination, setPagination] = useBusinessPageState('exceptionPagination', { current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE })
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState(null)
   const [selectedID, setSelectedID] = useBusinessPageState('exceptionSelectedID', null)

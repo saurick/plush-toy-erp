@@ -170,7 +170,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
-			"limit":               normalizedLimit(pm),
+			"limit":               normalizedBusinessListLimit(pm),
 			"offset":              normalizedOffset(pm),
 		}, statusCounts)), nil
 	case "list_finished_goods_quality_inspections":
@@ -200,7 +200,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
-			"limit":               normalizedLimit(pm),
+			"limit":               normalizedBusinessListLimit(pm),
 			"offset":              normalizedOffset(pm),
 		}, statusCounts)), nil
 	case "list_outsourcing_return_quality_inspections":
@@ -230,7 +230,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
-			"limit":               normalizedLimit(pm),
+			"limit":               normalizedBusinessListLimit(pm),
 			"offset":              normalizedOffset(pm),
 		}, statusCounts)), nil
 	case "list_production_stage_quality_inspections":
@@ -260,7 +260,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		return id, okData(withBusinessStatusCounts(map[string]any{
 			"quality_inspections": qualityInspectionsToAny(items),
 			"total":               total,
-			"limit":               normalizedLimit(pm),
+			"limit":               normalizedBusinessListLimit(pm),
 			"offset":              normalizedOffset(pm),
 		}, statusCounts)), nil
 	default:

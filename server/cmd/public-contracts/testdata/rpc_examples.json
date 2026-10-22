@@ -14065,29 +14065,23 @@
   "masterdata.list_products": {
     "basis": "handler-fixture",
     "data": {
-      "limit": 50,
+      "limit": 500,
       "offset": 0,
       "products": [
         {
-          "code": "P001",
-          "created_at": 1,
-          "customer_style_no": null,
-          "default_unit_id": 1,
-          "english_name": null,
-          "hs_code": null,
-          "id": 1,
-          "is_active": true,
-          "name": "产品",
-          "style_no": null,
-          "unit_net_weight_g": null,
-          "updated_at": 1
+          "id": 505,
+          "code": "PAGE-505",
+          "name": "PAGE-505成品"
         }
       ],
-      "total": 1
+      "total": 505
     },
     "message": "OK",
-    "params": {},
-    "test": "TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit"
+    "params": {
+      "limit": 500,
+      "offset": 0
+    },
+    "test": "TestBusinessListPaginationReturnsRequestedRowsAndMetadata"
   },
   "masterdata.list_suppliers": {
     "basis": "handler-fixture",

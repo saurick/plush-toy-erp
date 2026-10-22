@@ -120,7 +120,11 @@ import {
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
-import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
+import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
+  createBusinessTablePagination,
+  resolveExactRecordPage,
+} from '../utils/businessPagination.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
 import {
@@ -234,7 +238,7 @@ export default function PurchaseOrdersPage() {
   )
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 20,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
@@ -1523,14 +1527,12 @@ export default function PurchaseOrdersPage() {
             onOpenRecord={
               recordActionBusy ? undefined : openPurchaseOrderRecord
             }
-            pagination={{
-              current: pagination.current,
-              pageSize: pagination.pageSize,
+            pagination={createBusinessTablePagination({
+              pagination,
               total,
-              showSizeChanger: true,
               onChange: (current, pageSize) =>
                 setPagination({ current, pageSize }),
-            }}
+            })}
             emptyDescription="暂无采购订单"
           />
         )}

@@ -17,8 +17,8 @@ const (
 	WorkflowTaskBoardSortNewest     = "newest"
 
 	WorkflowTaskBoardDueWindow    = 24 * time.Hour
-	workflowTaskBoardDefaultLimit = 5
-	workflowTaskBoardMaxLimit     = 50
+	workflowTaskBoardDefaultLimit = WorkCenterDefaultLimit
+	workflowTaskBoardMaxLimit     = WorkCenterMaxLimit
 )
 
 var workflowTaskBoardLaneKeys = []string{

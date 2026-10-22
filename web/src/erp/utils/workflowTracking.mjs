@@ -1,3 +1,4 @@
+import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generated.mjs'
 import { resolveBusinessStatusCounts, businessStatusCount } from './businessStatusCounts.mjs'
 import {
   ProcessNodeStatus,
@@ -57,8 +58,8 @@ export function requireTrackingSummary(value) {
 
 export function requireTrackingPage(value, params = {}) {
   if (!Array.isArray(value?.items) || !Number.isSafeInteger(value.total) || value.total < 0 ||
-    !positive(value.limit) || value.limit > 50 || !Number.isSafeInteger(value.offset) || value.offset < 0 ||
-    value.limit !== (params.limit ?? 20) || value.offset !== (params.offset ?? 0) ||
+    !positive(value.limit) || value.limit > WorkCenterPaginationPolicy.maxPageSize || !Number.isSafeInteger(value.offset) || value.offset < 0 ||
+    value.limit !== (params.limit ?? WorkCenterPaginationPolicy.defaultPageSize) || value.offset !== (params.offset ?? 0) ||
     value.items.length !== Math.max(0, Math.min(value.limit, value.total - value.offset))) invalidTracking()
   const counts = resolveBusinessStatusCounts(value)
   if (!counts || Object.keys(counts).some((status) => !['active', 'completed'].includes(status)) ||

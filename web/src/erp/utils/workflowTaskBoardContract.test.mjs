@@ -99,9 +99,9 @@ test('workflowTaskBoardContract: 畸形成功响应 fail closed', () => {
   }
 })
 
-test('workflowTaskBoardContract: 按服务端上限接受 limit 200 被收敛为 50', () => {
+test('workflowTaskBoardContract: 按服务端上限接受 limit 200 被收敛为 100', () => {
   const response = overviewResponse()
-  response.lanes = response.lanes.map((lane) => ({ ...lane, limit: 50 }))
+  response.lanes = response.lanes.map((lane) => ({ ...lane, limit: 100 }))
   assert.equal(
     requireWorkflowTaskBoardResponse(response, { limit: 200, offset: 0 }),
     response

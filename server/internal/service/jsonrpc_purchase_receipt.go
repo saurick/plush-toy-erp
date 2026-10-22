@@ -149,7 +149,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		return id, okData(map[string]any{
 			"purchase_receipts": purchaseReceiptsToAny(items),
 			"total":             total,
-			"limit":             normalizedLimit(pm),
+			"limit":             normalizedBusinessListLimit(pm),
 			"offset":            normalizedOffset(pm),
 		}), nil
 	default:

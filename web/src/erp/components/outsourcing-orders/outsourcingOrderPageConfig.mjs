@@ -6,6 +6,7 @@ import {
   submitOutsourcingOrder,
 } from '../../api/masterDataOrderApi.mjs'
 import { isDraftSourceDocument } from '../../utils/sourceDocumentEditing.mjs'
+import { DEFAULT_BUSINESS_PAGE_SIZE } from '../../utils/businessPagination.mjs'
 
 export const OUTSOURCING_ORDER_STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -104,7 +105,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
 
 export const DEFAULT_OUTSOURCING_ORDER_PAGINATION = {
   current: 1,
-  pageSize: 20,
+  pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
 }
 
 export const OUTSOURCING_ORDERS_MODULE_KEY = 'processing-contracts'

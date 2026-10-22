@@ -1,4 +1,4 @@
-import { getBusinessPaginationParams } from './businessPagination.mjs'
+import { getBusinessPaginationParams, normalizeBusinessPageSize } from './businessPagination.mjs'
 
 function invalidProductionExceptionResponse() {
   return Object.assign(new Error('生产异常记录返回不完整'), {
@@ -88,7 +88,7 @@ export function reconcileProductionExceptionPage({
   pagination = {},
   selectedID = null,
 } = {}) {
-  const pageSize = positiveInteger(pagination.pageSize) || 20
+  const pageSize = normalizeBusinessPageSize(pagination.pageSize)
   const current = positiveInteger(pagination.current) || 1
   const normalizedTotal =
     Number.isSafeInteger(total) && total >= 0 ? total : 0

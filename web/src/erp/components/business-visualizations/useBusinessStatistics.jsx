@@ -22,6 +22,7 @@ import {
   statisticsQueryFromURL,
   normalizeStatisticsStatus,
   statisticsPaginationFromURL,
+  STATISTICS_PAGE_SIZE_OPTIONS,
   STATISTICS_AGES,
   STATISTICS_STATUSES,
 } from '../../utils/businessStatistics.mjs'
@@ -959,6 +960,7 @@ export default function useBusinessStatistics({
       </BusinessViewSurface>
       {!!data?.total && !loading && !error && (
         <WorkflowTaskPagination
+          pageSizeOptions={STATISTICS_PAGE_SIZE_OPTIONS}
           recordLabel={groupKey ? (ages ? '应收来源' : '来源订单') : '统计汇总'}
           unit={groupKey ? (ages ? '笔' : '单') : '项'}
           current={groupKey ? sourcePage : query.offset / query.limit + 1}

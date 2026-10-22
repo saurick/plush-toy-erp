@@ -43,6 +43,10 @@ import {
   normalizeHistoryRecords,
 } from '../utils/historyRecordCatalog.mjs'
 import { buildHistorySourceSelectOptions } from '../utils/historySourceSelectOptions.mjs'
+import {
+  createBusinessTablePagination,
+  normalizeBusinessPageSize,
+} from '../utils/businessPagination.mjs'
 
 import {
   BusinessListToolbarActions,
@@ -106,10 +110,9 @@ export default function HistoryRecordsPage() {
   const keyword = searchParams.get('keyword') || ''
   const status = searchParams.get('status') || ''
   const pageValue = Number(searchParams.get('page'))
-  const sizeValue = Number(searchParams.get('size'))
   const currentPage =
     Number.isSafeInteger(pageValue) && pageValue > 0 ? pageValue : 1
-  const pageSize = [10, 20, 50, 100].includes(sizeValue) ? sizeValue : 20
+  const pageSize = normalizeBusinessPageSize(searchParams.get('size'))
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState(null)
@@ -424,12 +427,12 @@ export default function HistoryRecordsPage() {
               : '当前筛选没有匹配的历史记录'
         }
         pagination={{
-          current: currentPage,
-          pageSize,
-          total,
-          showSizeChanger: true,
+          ...createBusinessTablePagination({
+            pagination: { current: currentPage, pageSize },
+            total,
+            onChange: (current, size) => updateQuery({ page: current, size }),
+          }),
           showTotal: (value) => `共 ${value} 条`,
-          onChange: (current, size) => updateQuery({ page: current, size }),
         }}
       />
       {columnOrderModal}

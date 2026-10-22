@@ -103,6 +103,7 @@ import {
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { suggestNextBOMVersion } from '../utils/bomVersionSuggestion.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -292,7 +293,7 @@ export default function BOMVersionsPage() {
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 20,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [taskContext, setTaskContext] = useBusinessPageState(

@@ -131,6 +131,7 @@ import {
   resolveShipmentActionAvailability,
 } from '../utils/operationalActionAvailability.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -309,7 +310,7 @@ export default function ShipmentsPage() {
   )
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 20,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)

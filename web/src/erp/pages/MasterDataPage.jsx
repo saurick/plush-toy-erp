@@ -86,6 +86,7 @@ import {
   uniqueReferenceOptions,
 } from '../utils/referenceSelectOptions.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -190,7 +191,7 @@ export default function MasterDataPage({ type }) {
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 20,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [, setContacts] = useState([])
@@ -644,9 +645,9 @@ export default function MasterDataPage({ type }) {
     setEditingRecord(null)
     setRecordModalOpen(false)
     setPagination((current) =>
-      current.current === 1 && current.pageSize === 20
+      current.current === 1 && current.pageSize === DEFAULT_BUSINESS_PAGE_SIZE
         ? current
-        : { current: 1, pageSize: 20 }
+        : { current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE }
     )
     setKeyword((current) => (current ? '' : current))
     setStockCategory('')
@@ -1178,7 +1179,11 @@ export default function MasterDataPage({ type }) {
         pagination={createBusinessTablePagination({
           pagination,
           total,
-          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+          onChange: (current, pageSize) => {
+            setLoading(true)
+            setRecords([])
+            setPagination({ current, pageSize })
+          },
         })}
         emptyDescription={`暂无${entityLabel}记录`}
         rowSelection={{

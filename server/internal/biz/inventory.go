@@ -879,9 +879,7 @@ func (uc *InventoryUsecase) ListBOMHeaders(ctx context.Context, filter BOMHeader
 	) {
 		return nil, 0, ErrBadParam
 	}
-	if filter.Limit <= 0 || filter.Limit > 200 {
-		filter.Limit = 50
-	}
+	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
 	if filter.Offset < 0 {
 		filter.Offset = 0
 	}
@@ -1133,9 +1131,7 @@ func normalizeInventoryTxnFilter(in InventoryTxnFilter) (InventoryTxnFilter, err
 }
 
 func normalizeInventoryListPagination(limit *int, offset *int) {
-	if *limit <= 0 || *limit > 200 {
-		*limit = 50
-	}
+	*limit = NormalizeBusinessListLimit(*limit)
 	if *offset < 0 {
 		*offset = 0
 	}

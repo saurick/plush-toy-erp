@@ -109,7 +109,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(withBusinessStatusCounts(map[string]any{
 			"sales_orders": salesOrdersToAny(items, includeItemCount),
 			"total":        total,
-			"limit":        normalizedLimit(pm),
+			"limit":        normalizedBusinessListLimit(pm),
 			"offset":       normalizedOffset(pm),
 		}, statusCounts))}, nil
 	default:

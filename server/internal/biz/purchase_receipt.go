@@ -495,9 +495,7 @@ func normalizePurchaseReceiptFilter(in PurchaseReceiptFilter) (PurchaseReceiptFi
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return PurchaseReceiptFilter{}, ErrBadParam
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}

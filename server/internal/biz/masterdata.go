@@ -1135,9 +1135,7 @@ func normalizeMasterDataFilter(in MasterDataFilter) (MasterDataFilter, error) {
 		}
 		in.SupplierTypes = normalizedTypes
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}
@@ -1154,9 +1152,7 @@ func normalizeProductSKUFilter(in ProductSKUFilter) (ProductSKUFilter, error) {
 	if in.ProductID < 0 {
 		in.ProductID = 0
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}

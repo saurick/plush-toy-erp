@@ -15,11 +15,11 @@ test('production exception query sends filters, order context and page offset', 
       status: 'APPROVED',
       executionStatus: 'PENDING',
       productionOrderID: 42,
-      pagination: { current: 3, pageSize: 20 },
+      pagination: { current: 3, pageSize: 300 },
     }),
     {
-      limit: 20,
-      offset: 40,
+      limit: 300,
+      offset: 600,
       decision_type: 'SCRAP',
       status: 'APPROVED',
       execution_status: 'PENDING',
@@ -62,8 +62,8 @@ test('production exception page retreats from an emptied tail page', () => {
   assert.deepEqual(
     reconcileProductionExceptionPage({
       records: [],
-      total: 20,
-      pagination: { current: 3, pageSize: 10 },
+      total: 1000,
+      pagination: { current: 3, pageSize: 500 },
       selectedID: 30,
     }),
     {

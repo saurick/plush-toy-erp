@@ -26,6 +26,7 @@ export default function WorkflowTaskPagination({
   recordLabel = '任务',
   unit = '项',
   retainedPage = null,
+  pageSizeOptions = TASK_BOARD_PAGE_SIZE_OPTIONS,
 }) {
   const screens = Grid.useBreakpoint()
   const compact = screens.md === false
@@ -52,7 +53,7 @@ export default function WorkflowTaskPagination({
           value={pageSize}
           disabled={loading}
           showSearch={false}
-          options={TASK_BOARD_PAGE_SIZE_OPTIONS.map((value) => ({
+          options={pageSizeOptions.map((value) => ({
             value,
             label: `${value} ${unit} / 页`,
           }))}

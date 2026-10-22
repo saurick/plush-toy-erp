@@ -1,3 +1,4 @@
+import { WorkCenterPaginationPolicy } from '../common/consts/policies.generated.mjs'
 import {
   ADMIN_TOKEN_ISSUER,
   ADMIN_TOKEN_AUDIENCE,
@@ -1563,7 +1564,7 @@ export function setupJsonRpcMockServer() {
             !['actionable', 'risk', 'approval'].includes(queueKey) ||
             !Number.isSafeInteger(limit) ||
             limit < 1 ||
-            limit > 50 ||
+            limit > WorkCenterPaginationPolicy.maxPageSize ||
             !Number.isSafeInteger(offset) ||
             offset < 0
           ) {

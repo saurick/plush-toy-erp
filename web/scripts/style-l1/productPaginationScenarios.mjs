@@ -11,8 +11,8 @@ export function createProductPaginationScenarios({
   let listRequests = []
 
   const resetProducts = () => {
-    products = Array.from({ length: 45 }, (_, index) => {
-      const id = 45 - index
+    products = Array.from({ length: 1245 }, (_, index) => {
+      const id = 1245 - index
       return {
         id,
         code: `PROD-PAGE-${String(id).padStart(3, '0')}`,
@@ -52,7 +52,7 @@ export function createProductPaginationScenarios({
           const body = route.request().postDataJSON() || {}
           const { id = 'product-pagination', method, params = {} } = body
           if (method === 'list_products') {
-            const limit = Number(params.limit || 20)
+            const limit = Number(params.limit)
             const offset = Number(params.offset || 0)
             listRequests.push({ limit, offset })
             await fulfill(route, id, {
@@ -87,19 +87,21 @@ export function createProductPaginationScenarios({
       },
       verify: async (page) => {
         await expectHeading(page, '产品档案')
-        await expectText(page, '共 45 条')
+        await expectText(page, '共 1245 条')
+        assert.deepEqual(listRequests.at(-1), { limit: 50, offset: 0 })
 
         const pageThreeRequest = page.waitForRequest((request) => {
           if (!request.url().endsWith('/rpc/masterdata')) return false
           const body = request.postDataJSON() || {}
           return (
             body.method === 'list_products' &&
-            Number(body.params?.offset) === 40
+            Number(body.params?.limit) === 50 &&
+            Number(body.params?.offset) === 100
           )
         })
         await page.locator('.ant-pagination-item-3').click()
         await pageThreeRequest
-        await expectText(page, 'PROD-PAGE-005')
+        await expectText(page, 'PROD-PAGE-1145')
 
         const sorter = page.locator('.ant-table-column-sorters').first()
         await sorter.hover()
@@ -179,19 +181,58 @@ export function createProductPaginationScenarios({
         })
         assert.equal(metrics.activePage, '1')
         assert.match(metrics.firstRow, /分页最新产品/u)
-        assert.match(metrics.pagination, /共 46 条/u)
-        assert.equal(metrics.rowCount, 20)
+        assert.match(metrics.pagination, /共 1246 条/u)
+        assert.equal(metrics.rowCount, 50)
         assert(
           metrics.tableScrollWidth >= metrics.tableClientWidth,
           `产品表格尺寸读回异常: ${JSON.stringify(metrics)}`
         )
         assert.deepEqual(
           listRequests
-            .filter((request) => request.limit === 20)
+            .filter((request) => request.limit === 50)
             .slice(-2)
             .map((request) => request.offset),
-          [40, 0]
+          [100, 0]
         )
+
+        const sizeSelect = page.locator('.ant-pagination-options .ant-select')
+        const options = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content')
+        const rowSelector = '.erp-business-data-table-card .ant-table-tbody > tr.ant-table-row'
+        const waitForPageRequest = (limit, offset) => page.waitForRequest((request) => {
+          if (!request.url().endsWith('/rpc/masterdata')) return false
+          const body = request.postDataJSON() || {}
+          return body.method === 'list_products' && Number(body.params?.limit) === limit && Number(body.params?.offset) === offset
+        })
+        for (const pageSize of [100, 200, 300, 500]) {
+          await sizeSelect.click()
+          assert.deepEqual(await options.allTextContents(), ['50 条/页', '100 条/页', '200 条/页', '300 条/页', '500 条/页'])
+          const request = waitForPageRequest(pageSize, 0)
+          await options.getByText(`${pageSize} 条/页`, { exact: true }).click()
+          await request
+          await page.waitForFunction(({ rowSelector, pageSize }) =>
+            document.querySelectorAll(rowSelector).length === pageSize,
+          { rowSelector, pageSize })
+          await expectText(page, `第 1-${pageSize} 条 / 共 1246 条`)
+        }
+
+        const lastPageRequest = waitForPageRequest(500, 1000)
+        await page.locator('.ant-pagination-item-3').click()
+        await lastPageRequest
+        await expectText(page, '第 1001-1246 条 / 共 1246 条')
+        assert.equal(await page.locator(rowSelector).count(), 246)
+        await expectText(page, 'PROD-PAGE-246')
+        await expectText(page, 'PROD-PAGE-001')
+
+        const firstPageRequest = waitForPageRequest(500, 0)
+        await page.locator('.ant-pagination-item-1').click()
+        await firstPageRequest
+        await expectText(page, '第 1-500 条 / 共 1246 条')
+        await sizeSelect.click()
+        const defaultPageRequest = waitForPageRequest(50, 0)
+        await options.getByText('50 条/页', { exact: true }).click()
+        await defaultPageRequest
+        await expectText(page, '第 1-50 条 / 共 1246 条')
+        assert.equal(await page.locator(rowSelector).count(), 50)
 
         await page.screenshot({
           path: path.join(

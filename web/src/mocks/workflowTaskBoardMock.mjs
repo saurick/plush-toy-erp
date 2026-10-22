@@ -1,3 +1,4 @@
+import { WorkCenterPaginationPolicy } from '../common/consts/policies.generated.mjs'
 import { getWorkflowTaskIdentity } from '../erp/utils/workflowTaskIdentity.mjs'
 
 const TASK_BOARD_LANE_KEYS = Object.freeze([
@@ -33,8 +34,8 @@ function normalizeText(value) {
 
 function normalizeLimit(value) {
   const number = Number(value)
-  if (!Number.isSafeInteger(number) || number <= 0) return 5
-  return Math.min(number, 50)
+  if (!Number.isSafeInteger(number) || number <= 0) return WorkCenterPaginationPolicy.defaultPageSize
+  return Math.min(number, WorkCenterPaginationPolicy.maxPageSize)
 }
 
 function normalizeOffset(value) {

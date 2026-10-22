@@ -63,6 +63,7 @@ import {
 } from '../utils/workflowTaskMutation.mjs'
 import { formatWorkflowTaskSource } from '../utils/dashboardTaskDisplay.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
@@ -196,7 +197,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 10,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [loading, setLoading] = useState(false)
   const [taskReasonModal, setTaskReasonModal] = useState(null)

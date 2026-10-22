@@ -138,9 +138,7 @@ func (uc *OperationalFactUsecase) ListProductionExceptions(ctx context.Context, 
 		return nil, 0, ErrBadParam
 	}
 	filter.Status, filter.ExecutionStatus, filter.DecisionType = strings.ToUpper(strings.TrimSpace(filter.Status)), strings.ToUpper(strings.TrimSpace(filter.ExecutionStatus)), strings.ToUpper(strings.TrimSpace(filter.DecisionType))
-	if filter.Limit <= 0 || filter.Limit > 200 {
-		filter.Limit = 50
-	}
+	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
 	return repo.ListProductionExceptions(ctx, filter)
 }
 

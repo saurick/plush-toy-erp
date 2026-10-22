@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/biz"
 	corevalue "server/internal/core/value"
 
 	"github.com/shopspring/decimal"
@@ -271,6 +272,10 @@ func optionalTimeUnix(value *time.Time) any {
 		return nil
 	}
 	return value.Unix()
+}
+
+func normalizedBusinessListLimit(pm map[string]any) int {
+	return biz.NormalizeBusinessListLimit(getInt(pm, "limit", biz.BusinessListDefaultLimit))
 }
 
 func normalizedLimit(pm map[string]any) int {

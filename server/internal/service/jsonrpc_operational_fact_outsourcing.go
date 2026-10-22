@@ -114,7 +114,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"outsourcing_facts": outsourcingFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(map[string]any{"outsourcing_facts": outsourcingFactsToAny(items), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}

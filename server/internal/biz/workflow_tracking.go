@@ -74,7 +74,7 @@ func normalizeWorkflowTrackingQuery(q WorkflowTrackingQuery) (WorkflowTrackingQu
 		(q.Status != "" && q.Status != "active" && q.Status != "completed") ||
 		(q.OwnerRoleKey != "" && !isWorkflowTaskBoardOwnerRoleKey(q.OwnerRoleKey)) ||
 		(q.Attention != "" && q.Attention != "overdue" && q.Attention != "blocked") ||
-		q.Limit < 1 || q.Limit > 50 || q.Offset < 0 {
+		q.Limit < 1 || q.Limit > WorkCenterMaxLimit || q.Offset < 0 {
 		return q, ErrBadParam
 	}
 	if q.DateFrom != nil && q.DateFrom.IsZero() || q.DateTo != nil && q.DateTo.IsZero() ||

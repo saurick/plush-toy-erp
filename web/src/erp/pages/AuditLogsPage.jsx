@@ -29,12 +29,14 @@ import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js
 import { buildAuditActionSelectOptions } from '../utils/auditActionSelectOptions.mjs'
 import { buildAuditLogParams } from '../utils/auditLogParams.mjs'
 import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
+import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
+  createBusinessTablePagination,
+} from '../utils/businessPagination.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
-const DEFAULT_PAGE_SIZE = 20
 const DRAWER_FOCUS_RESTORE_FALLBACK_MS = 600
-const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
 const riskLabelMap = {
   high: '高风险',
@@ -444,7 +446,7 @@ export default function AuditLogsPage() {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [pagination, setPagination] = useState({
     current: 1,
-    pageSize: DEFAULT_PAGE_SIZE,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const filteredEvents = useMemo(
     () =>
@@ -812,13 +814,17 @@ export default function AuditLogsPage() {
           ) : null
         }
         pagination={{
-          ...pagination,
-          total,
-          showSizeChanger: true,
-          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          ...createBusinessTablePagination({
+            pagination,
+            total,
+            onChange: (current, pageSize) => {
+              setLoading(true)
+              setEvents([])
+              setPagination({ current, pageSize })
+            },
+          }),
           showTotal: (value) =>
             `共 ${value} 条${riskFilter !== 'all' ? '（风险仅筛选本页）' : ''}`,
-          onChange: (current, pageSize) => setPagination({ current, pageSize }),
         }}
       />
       {columnOrderModal}

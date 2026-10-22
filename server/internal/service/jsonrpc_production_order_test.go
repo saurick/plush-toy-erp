@@ -270,7 +270,7 @@ func TestProductionOrderJSONRPCStrictCanonicalParams(t *testing.T) {
 	if decimalResult.Code != errcode.InvalidParam.Code {
 		t.Fatalf("numeric decimal=%#v", decimalResult)
 	}
-	_, invalidList, _ := d.handleProductionOrder(ctx, "list_production_orders", "list", mustJSONRPCStruct(t, map[string]any{"limit": float64(201)}))
+	_, invalidList, _ := d.handleProductionOrder(ctx, "list_production_orders", "list", mustJSONRPCStruct(t, map[string]any{"limit": float64(501)}))
 	if invalidList.Code != errcode.InvalidParam.Code {
 		t.Fatalf("invalid list=%#v", invalidList)
 	}

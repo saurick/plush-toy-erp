@@ -72,7 +72,7 @@ func TestWorkflowWorkbenchReturnsOneBoundedSnapshotForProjectedRoles(t *testing.
 	dispatcher, repo := workflowWorkbenchTestDispatcher(admin, customerConfigUC)
 	params := mustJSONRPCStruct(t, map[string]any{
 		"queue_key": biz.WorkflowWorkbenchQueueActionable,
-		"limit":     float64(8),
+		"limit":     float64(100),
 		"offset":    float64(0),
 	})
 
@@ -86,7 +86,7 @@ func TestWorkflowWorkbenchReturnsOneBoundedSnapshotForProjectedRoles(t *testing.
 		t.Fatalf("workbench result=%#v err=%v", result, err)
 	}
 	query := repo.workbenchQuery
-	if query.QueueKey != biz.WorkflowWorkbenchQueueActionable || query.Limit != 8 || query.Offset != 0 || query.SnapshotAt.IsZero() {
+	if query.QueueKey != biz.WorkflowWorkbenchQueueActionable || query.Limit != 100 || query.Offset != 0 || query.SnapshotAt.IsZero() {
 		t.Fatalf("workbench query=%#v", query)
 	}
 	if query.VisibilityScope == nil || query.RiskVisibilityScope == nil {
@@ -375,4 +375,28 @@ func workflowWorkbenchRoleTaskParamsWithView(
 		"role_key": roleKey,
 		"limit":    float64(20),
 	})
+}
+
+func TestWorkCenterPaginationQueryLimits(t *testing.T) {
+	for _, limit := range []int{0, 2, 20, 50, 100, 500} {
+		pm := map[string]any{"queue_key": "actionable"}
+		want := limit
+		if limit == 0 {
+			want = 20
+		} else {
+			pm["limit"] = float64(limit)
+			if limit > 100 {
+				want = 100
+			}
+		}
+		workbench, failure := getWorkflowWorkbenchQuery(pm)
+		if failure != nil || workbench.Limit != want {
+			t.Fatalf("workbench limit=%d: query=%+v failure=%+v", limit, workbench, failure)
+		}
+		delete(pm, "queue_key")
+		board, failure := getWorkflowTaskBoardQuery(pm)
+		if failure != nil || board.Limit != want {
+			t.Fatalf("task board limit=%d: query=%+v failure=%+v", limit, board, failure)
+		}
+	}
 }

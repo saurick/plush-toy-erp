@@ -118,6 +118,7 @@ import {
   linkedDocumentRequestKeyword,
 } from '../utils/relatedDocumentNavigation.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -206,7 +207,7 @@ export default function InventoryLedgerPage() {
   const { materials, products, productSKUs, units, warehouses, inventoryLots, loadReferenceOptions } = useInventoryReferences({ adminProfile })
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 20,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)

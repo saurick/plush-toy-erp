@@ -1,4 +1,5 @@
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
 import { isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
 import { DISCOVERY_FILTER_KEYS, DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
@@ -92,8 +93,8 @@ export const TASK_BOARD_SORT_OPTIONS = Object.freeze([
   { value: 'newest', label: '最近创建' },
 ])
 
-export const TASK_BOARD_FOCUS_PAGE_SIZE = 8
-export const TASK_BOARD_PAGE_SIZE_OPTIONS = Object.freeze([8, 20, 50])
+export const TASK_BOARD_FOCUS_PAGE_SIZE = WorkCenterPaginationPolicy.defaultPageSize
+export const TASK_BOARD_PAGE_SIZE_OPTIONS = Object.freeze([TASK_BOARD_FOCUS_PAGE_SIZE, 50, WorkCenterPaginationPolicy.maxPageSize])
 
 export function normalizeWorkflowTaskPageSize(value) {
   const size = Number(value)

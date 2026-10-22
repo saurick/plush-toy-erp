@@ -440,7 +440,7 @@ test('workflowTaskBoard: 从 URL 读取任务管理筛选并过滤非法值', ()
     sort: 'smart',
     mode: 'all',
     page: 1,
-    pageSize: 8,
+    pageSize: 20,
   })
 
   assert.deepEqual(
@@ -457,7 +457,7 @@ test('workflowTaskBoard: 从 URL 读取任务管理筛选并过滤非法值', ()
       sort: 'smart',
       mode: 'all',
       page: 1,
-      pageSize: 8,
+      pageSize: 20,
     }
   )
   assert.equal(
@@ -536,27 +536,29 @@ test('workflowTaskBoard: 页容量在 URL、请求与末页计算中保持一致
   )
 })
 
-test('workflowTaskBoard: 非法页容量回到默认值，合法容量最多五十项', () => {
-  for (const value of ['0', '-1', '1.5', '100', 'Infinity', 'bad']) {
+test('workflowTaskBoard: 非法页容量回到默认值，合法容量最多一百项', () => {
+  for (const value of ['0', '-1', '1.5', '8', '10', '200', 'Infinity', 'bad']) {
     const filters = readWorkflowTaskBoardFiltersFromSearch(
       `lane=due&pageSize=${value}`
     )
-    assert.equal(filters.pageSize, 8)
-    assert.equal(buildWorkflowTaskBoardRequest(filters).limit, 8)
+    assert.equal(filters.pageSize, 20)
+    assert.equal(buildWorkflowTaskBoardRequest(filters).limit, 20)
     assert.equal(
       writeWorkflowTaskBoardFiltersToSearch('', filters).has('pageSize'),
       false
     )
   }
-  const filters = readWorkflowTaskBoardFiltersFromSearch(
-    'lane=due&page=2&pageSize=50'
-  )
-  assert.equal(buildWorkflowTaskBoardRequest(filters).offset, 50)
-  assert.equal(buildWorkflowTaskBoardRequest(filters).limit, 50)
+  for (const pageSize of [20, 50, 100]) {
+    const filters = readWorkflowTaskBoardFiltersFromSearch(
+      `lane=due&page=2&pageSize=${pageSize}`
+    )
+    assert.equal(buildWorkflowTaskBoardRequest(filters).offset, pageSize)
+    assert.equal(buildWorkflowTaskBoardRequest(filters).limit, pageSize)
+  }
   assert.equal(hasActiveWorkflowTaskBoardFilters({ pageSize: 50 }), false)
 })
 
-test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset', () => {
+test('workflowTaskBoard: 聚焦请求保留筛选并按每页二十条计算 offset', () => {
   assert.deepEqual(
     buildWorkflowTaskBoardRequest({
       keyword: ' 包装 ',
@@ -577,7 +579,7 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset
       lane_key: 'due',
       sort: 'due_soon',
       limit: TASK_BOARD_FOCUS_PAGE_SIZE,
-      offset: 16,
+      offset: 40,
     }
   )
   assert.deepEqual(buildWorkflowTaskBoardRequest({}), {
@@ -707,14 +709,14 @@ test('workflowTaskBoard: 分类与翻页共享同一顶部摘要范围', () => {
 test('workflowTaskBoard: 聚焦页保留服务端总数并把越界展示页收敛到末页', () => {
   const response = {
     snapshot_at: now,
-    total: 18,
-    counts: { actionable: 1, exception: 1, due: 15, finished: 1 },
+    total: 38,
+    counts: { actionable: 1, exception: 1, due: 35, finished: 1 },
     lanes: [
       {
         key: 'due',
-        total: 15,
-        limit: 8,
-        offset: 16,
+        total: 35,
+        limit: 20,
+        offset: 40,
         tasks: [],
       },
     ],
@@ -728,7 +730,7 @@ test('workflowTaskBoard: 聚焦页保留服务端总数并把越界展示页收�
 
   assert.equal(model.focused, true)
   assert.equal(model.visibleLanes.length, 1)
-  assert.equal(model.visibleLanes[0].count, 15)
+  assert.equal(model.visibleLanes[0].count, 35)
   assert.equal(model.requestedPage, 3)
   assert.equal(model.pageCount, 2)
   assert.equal(model.page, 2)

@@ -530,7 +530,7 @@ test('workflowApi: workbench uses one bounded queue projection and forwards canc
     snapshot_at: 1_720_000_000,
     queue_key: 'actionable',
     total: 2,
-    limit: 8,
+    limit: 100,
     offset: 0,
     items: [
       validTask({ id: 11, version: 1, task_status_key: 'ready' }),
@@ -542,7 +542,7 @@ test('workflowApi: workbench uses one bounded queue projection and forwards canc
     calls.push({ method, params, options })
     return { data: response }
   })
-  const params = { queue_key: 'actionable', limit: 8, offset: 0 }
+  const params = { queue_key: 'actionable', limit: 100, offset: 0 }
   const controller = new AbortController()
 
   assert.equal(
@@ -579,6 +579,7 @@ test('workflowApi: workbench rejects unsafe queries and malformed successful res
     {},
     { queue_key: 'unknown', limit: 8, offset: 0 },
     { queue_key: 'risk', limit: 0, offset: 0 },
+    { queue_key: 'risk', limit: 101, offset: 0 },
     { queue_key: 'risk', limit: 8, offset: -1 },
     { queue_key: 'risk', limit: 8, offset: 0, role_key: 'boss' },
   ]) {

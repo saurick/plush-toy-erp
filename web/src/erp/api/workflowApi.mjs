@@ -1,3 +1,4 @@
+import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generated.mjs'
 import { resolveBusinessStatusCounts, businessStatusCount } from '../utils/businessStatusCounts.mjs'
 import { DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from '../utils/workflowTaskDiscovery.mjs'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
@@ -293,7 +294,7 @@ function requireWorkflowWorkbenchQuery(params = {}) {
     !WORKFLOW_WORKBENCH_QUEUE_KEYS.has(params.queue_key) ||
     !Number.isSafeInteger(params.limit) ||
     params.limit < 1 ||
-    params.limit > 50 ||
+    params.limit > WorkCenterPaginationPolicy.maxPageSize ||
     !Number.isSafeInteger(params.offset) ||
     params.offset < 0
   ) {

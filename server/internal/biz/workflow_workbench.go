@@ -11,8 +11,8 @@ const (
 	WorkflowWorkbenchQueueRisk       = "risk"
 	WorkflowWorkbenchQueueApproval   = "approval"
 
-	workflowWorkbenchDefaultLimit = 8
-	workflowWorkbenchMaxLimit     = 50
+	workflowWorkbenchDefaultLimit = WorkCenterDefaultLimit
+	workflowWorkbenchMaxLimit     = WorkCenterMaxLimit
 )
 
 type WorkflowWorkbenchQuery struct {

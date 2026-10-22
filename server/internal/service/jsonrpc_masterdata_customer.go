@@ -70,7 +70,7 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"customers": customersToAny(items),
 			"total":     total,
-			"limit":     normalizedLimit(pm),
+			"limit":     normalizedBusinessListLimit(pm),
 			"offset":    normalizedOffset(pm),
 		})}, nil
 	case "set_customer_active":

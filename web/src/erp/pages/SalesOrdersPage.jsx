@@ -125,6 +125,7 @@ import {
   settleSourceDocumentPostSaveEffect,
 } from '../utils/sourceDocumentMutation.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -298,7 +299,7 @@ export default function SalesOrdersPage() {
   const [statusCounts, setStatusCounts] = useState(null)
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 20,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)

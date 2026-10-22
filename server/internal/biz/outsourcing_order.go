@@ -643,9 +643,7 @@ func normalizeOutsourcingOrderFilter(in OutsourcingOrderFilter) (OutsourcingOrde
 	default:
 		return OutsourcingOrderFilter{}, ErrBadParam
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}

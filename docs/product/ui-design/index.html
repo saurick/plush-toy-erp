@@ -4279,7 +4279,7 @@
       loginMethod: localStorage.getItem('erp-login-method') === 'sms' && LOGIN_OPTIONS.sms ? 'sms' : 'password', loginValues: {account:'',password:'',phone:'',code:''},
       loginBusy: false, loginInvalid: [], loginCapsLock: false, loginDialog: null,
       loginSmsSending: false, loginSmsPhone: '', loginSmsDeadline: 0, loginSmsExpires: 0, loginSmsHint: '',
-      page: taskHandlingPreview ? 'tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'mobile-tasks' ? 'mobile-tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1,
+      page: taskHandlingPreview ? 'tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'mobile-tasks' ? 'mobile-tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1, businessPageSize: 50,
       devRPCCase: 'staging', devRPCFixed: false, devIntegrationView: 'inventory', devGraphModel: 'dag', devGraphExample: 'overview', devGraphNode: '', devGraphReferences: false, devGraphHighlightReturns: true, devArea: 'overview', devViews: { overview: 'evidence', engineering: 'tools', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
       devQualityChecked: false, devPressurePreview: null,
       density: initialAppearance.density,
@@ -5717,7 +5717,7 @@ active = new Set()
     }
 
     function getPageSlice(rows) {
-      const pageSize = 8;
+      const pageSize = state.businessPageSize;
       const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
       state.pageNo = Math.min(Math.max(1, state.pageNo), pageCount);
       const start = (state.pageNo - 1) * pageSize;
@@ -5916,7 +5916,7 @@ active = new Set()
       return `${operation}<section class="surface data-surface">
         <div class="table-wrap"><table><thead><tr><th><input class="checkbox" type="checkbox" data-action="select-all" ${allVisibleSelected ? 'checked' : ''} aria-label="选择当前页全部记录" /></th>${cols.map(([key, label, sortKey]) => `<th><button class="sort-btn ${state.sortKey === sortKey ? 'active' : ''}" data-action="sort" data-key="${sortKey}">${label}<span class="sort-glyph">${state.sortKey === sortKey ? (state.sortDir === 'asc' ? '▲' : '▼') : '↕'}</span></button></th>`).join('')}</tr></thead><tbody>${pageRows.length ? pageRows.map(row => renderTableRow(row, config, cols)).join('') : `<tr><td colspan="${cols.length + 1}"><div class="empty"><div><strong>没有匹配的记录</strong><span>调整搜索或筛选条件后重试</span></div></div></td></tr>`}</tbody></table></div>
         <div class="mobile-card-list">${pageRows.length ? pageRows.map(row => renderMobileRow(row, config)).join('') : '<div class="empty"><div><strong>没有匹配的记录</strong><span>调整搜索或筛选条件后重试</span></div></div>'}</div>
-        <footer class="table-footer"><span>${hasLocalFilter?'筛选结果':'业务总数'} ${resultTotal} 条 · 样例展示 ${pageRows.length ? `${page.start+1}–${page.start+pageRows.length} / ${rows.length}` : '0'}</span><span>已选 ${state.selected.size} 条</span><div class="pager">${renderPagerButtons(page.pageCount,state.pageNo)}</div></footer>
+        <footer class="table-footer"><span>${hasLocalFilter?'筛选结果':'业务总数'} ${resultTotal} 条 · 样例展示 ${pageRows.length ? `${page.start+1}–${page.start+pageRows.length} / ${rows.length}` : '0'}</span><span>已选 ${state.selected.size} 条</span><div class="pager"><select id="business-page-size" aria-label="每页条数">${[50, 100, 200, 300, 500].map(value=>`<option value="${value}" ${state.businessPageSize===value?'selected':''}>${value} 条/页</option>`).join('')}</select>${renderPagerButtons(page.pageCount,state.pageNo)}</div></footer>
       </section>`;
     }
 
@@ -15615,7 +15615,7 @@ return {orders,financeCustomers};})();
           ${renderFilterTrigger(Object.values(f).some(Boolean))}`;
         const matches = (!f.status || f.status==='active') && trackingDemoMatches(f);
         const pageSize = state.trackingPageSizes[state.boardMode] || 20;
-        const pager = `<nav class="statistics-pagination erp-task-pagination" aria-label="流转记录分页"><div class="erp-task-pagination__summary"><span role="status">第 ${matches?'1–1':'0–0'} 条，共 ${matches?1:0} 条</span><select data-tracking-page-size aria-label="每页流转记录数">${[8,20,50].map(value=>`<option value="${value}" ${value===pageSize?'selected':''}>${value} 条 / 页</option>`).join('')}</select></div><div class="statistics-pager"><button class="btn" aria-label="上一页" disabled>← 上一页</button><button class="btn is-current" aria-current="page" disabled>1</button><button class="btn" aria-label="下一页" disabled>下一页 →</button></div></nav>`;
+        const pager = `<nav class="statistics-pagination erp-task-pagination" aria-label="流转记录分页"><div class="erp-task-pagination__summary"><span role="status">第 ${matches?'1–1':'0–0'} 条，共 ${matches?1:0} 条</span><select data-tracking-page-size aria-label="每页流转记录数">${[20,50,100].map(value=>`<option value="${value}" ${value===pageSize?'selected':''}>${value} 条 / 页</option>`).join('')}</select></div><div class="statistics-pager"><button class="btn" aria-label="上一页" disabled>← 上一页</button><button class="btn is-current" aria-current="page" disabled>1</button><button class="btn" aria-label="下一页" disabled>下一页 →</button></div></nav>`;
         return `${header}<section class="surface operation-surface"><div class="command-row">${trackingViews}</div><div class="command-row">${filters}</div>${renderTrackingStates(f)}</section><section class="surface board-surface"><table class="task-board-table"><thead><tr><th>事项 / 来源单号</th><th>关联产品 / 物料</th><th>当前状态</th><th>当前去向 / 办理人</th><th>发起人</th><th></th></tr></thead><tbody>${matches?`<tr data-action="open-tracking"><td><strong>销售订单受理</strong>${copyValue("SO-20260925-001")}</td><td><div class="product-cell">${renderProductThumb(0,"浅棕小熊")}<div><strong>浅棕小熊（共 2 项关联内容）</strong><small>产品编号 P-BEAR-01 · 内部款号 BEAR-01</small></div></div></td><td><span class="badge info">办理中</span></td><td><strong class="task-responsibility-role">岗位：工程</strong> · 待处理</td><td><div class="task-initiator"><strong>业务小李</strong><small><strong class="task-responsibility-role">发起岗位：业务</strong></small></div></td><td><button class="btn ghost icon-btn" data-action="open-tracking" aria-haspopup="dialog" aria-label="流程跟踪：销售订单受理">${icon("right")}</button></td></tr>`:'<tr><td colspan="6"><div class="empty">当前筛选下没有记录</div></td></tr>'}</tbody></table>${pager}</section>`;
       }
       const q = state.boardSearch.trim().toLowerCase();
@@ -16919,6 +16919,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         });
       }
       document.querySelector('#list-search')?.addEventListener('input', e => { state.search = e.target.value; state.pageNo = 1; renderView(); document.querySelector('#list-search')?.focus(); setCaretEnd(document.querySelector('#list-search')); });
+      document.querySelector('#business-page-size')?.addEventListener('change', e => { state.businessPageSize = Number(e.target.value); state.pageNo = 1; renderView(); });
       document.querySelector('#history-source')?.addEventListener('change', e => { state.historySource = e.target.value; state.search = ''; state.status = 'all'; state.pageNo = 1; state.selected.clear(); renderView(); document.querySelector('#history-source')?.focus(); });
       document.querySelector('#board-search')?.addEventListener('input', e => { state.boardSearch = e.target.value; renderView(); document.querySelector('#board-search')?.focus(); setCaretEnd(document.querySelector('#board-search')); });
       document.querySelector('[data-tracking-page-size]')?.addEventListener('change',event=>{state.trackingPageSizes[state.boardMode]=Number(event.target.value);renderView();});

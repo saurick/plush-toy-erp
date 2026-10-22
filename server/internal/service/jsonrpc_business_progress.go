@@ -38,7 +38,7 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 			}
 		}
 	}
-	if q.Limit, ok = getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1); !ok {
+	if q.Limit, ok = getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1); !ok {
 		return id, invalidParamResult(), nil
 	}
 	if q.Offset, ok = getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0); !ok {

@@ -205,7 +205,7 @@ func TestInventoryUsecaseScopedReadsPreserveWarehouseRestrictionsAndResults(t *t
 	repo := &inventoryScopedBehaviorRepo{}
 	uc := NewInventoryUsecase(repo)
 	scope := WarehouseDataScope{Mode: DataScopeModeAssigned, WarehouseIDs: []int{3, 2, 3, 0}}
-	balances, total, err := uc.ListInventoryBalancesForAccess(context.Background(), InventoryBalanceFilter{SubjectType: " material ", Limit: 201, Offset: -1}, scope)
+	balances, total, err := uc.ListInventoryBalancesForAccess(context.Background(), InventoryBalanceFilter{SubjectType: " material ", Limit: 501, Offset: -1}, scope)
 	if err != nil || total != 17 || len(balances) != 1 || !balances[0].Quantity.Equal(decimal.RequireFromString("0.000001")) {
 		t.Fatalf("scoped balances lost count or precision: rows=%v total=%d err=%v", balances, total, err)
 	}

@@ -57,7 +57,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"products": productsToAny(items),
 			"total":    total,
-			"limit":    normalizedLimit(pm),
+			"limit":    normalizedBusinessListLimit(pm),
 			"offset":   normalizedOffset(pm),
 		})}, nil
 	case "set_product_active":
@@ -112,7 +112,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"product_skus": productSKUsToAny(items),
 			"total":        total,
-			"limit":        normalizedLimit(pm),
+			"limit":        normalizedBusinessListLimit(pm),
 			"offset":       normalizedOffset(pm),
 		})}, nil
 	case "set_product_sku_active":

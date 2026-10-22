@@ -304,7 +304,7 @@ func normalizeProductionOrderListFilter(filter ProductionOrderFilter) (Productio
 	filter.DateField = strings.TrimSpace(filter.DateField)
 	filter.SortBy = strings.TrimSpace(filter.SortBy)
 	filter.SortDirection = strings.ToLower(strings.TrimSpace(filter.SortDirection))
-	if !scopeOK || filter.Limit <= 0 || filter.Limit > 200 || filter.Offset < 0 ||
+	if !scopeOK || filter.Limit <= 0 || filter.Limit > BusinessListMaxLimit || filter.Offset < 0 ||
 		(filter.DateFrom != nil && filter.DateTo != nil && filter.DateFrom.After(*filter.DateTo)) ||
 		!validProductionOrderStatusFilter(filter.Status) || !validProductionOrderDateField(filter.DateField) ||
 		!validProductionOrderSort(filter.SortBy, filter.SortDirection) {

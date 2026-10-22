@@ -149,7 +149,7 @@ test('URL state preserves filters while bounding paging and ignoring unsupported
   assert.equal(bad.scope, 'active')
   assert.equal(bad.offset, 0)
   assert.equal(bad.date_from, '')
-  for (const pageSize of [8, 20, 50]) {
+  for (const pageSize of [20, 50, 100]) {
     const paged = progressQueryFromURL(
       new URLSearchParams(`page=2&page_size=${pageSize}`)
     )

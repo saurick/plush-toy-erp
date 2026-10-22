@@ -71,7 +71,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"stock_reservations": stockReservationsForAccessToAny(items, scope), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(map[string]any{"stock_reservations": stockReservationsForAccessToAny(items, scope), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}

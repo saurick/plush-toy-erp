@@ -1,3 +1,4 @@
+import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generated.mjs'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 
 export const WORKFLOW_TASK_BOARD_LANE_KEYS = Object.freeze([
@@ -67,7 +68,7 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
 
   const requestedLimit = Number(request.limit)
   const expectedLimit = Number.isSafeInteger(requestedLimit)
-    ? Math.min(Math.max(requestedLimit, 1), 50)
+    ? Math.min(Math.max(requestedLimit, 1), WorkCenterPaginationPolicy.maxPageSize)
     : Number.NaN
   const expectedOffset = Number(request.offset || 0)
   const seenLaneKeys = new Set()

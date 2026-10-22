@@ -101,6 +101,7 @@ import {
 import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   resetBusinessPaginationCurrent,
   resolveExactRecordPage,
@@ -272,7 +273,7 @@ export default function QualityInspectionsPage() {
   const [materialFilter, setMaterialFilter] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('')
   const [lotFilter, setLotFilter] = useState('')
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [pagination, setPagination] = useState({ current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [detailInspection, setDetailInspection] = useState(null)

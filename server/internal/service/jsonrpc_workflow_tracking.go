@@ -80,7 +80,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 	if !valid {
 		return id, invalidParamResult(), nil
 	}
-	q.Limit, valid = getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1)
+	q.Limit, valid = getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)
 	if !valid {
 		return id, invalidParamResult(), nil
 	}

@@ -155,3 +155,20 @@ test('visual steps preserve actual completion, blocked responsibility and routin
   assert.equal(incompleteHistory.items[0].tone, 'rejected')
   assert.doesNotMatch(incompleteHistory.items[0].detail, /审批负责人|实际审批人/)
 })
+
+
+test('tracking accepts a complete hundred-row page and rejects overflow or truncated responses', () => {
+  const summary = trackingFixture().summary
+  const page = {
+    items: Array.from({ length: 100 }, (_, index) => ({ ...summary, id: index + 1 })),
+    total: 105,
+    status_counts: { active: 105 },
+    limit: 100,
+    offset: 0,
+  }
+  assert.equal(requireTrackingPage(page, { limit: 100 }), page)
+  const last = { ...page, items: page.items.slice(0, 5), offset: 100 }
+  assert.equal(requireTrackingPage(last, { limit: 100, offset: 100 }), last)
+  assert.throws(() => requireTrackingPage({ ...page, items: page.items.slice(0, 50) }, { limit: 100 }), { isInvalidResponse: true })
+  assert.throws(() => requireTrackingPage({ ...page, limit: 101 }, { limit: 101 }), { isInvalidResponse: true })
+})

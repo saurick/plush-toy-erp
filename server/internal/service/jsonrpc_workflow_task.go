@@ -89,7 +89,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		limit := getWorkflowLimit(pm)
+		limit := getWorkflowTaskLimit(pm)
 		offset := getWorkflowOffset(pm)
 		keyword, keywordRes := getOptionalWorkflowTaskBoardString(pm, "keyword", 200)
 		if keywordRes != nil {

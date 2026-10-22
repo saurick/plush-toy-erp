@@ -47,7 +47,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 		return id, okData(map[string]any{
 			"inventory_balances": inventoryBalancesToAny(items),
 			"total":              total,
-			"limit":              normalizedLimit(pm),
+			"limit":              normalizedBusinessListLimit(pm),
 			"offset":             normalizedOffset(pm),
 		}), nil
 	case "list_inventory_lots":
@@ -69,7 +69,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 		return id, okData(map[string]any{
 			"inventory_lots": inventoryLotsToAny(items),
 			"total":          total,
-			"limit":          normalizedLimit(pm),
+			"limit":          normalizedBusinessListLimit(pm),
 			"offset":         normalizedOffset(pm),
 		}), nil
 	case "list_inventory_txns":
@@ -91,7 +91,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 		return id, okData(map[string]any{
 			"inventory_txns": inventoryTxnsToAny(items),
 			"total":          total,
-			"limit":          normalizedLimit(pm),
+			"limit":          normalizedBusinessListLimit(pm),
 			"offset":         normalizedOffset(pm),
 		}), nil
 	default:

@@ -110,7 +110,12 @@ import {
   linkedDocumentContext,
   linkedDocumentRequestKeyword,
 } from '../utils/relatedDocumentNavigation.mjs'
-import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
+import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
+  createBusinessTablePagination,
+  normalizeBusinessPageSize,
+  resolveExactRecordPage,
+} from '../utils/businessPagination.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import {
   resolveBusinessActionAvailability,
@@ -159,7 +164,7 @@ const DEFAULT_QUERY = Object.freeze({
   sort_by: 'updated_at',
   sort_direction: 'desc',
   page: 1,
-  page_size: 20,
+  page_size: DEFAULT_BUSINESS_PAGE_SIZE,
 })
 
 function positiveQuery(value, fallback) {
@@ -183,7 +188,7 @@ function queryFromSearchParams(params) {
     sort_direction:
       params.get('sort_direction') || DEFAULT_QUERY.sort_direction,
     page: positiveQuery(params.get('page'), 1),
-    page_size: Math.min(200, positiveQuery(params.get('page_size'), 20)),
+    page_size: normalizeBusinessPageSize(params.get('page_size')),
   }
 }
 
@@ -2084,14 +2089,12 @@ export default function ProductionOrdersPage() {
                   : 'view'
               )
             }
-        pagination={{
-              current: query.page,
-              pageSize: query.page_size,
-              total,
-              showSizeChanger: true,
-              onChange: (page, pageSize) =>
-                writeQuery({ page, page_size: pageSize }),
-            }}
+        pagination={createBusinessTablePagination({
+          pagination: { current: query.page, pageSize: query.page_size },
+          total,
+          onChange: (page, pageSize) =>
+            writeQuery({ page, page_size: pageSize }),
+        })}
         emptyDescription={
               canCreate
                 ? '暂无生产订单，可新建生产计划单'

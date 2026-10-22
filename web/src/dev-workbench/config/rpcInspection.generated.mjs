@@ -2597,13 +2597,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -2614,7 +2614,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -3194,8 +3194,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1)`。',
-        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1)',
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)',
         name: 'limit',
         required: '可选',
         source: Object.freeze({
@@ -3612,8 +3612,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1)`。',
-        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1)',
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)',
         name: 'limit',
         required: '可选',
         source: Object.freeze({
@@ -9278,13 +9278,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -9306,7 +9306,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -9409,13 +9409,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -9426,7 +9426,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -9605,13 +9605,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -9633,7 +9633,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11293,13 +11293,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11310,7 +11310,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11368,7 +11368,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: '待核对',
       }), Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 73,
@@ -11434,13 +11434,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11451,7 +11451,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11543,13 +11543,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11560,7 +11560,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11610,7 +11610,7 @@ export const RpcInspection = Object.freeze({
         type: 'array',
       })]),
       response: Object.freeze([Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 52,
@@ -11684,13 +11684,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11701,7 +11701,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11751,7 +11751,7 @@ export const RpcInspection = Object.freeze({
         type: 'array',
       })]),
       response: Object.freeze([Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 52,
@@ -11825,13 +11825,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11842,7 +11842,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11859,7 +11859,7 @@ export const RpcInspection = Object.freeze({
         type: 'integer',
       })]),
       response: Object.freeze([Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 115,
@@ -11933,13 +11933,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -11950,7 +11950,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -12000,7 +12000,7 @@ export const RpcInspection = Object.freeze({
         type: 'array',
       })]),
       response: Object.freeze([Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 60,
@@ -12074,13 +12074,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -12091,7 +12091,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -12141,7 +12141,7 @@ export const RpcInspection = Object.freeze({
         type: 'array',
       })]),
       response: Object.freeze([Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 86,
@@ -12215,13 +12215,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -12232,7 +12232,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -12282,7 +12282,7 @@ export const RpcInspection = Object.freeze({
         type: 'array',
       })]),
       response: Object.freeze([Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 39,
@@ -12356,13 +12356,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -12373,7 +12373,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -12423,7 +12423,7 @@ export const RpcInspection = Object.freeze({
         type: 'array',
       })]),
       response: Object.freeze([Object.freeze({
-        expression: '"limit": normalizedLimit(pm)',
+        expression: '"limit": normalizedBusinessListLimit(pm)',
         name: 'result.data.limit',
         source: Object.freeze({
           line: 57,
@@ -17002,8 +17002,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
@@ -17012,8 +17012,8 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 171,
-          path: 'server/internal/service/jsonrpc_operational_fact_finance_payment.go',
+          line: 278,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
       }), Object.freeze({
@@ -17137,13 +17137,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -17165,7 +17165,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -17375,8 +17375,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
@@ -17385,8 +17385,8 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 160,
-          path: 'server/internal/service/jsonrpc_operational_fact_finance_payment.go',
+          line: 278,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
       }), Object.freeze({
@@ -17532,13 +17532,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -17560,7 +17560,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -17903,13 +17903,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -17931,7 +17931,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -18219,13 +18219,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -18247,7 +18247,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -18427,13 +18427,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -18455,7 +18455,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -22055,8 +22055,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `productionOrderOptionalNonNegativeInt`；调用 `productionOrderOptionalNonNegativeInt(pm, "limit", 50)`。',
-        expression: 'productionOrderOptionalNonNegativeInt(pm, "limit", 50)',
+        description: '解析器 `productionOrderOptionalNonNegativeInt`；调用 `productionOrderOptionalNonNegativeInt(pm, "limit", biz.BusinessListDefaultLimit)`。',
+        expression: 'productionOrderOptionalNonNegativeInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         required: '可选',
         source: Object.freeze({
@@ -23896,7 +23896,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 282,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -23929,7 +23929,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -24010,13 +24010,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -24049,7 +24049,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -24234,7 +24234,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 282,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -24267,7 +24267,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -25900,13 +25900,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -25928,7 +25928,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -26151,13 +26151,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -26168,7 +26168,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -26292,13 +26292,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -26309,7 +26309,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -26434,13 +26434,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(pm, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(pm, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 277,
+          line: 278,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -26462,7 +26462,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 285,
+          line: 290,
           path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
@@ -29607,8 +29607,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", 5, 1)`。',
-        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", 5, 1)',
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)',
         name: 'limit',
         required: '可选',
         source: Object.freeze({
@@ -29975,8 +29975,8 @@ export const RpcInspection = Object.freeze({
         path: 'server/internal/service/jsonrpc_workflow.go',
       }),
       parameters: Object.freeze([Object.freeze({
-        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", 8, 1)`。',
-        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", 8, 1)',
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)',
         name: 'limit',
         required: '可选',
         source: Object.freeze({
@@ -30032,7 +30032,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 402,
+          line: 410,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -30043,7 +30043,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 413,
+          line: 421,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -30695,8 +30695,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getInt`；调用 `getInt(m, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
-        expression: 'getInt(m, "limit", 50)',
+        description: '解析器 `getInt`；调用 `getInt(m, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
+        expression: 'getInt(m, "limit", biz.BusinessListDefaultLimit)',
         name: 'limit',
         nullable: true,
         required: '按业务条件',
@@ -30712,7 +30712,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 413,
+          line: 421,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -30854,8 +30854,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1)`。',
-        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1)',
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)',
         name: 'limit',
         required: '可选',
         source: Object.freeze({

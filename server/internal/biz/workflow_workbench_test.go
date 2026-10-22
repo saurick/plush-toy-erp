@@ -31,7 +31,7 @@ func TestWorkflowUsecaseGetWorkflowWorkbenchNormalizesBoundedRead(t *testing.T) 
 	if err != nil || page == nil {
 		t.Fatalf("get workflow workbench page=%#v err=%v", page, err)
 	}
-	if repo.query.QueueKey != WorkflowWorkbenchQueueActionable || repo.query.Limit != 50 || repo.query.Offset != 16 {
+	if repo.query.QueueKey != WorkflowWorkbenchQueueActionable || repo.query.Limit != 100 || repo.query.Offset != 16 {
 		t.Fatalf("normalized query=%#v", repo.query)
 	}
 	if repo.query.SnapshotAt.IsZero() || repo.query.SnapshotAt.Nanosecond() != 0 || repo.query.SnapshotAt.Location() != time.UTC {

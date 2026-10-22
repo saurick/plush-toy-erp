@@ -45,10 +45,11 @@ import { compareOperationalFactDecimalValues } from './operationalFactDecimal.mj
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
+import { DEFAULT_BUSINESS_PAGE_SIZE } from '../../utils/businessPagination.mjs'
 
 export const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
   current: 1,
-  pageSize: 20,
+  pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
 })
 
 export const STATUS_OPTIONS = [

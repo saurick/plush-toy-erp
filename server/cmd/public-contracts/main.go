@@ -627,6 +627,12 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		path, export string
 		names        map[string]string
 	}{
+		{"biz/business_pagination.go", "BusinessPaginationPolicy", map[string]string{
+			"BusinessListDefaultLimit": "defaultPageSize", "BusinessListMaxLimit": "maxPageSize",
+		}},
+		{"biz/work_center_pagination.go", "WorkCenterPaginationPolicy", map[string]string{
+			"WorkCenterDefaultLimit": "defaultPageSize", "WorkCenterMaxLimit": "maxPageSize",
+		}},
 		{"biz/admin_password.go", "AdminPasswordPolicy", map[string]string{
 			"AdminPasswordMinLength": "minCharacters", "AdminPasswordMaxLength": "maxCharacters", "AdminPasswordMaxBytes": "maxBytes",
 		}},

@@ -120,7 +120,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsFocusedPageAndCapsLimit(t 
 			Lanes: []biz.WorkflowTaskBoardLane{{
 				Key:    biz.WorkflowTaskBoardLaneException,
 				Total:  60,
-				Limit:  50,
+				Limit:  100,
 				Offset: 20,
 				Tasks:  []*biz.WorkflowTask{},
 			}},
@@ -148,7 +148,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsFocusedPageAndCapsLimit(t 
 	if err != nil || res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("focused board response=%#v err=%v", res, err)
 	}
-	if repo.query.LaneKey != biz.WorkflowTaskBoardLaneException || repo.query.Sort != biz.WorkflowTaskBoardSortNewest || repo.query.Limit != 50 || repo.query.Offset != 20 {
+	if repo.query.LaneKey != biz.WorkflowTaskBoardLaneException || repo.query.Sort != biz.WorkflowTaskBoardSortNewest || repo.query.Limit != 100 || repo.query.Offset != 20 {
 		t.Fatalf("unexpected focused board query %#v", repo.query)
 	}
 	if repo.query.VisibilityScope == nil || !repo.query.VisibilityScope.StandaloneAllowAllOwnerRoles || repo.query.VisibilityScope.VisibleAssigneeID != nil {

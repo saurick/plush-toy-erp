@@ -93,7 +93,7 @@ func TestWorkflowUsecase_GetTaskBoardNormalizesReadContract(t *testing.T) {
 	if got.Keyword != "工程任务" || got.Status != "all" || got.OwnerRoleKey != SalesRoleKey || got.Due != "all" || got.SourceType != "" || got.LaneKey != "" || got.Sort != WorkflowTaskBoardSortSmart {
 		t.Fatalf("unexpected normalized query %#v", got)
 	}
-	if got.Limit != 50 || got.Offset != 0 {
+	if got.Limit != 100 || got.Offset != 0 {
 		t.Fatalf("unexpected pagination limit=%d offset=%d", got.Limit, got.Offset)
 	}
 	if len(got.VisibleOwnerRoleKeys) != 1 || got.VisibleOwnerRoleKeys[0] != SalesRoleKey {

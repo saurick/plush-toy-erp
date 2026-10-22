@@ -581,9 +581,7 @@ func normalizeQualityInspectionFilter(in QualityInspectionFilter) (QualityInspec
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}
@@ -623,9 +621,7 @@ func normalizeFinishedGoodsQualityInspectionFilter(in QualityInspectionFilter) (
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}
@@ -651,9 +647,7 @@ func normalizeOutsourcingReturnQualityInspectionFilter(in QualityInspectionFilte
 	in.SourceType = QualityInspectionSourceOutsourcingFact
 	in.InspectionType = QualityInspectionTypeOutsourcingReturn
 	in.SubjectType = QualityInspectionSubjectProduct
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}
@@ -687,9 +681,7 @@ func normalizeProductionStageQualityInspectionFilter(in QualityInspectionFilter)
 	if in.ProductionWIPBatchID > 0 {
 		in.SourceID = in.ProductionWIPBatchID
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
 	if in.Offset < 0 {
 		in.Offset = 0
 	}

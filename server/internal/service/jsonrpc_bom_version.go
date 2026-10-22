@@ -24,7 +24,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		return id, okData(map[string]any{
 			"bom_versions": bomHeadersToAny(items),
 			"total":        total,
-			"limit":        normalizedLimit(pm),
+			"limit":        normalizedBusinessListLimit(pm),
 			"offset":       normalizedOffset(pm),
 		}), nil
 	case "get_bom_version":

@@ -796,10 +796,10 @@ func normalizeWorkflowTaskFilter(filter WorkflowTaskFilter) WorkflowTaskFilter {
 	filter.DueFrom = normalizeWorkflowFilterTime(filter.DueFrom)
 	filter.DueTo = normalizeWorkflowFilterTime(filter.DueTo)
 	if filter.Limit <= 0 {
-		filter.Limit = 50
+		filter.Limit = BusinessListDefaultLimit
 	}
-	if filter.Limit > 200 {
-		filter.Limit = 200
+	if filter.Limit > BusinessListMaxLimit {
+		filter.Limit = BusinessListMaxLimit
 	}
 	if filter.Offset < 0 {
 		filter.Offset = 0

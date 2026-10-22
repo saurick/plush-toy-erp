@@ -1,5 +1,5 @@
 import { parseDateInputValue } from './dateRange.mjs'
-import { TASK_BOARD_PAGE_SIZE_OPTIONS, getWorkflowTaskOwnerRoleLabel } from './workflowTaskBoard.mjs'
+import { normalizeWorkflowTaskPageSize, getWorkflowTaskOwnerRoleLabel } from './workflowTaskBoard.mjs'
 import { getWorkflowTaskDisplayName } from './processRuntimePresentation.mjs'
 import { formatBusinessDate } from './businessDate.mjs'
 
@@ -195,9 +195,7 @@ export function progressQueryFromURL(params) {
       : ''
   const reversed = date('from') && date('to') && date('from') > date('to')
   const requestedLimit = Number(params.get('page_size'))
-  const limit = TASK_BOARD_PAGE_SIZE_OPTIONS.includes(requestedLimit)
-    ? requestedLimit
-    : 20
+  const limit = normalizeWorkflowTaskPageSize(requestedLimit)
   const page = Math.max(
     1,
     Math.min(

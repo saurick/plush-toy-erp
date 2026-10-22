@@ -198,7 +198,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"production_facts": productionFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(map[string]any{"production_facts": productionFactsToAny(items), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
 	case "list_production_order_material_requirements":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
 			return id, res, nil

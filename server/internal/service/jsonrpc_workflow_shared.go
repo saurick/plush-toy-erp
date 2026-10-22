@@ -398,6 +398,14 @@ func getWorkflowPriority(m map[string]any) (int16, bool) {
 	return int16(value), true
 }
 
+func getWorkflowTaskLimit(m map[string]any) int {
+	limit := getInt(m, "limit", biz.BusinessListDefaultLimit)
+	if limit <= 0 {
+		return biz.BusinessListDefaultLimit
+	}
+	return min(limit, biz.BusinessListMaxLimit)
+}
+
 func getWorkflowLimit(m map[string]any) int {
 	limit := getInt(m, "limit", 50)
 	if limit <= 0 {

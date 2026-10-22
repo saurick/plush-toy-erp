@@ -90,6 +90,7 @@ import {
   financeBusinessSourceFormValuesFromRequest,
 } from '../utils/financeBusinessSourceAction.mjs'
 import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -220,7 +221,7 @@ export default function PurchaseReceiptsPage() {
   const [lotFilter, setLotFilter] = useBusinessPageState('lotFilter', '')
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
-    pageSize: 20,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)

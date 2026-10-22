@@ -416,8 +416,8 @@ func productionOrderFilterFromParams(pm map[string]any) (biz.ProductionOrderFilt
 	if !ok {
 		return biz.ProductionOrderFilter{}, false
 	}
-	limit, ok := productionOrderOptionalNonNegativeInt(pm, "limit", 50)
-	if !ok || limit < 1 || limit > 200 {
+	limit, ok := productionOrderOptionalNonNegativeInt(pm, "limit", biz.BusinessListDefaultLimit)
+	if !ok || limit < 1 || limit > biz.BusinessListMaxLimit {
 		return biz.ProductionOrderFilter{}, false
 	}
 	offset, ok := productionOrderOptionalNonNegativeInt(pm, "offset", 0)

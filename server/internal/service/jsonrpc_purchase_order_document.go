@@ -112,7 +112,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(withBusinessStatusCounts(map[string]any{
 			"purchase_orders": purchaseOrdersToAny(items),
 			"total":           total,
-			"limit":           normalizedLimit(pm),
+			"limit":           normalizedBusinessListLimit(pm),
 			"offset":          normalizedOffset(pm),
 		}, statusCounts))}, nil
 	default:

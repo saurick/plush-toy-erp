@@ -118,8 +118,30 @@ export function createAuditLogScenarios({
       await page.locator('.ant-table-tbody tr[data-row-key]').first().waitFor()
       assert.equal(
         await page.locator('.ant-table-tbody tr[data-row-key]').count(),
-        20
+        50
       )
+      const pager = page.locator('.ant-pagination')
+      const readAuditPage = (limit, offset) => page.waitForResponse((response) => {
+        if (!response.url().endsWith('/rpc/admin')) return false
+        const body = response.request().postDataJSON()
+        return body?.method === 'audit_logs' && body.params?.limit === limit && body.params?.offset === offset
+      })
+      let read = readAuditPage(50, 50)
+      await pager.locator('.ant-pagination-next button').click()
+      await read
+      for (const size of [100, 50]) {
+        if (size === 50) {
+          read = readAuditPage(100, 100)
+          await pager.locator('.ant-pagination-next button').click()
+          await read
+        }
+        await pager.locator('.ant-select-selector').click()
+        read = readAuditPage(size, 0)
+        await page.locator('.ant-select-dropdown:visible').getByText(`${size} 条/页`, { exact: true }).click()
+        await read
+        await page.waitForFunction((expected) => document.querySelectorAll('.ant-table-tbody tr[data-row-key]').length === expected, size)
+        assert.equal(await pager.locator('.ant-pagination-prev button').isDisabled(), true)
+      }
       await verifyDrawer(page, 640)
       // Full filtered export must read beyond the first server page.
       const downloadPromise = page.waitForEvent('download')
@@ -218,7 +240,7 @@ export function createAuditLogScenarios({
       await page.waitForFunction(
         () =>
           document.querySelectorAll('.ant-table-tbody tr[data-row-key]')
-            .length === 20
+            .length === 50
       )
       await search.fill('慢查询')
       await search.fill('历史员工201')
@@ -235,7 +257,7 @@ export function createAuditLogScenarios({
       await page.waitForFunction(
         () =>
           document.querySelectorAll('.ant-table-tbody tr[data-row-key]')
-            .length === 20
+            .length === 50
       )
       const headers = await page
         .locator('.ant-table-thead:not([aria-hidden="true"]) th')

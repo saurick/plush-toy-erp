@@ -225,7 +225,7 @@ func TestQualityInspectionUsecaseListsKeepInspectionKindsSeparate(t *testing.T) 
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &qualityInspectionBehaviorRepo{}
 			uc := NewQualityInspectionUsecase(repo)
-			rows, total, err := tc.call(uc, context.Background(), QualityInspectionFilter{Status: " passed ", Result: " pass ", Keyword: " 检验 ", Limit: 201, Offset: -1})
+			rows, total, err := tc.call(uc, context.Background(), QualityInspectionFilter{Status: " passed ", Result: " pass ", Keyword: " 检验 ", Limit: 501, Offset: -1})
 			if err != nil || total != 7 || len(rows) != 1 || rows[0].ID != 20 || len(repo.filters) != 1 {
 				t.Fatalf("valid list lost result: rows=%v total=%d err=%v", rows, total, err)
 			}

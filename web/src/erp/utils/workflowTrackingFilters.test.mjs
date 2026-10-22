@@ -31,17 +31,17 @@ test('pagination belongs to each scope and resets only when its filters or page 
     assert.equal(next.get('track_id'), '1')
     assert.equal(next.get('track_source_id'), '12')
   }
-  const resized = writeTrackingPagination(params, 'started', 3, 8)
-  assert.deepEqual(readTrackingPagination(resized, 'started'), { page: 1, pageSize: 8 })
-  assert.deepEqual(readTrackingPagination(writeTrackingPagination(resized, 'started', 5, 8), 'started'), { page: 5, pageSize: 8 })
-  assert.deepEqual(readTrackingPagination(clearTrackingFilters(resized, 'started'), 'started'), { page: 1, pageSize: 8 })
+  const resized = writeTrackingPagination(params, 'started', 3, 100)
+  assert.deepEqual(readTrackingPagination(resized, 'started'), { page: 1, pageSize: 100 })
+  assert.deepEqual(readTrackingPagination(writeTrackingPagination(resized, 'started', 5, 100), 'started'), { page: 5, pageSize: 100 })
+  assert.deepEqual(readTrackingPagination(clearTrackingFilters(resized, 'started'), 'started'), { page: 1, pageSize: 100 })
 })
 
 test('malformed or overflowing pagination links fall back to a valid first page', () => {
   for (const page of ['0', '-1', '1.5', '20x', '1e5', '9007199254740991']) {
     assert.deepEqual(readTrackingPagination(new URLSearchParams({ track_page_started: page }), 'started'), { page: 1, pageSize: 20 })
   }
-  assert.deepEqual(readTrackingPagination(new URLSearchParams('track_page_size_started=100'), 'started'), { page: 1, pageSize: 20 })
+  assert.deepEqual(readTrackingPagination(new URLSearchParams('track_page_size_started=8'), 'started'), { page: 1, pageSize: 20 })
 })
 
 test('结束记录清除当前岗位和关注条件，链接恢复与再次切换不带回残值', () => {

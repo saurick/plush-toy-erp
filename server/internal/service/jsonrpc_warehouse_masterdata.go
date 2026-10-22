@@ -22,7 +22,7 @@ func (d *jsonrpcDispatcher) handleWarehouseMasterData(ctx context.Context, metho
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"warehouses": warehousesToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(map[string]any{"warehouses": warehousesToAny(items), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseManage); res != nil {
 		return id, res, nil

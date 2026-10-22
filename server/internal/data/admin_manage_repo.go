@@ -46,8 +46,8 @@ var _ biz.RoleDataScopeRepo = (*adminManageRepo)(nil)
 var _ biz.RoleSettingsRepo = (*adminManageRepo)(nil)
 
 const (
-	defaultRuntimeAuditListLimit = 50
-	maxRuntimeAuditListLimit     = 200
+	defaultRuntimeAuditListLimit = biz.BusinessListDefaultLimit
+	maxRuntimeAuditListLimit     = biz.BusinessListMaxLimit
 
 	adminSessionRevokeReasonAccountDisabled = "account_disabled"
 	adminSessionRevokeReasonAccountEnabled  = "account_enabled"

@@ -49,7 +49,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"processes": processesToAny(items),
 			"total":     total,
-			"limit":     normalizedLimit(pm),
+			"limit":     normalizedBusinessListLimit(pm),
 			"offset":    normalizedOffset(pm),
 		})}, nil
 	case "set_process_active":

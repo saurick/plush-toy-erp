@@ -36,7 +36,7 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"units":  unitsToAny(items),
 			"total":  total,
-			"limit":  normalizedLimit(pm),
+			"limit":  normalizedBusinessListLimit(pm),
 			"offset": normalizedOffset(pm),
 		})}, nil
 	case "list_warehouses":
@@ -54,7 +54,7 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"warehouses": warehousesToAny(items),
 			"total":      total,
-			"limit":      normalizedLimit(pm),
+			"limit":      normalizedBusinessListLimit(pm),
 			"offset":     normalizedOffset(pm),
 		})}, nil
 	default:

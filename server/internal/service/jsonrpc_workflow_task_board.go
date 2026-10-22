@@ -64,12 +64,12 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 		}
 		todoOnly = value
 	}
-	limit, ok := getOptionalWorkflowTaskBoardInteger(pm, "limit", 5, 1)
+	limit, ok := getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)
 	if !ok {
 		return biz.WorkflowTaskBoardQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "limit 必须是正整数"}
 	}
-	if limit > 50 {
-		limit = 50
+	if limit > biz.WorkCenterMaxLimit {
+		limit = biz.WorkCenterMaxLimit
 	}
 	offset, ok := getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)
 	if !ok || offset > workflowTaskBoardMaxOffset {
@@ -150,12 +150,12 @@ func getWorkflowWorkbenchQuery(pm map[string]any) (biz.WorkflowWorkbenchQuery, *
 	if _, ok := (biz.WorkflowWorkbenchCounts{}).QueueTotal(queueKey); !ok {
 		return biz.WorkflowWorkbenchQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "queue_key 不是有效的工作台队列"}
 	}
-	limit, ok := getOptionalWorkflowTaskBoardInteger(pm, "limit", 8, 1)
+	limit, ok := getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)
 	if !ok {
 		return biz.WorkflowWorkbenchQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "limit 必须是正整数"}
 	}
-	if limit > 50 {
-		limit = 50
+	if limit > biz.WorkCenterMaxLimit {
+		limit = biz.WorkCenterMaxLimit
 	}
 	offset, ok := getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)
 	if !ok || offset > workflowTaskBoardMaxOffset {

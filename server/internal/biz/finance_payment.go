@@ -304,9 +304,7 @@ func normalizeFinanceCreditNoteListFilter(filter FinanceCreditNoteFilter) (Finan
 	if filter.FinanceFactID < 0 || filter.Offset < 0 {
 		return FinanceCreditNoteFilter{}, ErrBadParam
 	}
-	if filter.Limit <= 0 || filter.Limit > 200 {
-		filter.Limit = 50
-	}
+	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
 	return filter, nil
 }
 
@@ -359,9 +357,7 @@ func normalizeFinancePaymentListFilter(filter FinancePaymentFilter) (FinancePaym
 	if filter.CounterpartyID < 0 || filter.Offset < 0 {
 		return FinancePaymentFilter{}, ErrBadParam
 	}
-	if filter.Limit <= 0 || filter.Limit > 200 {
-		filter.Limit = 50
-	}
+	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
 	return filter, nil
 }
 

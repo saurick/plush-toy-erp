@@ -215,7 +215,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 
-		return id, okData(withBusinessStatusCounts(map[string]any{"finance_facts": financeFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}, statusCounts)), nil
+		return id, okData(withBusinessStatusCounts(map[string]any{"finance_facts": financeFactsToAny(items), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}, statusCounts)), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}

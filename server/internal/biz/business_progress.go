@@ -145,7 +145,7 @@ func normalizeBusinessProgressQuery(q BusinessProgressQuery) (BusinessProgressQu
 		q.Scope == "ended" && (q.DueStatus == "overdue" || q.DueStatus == "due_soon" || q.BlockedOnly) ||
 		q.View != "production" && q.UnlinkedOnly ||
 		q.DueStatus == "undated" && (q.DateFrom != "" || q.DateTo != "") ||
-		q.Limit < 1 || q.Limit > 100 || q.Offset < 0 || q.Offset > 1000000 || q.ID < 0 ||
+		q.Limit < 1 || q.Limit > WorkCenterMaxLimit || q.Offset < 0 || q.Offset > 1000000 || q.ID < 0 ||
 		len([]rune(q.Keyword)) > 100 || len([]rune(q.Owner)) > 100 {
 		return q, ErrBadParam
 	}

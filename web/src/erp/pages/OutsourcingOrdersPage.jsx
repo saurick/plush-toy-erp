@@ -42,6 +42,7 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
 
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
@@ -1001,16 +1002,12 @@ export default function OutsourcingOrdersPage() {
             })}
             onOpenRecord={openOutsourcingOrderRecord}
             emptyDescription="暂无加工合同"
-            pagination={{
-              current: pagination.current,
-              pageSize: pagination.pageSize,
+            pagination={createBusinessTablePagination({
+              pagination,
               total,
-              showSizeChanger: true,
               onChange: (current, pageSize) =>
                 setPagination({ current, pageSize }),
-              showTotal: (nextTotal, range) =>
-                `第 ${range[0]}-${range[1]} 条 / 共 ${nextTotal} 条`,
-            }}
+            })}
             scroll={{ x: 1220 }}
           />
         </>

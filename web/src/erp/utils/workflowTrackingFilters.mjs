@@ -1,5 +1,5 @@
 import { getWorkflowTaskSourceTypeLabel } from './dashboardTaskDisplay.mjs'
-import { TASK_BOARD_PAGE_SIZE_OPTIONS, TASK_BOARD_ROLE_OPTIONS } from './workflowTaskBoard.mjs'
+import { normalizeWorkflowTaskPageSize, TASK_BOARD_ROLE_OPTIONS } from './workflowTaskBoard.mjs'
 
 export const TRACKING_VIEW_OPTIONS = [
   { value: 'tracking', label: '流程进度' },
@@ -60,7 +60,7 @@ export function clearTrackingFilters(params, scope) {
 
 export function readTrackingPagination(params, scope) {
   const size = Number(params.get(`track_page_size_${scope}`))
-  const pageSize = TASK_BOARD_PAGE_SIZE_OPTIONS.includes(size) ? size : 20
+  const pageSize = normalizeWorkflowTaskPageSize(size)
   const requested = params.get(`track_page_${scope}`) || '1'
   const page = /^\d+$/.test(requested) ? Number(requested) : 1
   return {

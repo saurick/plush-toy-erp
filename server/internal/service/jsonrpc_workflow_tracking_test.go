@@ -55,7 +55,7 @@ func TestWorkflowTrackingRPCRejectsInvalidAndForgedQueries(t *testing.T) {
 	}{
 		{"list_tracking", map[string]any{"actor_id": 8}},
 		{"list_tracking", map[string]any{"scope": "anyone"}},
-		{"list_tracking", map[string]any{"limit": 51}},
+		{"list_tracking", map[string]any{"limit": 101}},
 		{"list_tracking", map[string]any{"source_id": 1}},
 		{"list_tracking", map[string]any{"cursor": "obsolete"}},
 		{"list_tracking", map[string]any{"offset": -1}},

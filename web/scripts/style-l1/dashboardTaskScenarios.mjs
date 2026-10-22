@@ -921,7 +921,7 @@ export function createDashboardTaskScenarios({
         )
         const paginationTasks = await page.evaluate(async () => {
           const tasks = await Promise.all(
-            Array.from({ length: 17 }, async (_, index) => {
+            Array.from({ length: 37 }, async (_, index) => {
               const suffix = String(index + 1).padStart(2, '0')
               const response = await fetch('/rpc/workflow', {
                 method: 'POST',
@@ -966,13 +966,13 @@ export function createDashboardTaskScenarios({
         })
         assert.equal(
           paginationTasks.length,
-          17,
-          '任务管理分页回归应成功准备十七条补充任务'
+          37,
+          '任务管理分页回归应成功准备三十七条补充任务'
         )
         const expectedSecondPageFirstTask = [
           navigationTask,
           ...paginationTasks,
-        ].sort((left, right) => Number(right.id) - Number(left.id))[8]
+        ].sort((left, right) => Number(right.id) - Number(left.id))[20]
         assert(
           Number(expectedSecondPageFirstTask?.id) > 0,
           `任务管理分页回归缺少第二页首条任务: ${JSON.stringify({
@@ -984,7 +984,7 @@ export function createDashboardTaskScenarios({
         const actionableOverviewLane = page.locator('.erp-task-board-lane--overview')
         await page
           .locator('.erp-task-progress-rail__item[data-lane="actionable"] .erp-task-progress-rail__value')
-          .filter({ hasText: /^18$/ })
+          .filter({ hasText: /^38$/ })
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await actionableOverviewLane.locator('.erp-task-table-row').filter({ hasText: /看板分页测试任务|看板跳转测试任务/ }).count(),
@@ -1152,7 +1152,7 @@ export function createDashboardTaskScenarios({
             ).length === 1 &&
             document.querySelectorAll(
               '.erp-task-board-lanes--focused .ant-table-tbody > tr[data-task-code]'
-            ).length === 8,
+            ).length === 20,
           undefined,
           { timeout: 10_000 }
         )
@@ -1298,7 +1298,7 @@ export function createDashboardTaskScenarios({
             params.get('lane') === 'actionable' &&
             params.get('page') === '2' &&
             document.querySelectorAll('.ant-table-tbody > tr[data-task-code]')
-              .length === 8
+              .length === 18
           )
         })
         await page
@@ -1369,7 +1369,7 @@ export function createDashboardTaskScenarios({
               const body = request.postDataJSON()
               return (
                 body?.method === 'get_task_board' &&
-                body.params?.limit === 20 &&
+                body.params?.limit === 100 &&
                 body.params?.offset === 0
               )
             } catch {
@@ -1380,20 +1380,20 @@ export function createDashboardTaskScenarios({
             (request) => request,
             (error) => error
           )
-        await taskPager.getByText('8 项 / 页', { exact: true }).click()
-        await page.getByText('20 项 / 页', { exact: true }).click()
+        await taskPager.getByText('20 项 / 页', { exact: true }).click()
+        await page.getByText('100 项 / 页', { exact: true }).click()
         const changedPageSizeRequest = await pageSizeRead
         if (changedPageSizeRequest instanceof Error) {
           throw changedPageSizeRequest
         }
         await taskPager
-          .getByText('第 1–18 项，共 18 项', { exact: true })
+          .getByText('第 1–38 项，共 38 项', { exact: true })
           .waitFor()
-        assert.equal(new URL(page.url()).searchParams.get('pageSize'), '20')
+        assert.equal(new URL(page.url()).searchParams.get('pageSize'), '100')
         assert.equal(new URL(page.url()).searchParams.get('page'), '1')
         assert.equal(
           await page.locator('.ant-table-tbody > tr[data-task-code]').count(),
-          18
+          38
         )
         assert.equal(
           await taskPager.getByRole('button', { name: '上一页' }).isDisabled(),
@@ -1409,7 +1409,7 @@ export function createDashboardTaskScenarios({
           if (
             failPageSizeRead &&
             body?.method === 'get_task_board' &&
-            body.params?.limit === 8
+            body.params?.limit === 20
           ) {
             failPageSizeRead = false
             await route.fulfill({
@@ -1430,8 +1430,8 @@ export function createDashboardTaskScenarios({
           await route.fallback()
         }
         await page.route('**/rpc/workflow', failedPageSizeRoute)
-        await taskPager.getByText('20 项 / 页', { exact: true }).click()
-        await page.getByText('8 项 / 页', { exact: true }).click()
+        await taskPager.getByText('100 项 / 页', { exact: true }).click()
+        await page.getByText('20 项 / 页', { exact: true }).click()
         await page
           .locator('.ant-alert')
           .filter({ hasText: '任务管理加载失败' })
@@ -1444,7 +1444,7 @@ export function createDashboardTaskScenarios({
           .getByRole('button', { name: '重新加载', exact: true })
           .click()
         await taskPager
-          .getByText('第 1–8 项，共 18 项', { exact: true })
+          .getByText('第 1–20 项，共 38 项', { exact: true })
           .waitFor()
         await page.unroute('**/rpc/workflow', failedPageSizeRoute)
         for (const width of [1440, 390, 320]) {
