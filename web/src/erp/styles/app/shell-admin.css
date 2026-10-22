@@ -433,10 +433,6 @@
   flex: 1;
 }
 
-.erp-admin-account__chevron {
-  flex: none;
-}
-
 .erp-admin-drawer .erp-admin-account .erp-account-identity__copy {
   display: grid;
 }
@@ -445,8 +441,7 @@
   justify-content: center;
 }
 
-.erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-account .erp-account-identity__copy,
-.erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-account__chevron {
+.erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-account .erp-account-identity__copy {
   display: none;
 }
 

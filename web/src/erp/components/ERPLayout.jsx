@@ -12,7 +12,6 @@ import {
   AppstoreOutlined,
   BarChartOutlined,
   DatabaseOutlined,
-  DownOutlined,
   FileSearchOutlined,
   HistoryOutlined,
   HomeOutlined,
@@ -1404,7 +1403,6 @@ export default function ERPLayout({ legalNotice }) {
             onClick={(event) => { accountTriggerRef.current = event.currentTarget }}
           >
             <AccountIdentity profile={identityProfile} compact />
-            <DownOutlined className="erp-admin-account__chevron" />
           </Button>
         </Dropdown>
       </div>
