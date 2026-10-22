@@ -1536,7 +1536,7 @@ matched: 231,
 test('operation details reject unrelated or executable trace links', async () => {
   const operation = summaryFixture().operations[0]
   const base = 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/'
-  operation.trace = { commitUrl: `${base}commit/${operation.gitSha}`, pipelinesUrl: `${base}pipelines?sha=${operation.gitSha}`, releaseUrl: `${base}releases/artifact-${operation.gitSha}`, pipelineUrl: `${base}pipelines/91` }
+  operation.trace = { commitUrl: `${base}commit/${operation.gitSha}`, pipelinesUrl: `${base}commit/${operation.gitSha}/pipelines`, releaseUrl: `${base}releases/artifact-${operation.gitSha}`, pipelineUrl: `${base}pipelines/91` }
   const client = createDevDeliveryClient({ fetchImpl: async () => response({ kind: 'plush.dev-delivery-operation-result', operation }) })
   assert.equal((await client.operation(operation.id)).trace.pipelineUrl, `${base}pipelines/91`)
   // Malformed evidence must never turn a trace link into executable code.

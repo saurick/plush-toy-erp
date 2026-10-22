@@ -528,7 +528,7 @@ function publicOperation(
     evidence,
     trace: {
       commitUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/commit/${operation.gitSha}`,
-      pipelinesUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/pipelines?sha=${operation.gitSha}`,
+      pipelinesUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/commit/${operation.gitSha}/pipelines`,
       releaseUrl: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/releases/artifact-${operation.gitSha}`,
       pipelineUrl:
         Number.isSafeInteger(metadata.pipelineId) && metadata.pipelineId > 0

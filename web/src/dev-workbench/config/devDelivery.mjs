@@ -743,7 +743,7 @@ function validateOperation(operation) {
     if (
       operation.trace.commitUrl !== `${base}commit/${operation.gitSha}` ||
       operation.trace.pipelinesUrl !==
-        `${base}pipelines?sha=${operation.gitSha}` ||
+        `${base}commit/${operation.gitSha}/pipelines` ||
       operation.trace.releaseUrl !==
         `${base}releases/artifact-${operation.gitSha}` ||
       (operation.trace.pipelineUrl !== null &&
