@@ -331,12 +331,6 @@
   flex: 1;
 }
 
-.erp-workbench-queue-panel .ant-pagination {
-  margin: 0;
-  padding: var(--erp-panel-padding-block, 9px) var(--erp-panel-padding-inline, 12px);
-  border-top: 1px solid var(--erp-border);
-}
-
 .erp-workbench-queue-empty {
   display: grid;
   justify-items: center;

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Pagination, Select, Space, Tag } from 'antd'
+import { Alert, Button, Select, Space, Tag } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import Pagination from '@/common/components/pagination/AppPagination'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { DEV_INTEGRATION_ROUTE } from '../config/devRoutes.mjs'
@@ -298,7 +299,7 @@ export default function DevRPCContractReview() {
                     <span>{KIND_LABELS[row.kind]}{row.fields.length ? ` · ${row.fields.length} 处` : ''}</span>
                   </button>
                 ))}
-                <Pagination simple current={page} pageSize={PAGE_SIZE} total={report.changes.length} onChange={setPage} hideOnSinglePage />
+                <Pagination current={page} pageSize={PAGE_SIZE} total={report.changes.length} onChange={setPage} hideOnSinglePage />
               </aside>
               <section className="erp-dev-rpc-review__detail" aria-label={`${selected.label}变更详情`}>
                 <div className="erp-dev-rpc-review__detail-heading">

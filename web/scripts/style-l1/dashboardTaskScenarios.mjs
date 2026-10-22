@@ -1380,14 +1380,14 @@ export function createDashboardTaskScenarios({
             (request) => request,
             (error) => error
           )
-        await taskPager.getByText('20 项 / 页', { exact: true }).click()
-        await page.getByText('100 项 / 页', { exact: true }).click()
+        await taskPager.getByText('20 条/页', { exact: true }).click()
+        await page.getByText('100 条/页', { exact: true }).click()
         const changedPageSizeRequest = await pageSizeRead
         if (changedPageSizeRequest instanceof Error) {
           throw changedPageSizeRequest
         }
         await taskPager
-          .getByText('第 1–38 项，共 38 项', { exact: true })
+          .getByText('第 1-38 条 / 共 38 条', { exact: true })
           .waitFor()
         assert.equal(new URL(page.url()).searchParams.get('pageSize'), '100')
         assert.equal(new URL(page.url()).searchParams.get('page'), '1')
@@ -1430,8 +1430,8 @@ export function createDashboardTaskScenarios({
           await route.fallback()
         }
         await page.route('**/rpc/workflow', failedPageSizeRoute)
-        await taskPager.getByText('100 项 / 页', { exact: true }).click()
-        await page.getByText('20 项 / 页', { exact: true }).click()
+        await taskPager.getByText('100 条/页', { exact: true }).click()
+        await page.getByText('20 条/页', { exact: true }).click()
         await page
           .locator('.ant-alert')
           .filter({ hasText: '任务管理加载失败' })
@@ -1444,7 +1444,7 @@ export function createDashboardTaskScenarios({
           .getByRole('button', { name: '重新加载', exact: true })
           .click()
         await taskPager
-          .getByText('第 1–20 项，共 38 项', { exact: true })
+          .getByText('第 1-20 条 / 共 38 条', { exact: true })
           .waitFor()
         await page.unroute('**/rpc/workflow', failedPageSizeRoute)
         for (const width of [1440, 390, 320]) {

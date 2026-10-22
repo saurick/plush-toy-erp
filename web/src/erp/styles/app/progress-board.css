@@ -295,10 +295,6 @@
   padding: 4px 0;
   font-size: var(--erp-font-caption);
 }
-.erp-progress-board > .erp-task-pagination {
-  flex: 0 0 auto;
-  margin-top: 9px;
-}
 .erp-progress-warning {
   color: var(--erp-warning-text);
 }

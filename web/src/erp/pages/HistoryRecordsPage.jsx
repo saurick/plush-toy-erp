@@ -432,7 +432,6 @@ export default function HistoryRecordsPage() {
             total,
             onChange: (current, size) => updateQuery({ page: current, size }),
           }),
-          showTotal: (value) => `共 ${value} 条`,
         }}
       />
       {columnOrderModal}

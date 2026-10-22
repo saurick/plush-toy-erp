@@ -203,7 +203,6 @@ function RoleAssociatedAccounts({
             ? {
                 pageSize: DEFAULT_TABLE_PAGE_SIZE,
                 showSizeChanger: false,
-                showTotal: (total) => `共 ${total} 个账号`,
               }
             : false
         }

@@ -130,8 +130,7 @@
   color: var(--erp-primary, #26734d);
 }
 
-.erp-business-visual-frame .ant-btn-link,
-.erp-business-visual-pagination .ant-pagination-item-active a {
+.erp-business-visual-frame .ant-btn-link {
   color: var(--erp-primary, #26734d);
 }
 
@@ -1446,7 +1445,10 @@ button.erp-production-process__step {
 .erp-business-visual-pagination {
   display: flex;
   justify-content: flex-end;
-  padding: 14px 18px;
+}
+
+.erp-business-visual-pagination > .app-pagination {
+  flex: 1;
 }
 
 .erp-business-visual-unknown {

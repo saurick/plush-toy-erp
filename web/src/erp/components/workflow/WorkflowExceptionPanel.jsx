@@ -3,11 +3,11 @@ import {
   Alert,
   Button,
   Empty,
-  Pagination,
   Spin,
   Tag,
 } from 'antd'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
+import Pagination from '@/common/components/pagination/AppPagination'
 import { WorkflowTaskStatus } from '@/common/consts/statuses.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'

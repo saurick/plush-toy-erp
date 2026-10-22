@@ -2,6 +2,7 @@ import React, { useImperativeHandle, useMemo, useRef } from 'react'
 import { Empty, Table } from 'antd'
 import { normalizeTableColumns } from './tableColumns.mjs'
 import TableScrollControls from './TableScrollControls.jsx'
+import { useAppPagination } from '../pagination/AppPagination'
 import './app-table.css'
 
 const AppTable = React.forwardRef(
@@ -10,6 +11,7 @@ const AppTable = React.forwardRef(
     ref
   ) => {
     const tableRef = useRef(null)
+    const pagination = useAppPagination(props.pagination)
     useImperativeHandle(ref, () => tableRef.current)
     const alignedColumns = useMemo(
       () => normalizeTableColumns(columns),
@@ -35,6 +37,7 @@ const AppTable = React.forwardRef(
       <>
         <Table
           {...props}
+          pagination={pagination}
           ref={tableRef}
           className={`app-table ${className}`.trim()}
           columns={alignedColumns}

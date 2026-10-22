@@ -71,7 +71,7 @@ export function createBusinessDetailsScenarios(deps) {
         y: rect.top + rect.height / 2,
       })
       const footerBox = node.getBoundingClientRect()
-      const selectNode = node.querySelector('.erp-business-details-page-size')
+      const selectNode = node.querySelector('.ant-pagination-options-size-changer')
       const select = selectNode.getBoundingClientRect()
       const selectSurface = selectNode
         .querySelector('.ant-select-selector')
@@ -99,10 +99,10 @@ export function createBusinessDetailsScenarios(deps) {
           Number.parseFloat(footerStyle.paddingTop) -
             Number.parseFloat(footerStyle.paddingBottom)
         ),
-        selectorBeforePages: select.right <= pages.left,
+        selectorAfterPages: node.querySelector('.ant-pagination-next').getBoundingClientRect().right <= select.left,
         sameRow:
-          Math.abs(select.top - pages.top) <= 2 &&
-          Math.abs(close.top - pages.top) <= 2,
+          Math.abs(center(select).y - center(pages).y) <= 1 &&
+          Math.abs(center(close).y - center(pages).y) <= 1,
         footerCenterDeltas: {
           select: Math.abs(center(select).y - center(footerBox).y),
           pages: Math.abs(center(pages).y - center(footerBox).y),
@@ -112,10 +112,7 @@ export function createBusinessDetailsScenarios(deps) {
           value: Math.abs(center(selectValue).y - center(selectSurface).y),
           arrow: Math.abs(center(selectArrow).y - center(selectSurface).y),
         },
-        buttonsBoxed: buttons.every(
-          (button) =>
-            Number.parseFloat(getComputedStyle(button).borderTopWidth) >= 1
-        ),
+        compactButtons: buttons.every((button) => button.getBoundingClientRect().height === 28),
       }
     })
     assert(
@@ -131,10 +128,10 @@ export function createBusinessDetailsScenarios(deps) {
     )
     if (page.viewportSize().width >= 768) {
       assert(
-        controls.selectorBeforePages &&
+        controls.selectorAfterPages &&
           controls.sameRow &&
-          controls.buttonsBoxed,
-        `桌面应依次显示条数选择、方框页码和关闭: ${JSON.stringify(controls)}`
+          controls.compactButtons,
+        `桌面共用业务页紧凑分页，页码后显示条数选择，与关闭按钮居中对齐: ${JSON.stringify(controls)}`
       )
     }
     const before = await footer.boundingBox()
@@ -831,7 +828,7 @@ export function createBusinessDetailsScenarios(deps) {
         assert.equal(
           await modal
             .locator(
-              '.erp-business-details-page-size .ant-select-selection-item'
+              '.erp-business-details-pagination .ant-select-selection-item'
             )
             .innerText(),
           '10 条/页'
@@ -853,9 +850,9 @@ export function createBusinessDetailsScenarios(deps) {
           if (count === 0) {
             await modal.getByText('当前采购订单暂无明细', { exact: true }).waitFor()
             assert.equal(await modal.locator('.ant-pagination').count(), 0)
-            assert.equal(await modal.locator('.erp-business-details-total').count(), 0)
+            assert.equal(await modal.locator('.erp-business-details-pagination .ant-pagination-total-text').count(), 0)
           } else {
-            await modal.locator('.erp-business-details-total').getByText(`共 ${count} 条`, { exact: true }).waitFor()
+            await modal.locator('.erp-business-details-pagination .ant-pagination-total-text').getByText(`第 1-${count} 条 / 共 ${count} 条`, { exact: true }).waitFor()
           }
           assert.equal(
             await modal.locator('.erp-business-row-item-card').count(),

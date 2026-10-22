@@ -181,7 +181,7 @@ export function createBusinessStatisticsScenarios({
         assert.equal(calls.at(-1).params.offset, 0)
         assert.match(
           await summaryPager.innerText(),
-          narrow ? /1–8 \/ 10 项/ : /第 1–8 项，共 10 项/
+          /第 1-8 条 \/ 共 10 条/
         )
         assert.equal(
           await summaryPager
@@ -212,14 +212,15 @@ export function createBusinessStatisticsScenarios({
         if (narrow || dark) {
           assert.equal(
             await stats
-              .locator('.erp-statistics-table .ant-table-content')
+              .locator('.erp-statistics-table .ant-table-body, .erp-statistics-table .ant-table-content')
+              .first()
               .evaluate((node) => getComputedStyle(node).overflowX),
             'auto'
           )
           if (narrow) {
             assert.equal(
               await summaryPager
-                .locator('.ant-pagination-simple-pager')
+                .locator('.ant-pagination-mini')
                 .count(),
               1
             )
@@ -229,7 +230,7 @@ export function createBusinessStatisticsScenarios({
             await page.waitForFunction(() =>
               document
                 .querySelector('.erp-task-pagination [role=status]')
-                ?.textContent.includes('9–10')
+                ?.textContent.includes('9-10')
             )
             assert.equal(
               await stats
@@ -247,7 +248,7 @@ export function createBusinessStatisticsScenarios({
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-task-pagination [role=status]')
-            ?.textContent.includes('9–10')
+            ?.textContent.includes('9-10')
         )
         assert.equal(calls.at(-1).params.limit, 8)
         assert.equal(calls.at(-1).params.offset, 8)
@@ -270,31 +271,31 @@ export function createBusinessStatisticsScenarios({
           .first()
           .getByRole('button', { name: '时光百货', exact: true })
           .click()
-        await select(page, '每页来源订单数', '20 单 / 页')
+        await select(page, '每页来源订单数', '20 条/页')
         await stats
           .getByRole('button', { name: '返回汇总', exact: true })
           .click()
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-task-pagination [role=status]')
-            ?.textContent.includes('9–10')
+            ?.textContent.includes('9-10')
         )
         assert.equal(new URL(page.url()).searchParams.get('stats_page'), '2')
         assert.equal(calls.at(-1).params.limit, 8)
-        await select(page, '每页统计汇总数', '20 项 / 页')
+        await select(page, '每页统计汇总数', '20 条/页')
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-task-pagination [role=status]')
-            ?.textContent.includes('1–10')
+            ?.textContent.includes('1-10')
         )
         assert.equal(calls.at(-1).params.limit, 20)
         assert.equal(calls.at(-1).params.offset, 0)
         assert.equal(new URL(page.url()).searchParams.get('stats_page'), '1')
-        await select(page, '每页统计汇总数', '8 项 / 页')
+        await select(page, '每页统计汇总数', '8 条/页')
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-task-pagination [role=status]')
-            ?.textContent.includes('1–8')
+            ?.textContent.includes('1-8')
         )
         await page.screenshot({
           path: `${outputDir}/statistics-delivery-desktop.png`,
@@ -309,7 +310,7 @@ export function createBusinessStatisticsScenarios({
           .waitFor()
         assert.match(
           await stats.locator('.erp-task-pagination').innerText(),
-          /10 单/
+          /共 10 条/
         )
         await stats
           .getByRole('navigation', { name: '来源订单分页' })
@@ -318,14 +319,14 @@ export function createBusinessStatisticsScenarios({
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-task-pagination [role=status]')
-            ?.textContent.includes('9–10')
+            ?.textContent.includes('9-10')
         )
         assert.equal(calls.at(-1).params.offset, 8)
-        await select(page, '每页来源订单数', '20 单 / 页')
+        await select(page, '每页来源订单数', '20 条/页')
         await page.waitForFunction(() =>
           document
             .querySelector('.erp-task-pagination [role=status]')
-            ?.textContent.includes('1–10')
+            ?.textContent.includes('1-10')
         )
         assert.equal(calls.at(-1).params.limit, 20)
         assert.equal(calls.at(-1).params.offset, 0)
@@ -363,11 +364,17 @@ export function createBusinessStatisticsScenarios({
         )
         assert.equal(await stats.locator('.erp-statistics-table').count(), 0)
         await stats.getByText('图表与表格', { exact: true }).click()
-        await select(page, '每页统计汇总数', '50 项 / 页')
+        const pageSizeResponse = page.waitForResponse((response) => {
+          if (!response.url().endsWith('/rpc/business')) return false
+          const body = response.request().postDataJSON() || {}
+          return body.method?.includes('statistics') && body.params?.limit === 50
+        })
+        await select(page, '每页统计汇总数', '50 条/页')
+        await pageSizeResponse
         await page.waitForFunction(() =>
           document
-            .querySelector('.erp-task-pagination')
-            ?.textContent.includes('50 项 / 页')
+            .querySelector('.erp-task-pagination .ant-select-selection-item')
+            ?.textContent.includes('50 条/页')
         )
         assert.equal(calls.at(-1).params.limit, 50)
         assert.equal(calls.at(-1).params.offset, 0)

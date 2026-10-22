@@ -1,6 +1,7 @@
 import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Empty, Pagination, Popover, Tag, Typography } from 'antd'
+import { Button, Empty, Popover, Tag, Typography } from 'antd'
+import Pagination from '@/common/components/pagination/AppPagination'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
@@ -66,13 +67,6 @@ function defaultSelectedLabel(row = {}) {
     row.title ||
     '记录已关联'
   )
-}
-
-function formatPaginationTotal(total, currentPage, pageSize) {
-  if (total <= 0) return '共 0 条'
-  const start = (currentPage - 1) * pageSize + 1
-  const end = Math.min(total, currentPage * pageSize)
-  return `${start}-${end} / 共 ${total} 条`
 }
 
 export default function SourceImportPickerModal({
@@ -492,20 +486,12 @@ export default function SourceImportPickerModal({
           scroll={{ x: 760, y: 380 }}
         />
         <div className="erp-source-import-picker__pagination">
-          <Text type="secondary">
-            {formatPaginationTotal(
-              serverPagination ? serverTotal : filteredRows.length,
-              effectiveCurrentPage,
-              pageSize
-            )}
-          </Text>
           <Pagination
             current={effectiveCurrentPage}
             pageSize={pageSize}
             total={serverPagination ? serverTotal : filteredRows.length}
             hideOnSinglePage={false}
             showSizeChanger={false}
-            showLessItems
             onChange={handlePageChange}
           />
         </div>

@@ -14,7 +14,6 @@ import {
   Button,
   Checkbox,
   Empty,
-  Pagination,
   Progress,
   Select,
   Skeleton,
@@ -23,6 +22,7 @@ import {
   Typography,
 } from 'antd'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import Pagination from '@/common/components/pagination/AppPagination'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import SearchInput from '@/common/components/SearchInput'

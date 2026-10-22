@@ -823,8 +823,6 @@ export default function AuditLogsPage() {
               setPagination({ current, pageSize })
             },
           }),
-          showTotal: (value) =>
-            `共 ${value} 条${riskFilter !== 'all' ? '（风险仅筛选本页）' : ''}`,
         }}
       />
       {columnOrderModal}

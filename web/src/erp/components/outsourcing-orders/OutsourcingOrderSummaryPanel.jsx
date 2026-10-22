@@ -394,7 +394,6 @@ export default forwardRef((
             pageSize: filters.limit,
             total: result.total,
             showSizeChanger: false,
-            showTotal: (total) => `共 ${total} 条加工明细`,
             onChange: (page) => update({ page }),
           }}
         />

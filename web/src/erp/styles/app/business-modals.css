@@ -475,24 +475,7 @@
   min-width: 0;
 }
 
-.erp-source-import-picker .ant-pagination {
-  margin-bottom: 0;
-}
-
 .erp-source-import-picker__pagination {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.erp-source-import-picker__pagination > .ant-typography {
-  flex: none;
-  white-space: nowrap;
-}
-
-.erp-source-import-picker__pagination .ant-pagination {
   min-width: 0;
 }
 

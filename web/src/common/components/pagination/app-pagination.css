@@ -1,0 +1,30 @@
+.app-pagination.ant-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  row-gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--erp-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-pagination .ant-select-dropdown .ant-select-item-option-content {
+  white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+  .app-pagination.ant-pagination > .ant-pagination-total-text {
+    flex-basis: 100%;
+    height: auto;
+    margin-inline-end: 0;
+    white-space: normal;
+  }
+
+  .app-pagination.ant-pagination .ant-pagination-options {
+    display: inline-flex;
+    margin-inline-start: 8px;
+  }
+}

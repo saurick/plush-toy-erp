@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useId, useState } from 'react'
-import { Alert, Button, Pagination, Select, Space, Tag } from 'antd'
+import { Alert, Button, Select, Space, Tag } from 'antd'
+import Pagination from '@/common/components/pagination/AppPagination'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -33,7 +34,7 @@ export default function BOMTaskPanel({ context, onContextChange, adminProfile })
   const total = current?.total || 0
   const selected = orders.find((order) => order.id === context?.orderID)
     || (total === 1 ? orders[0] : null)
-  const renderOrderMenu = useCallback((menu) => <>{menu}{total > PAGE_SIZE ? <div className="business-task-panel__order-pagination"><Pagination simple current={page} pageSize={PAGE_SIZE} total={total} showSizeChanger={false} onChange={(nextPage) => onContextChange({ bomID, page: nextPage })} /></div> : null}</>, [total, page, bomID, onContextChange])
+  const renderOrderMenu = useCallback((menu) => <>{menu}{total > PAGE_SIZE ? <div className="business-task-panel__order-pagination"><Pagination current={page} pageSize={PAGE_SIZE} total={total} showSizeChanger={false} onChange={(nextPage) => onContextChange({ bomID, page: nextPage })} /></div> : null}</>, [total, page, bomID, onContextChange])
 
   useEffect(() => {
     if (!bomID || !canReadOrders || !canReadTasks) return undefined

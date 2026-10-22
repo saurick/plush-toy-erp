@@ -305,7 +305,6 @@ export default function InventoryOperationRecordsModal({
           ...pagination,
           total,
           showSizeChanger: true,
-          showTotal: (count) => `共 ${count} 条`,
         }}
         onChange={(next) =>
           setPagination({

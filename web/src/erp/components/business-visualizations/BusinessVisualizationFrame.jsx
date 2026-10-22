@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react'
 import { useLocation, useOutletContext } from 'react-router-dom'
-import { Button, Empty, Pagination } from 'antd'
+import { Button, Empty } from 'antd'
+import Pagination from '@/common/components/pagination/AppPagination'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
 
@@ -12,7 +13,6 @@ export function VisualizationPagination({ pagination, onChange }) {
         pageSize={pagination.pageSize}
         total={pagination.total}
         showSizeChanger={false}
-        showTotal={(total) => `共 ${total} 条，每页 ${pagination.pageSize} 条`}
         onChange={onChange}
       />
     </div>

@@ -57,7 +57,7 @@ export function createDevBusinessUsabilityScenarios({
         )
 
         const table = page.locator('.erp-dev-business-usability-table-card')
-        const pager = table.locator('.erp-dev-pagination')
+        const pager = table.locator('.app-pagination')
         const range = pager.locator('.ant-pagination-total-text')
         await range.waitFor()
         const rangeText = await range.innerText()
@@ -69,13 +69,13 @@ export function createDevBusinessUsabilityScenarios({
           .boundingBox()
         const summaryBox = await range.boundingBox()
         assert(firstItem && summaryBox)
-        assert.equal(firstItem.height, 34, '分页使用电脑版当前主题的标准尺寸')
+        assert.equal(firstItem.height, 28, '分页使用业务页相同的紧凑尺寸')
         assert.equal(firstItem.width, firstItem.height)
         assert(
           summaryBox.x + summaryBox.width < firstItem.x,
           '记录范围与页码不重叠'
         )
-        assert.doesNotMatch(await pager.getAttribute('class'), /ant-pagination-mini/u)
+        assert.match(await pager.getAttribute('class'), /ant-pagination-mini/u)
         await pager.locator('.ant-pagination-prev.ant-pagination-disabled').waitFor()
 
         const rows = table.locator('.ant-table-tbody > .ant-table-row')

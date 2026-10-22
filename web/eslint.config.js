@@ -12,6 +12,23 @@ const nativeTableRestriction = {
   message: '原生数据表使用 data-table-lines="appearance" 跟随账号网格设置；纸面、图解和有固定线框的专用表使用 "fixed"。',
 }
 
+const paginationOwners = ['src/common/components/pagination/AppPagination.jsx']
+const navigationOwners = [
+  'src/common/components/navigation/SlidingSegmented.jsx',
+  'src/common/components/navigation/SlidingTabs.jsx',
+  'src/common/components/navigation/SlidingTabList.jsx',
+]
+function paginationImportRestrictions(protectNavigation = false) {
+  return ['error', {
+    paths: ['antd', 'antd/es', 'antd/es/index', 'antd/es/index.js', 'antd/lib', 'antd/lib/index', 'antd/lib/index.js'].map((name) => ({
+      name,
+      importNames: ['Pagination', 'default', ...(protectNavigation && name === 'antd' ? ['Segmented', 'Tabs'] : [])],
+      message: '分页使用 AppPagination，表格分页由 AppTable 管理；页签继续使用 SlidingTabs / SlidingSegmented。',
+    })),
+    patterns: [{ group: ['antd/es/pagination', 'antd/es/pagination/**', 'antd/lib/pagination', 'antd/lib/pagination/**'], message: '分页统一使用 AppPagination，不绕过共享入口。' }],
+  }]
+}
+
 export default [
   ...compat.config({
     env: {
@@ -116,11 +133,27 @@ export default [
   }),
   {
     files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],
-    ignores: [
-      'src/common/components/navigation/SlidingSegmented.jsx',
-      'src/common/components/navigation/SlidingTabs.jsx',
-      'src/common/components/navigation/SlidingTabList.jsx',
-    ],
+    ignores: [...navigationOwners, ...paginationOwners],
+    rules: {
+      'no-restricted-imports': paginationImportRestrictions(true),
+      'no-restricted-syntax': [
+        'error',
+        nativeTableRestriction,
+        {
+          selector:
+            'JSXOpeningElement[name.name=/^[a-z]/]:has(JSXAttribute[name.name="role"][value.value="tablist"])',
+          message:
+            'Use SlidingTabList for custom tabs. The shared component owns selection motion and keyboard navigation.',
+        },
+      ],
+    },
+  },
+  {
+    files: navigationOwners,
+    rules: { 'no-restricted-imports': paginationImportRestrictions() },
+  },
+  {
+    files: paginationOwners,
     rules: {
       'no-restricted-imports': [
         'error',
@@ -133,16 +166,6 @@ export default [
                 'Use SlidingSegmented or SlidingTabs for visible boundaries, selected states, keyboard and motion. See DEV UI 交互设计 → 交互控件规范.',
             },
           ],
-        },
-      ],
-      'no-restricted-syntax': [
-        'error',
-        nativeTableRestriction,
-        {
-          selector:
-            'JSXOpeningElement[name.name=/^[a-z]/]:has(JSXAttribute[name.name="role"][value.value="tablist"])',
-          message:
-            'Use SlidingTabList for custom tabs. The shared component owns selection motion and keyboard navigation.',
         },
       ],
     },

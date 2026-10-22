@@ -382,7 +382,6 @@ export default function SalesOrderSummaryPanel({
             pageSize: filters.limit,
             total: result.total,
             showSizeChanger: false,
-            showTotal: (total) => `共 ${total} 条产品明细`,
             onChange: (page) => update({ page }),
           }}
         />

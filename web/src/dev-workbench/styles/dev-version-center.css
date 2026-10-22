@@ -513,10 +513,6 @@
   color: var(--ant-color-text, rgb(0 0 0 / 88%));
 }
 
-.erp-dev-version-table-card .ant-pagination {
-  row-gap: 8px;
-}
-
 .erp-dev-pipeline-timing .ant-card-body {
   display: grid;
   gap: 20px;

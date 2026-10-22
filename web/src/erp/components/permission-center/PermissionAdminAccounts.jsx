@@ -987,7 +987,6 @@ export default function PermissionAdminAccounts({
           pageSize: tablePagination.pageSize,
           pageSizeOptions: TABLE_PAGE_SIZE_OPTIONS,
           showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
         }}
         locale={{ emptyText }}
         scroll={{ x: 1100 }}
