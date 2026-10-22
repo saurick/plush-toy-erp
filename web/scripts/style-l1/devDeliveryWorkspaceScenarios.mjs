@@ -95,8 +95,8 @@ path: '/__dev/delivery',
 viewport: { width: 1440, height: 900 },
       beforeNavigate: installDataPreparationContractFailureRoute,
       verify: async (page) => {
-        await expectHeading(page, '交付运行')
-        const tasks = page.getByRole('region', { name: '交付运行任务' })
+        await expectHeading(page, '交付运维')
+        const tasks = page.getByRole('region', { name: '交付运维任务' })
         assert.equal(await tasks.locator('article').count(), 4)
         assert.equal(await tasks.getByRole('link').count(), 4)
         const guide = page.getByRole('region', { name: '发布上线的顺序' })

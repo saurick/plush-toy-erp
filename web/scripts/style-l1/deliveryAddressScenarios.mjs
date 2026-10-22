@@ -236,7 +236,7 @@ export function createDeliveryAddressScenarios({
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await page
-        .getByRole('heading', { name: 'UI 交互设计', exact: true })
+        .getByRole('heading', { name: '交互设计', exact: true })
         .waitFor()
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       await frame.getByRole('button', { name: '销售管理', exact: true }).click()

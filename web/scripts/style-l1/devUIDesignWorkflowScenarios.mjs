@@ -10,7 +10,7 @@ import { createDevRoleFlowScenarios } from './devRoleFlowScenarios.mjs'
 
 export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }) {
   const open = async (page) => {
-    await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+    await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
     const navigationPaint = await page
       .locator('.erp-dev-ui-design-reader:visible > .erp-dev-ui-design-toolbar')
       .evaluate((node) => {
@@ -140,7 +140,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         await page.route('**/__style-l1/persistent-operation-bar', (route) => route.fulfill({
           status: 200,
           contentType: 'text/html; charset=utf-8',
-          body: `<!doctype html><html><head><style>html,body{height:100%;margin:0}body{display:grid;grid-template-rows:auto minmax(0,1fr)}h1{margin:0;font:14px system-ui}iframe{width:100%;height:100%;border:0}</style></head><body><h1>UI 交互设计</h1><iframe title="ERP 当前交互设计" sandbox="allow-scripts" srcdoc="${srcdoc}"></iframe></body></html>`,
+          body: `<!doctype html><html><head><style>html,body{height:100%;margin:0}body{display:grid;grid-template-rows:auto minmax(0,1fr)}h1{margin:0;font:14px system-ui}iframe{width:100%;height:100%;border:0}</style></head><body><h1>交互设计</h1><iframe title="ERP 当前交互设计" sandbox="allow-scripts" srcdoc="${srcdoc}"></iframe></body></html>`,
         }))
       },
       verify: async (page) => {
@@ -371,7 +371,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
-        await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/ }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         const drawer = frame.getByRole('dialog', { name: '任务办理', exact: true })
@@ -486,7 +486,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
       deviceScaleFactor: 2,
       verify: async (page) => {
         page.setDefaultTimeout(8000)
-        await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByText('任务处理', { exact: true }).waitFor()
         await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-header .erp-sliding-tabs', 1)
         await verifyMobileNavigationMotion(page, assert, '.erp-dev-ui-design-header .erp-sliding-tabs', 0, true)

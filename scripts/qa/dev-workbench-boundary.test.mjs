@@ -207,7 +207,7 @@ test("dev workbench boundary: Node serve bridges are centralized outside browser
   );
 });
 
-test("dev workbench boundary: primary navigation is fixed to four areas", () => {
+test("dev workbench boundary: primary navigation exposes overview and four responsibility areas", () => {
   assert.deepEqual(
     DEV_WORKSPACE_NAV_ITEMS.map(({ key, route }) => ({ key, route })),
     [
@@ -216,21 +216,22 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
         key: "product-engineering",
         route: "/__dev/product-engineering",
       },
+      { key: "development-resources", route: "/__dev/development-resources" },
       { key: "quality", route: "/__dev/quality" },
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
   assert(
     DEV_SECONDARY_NAV_ITEMS.some(
-      (item) => item.route === "/__dev/integration" && item.areaKey === "product-engineering",
+      (item) => item.route === "/__dev/integration" && item.areaKey === "development-resources",
     ),
-    "接口与集成归入既有产品工程区域",
+    "接口与集成归入开发资源",
   );
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
         item.route.startsWith("/__dev/") &&
-        ["product-engineering", "quality", "delivery"].includes(item.areaKey),
+        ["product-engineering", "development-resources", "quality", "delivery"].includes(item.areaKey),
     ),
   );
 });

@@ -923,6 +923,7 @@ test("affected: shared DEV navigation expands only to the canonical desktop scen
 
   assert(browser);
   assert.match(browser.text, /dev-page-overview-desktop-light/u);
+  assert.match(browser.text, /dev-page-development-resources-desktop-light/u);
   assert.match(browser.text, /dev-quality-gates-desktop-light/u);
   assert.match(browser.text, /dev-version-center-tabs-pagination-desktop/u);
   assert.match(browser.text, /dev-pressure-desktop/u);

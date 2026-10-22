@@ -157,7 +157,7 @@ export function createEmptyStateScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame.locator('#sidebar').getByRole('button', { name: '质量验证', exact: true }).click()
+        await frame.locator('#sidebar').getByRole('button', { name: '测试验证', exact: true }).click()
         await frame.getByRole('tab', { name: '压力测试', exact: true }).click()
         const load = frame.getByRole('combobox', { name: '负载档位示意' })
         await chooseSelectOption(load, 'capacity')
@@ -220,7 +220,7 @@ export function createEmptyStateScenarios({
         await table
           .getByRole('button', { name: '权限关系', exact: true })
           .waitFor()
-        await table.getByRole('button', { name: '业务链观察', exact: true }).click()
+        await table.getByRole('button', { name: '业务链路', exact: true }).click()
         const observation = frame.locator('[data-dev-flow-preview]')
         await observation.getByRole('tab', { name: '实例跟踪' }).click()
         await observation.getByText('输入示例单号，定位关联任务。', { exact: true }).waitFor()
@@ -256,7 +256,7 @@ export function createEmptyStateScenarios({
         await page.keyboard.press('Escape')
         const sidebar = frame.locator('#sidebar')
         await sidebar
-          .getByRole('button', { name: '交付运行', exact: true })
+          .getByRole('button', { name: '交付运维', exact: true })
           .click()
         for (const task of [
           { tool: '客户配置', expected: '试跑与发布' },
@@ -306,8 +306,8 @@ export function createEmptyStateScenarios({
           await frame.locator(':focus').getAttribute('data-action'),
           'dev-lock-flow'
         )
-        await sidebar.getByRole('button', { name: '交付运行', exact: true }).click()
-        const deliveryTabs = frame.getByRole('tablist', { name: '交付运行视图' })
+        await sidebar.getByRole('button', { name: '交付运维', exact: true }).click()
+        const deliveryTabs = frame.getByRole('tablist', { name: '交付运维视图' })
         await deliveryTabs.getByRole('tab', { name: '环境证据', exact: true }).click()
         await frame.getByRole('table', { name: '环境证据样例' }).waitFor()
         const tabs = await deliveryTabs.elementHandle()
@@ -379,7 +379,7 @@ export function createEmptyStateScenarios({
         )
         await page.emulateMedia({ reducedMotion: 'no-preference' })
         await sidebar
-          .getByRole('button', { name: '质量验证', exact: true })
+          .getByRole('button', { name: '测试验证', exact: true })
           .click()
         await frame.getByRole('button', { name: '开始验证', exact: true }).click()
         await frame

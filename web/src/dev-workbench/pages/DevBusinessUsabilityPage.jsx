@@ -188,7 +188,7 @@ export default function DevBusinessUsabilityPage() {
           <Title level={1}>
             {DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_USABILITY_ROUTE]}
           </Title>
-          <Link to={DEV_TESTING_ROUTE}>返回改动验证</Link>
+          <Link to={DEV_TESTING_ROUTE}>返回测试执行</Link>
         </div>
       </header>
 
@@ -198,7 +198,7 @@ export default function DevBusinessUsabilityPage() {
           <Paragraph>推荐岗位不是权限，覆盖状态也不是客户验收。</Paragraph>
           <Paragraph>
             岗位标签只表示该页面被哪些岗位帮助列为常用入口；实际能否进入和操作仍以正式权限为准。业务上下游继续到
-            <Link to="/__dev/status-flows">业务链观察</Link>
+            <Link to="/__dev/status-flows">业务链路</Link>
             核对。界面值的含义和布局取舍到<Link to="/__dev/ui-design?view=specification&topic=task-cards">工作中心设计说明</Link>对照。
           </Paragraph>
         </details>

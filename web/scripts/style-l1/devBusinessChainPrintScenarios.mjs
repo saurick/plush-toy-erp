@@ -18,7 +18,7 @@ export function createDevBusinessChainPrintScenarios({ assert, assertNoHorizonta
         })
       },
       verify: async (page) => {
-        await expectText(page, '业务链观察')
+        await expectText(page, '业务链路')
         await page.locator('[data-catalog-status="ready"]').waitFor()
         const openExport = async () => {
           await page.getByRole('button', { name: '导出', exact: true }).hover()

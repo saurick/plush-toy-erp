@@ -16,7 +16,7 @@ import {
   DEV_STATUS_FLOWS_ROUTE,
   DEV_TESTING_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
-  DEV_WORKBENCH_AREA_KEYS,
+  DEV_SECONDARY_NAV_ITEMS,
 } from './devRoutes.mjs'
 
 export { DEV_HUB_ROUTE }
@@ -27,8 +27,8 @@ export const DEV_HUB_ALL_GROUP = 'all'
 export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
     key: 'product-core',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '产品内核 / Product Core',
+    searchKeywords: Object.freeze(['产品内核']),
+    englishTitle: 'Product Capabilities',
     group: '产品治理 / Product Governance',
     route: DEV_PRODUCT_CORE_ROUTE,
     source: 'docs/product/产品能力进度台账.md',
@@ -43,8 +43,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'permission-relationships',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '权限关系 / Effective Access',
+    englishTitle: 'Effective Access',
     group: '权限治理 / Access Governance',
     route: DEV_PERMISSION_RELATIONSHIPS_ROUTE,
     source: 'docs/product/配置与权限策略.md',
@@ -61,8 +60,8 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'status-flows',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '业务链观察 / Business Chain Observatory',
+    searchKeywords: Object.freeze(['业务链观察']),
+    englishTitle: 'Business Chain Observatory',
     group: '业务链治理 / Business Chain Governance',
     route: DEV_STATUS_FLOWS_ROUTE,
     source: 'docs/architecture/业务链与运行轨迹边界.md',
@@ -78,8 +77,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'integration',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '接口与集成 / Interfaces and Integration',
+    englishTitle: 'Interfaces and Integration',
     group: '产品治理 / Product Governance',
     route: DEV_INTEGRATION_ROUTE,
     source: 'server/docs/api.md',
@@ -95,8 +93,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'business-usability',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
-    title: '页面说明检查 / Page Help Check',
+    englishTitle: 'Page Help Check',
     group: '验证治理 / QA',
     route: DEV_BUSINESS_USABILITY_ROUTE,
     source: 'web/src/erp/config/businessUsabilityCatalog.mjs',
@@ -114,8 +111,8 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'docs',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '开发文档 / Dev Docs',
+    searchKeywords: Object.freeze(['开发文档']),
+    englishTitle: 'Project Docs',
     group: '文档治理 / Docs',
     route: DEV_DOCS_ROUTE,
     source: 'docs/**/*.md',
@@ -130,8 +127,8 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'project-skills',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '工程规范与 Skill / Project Skills',
+    searchKeywords: Object.freeze(['工程规范与 Skill']),
+    englishTitle: 'Project Skills',
     group: '文档治理 / Docs',
     route: DEV_PROJECT_SKILLS_ROUTE,
     source: '.agents/skills/README.md',
@@ -146,8 +143,8 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'testing',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
-    title: '改动验证 / Change Validation',
+    searchKeywords: Object.freeze(['改动验证']),
+    englishTitle: 'Test Execution',
     group: '验证治理 / QA',
     route: DEV_TESTING_ROUTE,
     source: 'docs/product/自动化测试策略.md',
@@ -163,8 +160,8 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'business-chain-audit',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
-    title: '链路实测 / Business Chain Audit',
+    searchKeywords: Object.freeze(['链路实测']),
+    englishTitle: 'Business Chain Reports',
     group: '验证治理 / QA',
     route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
@@ -180,8 +177,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'quality-gates',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
-    title: '质量门禁 / Quality Gates',
+    englishTitle: 'Quality Gates',
     group: '验证治理 / QA',
     route: DEV_QUALITY_GATES_ROUTE,
     source: 'scripts/qa/README.md',
@@ -198,8 +194,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'data-preparation',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
-    title: '测试数据 / Test Data',
+    englishTitle: 'Test Data',
     group: '验证治理 / QA',
     route: DEV_DATA_PREPARATION_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
@@ -218,8 +213,8 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'ui-design',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: 'UI 交互设计 / UI Interaction Design',
+    searchKeywords: Object.freeze(['UI 交互设计']),
+    englishTitle: 'UI Interaction Design',
     group: '产品设计 / Product Design',
     route: DEV_UI_DESIGN_ROUTE,
     source: 'docs/product/ui-design',
@@ -234,8 +229,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'customer-config',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
-    title: '客户配置 / Customer Config',
+    englishTitle: 'Customer Config',
     group: '客户治理 / Customer Governance',
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     source: 'config/customers/yoyoosun',
@@ -250,8 +244,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'database-migration',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
-    title: '数据库迁移 / Database Migration',
+    englishTitle: 'Database Migration',
     group: '交付治理 / Delivery',
     route: DEV_DATABASE_MIGRATION_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
@@ -271,8 +264,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'version-center',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
-    title: '版本发布 / Release & Deployment',
+    englishTitle: 'Release & Deployment',
     group: '交付治理 / Delivery',
     route: DEV_VERSION_CENTER_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
@@ -289,8 +281,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'drill-recovery',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
-    title: '安全与恢复 / Security & Recovery',
+    englishTitle: 'Security & Recovery',
     group: '交付治理 / Delivery',
     route: DEV_DRILL_RECOVERY_ROUTE,
     source: 'docs/security/运维安全与勒索恢复.md',
@@ -308,7 +299,14 @@ export const DEV_HUB_ITEMS = Object.freeze([
     description:
       '目标安全、备份与恢复证据',
   }),
-])
+].map((item) => {
+  const navigation = DEV_SECONDARY_NAV_ITEMS.find((entry) => entry.key === item.key)
+  return Object.freeze({
+    ...item,
+    areaKey: navigation.areaKey,
+    title: `${navigation.label} / ${item.englishTitle}`,
+  })
+}).sort((a, b) => DEV_SECONDARY_NAV_ITEMS.findIndex((item) => item.key === a.key) - DEV_SECONDARY_NAV_ITEMS.findIndex((item) => item.key === b.key)))
 
 export function isDevHubEnabled(env = import.meta.env) {
   return env?.DEV === true
@@ -365,6 +363,7 @@ export function filterDevHubItems(items = DEV_HUB_ITEMS, filters = '') {
       item.truthSource,
       item.status,
       item.description,
+      ...(item.searchKeywords || []),
       ...(Array.isArray(item.guardrails) ? item.guardrails : []),
     ]
       .join(' ')

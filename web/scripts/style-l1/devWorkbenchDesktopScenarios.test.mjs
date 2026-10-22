@@ -8,6 +8,7 @@ import {
   DEV_DRILL_RECOVERY_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
+  DEV_DEVELOPMENT_RESOURCES_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
@@ -125,7 +126,7 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
   }
 })
 
-test('product and quality area smokes enforce their complete landing contracts', async () => {
+test('product, resources and quality area smokes enforce their complete landing contracts', async () => {
   const counts = new Map([
     ['.erp-dev-workspace-page', 1],
     ['.erp-dev-product-task__index', 0],
@@ -138,7 +139,9 @@ test('product and quality area smokes enforce their complete landing contracts',
     expectHeading: async () => {},
   })
 
-  for (const route of [DEV_PRODUCT_ENGINEERING_ROUTE, DEV_QUALITY_ROUTE]) {
+  for (const route of [DEV_PRODUCT_ENGINEERING_ROUTE, DEV_DEVELOPMENT_RESOURCES_ROUTE, DEV_QUALITY_ROUTE]) {
+    const areaKey = DEV_WORKSPACE_NAV_ITEMS.find((area) => area.route === route).key
+    const tools = DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === areaKey && entry.showInNavigation !== false)
     const scenario = scenarios.find(({ path }) => path === route)
     assert(scenario)
     const browserMotion = new Error('real browser interaction follows the landing checks')
@@ -146,21 +149,21 @@ test('product and quality area smokes enforce their complete landing contracts',
       emulateMedia: async () => { throw browserMotion },
       getByRole: (role, options) => {
         if (role === 'table') {
-          assert.deepEqual(options, { name: '产品工程工具清单' })
+          assert.deepEqual(options, { name: '开发资源工具清单' })
           return { locator: (selector) => {
             assert.equal(selector, 'tbody tr')
-            return { count: async () => 7 }
+            return { count: async () => tools.length }
           } }
         }
         assert.equal(role, 'tablist')
-        assert.deepEqual(options, { name: '产品工程查看方式' })
-        return { count: async () => route === DEV_PRODUCT_ENGINEERING_ROUTE ? 1 : 0 }
+        assert.deepEqual(options, { name: '开发资源查看方式' })
+        return { count: async () => route === DEV_DEVELOPMENT_RESOURCES_ROUTE ? 1 : 0 }
       },
       locator: (selector) => ({
         evaluateAll: async (read) => {
-          assert.equal(selector, '.erp-dev-product-tools a')
+          assert.equal(selector, '.erp-dev-tool-table tbody th a')
           const links = DEV_SECONDARY_NAV_ITEMS
-            .filter((entry) => entry.areaKey === 'product-engineering' && entry.showInNavigation !== false)
+            .filter((entry) => entry.areaKey === areaKey && entry.showInNavigation !== false)
             .map((entry) => ({ getAttribute: (name) => {
               assert.equal(name, 'href')
               return entry.route
@@ -169,14 +172,14 @@ test('product and quality area smokes enforce their complete landing contracts',
         },
         count: async () =>
           selector === '.erp-dev-tool-table tbody tr' &&
-          route === DEV_PRODUCT_ENGINEERING_ROUTE
-            ? 7
+          route !== DEV_QUALITY_ROUTE
+            ? tools.length
             : (counts.get(selector) ?? 0),
         waitFor: async () => {},
       }),
       url: () => `http://127.0.0.1${route}`,
     })
-    if (route === DEV_PRODUCT_ENGINEERING_ROUTE) {
+    if (route === DEV_DEVELOPMENT_RESOURCES_ROUTE) {
       await assert.rejects(verification, (error) => error === browserMotion)
     } else {
       await verification

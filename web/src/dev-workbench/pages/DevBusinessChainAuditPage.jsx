@@ -9,6 +9,7 @@ import {
   Typography,
 } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import { DEV_PAGE_TITLE_BY_ROUTE, DEV_BUSINESS_CHAIN_AUDIT_ROUTE } from '../config/devRoutes.mjs'
 import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
@@ -275,7 +276,7 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
                 ?.currentExists === false ? (
                   <Text type="secondary">当前定义已移除</Text>
               ) : (
-                <Link to={chainDefinitionURL(row.key)}>业务链观察</Link>
+                <Link to={chainDefinitionURL(row.key)}>业务链路</Link>
               ),
           },
         ]}
@@ -496,13 +497,13 @@ export default function DevBusinessChainAuditPage() {
     >
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-chain-audit__header">
-        <Title level={1}>链路实测</Title>
+        <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_CHAIN_AUDIT_ROUTE]}</Title>
         <div hidden={!batch}>
           <DevTaskNav
             level="primary"
             compact
             idPrefix="chain-audit"
-            ariaLabel="链路实测视图"
+            ariaLabel="链路实测报告视图"
             items={CHAIN_AUDIT_TABS}
             value={view}
             onChange={(value) =>
@@ -511,7 +512,7 @@ export default function DevBusinessChainAuditPage() {
           />
         </div>
         <Space wrap>
-          <Link to={chainDefinitionURL(chain)}>业务链观察</Link>
+          <Link to={chainDefinitionURL(chain)}>业务链路</Link>
           <Button
             onClick={() => setRevision((value) => value + 1)}
             loading={catalog.loading}

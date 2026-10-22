@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AppstoreOutlined,
+  BuildOutlined,
   CodeOutlined,
   CopyOutlined,
   DeploymentUnitOutlined,
@@ -17,6 +18,7 @@ import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import {
   DEV_DOCS_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
+  DEV_WORKBENCH_AREA_KEYS,
   DEV_WORKSPACE_NAV_ITEMS,
   getDevSecondaryNavItems,
   resolveDevWorkbenchAreaKey,
@@ -24,12 +26,13 @@ import {
 import { preloadDevRoute } from '../config/devRouteModules.mjs'
 
 const COPY_MESSAGE_KEY = 'dev-page-nav-copy-deep-link'
-const navIcons = [
-  <AppstoreOutlined key="overview" />,
-  <CodeOutlined key="product" />,
-  <SafetyCertificateOutlined key="quality" />,
-  <DeploymentUnitOutlined key="delivery" />,
-]
+const navIcons = {
+  [DEV_WORKBENCH_AREA_KEYS.overview]: <AppstoreOutlined />,
+  [DEV_WORKBENCH_AREA_KEYS.productEngineering]: <BuildOutlined />,
+  [DEV_WORKBENCH_AREA_KEYS.developmentResources]: <CodeOutlined />,
+  [DEV_WORKBENCH_AREA_KEYS.quality]: <SafetyCertificateOutlined />,
+  [DEV_WORKBENCH_AREA_KEYS.delivery]: <DeploymentUnitOutlined />,
+}
 const EMPTY_NAVIGATION_INTENT = Object.freeze({
   sourcePathname: '',
   targetPathname: '',
@@ -200,7 +203,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
           className="erp-dev-workspace-nav__routes"
           aria-label="开发工作台页面"
         >
-          {DEV_WORKSPACE_NAV_ITEMS.map((area, index) => (
+          {DEV_WORKSPACE_NAV_ITEMS.map((area) => (
             <div key={area.key} className="erp-dev-workspace-nav__group">
               <Link
                 ref={
@@ -228,7 +231,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                   className="erp-dev-workspace-nav__route-mark"
                   aria-hidden="true"
                 >
-                  {navIcons[index]}
+                  {navIcons[area.key]}
                 </span>
                 <span>{area.label}</span>
               </Link>
@@ -282,7 +285,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                   复制链接
                 </Button>
                 {sourceHref ? (
-                  <Button type="text" href={sourceHref} icon={<FileTextOutlined />} aria-label={`在开发文档中打开来源 ${sourcePath}`}>
+                  <Button type="text" href={sourceHref} icon={<FileTextOutlined />} aria-label={`在项目文档中打开来源 ${sourcePath}`}>
                     来源文档
                   </Button>
                 ) : null}

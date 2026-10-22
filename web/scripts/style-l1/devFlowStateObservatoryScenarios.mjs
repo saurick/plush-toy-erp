@@ -44,19 +44,19 @@ export function createDevFlowStateObservatoryScenarios({
         })
       },
       verify: async (page) => {
-        await expectText(page, '业务链观察')
+        await expectText(page, '业务链路')
         const root = page.locator('[data-dev-flow-state-observatory]')
         await root.waitFor({ state: 'visible', timeout: 10_000 })
         await expect(page.locator('#dev-flow-task-search')).toHaveCount(0)
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0,
-          '业务链观察子页不应重复常驻环境事实'
+          '业务链路子页不应重复常驻环境事实'
         )
         assert.equal(
           await root.count(),
           1,
-          '业务链观察页应提供唯一桌面内容根节点'
+          '业务链路页应提供唯一桌面内容根节点'
         )
         await assertNoHorizontalOverflow(
           page,
@@ -152,7 +152,7 @@ export function createDevFlowStateObservatoryScenarios({
         await root.getByRole('button', { name: '返回完整流程', exact: true }).click()
         await root.getByRole('heading', { name: '订单全流程', exact: true }).waitFor()
         await root.getByRole('button', { name: '按业务查阅', exact: true }).click()
-        const tabs = page.getByRole('tablist', { name: '业务链观察方式' })
+        const tabs = page.getByRole('tablist', { name: '业务链路方式' })
         assert.equal(await tabs.getByRole('tab').count(), 2)
         await tabs.getByRole('tab', { name: '实例跟踪' }).click()
         await expectText(page, '输入单号或任务，查看实际进度与异常')
@@ -478,7 +478,7 @@ export function createDevFlowStateObservatoryScenarios({
         assert.deepEqual(
           writeRequestsByPage.get(page) || [],
           [],
-          '业务链观察桌面 smoke 不得发出写请求'
+          '业务链路桌面 smoke 不得发出写请求'
         )
       },
     },

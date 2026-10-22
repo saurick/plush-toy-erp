@@ -323,7 +323,7 @@ export function createReadabilityScenarios({
             if (item.key === 'overview') {
               await page
                 .getByRole('button', {
-                  name: '查看产品内核来源与边界',
+                  name: '查看产品能力来源与边界',
                   exact: true,
                 })
                 .click()
@@ -337,7 +337,7 @@ export function createReadabilityScenarios({
               await assertNoHorizontalOverflow(page, 'dev-readability-help')
               await page
                 .getByRole('button', {
-                  name: '查看产品内核来源与边界',
+                  name: '查看产品能力来源与边界',
                   exact: true,
                 })
                 .press('Escape')

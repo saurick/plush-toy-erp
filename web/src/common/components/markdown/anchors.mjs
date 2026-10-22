@@ -1,5 +1,5 @@
 const SUPPORTED_ANCHOR_LINE =
-  /^\s*<a\s+(?:id|name)=["']([A-Za-z0-9][A-Za-z0-9._:-]*)["']\s*><\/a>\s*$/iu
+  /^\s*<a\s+(?:id|name)=["']([\p{L}\p{N}][\p{L}\p{M}\p{N}._:-]*)["']\s*><\/a>\s*$/iu
 
 function readFenceStart(line = '') {
   const match = /^(`{3,}|~{3,})/u.exec(String(line).trim())

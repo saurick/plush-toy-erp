@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Link, useSearchParams } from 'react-router-dom'
+import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PROJECT_SKILLS_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
 import { MermaidDiagram } from '@/common/components/markdown'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
@@ -99,7 +100,7 @@ export default function DevProjectSkillsPage() {
     <div className="erp-dev-workspace-page erp-dev-tool-page erp-dev-skills">
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-skills__header">
-        <Title level={1}>工程规范与 Skill</Title>
+        <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_PROJECT_SKILLS_ROUTE]}</Title>
         {snapshot ? (
           <div className="erp-dev-skills__health" role="status">
             <Tag color={snapshot.health.status === 'ok' ? 'success' : 'error'}>

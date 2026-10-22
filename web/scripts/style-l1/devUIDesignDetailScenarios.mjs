@@ -114,7 +114,7 @@ export function createDevUIDesignDetailScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await page
-          .getByRole('heading', { name: 'UI 交互设计', exact: true })
+          .getByRole('heading', { name: '交互设计', exact: true })
           .waitFor()
         await page.getByRole('tab', { name: '设计说明', exact: true }).click()
         const directory = page.getByRole('navigation', { name: '设计阅读目录' })
@@ -475,10 +475,10 @@ export function createDevUIDesignDetailScenarios({
           .waitFor()
         await page.getByRole('button', { name: /全屏预览/ }).click()
         await page
-          .getByRole('dialog', { name: 'UI 交互设计全屏预览' })
+          .getByRole('dialog', { name: '交互设计全屏预览' })
           .waitFor()
         const fullscreenBounds = await page
-          .getByRole('dialog', { name: 'UI 交互设计全屏预览' })
+          .getByRole('dialog', { name: '交互设计全屏预览' })
           .evaluate((element) => {
             const rect = element.getBoundingClientRect()
             return {
@@ -537,7 +537,7 @@ export function createDevUIDesignDetailScenarios({
         await account.waitFor({ state: 'hidden' })
         assert.equal(
           await page
-            .getByRole('dialog', { name: 'UI 交互设计全屏预览' })
+            .getByRole('dialog', { name: '交互设计全屏预览' })
             .isVisible(),
           true
         )
@@ -545,7 +545,7 @@ export function createDevUIDesignDetailScenarios({
           .getByRole('button', { name: '销售管理', exact: true })
           .press('Escape')
         await page
-          .getByRole('dialog', { name: 'UI 交互设计全屏预览' })
+          .getByRole('dialog', { name: '交互设计全屏预览' })
           .waitFor({ state: 'hidden' })
         assert.equal(
           await page
@@ -717,7 +717,7 @@ export function createDevUIDesignDetailScenarios({
                 false
               )
               await page
-                .getByRole('dialog', { name: 'UI 交互设计全屏预览' })
+                .getByRole('dialog', { name: '交互设计全屏预览' })
                 .waitFor()
               await page.emulateMedia({ reducedMotion: 'reduce' })
               await trigger.click()

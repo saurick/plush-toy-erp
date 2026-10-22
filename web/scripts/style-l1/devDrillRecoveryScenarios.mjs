@@ -28,7 +28,7 @@ export function createDevDrillRecoveryScenarios({
             .getByRole('link', { name: '安全与恢复', exact: true })
             .getAttribute('aria-current'),
           'page',
-          '交付运行菜单必须明确标记当前安全与恢复入口'
+          '交付运维菜单必须明确标记当前安全与恢复入口'
         )
         await page.getByText('项目方演练造数环境', { exact: true }).waitFor()
         const security = page.getByRole('table', { name: '安全检查' })
@@ -53,7 +53,7 @@ export function createDevDrillRecoveryScenarios({
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0,
-          '双环境事实只在交付运行总览展示，演练子页不应重复常驻'
+          '双环境事实只在交付运维总览展示，演练子页不应重复常驻'
         )
         assert.equal(await page.getByRole('table', { name: '演练清单' }).isVisible(), false)
         await verifySlidingMotion(page, assert, '.erp-dev-recovery-page .erp-dev-delivery-taskbar', 1)

@@ -89,11 +89,11 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 
 该接口仅反映当前工作区逻辑与登记开发库，不证明其他环境或旧运行制品的实际权限。
 
-工程规范与 Skill 使用固定 `GET /__dev/api/project-skills`，只读取当前仓库 `.agents/skills/`，不接受查询参数、请求体或写方法。
+项目 Skill 使用固定 `GET /__dev/api/project-skills`，只读取当前仓库 `.agents/skills/`，不接受查询参数、请求体或写方法。
 
 `devProjectSkillsPlugin.mjs` 复用 `skill-health.mjs` 的 validator 和 metadata parser，返回适用范围、入口 Markdown 引用、正文提及的项目 Skill 以及带时间的结构诊断；只在打开页面或显式刷新时检查。它不执行 Skill、命令或业务写入，也不采集会话、调用次数或全局 Skill。
 
-源文件继续在仓库维护，正文阅读复用开发文档查看器。
+源文件继续在仓库维护，正文阅读复用项目文档查看器。
 
 `local` 仅接受真实 loopback 连接和 loopback Host；其他模式可接受符合各自认证要求的私网来源，数字 Host 必须与实际监听 IPv4 地址和端口一致。内网 HTTPS 域名使用下述显式代理配置；其他 DNS 别名、公网、伪造 Host 和跨站元数据均拒绝。POST 继续要求精确同源 Origin、CSRF、固定动作、原有确认、状态和资源预检；直接访问不取消这些控制。
 

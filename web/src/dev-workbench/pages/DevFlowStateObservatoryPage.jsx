@@ -35,7 +35,7 @@ import { AUTH_SESSION_CHANGED_EVENT, getToken } from '@/common/auth/auth'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
-import { DEV_BUSINESS_CHAIN_AUDIT_ROUTE } from '../config/devRoutes.mjs'
+import { DEV_BUSINESS_CHAIN_AUDIT_ROUTE, DEV_PAGE_TITLE_BY_ROUTE, DEV_STATUS_FLOWS_ROUTE } from '../config/devRoutes.mjs'
 import { buildDevBusinessChainProjection } from '../config/devBusinessChainProjection.mjs'
 import { buildDevBusinessChainCustomerReview } from '../config/devBusinessChainCustomerReview.mjs'
 import { DEV_CUSTOMER_QUERY_KEY } from '../config/devCustomerScope.mjs'
@@ -1047,14 +1047,14 @@ export default function DevFlowStateObservatoryPage() {
       <header className="erp-dev-flow-header">
         <Space align="center">
           <PartitionOutlined className="erp-dev-flow-header__icon" />
-          <Title level={1}>业务链观察</Title>
-          <Link to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}>查看链路实测</Link>
+          <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_STATUS_FLOWS_ROUTE]}</Title>
+          <Link to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}>查看链路实测报告</Link>
         </Space>
         <section className="erp-dev-flow-nav erp-dev-flow-workspace-nav">
           <DevTaskNav
             compact
             level="primary"
-            ariaLabel="业务链观察方式"
+            ariaLabel="业务链路方式"
             items={PRIMARY_VIEWS}
             value={['tracking', 'workflow', 'runtime'].includes(view) ? 'tracking' : 'chain'}
             disabled={catalogState.status === 'loading'}

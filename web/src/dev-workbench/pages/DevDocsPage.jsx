@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Empty, Space, Spin, Tag, Tooltip, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { DEV_PAGE_TITLE_BY_ROUTE, DEV_DOCS_ROUTE } from '../config/devRoutes.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
@@ -928,7 +929,7 @@ export default function DevDocsPage() {
           <Space align="center" size={10} wrap>
             <BookOutlined className="erp-dev-docs-header__icon" />
             <Title level={1} className="erp-dev-docs-title">
-              开发文档
+              {DEV_PAGE_TITLE_BY_ROUTE[DEV_DOCS_ROUTE]}
             </Title>
           </Space>
           <Button
@@ -950,11 +951,11 @@ export default function DevDocsPage() {
             </Paragraph>
           </details>
         </div>
-        <div className="erp-dev-docs-controls" role="group" aria-label="开发文档检索">
+        <div className="erp-dev-docs-controls" role="group" aria-label="项目文档检索">
           <div className="erp-dev-docs-lifecycle">
             <Segmented
               size="small"
-              aria-label="开发文档层级"
+              aria-label="项目文档层级"
               className="erp-dev-docs-lifecycle__control"
               options={LIFECYCLE_OPTIONS}
               value={lifecycle}
@@ -963,9 +964,9 @@ export default function DevDocsPage() {
           </div>
           <SearchInput
             allowClear
-            aria-label="搜索开发文档"
+            aria-label="搜索项目文档"
             value={keyword}
-            placeholder="搜索开发文档"
+            placeholder="搜索项目文档"
             searchHint={
               isTitleOnlySearch
                 ? '当前仅搜索文档标题；切换“全部”可搜索路径和正文'
@@ -977,7 +978,7 @@ export default function DevDocsPage() {
           <div className="erp-dev-docs-search-scope">
             <Segmented
               size="small"
-              aria-label="开发文档搜索范围"
+              aria-label="项目文档搜索范围"
               className="erp-dev-docs-search-scope__control"
               options={SEARCH_SCOPE_OPTIONS}
               value={searchScope}
@@ -1172,7 +1173,7 @@ export default function DevDocsPage() {
                   </Button>
                 </Space>
               </div>
-              <div ref={treeRef} className="erp-dev-docs-tree" aria-label="开发文档目录树">
+              <div ref={treeRef} className="erp-dev-docs-tree" aria-label="项目文档目录树">
                 {docTree.map((node) => (
                   <DevDocsTreeNode
                     key={node.key}

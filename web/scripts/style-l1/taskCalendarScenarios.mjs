@@ -453,7 +453,7 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
     verify: async (page) => {
-      await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+      await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       await frame.locator('[data-action="board-mode"][data-value="todo"]').click()
       const desktopSwitch = frame.locator('.task-calendar-switch[data-device="desktop"]')

@@ -1341,7 +1341,7 @@ test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', 
 test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界', () => {
   assert.match(testingPageSource, /const VIEW_CLOSEOUT = 'closeout'/)
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
-  assert.match(testingPageSource, /改动验证/)
+  assert.match(testingPageSource, /DEV_PAGE_TITLE_BY_ROUTE\[DEV_TESTING_ROUTE\]/)
   assert.match(testingPageSource, /\{ label: '本轮验证', value: VIEW_TIERS \}/)
   assert.doesNotMatch(
     testingPageSource,

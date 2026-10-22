@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
-  DEV_PRODUCT_ENGINEERING_VIEWS,
+  DEV_DEVELOPMENT_RESOURCES_VIEWS,
   DEV_PROJECT_GRAPH_EXAMPLES,
   DEV_PROJECT_GRAPH_GROUPS,
   DEV_PROJECT_GRAPH_MODELS,
@@ -10,7 +10,7 @@ import {
 import { DEV_SECONDARY_NAV_ITEMS } from './devRoutes.mjs'
 
 test('project graph catalogue distinguishes direction and hierarchy and assigns every example once', () => {
-  assert.deepEqual(DEV_PRODUCT_ENGINEERING_VIEWS, [
+  assert.deepEqual(DEV_DEVELOPMENT_RESOURCES_VIEWS, [
     { value: 'tools', label: '工具清单' },
     { value: 'relationships', label: '项目图视角' },
   ])

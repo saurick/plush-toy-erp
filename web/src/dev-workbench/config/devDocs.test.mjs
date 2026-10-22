@@ -7,6 +7,7 @@ import { createServer as createHTTPServer } from 'node:http'
 import test from 'node:test'
 import { build, createServer } from 'vite'
 import { createDevDocsMetadataPlugin } from '../../../vite.docs.mjs'
+import { extractMarkdownHeadings } from '../../common/components/markdown/anchors.mjs'
 
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
@@ -265,7 +266,7 @@ test('devDocs: 合并后的专题和操作说明仍能在查看器内查阅', ()
   )
 })
 
-test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registry', () => {
+test('devDocs: 当前工作区项目文档列表不恢复产品内文档 registry', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
     '../../../../AGENTS.md': '# 协作约定',
@@ -461,7 +462,7 @@ test('devDocs: 支持在全部与仅标题范围之间筛选', () => {
 })
 
 test('devDocs: 搜索范围切换有明确名称和无结果恢复提示', () => {
-  assert.match(devDocsPageSource, /aria-label="开发文档层级"/u)
+  assert.match(devDocsPageSource, /aria-label="项目文档层级"/u)
   assert.match(
     devDocsPageSource,
     /\{ label: '当前', value: DEV_DOCS_LIFECYCLE_CURRENT \}/u
@@ -474,7 +475,7 @@ test('devDocs: 搜索范围切换有明确名称和无结果恢复提示', () =>
     devDocsPageSource,
     /\{ label: '历史', value: DEV_DOCS_LIFECYCLE_ARCHIVE \}/u
   )
-  assert.match(devDocsPageSource, /aria-label="开发文档搜索范围"/u)
+  assert.match(devDocsPageSource, /aria-label="项目文档搜索范围"/u)
   assert.match(
     devDocsPageSource,
     /\{ label: '全部', value: DEV_DOCS_SEARCH_SCOPE_ALL \}/u
@@ -572,4 +573,32 @@ test('devDocs: 支持刷新后恢复目录展开状态', () => {
     ),
     ['dir:docs', 'dir:docs/product']
   )
+})
+
+
+test('devDocs: workbench name changes preserve bookmarked section anchors', () => {
+  const sources = [
+    ['docs/engineering/研发效能工作台与CI-CD设计.md', [
+      ['产品工程入口-__devproduct-engineering', '产品与业务入口'],
+      ['产品内核-__devproduct-core', '产品能力'],
+      ['工程规范与-skill-__devproject-skills', '项目 Skill'],
+      ['开发文档-__devdocs', '项目文档'],
+      ['ui-交互设计-__devui-design', '交互设计'],
+      ['链路实测-__devbusiness-chain-audit', '链路实测报告'],
+      ['交付运行总览-__devdelivery', '交付运维总览'],
+    ]],
+    ['docs/architecture/业务链与运行轨迹边界.md', [
+      ['业务链观察的页面合同', '业务链路的页面合同'],
+    ]],
+    ['web/src/dev-workbench/pages/delivery/README.md', [
+      ['交付运行页面', '交付运维页面'],
+    ]],
+  ]
+  for (const [source, bookmarks] of sources) {
+    const headings = extractMarkdownHeadings(readFileSync(path.join(repoRoot, source), 'utf8'), [1, 2, 3, 4, 5, 6])
+    for (const [anchor, title] of bookmarks) {
+      const heading = headings.find((item) => item.aliases.includes(anchor))
+      assert(heading?.title.startsWith(title), `${source}#${anchor} must retain the renamed heading`)
+    }
+  }
 })

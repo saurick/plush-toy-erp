@@ -43,7 +43,7 @@ export function DeliveryWorkspace({ items, scope }) {
   return (
     <div className="erp-dev-delivery-home">
       {scope.status === 'ready' ? (
-        <section className="erp-dev-delivery-jobs" aria-label="交付运行任务">
+        <section className="erp-dev-delivery-jobs" aria-label="交付运维任务">
           {taskGroups.map((group) => (
             <div className="erp-dev-delivery-job-group" key={group.title}>
               <h2>{group.title}</h2>

@@ -9,6 +9,7 @@ import {
   DEV_DATABASE_MIGRATION_ROUTE,
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DELIVERY_ROUTE,
+  DEV_DEVELOPMENT_RESOURCES_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_PROJECT_SKILLS_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
@@ -53,6 +54,10 @@ const DevHubPage = createDevLazyRoute(
 )
 const DevProductEngineeringPage = createDevLazyRoute(
   DEV_PRODUCT_ENGINEERING_ROUTE,
+  importDevWorkbenchAreaPage
+)
+const DevDevelopmentResourcesPage = createDevLazyRoute(
+  DEV_DEVELOPMENT_RESOURCES_ROUTE,
   importDevWorkbenchAreaPage
 )
 const DevQualityPage = createDevLazyRoute(
@@ -132,6 +137,15 @@ const DevDrillRecoveryPage = createDevLazyRoute(
   () => import('./pages/DevDrillRecoveryPage.jsx')
 )
 
+function DevProductEngineeringEntry() {
+  const { search, hash } = useLocation()
+  // 既有项目图深链保留全部选择，在新的责任区继续查看。
+  if (new URLSearchParams(search).get('view') === 'relationships') {
+    return <Navigate to={{ pathname: DEV_DEVELOPMENT_RESOURCES_ROUTE, search, hash }} replace />
+  }
+  return <DevProductEngineeringPage areaKey={DEV_WORKBENCH_AREA_KEYS.productEngineering} />
+}
+
 function DevRouteLoadingFallback({ title = '正在加载研发效能工作台' }) {
   return (
     <Loading
@@ -187,9 +201,13 @@ export default function DevWorkbenchRoutes() {
           <Route index element={<DevHubPage />} />
           <Route
             path="product-engineering"
+            element={<DevProductEngineeringEntry />}
+          />
+          <Route
+            path="development-resources"
             element={
-              <DevProductEngineeringPage
-                areaKey={DEV_WORKBENCH_AREA_KEYS.productEngineering}
+              <DevDevelopmentResourcesPage
+                areaKey={DEV_WORKBENCH_AREA_KEYS.developmentResources}
               />
             }
           />

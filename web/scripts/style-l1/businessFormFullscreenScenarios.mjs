@@ -150,7 +150,7 @@ export function createBusinessFormFullscreenScenarios({ assert, outputDir }, sce
       path: '/__dev/ui-design',
       viewport: { width: 1920, height: 1080 },
       verify: async page => {
-        await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/u }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame.getByRole('button', { name: '业务汇总', exact: true }).waitFor()

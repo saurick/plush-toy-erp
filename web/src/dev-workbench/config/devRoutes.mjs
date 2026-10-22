@@ -2,6 +2,7 @@ export const DEV_WORKBENCH_FAVICON_HREF = new URL('../assets/favicon-dev.svg?no-
 
 export const DEV_HUB_ROUTE = '/__dev'
 export const DEV_PRODUCT_ENGINEERING_ROUTE = '/__dev/product-engineering'
+export const DEV_DEVELOPMENT_RESOURCES_ROUTE = '/__dev/development-resources'
 export const DEV_PRODUCT_CORE_ROUTE = '/__dev/product-core'
 export const DEV_INTEGRATION_ROUTE = '/__dev/integration'
 export const DEV_PERMISSION_RELATIONSHIPS_ROUTE =
@@ -27,6 +28,7 @@ export const DEV_DRILL_RECOVERY_ROUTE = '/__dev/drill-recovery'
 export const DEV_WORKBENCH_AREA_KEYS = Object.freeze({
   overview: 'overview',
   productEngineering: 'product-engineering',
+  developmentResources: 'development-resources',
   quality: 'quality',
   delivery: 'delivery',
 })
@@ -43,19 +45,25 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_ENGINEERING_ROUTE,
-    label: '产品工程',
-    description: '内核、权限、业务链与开发文档',
+    label: '产品与业务',
+    description: '产品能力、业务链路、权限与交互设计',
+  }),
+  Object.freeze({
+    key: DEV_WORKBENCH_AREA_KEYS.developmentResources,
+    route: DEV_DEVELOPMENT_RESOURCES_ROUTE,
+    label: '开发资源',
+    description: '接口、项目文档、Skill 与项目关系图',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_QUALITY_ROUTE,
-    label: '质量验证',
-    description: '改动验证、测试数据与证据',
+    label: '测试验证',
+    description: '测试执行、实测报告、质量门禁与测试数据',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.delivery,
     route: DEV_DELIVERY_ROUTE,
-    label: '交付运行',
+    label: '交付运维',
     description: '配置、迁移、发布与恢复',
   }),
 ])
@@ -65,7 +73,13 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     key: 'product-core',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_CORE_ROUTE,
-    label: '产品内核',
+    label: '产品能力',
+  }),
+  Object.freeze({
+    key: 'status-flows',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_STATUS_FLOWS_ROUTE,
+    label: '业务链路',
   }),
   Object.freeze({
     key: 'permission-relationships',
@@ -74,14 +88,14 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     label: '权限关系',
   }),
   Object.freeze({
-    key: 'status-flows',
+    key: 'ui-design',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    route: DEV_STATUS_FLOWS_ROUTE,
-    label: '业务链观察',
+    route: DEV_UI_DESIGN_ROUTE,
+    label: '交互设计',
   }),
   Object.freeze({
     key: 'integration',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
     route: DEV_INTEGRATION_ROUTE,
     label: '接口与集成',
   }),
@@ -94,33 +108,27 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'docs',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
     route: DEV_DOCS_ROUTE,
-    label: '开发文档',
+    label: '项目文档',
   }),
   Object.freeze({
     key: 'project-skills',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
     route: DEV_PROJECT_SKILLS_ROUTE,
-    label: '工程规范与 Skill',
-  }),
-  Object.freeze({
-    key: 'ui-design',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    route: DEV_UI_DESIGN_ROUTE,
-    label: 'UI 交互设计',
+    label: '项目 Skill',
   }),
   Object.freeze({
     key: 'testing',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_TESTING_ROUTE,
-    label: '改动验证',
+    label: '测试执行',
   }),
   Object.freeze({
     key: 'business-chain-audit',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
-    label: '链路实测',
+    label: '链路实测报告',
   }),
   Object.freeze({
     key: 'quality-gates',

@@ -100,6 +100,7 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-version-center-tabs-pagination-desktop",
   "dev-page-overview-desktop-light",
   "dev-page-product-engineering-desktop-light",
+  "dev-page-development-resources-desktop-light",
   "dev-page-integration-desktop-light",
   "dev-page-quality-desktop-light",
   "dev-page-delivery-desktop-light",
@@ -687,7 +688,7 @@ function devBrowserScenarioNames(file) {
     ],
     [/ProductCore|product-core/u, ["dev-page-product-core-desktop-light"]],
     [/DevIntegration|devIntegration|dev-integration/u, ["dev-page-integration-desktop-light"]],
-    [/DevProjectGraphView|DevProjectRelationships|devProjectGraph|devRelationshipPerspectives/u, ["dev-page-product-engineering-desktop-light", "dev-page-integration-desktop-light"]],
+    [/DevProjectGraphView|DevProjectRelationships|devProjectGraph|devRelationshipPerspectives/u, ["dev-page-development-resources-desktop-light", "dev-page-integration-desktop-light"]],
     [
       /PermissionRelationship|permission-relationships/u,
       ["dev-page-permission-relationships-desktop-light"],
@@ -716,6 +717,7 @@ function devBrowserScenarioNames(file) {
       /DevWorkbenchArea|dev-product-engineering-workflow/u,
       [
         "dev-page-product-engineering-desktop-light",
+        "dev-page-development-resources-desktop-light",
         "dev-page-quality-desktop-light",
         "dev-page-delivery-desktop-light",
       ],

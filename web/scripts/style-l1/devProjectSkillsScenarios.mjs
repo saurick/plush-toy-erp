@@ -52,7 +52,7 @@ export function createDevProjectSkillsScenarios({
         /Failed to load resource: the server responded with a status of 503/u,
       ],
       verify: async (page) => {
-        await expectHeading(page, '工程规范与 Skill')
+        await expectHeading(page, '项目 Skill')
         await page.getByText('结构检查通过', { exact: true }).waitFor()
         const disclosures = page.locator('.erp-dev-skills__disclosure')
         assert.deepEqual(
@@ -264,7 +264,7 @@ export function createDevProjectSkillsScenarios({
           .getByRole('button', { name: '重新读取', exact: true })
           .click()
         await page.getByText('结构检查通过', { exact: true }).waitFor()
-        await assertNoHorizontalOverflow(page, '工程规范与 Skill')
+        await assertNoHorizontalOverflow(page, '项目 Skill')
       },
     },
   ]

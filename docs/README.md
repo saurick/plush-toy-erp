@@ -54,6 +54,6 @@ README 只管导航，专题说明规则和操作，`progress.md` 与归档保�
 
 员工从 `/erp/help-center` 阅读操作图解和获准的三册手册；书目、正文、搜索与下载均受当前账号权限限制。内容来源、在线纠错、企业补充和导出见[手册维护](manuals/README.md)。业务页的“这页怎么用”继续复用 `businessUsabilityCatalog.mjs`。
 
-开发文档从 `/__dev/docs` 阅读当前工作区 Markdown，新访客先进入本页；可搜索、按目录查找、置顶和跳转章节。“当前”“评审与参考”“历史”分开查看，正文按需加载。原型、归档和过程记录不证明当前实现。
+项目文档从 `/__dev/docs` 阅读当前工作区 Markdown，新访客先进入本页；可搜索、按目录查找、置顶和跳转章节。“当前”“评审与参考”“历史”分开查看，正文按需加载。原型、归档和过程记录不证明当前实现。
 
 普通仓库专题保留在仓库与 DEV 查看器；不恢复旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness`、`/erp/mobile-workbenches`、`/erp/roles/*` 路由或前端 `docRegistry`。受控三册只开放固定书目与章节，不开放任意仓库文件读取。

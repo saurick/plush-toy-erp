@@ -18,6 +18,7 @@ import {
 } from './devHub.mjs'
 import {
   DEV_SECONDARY_NAV_ITEMS,
+  DEV_PAGE_TITLE_BY_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
   DEV_WORKSPACE_NAV_ITEMS,
   getDevSecondaryNavItems,
@@ -78,7 +79,7 @@ test('devHub: route and dev gate stay dev-only', () => {
 test('devHub: every dev route exposes a distinct browser title', () => {
   assert.equal(
     resolveDevPageTitle('/__dev/product-core', 'Plush Toy ERP'),
-    '产品内核 · Plush Toy ERP'
+    '产品能力 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/permission-relationships', 'Plush Toy ERP'),
@@ -87,7 +88,7 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   assert.equal(resolveDevPageTitle('/__dev/integration', 'Plush Toy ERP'), '接口与集成 · Plush Toy ERP')
   assert.equal(
     resolveDevPageTitle('/__dev/testing', 'Plush Toy ERP'),
-    '改动验证 · Plush Toy ERP'
+    '测试执行 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/erp/dashboard', 'Plush Toy ERP'),
@@ -95,11 +96,11 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   )
   assert.equal(
     resolveDevPageTitle('/__dev/docs/', 'Plush Toy ERP'),
-    '开发文档 · Plush Toy ERP'
+    '项目文档 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/status-flows', 'Plush Toy ERP'),
-    '业务链观察 · Plush Toy ERP'
+    '业务链路 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/business-usability', 'Plush Toy ERP'),
@@ -107,7 +108,7 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   )
   assert.equal(
     resolveDevPageTitle('/__dev/quality', 'Plush Toy ERP'),
-    '质量验证 · Plush Toy ERP'
+    '测试验证 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/quality-gates', 'Plush Toy ERP'),
@@ -135,33 +136,34 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   )
 })
 
-test('devHub: shared workspace navigation exposes exactly four primary areas and keeps all deep links', () => {
+test('devHub: shared workspace navigation exposes overview and four responsibility areas and keeps all deep links', () => {
   assert.deepEqual(
     DEV_WORKSPACE_NAV_ITEMS.map((item) => item.route),
     [
       '/__dev',
       '/__dev/product-engineering',
+      '/__dev/development-resources',
       '/__dev/quality',
       '/__dev/delivery',
     ]
   )
   assert.deepEqual(
     DEV_WORKSPACE_NAV_ITEMS.map((item) => item.label),
-    ['总览', '产品工程', '质量验证', '交付运行']
+    ['总览', '产品与业务', '开发资源', '测试验证', '交付运维']
   )
   assert.deepEqual(
     DEV_SECONDARY_NAV_ITEMS.map((item) => [item.areaKey, item.label]),
     [
-      ['product-engineering', '产品内核'],
+      ['product-engineering', '产品能力'],
+      ['product-engineering', '业务链路'],
       ['product-engineering', '权限关系'],
-      ['product-engineering', '业务链观察'],
-      ['product-engineering', '接口与集成'],
+      ['product-engineering', '交互设计'],
+      ['development-resources', '接口与集成'],
       ['quality', '页面说明检查'],
-      ['product-engineering', '开发文档'],
-      ['product-engineering', '工程规范与 Skill'],
-      ['product-engineering', 'UI 交互设计'],
-      ['quality', '改动验证'],
-      ['quality', '链路实测'],
+      ['development-resources', '项目文档'],
+      ['development-resources', '项目 Skill'],
+      ['quality', '测试执行'],
+      ['quality', '链路实测报告'],
       ['quality', '质量门禁'],
       ['quality', '测试数据'],
       ['delivery', '客户配置'],
@@ -211,13 +213,13 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       (item) => item.route === '/__dev/business-usability'
     ),
     false,
-    '页面说明检查保留登记和深链，通过改动验证按需进入'
+    '页面说明检查保留登记和深链，通过测试执行按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 7)
-  assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'product-engineering')
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 4)
+  assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'development-resources')
   assert.equal(getDevSecondaryNavItems('quality').length, 4)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/business-chain-audit'), 'quality')
-  assert.equal(resolveDevPageTitle('/__dev/business-chain-audit', 'ERP'), '链路实测 · ERP')
+  assert.equal(resolveDevPageTitle('/__dev/business-chain-audit', 'ERP'), '链路实测报告 · ERP')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/quality-gates'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/data-preparation'), 'quality')
@@ -247,15 +249,12 @@ test('devHub: quality area offers the change validation path and registered tool
   assert.match(devWorkbenchAreaPageSource, /DEV_TESTING_ROUTE/u)
 })
 
-test('devHub: product engineering keeps registered tools and a peer project graph view', () => {
+test('devHub: area tools follow navigation order and development resources own project graphs', () => {
   assert.match(
     devWorkbenchAreaPageSource,
     /getDevSecondaryNavItems\(areaKey\)/u
   )
-  assert.match(
-    devWorkbenchAreaPageSource,
-    /item\.areaKey === areaKey && visibleRoutes\.has\(item\.route\)/u
-  )
+  assert.match(devWorkbenchAreaPageSource, /DEV_HUB_ITEMS\.find\(\(item\) => item\.key === entry\.key\)/u)
   assert.match(devWorkbenchAreaPageSource, /<DevToolTable/u)
   assert.match(
     devWorkbenchAreaPageSource,
@@ -263,9 +262,9 @@ test('devHub: product engineering keeps registered tools and a peer project grap
   )
   assert.match(
     devWorkbenchAreaPageSource,
-    /产品工程查看方式/u
+    /开发资源查看方式/u
   )
-  assert.match(devWorkbenchAreaPageSource, /DEV_PRODUCT_ENGINEERING_VIEWS/u)
+  assert.match(devWorkbenchAreaPageSource, /DEV_DEVELOPMENT_RESOURCES_VIEWS/u)
   assert.match(devWorkbenchAreaPageSource, /<DevProjectRelationships/u)
   assert.match(devToolTableSource, /DEV_PAGE_TITLE_BY_ROUTE\[item.route\]/u)
   assert.match(devToolTableSource, /<th scope="col">用来做什么<\/th>/u)
@@ -274,6 +273,7 @@ test('devHub: product engineering keeps registered tools and a peer project grap
 test('devHub: tools share one area registry without duplicate overview stage inventories', () => {
   const toolAreaKeys = [
     DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    DEV_WORKBENCH_AREA_KEYS.developmentResources,
     DEV_WORKBENCH_AREA_KEYS.quality,
     DEV_WORKBENCH_AREA_KEYS.delivery,
   ]
@@ -385,8 +385,9 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     DEV_HUB_ITEMS.map((item) => item.route),
     [
       '/__dev/product-core',
-      '/__dev/permission-relationships',
       '/__dev/status-flows',
+      '/__dev/permission-relationships',
+      '/__dev/ui-design',
       '/__dev/integration',
       '/__dev/business-usability',
       '/__dev/docs',
@@ -395,7 +396,6 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/business-chain-audit',
       '/__dev/quality-gates',
       '/__dev/data-preparation',
-      '/__dev/ui-design',
       '/__dev/customer-config',
       '/__dev/database-migration',
       '/__dev/version-center',
@@ -423,7 +423,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   const productCoreItem = DEV_HUB_ITEMS.find(
     (item) => item.key === 'product-core'
   )
-  assert.equal(productCoreItem?.title, '产品内核 / Product Core')
+  assert.equal(productCoreItem?.title, '产品能力 / Product Capabilities')
   assert.equal(productCoreItem?.source, 'docs/product/产品能力进度台账.md')
   assert.match(productCoreItem?.truthSource || '', /唯一产品能力进度台账/u)
   assert.match(
@@ -560,7 +560,7 @@ test('devHub: summary records dev-only boundary', () => {
 
 test('devHub: filters by title, group, source and route', () => {
   assert.deepEqual(
-    filterDevHubItems(DEV_HUB_ITEMS, '改动验证').map((item) => item.key),
+    filterDevHubItems(DEV_HUB_ITEMS, '测试执行').map((item) => item.key),
     ['testing']
   )
   assert.deepEqual(
@@ -588,11 +588,11 @@ test('devHub: filters by governance group and keyword together', () => {
     [
       'all',
       '产品治理 / Product Governance',
-      '权限治理 / Access Governance',
       '业务链治理 / Business Chain Governance',
+      '权限治理 / Access Governance',
+      '产品设计 / Product Design',
       '验证治理 / QA',
       '文档治理 / Docs',
-      '产品设计 / Product Design',
       '客户治理 / Customer Governance',
       '交付治理 / Delivery',
     ]
@@ -660,4 +660,22 @@ test('devHub: builds pinned items in stored route order', () => {
     ]).map((item) => item.key),
     ['ui-design', 'docs']
   )
+})
+
+
+test('devHub: every tool has a unique owner and old name searches retain their destination', () => {
+  assert.equal(new Set(DEV_SECONDARY_NAV_ITEMS.map((item) => item.route)).size, DEV_SECONDARY_NAV_ITEMS.length)
+  for (const navigation of DEV_SECONDARY_NAV_ITEMS) {
+    const item = DEV_HUB_ITEMS.find((entry) => entry.key === navigation.key)
+    assert.equal(item.route, navigation.route)
+    assert.equal(item.areaKey, navigation.areaKey)
+    assert.equal(item.title.split(' / ')[0], navigation.label)
+    assert.equal(DEV_PAGE_TITLE_BY_ROUTE[item.route], navigation.label)
+    for (const keyword of item.searchKeywords || []) {
+      assert(filterDevHubItems(DEV_HUB_ITEMS, keyword).some((entry) => entry.route === item.route))
+    }
+  }
+  assert.deepEqual(getDevSecondaryNavItems('development-resources').map((item) => item.route), [
+    '/__dev/integration', '/__dev/docs', '/__dev/project-skills',
+  ])
 })

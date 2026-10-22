@@ -11,7 +11,7 @@ import {
 } from './devRoutes.mjs'
 import { RpcTransport } from '../../common/consts/rpcMethods.generated.mjs'
 
-export const DEV_PRODUCT_ENGINEERING_VIEWS = Object.freeze([
+export const DEV_DEVELOPMENT_RESOURCES_VIEWS = Object.freeze([
   { value: 'tools', label: '工具清单' },
   { value: 'relationships', label: '项目图视角' },
 ])
@@ -36,7 +36,7 @@ export const DEV_PROJECT_GRAPH_EXAMPLES = Object.freeze({
     directed: true,
     direction: 'LR',
     caption: '实线表示职责与约束，虚线表示验证、证据关联；这是项目关系的定向投影。',
-    destinations: [{ label: '产品内核', route: DEV_PRODUCT_CORE_ROUTE }, { label: '工程规范与 Skill', route: DEV_PROJECT_SKILLS_ROUTE }],
+    destinations: [{ label: '产品能力', route: DEV_PRODUCT_CORE_ROUTE }, { label: '项目 Skill', route: DEV_PROJECT_SKILLS_ROUTE }],
     nodes: [
       { id: 'p', label: '产品结构与治理', description: '组织能力范围与正式依据；目录归属、规则引用和能力状态分别核对。' },
       { id: 'a', label: '权限与责任', description: '约束访问、业务动作和办理责任；图示不代替实际账号的有效权限。' },
@@ -216,16 +216,16 @@ export const DEV_PROJECT_GRAPH_EXAMPLES = Object.freeze({
     directed: true,
     direction: 'TD',
     caption: '只展示层级归属；叠加跨目录引用后，整体可能成为有汇合关系的 DAG。',
-    destinations: [{ label: '产品内核', route: DEV_PRODUCT_CORE_ROUTE }, { label: '工程规范与 Skill', route: DEV_PROJECT_SKILLS_ROUTE }],
+    destinations: [{ label: '产品能力', route: DEV_PRODUCT_CORE_ROUTE }, { label: '项目 Skill', route: DEV_PROJECT_SKILLS_ROUTE }],
     nodes: [
       { id: 'project', label: '项目', description: '目录总入口；本图用于定位，不推断产品能力完成状态。' },
-      { id: 'core', label: '产品内核', description: '产品能力与领域边界归入内核目录。' },
+      { id: 'core', label: '产品能力', description: '产品能力与领域边界归入内核目录。' },
       { id: 'customer', label: '客户配置', description: '客户差异以配置、模板和扩展等受控方式承载。' },
       { id: 'engineering', label: '工程交付', description: '汇集质量与交付职责，具体执行仍由正式工具负责。' },
       { id: 'master', label: '主数据', description: '主数据是独立业务真源，在此仅展示目录归属。' },
       { id: 'facts', label: '业务事实', description: '事实与协同分层；本节点不表示事实已生效。' },
-      { id: 'qa', label: '质量验证', description: '验证范围可以引用产品内核等其他目录的依据。' },
-      { id: 'delivery', label: '交付运行', description: '按正式版本、部署与恢复证据核对交付。' },
+      { id: 'qa', label: '测试验证', description: '验证范围可以引用产品能力等其他目录的依据。' },
+      { id: 'delivery', label: '交付运维', description: '按正式版本、部署与恢复证据核对交付。' },
     ],
     edges: [
       { from: 'project', to: 'core' },
@@ -243,14 +243,14 @@ export const DEV_PROJECT_GRAPH_EXAMPLES = Object.freeze({
     directed: true,
     direction: 'TD',
     caption: '两棵独立目录树构成森林；不为它们强加一个虚构的共同父节点。',
-    destinations: [{ label: '开发文档', route: DEV_DOCS_ROUTE }],
+    destinations: [{ label: '项目文档', route: DEV_DOCS_ROUTE }],
     nodes: [
       { id: 'product', label: '产品目录', description: '产品主题的目录根，与工程目录根并列。' },
       { id: 'engineering', label: '工程目录', description: '工程主题的目录根；没有与产品目录的归属连线。' },
-      { id: 'core', label: '产品内核', description: '产品主题下的能力边界。' },
+      { id: 'core', label: '产品能力', description: '产品主题下的能力边界。' },
       { id: 'customer', label: '客户配置', description: '产品主题下的客户差异资料。' },
-      { id: 'qa', label: '质量验证', description: '工程主题下的验证依据。' },
-      { id: 'delivery', label: '交付运行', description: '工程主题下的交付依据。' },
+      { id: 'qa', label: '测试验证', description: '工程主题下的验证依据。' },
+      { id: 'delivery', label: '交付运维', description: '工程主题下的交付依据。' },
     ],
     edges: [
       { from: 'product', to: 'core' },

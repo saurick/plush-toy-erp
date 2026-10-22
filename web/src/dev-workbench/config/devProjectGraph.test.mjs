@@ -32,7 +32,7 @@ test('project graph distinguishes rooted trees, forests and cross-directory refe
   assert.equal(referenced.classification.hasCycle, false)
   assert.equal(referenced.classification.isHierarchy, false)
   assert.equal(referenced.classification.label, '有向 · 无环（DAG）')
-  assert.match(getProjectGraphNodeContext(referenced, 'master').relationships, /产品内核、质量验证/u)
+  assert.match(getProjectGraphNodeContext(referenced, 'master').relationships, /产品能力、测试验证/u)
   assert.equal(buildProjectGraph('tree').edges.length, DEV_PROJECT_GRAPH_EXAMPLES.tree.edges.length)
 })
 

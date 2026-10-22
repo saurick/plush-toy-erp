@@ -266,11 +266,11 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     )
   }
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.getByRole('textbox', { name: '搜索开发文档' }).fill('没有该标题 docs-governance')
+  await page.getByRole('textbox', { name: '搜索项目文档' }).fill('没有该标题 docs-governance')
   await page.getByRole('button', { name: '文档首页', exact: true }).click()
   const home = page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '文档入口与治理 / docs Guide', exact: true })
   await home.waitFor()
-  assert.equal(await page.getByRole('textbox', { name: '搜索开发文档' }).inputValue(), '')
+  assert.equal(await page.getByRole('textbox', { name: '搜索项目文档' }).inputValue(), '')
   assert.equal(new URL(page.url()).searchParams.get('path'), 'docs/README.md')
   await page.reload()
   await home.waitFor()

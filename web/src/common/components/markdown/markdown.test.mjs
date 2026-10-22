@@ -35,6 +35,7 @@ test('Markdown renders GitHub-compatible heading ids and safe explicit aliases',
 
 <a id="stable-explicit-anchor"></a>
 <a name="stable-name-anchor"></a>
+<a id="产品工程入口-__devproduct-engineering"></a>
 
 #### Custom Target
 
@@ -64,6 +65,7 @@ test('Markdown renders GitHub-compatible heading ids and safe explicit aliases',
     container.querySelectorAll('[id="stable-name-anchor"]').length,
     1
   )
+  assert.equal(findDevDocsMarkdownAnchor(container, '产品工程入口-__devproduct-engineering')?.tagName, 'SPAN')
   assert.equal(container.querySelector('#fenced-anchor'), null)
   assert.equal(container.querySelector('#unsafe-anchor'), null)
   assert.equal(container.querySelector('script'), null)

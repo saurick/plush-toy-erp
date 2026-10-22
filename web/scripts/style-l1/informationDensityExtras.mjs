@@ -59,7 +59,7 @@ export function createInformationDensityExtras(deps) {
       viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2,
       verify: async (page) => {
         page.setDefaultTimeout(15000)
-        await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/u }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await openUIDesignMobileTasks(frame)
@@ -93,7 +93,7 @@ export function createInformationDensityExtras(deps) {
       viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2,
       verify: async (page) => {
         page.setDefaultTimeout(15000)
-        await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/u }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame.locator('button[data-action="open-task"][data-id="T06"]').waitFor()

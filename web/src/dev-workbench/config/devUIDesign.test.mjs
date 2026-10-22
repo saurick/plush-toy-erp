@@ -487,5 +487,5 @@ test('design does not reach the formal ERP routes or production import graph', (
   assert.match(routes, /path="ui-design"/)
   assert.match(routes, /DevUIDesignPage/)
   assert.doesNotMatch(routes, /path="prototypes"/)
-  assert.match(read('web/src/dev-workbench/config/devHub.mjs'), /UI 交互设计/)
+  assert.match(read('web/src/dev-workbench/config/devHub.mjs'), /交互设计/)
 })

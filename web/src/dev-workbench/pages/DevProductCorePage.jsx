@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react'
 import { AppstoreOutlined, ArrowLeftOutlined, FileTextOutlined, RightOutlined } from '@ant-design/icons'
 import { Alert, Button, Drawer, Empty, Tag, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PRODUCT_CORE_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import DevPageNav from '../components/DevPageNav.jsx'
@@ -165,7 +166,7 @@ export default function DevProductCorePage() {
             <AppstoreOutlined />
           </span>
           <div>
-            <Title level={1}>产品内核</Title>
+            <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_PRODUCT_CORE_ROUTE]}</Title>
           </div>
         </div>
       </header>
@@ -175,7 +176,7 @@ export default function DevProductCorePage() {
           <div
             className="erp-dev-product-core-filters"
             role="group"
-            aria-label="按产品内核归属筛选"
+            aria-label="按产品能力归属筛选"
           >
             {filterOptions.map((option) => {
               const isActive = membership === option.key
@@ -194,7 +195,7 @@ export default function DevProductCorePage() {
           <div className="erp-dev-product-core-toolbar__actions">
             <SearchInput
               allowClear
-              aria-label="搜索产品内核能力"
+              aria-label="搜索产品能力"
               placeholder="搜索能力、范围或边界"
               searchHint="可搜索能力名称、当前可用范围、状态和当前边界"
               value={keyword}

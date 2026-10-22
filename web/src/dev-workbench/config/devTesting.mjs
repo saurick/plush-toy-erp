@@ -335,9 +335,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   },
   {
     key: 'dev-docs',
-    label: '开发文档查看器 / Dev Docs',
+    label: '项目文档查看器 / Dev Docs',
     description:
-      '仓库 Markdown 文档或开发文档查看器改动时复制；只证明 dev-only 导航与只读查看，不改正式文档真源、不进入正式菜单。',
+      '仓库 Markdown 文档或项目文档查看器改动时复制；只证明 dev-only 导航与只读查看，不改正式文档真源、不进入正式菜单。',
     commands: [
       CURRENT_CHECKOUT_ROOT_COMMAND,
       'node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devHub.test.mjs',

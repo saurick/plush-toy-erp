@@ -3,6 +3,7 @@ import React from 'react'
 import {
   BuildOutlined,
   CheckCircleOutlined,
+  CodeOutlined,
   DeploymentUnitOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
@@ -14,13 +15,13 @@ import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 import DevToolTable from '../components/DevToolTable.jsx'
-import DevProductEngineeringTools from '../components/DevProductEngineeringTools.jsx'
 import DevProjectRelationships from '../components/DevProjectRelationships.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
-import { DEV_PRODUCT_ENGINEERING_VIEWS } from '../config/devRelationshipPerspectives.mjs'
+import { DEV_DEVELOPMENT_RESOURCES_VIEWS } from '../config/devRelationshipPerspectives.mjs'
 import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_DELIVERY_ROUTE,
+  DEV_DEVELOPMENT_RESOURCES_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_TESTING_ROUTE,
@@ -34,6 +35,11 @@ const AREA_PRESENTATION = {
     title: DEV_PAGE_TITLE_BY_ROUTE[DEV_PRODUCT_ENGINEERING_ROUTE],
     description: '查规则、核对权限与业务链，查看页面方案。',
     icon: <BuildOutlined />,
+  },
+  [DEV_WORKBENCH_AREA_KEYS.developmentResources]: {
+    title: DEV_PAGE_TITLE_BY_ROUTE[DEV_DEVELOPMENT_RESOURCES_ROUTE],
+    description: '查接口、项目文档、Skill 与项目关系。',
+    icon: <CodeOutlined />,
   },
   [DEV_WORKBENCH_AREA_KEYS.quality]: {
     title: DEV_PAGE_TITLE_BY_ROUTE[DEV_QUALITY_ROUTE],
@@ -53,14 +59,11 @@ const DELIVERY_VIEWS = [
 export default function DevWorkbenchAreaPage({ areaKey }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const presentation = AREA_PRESENTATION[areaKey]
-  const visibleRoutes = new Set(
-    getDevSecondaryNavItems(areaKey).map((item) => item.route)
-  )
-  const items = DEV_HUB_ITEMS.filter(
-    (item) => item.areaKey === areaKey && visibleRoutes.has(item.route)
+  const items = getDevSecondaryNavItems(areaKey).map(
+    (entry) => DEV_HUB_ITEMS.find((item) => item.key === entry.key)
   )
   const isQuality = areaKey === DEV_WORKBENCH_AREA_KEYS.quality
-  const isProductEngineering = areaKey === DEV_WORKBENCH_AREA_KEYS.productEngineering
+  const isDevelopmentResources = areaKey === DEV_WORKBENCH_AREA_KEYS.developmentResources
   const isDelivery = areaKey === DEV_WORKBENCH_AREA_KEYS.delivery
   const customerScope = useDevCustomerScope({
     searchParams,
@@ -71,7 +74,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
     isDelivery && searchParams.get('view') === 'environments'
       ? 'environments'
       : 'prepare'
-  const productView = searchParams.get('view') === 'relationships' ? 'relationships' : 'tools'
+  const resourceView = searchParams.get('view') === 'relationships' ? 'relationships' : 'tools'
   if (!presentation) {
     throw new Error(`unknown dev workbench area: ${String(areaKey || '')}`)
   }
@@ -101,7 +104,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             level="primary"
             className="erp-dev-delivery-taskbar"
             idPrefix="dev-delivery"
-            ariaLabel="交付运行视图"
+            ariaLabel="交付运维视图"
             items={DELIVERY_VIEWS}
             value={activeView}
             onChange={(value) => {
@@ -111,17 +114,17 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             }}
           />
         ) : null}
-        {isProductEngineering ? (
+        {isDevelopmentResources ? (
           <DevTaskNav
             compact
             level="primary"
             className="erp-dev-product-view-tabs"
-            idPrefix="dev-product-engineering"
-            ariaLabel="产品工程查看方式"
-            items={DEV_PRODUCT_ENGINEERING_VIEWS}
-            value={productView}
+            idPrefix="dev-development-resources"
+            ariaLabel="开发资源查看方式"
+            items={DEV_DEVELOPMENT_RESOURCES_VIEWS}
+            value={resourceView}
             onChange={(value) => {
-              if (value === productView) return
+              if (value === resourceView) return
               const next = new URLSearchParams(searchParams)
               next.set('view', value)
               setSearchParams(next)
@@ -131,7 +134,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
         {isDelivery ? (
           <section
             className="erp-dev-workbench-header-context"
-            aria-label="交付运行范围"
+            aria-label="交付运维范围"
             hidden={activeView !== 'prepare'}
           >
             <DevCustomerScopeSelector
@@ -146,15 +149,13 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
       </header>
       <main className="erp-dev-hub-shell">
         <div
-          hidden={(isDelivery && activeView !== 'prepare') || (isProductEngineering && productView !== 'tools')}
-          id={isDelivery ? 'dev-delivery-panel-prepare' : isProductEngineering ? 'dev-product-engineering-panel-tools' : undefined}
-          role={isDelivery || isProductEngineering ? 'tabpanel' : undefined}
-          aria-labelledby={isDelivery ? 'dev-delivery-tab-prepare' : isProductEngineering ? 'dev-product-engineering-tab-tools' : undefined}
+          hidden={(isDelivery && activeView !== 'prepare') || (isDevelopmentResources && resourceView !== 'tools')}
+          id={isDelivery ? 'dev-delivery-panel-prepare' : isDevelopmentResources ? 'dev-development-resources-panel-tools' : undefined}
+          role={isDelivery || isDevelopmentResources ? 'tabpanel' : undefined}
+          aria-labelledby={isDelivery ? 'dev-delivery-tab-prepare' : isDevelopmentResources ? 'dev-development-resources-tab-tools' : undefined}
         >
           {isDelivery ? (
             <DeliveryWorkspace items={items} scope={customerScope} />
-          ) : isProductEngineering ? (
-            <DevProductEngineeringTools items={items} />
           ) : (
             <section
               className="erp-dev-area-tools"
@@ -167,14 +168,14 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             </section>
           )}
         </div>
-        {isProductEngineering ? (
+        {isDevelopmentResources ? (
           <section
-            hidden={productView !== 'relationships'}
-            id="dev-product-engineering-panel-relationships"
+            hidden={resourceView !== 'relationships'}
+            id="dev-development-resources-panel-relationships"
             role="tabpanel"
-            aria-labelledby="dev-product-engineering-tab-relationships"
+            aria-labelledby="dev-development-resources-tab-relationships"
           >
-            {productView === 'relationships' ? <DevProjectRelationships /> : null}
+            {resourceView === 'relationships' ? <DevProjectRelationships /> : null}
           </section>
         ) : null}
         {isDelivery ? (

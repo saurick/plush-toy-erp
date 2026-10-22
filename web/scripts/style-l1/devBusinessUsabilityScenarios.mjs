@@ -16,7 +16,7 @@ export function createDevBusinessUsabilityScenarios({
             .locator('.erp-dev-workspace-nav__route[href="/__dev/quality"]')
             .getAttribute('class'),
           /erp-dev-workspace-nav__route--context/u,
-          '页面说明检查应归属质量验证'
+          '页面说明检查应归属测试验证'
         )
         assert.equal(
           await page
@@ -25,7 +25,7 @@ export function createDevBusinessUsabilityScenarios({
             )
             .count(),
           0,
-          '辅助检查通过改动验证进入，不再占据常驻导航'
+          '辅助检查通过测试执行进入，不再占据常驻导航'
         )
         await page
           .locator('.erp-dev-business-usability-boundary > summary')

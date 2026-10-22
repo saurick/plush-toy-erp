@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
 import { Button, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { DEV_PAGE_TITLE_BY_ROUTE, DEV_UI_DESIGN_ROUTE } from '../config/devRoutes.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
@@ -87,7 +88,7 @@ export default function DevUIDesignPage() {
     <div className="erp-dev-ui-design-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath="docs/product/ui-design/README.md" />
       <header className="erp-dev-ui-design-header">
-        <Typography.Title level={1}>UI 交互设计</Typography.Title>
+        <Typography.Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_UI_DESIGN_ROUTE]}</Typography.Title>
         <Tabs
           activeKey={view}
           items={VIEWS}

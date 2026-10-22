@@ -278,7 +278,7 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
           type="warning"
           showIcon
           message="当前改动没有匹配门禁"
-          description="未知改动不能据此视为安全；请回到改动验证核对 affected 计划，必要时运行完整门禁。"
+          description="未知改动不能据此视为安全；请回到测试执行核对 affected 计划，必要时运行完整门禁。"
         />
       ) : null}
       <div className="erp-dev-quality-gap-flow" aria-label="覆盖缺口判断路径">

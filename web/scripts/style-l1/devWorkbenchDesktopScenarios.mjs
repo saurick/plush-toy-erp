@@ -12,6 +12,7 @@ import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
+  DEV_DEVELOPMENT_RESOURCES_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
@@ -34,7 +35,7 @@ const SPECIALIZED_ROUTES = new Set([
 
 const DESKTOP_HEADING_BY_ROUTE = Object.freeze({
   '/__dev': '总览',
-  [DEV_TESTING_ROUTE]: '改动验证',
+  [DEV_TESTING_ROUTE]: '测试执行',
   [DEV_DATA_PREPARATION_ROUTE]: '测试数据',
 })
 
@@ -208,7 +209,7 @@ export function createDevWorkbenchDesktopScenarios({
         await page
           .locator('.erp-dev-overview-library__toolbar .ant-select-selector')
           .click()
-        await page.locator('.ant-select-dropdown [title="质量验证"]').click()
+        await page.locator('.ant-select-dropdown [title="测试验证"]').click()
         assert.equal(new URL(page.url()).searchParams.get('group'), 'quality')
         const qualityToolCount = DEV_HUB_ITEMS.filter((tool) => tool.areaKey === 'quality').length
         await page.waitForFunction(
@@ -798,9 +799,9 @@ export function createDevWorkbenchDesktopScenarios({
         await assertNoHorizontalOverflow(page, '文档检索页头窄窗口')
         await page.setViewportSize({ width: 1440, height: 900 })
         await assertDevDocsDirectorySpace(page, assert)
-        await verifySlidingMotion(page, assert, '[aria-label="开发文档搜索范围"]', 1)
-        await verifySlidingMotion(page, assert, '[aria-label="开发文档搜索范围"]', 0, true)
-        const selector = '[aria-label="开发文档层级"]'
+        await verifySlidingMotion(page, assert, '[aria-label="项目文档搜索范围"]', 1)
+        await verifySlidingMotion(page, assert, '[aria-label="项目文档搜索范围"]', 0, true)
+        const selector = '[aria-label="项目文档层级"]'
         const selectedLifecycle = page.locator(
           `${selector} .erp-segmented-item-selected`
         )
@@ -816,7 +817,7 @@ export function createDevWorkbenchDesktopScenarios({
         await page.reload()
         await page.locator(`${selector} [data-sliding-ready="true"]`).waitFor()
         assert.equal(await selectedLifecycle.innerText(), '当前')
-        const search = page.getByRole('textbox', { name: '搜索开发文档' })
+        const search = page.getByRole('textbox', { name: '搜索项目文档' })
         await search.fill('不存在的文档检索内容 navigation-no-result')
         await page
           .getByText('没有匹配的文档，阅读操作已隐藏', { exact: true })
@@ -862,8 +863,8 @@ export function createDevWorkbenchDesktopScenarios({
           contentType: 'application/javascript',
           body: `export default ${JSON.stringify(createDevDocsReadingFixture(keyword))}`,
         }))
-        await page.locator('[aria-label="开发文档层级"]').getByText('历史', { exact: true }).click()
-        await page.getByRole('textbox', { name: '搜索开发文档' }).fill(keyword)
+        await page.locator('[aria-label="项目文档层级"]').getByText('历史', { exact: true }).click()
+        await page.getByRole('textbox', { name: '搜索项目文档' }).fill(keyword)
         await page.getByText('归档全文检索探针', { exact: true }).waitFor()
         assert.equal(await page.getByText('没有匹配的文档', { exact: true }).count(), 0)
         await verifyDevDocsReadingNavigation(page, assert)
@@ -905,10 +906,13 @@ export function createDevWorkbenchDesktopScenarios({
         const catalogFits = await page.locator('.erp-dev-product-core-groups').evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
         assert(catalogFits, '能力目录不依赖横向滚动')
       }
-      if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
-        const visibleTools = await page.locator('.erp-dev-product-tools a').evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort())
-        const registeredTools = DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === 'product-engineering' && entry.showInNavigation !== false).map((entry) => entry.route).sort()
+      if ([DEV_PRODUCT_ENGINEERING_ROUTE, DEV_DEVELOPMENT_RESOURCES_ROUTE].includes(item.route)) {
+        const areaKey = item.route === DEV_PRODUCT_ENGINEERING_ROUTE ? 'product-engineering' : 'development-resources'
+        const visibleTools = await page.locator('.erp-dev-tool-table tbody th a').evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort())
+        const registeredTools = DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === areaKey && entry.showInNavigation !== false).map((entry) => entry.route).sort()
         assert.deepEqual(visibleTools, registeredTools, '按用途分组后全部常驻工具仍各有一个入口')
+      }
+      if (item.route === DEV_DEVELOPMENT_RESOURCES_ROUTE) {
         await verifyProjectGraphDirectory(page, { assert, assertNoHorizontalOverflow })
       }
       if (item.route === DEV_INTEGRATION_ROUTE) {
@@ -918,7 +922,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(
           await page.locator('.erp-dev-tool-table tbody tr').count(),
           DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === 'quality' && entry.showInNavigation !== false).length,
-          '质量验证首页应完整显示已登记的常驻工具'
+          '测试验证首页应完整显示已登记的常驻工具'
         )
         assert.equal(
           await page
@@ -927,7 +931,7 @@ export function createDevWorkbenchDesktopScenarios({
             )
             .count(),
           1,
-          '质量验证首页应提供质量门禁入口'
+          '测试验证首页应提供质量门禁入口'
         )
       }
       if (item.route === DEV_CUSTOMER_CONFIG_ROUTE) {

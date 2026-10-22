@@ -63,6 +63,8 @@ import {
 import {
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_DELIVERY_ROUTE,
+  DEV_PAGE_TITLE_BY_ROUTE,
+  DEV_TESTING_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_INTEGRATION_ROUTE,
 } from '../config/devRoutes.mjs'
@@ -1879,7 +1881,7 @@ export default function DevTestingPage() {
                 ? 'Git 收口检查'
                 : view === VIEW_COMMANDS
                   ? '专项检查命令'
-                  : '改动验证'}
+                  : DEV_PAGE_TITLE_BY_ROUTE[DEV_TESTING_ROUTE]}
             </Title>
           </Space>
         </div>
@@ -1888,7 +1890,7 @@ export default function DevTestingPage() {
           hidden={isAuxiliaryView}
         >
           <SlidingTabList
-            aria-label="质量验证工作区主视图"
+            aria-label="测试验证工作区主视图"
             options={VIEW_OPTIONS}
             value={isAuxiliaryView ? VIEW_TIERS : view}
             onChange={selectView}
@@ -1900,7 +1902,7 @@ export default function DevTestingPage() {
         >
           {isCloseoutView ? (
             <Link to={DEV_DELIVERY_ROUTE}>
-              <LeftOutlined aria-hidden="true" /> 返回交付运行
+              <LeftOutlined aria-hidden="true" /> 返回交付运维
             </Link>
           ) : (
             <Button

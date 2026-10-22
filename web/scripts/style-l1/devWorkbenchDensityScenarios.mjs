@@ -59,13 +59,13 @@ export function createDevWorkbenchDensityScenarios({
       deviceScaleFactor: 2,
       verify: async (page) => {
         const nav = page.locator('.erp-dev-workspace-nav')
-        const primary = nav.getByRole('link', { name: '产品工程', exact: true })
-        const secondary = nav.getByRole('link', { name: '产品内核', exact: true })
-        await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
+        const primary = nav.getByRole('link', { name: '产品与业务', exact: true })
+        const secondary = nav.getByRole('link', { name: '产品能力', exact: true })
+        await page.getByRole('heading', { name: '产品与业务', exact: true }).waitFor()
         const initial = await assertSidebarSelection(page, assert)
-        assert.equal(initial.label, '产品工程')
-        assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 3, '三个工作区的子入口始终展开')
-        assert.equal(await nav.getByRole('group', { name: '产品工程工作入口' }).count(), 1)
+        assert.equal(initial.label, '产品与业务')
+        assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 4, '四个工作区的子入口始终展开')
+        assert.equal(await nav.getByRole('group', { name: '产品与业务工作入口' }).count(), 1)
         const tools = nav.getByRole('button', { name: '页面工具', exact: true })
         await tools.click()
         const utilities = page.getByRole('group', { name: '页面工具', exact: true })
@@ -75,9 +75,9 @@ export function createDevWorkbenchDensityScenarios({
         assert.equal(await tools.evaluate((button) => button === document.activeElement), true, '收起页面工具后恢复入口焦点')
         const originalBox = await secondary.boundingBox()
         await secondary.click()
-        await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '产品能力', exact: true }).waitFor()
         const selected = await assertSidebarSelection(page, assert)
-        assert.equal(selected.label, '产品内核')
+        assert.equal(selected.label, '产品能力')
         assert.deepEqual(selected.appearance, initial.appearance, '两级侧栏共用选中外观')
         assert.deepEqual(await secondary.boundingBox(), originalBox, '切换不改变菜单位置或尺寸')
         await secondary.press('Shift+Tab')
@@ -87,19 +87,19 @@ export function createDevWorkbenchDensityScenarios({
         }))
         assert(focus.visible && focus.outline === '2px', '键盘聚焦仍有清晰边框')
         await primary.press('Enter')
-        await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
-        assert.equal((await assertSidebarSelection(page, assert)).label, '产品工程')
+        await page.getByRole('heading', { name: '产品与业务', exact: true }).waitFor()
+        assert.equal((await assertSidebarSelection(page, assert)).label, '产品与业务')
         await page.goBack()
-        await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
-        assert.equal((await assertSidebarSelection(page, assert)).label, '产品内核')
+        await page.getByRole('heading', { name: '产品能力', exact: true }).waitFor()
+        assert.equal((await assertSidebarSelection(page, assert)).label, '产品能力')
         await page.reload()
-        await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '产品能力', exact: true }).waitFor()
         await assertSidebarSelection(page, assert)
-        assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 3, '刷新后仍完整展开所有工作区')
-        for (const label of ['质量验证', '交付运行', '总览', '产品工程']) {
+        assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 4, '刷新后仍完整展开所有工作区')
+        for (const label of ['开发资源', '测试验证', '交付运维', '总览', '产品与业务']) {
           await nav.getByRole('link', { name: label, exact: true }).click()
           await page.getByRole('heading', { name: label, exact: true }).waitFor()
-          assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 3, '切换页面不折叠其他工作区')
+          assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 4, '切换页面不折叠其他工作区')
           assert.equal((await assertSidebarSelection(page, assert)).label, label)
         }
         await assertNoHorizontalOverflow(page, '效能工作台侧栏选中样式')
@@ -258,7 +258,7 @@ export function createDevWorkbenchDensityScenarios({
             assert.equal(
               await root.locator('.erp-dev-testing-reader__toolbar').count(),
               0,
-              '改动验证不应保留空的辅助操作栏'
+              '测试执行不应保留空的辅助操作栏'
             )
           }
           if (

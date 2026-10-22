@@ -149,7 +149,7 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
       hidden={!active}
       role={fullscreen ? 'dialog' : 'region'}
       aria-modal={fullscreen ? 'true' : undefined}
-      aria-label={fullscreen ? 'UI 交互设计全屏预览' : '最新可交互设计'}
+      aria-label={fullscreen ? '交互设计全屏预览' : '最新可交互设计'}
     >
       <div className="erp-dev-ui-design-toolbar">
         {pageSelector}

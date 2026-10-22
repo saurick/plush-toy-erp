@@ -184,7 +184,7 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     ),
     "Product Core dev entry must keep the capability ledger as its only status truth",
   );
-  assert.match(productCoreItem?.title || "", /产品内核/);
+  assert.match(productCoreItem?.title || "", /产品能力/);
   assert.equal(productCoreItem?.source, DEV_PRODUCT_CORE_SOURCE_PATH);
   assertIncludes(
     devProductCorePageSource,
