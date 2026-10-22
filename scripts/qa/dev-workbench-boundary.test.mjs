@@ -298,6 +298,14 @@ const allowedERPImportsByFile = new Map([
     new Set(["utils/workflowFulfillment.mjs"]),
   ],
   [
+    "web/src/dev-workbench/components/flow-state/FulfillmentExceptionDetails.jsx",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/FulfillmentSubflow.jsx",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
     "web/src/dev-workbench/components/flow-state/FulfillmentChainCanvas.jsx",
     new Set(["utils/workflowFulfillment.mjs"]),
   ],

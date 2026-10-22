@@ -974,7 +974,7 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
     /sourcePath=\{overview\.sourcePath \|\| DEV_CUSTOMER_CONFIG_SOURCE_PATH\}/
   )
   assert.doesNotMatch(source, /\{item\.sourcePath\}/)
-  assert.match(source, /<Select\s+aria-label="客户包选择"/u)
+  assert.match(source, /<Select\b[^>]*aria-label="客户包选择"/u)
   assert.doesNotMatch(source, /customerKey\.slice/)
   assert.doesNotMatch(source, /\$\{item\.label\} \(\$\{item\.customerKey\}\)/)
   assert.doesNotMatch(source, /\{item\.label\} \/ \{item\.customerKey\}/)

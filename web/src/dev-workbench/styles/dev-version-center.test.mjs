@@ -115,8 +115,9 @@ test('version decisions and target evidence remain source-backed', () => {
     /erp-dev-version-target-selector__boundaries/u
   )
   assert.match(component, /构建缓存与制品/u)
-  assert.match(versionPage, /v2 · 7 项制品 · 证据未闭合/u)
-  assert.match(versionPage, /v1 · 6 项制品 · 仅旧版回滚/u)
+  assert.match(versionPage, /v2 · 7 项制品/u)
+  assert.match(versionPage, /v1 · 6 项制品/u)
+  assert.match(versionPage, /record\.completeAssets\s*\? record\.promotionEligible\s*\? '制品齐全'\s*: record\.assets\.includes\('release-rehearsal\.json'\)\s*\? '演练证据待补齐'\s*: '仅可回滚'/u)
   assert.match(versionPage, /CI\/CD 证据分两处查看/u)
   assert.match(
     versionPage,

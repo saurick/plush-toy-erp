@@ -121,32 +121,30 @@ function parseMarkdownTable(source = '', heading = '') {
   const sectionLines = extractMarkdownSection(source, heading)
     .split(/\r?\n/)
     .map((line) => line.trim())
-  const headerIndex = sectionLines.findIndex((line) => line.startsWith('|'))
-  if (headerIndex < 0) return []
-
-  const headers = splitMarkdownTableRow(sectionLines[headerIndex]).map(
-    stripMarkdownInline
-  )
-  const separator = splitMarkdownTableRow(sectionLines[headerIndex + 1] || '')
-  const hasValidSeparator =
-    separator.length === headers.length &&
-    separator.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
-  if (!hasValidSeparator) return []
-
+  const expectedHeaders = ['业务能力', '状态', '当前可用范围', '当前边界']
   const rows = []
-  for (let index = headerIndex + 2; index < sectionLines.length; index += 1) {
-    const line = sectionLines[index]
-    if (!line.startsWith('|')) break
-    const cells = splitMarkdownTableRow(line)
-    if (cells.length !== headers.length) continue
-    rows.push(
-      Object.fromEntries(
-        headers.map((header, cellIndex) => [
-          header,
-          stripMarkdownInline(cells[cellIndex]),
-        ])
+  for (let index = 0; index < sectionLines.length; index += 1) {
+    if (!sectionLines[index].startsWith('|')) continue
+    const headers = splitMarkdownTableRow(sectionLines[index]).map(stripMarkdownInline)
+    const separator = splitMarkdownTableRow(sectionLines[index + 1] || '')
+    if (
+      headers.length !== expectedHeaders.length ||
+      headers.some((header, column) => header !== expectedHeaders[column]) ||
+      separator.length !== headers.length ||
+      !separator.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
+    ) continue
+
+    // One capability section can contain several tables grouped by subheading.
+    for (index += 2; index < sectionLines.length && sectionLines[index].startsWith('|'); index += 1) {
+      const cells = splitMarkdownTableRow(sectionLines[index])
+      if (cells.length !== headers.length) continue
+      rows.push(
+        Object.fromEntries(
+          headers.map((header, cellIndex) => [header, stripMarkdownInline(cells[cellIndex])])
+        )
       )
-    )
+    }
+    index -= 1
   }
   return rows
 }
