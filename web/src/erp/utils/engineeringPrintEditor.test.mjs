@@ -211,7 +211,7 @@ test('engineeringPrintTemplates: BOM 版本带值生成色卡并用材料快照�
     },
     {
       companyName: '东莞市永绅玩具有限公司',
-      productOptions: [{ value: 11, label: '26204# / 抱抱猴子 / 黑色' }],
+      products: [{ id: 11, code: '26204#', name: '抱抱猴子' }],
       materials: [
         {
           id: 21,
@@ -262,7 +262,6 @@ test('engineeringPrintTemplates: BOM 版本带值生成作业指导书工程资�
     },
     {
       companyName: '东莞市永绅玩具有限公司',
-      productOptions: [{ value: 11, label: '26204# / 抱抱猴子 / 黑色' }],
       products: [
         {
           id: 11,
@@ -421,11 +420,13 @@ test('engineeringPrintTemplates: business drafts keep product image slots empty 
   assert.equal(workInstruction.images.header_right.dataURL, '')
 })
 
-test('engineeringPrintTemplates: 作业指导书产品选项回退不把款号片段拼进名称', () => {
+test('engineeringPrintTemplates: 作业指导书来源快照分别保留产品编号和名称', () => {
   const draft = buildWorkInstructionDraftFromBOMVersion(
-    { product_id: 11, items: [] },
     {
-      productOptions: [{ value: 11, label: '26204# / 抱抱猴子 / YS26204' }],
+      product_id: 11,
+      product_no_snapshot: '26204#',
+      product_name_snapshot: '抱抱猴子',
+      items: [],
     }
   )
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Tag } from 'antd'
 import ProductIdentity from './ProductIdentity.jsx'
+import DeliveryInfoCell from '../business-list/DeliveryInfoCell.jsx'
 import { materialStockCategoryLabel } from '../../utils/warehouseClassification.mjs'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -481,7 +482,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
               compareText(a?.default_payment_method, b?.default_payment_method),
             render: (value, record) => {
               const termDays = record?.default_payment_term_days
-              if (value && termDays != null) return `${value} / ${termDays}天`
+              if (value && termDays != null) return `${value} ${termDays}天`
               if (value) return value
               if (termDays != null) return `${termDays}天`
               return '-'
@@ -489,7 +490,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             exportValue: (record) => {
               const method = record?.default_payment_method
               const termDays = record?.default_payment_term_days
-              if (method && termDays != null) return `${method} / ${termDays}天`
+              if (method && termDays != null) return `${method} ${termDays}天`
               return method || (termDays != null ? `${termDays}天` : '')
             },
           },
@@ -517,23 +518,24 @@ function baseColumns({ type, unitDisplay, processOptions }) {
                   a?.default_delivery_address,
                 ]
                   .filter(Boolean)
-                  .join(' / '),
+                  .join(' '),
                 [
                   b?.default_delivery_recipient,
                   b?.default_delivery_phone,
                   b?.default_delivery_address,
                 ]
                   .filter(Boolean)
-                  .join(' / ')
+                  .join(' ')
               ),
-            render: (_, record) =>
-              [
-                record?.default_delivery_recipient,
-                record?.default_delivery_phone,
-                record?.default_delivery_address,
-              ]
-                .filter(Boolean)
-                .join(' / ') || '-',
+            render: (_, record) => (
+              <DeliveryInfoCell
+                snapshot={{
+                  recipient: record?.default_delivery_recipient,
+                  phone: record?.default_delivery_phone,
+                  address: record?.default_delivery_address,
+                }}
+              />
+            ),
             exportValue: (record) =>
               [
                 record?.default_delivery_recipient,
@@ -541,7 +543,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
                 record?.default_delivery_address,
               ]
                 .filter(Boolean)
-                .join(' / '),
+                .join(' '),
           },
         ]
       : []),

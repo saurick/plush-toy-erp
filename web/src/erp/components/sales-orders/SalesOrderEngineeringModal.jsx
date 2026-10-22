@@ -72,7 +72,7 @@ function EngineeringRow({ field, form, context, bomPermissions, disabled, onOpen
               optionRender={renderProductOption}
               options={(context?.products || []).map((product) => ({
                 value: product.id,
-                label: `${product.code} / ${product.name}`,
+                label: `${product.code} ${product.name}`,
               }))}
               onChange={() => {
                 form.setFieldValue(
@@ -99,7 +99,7 @@ function EngineeringRow({ field, form, context, bomPermissions, disabled, onOpen
               .filter((sku) => sku.product_id === productID)
               .map((sku) => ({
                 value: sku.id,
-                label: [sku.sku_code, sku.sku_name].filter(Boolean).join(' / '),
+                label: [sku.sku_code, sku.sku_name].filter(Boolean).join(' '),
               }))}
             onChange={() =>
               form.setFieldValue(

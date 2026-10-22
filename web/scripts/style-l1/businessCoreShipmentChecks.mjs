@@ -43,8 +43,8 @@ export async function verifyBusinessCoreShipments(page, deps) {
   await expectButton(page, '新建出货单')
 
   for (const headerText of [
-    '实际 / 最终总净重（克）',
-    '计划出货日期 / 实际出货日期',
+    '总净重（克）',
+    '出货日期',
   ]) {
     const header = page
       .locator(
@@ -275,8 +275,8 @@ export async function verifyBusinessCoreShipments(page, deps) {
   await assertBusinessMainTableSortableColumns(page, {
     scenarioName: 'business-formal-shipments',
     unsortableHeaders: [
-      '实际 / 最终总净重（克）',
-      '包装 / 毛重 / 体积',
+      '总净重（克）',
+      '包装信息',
       '实际运费',
       '唛头',
       '备注',

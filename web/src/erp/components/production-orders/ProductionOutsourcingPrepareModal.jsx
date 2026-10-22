@@ -104,7 +104,7 @@ export default function ProductionOutsourcingPrepareModal({
                   `${item.planned_quantity} ${item.unit_name_snapshot || ''}`,
                 ]
                   .filter(Boolean)
-                  .join(' / '),
+                  .join(' '),
               }))}
             />
           </Form.Item>

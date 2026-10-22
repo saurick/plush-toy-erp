@@ -53,7 +53,7 @@ function selectedInventoryText(record, labels = {}) {
     labels.lot || '未分批次',
     labels.unit || '单位已关联',
     `账面数量 ${String(quantity)}`,
-  ].join(' / ')
+  ].join(' ')
 }
 
 function draftItemValues(item = {}, operationType = '') {

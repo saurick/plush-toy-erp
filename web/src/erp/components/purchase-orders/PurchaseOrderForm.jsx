@@ -74,13 +74,13 @@ function getNextLineNo(lines = []) {
 
 function supplierLabel(supplier = {}) {
   return (
-    [supplier.code, supplier.name].filter(Boolean).join(' / ') || '供应商已关联'
+    [supplier.code, supplier.name].filter(Boolean).join(' ') || '供应商已关联'
   )
 }
 
 function materialLabel(material = {}) {
   return (
-    [material.code, material.name].filter(Boolean).join(' / ') || '材料已关联'
+    [material.code, material.name].filter(Boolean).join(' ') || '材料已关联'
   )
 }
 

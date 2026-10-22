@@ -50,7 +50,7 @@ function joinSummary(values = []) {
     values
       .map((value) => text(value, ''))
       .filter(Boolean)
-      .join(' / ') || '-'
+      .join(' ') || '-'
   )
 }
 

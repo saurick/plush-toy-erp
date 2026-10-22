@@ -153,7 +153,7 @@ export function createBusinessColumnPriorityScenarios({
           ],
           [
             '/erp/warehouse/shipments',
-            ['出货单号', '状态', '客户', '计划出货日期 / 实际出货日期'],
+            ['出货单号', '状态', '客户', '出货日期'],
           ],
           [
             '/erp/warehouse/inventory?view=balances',
@@ -243,7 +243,7 @@ export function createBusinessColumnPriorityScenarios({
         await waitForLeadingLabels(page, ['出货单号', '状态', '客户'])
         await verifySavedOrderAndReset(
           page,
-          '计划出货日期 / 实际出货日期',
+          '出货日期',
           '移到最前'
         )
 

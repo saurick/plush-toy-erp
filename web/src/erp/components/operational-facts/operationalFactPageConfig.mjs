@@ -43,6 +43,7 @@ import {
 } from './OperationalFactForms.jsx'
 import { compareOperationalFactDecimalValues } from './operationalFactDecimal.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 
 export const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
@@ -188,7 +189,7 @@ function sourceDocumentRef(record = {}) {
 
 function sourceColumnText(record = {}) {
   if (!record.source_type) return ''
-  return `${sourceTypeLabel(record.source_type)} / ${sourceDocumentRef(record)}`
+  return `${sourceTypeLabel(record.source_type)} ${sourceDocumentRef(record)}`
 }
 
 function subjectColumnText(record = {}) {
@@ -198,15 +199,19 @@ function subjectColumnText(record = {}) {
       record.subject_id || record.product_id
     )),
     normalizeText(record.sku_code_snapshot),
-  ].filter(Boolean).join(' / ')
+  ].filter(Boolean).join(' ')
 }
 
-function stockContextText(record = {}) {
+function stockContextParts(record = {}) {
   return [
     namedBusinessReference(record.warehouse_name, record.warehouse_code, safeRefText('仓库', record.warehouse_id)),
     normalizeText(record.lot_no) || safeRefText('批次', record.lot_id),
     normalizeText(record.unit_name) || safeRefText('单位', record.unit_id),
-  ].join(' / ')
+  ]
+}
+
+function stockContextText(record = {}) {
+  return stockContextParts(record).join(' ')
 }
 
 function namedBusinessReference(name, code, fallback) {
@@ -233,7 +238,7 @@ function reservationSalesOrderLineText(record = {}) {
   return record.sales_order_item_id ? '订单行已关联' : '-'
 }
 
-function reservationProductText(record = {}) {
+function reservationProductParts(record = {}) {
   const product = namedBusinessReference(
     record.product_name,
     record.product_code,
@@ -244,10 +249,14 @@ function reservationProductText(record = {}) {
     record.product_sku_code,
     record.product_sku_id ? '规格已关联' : ''
   )
-  return [product, sku].filter(Boolean).join(' / ')
+  return [product, sku]
 }
 
-function reservationWarehouseLotText(record = {}) {
+function reservationProductText(record = {}) {
+  return reservationProductParts(record).filter(Boolean).join(' ')
+}
+
+function reservationWarehouseLotParts(record = {}) {
   const warehouse = namedBusinessReference(
     record.warehouse_name,
     record.warehouse_code,
@@ -255,7 +264,11 @@ function reservationWarehouseLotText(record = {}) {
   )
   const lot =
     normalizeText(record.lot_no) || (record.lot_id ? '批次已关联' : '无批次')
-  return `${warehouse} / ${lot}`
+  return [warehouse, lot]
+}
+
+function reservationWarehouseLotText(record = {}) {
+  return reservationWarehouseLotParts(record).join(' ')
 }
 
 function reservationUnitText(record = {}) {
@@ -414,7 +427,13 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       exportTitle: '仓库 / 批次 / 单位',
       width: 220,
       sortValue: stockContextText,
-      render: (_, record) => stockContextText(record),
+      render: (_, record) => {
+        const [warehouse, lot, unit] = stockContextParts(record)
+        return React.createElement(BusinessCellStack, {
+          primary: warehouse === '-' ? '' : warehouse,
+          secondary: [lot, unit].filter((value) => value && value !== '-').join(' '),
+        })
+      },
       exportValue: stockContextText,
     },
     {
@@ -701,16 +720,21 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 300,
         sortValue: reservationProductText,
         className: 'erp-product-identity-cell',
-        render: (_, record) =>
-          React.createElement(
+        render: (_, record) => {
+          const [product, sku] = reservationProductParts(record)
+          return React.createElement(
             ProductIdentity,
             {
               productId: record.product_id,
               name: record.product_name || record.product_code || '产品',
               compact: true,
             },
-            reservationProductText(record)
-          ),
+            React.createElement(BusinessCellStack, {
+              primary: product === '-' ? '' : product,
+              secondary: sku,
+            })
+          )
+        },
         exportValue: reservationProductText,
       },
       {
@@ -719,7 +743,13 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         title: '仓库 / 批次',
         width: 240,
         sortValue: reservationWarehouseLotText,
-        render: (_, record) => reservationWarehouseLotText(record),
+        render: (_, record) => {
+          const [warehouse, lot] = reservationWarehouseLotParts(record)
+          return React.createElement(BusinessCellStack, {
+            primary: warehouse === '-' ? '' : warehouse,
+            secondary: lot,
+          })
+        },
         exportValue: reservationWarehouseLotText,
       },
       {

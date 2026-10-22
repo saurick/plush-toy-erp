@@ -1027,14 +1027,6 @@ export function createEngineeringPrintDraft(templateKey, input = {}) {
   return {}
 }
 
-function optionLabelByID(options, id, fallback = '') {
-  const targetID = Number(id || 0)
-  const matched = (Array.isArray(options) ? options : []).find(
-    (item) => Number(item?.value || item?.id || 0) === targetID
-  )
-  return toText(matched?.label || matched?.name || matched?.code || fallback)
-}
-
 function recordByID(records, id) {
   const targetID = Number(id || 0)
   if (!targetID) return null
@@ -1069,29 +1061,21 @@ function workInstructionImagesFromProductImages(productImages = {}) {
   }
 }
 
-function bomProductSnapshot(
-  record = {},
-  { productOptions = [], products = [] } = {}
-) {
+function bomProductSnapshot(record = {}, { products = [] } = {}) {
   const productRecord = recordByID(products, record.product_id)
-  const productLabel = optionLabelByID(productOptions, record.product_id)
-  const [optionCode = '', ...optionNameParts] = productLabel.split(' / ')
   return {
     productNo: toText(
       productRecord?.style_no ||
         productRecord?.customer_style_no ||
         record.product_no ||
         record.product_no_snapshot ||
-        optionCode ||
         record.product_code ||
         productRecord?.code
     ),
     productName: toText(
       productRecord?.name ||
         record.product_name ||
-        record.product_name_snapshot ||
-        optionNameParts[0] ||
-        productLabel
+        record.product_name_snapshot
     ),
   }
 }
@@ -1099,7 +1083,6 @@ function bomProductSnapshot(
 export function buildMaterialDetailDraftFromBOMVersion(
   version = {},
   {
-    productOptions = [],
     products = [],
     materials = [],
     units = [],
@@ -1107,7 +1090,7 @@ export function buildMaterialDetailDraftFromBOMVersion(
     productImages = {},
   } = {}
 ) {
-  const product = bomProductSnapshot(version, { productOptions, products })
+  const product = bomProductSnapshot(version, { products })
   const materialByID = new Map(
     (Array.isArray(materials) ? materials : []).map((material) => [
       Number(material?.id || 0),
@@ -1168,9 +1151,9 @@ export function buildMaterialDetailDraftFromBOMVersion(
 
 export function buildColorCardDraftFromBOMVersion(
   version = {},
-  { productOptions = [], products = [], materials = [], companyName = '' } = {}
+  { products = [], materials = [], companyName = '' } = {}
 ) {
-  const product = bomProductSnapshot(version, { productOptions, products })
+  const product = bomProductSnapshot(version, { products })
   const materialByID = new Map(
     (Array.isArray(materials) ? materials : []).map((material) => [
       Number(material?.id || 0),
@@ -1225,7 +1208,6 @@ export function buildColorCardDraftFromBOMVersion(
 export function buildWorkInstructionDraftFromBOMVersion(
   version = {},
   {
-    productOptions = [],
     products = [],
     materials = [],
     units = [],
@@ -1233,10 +1215,7 @@ export function buildWorkInstructionDraftFromBOMVersion(
     productImages = {},
   } = {}
 ) {
-  const product = bomProductSnapshot(version, {
-    productOptions,
-    products,
-  })
+  const product = bomProductSnapshot(version, { products })
   const materialByID = new Map(
     (Array.isArray(materials) ? materials : []).map((material) => [
       Number(material?.id || 0),

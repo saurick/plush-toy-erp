@@ -98,7 +98,7 @@ function skuLabel(sku = {}) {
   return (
     [sku.sku_code, sku.sku_name || sku.customer_sku || sku.barcode]
       .filter(Boolean)
-      .join(' / ') || '规格已关联'
+      .join(' ') || '规格已关联'
   )
 }
 
@@ -106,7 +106,7 @@ function contactOptionLabel(contact = {}) {
   return (
     [contact.name, contact.title, contactPhoneText(contact)]
       .filter(Boolean)
-      .join(' / ') || '联系人已关联'
+      .join(' ') || '联系人已关联'
   )
 }
 
@@ -349,7 +349,7 @@ export function SalesOrderFormFields({
       <BusinessFormSection title="联系与交付">
         <Form.Item
           className="erp-business-action-form__field"
-          label="业务员 / 跟单人"
+          label="业务员（跟单人）"
           name="sales_owner"
         >
           <AutoComplete
@@ -1138,7 +1138,7 @@ export function SalesOrderItemsFormSection({
                             hasProductSource ? unitText : '',
                           ]
                             .filter(Boolean)
-                            .join(' / ')
+                            .join(' ')
                           return (
                             <Form.Item
                               className="erp-line-item-field erp-line-item-field--source-summary"

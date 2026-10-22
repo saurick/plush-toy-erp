@@ -362,7 +362,7 @@ test('moduleTableColumns: 无 dataIndex/key 的展示列按原始列位置解析
       render: (_, record) => record.customer_snapshot || '-',
     },
     {
-      title: '计划出货日期 / 实际出货日期',
+      title: '出货日期',
       sortValue: (record) => record.shipped_at || record.planned_ship_at,
       render: (_, record) => record.shipped_at || record.planned_ship_at || '-',
     },

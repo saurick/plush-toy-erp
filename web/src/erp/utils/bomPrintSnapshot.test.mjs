@@ -71,6 +71,25 @@ test('BOM print reloads the selected version and includes disabled references fo
   assert.equal(draft.lines[0].totalUsage, '220')
 })
 
+test('BOM print keeps product field values intact without parsing display separators', () => {
+  for (const build of [
+    buildMaterialDetailDraftFromBOMVersion,
+    buildColorCardDraftFromBOMVersion,
+    buildWorkInstructionDraftFromBOMVersion,
+  ]) {
+    const draft = build(
+      { product_id: 11, items: [] },
+      { products: [{ id: 11, code: 'P/11', name: '小熊 / 礼盒装' }] }
+    )
+    assert.equal(draft.productNo, 'P/11')
+    assert.equal(draft.productName, '小熊 / 礼盒装')
+
+    const missing = build({ product_id: 11, items: [] })
+    assert.equal(missing.productNo, '')
+    assert.equal(missing.productName, '')
+  }
+})
+
 test('BOM print reloads changed and cleared fields instead of reusing an earlier draft', async () => {
   const deps = fixture()
   let quantity = '100'

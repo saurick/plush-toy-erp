@@ -1,0 +1,20 @@
+.erp-business-cell-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+
+.erp-business-cell-stack > span {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.erp-business-cell-stack__secondary {
+  color: var(--erp-text-muted);
+}

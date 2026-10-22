@@ -74,12 +74,12 @@ export function buildSalesOrderReservationItemChoices(
       [item?.product_code_snapshot, item?.product_name_snapshot]
         .map((value) => String(value || '').trim())
         .filter(Boolean)
-        .join(' / ') || `销售明细 ${index + 1}`
+        .join(' ') || `销售明细 ${index + 1}`
     const skuText = String(item?.color_snapshot || '').trim()
     const unitText = String(item?.unit_name_snapshot || '').trim()
     return {
       value: itemID,
-      label: `${productText}${skuText ? ` / ${skuText}` : ''} · 订单 ${positiveUnitsText(ordered)}${unitText ? ` ${unitText}` : ''}`,
+      label: `${productText}${skuText ? ` ${skuText}` : ''} · 订单 ${positiveUnitsText(ordered)}${unitText ? ` ${unitText}` : ''}`,
       item,
       ordered: positiveUnitsText(ordered),
       activeReserved: positiveUnitsText(activeReserved),
@@ -129,7 +129,7 @@ export function buildReservationBalanceChoices(
         (positiveID(balance?.lot_id) ? '批次已关联' : '无批次')
       return {
         value: positiveID(balance?.id),
-        label: `${warehouseText} / ${lotText} · 可用 ${positiveUnitsText(available) || '0'}`,
+        label: `${warehouseText} ${lotText} · 可用 ${positiveUnitsText(available) || '0'}`,
         balance,
         available: positiveUnitsText(available),
         disabled:

@@ -118,7 +118,7 @@ export function sourceLineProductText(
       : '',
   ]
     .filter(Boolean)
-    .join(' / ')
+    .join(' ')
 }
 
 function ShipmentFormFields({
@@ -887,7 +887,7 @@ function ShipmentItemsTable({
               referenceLabel(warehouseOptions, record.warehouse_id, '仓库'),
               referenceLabel(inventoryLotOptions, record.lot_id, '批次'),
               referenceLabel(unitOptions, record.unit_id, '单位'),
-            ].join(' / '),
+            ].join(' '),
         },
         { align: 'right', title: '数量', dataIndex: 'quantity', width: 120 },
         {

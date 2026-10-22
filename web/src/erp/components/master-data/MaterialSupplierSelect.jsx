@@ -27,7 +27,7 @@ export default function MaterialSupplierSelect({
             )
             .map((item) => ({
               value: item.id,
-              label: `${item.code} / ${item.name}`,
+              label: `${item.code} ${item.name}`,
               disabled: !item.is_active,
             }))
         )

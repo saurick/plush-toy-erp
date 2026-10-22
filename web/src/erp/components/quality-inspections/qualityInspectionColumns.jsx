@@ -167,7 +167,7 @@ export function isProductionStageQualityInspection(record) {
 }
 
 function productionWipProductLabel(record) {
-  return `${visibleBusinessText(record?.product_code)} / ${visibleBusinessText(
+  return `${visibleBusinessText(record?.product_code)} ${visibleBusinessText(
     record?.product_name
   )}`
 }
@@ -329,7 +329,7 @@ export function buildQualityInspectionExportColumns({
             purchaseReceiptOptions,
             allPurchaseReceiptItemOptions
           ),
-        ].join(' / '),
+        ].join(' '),
     },
     {
       align: 'left',
@@ -514,7 +514,7 @@ export function buildQualityInspectionDataColumns({
             purchaseReceiptOptions,
             allPurchaseReceiptItemOptions
           ),
-        ].join(' / '),
+        ].join(' '),
     },
     {
       align: 'left',
@@ -535,7 +535,7 @@ export function buildQualityInspectionDataColumns({
           warehouseOptions
         )
           .filter(Boolean)
-          .join(' / '),
+          .join(' '),
     },
     {
       align: 'left',
@@ -552,7 +552,7 @@ export function buildQualityInspectionDataColumns({
       exportValue: (record) =>
         [formatUnixDate(record?.inspected_at), qualityInspectorText(record)]
           .filter(Boolean)
-          .join(' / '),
+          .join(' '),
     },
     {
       align: 'left',

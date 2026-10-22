@@ -1060,7 +1060,7 @@ export function productionWipOrderItemLabel(item = {}) {
   ]
     .map((value) => String(value || '').trim())
     .filter(Boolean)
-    .join(' / ')
+    .join(' ')
   return [line, product || '订单产品已关联'].filter(Boolean).join(' · ')
 }
 
@@ -1290,7 +1290,7 @@ export function buildProductionWipFabricContractOptions(
           snapshotText(requirement.material_name_snapshot),
         ]
           .filter(Boolean)
-          .join(' / ') || '材料已关联'
+          .join(' ') || '材料已关联'
       const unit = snapshotText(requirement.unit_name_snapshot) || '单位已关联'
       const options = sources
         .filter(
@@ -1396,7 +1396,7 @@ export function buildProductionWipOutsourcingCandidateOptions(
           ),
         ]
           .filter(Boolean)
-          .join(' / ') || '产品已关联'
+          .join(' ') || '产品已关联'
       const sku =
         snapshotText(
           item.sku_code_snapshot,

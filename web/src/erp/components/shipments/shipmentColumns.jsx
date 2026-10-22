@@ -1,5 +1,7 @@
 import React from 'react'
 import { Tag } from 'antd'
+import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
+import DeliveryInfoCell from '../business-list/DeliveryInfoCell.jsx'
 import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
@@ -52,7 +54,7 @@ function deliveryText(snapshot = {}) {
   return (
     [source.country_region, source.recipient, source.phone, source.address]
       .filter(Boolean)
-      .join(' / ') || '-'
+      .join(' ') || '-'
   )
 }
 
@@ -60,7 +62,7 @@ function transportText(record = {}) {
   return (
     [record.transport_method, record.carrier_name, record.tracking_no]
       .filter(Boolean)
-      .join(' / ') || '-'
+      .join(' ') || '-'
   )
 }
 
@@ -71,7 +73,7 @@ function packageText(record = {}) {
     record.gross_weight_kg ? `毛重 ${record.gross_weight_kg} 千克` : '',
     record.volume_m3 ? `体积 ${record.volume_m3} 立方米` : '',
   ]
-  return parts.filter(Boolean).join(' / ') || '-'
+  return parts.filter(Boolean).join(' ') || '-'
 }
 
 function freightText(record = {}, fallback = '-') {
@@ -93,6 +95,13 @@ function shipmentWeightText(value, record) {
   if (hasFinalShipmentWeight(record?.status)) return `最终 ${weight} 克`
   if (record?.status === ShipmentStatus.DRAFT) return `实际 ${weight} 克`
   return `${weight} 克`
+}
+
+function shipmentDatesText(record = {}) {
+  const planned = formatUnixDate(record.planned_ship_at)
+  const actual = formatUnixDate(record.shipped_at)
+  if (planned === '-' && actual === '-') return '-'
+  return `计划 ${planned}\n实际 ${actual}`
 }
 
 export function buildShipmentColumns({ salesOrdersByID }) {
@@ -178,7 +187,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
     {
       align: 'right',
       defaultPriority: 60,
-      title: '实际 / 最终总净重（克）',
+      title: '总净重（克）',
       exportTitle: '总净重（克）',
       dataIndex: 'total_net_weight_g',
       width: 190,
@@ -195,14 +204,14 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       dataIndex: 'delivery_snapshot',
       width: 360,
       sortValue: (record) => deliveryText(record?.delivery_snapshot),
-      render: deliveryText,
+      render: (value) => <DeliveryInfoCell snapshot={value} />,
       exportValue: (record) => deliveryText(record?.delivery_snapshot),
     },
     {
       align: 'left',
       defaultPriority: 80,
-      title: '运输 / 承运 / 单号',
-      exportTitle: '运输 / 承运 / 单号',
+      title: '物流信息',
+      exportTitle: '物流信息',
       key: 'transport',
       copyable: {
         label: '物流单号',
@@ -210,14 +219,19 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       },
       width: 300,
       sortValue: transportText,
-      render: (_, record) => transportText(record),
+      render: (_, record) => (
+        <BusinessCellStack
+          primary={[record.carrier_name, record.transport_method].filter(Boolean).join(' ')}
+          secondary={record.tracking_no}
+        />
+      ),
       exportValue: transportText,
     },
     {
       align: 'left',
       defaultPriority: 90,
-      title: '包装 / 毛重 / 体积',
-      exportTitle: '包装 / 毛重 / 体积',
+      title: '包装信息',
+      exportTitle: '包装信息',
       key: 'package_summary',
       width: 280,
       sortable: false,
@@ -248,19 +262,17 @@ export function buildShipmentColumns({ salesOrdersByID }) {
     },
     {
       defaultPriority: 40,
-      title: '计划出货日期 / 实际出货日期',
-      exportTitle: '计划出货日期 / 实际出货日期',
+      title: '出货日期',
+      exportTitle: '出货日期',
       width: 180,
       sortValue: (record) => record.shipped_at || record.planned_ship_at,
       sortType: 'date',
-      render: (_, record) =>
-        `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
-          record.shipped_at
-        )}`,
-      exportValue: (record) =>
-        `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
-          record.shipped_at
-        )}`,
+      render: (_, record) => (
+        <span style={{ whiteSpace: 'pre-line' }}>
+          {shipmentDatesText(record)}
+        </span>
+      ),
+      exportValue: shipmentDatesText,
     },
     {
       align: 'left',

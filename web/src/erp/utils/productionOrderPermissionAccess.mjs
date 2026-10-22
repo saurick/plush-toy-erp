@@ -3,7 +3,7 @@ function snapshotLabel(values, fallback) {
     values
       .map((value) => String(value || '').trim())
       .filter(Boolean)
-      .join(' / ') || fallback
+      .join(' ') || fallback
   )
 }
 

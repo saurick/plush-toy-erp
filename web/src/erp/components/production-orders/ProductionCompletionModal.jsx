@@ -199,7 +199,7 @@ export default function ProductionCompletionModal({
                 [item?.product_name_snapshot, item?.sku_code_snapshot]
                   .map((value) => String(value || '').trim())
                   .filter(Boolean)
-                  .join(' / ') || '产品已关联'
+                  .join(' ') || '产品已关联'
               return `${line} · ${product}：${reason}`
             })
             .join('；')}

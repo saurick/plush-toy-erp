@@ -29,7 +29,7 @@ function sourceProductText(source, productOptions, productSKUOptions) {
   const sku = source?.productSkuID
     ? referenceLabel(productSKUOptions, source.productSkuID, '产品规格')
     : '未分规格'
-  return `${product} / ${sku}`
+  return `${product} ${sku}`
 }
 
 function sourceOptionLabel(
@@ -50,7 +50,7 @@ function sourceOptionLabel(
   const unavailable = source?.unavailableReason
     ? `（${source.unavailableReason}）`
     : ''
-  return `${product} / ${warehouse} / ${lot} · 数量 ${quantity}${unavailable}`
+  return `${product} ${warehouse} ${lot} · 数量 ${quantity}${unavailable}`
 }
 
 function renderShipmentQualityProductOption(option) {

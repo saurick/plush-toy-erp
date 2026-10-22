@@ -30,7 +30,7 @@ function requirementLabel(requirement) {
     [requirement?.material_code_snapshot, requirement?.material_name_snapshot]
       .map((value) => String(value || '').trim())
       .filter(Boolean)
-      .join(' / ') || '物料需求已关联'
+      .join(' ') || '物料需求已关联'
   )
 }
 

@@ -24,7 +24,7 @@ function readableText(values = [], fallback = '-') {
   const text = values
     .map((value) => String(value || '').trim())
     .filter(Boolean)
-    .join(' / ')
+    .join(' ')
   return text || fallback
 }
 

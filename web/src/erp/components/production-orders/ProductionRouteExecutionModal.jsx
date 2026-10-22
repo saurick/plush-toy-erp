@@ -1077,7 +1077,7 @@ onCancel: () => resolve(false),
                               requirement.material_name_snapshot,
                             ]
                               .filter(Boolean)
-                              .join(' / ')
+                              .join(' ')
                             return (
                               <Form.Item
                                 key={requirement.id}
@@ -1803,7 +1803,7 @@ onCancel: () => resolve(false),
                       operation.outsourcing_allowed ? '外发' : '',
                     ]
                       .filter(Boolean)
-                      .join(' / ')
+                      .join(' ')
                     return {
                       key: operation.id,
                       title: (

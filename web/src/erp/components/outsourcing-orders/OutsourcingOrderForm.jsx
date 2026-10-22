@@ -125,7 +125,7 @@ export function supplierLabel(supplier = {}) {
   return (
     [supplier.code, supplier.short_name || supplier.name]
       .filter(Boolean)
-      .join(' / ') || '供应商已关联'
+      .join(' ') || '供应商已关联'
   )
 }
 
@@ -133,7 +133,7 @@ export function productLabel(product = {}) {
   return (
     [product.style_no?.trim() || product.code, product.name]
       .filter(Boolean)
-      .join(' / ') || '产品已关联'
+      .join(' ') || '产品已关联'
   )
 }
 
@@ -146,13 +146,13 @@ export function productSKULabel(productSKU = {}) {
       productSKU.customer_sku,
     ]
       .filter(Boolean)
-      .join(' / ') || '产品规格已关联'
+      .join(' ') || '产品规格已关联'
   )
 }
 
 export function materialLabel(material = {}) {
   return (
-    [material.code, material.name].filter(Boolean).join(' / ') || '材料已关联'
+    [material.code, material.name].filter(Boolean).join(' ') || '材料已关联'
   )
 }
 
@@ -160,7 +160,7 @@ export function processLabel(process = {}) {
   return (
     [process.name, process.category !== process.name ? process.category : '']
       .filter(Boolean)
-      .join(' / ') || '工序已关联'
+      .join(' ') || '工序已关联'
   )
 }
 
@@ -845,7 +845,7 @@ export default function OutsourcingOrderForm({
                     contact.mobile || contact.phone,
                   ]
                     .filter(Boolean)
-                    .join(' / '),
+                    .join(' '),
                   contact,
                 }))}
                 onChange={onSupplierContactNameChange}

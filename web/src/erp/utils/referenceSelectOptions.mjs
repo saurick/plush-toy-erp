@@ -26,7 +26,7 @@ function compactParts(parts = []) {
   return parts
     .map((part) => String(part ?? '').trim())
     .filter(Boolean)
-    .join(' / ')
+    .join(' ')
 }
 
 export function uniqueReferenceOptions(records, toOption) {

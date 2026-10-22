@@ -59,7 +59,7 @@ function mergePaymentConditionOptions(...optionGroups) {
         option?.label ||
         (normalizedDays === undefined
           ? value
-          : `${value} / ${normalizedDays}天`),
+          : `${value} ${normalizedDays}天`),
       payment_term_days: normalizedDays,
     })
   })
@@ -106,7 +106,7 @@ function formatPaymentCondition(record = {}) {
     if (method === canonicalTermText) {
       return canonicalTermText
     }
-    return `${method} / ${termDays}天`
+    return `${method} ${termDays}天`
   }
   if (method) {
     return method

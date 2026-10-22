@@ -187,7 +187,7 @@ export default function PurchaseOrderTermsModal({
                 render: (_, item) =>
                   [item.material_code_snapshot, item.material_name_snapshot]
                     .filter(Boolean)
-                    .join(' / ') || '采购物料',
+                    .join(' ') || '采购物料',
               },
               {
                 title: '采购数量',

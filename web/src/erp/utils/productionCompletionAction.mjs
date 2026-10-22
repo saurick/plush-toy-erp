@@ -293,12 +293,12 @@ export function buildProductionCompletionChoices(
       [item?.product_code_snapshot, item?.product_name_snapshot]
         .map((value) => String(value || '').trim())
         .filter(Boolean)
-        .join(' / ') || `生产明细 ${index + 1}`
+        .join(' ') || `生产明细 ${index + 1}`
     const skuText = String(item?.sku_code_snapshot || '').trim()
     const unitText = String(item?.unit_name_snapshot || '').trim()
     return {
       value: lineID,
-      label: `${productText}${skuText ? ` / ${skuText}` : ''} · 剩余 ${quantityTextFromUnits(remaining)}${unitText ? ` ${unitText}` : ''}`,
+      label: `${productText}${skuText ? ` ${skuText}` : ''} · 剩余 ${quantityTextFromUnits(remaining)}${unitText ? ` ${unitText}` : ''}`,
       item,
       planned: quantityTextFromUnits(planned),
       receivableQuantity: quantityTextFromUnits(receivableQuantity),
@@ -336,7 +336,7 @@ export function buildProductionCompletionLotOptions(item = {}, lots = []) {
         [lot.lot_no, lot.production_lot_no]
           .map((value) => String(value || '').trim())
           .filter(Boolean)
-          .join(' / ') || '批次已关联',
+          .join(' ') || '批次已关联',
     }))
     .filter((option) => Number.isSafeInteger(option.value) && option.value > 0)
 }

@@ -1275,9 +1275,9 @@ export function createBusinessFormInteractionScenarios({
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'shipment-date-filter-desktop',
           unsortableHeaders: [
-            '实际 / 最终总净重（克）',
+            '总净重（克）',
             '实际运费',
-            '包装 / 毛重 / 体积',
+            '包装信息',
             '备注',
           ],
         })

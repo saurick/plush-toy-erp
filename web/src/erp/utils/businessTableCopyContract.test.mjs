@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { registerJSXTestLoader } from '../../../scripts/test/reactRuntime.mjs'
+
+registerJSXTestLoader()
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url))
 const sourceRoot = resolve(currentDirectory, '..')
@@ -87,13 +91,24 @@ test('formal business main tables register useful text columns explicitly', () =
   )
 })
 
-test('sales order contact rendering does not consume the table record as fallback text', () => {
-  const source = readSource(
-    'components/sales-orders/salesOrderColumns.jsx'
-  )
-
-  assert.match(source, /render:\s*\(value\)\s*=>\s*contactText\(value\)/u)
-  assert.doesNotMatch(source, /render:\s*contactText\s*,/u)
+test('sales order contacts keep missing values safe and copy text independent of the stacked display', async () => {
+  const { buildSalesOrderColumns } = await import('../components/sales-orders/salesOrderColumns.jsx')
+  const contact = buildSalesOrderColumns().find(({ dataIndex }) => dataIndex === 'contact_snapshot')
+  for (const [snapshot, display, copy] of [
+    [undefined, '-', ''],
+    [null, '-', ''],
+    [{}, '-', ''],
+    [{ name: '小吴' }, '小吴', '小吴'],
+    [{ phone: '010-12345678' }, '010-12345678', '010-12345678'],
+    [{ name: '小吴', mobile: '13800000000', phone: '010-12345678' }, '小吴13800000000', '小吴 13800000000'],
+  ]) {
+    const record = { contact_snapshot: snapshot, order_no: 'must-not-be-rendered' }
+    const markup = renderToStaticMarkup(contact.render(snapshot, record, 0))
+    assert.equal(markup.replace(/<[^>]*>/gu, ''), display)
+    assert.equal(contact.copyable.resolveValue(snapshot, record), copy)
+    assert.equal(contact.exportValue(record), copy || '-')
+    assert.doesNotMatch(markup, /must-not-be-rendered|\[object Object\]/u)
+  }
 })
 
 test('copy whitelist avoids routine dates, amounts, quantities and statuses', () => {

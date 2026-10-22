@@ -375,7 +375,7 @@ export default function PurchaseReceiptsPage() {
         if (!value || seen.has(value)) return null
         seen.add(value)
         return {
-          label: [supplier.code, value].filter(Boolean).join(' / '),
+          label: [supplier.code, value].filter(Boolean).join(' '),
           value,
         }
       })

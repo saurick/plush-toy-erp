@@ -102,7 +102,7 @@ test('reservation balance choices only expose matching available stock grain', (
     { productID: 7, productSkuID: 8 }
   )
   assert.equal(choices.length, 1)
-  assert.match(choices[0].label, /成品仓 \/ LOT-01 · 可用 6/u)
+  assert.match(choices[0].label, /成品仓 LOT-01 · 可用 6/u)
 })
 
 test('reservation payload derives protected source and stock fields', () => {

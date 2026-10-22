@@ -201,7 +201,7 @@ export function buildProductionReworkProgressItems({
         ]
           .map((value) => String(value || '').trim())
           .filter(Boolean)
-          .join(' / ') || '生产产品'
+          .join(' ') || '生产产品'
       return Object.freeze({
         key: originFactID,
         productID: Number(item?.product_id || 0),

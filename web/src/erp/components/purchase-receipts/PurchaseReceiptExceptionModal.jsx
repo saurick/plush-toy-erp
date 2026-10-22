@@ -34,7 +34,7 @@ function receiptItemLabel(item, materialOptions = []) {
     quantity ? `入库 ${quantity}` : '',
   ]
     .filter(Boolean)
-    .join(' / ')
+    .join(' ')
 }
 
 function localDateTimeValue() {

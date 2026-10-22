@@ -93,7 +93,7 @@ export function partyOption(record, fallback) {
   ).trim()
   return {
     value: Number(record?.id),
-    label: [code, name].filter(Boolean).join(' / ') || fallback,
+    label: [code, name].filter(Boolean).join(' ') || fallback,
   }
 }
 

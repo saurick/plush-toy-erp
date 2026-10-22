@@ -35,7 +35,7 @@ test('production order view uses frozen snapshots without remote source reads', 
   )
 
   const options = productionReferenceSnapshotOptions(sourcedItems)
-  assert.equal(options.product[0].label, 'P-1 / 小熊')
+  assert.equal(options.product[0].label, 'P-1 小熊')
   assert.equal(options.product_sku[0].label, 'SKU-2')
   assert.equal(options.unit[0].label, '只')
   assert.equal(options.sales_order_item[0].label, '销售订单行已关联')

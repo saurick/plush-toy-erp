@@ -1324,7 +1324,7 @@ test('FL_shipment_ship_date__retains_planned_and_actual_ship_dates masterDataOrd
   )
   assert.match(
     shipmentColumnsSource,
-    /exportTitle:\s*'计划出货日期 \/ 实际出货日期'/u
+    /exportTitle:\s*'出货日期'/u
   )
 })
 

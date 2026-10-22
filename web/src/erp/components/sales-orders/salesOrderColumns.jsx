@@ -1,5 +1,7 @@
 import React from 'react'
 import { Tag } from 'antd'
+import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
+import DeliveryInfoCell from '../business-list/DeliveryInfoCell.jsx'
 
 import {
   SALES_ORDER_ITEM_STATUS_LABELS,
@@ -38,7 +40,7 @@ function displaySalesOrderItemAmount(record, fallback = '-') {
 function contactText(snapshot = {}, fallback = '-') {
   const name = snapshot?.name || ''
   const phone = snapshot?.mobile || snapshot?.phone || ''
-  return [name, phone].filter(Boolean).join(' / ') || fallback
+  return [name, phone].filter(Boolean).join(' ') || fallback
 }
 
 function moneyText(value, currency, fallback = '-') {
@@ -53,7 +55,7 @@ function moneyText(value, currency, fallback = '-') {
 function taxTermsText(record = {}) {
   const mode = salesOrderTaxModeText(record.tax_mode)
   const rate = String(record.tax_rate ?? '').trim()
-  return rate ? `${mode} / ${rate}%` : mode
+  return rate ? `${mode} ${rate}%` : mode
 }
 
 function quotedFreightText(record = {}, fallback = '-') {
@@ -69,7 +71,7 @@ function deliveryText(snapshot = {}) {
   return (
     [source.country_region, source.recipient, source.phone, source.address]
       .filter(Boolean)
-      .join(' / ') || '-'
+      .join(' ') || '-'
   )
 }
 
@@ -142,8 +144,8 @@ export function buildSalesOrderColumns() {
     },
     {
       defaultPriority: 70,
-      title: '业务员 / 跟单人',
-      exportTitle: '业务员 / 跟单人',
+      title: '业务员（跟单人）',
+      exportTitle: '业务员（跟单人）',
       dataIndex: 'sales_owner',
       copyable: true,
       width: 140,
@@ -165,7 +167,12 @@ export function buildSalesOrderColumns() {
           contactText(a?.contact_snapshot),
           contactText(b?.contact_snapshot)
         ),
-      render: (value) => contactText(value),
+      render: (value) => (
+        <BusinessCellStack
+          primary={value?.name}
+          secondary={value?.mobile || value?.phone}
+        />
+      ),
       exportValue: (record) => contactText(record?.contact_snapshot),
     },
     {
@@ -191,8 +198,8 @@ export function buildSalesOrderColumns() {
         moneyText(record?.goods_amount, record?.currency, ''),
     },
     {
-      title: '计税方式 / 税率',
-      exportTitle: '计税方式 / 税率',
+      title: '计税信息',
+      exportTitle: '计税信息',
       key: 'tax_terms',
       defaultHidden: true,
       width: 200,
@@ -298,7 +305,7 @@ export function buildSalesOrderColumns() {
           deliveryText(a?.delivery_snapshot),
           deliveryText(b?.delivery_snapshot)
         ),
-      render: deliveryText,
+      render: (value) => <DeliveryInfoCell snapshot={value} />,
       exportValue: (record) => deliveryText(record?.delivery_snapshot),
     },
     {

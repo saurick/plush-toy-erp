@@ -693,7 +693,7 @@ test('production WIP outsourcing candidates mirror the confirmed open exact-matc
   assert.match(options[0].label, /OUT-SEW-001.*永绅车缝加工厂.*车缝.*120 只/u)
   assert.match(
     options[0].matchSummary,
-    /产品 BEAR-20 \/ 毛绒小熊；规格 BROWN-20CM；工序 车缝；数量 120 只/u
+    /产品 BEAR-20 毛绒小熊；规格 BROWN-20CM；工序 车缝；数量 120 只/u
   )
 
   const mismatches = [
@@ -871,7 +871,7 @@ test('production WIP labels show business line snapshots and never raw IDs', () 
   const item = productionWipOrderItem(aggregate, batch)
   assert.equal(
     productionWipBatchLabel(batch, item),
-    'WIP-001 · 第 1 行 · 毛绒小熊 / BROWN-20CM'
+    'WIP-001 · 第 1 行 · 毛绒小熊 BROWN-20CM'
   )
   assert.deepEqual(
     productionWipOperationsForBatch(aggregate, batch).map(
