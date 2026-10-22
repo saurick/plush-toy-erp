@@ -391,3 +391,36 @@ test("client confines requests, bounds responses and verifies existing environme
     /exceeds limit/u,
   );
 });
+
+test("CLI can reconcile a lost registration response before target execution without changing the ready operation", async (t) => {
+  const f = fixture(t);
+  const client = fakeClient();
+  const create = client.createDeployment;
+  client.createDeployment = async (...args) => {
+    await create.apply(client, args);
+    throw new Error("response lost");
+  };
+  const recorder = createGitlabDeploymentRecorder({ store: f.store, client });
+  await assert.rejects(recorder.register(f.id), /response lost/u);
+  const result = await runDeploymentRecordsCLI(
+    [
+      "reconcile",
+      "--execute",
+      "--operation-id",
+      f.id,
+      "--deployment-id",
+      "100",
+    ],
+    {
+      root: f.root,
+      resolveCredential: async () => ({ token: "test" }),
+      verifyCredential: async () => {},
+      createClient: () => client,
+      write: () => {},
+    },
+  );
+  assert.equal(result.results[0].deploymentId, 100);
+  assert.equal(result.results[0].status, "pending");
+  assert.equal(readDeliveryOperation(f.store, f.id).status, "ready");
+  assert.equal(client.calls.filter((x) => x === "create").length, 1);
+});

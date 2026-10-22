@@ -44,7 +44,8 @@ export async function runDeploymentRecordsCLI(
   const operations = readAllDeliveryOperations(store)
     .filter(
       (x) =>
-        DELIVERY_OPERATION_TERMINAL_STATUSES.includes(x.status) &&
+        (command === "reconcile" ||
+          DELIVERY_OPERATION_TERMINAL_STATUSES.includes(x.status)) &&
         (!options["operation-id"] || x.id === options["operation-id"]),
     )
     .sort(
@@ -52,7 +53,11 @@ export async function runDeploymentRecordsCLI(
         a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id),
     );
   if (options["operation-id"] && operations.length !== 1)
-    throw new Error("a terminal operation is required");
+    throw new Error(
+      command === "reconcile"
+        ? "operation was not found"
+        : "a terminal operation is required",
+    );
   const counts = {};
   for (const operation of operations)
     counts[operation.target] = (counts[operation.target] || 0) + 1;
