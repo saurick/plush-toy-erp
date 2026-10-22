@@ -25,6 +25,7 @@ export function useVersionCenter() {
   const {
     actionKey,
     activeDeliverySnapshotKeyRef,
+    activeOperationScopeRef,
     activeView,
     checkedAt,
     clearOperationDetailFocusRestoreTimer,
@@ -45,6 +46,7 @@ export function useVersionCenter() {
     operationDetail,
     operationDetailLoading,
     operationDetailRequestRef,
+    operationDetailAbortRef,
     operationDetailTriggerRef,
     operationHistoryFilters,
     operationPollError,
@@ -68,7 +70,6 @@ export function useVersionCenter() {
     setVersionPage,
     summary,
     summaryFresh,
-    summaryInCurrentScope,
     updateOperationHistoryFilter,
     updateSummary,
     versionPage,
@@ -232,22 +233,30 @@ export function useVersionCenter() {
 
   const openOperationDetail = async (operation, trigger) => {
     const requestedSnapshotKey = deliverySnapshotKey
+    const requestedOperationScope = activeOperationScopeRef.current
     if (
-      !summaryInCurrentScope ||
+      !customerReady ||
       activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
     ) {
       return
     }
     const requestId = operationDetailRequestRef.current + 1
     operationDetailRequestRef.current = requestId
+    operationDetailAbortRef.current?.abort()
+    const controller = new AbortController()
+    operationDetailAbortRef.current = controller
     clearOperationDetailFocusRestoreTimer()
     operationDetailTriggerRef.current = trigger
     setOperationDetail(operation)
     setOperationDetailLoading(true)
     try {
-      const nextOperation = await client.operation(operation.id)
+      const nextOperation = await client.operation(operation.id, {
+        target: operation.target,
+        signal: controller.signal,
+      })
       if (
         operationDetailRequestRef.current !== requestId ||
+        activeOperationScopeRef.current !== requestedOperationScope ||
         activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
       ) {
         return
@@ -256,6 +265,7 @@ export function useVersionCenter() {
     } catch (error) {
       if (
         operationDetailRequestRef.current !== requestId ||
+        activeOperationScopeRef.current !== requestedOperationScope ||
         activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
       ) {
         return
@@ -264,6 +274,7 @@ export function useVersionCenter() {
     } finally {
       if (
         operationDetailRequestRef.current === requestId &&
+        activeOperationScopeRef.current === requestedOperationScope &&
         activeDeliverySnapshotKeyRef.current === requestedSnapshotKey
       ) {
         setOperationDetailLoading(false)

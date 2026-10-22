@@ -43,21 +43,23 @@ export function buildVersionCenterModel({
     (version) => deliveryVersionForTarget(version, selectedTargetKey) || version
   )
   const releaseVersion = summary?.releaseVersionPolicy?.nextVersion || ''
-  const operations = summary?.operations || []
+  const allOperations = summary?.operations || []
+  const operations = allOperations.filter((operation) =>
+    operation.target === selectedTargetKey || operation.action === 'release'
+  )
   const openOperations = operations.filter((operation) =>
     OPEN_OPERATION_STATUSES.has(operation.status)
   )
   const hasOperationHistoryFilters = Boolean(
     operationHistoryFilters.action !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
     operationHistoryFilters.result !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
-    operationHistoryFilters.target !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
     operationHistoryFilters.keyword
   )
-  const pollingOperation = operations.find((operation) =>
+  const pollingOperation = allOperations.find((operation) =>
     POLLING_OPERATION_STATUSES.has(operation.status)
   )
   const pollingOperationId = pollingOperation?.id || ''
-  const hasOpenOperation = operations.some((operation) =>
+  const hasOpenOperation = allOperations.some((operation) =>
     OPEN_OPERATION_STATUSES.has(operation.status)
   )
   const isMutationRunning = Boolean(actionKey)

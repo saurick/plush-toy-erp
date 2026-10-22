@@ -2,10 +2,12 @@ import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import process from 'node:process'
+import { setImmediate as yieldReadRequests } from 'node:timers/promises'
 
 import {
   consumeDeliveryOperationStore,
   createOrReuseDeliveryOperation,
+  createDeliveryOperationReadIndex,
   DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
   deliveryOperationRequestCounts,
   listDeliveryOperations,
@@ -53,6 +55,7 @@ import {
 import { readLatestBackupRestoreEvidence } from './devRecoveryEvidence.mjs'
 import {
   filterDevOperationHistory,
+  deliveryOperationRetryPolicy,
   resolveDevOperationHistoryFilters,
 } from '../src/dev-workbench/config/devDelivery.mjs'
 
@@ -102,13 +105,18 @@ function isDeliveryTarget(value) {
   return DELIVERY_TARGET_KEYS.includes(String(value || ''))
 }
 
-function bindVersionActions({
+async function bindVersionActions({
   classifyRelation,
   projectRoot,
   targetEvidence,
   versions,
 }) {
-  return versions.map((version) => {
+  const relations = new Map()
+  const boundVersions = []
+  for (const version of versions) {
+    // Git ancestry is synchronous. Yield between versions so a large release
+    // catalog cannot monopolize the server while history/details are requested.
+    await yieldReadRequests()
     const actionsByTarget = Object.fromEntries(
       DELIVERY_TARGET_KEYS.map((targetKey) => {
         const evidence = targetEvidence.get(targetKey)
@@ -143,11 +151,15 @@ function bindVersionActions({
           ]
         }
         try {
-          const relation = classifyRelation({
-            repoRoot: projectRoot,
-            currentGitSha: serverSha,
-            candidateGitSha: version.gitSha,
-          })
+          const identity = `${serverSha}:${version.gitSha}`
+          if (!relations.has(identity)) {
+            relations.set(identity, classifyRelation({
+              repoRoot: projectRoot,
+              currentGitSha: serverSha,
+              candidateGitSha: version.gitSha,
+            }))
+          }
+          const relation = relations.get(identity)
           return [
             targetKey,
             {
@@ -166,12 +178,13 @@ function bindVersionActions({
         }
       })
     )
-    return {
+    boundVersions.push({
       ...version,
       ...actionsByTarget['demo-133'],
       actionsByTarget,
-    }
-  })
+    })
+  }
+  return boundVersions
 }
 
 function assertExactKeys(value, expected, field) {
@@ -317,11 +330,6 @@ function publicOperation(
   operation,
   { eventLimit = 20, requestCount = 1, evidence = null } = {}
 ) {
-  const retryableAction = ['release', 'promote', 'rollback'].includes(
-    operation.action
-  )
-  const retryAllowed =
-    retryableAction && ['failed', 'blocked'].includes(operation.status)
   const readyConfirmation =
     operation.status !== 'ready'
       ? ''
@@ -586,18 +594,7 @@ function publicOperation(
       reuseCount: Math.max(0, requestCount - 1),
       basis: ['action', 'target', 'git_sha', 'version', 'delivery_inputs'],
     },
-    retry: {
-      allowed: retryAllowed,
-      reason: retryAllowed
-        ? 'explicit_retry_available'
-        : operation.status === 'not_proven'
-          ? 'target_readback_required'
-          : ['failed', 'blocked'].includes(operation.status)
-            ? 'action_not_retryable'
-            : TERMINAL_STATUSES.has(operation.status)
-              ? 'terminal_no_retry_needed'
-              : 'operation_in_progress',
-    },
+    retry: deliveryOperationRetryPolicy(operation),
     confirmationRequired: readyConfirmation,
     terminal: TERMINAL_STATUSES.has(operation.status),
   }
@@ -781,6 +778,7 @@ export function createDevDeliveryService({
   const children = new Map()
   const preflightCache = new Map()
   const initializationPreflightCache = new Map()
+  const operationReadIndex = createDeliveryOperationReadIndex(store)
   let pipelineTimingCache = null
 
   function executorEnvironment({ targetFetch = false } = {}) {
@@ -799,8 +797,8 @@ export function createDevDeliveryService({
   }
 
   function presentOperation(operation, options = {}) {
-    const requestCount =
-      deliveryOperationRequestCounts(store).get(operation.id) || 1
+    const indexed = operationReadIndex.read()
+    const requestCount = indexed.requestCounts.get(operation.id) || 1
     let evidence = null
     if (options.eventLimit === 100) {
       const stored = readDeliveryOperationReceipt(store, operation)
@@ -877,10 +875,26 @@ export function createDevDeliveryService({
         }
       }
     }
-    return publicOperation(operation, { ...options, requestCount, evidence })
+    const presented = publicOperation(operation, { ...options, requestCount, evidence })
+    if (indexed.unreadableRequests > 0) {
+      presented.issues = [...presented.issues, {
+        code: 'operation_request_index_incomplete',
+level: 'warning',
+        message: '请求索引未完整读回，幂等复用次数仅含已校验记录',
+      }]
+    }
+    return presented
   }
 
-  recoverInterruptedDeliveryOperations(store, now())
+  let recovered = false
+  function recoverOperations() {
+    if (recovered) return
+    recoverInterruptedDeliveryOperations(store, now())
+    recovered = true
+  }
+  // An unrelated damaged operation must not prevent reading intact history.
+  // Summary and all mutations still require the complete recovery check.
+  try { recoverOperations() } catch { /* Retried by summary/action. */ }
 
   function releaseControlIdentity(download) {
     if (download?.transportMode === 'v2_direct') {
@@ -1168,7 +1182,7 @@ export function createDevDeliveryService({
         repositoryResult.status === 'fulfilled' ? repositoryResult.value : null,
       versions:
         versionsResult.status === 'fulfilled'
-          ? bindVersionActions({
+          ? await bindVersionActions({
               classifyRelation,
               projectRoot: root,
               targetEvidence,
@@ -1651,6 +1665,9 @@ export function createDevDeliveryService({
 
   async function retryOperation(payload) {
     const previous = readDeliveryOperation(store, payload.operationId)
+    if (previous.action !== 'release' && !isDeliveryTarget(previous.target)) {
+      throw new Error('historical deployment target is read-only')
+    }
     if (!['failed', 'blocked'].includes(previous.status)) {
       if (previous.status === 'not_proven') {
         throw new Error('target outcome must be read back before retry')
@@ -2100,6 +2117,7 @@ export function createDevDeliveryService({
 
   return {
     async summary(options) {
+      recoverOperations()
       return getSummary(options)
     },
     history(query = {}) {
@@ -2133,8 +2151,10 @@ export function createDevDeliveryService({
       ) {
         throw new Error('operation history pagination is invalid')
       }
-      const all = readAllDeliveryOperations(store).filter(
+      const indexed = operationReadIndex.read()
+      const all = indexed.operations.filter(
         (operation) =>
+          operation.target === filters.target &&
           TERMINAL_STATUSES.has(operation.status) &&
           ['release', 'promote', 'rollback', 'rebuild-database'].includes(
             operation.action
@@ -2151,17 +2171,24 @@ export function createDevDeliveryService({
         .filter((operation) => operation.status === 'passed')
         .map(
           (operation) =>
-            Date.parse(operation.updatedAt) - Date.parse(operation.createdAt)
+            Math.max(0, Date.parse(operation.updatedAt) - Date.parse(operation.createdAt))
         )
         .sort((a, b) => a - b)
       const actualPage = Math.min(
         page,
         Math.max(1, Math.ceil(matches.length / pageSize))
       )
-      const requestCounts = deliveryOperationRequestCounts(store)
+      const { requestCounts } = indexed
       return {
         kind: 'plush.dev-delivery-history',
+        target: filters.target,
         generatedAt: now(),
+        integrity: {
+          unreadableOperations: indexed.unreadableOperations.filter(
+            (issue) => !issue.target || issue.target === filters.target
+          ).length,
+          unreadableRequests: indexed.unreadableRequests,
+        },
         page: actualPage,
         pageSize,
         total: all.length,
@@ -2186,12 +2213,20 @@ export function createDevDeliveryService({
           ),
       }
     },
-    readOperation(operationId) {
-      return presentOperation(readDeliveryOperation(store, operationId), {
+    readOperation(operationId, target) {
+      const operation = readDeliveryOperation(store, operationId)
+      if (target !== undefined && (
+        resolveDevOperationHistoryFilters({ target }).target !== target ||
+        operation.target !== target
+      )) {
+        throw new Error('operation target does not match the requested scope')
+      }
+      return presentOperation(operation, {
         eventLimit: 100,
       })
     },
     async act(request) {
+      recoverOperations()
       const validated = validateDevDeliveryAction(request)
       if (validated.action === 'dispatch-release') {
         return {
@@ -2351,12 +2386,16 @@ export function createDevDeliveryMiddleware({
       }
       const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
       if (request.method === 'GET' && operationMatch) {
+        const params = new URL(request.url, 'http://localhost').searchParams
+        if ([...params.keys()].some((key) => key !== 'target') || params.getAll('target').length > 1) {
+          throw new Error('operation detail query is invalid')
+        }
         if (!UUID_V4_PATTERN.test(operationMatch[1])) {
           throw new Error('operation id is invalid')
         }
         sendJson(response, 200, {
           kind: 'plush.dev-delivery-operation-result',
-          operation: deliveryService.readOperation(operationMatch[1]),
+          operation: deliveryService.readOperation(operationMatch[1], params.get('target') ?? undefined),
         })
         return
       }

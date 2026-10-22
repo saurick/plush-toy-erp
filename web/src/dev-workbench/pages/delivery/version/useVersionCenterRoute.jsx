@@ -4,6 +4,7 @@ import useDevCustomerScope from '../../../hooks/useDevCustomerScope.mjs'
 import { buildDevCustomerSnapshotKey } from '../../../config/devCustomerScope.mjs'
 import {
   DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
+  DEV_DELIVERY_TARGETS,
   DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
   DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS,
   DEV_VERSION_CENTER_VIEW_HISTORY,
@@ -56,15 +57,26 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
     requestedHistoryTargetCount === 1 ? requestedHistoryTargetValues[0] : ''
   const requestedHistoryKeyword =
     requestedHistoryKeywordCount === 1 ? requestedHistoryKeywordValues[0] : ''
+  const targetValues = searchParams.getAll('target')
+  const isEnvironment = (value) => DEV_DELIVERY_TARGETS.some((target) => target.key === value)
+  const requestedTargetCount = targetValues.length
+  const requestedTarget = requestedTargetCount === 1 ? targetValues[0] : ''
+  const selectedTargetKey = isEnvironment(requestedHistoryTarget) ? requestedHistoryTarget
+    : isEnvironment(requestedTarget) ? requestedTarget : 'demo-133'
   const operationHistoryFilters = resolveDevOperationHistoryFilters({
     action: requestedHistoryAction,
     result: requestedHistoryResult,
-    target: requestedHistoryTarget,
+    target: ['gitlab-release', 'github-release', 'test-133'].includes(requestedHistoryTarget)
+      ? requestedHistoryTarget : selectedTargetKey,
     keyword: requestedHistoryKeyword,
   })
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams)
     let changed = false
+    if (requestedTargetCount !== 1 || requestedTarget !== selectedTargetKey) {
+      nextParams.set('target', selectedTargetKey)
+      changed = true
+    }
     if (requestedViewCount !== 1 || requestedView !== activeView) {
       nextParams.set(DEV_VERSION_CENTER_VIEW_QUERY_KEY, activeView)
       changed = true
@@ -85,7 +97,7 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
       [
         DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target,
         operationHistoryFilters.target,
-        DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+        selectedTargetKey,
         requestedHistoryTargetCount,
       ],
       [
@@ -120,7 +132,20 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
     requestedViewCount,
     searchParams,
     setSearchParams,
+    selectedTargetKey,
+    requestedTargetCount,
+    requestedTarget,
   ])
+
+  const setSelectedTargetKey = useCallback((target) => {
+    if (!DEV_DELIVERY_TARGETS.some((item) => item.key === target)) return
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('target', target)
+    nextParams.delete(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target)
+    nextParams.delete(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action)
+    setHistoryPage(1)
+    setSearchParams(nextParams)
+  }, [searchParams, setSearchParams, setHistoryPage])
 
   const selectView = useCallback(
     (nextView) => {
@@ -138,10 +163,17 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
     (key, value, { replace = false } = {}) => {
       const nextParams = new URLSearchParams(searchParams)
       const normalized = String(value || '').trim()
-      if (!normalized || normalized === DEV_VERSION_CENTER_HISTORY_FILTER_ALL) {
+      if (key === DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target &&
+        DEV_DELIVERY_TARGETS.some((target) => target.key === normalized)) {
+        nextParams.set('target', normalized)
+        nextParams.delete(key)
+      } else if (!normalized || normalized === DEV_VERSION_CENTER_HISTORY_FILTER_ALL) {
         nextParams.delete(key)
       } else {
         nextParams.set(key, normalized)
+      }
+      if (key === DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target) {
+        nextParams.delete(DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action)
       }
       nextParams.set(
         DEV_VERSION_CENTER_VIEW_QUERY_KEY,
@@ -158,6 +190,7 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
     for (const key of Object.values(
       DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS
     )) {
+      if (key === DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target) continue
       nextParams.delete(key)
     }
     nextParams.set(
@@ -181,6 +214,8 @@ export function useVersionCenterRoute({ setHistoryPage, workspaceRef }) {
     deliverySnapshotKey,
     activeView,
     operationHistoryFilters,
+    selectedTargetKey,
+    setSelectedTargetKey,
     selectView,
     updateOperationHistoryFilter,
     clearOperationHistoryFilters,

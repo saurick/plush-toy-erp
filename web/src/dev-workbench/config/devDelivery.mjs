@@ -47,7 +47,7 @@ export const DEV_DELIVERY_TARGETS = Object.freeze([
   Object.freeze({
     key: 'production-133',
     label: 'erp 正式业务',
-    shortLabel: '正式环境',
+    shortLabel: 'erp 正式环境',
     purpose: 'customer-production',
     endpoint: 'https://erp.yoyoosun.net',
     dataBoundary: '独立正式数据；仅显式部署，不提供测试数据重建',
@@ -70,6 +70,7 @@ const DEV_VERSION_CENTER_HISTORY_RESULT_VALUES = new Set([
 ])
 const DEV_VERSION_CENTER_HISTORY_TARGET_VALUES = new Set([
   ...DEV_DELIVERY_TARGET_KEYS,
+  'test-133',
   'gitlab-release',
   'github-release',
 ])
@@ -282,7 +283,7 @@ export function resolveDevOperationHistoryFilters(value = {}) {
       : DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
     target: DEV_VERSION_CENTER_HISTORY_TARGET_VALUES.has(target)
       ? target
-      : DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      : 'demo-133',
     keyword,
   }
 }
@@ -663,8 +664,10 @@ function validOperationIdempotency(operation) {
   )
 }
 
-function validOperationRetry(operation) {
-  const value = operation.retry
+export function deliveryOperationRetryPolicy(operation) {
+  if (operation.action !== 'release' && !DEV_DELIVERY_TARGET_KEYS.includes(operation.target)) {
+    return { allowed: false, reason: 'historical_target_read_only' }
+  }
   const retryableAction = RETRYABLE_DELIVERY_OPERATION_ACTIONS.has(
     operation.action
   )
@@ -681,7 +684,12 @@ function validOperationRetry(operation) {
             )
           ? 'terminal_no_retry_needed'
           : 'operation_in_progress'
-  return value?.allowed === allowed && value?.reason === reason
+  return { allowed, reason }
+}
+
+function validOperationRetry(operation) {
+  const expected = deliveryOperationRetryPolicy(operation)
+  return operation.retry?.allowed === expected.allowed && operation.retry?.reason === expected.reason
 }
 
 function validateOperation(operation) {
@@ -1180,23 +1188,61 @@ async function readJson(response) {
   try {
     payload = await response.json()
   } catch {
-    throw new Error('版本中心返回了无效响应')
+    const error = new Error('版本中心返回了无效响应')
+    error.status = response.status
+    throw error
   }
   if (!response.ok) {
-    throw new Error(
+    const error = new Error(
       typeof payload?.message === 'string'
         ? payload.message
         : '版本中心操作失败'
     )
+    error.status = response.status
+    throw error
   }
   return payload
 }
 
-export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
+export function createDevDeliveryClient({
+  fetchImpl = globalThis.fetch,
+  readTimeoutMs = 8000,
+} = {}) {
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is unavailable')
   }
   let csrfToken = ''
+
+  async function readOperationJson(url, signal) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const controller = new AbortController()
+      const abort = () => controller.abort(signal.reason)
+      signal?.addEventListener('abort', abort, { once: true })
+      if (signal?.aborted) abort()
+      const timer = setTimeout(() => controller.abort(
+        new DOMException('记录读取超时，请重试', 'TimeoutError')
+      ), readTimeoutMs)
+      try {
+        return await readJson(await fetchImpl(url, {
+          method: 'GET',
+cache: 'no-store',
+credentials: 'same-origin',
+          headers: { accept: 'application/json' },
+signal: controller.signal,
+        }))
+      } catch (error) {
+        if (signal?.aborted) throw signal.reason
+        const reason = controller.signal.aborted ? controller.signal.reason : error
+        if (attempt === 1 || !(
+          reason?.name === 'TypeError' || reason?.name === 'TimeoutError' ||
+          [408, 429, 502, 503, 504].includes(reason?.status)
+        )) throw reason
+      } finally {
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', abort)
+      }
+    }
+  }
 
   async function session() {
     if (csrfToken) return csrfToken
@@ -1226,23 +1272,22 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
     async history({
       page = 1,
       pageSize = DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+      signal,
       ...filters
     } = {}) {
+      const resolved = resolveDevOperationHistoryFilters(filters)
       const query = new URLSearchParams({
-        ...resolveDevOperationHistoryFilters(filters),
+        ...resolved,
         page: String(page),
         pageSize: String(pageSize),
       })
-      const payload = await readJson(
-        await fetchImpl(`${DEV_DELIVERY_OPERATION_API_PREFIX}?${query}`, {
-          method: 'GET',
-          cache: 'no-store',
-          credentials: 'same-origin',
-          headers: { accept: 'application/json' },
-        })
-      )
+      const payload = await readOperationJson(`${DEV_DELIVERY_OPERATION_API_PREFIX}?${query}`, signal)
       if (
         payload?.kind !== 'plush.dev-delivery-history' ||
+        payload.target !== resolved.target ||
+        !['unreadableOperations', 'unreadableRequests'].every(
+          (key) => Number.isSafeInteger(payload.integrity?.[key]) && payload.integrity[key] >= 0
+        ) ||
         !['page', 'pageSize', 'total', 'matched'].every(
           (key) => Number.isSafeInteger(payload[key]) && payload[key] >= 0
         ) ||
@@ -1269,7 +1314,10 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
       ) {
         throw new Error('发布历史响应无效')
       }
-      payload.operations.forEach(validateOperation)
+      payload.operations.forEach((operation) => {
+        validateOperation(operation)
+        if (operation.target !== resolved.target) throw new Error('操作记录环境不匹配')
+      })
       return payload
     },
     async summary() {
@@ -1284,21 +1332,19 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
         )
       )
     },
-    async operation(operationId) {
+    async operation(operationId, { target, signal } = {}) {
       if (!OPERATION_ID_PATTERN.test(String(operationId || ''))) {
         throw new Error('版本中心 operation ID 无效')
       }
-      const payload = await readJson(
-        await fetchImpl(`${DEV_DELIVERY_OPERATION_API_PREFIX}/${operationId}`, {
-          method: 'GET',
-          cache: 'no-store',
-          credentials: 'same-origin',
-          headers: { accept: 'application/json' },
-        })
-      )
+      if (target !== undefined && !DEV_VERSION_CENTER_HISTORY_TARGET_VALUES.has(target)) {
+        throw new Error('操作记录环境无效')
+      }
+      const query = target ? `?${new URLSearchParams({ target })}` : ''
+      const payload = await readOperationJson(`${DEV_DELIVERY_OPERATION_API_PREFIX}/${operationId}${query}`, signal)
       if (payload?.kind !== 'plush.dev-delivery-operation-result') {
         throw new Error('版本中心 operation 响应无效')
       }
+      if (target && payload.operation?.target !== target) throw new Error('操作记录环境不匹配')
       return validateOperation(payload.operation)
     },
     async action(action, payload) {
@@ -1369,6 +1415,7 @@ export function deliveryRetryPresentation(value) {
     explicit_retry_available: '可发起一次关联的新尝试',
     target_readback_required: '结果未知，必须先读回目标',
     action_not_retryable: '该动作须返回专用流程处理，不能在此重试',
+    historical_target_read_only: '历史目标只供查阅，不能再次执行',
     terminal_no_retry_needed: '已完成，无需重试',
     operation_in_progress: '操作进行中',
   }

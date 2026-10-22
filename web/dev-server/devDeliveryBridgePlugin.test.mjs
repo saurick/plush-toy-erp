@@ -2440,13 +2440,15 @@ test('delivery history searches all retained operations and returns bounded page
     provider: { provider: 'gitlab' },
   })
   const all = service.history()
-  assert.equal(all.total, 231)
+  assert.equal(all.total, 116)
+  assert.equal(all.target, 'demo-133')
+  assert.ok(all.operations.every((operation) => operation.target === 'demo-133'))
   assert.equal(all.operations.length, 10)
-  assert.equal(all.statistics.counts.passed, 154)
-  assert.equal(all.statistics.counts.failed, 77)
+  assert.equal(all.statistics.counts.passed, 77)
+  assert.equal(all.statistics.counts.failed, 39)
   assert.equal(all.statistics.passedDurationMedianMs, 10_000)
-  assert.equal(service.history({ page: '24' }).operations.length, 1)
-  assert.equal(service.history({ page: '999' }).page, 24)
+  assert.equal(service.history({ page: '12' }).operations.length, 6)
+  assert.equal(service.history({ page: '999' }).page, 12)
   const oldest = service.history({
     keyword: '00000000-0000-4000-8000-000000000000',
   })
@@ -2457,7 +2459,9 @@ test('delivery history searches all retained operations and returns bounded page
     result: 'attention',
     pageSize: '50',
   })
+  assert.equal(filtered.total, 115)
   assert.equal(filtered.matched, 38)
+  assert.throws(() => service.readOperation(all.operations[0].id, 'production-133'), /target does not match/u)
   assert.equal(filtered.statistics.counts.failed, 38)
   assert.equal(filtered.statistics.passedDurationMedianMs, null)
   assert.equal(service.history({ keyword: 'no-such-version' }).matched, 0)
@@ -2465,6 +2469,8 @@ test('delivery history searches all retained operations and returns bounded page
     { page: '0' },
     { pageSize: '51' },
     { result: 'unexpected' },
+    { target: 'all' },
+    { target: 'unknown' },
     { keyword: 'a'.repeat(129) },
     { command: 'anything' },
   ]) {
@@ -2482,4 +2488,75 @@ test('delivery history searches all retained operations and returns bounded page
     url: '/__dev/api/delivery/operations?page=1&page=2',
   })
   assert.equal(duplicated.statusCode, 409)
+})
+
+test('history isolates all three deployments and shared releases even when another record is damaged at startup', async (t) => {
+  const { root, store } = createProject(t)
+  const targets = ['demo-133', 'customer-test-133', 'production-133', 'gitlab-release', 'test-133']
+  const ids = targets.map((target, index) => {
+    const { operation } = createOrReuseDeliveryOperation(store, {
+      action: target.endsWith('-release') ? 'release' : 'promote',
+target,
+      gitSha: SHA,
+version: '2026.10.22-1',
+idempotencyKey: `isolated-history-${index}`,
+    })
+    transitionDeliveryOperation(store, operation.id, { status: 'running', message: 'started' })
+    transitionDeliveryOperation(store, operation.id, { status: 'passed', message: 'finished' })
+    return operation.id
+  })
+  const damaged = path.join(store, 'operations', 'ffffffff-ffff-4fff-8fff-ffffffffffff.json')
+  writeFileSync(damaged, '{')
+  const service = createDevDeliveryService({ projectRoot: root, operationStore: store, provider: { provider: 'gitlab' } })
+  for (const [index, target] of targets.entries()) {
+    const history = service.history({ target })
+    assert.equal(history.total, 1)
+    assert.equal(history.matched, 1)
+    assert.equal(history.operations[0].id, ids[index])
+    assert.equal(history.integrity.unreadableOperations, 1)
+    if (target === 'test-133') assert.deepEqual(history.operations[0].retry, { allowed: false, reason: 'historical_target_read_only' })
+    assert.equal(service.history({ target, keyword: ids[(index + 1) % ids.length] }).matched, 0)
+    assert.equal(service.readOperation(ids[index], target).target, target)
+    assert.throws(() => service.readOperation(ids[index], targets[(index + 1) % ids.length]), /target does not match/u)
+  }
+  await assert.rejects(service.summary())
+  // Mutation/recovery must stay fail-closed even while intact history is readable.
+  await assert.rejects(service.act({ action: 'dispatch-release', payload: { gitSha: SHA, version: '2026.10.22-1', idempotencyKey: 'isolation-no-write-1' } }))
+  rmSync(damaged)
+  assert.equal(service.history().integrity.unreadableOperations, 0)
+  await assert.rejects(service.act({ action: 'retry-operation', payload: { operationId: ids.at(-1), idempotencyKey: 'historical-target-no-retry' } }), /historical deployment target is read-only/u)
+  const middleware = createDevDeliveryMiddleware({ service, csrfToken: 'a'.repeat(32) })
+  const response = await requestMiddleware(middleware, { url: `/__dev/api/delivery/operations/${ids[0]}?target=production-133` })
+  assert.equal(response.statusCode, 409)
+})
+
+test('large version summaries yield to local history and share ancestry work for identical deployed SHAs', async (t) => {
+  const { root, store } = createProject(t)
+  const versions = Array.from({ length: 40 }, (_, index) => ({
+    gitSha: index.toString(16).padStart(40, '0'),
+    version: `2026.10.22-${index + 1}`,
+  }))
+  let comparisons = 0
+  let historyServedDuringSummary = false
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: { provider: 'gitlab', listVersions: () => versions, getReleaseStatus: () => ({ status: 'missing' }) },
+    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
+    runPreflight: (target) => ({ status: 'passed', target, remote: { runtime: { serverSha: SHA, webSha: SHA } } }),
+    readRecoveryEvidence: () => null,
+    classifyRelation: () => {
+      comparisons += 1
+      if (comparisons === 1) { setImmediate(() => {
+        assert.equal(service.history({ target: 'production-133' }).target, 'production-133')
+        historyServedDuringSummary = comparisons < versions.length
+      }) }
+      return { actionClass: 'promote', actionReason: 'candidate_descends_from_current' }
+    },
+  })
+  const summary = await service.summary()
+  assert.equal(historyServedDuringSummary, true)
+  assert.equal(comparisons, versions.length)
+  assert.equal(summary.versions.length, versions.length)
+  assert.equal(summary.versions[0].actionsByTarget['production-133'].actionClass, 'promote')
 })

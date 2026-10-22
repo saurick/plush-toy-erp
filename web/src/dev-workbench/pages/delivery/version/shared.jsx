@@ -43,13 +43,13 @@ export const OPERATION_HISTORY_ACTION_OPTIONS = [
 ]
 
 export const OPERATION_HISTORY_TARGET_OPTIONS = [
-  { label: '全部目标', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
-  { label: 'GitLab Release', value: 'gitlab-release' },
-  { label: 'GitHub 历史 Release', value: 'github-release' },
   ...DEV_DELIVERY_TARGETS.map((target) => ({
     label: target.shortLabel,
     value: target.key,
   })),
+  { label: '共享制品 · GitLab', value: 'gitlab-release' },
+  { label: '历史制品 · GitHub', value: 'github-release' },
+  { label: '历史目标 test-133', value: 'test-133' },
 ]
 
 export const GIT_INDEX_LOCK_RECOVERY_FLOW = `flowchart TD

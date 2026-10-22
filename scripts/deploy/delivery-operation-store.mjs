@@ -740,6 +740,76 @@ export function readAllDeliveryOperations(store) {
     );
 }
 
+// Read-only projection: validate changed files, but check file identity on every
+// read so executor writes, atomic replacements and in-place repairs are visible.
+// Mutation/recovery paths continue to read and validate the authoritative files.
+export function createDeliveryOperationReadIndex(store) {
+  const caches = { operations: new Map(), idempotency: new Map() };
+  const knownDirectories = new Set();
+  function scan(kind, pattern, validate) {
+    const directory = path.join(store, kind);
+    const cache = caches[kind];
+    let directoryStat;
+    try {
+      directoryStat = lstatSync(directory);
+    } catch (error) {
+      if (error.code !== "ENOENT" || knownDirectories.has(kind)) throw error;
+      return { values: [], unreadable: [] };
+    }
+    if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) {
+      throw new Error("operation read index directory is invalid");
+    }
+    knownDirectories.add(kind);
+    const files = new Set(readdirSync(directory).filter((file) => pattern.test(file)));
+    for (const file of cache.keys()) if (!files.has(file)) cache.delete(file);
+    const values = [];
+    const unreadable = [];
+    for (const file of files) {
+      const previous = cache.get(file);
+      try {
+        const filePath = path.join(directory, file);
+        const stat = lstatSync(filePath, { bigint: true });
+        if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("invalid file");
+        const identity = [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs, stat.mode].join(":");
+        const value = previous?.identity === identity
+          ? previous.value
+          : validate(readPrivateJson(filePath), file);
+        cache.set(file, { identity, value });
+        values.push(value);
+      } catch {
+        // Never serve a previously valid record as current after validation fails.
+        unreadable.push({ target: previous?.value?.target || null });
+        cache.delete(file);
+      }
+    }
+    return { values, unreadable };
+  }
+  return {
+    read() {
+      const operations = scan("operations", /^[0-9a-f-]{36}\.json$/u, (value, file) => {
+        const operation = validateDeliveryOperation(value);
+        if (`${operation.id}.json` !== file) throw new Error("operation file identity is invalid");
+        return operation;
+      });
+      const requests = scan("idempotency", /^[0-9a-f]{64}\.json$/u, (value) =>
+        validateIdempotencyIndex(value, value?.idempotencyKey),
+      );
+      const requestCounts = new Map();
+      for (const request of requests.values) {
+        requestCounts.set(request.operationId, (requestCounts.get(request.operationId) || 0) + 1);
+      }
+      return {
+        operations: operations.values.sort((left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id),
+        ),
+        requestCounts,
+        unreadableOperations: operations.unreadable,
+        unreadableRequests: requests.unreadable.length,
+      };
+    },
+  };
+}
+
 export function listDeliveryOperations(store, { limit = 50 } = {}) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
     throw new Error("operation list limit is invalid");

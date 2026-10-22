@@ -1,4 +1,4 @@
-import { DEV_DELIVERY_TARGETS, filterDevOperationHistory, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
+import { DEV_DELIVERY_TARGETS, deliveryOperationRetryPolicy, filterDevOperationHistory, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
 import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
@@ -218,6 +218,15 @@ export function createVersionCenterSummary() {
       retry: operationRetry(status),
     }
   })
+  const scopedHistory = [
+    ...historyOperations.filter((operation) => operation.action === 'release').map((operation) => ({ ...operation, action: 'promote', target: 'customer-test-133' })),
+    ...historyOperations.slice(0, 3).map((operation) => ({ ...operation, action: 'promote', target: 'demo-133' })),
+    ...historyOperations.slice(0, 2).map((operation) => ({ ...operation, action: 'promote', target: 'production-133' })),
+    { ...historyOperations[0], action: 'promote', target: 'test-133' },
+  ].map((operation, index) => {
+    const id = `b0000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
+    return { ...operation, id, idempotency: operationIdempotency(id), retry: deliveryOperationRetryPolicy(operation) }
+  })
   const targetPreflight = ({
     target,
     purpose,
@@ -292,7 +301,7 @@ export function createVersionCenterSummary() {
       preflight: key === 'demo-133' ? demoTarget : key === 'customer-test-133' ? customerTestTarget : null,
       initializationPreflight: null,
     })),
-    operations: [openOperation, ...historyOperations],
+    operations: [openOperation, ...historyOperations, ...scopedHistory],
     timings: {
       schemaVersion: 'plush.delivery-pipeline-timings/v1',
       generatedAt: '2026-08-09T02:00:00.000Z',
@@ -393,6 +402,7 @@ export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
       new URL(route.request().url()).searchParams
     )
     const all = summary.operations.filter((operation) =>
+      operation.target === (query.target || 'demo-133') &&
       ['passed', 'failed', 'blocked', 'not_proven'].includes(operation.status)
     )
     const matches = filterDevOperationHistory(all, query)
@@ -416,6 +426,8 @@ export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
       contentType: 'application/json',
       body: JSON.stringify({
         kind: 'plush.dev-delivery-history',
+        target: query.target || 'demo-133',
+        integrity: { unreadableOperations: 0, unreadableRequests: 0 },
         generatedAt: summary.generatedAt,
         total: all.length,
         matched: matches.length,
@@ -561,6 +573,66 @@ async function assertManualGuideViewport(page, assert) {
   }
 }
 
+async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOverflow) {
+        await installSummaryRoute(page)
+        await page.route('**/__dev/api/delivery/summary', (route) => route.fulfill({
+          status: 503, contentType: 'application/json', body: JSON.stringify({ message: '目标摘要暂不可读' }),
+        }))
+        await page.goto(new URL('/__dev/version-center?view=history&target=demo-133&customer=yoyoosun', page.url()).href)
+        const history = page.locator('.erp-dev-version-tab--history')
+        await history.getByText('共 3 条记录', { exact: true }).waitFor()
+        const chooseScope = async (label) => {
+          await history.getByRole('combobox', { name: '记录归属', exact: true }).press('ArrowDown')
+          await page.locator('.ant-select-dropdown').filter({ visible: true }).getByText(label, { exact: true }).click()
+        }
+        // Detail reads remain usable when every remote summary read fails.
+        const detailRead = page.waitForResponse((response) => response.url().includes('/__dev/api/delivery/operations/') && response.url().includes('target=demo-133') && response.status() === 200)
+        await history.getByRole('button', { name: '查看详情', exact: true }).first().click()
+        assert.equal((await (await detailRead).json()).operation.target, 'demo-133')
+        await page.getByRole('dialog').waitFor({ state: 'visible' })
+        await page.getByRole('dialog').getByText('操作耗时', { exact: true }).waitFor()
+        await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
+        await page.getByRole('dialog').waitFor({ state: 'hidden' })
+        for (const [label, count] of [['test 环境', 12], ['erp 正式环境', 2], ['历史制品 · GitHub', 6], ['历史目标 test-133', 1]]) {
+          await chooseScope(label)
+          await history.getByText(`共 ${count} 条记录`, { exact: true }).waitFor()
+          const texts = await history.locator('tbody tr').allTextContents()
+          assert.equal(texts.some((text) => text.includes(label === '历史制品 · GitHub' ? 'test 环境' : 'GitHub Release')), false)
+        }
+        assert.equal(await history.getByRole('button', { name: '再次尝试', exact: true }).count(), 0)
+        await history.getByText(/原始目标已退役/u).waitFor()
+        // An old response that finishes after switching scope must never replace it.
+        let releaseDemo
+        let sawDemo
+        const demoStarted = new Promise((resolve) => { sawDemo = resolve })
+        const gate = new Promise((resolve) => { releaseDemo = resolve })
+        await page.route('**/__dev/api/delivery/operations?*', async (route) => {
+          if (new URL(route.request().url()).searchParams.get('target') !== 'demo-133') return route.fallback()
+          sawDemo()
+          await gate
+          return route.fallback().catch(() => {})
+        })
+        await chooseScope('demo 环境')
+        await demoStarted
+        await chooseScope('erp 正式环境')
+        await history.getByText('共 2 条记录', { exact: true }).waitFor()
+        releaseDemo()
+        await history.getByRole('button', { name: '刷新记录', exact: true }).click()
+        await history.getByText('共 2 条记录', { exact: true }).waitFor()
+        let failing = true
+        await page.route('**/__dev/api/delivery/operations?*', (route) => failing
+          ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: '连接暂时中断' }) })
+          : route.fallback())
+        await history.getByRole('button', { name: '刷新记录', exact: true }).click()
+        await history.getByText('当前显示上次成功读回的操作记录', { exact: true }).waitFor()
+        assert.equal(await history.locator('tbody tr[data-row-key]').count(), 2)
+        failing = false
+        await history.getByRole('button', { name: '重试读取', exact: true }).click()
+        await history.getByRole('button', { name: '刷新记录', exact: true }).waitFor()
+        await history.getByText('共 2 条记录', { exact: true }).waitFor()
+        await assertNoHorizontalOverflow(page, 'dev-version-history-isolation-recovery-desktop')
+}
+
 export function createDevVersionCenterScenarios({
   assert,
   assertNoHorizontalOverflow,
@@ -575,7 +647,7 @@ export function createDevVersionCenterScenarios({
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 2,
       expectedConsoleErrorPatterns: [
-        /console error \[path=\/__dev\/version-center\]: Failed to load resource: the server responded with a status of 503 .*\/__dev\/api\/delivery\/operations\?/u,
+        /console error \[path=\/__dev\/version-center\]: Failed to load resource: the server responded with a status of 503 .*\/__dev\/api\/delivery\/(?:operations\?|summary)/u,
       ],
       beforeNavigate: async (page) => {
         summaryRequests = 0
@@ -616,6 +688,7 @@ export function createDevVersionCenterScenarios({
         )
         assert.equal(await page.getByRole('table', { name: '发布状态摘要' }).isVisible(), false)
         assert.equal(await page.getByRole('button', { name: '生成发布制品', exact: true }).count(), 1)
+        assert.equal(await page.locator('.erp-dev-version-current-operation').count(), 0, 'another environment operation must not appear under demo')
         const versionTable = page.locator('.erp-dev-version-tab--versions .ant-table')
         assert.equal(await versionTable.getByRole('columnheader').count(), 4)
         assert.equal(await versionTable.getByRole('button', { name: '检查回滚', exact: true }).count(), 0)
@@ -959,11 +1032,13 @@ export function createDevVersionCenterScenarios({
           .waitFor({ state: 'visible' })
         await verifySlidingMotion(page, assert, '.erp-dev-version-workspace .ant-tabs-nav-list', 3, true)
         await waitForView(page, 'history')
-        assert.equal(await page.locator('.erp-dev-version-current-operation').isVisible(), true)
+        assert.equal(new URL(page.url()).searchParams.get('target'), 'demo-133')
+        assert.equal(await page.locator('.erp-dev-version-current-operation').count(), 0, 'returning to demo must not display the test operation')
         await assertNoHorizontalOverflow(
           page,
           'dev-version-center-tabs-pagination-desktop-pipeline'
         )
+        await verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOverflow)
       },
     },
   ]

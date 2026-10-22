@@ -25,6 +25,7 @@ import {
   formatDeliveryDuration,
 } from '../../../config/devDelivery.mjs'
 import FilterSelect from '@/common/components/select/FilterSelect'
+import AppSelect from '@/common/components/select/AppSelect'
 
 const { Text } = Typography
 
@@ -58,6 +59,10 @@ export function buildVersionWorkspace({
   versionTableRef,
   versions,
 }) {
+  const historyScope = OPERATION_HISTORY_TARGET_OPTIONS.find(
+    (option) => option.value === operationHistoryFilters.target
+  )
+  const sharedReleaseHistory = operationHistoryFilters.target.endsWith('-release')
   return [
     {
       key: DEV_VERSION_CENTER_VIEW_VERSIONS,
@@ -162,7 +167,7 @@ export function buildVersionWorkspace({
           aria-label="操作记录"
         >
           <Card
-            title="发布与部署记录（已结束）"
+            title={`${historyScope?.label || '当前环境'}${sharedReleaseHistory ? '发布' : '部署'}记录（已结束）`}
             className="erp-dev-version-table-card"
             extra={
               <Tag color={operationHistoryPresentation.color}>
@@ -170,6 +175,20 @@ export function buildVersionWorkspace({
               </Tag>
             }
           >
+            {operationHistoryFilters.target === 'test-133' ? (
+              <Alert type="info" showIcon message="原始目标已退役；此处仅保留当时的部署记录，不计入当前 demo、test 或 erp，也不能再次执行。" />
+            ) : null}
+            {sharedReleaseHistory ? (
+              <Alert type="info" showIcon message="制品供各环境部署使用；各环境的部署结果在各自记录中查看。" />
+            ) : null}
+            {historyResult && (historyResult.integrity.unreadableOperations > 0 || historyResult.integrity.unreadableRequests > 0) ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="部分记录未通过完整性校验"
+                description={`操作记录 ${historyResult.integrity.unreadableOperations} 条、请求索引 ${historyResult.integrity.unreadableRequests} 条暂不可读；当前列表或统计可能不完整。修复原始记录后可重新读取。`}
+              />
+            ) : null}
             {operationHistoryState === 'stale' ? (
               <Alert
                 type="warning"
@@ -183,7 +202,7 @@ export function buildVersionWorkspace({
                 type="error"
                 showIcon
                 message="工作台操作记录当前不可读"
-                description="未使用 GitLab Pipeline、Package、Release、Codex 对话或普通 SSH 动作补造操作记录。"
+                description="请重试读取；读取失败不表示当前环境没有记录。"
               />
             ) : null}
             <div
@@ -214,7 +233,7 @@ export function buildVersionWorkspace({
                     placeholder="动作"
                     aria-label="筛选动作"
                     value={operationHistoryFilters.action}
-                    options={OPERATION_HISTORY_ACTION_OPTIONS}
+                    options={OPERATION_HISTORY_ACTION_OPTIONS.filter((option) => option.value === 'all' || (sharedReleaseHistory ? option.value === 'release' : option.value !== 'release'))}
                     onChange={(value) =>
                       updateOperationHistoryFilter(
                         DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
@@ -224,12 +243,10 @@ export function buildVersionWorkspace({
                   />
                 </div>
                 <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
-                  <Text type="secondary">目标</Text>
-                  <FilterSelect
-                    emptyValue="all"
-                    label="目标"
-                    placeholder="目标"
-                    aria-label="筛选目标"
+                  <Text type="secondary">记录归属</Text>
+                  <AppSelect
+                    allowClear={false}
+                    aria-label="记录归属"
                     value={operationHistoryFilters.target}
                     options={OPERATION_HISTORY_TARGET_OPTIONS}
                     onChange={(value) =>
@@ -272,15 +289,13 @@ export function buildVersionWorkspace({
                       ? `匹配 ${String(historyResult?.matched ?? 0)} / 共 ${String(historyResult?.total ?? 0)} 条记录`
                       : `共 ${String(historyResult?.total ?? 0)} 条记录`}
                 </Text>
-                {['failure', 'stale'].includes(operationHistoryState) ? (
-                  <Button
-                    type="link"
-                    onClick={retryHistory}
-                    disabled={historyLoading}
-                  >
-                    重试读取
-                  </Button>
-                ) : null}
+                <Button
+                  type="link"
+                  onClick={retryHistory}
+                  disabled={historyLoading}
+                >
+                  {['failure', 'stale'].includes(operationHistoryState) ? '重试读取' : '刷新记录'}
+                </Button>
                 {hasOperationHistoryFilters ? (
                   <Button type="link" onClick={clearOperationHistoryFilters}>
                     清空筛选
@@ -337,7 +352,7 @@ export function buildVersionWorkspace({
                         description={
                           hasOperationHistoryFilters
                             ? '没有符合筛选条件的记录，请调整或清空上方条件'
-                            : '尚无已结束的制品发布、目标部署、数据清空重建或回滚记录'
+                            : sharedReleaseHistory ? '尚无已结束的制品发布记录' : '当前环境尚无已结束的部署、数据清空重建或回滚记录'
                         }
                       />
                     ),

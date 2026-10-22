@@ -914,7 +914,7 @@ test('operation history filters normalize invalid input and compose useful dimen
     {
       action: DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
       result: DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
-      target: DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+      target: 'demo-133',
       keyword: '2026.08.31',
     }
   )
@@ -922,7 +922,7 @@ test('operation history filters normalize invalid input and compose useful dimen
     filterDevOperationHistory(operations, {
       result: DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION,
     }).map((operation) => operation.id),
-    [operations[1].id, operations[2].id]
+    [operations[1].id]
   )
   assert.deepEqual(
     filterDevOperationHistory(operations, {
@@ -1515,6 +1515,8 @@ test('history client validates bounded server pages and statistics without loadi
   const operation = summaryFixture().operations[0]
   const data = {
     kind: 'plush.dev-delivery-history',
+    target: operation.target,
+    integrity: { unreadableOperations: 0, unreadableRequests: 0 },
 generatedAt: '2026-10-22T14:00:00Z',
     page: 21,
 pageSize: 10,
@@ -1525,7 +1527,7 @@ matched: 231,
   }
   let requested
   const client = createDevDeliveryClient({ fetchImpl: async (url) => { requested = new URL(url, 'http://localhost'); return response(data) } })
-  assert.equal((await client.history({ page: 21, keyword: '2026' })).total, 231)
+  assert.equal((await client.history({ page: 21, keyword: '2026', target: operation.target })).total, 231)
   assert.equal(requested.pathname, '/__dev/api/delivery/operations')
   assert.equal(requested.searchParams.get('page'), '21')
   assert.equal(requested.searchParams.get('keyword'), '2026')
@@ -1543,4 +1545,59 @@ test('operation details reject unrelated or executable trace links', async () =>
   // eslint-disable-next-line no-script-url
   operation.trace.commitUrl = 'javascript:alert(1)'
   await assert.rejects(client.operation(operation.id), /trace links are invalid/u)
+})
+
+test('record reads retry one transient failure, bound timeouts and cancel without retrying', async () => {
+  const operation = summaryFixture().operations[0]
+  let attempts = 0
+  const client = createDevDeliveryClient({ fetchImpl: async () => {
+    attempts += 1
+    if (attempts === 1) throw new TypeError('network disconnected')
+    return response({ kind: 'plush.dev-delivery-operation-result', operation })
+  } })
+  assert.equal((await client.operation(operation.id, { target: operation.target })).id, operation.id)
+  assert.equal(attempts, 2)
+  attempts = 0
+  const timeoutClient = createDevDeliveryClient({ readTimeoutMs: 5,
+fetchImpl: async (url, { signal }) => {
+    attempts += 1
+    return new Promise((resolve, reject) => {
+      if (signal.aborted) reject(signal.reason)
+      else signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    })
+  } })
+  await assert.rejects(timeoutClient.operation(operation.id), { name: 'TimeoutError' })
+  assert.equal(attempts, 2)
+  const controller = new AbortController()
+  attempts = 0
+  const pending = timeoutClient.operation(operation.id, { signal: controller.signal })
+  controller.abort()
+  await assert.rejects(pending, { name: 'AbortError' })
+  assert.equal(attempts, 1)
+})
+
+test('record reads reject cross-environment responses and do not retry contract failures', async () => {
+  const operation = summaryFixture().operations[0]
+  let attempts = 0
+  const client = createDevDeliveryClient({ fetchImpl: async () => {
+    attempts += 1
+    return response({ kind: 'plush.dev-delivery-operation-result', operation })
+  } })
+  const wrongTarget = operation.target === 'production-133' ? 'demo-133' : 'production-133'
+  await assert.rejects(client.operation(operation.id, { target: wrongTarget }), /环境不匹配/u)
+  assert.equal(attempts, 1)
+  const data = { kind: 'plush.dev-delivery-history',
+target: wrongTarget,
+    integrity: { unreadableOperations: 0, unreadableRequests: 0 },
+    page: 1,
+pageSize: 10,
+total: 1,
+matched: 1,
+operations: [operation],
+    statistics: { counts: { passed: 1, failed: 0, blocked: 0, not_proven: 0 }, passedDurationSamples: 1, passedDurationMedianMs: 10 },
+  }
+  const historyClient = createDevDeliveryClient({ fetchImpl: async () => response(data) })
+  await assert.rejects(historyClient.history({ target: wrongTarget }), /环境不匹配/u)
+  data.target = operation.target
+  await assert.rejects(historyClient.history({ target: wrongTarget }), /发布历史响应无效/u)
 })

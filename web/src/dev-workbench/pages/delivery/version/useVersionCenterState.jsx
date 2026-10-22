@@ -22,6 +22,8 @@ export function useVersionCenterState() {
     deliverySnapshotKey,
     activeView,
     operationHistoryFilters,
+    selectedTargetKey,
+    setSelectedTargetKey,
     selectView,
     updateOperationHistoryFilter,
     clearOperationHistoryFilters,
@@ -58,13 +60,15 @@ export function useVersionCenterState() {
   const [operationDetailLoading, setOperationDetailLoading] = useState(false)
   const [operationPollError, setOperationPollError] = useState('')
   const [versionPage, setVersionPage] = useState(1)
-  const [selectedTargetKey, setSelectedTargetKey] = useState('demo-133')
   const [qualityGateSummary, setQualityGateSummary] = useState(null)
   const [qualityGateError, setQualityGateError] = useState('')
   const mutationInFlightRef = useRef(false)
   const refreshRequestRef = useRef(0)
   const qualityGateRequestRef = useRef(0)
   const operationDetailRequestRef = useRef(0)
+  const operationDetailAbortRef = useRef(null)
+  const activeOperationScopeRef = useRef('')
+  activeOperationScopeRef.current = `${deliverySnapshotKey}:${selectedTargetKey}:${operationHistoryFilters.target}`
   const versionTableRef = useRef(null)
   const historyTableRef = useRef(null)
   const operationDetailTriggerRef = useRef(null)
@@ -103,6 +107,7 @@ export function useVersionCenterState() {
 
   const closeOperationDetail = useCallback(() => {
     operationDetailRequestRef.current += 1
+    operationDetailAbortRef.current?.abort()
     setOperationDetail(null)
     clearOperationDetailFocusRestoreTimer()
     // 快速关闭可能打断 Drawer 动画回调，仍在关闭截止后恢复原触发点。
@@ -115,6 +120,18 @@ export function useVersionCenterState() {
     clearOperationDetailFocusRestoreTimer,
     restoreOperationDetailTriggerFocus,
   ])
+
+  const cancelOperationDetailRead = useCallback(() => {
+    operationDetailAbortRef.current?.abort()
+  }, [])
+
+  useEffect(() => {
+    operationDetailRequestRef.current += 1
+    cancelOperationDetailRead()
+    setOperationDetail(null)
+    setOperationDetailLoading(false)
+    return cancelOperationDetailRead
+  }, [selectedTargetKey, operationHistoryFilters.target, cancelOperationDetailRead])
 
   useEffect(
     () => () => {
@@ -331,6 +348,7 @@ export function useVersionCenterState() {
   return {
     actionKey,
     activeDeliverySnapshotKeyRef,
+    activeOperationScopeRef,
     activeView,
     checkedAt,
     clearOperationDetailFocusRestoreTimer,
@@ -351,6 +369,7 @@ export function useVersionCenterState() {
     operationDetail,
     operationDetailLoading,
     operationDetailRequestRef,
+    operationDetailAbortRef,
     operationDetailTriggerRef,
     operationHistoryFilters,
     operationPollError,

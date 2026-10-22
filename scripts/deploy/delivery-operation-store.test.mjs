@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, renameSync, symlinkSync, unlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   consumeDeliveryOperationStore,
   createOrReuseDeliveryOperation,
+  createDeliveryOperationReadIndex,
   DELIVERY_OPERATION_ACTIONS,
   DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
   deliveryOperationRequestCounts,
@@ -539,4 +540,40 @@ test("delivery operation metadata rejects secrets paths and arbitrary output roo
     () => resolveDeliveryOperationStore(root, "../outside"),
     /repository output/u,
   );
+});
+
+test("read index invalidates atomic and in-place changes, isolates damage and repairs without restart", (t) => {
+  const { store } = createStore(t);
+  const { operation } = createOrReuseDeliveryOperation(store, {
+    operationId: OPERATION_ID, action: "promote", target: "demo-133", gitSha: SHA,
+    version: "2026.10.22-1", idempotencyKey: IDEMPOTENCY_KEY,
+  });
+  const reader = createDeliveryOperationReadIndex(store);
+  const first = reader.read();
+  assert.equal(reader.read().operations[0], first.operations[0], "unchanged files reuse their validated projection");
+  transitionDeliveryOperation(store, operation.id, { status: "running", message: "started" });
+  assert.equal(reader.read().operations[0].status, "running");
+  const file = path.join(store, "operations", `${operation.id}.json`);
+  const valid = readFileSync(file, "utf8");
+  writeFileSync(file, "{");
+  assert.equal(reader.read().operations.length, 0);
+  assert.equal(reader.read().unreadableOperations.length, 1);
+  writeFileSync(file, valid);
+  assert.equal(reader.read().operations[0].status, "running");
+  assert.equal(reader.read().unreadableOperations.length, 0);
+  const directory = path.dirname(file);
+  renameSync(directory, `${directory}.moved`);
+  assert.throws(() => reader.read(), /ENOENT/u, "a missing established store must not look like empty history");
+  renameSync(`${directory}.moved`, directory);
+  const replacement = `${file}.replace`;
+  writeFileSync(replacement, valid);
+  renameSync(replacement, file);
+  assert.equal(reader.read().operations[0].id, operation.id);
+  unlinkSync(file);
+  symlinkSync(replacement, file);
+  assert.equal(reader.read().operations.length, 0);
+  assert.equal(reader.read().unreadableOperations.length, 1);
+  unlinkSync(file);
+  assert.equal(reader.read().unreadableOperations.length, 0);
+  assert.equal(reader.read().operations.length, 0);
 });

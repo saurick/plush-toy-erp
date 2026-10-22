@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { resolveDevOperationHistoryState } from '../../../config/devDelivery.mjs'
 import { operationHistoryStatePresentation } from './shared.jsx'
 
@@ -12,27 +12,30 @@ export function useOperationHistory({
   setPage,
 }) {
   const queryKey = JSON.stringify({ scope, filters, page })
-  const [snapshot, setSnapshot] = useState(null)
+  const snapshots = useRef(new Map())
   const [request, setRequest] = useState(null)
   const [retry, setRetry] = useState(0)
   useEffect(() => {
     if (!enabled) return undefined
     const { filters: requestedFilters, page: requestedPage } =
       JSON.parse(queryKey)
-    let cancelled = false
+    const controller = new AbortController()
     setRequest({ key: queryKey, loading: true, error: '' })
-    const timer = window.setTimeout(async () => {
+    const load = async () => {
       try {
         const data = await client.history({
           ...requestedFilters,
           page: requestedPage,
+          signal: controller.signal,
         })
-        if (cancelled) return
-        setSnapshot({ key: queryKey, data })
+        if (controller.signal.aborted) return
+        snapshots.current.delete(queryKey)
+        snapshots.current.set(queryKey, data)
+        if (snapshots.current.size > 20) snapshots.current.delete(snapshots.current.keys().next().value)
         setRequest({ key: queryKey, loading: false, error: '' })
         if (data.page !== requestedPage) setPage(data.page)
       } catch {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setRequest({
             key: queryKey,
             loading: false,
@@ -40,13 +43,11 @@ export function useOperationHistory({
           })
         }
       }
-    }, 200)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
     }
+    load()
+    return () => controller.abort()
   }, [client, enabled, queryKey, refreshKey, setPage, retry])
-  const data = snapshot?.key === queryKey ? snapshot.data : null
+  const data = snapshots.current.get(queryKey) || null
   const loading = enabled && (request?.key !== queryKey || request.loading)
   const error = request?.key === queryKey ? request.error : ''
   const state = resolveDevOperationHistoryState({
