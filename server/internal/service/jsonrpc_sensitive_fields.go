@@ -81,7 +81,7 @@ var partyPrivateFieldKeys = map[string]struct{}{
 
 var commercialFieldKeys = map[string]struct{}{
 	"amount": {}, "amount_snapshot": {}, "discount": {}, "discount_rate": {},
-	"quoted_freight_amount": {}, "tax_amount": {}, "tax_rate": {}, "total_amount": {}, "unit_price": {},
+	"goods_amount": {}, "order_total": {}, "quoted_freight_amount": {}, "tax_amount": {}, "tax_rate": {}, "total_amount": {}, "unit_price": {},
 	"unit_price_snapshot": {},
 }
 

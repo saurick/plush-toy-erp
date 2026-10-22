@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Empty, Select, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Empty, Space, Tag, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
@@ -21,6 +21,7 @@ import {
 } from '../config/devRoutes.mjs'
 import DevTimestamp from './DevTimestamp.jsx'
 import '../styles/dev-business-rules.css'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const categoryLabel = (key) =>
   BUSINESS_RULE_CATEGORIES.find((entry) => entry.value === key)?.label
@@ -140,7 +141,9 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
         {report ? <DevTimestamp value={report.generatedAt} missing="采集时间未证明" /> : null}
       </p>
       <div className="erp-dev-business-rules__toolbar">
-        <Select
+        <FilterSelect
+          label="关键规则专项"
+          placeholder="关键规则专项"
           aria-label="关键规则专项"
           value={filters.category}
           onChange={(value) => update('ruleCategory', value)}

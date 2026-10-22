@@ -1,6 +1,7 @@
 import React from 'react'
-import { Button, Form, Input, Select, Space, Typography } from 'antd'
+import { Button, Form, Input, Space, Typography } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
 } from '../business-list/BusinessCompactFieldTable.jsx'
@@ -68,6 +69,7 @@ export function IncomingCheckItemsForm() {
                       label="检查结果"
                     >
                       <Select
+                        placeholder="请选择检查结果"
                         options={Object.entries(CHECK_RESULT_LABELS).map(
                           ([value, label]) => ({ value, label })
                         )}

@@ -115,7 +115,7 @@ func sourceModuleGateCustomerConfig(overrides map[string]string) *biz.CustomerCo
 
 func assertSourceModuleDeniedBeforeCalls(t *testing.T, result *v1.JsonrpcResult, err error, calls int) {
 	t.Helper()
-	if err != nil || result == nil || result.GetCode() != errcode.InvalidParam.Code {
+	if err != nil || result == nil || result.GetCode() != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("source module gate result=%#v err=%v", result, err)
 	}
 	if calls != 0 {

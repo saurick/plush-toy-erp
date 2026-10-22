@@ -1,4 +1,6 @@
 import { fulfillmentExceptionPath, fulfillmentStepMatchesRole } from '../../erp/utils/workflowFulfillment.mjs'
+import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
+import { buildFulfillmentExceptionGraph } from './devFulfillmentExceptionGraph.mjs'
 
 const STAGE_COPY = Object.freeze({
   sales_order: ['接单与用料审批', '工程 / 审批'],
@@ -76,9 +78,38 @@ export function selectFulfillmentSubstep(flow, requestedKey, role) {
 export function buildFulfillmentExceptionDirectory(guides, role, stage) {
   return guides.map((guide) => ({
     guide,
-    related: guide.entry_stages.includes(stage),
+    stages: catalog.fulfillment_flow.filter((step) => step.handling?.guides.includes(guide.key)),
+    related: catalog.fulfillment_flow.some((step) => step.stage === stage && step.handling?.guides.includes(guide.key)),
     roleMatch: guide.plans.some((plan) => fulfillmentExceptionPath(guide, plan.key).steps.some((step) => fulfillmentStepMatchesRole(step, role))),
   })).sort((a, b) => Number(b.related) - Number(a.related) || Number(b.roleMatch) - Number(a.roleMatch))
+}
+
+// A directory selection has no originating stage. Only an explicit context may
+// supply an origin-dependent return; a choice among several plans stays empty.
+export function selectFulfillmentException({ guideKey, planKey, originStage, stepKey, role = 'all' }) {
+  const guide = catalog.exception_guides.find((item) => item.key === guideKey)
+  if (!guide) return { invalid: '未登记的异常类型' }
+  if (originStage && !guide.entry_stages.includes(originStage)) return { invalid: '该环节不适用于当前异常类型' }
+  if (planKey && !guide.plans.some((item) => item.key === planKey)) return { invalid: '处理方式不属于当前异常类型' }
+  const plan = guide.plans.find((item) => item.key === planKey) || (guide.plans.length === 1 ? guide.plans[0] : null)
+  const origin = catalog.fulfillment_flow.find((item) => item.stage === originStage) || null
+  const related = catalog.fulfillment_flow.filter((item) => item.handling?.guides.includes(guide.key))
+  if (!plan) return { guide, plan: null, origin, related, steps: [] }
+  const { steps } = fulfillmentExceptionPath(guide, plan.key)
+  const graph = origin || !guide.entry_stages.length ? buildFulfillmentExceptionGraph(guide, { planKey: plan.key, originStage }) : null
+  const { target } = plan.continuation
+  const returnStage = graph?.returnStage || catalog.fulfillment_flow.find((item) => item.stage === target) || null
+  const reentryStage = catalog.fulfillment_flow.find((item) => item.stage === plan.continuation.reentry?.stage) || null
+  return {
+    guide,
+    plan,
+    origin,
+    related,
+    steps,
+    returnStage,
+    reentryStage,
+    selected: steps.find((item) => item.key === stepKey) || steps.find((item) => fulfillmentStepMatchesRole(item, role)) || steps[0],
+  }
 }
 
 export function getFulfillmentSupplement(step) {

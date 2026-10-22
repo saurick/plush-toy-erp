@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Descriptions, Form, Input, Select, Typography } from 'antd'
+import { Alert, Descriptions, Form, Input, Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import {
   buildReservationBalanceChoices,
@@ -209,6 +210,7 @@ export default function SalesOrderReservationModal({
           rules={[{ required: true, message: '请选择要预留的订单明细' }]}
         >
           <Select
+            placeholder="请选择销售订单明细"
             showSearch
             optionFilterProp="label"
             options={itemOptions}
@@ -234,6 +236,7 @@ export default function SalesOrderReservationModal({
           rules={[{ required: true, message: '请选择仓库与批次' }]}
         >
           <Select
+            placeholder="请选择可用库存"
             showSearch
             optionFilterProp="label"
             options={balanceChoices.map(({ value, label, disabled }) => ({

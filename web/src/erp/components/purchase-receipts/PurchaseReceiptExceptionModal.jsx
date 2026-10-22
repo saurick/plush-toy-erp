@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Button, Form, Input, Select, Space } from 'antd'
+import { Alert, Button, Form, Input, Space } from 'antd'
 import { MinusCircleOutlined } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -179,6 +180,7 @@ export default function PurchaseReceiptExceptionModal({
                         rules={[{ required: true, message: '请选择入库明细' }]}
                       >
                         <Select
+                          placeholder="请选择入库明细"
                           showSearch
                           optionFilterProp="label"
                           options={itemOptions}
@@ -194,6 +196,7 @@ export default function PurchaseReceiptExceptionModal({
                           ]}
                         >
                           <Select
+                            placeholder="请选择调整方式"
                             options={PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS}
                           />
                         </Form.Item>
@@ -256,6 +259,7 @@ export default function PurchaseReceiptExceptionModal({
                                   ]}
                                 >
                                   <Select
+                                    placeholder="请选择目标批次"
                                     showSearch
                                     optionFilterProp="label"
                                     options={lotOptions}
@@ -276,6 +280,7 @@ export default function PurchaseReceiptExceptionModal({
                                   ]}
                                 >
                                   <Select
+                                    placeholder="请选择目标仓库"
                                     showSearch
                                     optionFilterProp="label"
                                     options={warehouseOptions}

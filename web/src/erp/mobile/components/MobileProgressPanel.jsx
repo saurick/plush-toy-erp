@@ -91,6 +91,7 @@ export default function MobileProgressPanel({
   const loadMorePending = useRef(false)
   const restoreScroll = useRef(initial.scrollTop)
   const timer = useRef(null)
+  const scrollHistoryTimer = useRef(null)
   const composing = useRef(false)
   const begin = useLatestRequestCoordinator()
   const query = useMemo(
@@ -108,30 +109,32 @@ export default function MobileProgressPanel({
 
   const remember = useCallback(
     (changes = {}) => {
+      clearTimeout(scrollHistoryTimer.current)
+      const current = window.history.state || {}
+      const mobileProgress = {
+        ...(current.mobileProgress?.scope === scopeKey ? current.mobileProgress : {}),
+        scope: scopeKey,
+        query: latest.current.values,
+        queries: queriesRef.current,
+        selection: latest.current.selection,
+        scrollTop: restoreScroll.current ?? scrollRef.current?.scrollTop ?? 0,
+        ...changes,
+      }
+      if (JSON.stringify(current.mobileProgress) === JSON.stringify(mobileProgress)) return
       window.history.replaceState(
-        {
-          ...window.history.state,
-          mobileProgress: {
-            ...(window.history.state?.mobileProgress?.scope === scopeKey
-              ? window.history.state.mobileProgress
-              : {}),
-            scope: scopeKey,
-            query: latest.current.values,
-            queries: queriesRef.current,
-            selection: latest.current.selection,
-            scrollTop: scrollRef.current?.scrollTop || 0,
-            ...changes,
-          },
-        },
+        { ...current, mobileProgress },
         ''
       )
     },
     [scopeKey]
   )
   useEffect(() => {
-    remember()
-  }, [remember, values, selection])
-  useEffect(() => () => clearTimeout(timer.current), [])
+    if (active) remember()
+  }, [active, remember, values, selection])
+  useEffect(() => () => {
+    clearTimeout(timer.current)
+    clearTimeout(scrollHistoryTimer.current)
+  }, [])
   useEffect(() => {
     if (!suppressDetailOpenMotion) return undefined
     const frame = requestAnimationFrame(() => {
@@ -144,6 +147,7 @@ export default function MobileProgressPanel({
   }, [active])
   useEffect(() => {
     const pop = () => {
+      clearTimeout(scrollHistoryTimer.current)
       const restored = readMobileProgressState(
         window.history.state,
         scopeKey,
@@ -380,7 +384,12 @@ export default function MobileProgressPanel({
       <div
         className="mobile-progress-scroll"
         ref={scrollRef}
-        onScroll={() => remember()}
+        onScroll={(event) => {
+          if (!active) return
+          const { scrollTop } = event.currentTarget
+          clearTimeout(scrollHistoryTimer.current)
+          scrollHistoryTimer.current = setTimeout(() => remember({ scrollTop }), 150)
+        }}
       >
         <div className="mobile-progress-controls">
           <SlidingTabList

@@ -150,7 +150,7 @@ test("mobile workflow runtime browser smoke creates simulated workflow task only
   assert.equal(bossTask.task_group, "trial_boss_work");
   assert.equal(bossTask.owner_role_key, "boss");
   assert.equal(bossTask.task_status_key, "ready");
-  assert.equal(bossTask.payload.simulated_only, true);
+  assert.equal(Object.hasOwn(bossTask.payload, "simulated_only"), false);
   assert.equal(bossTask.payload.mobile_workflow_browser_smoke, true);
   assert.equal(bossTask.payload.critical_path, true);
   assert.equal(bossTask.payload.notification_type, "approval_required");
@@ -163,7 +163,7 @@ test("mobile workflow runtime browser smoke creates simulated workflow task only
   assert.equal(bossDoneTask.required_capability_key, "workflow.task.approve");
   assert.equal(bossDoneTask.task_status_key, "ready");
   assert.equal(bossDoneTask.business_status_key, "project_pending");
-  assert.equal(bossDoneTask.payload.simulated_only, true);
+  assert.equal(Object.hasOwn(bossDoneTask.payload, "simulated_only"), false);
   assert.equal(bossDoneTask.payload.mobile_workflow_browser_smoke, true);
   assert.equal(bossDoneTask.payload.notification_type, "approval_required");
   assert.match(bossDoneTask.payload.complete_condition, /完成反馈/u);
@@ -174,7 +174,7 @@ test("mobile workflow runtime browser smoke creates simulated workflow task only
   assert.equal(bossRejectTask.owner_role_key, "boss");
   assert.equal(bossRejectTask.task_status_key, "ready");
   assert.equal(bossRejectTask.business_status_key, "project_pending");
-  assert.equal(bossRejectTask.payload.simulated_only, true);
+  assert.equal(Object.hasOwn(bossRejectTask.payload, "simulated_only"), false);
   assert.equal(bossRejectTask.payload.mobile_workflow_browser_smoke, true);
   assert.equal(bossRejectTask.payload.notification_type, "approval_required");
   assert.match(bossRejectTask.payload.complete_condition, /退回/u);
@@ -185,7 +185,7 @@ test("mobile workflow runtime browser smoke creates simulated workflow task only
   assert.equal(qualityTask.owner_role_key, "quality");
   assert.equal(qualityTask.task_status_key, "ready");
   assert.equal(qualityTask.business_status_key, "qc_pending");
-  assert.equal(qualityTask.payload.simulated_only, true);
+  assert.equal(Object.hasOwn(qualityTask.payload, "simulated_only"), false);
   assert.equal(qualityTask.payload.mobile_workflow_browser_smoke, true);
   assert.equal(
     qualityTask.payload.notification_type,
@@ -205,7 +205,7 @@ test("mobile workflow runtime browser smoke creates simulated workflow task only
     warehouseInboundTask.business_status_key,
     "warehouse_inbound_pending",
   );
-  assert.equal(warehouseInboundTask.payload.simulated_only, true);
+  assert.equal(Object.hasOwn(warehouseInboundTask.payload, "simulated_only"), false);
   assert.equal(
     warehouseInboundTask.payload.mobile_workflow_browser_smoke,
     true,
@@ -222,7 +222,7 @@ test("mobile workflow runtime browser smoke creates simulated workflow task only
   assert.equal(warehouseTask.owner_role_key, "warehouse");
   assert.equal(Object.hasOwn(warehouseTask, "assignee_id"), false);
   assert.equal(warehouseTask.task_status_key, "ready");
-  assert.equal(warehouseTask.payload.simulated_only, true);
+  assert.equal(Object.hasOwn(warehouseTask.payload, "simulated_only"), false);
   assert.equal(warehouseTask.payload.mobile_workflow_browser_smoke, true);
   assert.equal(warehouseTask.payload.critical_path, true);
   assert.equal(
@@ -437,7 +437,7 @@ test("mobile workflow runtime browser smoke input template is no-write", () => {
   assert.doesNotMatch(template.commands.join("\n"), /127\.0\.0\.1:5175/u);
   assert.match(template.boundary, /does not prove mobile workflow/u);
   assert.match(template.boundary, /audited frontend runtime/u);
-  assert.match(template.boundary, /simulated_only workflow task evidence/u);
+  assert.match(template.boundary, /workflow task evidence/u);
 });
 
 test("mobile workflow runtime browser smoke simulated task plan covers required actions and notifications", () => {

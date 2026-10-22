@@ -572,16 +572,6 @@
   background: var(--erp-surface-bg-muted);
 }
 
-.erp-business-operation-panel__selection--placeholder:has([data-business-selection-placeholder]:empty) {
-  display: none;
-}
-
-.erp-business-selection-action-bar__placeholder-text {
-  min-width: 0;
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-}
-
 .erp-business-selection-action-bar--loading {
   visibility: hidden;
 }
@@ -1593,7 +1583,7 @@
 
 .erp-business-selection-action-bar__row {
   display: flex;
-  min-height: 30px;
+  min-height: 32px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -1601,7 +1591,7 @@
 
 .erp-business-selection-action-bar__copy {
   display: flex;
-  flex: 1 1 560px;
+  flex: 0 1 auto;
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
@@ -1725,14 +1715,14 @@
 
 :where(.erp-business-selection-action-bar--embedded)
   .erp-business-selection-action-bar__copy {
-  flex-basis: 280px;
+  flex-basis: auto;
 }
 
 .erp-business-selection-action-bar--embedded
   .erp-business-selection-action-bar__actions
   .ant-btn {
-  height: max(30px, var(--erp-touch-target, 0px));
-  min-height: max(30px, var(--erp-touch-target, 0px));
+  height: max(32px, var(--erp-touch-target, 0px));
+  min-height: max(32px, var(--erp-touch-target, 0px));
   border-radius: 8px;
   font-size: var(--erp-font-small);
   line-height: 1.2;
@@ -1800,7 +1790,45 @@
 .erp-business-module-table-card .ant-table-wrapper {
   overflow: auto;
   min-width: 0;
-  margin: 10px 12px;
+  margin: 0;
+}
+
+@media screen {
+  .erp-business-page-layout:has(.erp-business-data-table-card--sticky) {
+    flex: 1 0 auto;
+  }
+
+  .erp-business-page-layout:has(.erp-business-data-table-card--sticky)
+    > .erp-business-operation-panel.ant-card,
+  [data-page-table-region]:has(.erp-business-data-table-card--sticky)
+    > .erp-business-operation-panel.ant-card,
+  [data-page-table-region]:has(.erp-business-data-table-card--sticky)
+    [data-page-table-toolbar] {
+    position: sticky;
+    z-index: 5;
+    top: calc(-1 * var(--erp-list-scroll-padding, var(--erp-page-padding)));
+    background: var(--erp-surface-bg);
+    box-shadow: 0 2px 4px color-mix(in srgb, var(--erp-border) 60%, transparent);
+  }
+
+  .erp-business-data-table-card--sticky.ant-card,
+  .erp-business-data-table-card--sticky .ant-table-wrapper,
+  .erp-dashboard-card:has(.erp-business-data-table-card--sticky) {
+    overflow: visible;
+  }
+
+  .erp-business-data-table-card--sticky .ant-table-sticky-holder {
+    z-index: 4;
+    background: var(--erp-surface-bg);
+    box-shadow: 0 1px 0 var(--erp-border-strong);
+  }
+
+  /* The shared horizontal controls already provide the single scroll rail. */
+  .erp-business-data-table-card--sticky .ant-table-sticky-scroll,
+  .erp-statistics-table .ant-table-sticky-scroll,
+  .erp-role-permission-impact .ant-table-sticky-scroll {
+    display: none;
+  }
 }
 
 .erp-business-module-table-card .ant-table-wrapper .ant-table-thead > tr > th {

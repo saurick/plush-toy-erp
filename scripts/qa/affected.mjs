@@ -49,6 +49,49 @@ const DEV_WORKBENCH_PLUGINS_TEST =
 const DEV_QUALITY_GATE_PROVIDER_BOUNDARY_TEST =
   "scripts/qa/dev-quality-gate-provider-boundary.test.mjs";
 const GITLAB_CI_TEST = "scripts/qa/gitlab-ci.test.mjs";
+const SALES_EXPORT_GROWTH_SOURCES = new Set([
+  "server/internal/biz/sales_order.go",
+  "server/internal/biz/sales_order_export.go",
+  "server/internal/data/sales_order_export.go",
+  "server/internal/data/sales_order_repo.go",
+  "server/internal/service/jsonrpc_sales_order_export.go",
+  "scripts/qa/engineering-pressure.mjs",
+  "scripts/qa/pressure-engineering-data.mjs",
+  "scripts/qa/pressure-engineering-scenario.mjs",
+  "scripts/qa/pressure-isolated-lifecycle.mjs",
+  "scripts/qa/pressure-runtime.mjs",
+  "web/src/common/consts/policies.generated.mjs",
+  "web/src/dev-workbench/config/devPressureData.mjs",
+]);
+const GROWTH_VALIDATION_EVIDENCE_SOURCES = new Set([
+  "docs/product/自动化测试策略.md",
+  "scripts/qa/lib/business-rule-catalog.mjs",
+  "web/dev-server/devIntegrationEvidence.mjs",
+  "web/src/dev-workbench/pages/DevTestingPage.jsx",
+  "web/src/dev-workbench/components/DevTestingStrategyGuide.jsx",
+  "web/src/dev-workbench/components/DevBusinessRulesPanel.jsx",
+  "web/src/dev-workbench/config/devTesting.mjs",
+  "web/src/dev-workbench/config/devBusinessRules.mjs",
+  "web/scripts/style-l1/growthValidationScenarios.mjs",
+]);
+const GROWTH_VALIDATION_SCENARIO = "dev-growth-correctness-evidence";
+const WORK_CENTER_SAMPLE_SOURCES = new Set([
+  "web/src/dev-workbench/components/DevWorkCenterDesign.jsx",
+  "web/src/dev-workbench/components/DevWorkCenterDesign.test.mjs",
+  "web/src/dev-workbench/config/devWorkCenterDesign.mjs",
+  "web/src/dev-workbench/config/devWorkCenterDesign.test.mjs",
+  "web/src/dev-workbench/styles/dev-work-center-design.css",
+  "web/scripts/style-l1/devWorkCenterDesignScenarios.mjs",
+  "web/src/erp/components/business-visualizations/ProgressCompactContent.jsx",
+  "web/src/erp/components/master-data/ProductIdentity.jsx",
+  "web/src/erp/components/workflow/WorkflowTaskIdentity.jsx",
+  "web/src/erp/components/workflow/WorkflowTaskProductImage.jsx",
+  "web/src/erp/components/workflow/WorkflowTaskCopy.jsx",
+  "web/src/erp/components/workflow/WorkflowTaskTiming.jsx",
+  "web/src/erp/utils/workflowTaskIdentity.mjs",
+  "web/src/erp/utils/workflowTaskTiming.mjs",
+  "web/src/erp/utils/businessProgress.mjs",
+]);
 const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-business-usability-desktop-light",
   "dev-drill-recovery-desktop-light",
@@ -66,6 +109,7 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-page-ui-design-desktop-light",
   "dev-page-testing-desktop-light",
   "dev-pressure-desktop",
+  GROWTH_VALIDATION_SCENARIO,
   "dev-page-data-preparation-desktop-light",
   "dev-page-customer-config-desktop-light",
   "dev-page-database-migration-desktop-light",
@@ -589,6 +633,7 @@ function isPhaseLabelGovernedPath(file) {
 
 function isDevPageGovernancePath(file) {
   return (
+    (file.startsWith("web/") && GROWTH_VALIDATION_EVIDENCE_SOURCES.has(file)) ||
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
@@ -614,6 +659,9 @@ function isDevQualityGateProviderBoundaryPath(file) {
 }
 
 function devBrowserScenarioNames(file) {
+  const growth = GROWTH_VALIDATION_EVIDENCE_SOURCES.has(file)
+    ? [GROWTH_VALIDATION_SCENARIO]
+    : [];
   const mappings = [
     [
       /BusinessChainCustomerReview|devBusinessChainPrint/u,
@@ -679,7 +727,7 @@ function devBrowserScenarioNames(file) {
     [/dev-delivery-workflow/u, ["dev-page-delivery-desktop-light"]],
   ];
   const match = mappings.find(([pattern]) => pattern.test(file));
-  if (match) return match[1];
+  if (match) return uniqueSorted([...match[1], ...growth]);
   if (
     /(?:DevWorkbenchRoutes|DevPageNav|DevTaskNav|devRoutes|dev-navigation|dev-workbench-density|styles\/index\.css|style-l1\/scenarios\.mjs)/u.test(
       file,
@@ -687,7 +735,7 @@ function devBrowserScenarioNames(file) {
   ) {
     return DEV_DESKTOP_SCENARIOS;
   }
-  return [];
+  return growth;
 }
 
 function devBrowserFollowUpText(file) {
@@ -761,6 +809,33 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (WORK_CENTER_SAMPLE_SOURCES.has(file)) {
+      addNodeTests(state, [
+        "scripts/qa/dev-workbench-boundary.test.mjs",
+        "web/src/dev-workbench/config/devWorkCenterDesign.test.mjs",
+        "web/src/dev-workbench/components/DevWorkCenterDesign.test.mjs",
+      ], file, "T5");
+      addFollowUp(state, "browser-regression", "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-ui-design-work-center-explanations,dev-ui-design-work-center-reading pnpm --dir web style:l1，核对工作中心样例的首次加载、两端切换、关联清单、示例复制与返回恢复均不请求业务数据。", file);
+    }
+    if (GROWTH_VALIDATION_EVIDENCE_SOURCES.has(file)) {
+      addNodeTests(state, [
+        "scripts/qa/business-rule-catalog.test.mjs",
+        "web/src/dev-workbench/config/devTestingStrategy.test.mjs",
+        "web/src/dev-workbench/config/devBusinessRules.test.mjs",
+        "web/dev-server/devIntegrationEvidence.test.mjs",
+      ], file, "T5");
+      addFollowUp(state, "browser-regression", "T5", devBrowserFollowUpText(file), file);
+    }
+    if (SALES_EXPORT_GROWTH_SOURCES.has(file)) {
+      addNodeTests(state, [
+        "scripts/qa/engineering-pressure.test.mjs",
+        "scripts/qa/pressure-engineering-scenario.test.mjs",
+        "scripts/qa/business-rule-catalog.test.mjs",
+      ], file, "T7");
+      addFollowUp(state, "growth-capacity-validation", "T7",
+        "核对销售导出的总数据量、单次完整范围、准入与超时；真实数据库规则通过后，按资源预算运行 pressure-isolated-lifecycle.mjs --profile quick --data-scale baseline --run。比较增长规模时保持负载和资源一致，未运行的容量范围保留未验证；10 分钟容量档不自动执行。", file);
+    }
     if (
       PUBLIC_CONTRACT_SOURCE.test(file) ||
       requiresRPCContractCheck([file]) ||
@@ -969,6 +1044,17 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
             "scripts/qa/test-data-isolation-boundary.test.mjs",
           ];
       addNodeTests(state, suite, file, "T6");
+      continue;
+    }
+
+    if (file === "web/eslint.config.js" || file === "web/.stylelintrc") {
+      const eslint = file === "web/eslint.config.js";
+      addFixed(state, eslint ? "webLint" : "webCss", file);
+      addNodeTests(state, eslint ? [
+        "web/scripts/navigationControls.test.mjs",
+        "web/src/common/components/sharedComponentBoundaries.test.mjs",
+        "web/src/erp/utils/selectControlContract.test.mjs",
+      ] : ["web/scripts/stylelint/styleBoundaries.test.mjs"], file, "T5");
       continue;
     }
 

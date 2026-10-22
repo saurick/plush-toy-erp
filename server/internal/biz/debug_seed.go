@@ -335,6 +335,19 @@ func (uc *DebugUsecase) SeedBusinessChainScenario(ctx context.Context, in DebugB
 	}
 
 	plan := scenario.buildPlan(debugRunID, uc.now())
+	for _, task := range plan.Tasks {
+		if err := ValidateSeedBusinessText(task.TaskName, workflowStringPtrValue(task.BlockedReason)); err != nil {
+			return nil, err
+		}
+		if err := ValidateSeedBusinessValues(task.Payload); err != nil {
+			return nil, err
+		}
+	}
+	for _, record := range plan.Records {
+		if err := ValidateSeedBusinessValues(record.Payload); err != nil {
+			return nil, err
+		}
+	}
 	return uc.repo.SeedBusinessChainDebugData(ctx, plan, actorID)
 }
 
@@ -704,7 +717,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "progress", suffix: "FQC", group: "finished_goods_qc", name: "成品抽检", statusKey: "ready", businessStatusKey: "qc_pending", ownerRoleKey: "quality", priority: 2, dueOffsetDays: 1},
-			{recordRef: "shipping", suffix: "SHIP", group: "trial_warehouse_work", name: "模拟出货放行确认", statusKey: "ready", businessStatusKey: "shipment_pending", ownerRoleKey: "warehouse", priority: 2, dueOffsetDays: 3},
+			{recordRef: "shipping", suffix: "SHIP", group: "trial_warehouse_work", name: "确认出货放行", statusKey: "ready", businessStatusKey: "shipment_pending", ownerRoleKey: "warehouse", priority: 2, dueOffsetDays: 3},
 			{recordRef: "outbound", suffix: "OUT", group: "warehouse_outbound", name: "仓库出库确认", statusKey: "ready", businessStatusKey: "shipped", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 4},
 		},
 		states: []debugStateTemplate{
@@ -916,17 +929,14 @@ func (s debugBusinessChainScenario) buildPlan(debugRunID string, now time.Time) 
 	cleanupToken := fmt.Sprintf("%s:%s", debugRunID, s.key)
 	basePayload := func(extra map[string]any) map[string]any {
 		payload := map[string]any{
-			"debug":                  true,
-			"created_by_debug":       true,
-			"simulated_only":         true,
-			"evidence_class":         "simulated_display_only",
-			"proves_process_runtime": false,
-			"debug_run_id":           debugRunID,
-			"scenario_key":           s.key,
-			"scenario_code":          s.code,
-			"cleanup_token":          cleanupToken,
-			"debug_seed":             debugSeedVersion,
-			"debug_created_at":       now.UTC().Format(time.RFC3339),
+			"debug":            true,
+			"created_by_debug": true,
+			"debug_run_id":     debugRunID,
+			"scenario_key":     s.key,
+			"scenario_code":    s.code,
+			"cleanup_token":    cleanupToken,
+			"debug_seed":       debugSeedVersion,
+			"debug_created_at": now.UTC().Format(time.RFC3339),
 		}
 		for key, value := range extra {
 			payload[key] = value

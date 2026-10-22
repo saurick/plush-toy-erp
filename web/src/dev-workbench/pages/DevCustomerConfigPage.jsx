@@ -1,10 +1,5 @@
 import React, { useEffect } from 'react'
-import {
-  ArrowLeftOutlined,
-  ArrowRightOutlined,
-  DeploymentUnitOutlined,
-  SettingOutlined,
-} from '@ant-design/icons'
+import { SettingOutlined } from '@ant-design/icons'
 import { Alert, Button, Space, Tag, Typography } from 'antd'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
@@ -26,7 +21,7 @@ import { useCustomerConfigOperations } from './customer-config/useCustomerConfig
 import { useCustomerConfigRoute } from './customer-config/useCustomerConfigRoute.mjs'
 import './customer-config/customer-config-workflow.css'
 
-const { Text, Title } = Typography
+const { Title } = Typography
 const steps = CUSTOMER_CONFIG_STEPS.map((step) => ({
   ...step,
   label: (
@@ -56,9 +51,6 @@ export default function DevCustomerConfigPage() {
         DEV_VERSION_CENTER_ROUTE,
         overview.customerKey
       )
-  const stepIndex = CUSTOMER_CONFIG_STEPS.findIndex(
-    (item) => item.value === activeStep
-  )
   const selectStep = (step) => {
     if (!isMutationRunning) route.navigate(step)
   }
@@ -161,12 +153,6 @@ export default function DevCustomerConfigPage() {
             disabled={isMutationRunning}
           />
           {!isMissingCustomer ? <Tag>工作区配置源</Tag> : null}
-          <details className="erp-dev-customer-source">
-            <summary>配置来源</summary>
-            <Text type="secondary">
-              {overview.sourceLabel || '未登记客户配置包'}
-            </Text>
-          </details>
         </section>
         {!isMissingCustomer ? (
           <DevTaskNav
@@ -181,13 +167,6 @@ export default function DevCustomerConfigPage() {
             disabled={isMutationRunning}
           />
         ) : null}
-        <Button
-          href={deploymentHref}
-          icon={<DeploymentUnitOutlined aria-hidden="true" />}
-          disabled={isMutationRunning}
-        >
-          版本发布与部署
-        </Button>
       </header>
       {operations.historyState.status === 'error' ? (
         <Alert
@@ -216,39 +195,6 @@ export default function DevCustomerConfigPage() {
           panel
         )}
       </section>
-      {!isMissingCustomer && activeStep !== 'overview' ? (
-        <footer className="erp-dev-customer-step-footer">
-          <Button
-            icon={<ArrowLeftOutlined aria-hidden="true" />}
-            disabled={isMutationRunning}
-            onClick={() =>
-              selectStep(CUSTOMER_CONFIG_STEPS[stepIndex - 1].value)
-            }
-          >
-            {stepIndex === 1 ? '返回总览' : '上一步'}
-          </Button>
-          <Text type="secondary">步骤 {stepIndex} / 5</Text>
-          {stepIndex < CUSTOMER_CONFIG_STEPS.length - 1 ? (
-            <Button
-              type="primary"
-              icon={<ArrowRightOutlined aria-hidden="true" />}
-              disabled={isMutationRunning}
-              onClick={() =>
-                selectStep(CUSTOMER_CONFIG_STEPS[stepIndex + 1].value)
-              }
-            >
-              下一步：{CUSTOMER_CONFIG_STEPS[stepIndex + 1].label}
-            </Button>
-          ) : (
-            <Button
-              onClick={() => selectStep('overview')}
-              disabled={isMutationRunning}
-            >
-              返回配置总览
-            </Button>
-          )}
-        </footer>
-      ) : null}
     </main>
   )
 }

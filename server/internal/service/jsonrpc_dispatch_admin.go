@@ -681,10 +681,10 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 		return &v1.JsonrpcResult{Code: errcode.AdminNotFound.Code, Message: errcode.AdminNotFound.Message}
 	case errors.Is(err, biz.ErrRoleNotFound):
 		l.Warnf("[admin] role not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "角色不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "角色不存在"}
 	case errors.Is(err, biz.ErrPermissionNotFound):
 		l.Warnf("[admin] permission not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "权限不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "权限不存在"}
 	case errors.Is(err, biz.ErrAdminSelfRoleChangeForbidden):
 		l.Warnf("[admin] self role change denied err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能修改当前登录账号的角色"}
@@ -702,16 +702,16 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "产品系统角色只能查看，不能修改权限"}
 	case errors.Is(err, biz.ErrPermissionNotDelegable):
 		l.Warnf("[admin] permission not delegable err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该权限不能分配给业务角色"}
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该权限不能分配给业务角色"}
 	case errors.Is(err, biz.ErrDebugRoleProductionForbidden):
 		l.Warnf("[admin] debug role rejected by environment err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前环境不能分配调试角色"}
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前环境不能分配调试角色"}
 	case errors.Is(err, biz.ErrRoleVersionConflict):
 		l.Warnf("[admin] role version conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "角色权限刚刚发生变化，请刷新后重试"}
 	case errors.Is(err, biz.ErrRoleExists):
 		l.Warnf("[admin] role exists err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "角色已存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "角色已存在"}
 	case errors.Is(err, biz.ErrAdminExists):
 		l.Warnf("[admin] exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.AdminExists.Code, Message: errcode.AdminExists.Message}

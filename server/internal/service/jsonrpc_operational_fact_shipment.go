@@ -48,12 +48,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
-			return id, res, nil
-		}
 		in, ok := shipmentCreateWithItemsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
+			return id, res, nil
 		}
 		if shipmentCreateUsesSalesOrderSource(in) {
 			if res := d.requireSourceActionReadPermissions(
@@ -74,12 +74,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentUpdate); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
-			return id, res, nil
-		}
 		in, ok := shipmentDraftSaveFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
+			return id, res, nil
 		}
 		if shipmentDraftSaveUsesSalesOrderSource(in) {
 			if res := d.requireSourceActionReadPermissions(

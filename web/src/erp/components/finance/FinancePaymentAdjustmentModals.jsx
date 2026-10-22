@@ -1,5 +1,6 @@
 import React from 'react'
-import { Form, Input, Select } from 'antd'
+import { Form, Input } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 
 import { FinanceAllocationStatus } from '../../../common/consts/statuses.generated.mjs'
 
@@ -32,6 +33,7 @@ export function FinanceAllocationReversalModal({
           rules={[{ required: true }]}
         >
           <Select
+            placeholder="请选择已抵扣记录"
             options={(currentPayment?.allocations || [])
               .filter(
                 (a) =>

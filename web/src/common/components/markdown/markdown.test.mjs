@@ -87,3 +87,34 @@ test('heading ids count duplicates across levels while filtered outlines stay na
     ]
   )
 })
+
+test('long Markdown preserves all blocks, duplicate anchors and replacement without layout wrappers', async (t) => {
+  const dom = installTestDOM()
+  const [{ createRoot }, { Markdown }] = await Promise.all([
+    import('react-dom/client'),
+    import('./index.jsx'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    dom.restore()
+  })
+  const sections = Array.from({ length: 300 }, (_, index) =>
+    `## 重复标题\n\n段落 ${index}\n\n| 字段 | 值 |\n| --- | --- |\n| id | ${index} |\n`)
+  const source = sections.join('\n')
+  await act(async () => root.render(createElement(Markdown, { source })))
+  assert.equal(container.querySelectorAll('h2').length, 300)
+  assert.equal(container.querySelectorAll('table').length, 300)
+  assert.equal(container.children.length, 900)
+  assert.equal(container.querySelectorAll('div').length, 0)
+  assert.equal(container.querySelectorAll('[id="重复标题-299"]').length, 1)
+  assert.equal(container.lastElementChild.textContent, '字段值id299')
+  await act(async () => root.render(createElement(Markdown, { source: '# 替换内容' })))
+  assert.equal(container.children.length, 1)
+  assert.equal(container.querySelector('h1').id, '替换内容')
+  await act(async () => root.render(createElement(Markdown, { source: '' })))
+  assert.equal(container.children.length, 0)
+})

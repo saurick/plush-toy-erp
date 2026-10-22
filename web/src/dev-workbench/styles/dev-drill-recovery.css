@@ -36,34 +36,21 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-dev-recovery-recommendation {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--erp-border);
-  border-radius: 8px;
-  background: var(--erp-surface-bg);
-}
-
-.erp-dev-recovery-recommendation h3.ant-typography {
-  margin: 0;
-  font-size: var(--erp-font-emphasis);
-  line-height: 1.5;
-}
-
-.erp-dev-recovery-recommendation > .ant-typography {
-  margin: 0;
-}
-
-.erp-dev-recovery-recommendation > .ant-btn {
-  margin-inline-start: auto;
-}
-
 .erp-dev-recovery-catalog .ant-card-body {
   padding: 0;
+}
+
+.erp-dev-recovery-drill-link.ant-btn {
+  justify-content: flex-start;
+  min-height: 32px;
+  height: auto;
+  max-width: 100%;
+  padding: 0;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: normal;
 }
 
 .erp-dev-security-checks .ant-card-body {
@@ -76,11 +63,11 @@
 }
 
 .erp-dev-security-table th:first-child {
-  width: 18%;
+  width: 24%;
 }
 
 .erp-dev-security-table th:nth-child(2) {
-  width: 50%;
+  width: 22%;
 }
 
 .erp-dev-security-checks__evidence {
@@ -93,6 +80,11 @@
   width: fit-content;
   color: var(--erp-text-muted);
   cursor: pointer;
+}
+
+.erp-dev-recovery-emergency > h2 {
+  margin: 0 0 12px;
+  font-size: var(--erp-font-emphasis);
 }
 
 .erp-dev-recovery-row__detail {

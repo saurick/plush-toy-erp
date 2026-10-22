@@ -1336,20 +1336,6 @@ export function shortGitSha(value) {
     : '未证明'
 }
 
-export function formatDeliveryTimestamp(value, missing = '时间未证明') {
-  const timestamp = Date.parse(String(value || ''))
-  if (!Number.isFinite(timestamp)) return missing
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).format(new Date(timestamp))
-}
-
 export function formatDeliveryBytes(value) {
   if (!Number.isSafeInteger(value) || value < 0) return '未证明'
   if (value < 1024) return `${String(value)} B`

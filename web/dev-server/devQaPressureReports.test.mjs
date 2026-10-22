@@ -313,6 +313,50 @@ purchaseItems: scale.historyOrders * 1.2,
   return data
 }
 const projectScale = (data, id = 'scale-run') => projectDevPressureReport(id, data.lifecycle, data.engineering, data.reads, source)
+function paginatedFixture() {
+  const data = scaleFixture('volume')
+  data.engineering.paginationPageSize = 500
+  data.engineering.levels = structuredClone(data.engineering.levels)
+  for (const level of data.engineering.levels) {
+    const metric = level.methods['sales_order.get_sales_order']
+    level.methods['sales_order.list_sales_orders'] = structuredClone(metric)
+    level.pagination = {
+      pageSize: 500,
+      totalRows: 762,
+      fullPages: 1,
+      tailRows: 262,
+      minPageSamples: 10,
+      accepted: true,
+      full: { ...metric, requests: 10, successes: 10 },
+      tail: { ...metric, requests: 10, successes: 10 },
+    }
+  }
+  return data
+}
+test('pagination evidence carries full and tail samples and cannot trust a bare passed flag', () => {
+  const data = paginatedFixture()
+  const report = projectScale(data)
+  assert.equal(report.status, 'passed')
+  assert.equal(report.engineering.levels[1].pagination.full.successes, 10)
+  assert.equal(report.engineering.levels[1].pagination.tailRows, 262)
+  const envelope = { kind: 'plush.dev-pressure-reports', reports: [], report, progress: null, invalidCount: 0 }
+  assert.equal(normalizeDevPressureReports(envelope).report.id, report.id)
+  for (const mutate of [
+    (p) => p.minPageSamples = 0, (p) => p.full.successes = 0, (p) => p.full.failures = 1,
+    (p) => p.full.successfulLatencyMs = { p95: 1001, p99: 2001 }, (p) => p.tailRows++,
+    (p) => p.pageSize = 50, (p) => p.totalRows++, (p) => p.accepted = false,
+  ]) {
+    const broken = paginatedFixture(); mutate(broken.engineering.levels[1].pagination)
+    assert.equal(projectScale(broken).status, 'incomplete')
+  }
+  const missing = paginatedFixture(); delete missing.engineering.levels[1].pagination
+  assert.equal(projectScale(missing).status, 'incomplete')
+  const historical = projectScale(scaleFixture('volume'))
+  assert.equal(historical.engineering.levels[1].pagination, null)
+  assert.notEqual(historical.comparisonKey, report.comparisonKey)
+  const malformed = structuredClone(envelope); malformed.report.engineering.levels[1].pagination.tailRows++
+  assert.throws(() => normalizeDevPressureReports(malformed))
+})
 test('scale evidence separates background, pool, actual read counts and storage without exposing IDs', () => {
   const report = projectScale(scaleFixture())
   assert.equal(report.dataset.history.orders, 20)

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo } from 'react'
-import { AppstoreOutlined, FileTextOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Tag, Typography } from 'antd'
+import React, { useEffect, useMemo, useRef } from 'react'
+import { AppstoreOutlined, ArrowLeftOutlined, FileTextOutlined, RightOutlined } from '@ant-design/icons'
+import { Alert, Button, Drawer, Empty, Tag, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -16,6 +16,7 @@ import {
   filterProductCoreCapabilities,
   normalizeProductCoreMembership,
   parseProductCoreCapabilities,
+  resolveProductCoreCapability,
 } from '../config/devProductCore.mjs'
 import '../styles/dev-product-core.css'
 
@@ -54,35 +55,6 @@ function getProductCoreSource() {
   )
 }
 
-function CapabilityRow({ item, keyword }) {
-  const [scopeLead, ...scopeDetails] = item.availableScope.split('；')
-  const showMatchedScope = Boolean(keyword.trim()) && scopeDetails.join('；').toLowerCase().includes(keyword.trim().toLowerCase())
-  return (
-    <tr data-membership={item.membershipKey}>
-      <td data-label="业务能力">
-        <strong>{item.capability}</strong>
-      </td>
-      <td data-label="状态">
-        <div className="erp-dev-product-core-status">
-          <Tag color={STATUS_COLOR_BY_MEMBERSHIP[item.membershipKey]}>
-            {item.membership}
-          </Tag>
-        </div>
-      </td>
-      <td data-label="当前可用范围">
-        {scopeLead}
-        {scopeDetails.length > 0 ? (
-          <details className="erp-dev-product-core-scope" open={showMatchedScope || undefined}>
-            <summary>其余可用范围（{scopeDetails.length} 项）</summary>
-            <ul>{scopeDetails.map((text, index) => <li key={index}>{text}</li>)}</ul>
-          </details>
-        ) : null}
-      </td>
-      <td data-label="当前边界">{item.boundary}</td>
-    </tr>
-  )
-}
-
 export default function DevProductCorePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const source = useMemo(() => getProductCoreSource(), [])
@@ -101,6 +73,15 @@ export default function DevProductCorePage() {
     () => filterProductCoreCapabilities(capabilities, { membership, keyword }),
     [capabilities, keyword, membership]
   )
+  const requestedCapability = searchParams.get('capability') || ''
+  const selectedCapability = resolveProductCoreCapability(filteredCapabilities, requestedCapability)
+  const detailOpener = useRef(null)
+  const capabilityGroups = useMemo(
+    () => [...DEV_PRODUCT_CORE_MEMBERSHIP_ORDER, 'unknown']
+      .map((key) => ({ key, items: filteredCapabilities.filter((item) => item.membershipKey === key) }))
+      .filter((group) => group.items.length),
+    [filteredCapabilities]
+  )
   const filterOptions = useMemo(
     () => [
       {
@@ -118,14 +99,18 @@ export default function DevProductCorePage() {
   )
 
   useEffect(() => {
-    if (!requestedMembership || requestedMembership === membership) return
+    const invalidMembership = requestedMembership && requestedMembership !== membership
+    const invalidCapability = requestedCapability && selectedCapability?.capability !== requestedCapability
+    if (!invalidMembership && !invalidCapability) return
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('status')
+    if (invalidMembership) nextParams.delete('status')
+    if (invalidCapability) nextParams.delete('capability')
     setSearchParams(nextParams, { replace: true })
-  }, [membership, requestedMembership, searchParams, setSearchParams])
+  }, [membership, requestedMembership, requestedCapability, selectedCapability, searchParams, setSearchParams])
 
   const handleMembershipChange = (nextMembership) => {
     const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('capability')
     if (nextMembership === DEV_PRODUCT_CORE_MEMBERSHIP_ALL) {
       nextParams.delete('status')
     } else {
@@ -137,6 +122,7 @@ export default function DevProductCorePage() {
   const handleKeywordChange = (event) => {
     const nextKeyword = event.target.value
     const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('capability')
     if (nextKeyword.trim()) {
       nextParams.set('q', nextKeyword)
     } else {
@@ -147,6 +133,20 @@ export default function DevProductCorePage() {
 
   const handleReset = () => {
     setSearchParams(new URLSearchParams())
+  }
+
+  const selectCapability = (item, event) => {
+    if (item === selectedCapability) return
+    detailOpener.current = event.currentTarget
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('capability', item.capability)
+    setSearchParams(nextParams)
+  }
+
+  const closeCapability = () => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('capability')
+    setSearchParams(nextParams, { replace: true })
   }
 
   const hasActiveFilter =
@@ -168,13 +168,10 @@ export default function DevProductCorePage() {
             <Title level={1}>产品内核</Title>
           </div>
         </div>
+      </header>
 
+      <main className="erp-dev-product-core-shell">
         <div className="erp-dev-product-core-toolbar">
-          <div>
-            <Text id="product-core-inventory-title" type="secondary" aria-live="polite">
-              {filteredCapabilities.length} / {summary.total} 项能力
-            </Text>
-          </div>
           <div
             className="erp-dev-product-core-filters"
             role="group"
@@ -204,28 +201,14 @@ export default function DevProductCorePage() {
               onChange={handleKeywordChange}
             />
             {hasActiveFilter ? (
-              <Button onClick={handleReset}>清除筛选</Button>
+              <>
+                <Text type="secondary" aria-live="polite">{filteredCapabilities.length} 项</Text>
+                <Button onClick={handleReset}>清除筛选</Button>
+              </>
             ) : null}
           </div>
         </div>
 
-        <div className="erp-dev-product-core-header__actions">
-          <div
-            className="erp-dev-product-core-header__summary"
-            aria-label="产品内核汇总"
-          >
-            <strong>
-              {summary.counts.entered || 0}/{summary.total}
-            </strong>
-            <span>项已进入内核</span>
-          </div>
-          <Button icon={<FileTextOutlined />} href={DEV_PRODUCT_CORE_DOCS_HREF}>
-            查看能力台账
-          </Button>
-        </div>
-      </header>
-
-      <main className="erp-dev-product-core-shell">
         {capabilities.length === 0 ? (
           <Alert
             type="error"
@@ -239,44 +222,74 @@ export default function DevProductCorePage() {
         ) : (
           <section
             className="erp-dev-product-core-inventory"
-            aria-labelledby="product-core-inventory-title"
+            aria-label="产品能力目录"
           >
             {filteredCapabilities.length > 0 ? (
-              <div className="erp-dev-product-core-table-wrap">
-                <table className="erp-dev-product-core-table" data-table-lines="appearance">
-                  <caption>当前 Product Core 能力与边界</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">业务能力</th>
-                      <th scope="col">状态</th>
-                      <th scope="col">当前可用范围</th>
-                      <th scope="col">当前边界</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCapabilities.map((item) => (
-                      <CapabilityRow key={`${item.key}:${keyword}`} item={item} keyword={keyword} />
-                    ))}
-                  </tbody>
-                </table>
+              <div className="erp-dev-product-core-groups">
+                {capabilityGroups.map((group) => (
+                  <section className="erp-dev-product-core-group" key={group.key} data-membership={group.key}>
+                    <Title level={2}>{group.items[0].membership}</Title>
+                    <ul>
+                      {group.items.map((item) => (
+                        <li key={item.key}>
+                          <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={(event) => selectCapability(item, event)}
+                          >
+                            <span>{item.capability}</span>
+                            <RightOutlined aria-hidden="true" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
               </div>
             ) : (
               <div className="erp-dev-product-core-empty">
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description="没有匹配的产品能力"
-                >
-                  <Button onClick={handleReset}>查看全部能力</Button>
-                </Empty>
+                />
               </div>
             )}
           </section>
         )}
 
-        <DevStaticGuidance title="进入 Product Core 不等于已发布或已验收">
+        <DevStaticGuidance title="状态说明">
+          <Text>进入 Product Core 不等于已发布或已验收。</Text>
           <Text>{summary.boundary}</Text>
         </DevStaticGuidance>
       </main>
+      <Drawer
+        rootClassName="erp-dev-product-core-drawer"
+        title={selectedCapability?.capability || '能力详情'}
+        open={Boolean(selectedCapability)}
+        width={680}
+        styles={{ wrapper: { maxWidth: '100%' } }}
+        closable={false}
+        extra={<Button type="text" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={closeCapability}>返回能力目录</Button>}
+        onClose={closeCapability}
+        afterOpenChange={(open) => {
+          if (!open && detailOpener.current?.isConnected) detailOpener.current.focus({ preventScroll: true })
+        }}
+      >
+        {selectedCapability ? (
+          <article className="erp-dev-product-core-detail" aria-label="当前能力详情">
+            <Tag color={STATUS_COLOR_BY_MEMBERSHIP[selectedCapability.membershipKey]}>{selectedCapability.membership}</Tag>
+            <section>
+              <Title level={3}>当前可用范围</Title>
+              <ul>{selectedCapability.availableScope.split('；').map((text, index) => <li key={index}>{text}</li>)}</ul>
+            </section>
+            <section className="erp-dev-product-core-detail__boundary">
+              <Title level={3}>当前边界</Title>
+              <p>{selectedCapability.boundary}</p>
+            </section>
+            <Button icon={<FileTextOutlined />} href={DEV_PRODUCT_CORE_DOCS_HREF}>查看能力台账</Button>
+          </article>
+        ) : null}
+      </Drawer>
     </div>
   )
 }

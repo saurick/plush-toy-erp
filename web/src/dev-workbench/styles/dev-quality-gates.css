@@ -79,6 +79,10 @@
   min-width: 0;
 }
 
+.erp-dev-quality-server-evidence__heading-copy h2.ant-typography {
+  font-size: 20px;
+}
+
 .erp-dev-quality-server-evidence__facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -781,9 +785,9 @@
 }
 
 .erp-dev-quality-context dl {
-  display: grid;
+  display: flex;
   flex: 1;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  flex-wrap: wrap;
   gap: 8px 16px;
   min-width: 0;
   margin: 0;

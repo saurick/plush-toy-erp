@@ -390,14 +390,14 @@ test('ERPLayout: 桌面侧栏可收起为图标栏并恢复完整菜单', async 
   try {
     const sider = h.container.querySelector('.erp-admin-sider')
     const menu = sider.querySelector('.erp-admin-menu')
-    const catalog = sider.querySelector('.erp-module-catalog-trigger')
+    const account = sider.querySelector('.erp-admin-account')
     const collapse = () =>
       sider.querySelector('.erp-admin-brand__collapse.ant-btn')
 
     assert.equal(sider.dataset.sidebarCollapsed, 'false')
     assert.equal(menu.classList.contains('ant-menu-inline-collapsed'), false)
     assert(sider.querySelector('.erp-admin-brand__logo-copy'))
-    assert.match(catalog.textContent, /全部模块/u)
+    assert.match(account.getAttribute('aria-label'), /^账号菜单：/u)
     assert.equal(collapse().getAttribute('aria-label'), '收起侧边菜单')
 
     await act(async () => collapse().click())
@@ -407,8 +407,7 @@ test('ERPLayout: 桌面侧栏可收起为图标栏并恢复完整菜单', async 
     assert(sider.classList.contains('ant-layout-sider-collapsed'))
     assert(menu.classList.contains('ant-menu-inline-collapsed'))
     assert.equal(sider.querySelector('.erp-admin-brand__logo-copy'), null)
-    assert.equal(catalog.textContent.trim(), '')
-    assert.equal(catalog.getAttribute('aria-label'), '全部模块')
+    assert.match(account.getAttribute('aria-label'), /^账号菜单：/u)
     assert.equal(collapse().getAttribute('aria-label'), '展开侧边菜单')
 
     await act(async () => collapse().click())
@@ -417,25 +416,25 @@ test('ERPLayout: 桌面侧栏可收起为图标栏并恢复完整菜单', async 
     assert.equal(sider.dataset.sidebarCollapsed, 'false')
     assert.equal(menu.classList.contains('ant-menu-inline-collapsed'), false)
     assert(sider.querySelector('.erp-admin-brand__logo-copy'))
-    assert.match(catalog.textContent, /全部模块/u)
+    assert.match(account.getAttribute('aria-label'), /^账号菜单：/u)
     assert.equal(collapse().getAttribute('aria-label'), '收起侧边菜单')
   } finally {
     await h.cleanup()
   }
 })
 
-test('ERPLayout: 工作中心已有页面标题时顶栏不重复名称', async () => {
+test('ERPLayout: 工作中心使用页面标题，不保留独立顶栏', async () => {
   const h = await mountRecoveryHarness()
   try {
-    const breadcrumb = h.container.querySelector('.erp-admin-breadcrumb')
+    const header = h.container.querySelector('.erp-admin-header')
 
-    assert.equal(breadcrumb, null)
+    assert.equal(header, null)
   } finally {
     await h.cleanup()
   }
 })
 
-test('ERPLayout: 自带标题卡的业务页不在顶栏重复页面名称', async () => {
+test('ERPLayout: 自带标题卡的业务页不叠加布局标题', async () => {
   const { hasSelfContainedBusinessPageHead } = await loadERPLayoutRuntime()
 
   assert.equal(

@@ -14,6 +14,8 @@
 
 生产使用 `base-release` 和独立受控凭据；`production-133` 不进入测试凭据轮换或测试登录矩阵。
 
-133 测试凭据合同是 `deployments/yoyoosun/env/credential.contract.json`，只登记 `demo-133` 与 `customer-test-133`。两目标稳定 `admin` 使用同一份固定测试凭据；demo 另外轮换合同列出的 11 个 `uat_*` 岗位账号，验收登录矩阵共 12 个身份；test 只轮换并登录 admin，同时证明非管理员 `id/username` 集合未变化，不读取或改写其密码。该轮换和登录矩阵只属于 `customer-trial-acceptance`，普通 `base-release` 不执行。
+133 测试凭据合同是 `deployments/yoyoosun/env/credential.contract.json`，只登记 `demo-133` 与 `customer-test-133`。
+
+两目标稳定 `admin` 使用同一份固定测试凭据；demo 另外轮换合同列出的 11 个 `uat_*` 岗位账号，验收登录矩阵共 12 个身份；test 只轮换并登录 admin，同时证明非管理员 `id/username` 集合未变化，不读取或改写其密码。该轮换和登录矩阵只属于 `customer-trial-acceptance`，普通 `base-release` 不执行。
 
 真实 `.env`、备份、证书私钥和 raw customer files 不得放入本目录。运行与凭据合同继续使用 `../env/runtime.contract.json`、`../env/credential.contract.json`，通用执行器读取这些合同，不派生第二份客户规则。

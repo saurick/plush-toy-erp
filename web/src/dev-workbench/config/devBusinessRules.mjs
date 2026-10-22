@@ -10,14 +10,16 @@ export { BUSINESS_RULES, BUSINESS_RULE_CATEGORIES, BUSINESS_RULE_DIAGRAMS }
 
 export function normalizeBusinessRuleEvidence(value) {
   const ids = new Set(businessRuleTests('postgres').map(businessTestKey))
-  if (!Array.isArray(value?.ruleTests) || value.ruleTests.length !== ids.size)
+  if (!Array.isArray(value?.ruleTests) || value.ruleTests.length !== ids.size) {
     throw new Error('关键场景证据不完整')
+  }
   for (const entry of value.ruleTests) {
     if (
       !ids.delete(entry.id) ||
       !['passed', 'failed', 'skipped', 'missing'].includes(entry.status)
-    )
+    ) {
       throw new Error('关键场景证据无效')
+    }
     if (
       entry.status === 'passed' &&
       (!Number.isInteger(entry.counts?.executed) ||
@@ -25,8 +27,9 @@ export function normalizeBusinessRuleEvidence(value) {
         entry.counts.passed !== entry.counts.executed ||
         entry.counts.failed !== 0 ||
         entry.counts.skipped !== 0)
-    )
+    ) {
       throw new Error('关键场景执行数不完整')
+    }
   }
   return value
 }
@@ -104,16 +107,19 @@ export function buildBusinessRuleRows({
               match.counts.passed !== match.counts.executed ||
               match.counts.failed !== 0 ||
               match.counts.skipped !== 0)
-          )
+          ) {
             status = 'missing'
-          if (status !== 'missing' && evidence.current !== true)
+          }
+          if (status !== 'missing' && evidence.current !== true) {
             status = 'stale'
+          }
           if (
             status === 'passed' &&
             (evidence.run?.cleanupComplete !== true ||
               evidence.run?.status !== 'passed')
-          )
+          ) {
             status = 'blocked'
+          }
         }
       }
       return { ...test, id: businessTestKey(test), status }

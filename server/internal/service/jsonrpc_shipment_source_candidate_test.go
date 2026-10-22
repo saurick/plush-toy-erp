@@ -384,7 +384,7 @@ func TestJSONRPCListShipmentSourceCandidatesRequiresEnabledShipmentAndSalesOrder
 		configRepo.modules[key] = modules
 
 		_, result, err := dispatcher.handleOperationalFact(ctx, "list_shipment_source_candidates", "sales-order-read-only", mustJSONRPCStruct(t, map[string]any{}))
-		if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+		if err != nil || result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("read-only sales order source response=%#v err=%v", result, err)
 		}
 		if repo.candidateCalls != 0 {
@@ -404,7 +404,7 @@ func TestJSONRPCListShipmentSourceCandidatesRequiresEnabledShipmentAndSalesOrder
 		)
 		activateOperationalFactTestCustomerConfig(t, dispatcher, readOnlyShipments)
 		_, result, err := dispatcher.handleOperationalFact(ctx, "list_shipment_source_candidates", "shipment-read-only", mustJSONRPCStruct(t, map[string]any{}))
-		if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+		if err != nil || result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("read-only shipments response=%#v err=%v", result, err)
 		}
 		if repo.candidateCalls != 0 {
@@ -503,7 +503,7 @@ func TestJSONRPCCreateShipmentWithItemsRequiresWritableShipmentDependencyClosure
 		)
 		activateOperationalFactTestCustomerConfig(t, dispatcher, readOnly)
 		_, result, err := dispatcher.handleOperationalFact(ctx, "create_shipment_with_items", "read-only-source", mustJSONRPCStruct(t, shipmentCreateWithItemsParams(true, true)))
-		if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+		if err != nil || result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("read-only sales orders source response=%#v err=%v", result, err)
 		}
 		if repo.createCalls != 0 {

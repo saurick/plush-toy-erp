@@ -85,7 +85,7 @@ func TestProcessDomainCommandAuthorizationUsesProcessRevisionAfterActiveSwitch(t
 		uc, repo := newUsecase()
 		repo.modules[customerRevisionKey(customerKey, r1)] = processRuntimeSalesSubmitModules("disabled")
 		repo.modules[customerRevisionKey(customerKey, r2)] = processRuntimeSalesSubmitModules("enabled")
-		if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r1, admin, ProcessDomainCommandSalesOrderSubmit); !errors.Is(err, ErrBadParam) {
+		if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r1, admin, ProcessDomainCommandSalesOrderSubmit); !errors.Is(err, ErrCustomerConfigModuleDisabled) {
 			t.Fatalf("R2 modules widened R1 command: %v", err)
 		}
 	})
@@ -165,12 +165,12 @@ func TestProcessDomainCommandShipmentShipRequiresWorkflowTasksAtCapturedRevision
 	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r1, admin, ProcessDomainCommandShipmentShip); err != nil {
 		t.Fatalf("enabled workflow_tasks at captured R1 rejected shipment ship: %v", err)
 	}
-	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r2, admin, ProcessDomainCommandShipmentShip); !errors.Is(err, ErrBadParam) {
+	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r2, admin, ProcessDomainCommandShipmentShip); !errors.Is(err, ErrCustomerConfigModuleReadOnly) {
 		t.Fatalf("read_only workflow_tasks at captured R2 allowed shipment ship: %v", err)
 	}
 
 	repo.modules[customerRevisionKey(customerKey, r2)] = processRuntimeShipmentShipModules("disabled")
-	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r2, admin, ProcessDomainCommandShipmentShip); !errors.Is(err, ErrBadParam) {
+	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r2, admin, ProcessDomainCommandShipmentShip); !errors.Is(err, ErrCustomerConfigModuleDisabled) {
 		t.Fatalf("disabled workflow_tasks at captured R2 allowed shipment ship: %v", err)
 	}
 }

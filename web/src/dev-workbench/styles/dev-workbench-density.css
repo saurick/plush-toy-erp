@@ -391,17 +391,8 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   padding-top: 28px;
 }
 
-.erp-dev-workspace-page .erp-dev-chain__stage-card {
-  min-height: 64px;
-}
-
 .erp-dev-workspace-page .erp-dev-chain__stage-main {
-  min-height: 38px;
   padding-block: 6px;
-}
-
-.erp-dev-workspace-page .erp-dev-chain__stage-foot {
-  padding-block-end: 2px;
 }
 
 .erp-dev-workspace-page .erp-dev-chain__independent-path {

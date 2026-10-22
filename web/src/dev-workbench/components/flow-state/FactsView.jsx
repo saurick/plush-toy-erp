@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
-import { Alert, Button, Select, Tag } from 'antd'
+import { Alert, Button, Tag } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { BusinessChainProjectionContext } from './FlowTaskContext.jsx'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
@@ -61,6 +62,8 @@ function FactsView({
       <section className="erp-dev-flow-definition-selector">
         <label htmlFor="dev-flow-fact-select">选择事实定义</label>
         <Select
+          allowClear={false}
+          placeholder="选择事实定义"
           id="dev-flow-fact-select"
           aria-label="选择事实定义"
           showSearch

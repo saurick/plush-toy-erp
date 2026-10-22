@@ -7,7 +7,8 @@ import {
   SearchOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Popover, Select, Tag } from 'antd'
+import { Button, Empty, Popover, Tag } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { BusinessChainProjectionContext } from './FlowTaskContext.jsx'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
@@ -392,6 +393,8 @@ function StateRulesView({
       <section className="erp-dev-flow-definition-selector">
         <label htmlFor="dev-flow-state-select">选择状态对象</label>
         <Select
+          allowClear={false}
+          placeholder="选择状态对象"
           id="dev-flow-state-select"
           aria-label="选择状态对象"
           showSearch

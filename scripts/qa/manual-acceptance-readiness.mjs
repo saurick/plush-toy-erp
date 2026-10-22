@@ -32,6 +32,7 @@ import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-c
 import {
   TASK_CATALOG_SCENARIO_DIGEST,
   TASK_SOURCE_TYPE,
+  getManualAcceptanceTaskScenario,
   TASK_STATUS_KEYS,
   getManualAcceptanceTaskProfileContract,
   getManualAcceptanceTaskVisibleCodePrefix,
@@ -1686,17 +1687,16 @@ function buildDatasetProbes(
     params: {
       ...(taskReport
         ? {
-            source_type: taskReport.sourceType,
-            source_id: taskReport.sourceID,
+            search: `${getManualAcceptanceTaskVisibleCodePrefix("boss", taskReport.taskProfile)}-`,
             owner_role_key: "boss",
           }
         : {}),
       limit: QUERY_LIMIT,
       offset: 0,
     },
-    batchEvidence: taskReport ? "exact_source" : "not_proven",
-    exactSourceType: taskReport?.sourceType || null,
-    exactSourceID: taskReport?.sourceID || null,
+    batchEvidence: taskReport ? "exact_task_codes" : "not_proven",
+    exactSourceType: null,
+    exactSourceID: null,
     exactTaskCodePrefix: taskReport
       ? getManualAcceptanceTaskVisibleCodePrefix("boss", taskReport.taskProfile)
       : null,
@@ -1734,16 +1734,15 @@ function buildDatasetProbes(
         owner_role_key: roleKey,
         ...(taskReport
           ? {
-              source_type: taskReport.sourceType,
-              source_id: taskReport.sourceID,
+              search: `${getManualAcceptanceTaskVisibleCodePrefix(roleKey, taskReport.taskProfile)}-`,
             }
           : {}),
         limit: QUERY_LIMIT,
         offset: 0,
       },
-      batchEvidence: taskReport ? "exact_source" : "not_proven",
-      exactSourceType: taskReport?.sourceType || null,
-      exactSourceID: taskReport?.sourceID || null,
+      batchEvidence: taskReport ? "exact_task_codes" : "not_proven",
+      exactSourceType: null,
+      exactSourceID: null,
       exactTaskCodePrefix: taskReport
         ? getManualAcceptanceTaskVisibleCodePrefix(
             roleKey,
@@ -1992,6 +1991,13 @@ function textValueCounts(items, valueAt) {
   return counts;
 }
 
+function taskScenarioForReadinessItem(probe, item) {
+  const suffix = String(item?.task_code || "").slice(`${probe.exactTaskCodePrefix}-`.length);
+  const index = Number(suffix);
+  if (!/^[0-9]{2}$/u.test(suffix) || index < 1 || index > MOBILE_TASKS_PER_ROLE) return "unknown_task";
+  return getManualAcceptanceTaskScenario(probe.exactOwnerRoleKey, index);
+}
+
 export function evaluateManualAcceptanceDataset(probe, data) {
   const requiredStatuses = (probe.requiredStatuses || []).map((item) =>
     String(item).toUpperCase(),
@@ -2162,11 +2168,11 @@ export function evaluateManualAcceptanceDataset(probe, data) {
       batchItems.push(item);
     }
   } else {
-    if (probe.batchEvidence === "exact_source") {
+    if (probe.batchEvidence === "exact_task_codes") {
       taskCoverageItems = items.filter(
         (item) =>
-          item?.source_type === probe.exactSourceType &&
-          Number(item?.source_id) === Number(probe.exactSourceID) &&
+          !item?.source_type &&
+          !item?.source_id &&
           (!probe.exactTaskCodePrefix ||
             String(item?.task_code || "").startsWith(
               `${probe.exactTaskCodePrefix}-`,
@@ -2193,7 +2199,7 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     : (taskCoverageItems ?? batchItems);
   const responseTotal = positiveInteger(data.total);
   const batchScoped =
-    probe.batchEvidence === "exact_source" ||
+    probe.batchEvidence === "exact_task_codes" ||
     probe.batchEvidence === "exact_references" ||
     Boolean(probe.batchPrefix);
   const actual = batchScoped
@@ -2285,7 +2291,7 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     requiredScenarios.length > 0
       ? textValueCounts(
           taskCoverageItems,
-          (item) => item?.payload?.acceptance_scenario_key,
+          (item) => taskScenarioForReadinessItem(probe, item),
         )
       : {};
   const missingScenarios = requiredScenarios.filter(
@@ -2299,7 +2305,7 @@ export function evaluateManualAcceptanceDataset(probe, data) {
       taskGroup,
       textValueCounts(
         taskCoverageItems.filter((item) => item?.task_group === taskGroup),
-        (item) => item?.payload?.acceptance_scenario_key,
+        (item) => taskScenarioForReadinessItem(probe, item),
       ),
     ]),
   );
@@ -2798,7 +2804,7 @@ function mobileTotalResult(mobileResults) {
     enoughStatuses: !unproven && missingStatuses.length === 0,
     enoughSecondaryKinds: true,
     allRolesPass,
-    batchEvidence: unproven ? "not_proven" : "exact_source",
+    batchEvidence: unproven ? "not_proven" : "exact_task_codes",
     notProvenReason: unproven
       ? "未提供本次岗位任务写入报告，不能证明九个岗位的本批任务。"
       : null,
@@ -2891,7 +2897,7 @@ function bossDashboardActiveResult(bossResult) {
     (sum, count) => sum + Number(count || 0),
     0,
   );
-  const sourceProven = bossResult?.batchEvidence === "exact_source";
+  const sourceProven = bossResult?.batchEvidence === "exact_task_codes";
   const passed =
     bossResult?.status === "pass" && sourceProven && actual === expectedMinimum;
   return {
@@ -2911,7 +2917,7 @@ function bossDashboardActiveResult(bossResult) {
     enoughRecords: passed,
     enoughStatuses: passed,
     enoughSecondaryKinds: true,
-    batchEvidence: sourceProven ? "exact_source" : "not_proven",
+    batchEvidence: sourceProven ? "exact_task_codes" : "not_proven",
     exactSourceType: sourceProven ? bossResult.exactSourceType : null,
     exactSourceID: sourceProven ? bossResult.exactSourceID : null,
     exactTaskCodePrefix: sourceProven ? bossResult.exactTaskCodePrefix : null,

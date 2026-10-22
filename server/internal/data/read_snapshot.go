@@ -20,6 +20,28 @@ type readSnapshot struct {
 	entTx  *ent.Tx
 }
 
+// Client-only snapshots retain the configured Ent query hooks and SQL logger.
+// Native aggregate queries continue to use beginReadSnapshot and its sqlTx.
+func beginClientReadSnapshot(ctx context.Context, data *Data) (*readSnapshot, error) {
+	if data == nil || data.postgres == nil || data.sqldb == nil {
+		return beginReadSnapshot(ctx, data)
+	}
+	tx, err := data.postgres.BeginTx(ctx, readSnapshotOptions(data.sqlDialect))
+	if err != nil {
+		return nil, err
+	}
+	return &readSnapshot{client: tx.Client(), entTx: tx}, nil
+}
+
+func readSnapshotOptions(sqlDialect string) *stdsql.TxOptions {
+	options := &stdsql.TxOptions{}
+	if sqlDialect == "" || sqlDialect == dialect.Postgres {
+		options.Isolation = stdsql.LevelRepeatableRead
+		options.ReadOnly = true
+	}
+	return options
+}
+
 func beginReadSnapshot(ctx context.Context, data *Data) (*readSnapshot, error) {
 	if data == nil || data.postgres == nil {
 		return nil, biz.ErrBadParam
@@ -36,12 +58,7 @@ func beginReadSnapshot(ctx context.Context, data *Data) (*readSnapshot, error) {
 	if sqlDialect == "" {
 		sqlDialect = dialect.Postgres
 	}
-	options := &stdsql.TxOptions{}
-	if sqlDialect == dialect.Postgres {
-		options.Isolation = stdsql.LevelRepeatableRead
-		options.ReadOnly = true
-	}
-	sqlTx, err := data.sqldb.BeginTx(ctx, options)
+	sqlTx, err := data.sqldb.BeginTx(ctx, readSnapshotOptions(sqlDialect))
 	if err != nil {
 		return nil, err
 	}

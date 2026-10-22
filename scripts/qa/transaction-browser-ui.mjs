@@ -169,7 +169,7 @@ export async function selectRow(page, id) {
 }
 export async function pageAction(page, label) {
   const direct = page.locator("button:visible").filter({ hasText: label });
-  const more = page.getByRole("button", { name: /^更多操作(?:，共 \d+ 项)?$/u });
+  const more = page.getByRole("button", { name: /^更多操作，共 \d+ 项$/u });
   await expect.poll(async () => (await direct.count()) > 0 || await more.isVisible()).toBe(true);
   if ((await direct.count()) > 0) {
     await expect(direct).toHaveCount(1);
@@ -312,6 +312,16 @@ export async function login(browser, options, role, report) {
     counts: page.rpcNetwork.counts,
     cancellations: page.rpcNetwork.cancellations,
     history: page.rpcNetwork.history,
+  });
+  page.on("requestfailed", request => {
+    if (["script", "stylesheet"].includes(request.resourceType())) {
+      (report.assetErrors ??= []).push({ url: request.url(), failure: request.failure()?.errorText });
+    }
+  });
+  page.on("response", response => {
+    if (response.status() >= 400 && ["script", "stylesheet"].includes(response.request().resourceType())) {
+      (report.assetErrors ??= []).push({ url: response.url(), status: response.status() });
+    }
   });
   page.setDefaultTimeout(30000);
   page.on("pageerror", (error) =>

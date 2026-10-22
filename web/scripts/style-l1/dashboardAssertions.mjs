@@ -15,6 +15,7 @@ import {
   isWarningBorderColor,
 } from './colorAssertions.mjs'
 import { createMobileTaskAssertions } from './mobileTaskAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createDashboardAssertions({ outputDir, baseURL }) {
   async function gotoScenarioPath(page, scenarioPath, options = {}) {
@@ -66,10 +67,15 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           rect.height > 0
         )
       }
-      const buttons = Array.from(
+      const visibleButtons = Array.from(
         document.querySelectorAll('.erp-admin-content button')
+      ).filter(isVisible)
+      const pageRefreshButtons = visibleButtons.filter((button) =>
+        button.closest('.erp-page-actions') &&
+        button.getAttribute('aria-label') === '刷新当前页'
       )
-        .filter(isVisible)
+      const buttons = visibleButtons
+        .filter((button) => !pageRefreshButtons.includes(button))
         .map((button) => ({
           text: String(button.textContent || '').trim(),
           className: String(button.className || ''),
@@ -77,11 +83,13 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         .filter((button) => forbiddenLabels.has(button.text))
 
       return {
+        pageRefreshButtonCount: pageRefreshButtons.length,
         forbiddenButtonCount: buttons.length,
         forbiddenButtons: buttons,
       }
     })
 
+    assert.equal(metrics.pageRefreshButtonCount, 1, `${scenarioName} 当前页面应只保留一个共享刷新入口`)
     assert.equal(
       metrics.forbiddenButtonCount,
       0,
@@ -736,6 +744,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       { expectedTaskText },
       { timeout: 10_000 }
     )
+    await waitForFiniteAnimations(page)
 
     const metrics = await page.evaluate(
       ({ expectedTaskText: taskText }) => {
@@ -793,7 +802,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           activeStepPanel instanceof HTMLElement
             ? rectOf(activeStepPanel.querySelector(selector))
             : null
-        const summary = rectInDrawer('.erp-task-action-drawer__summary--task')
+        const summary = rectInDrawer('.workflow-task-info-card[aria-label="任务信息"], .erp-task-action-drawer__summary--task')
         const metaGrid = rectInDrawer('.workflow-task-current, .erp-task-action-drawer__receipt-context')
         const guide = rectInDrawer('.erp-task-action-drawer__guide')
         const guideSteps = rectInDrawer('.erp-task-action-drawer__guide-steps')
@@ -810,7 +819,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         const textArea = rectInActiveStepPanel('textarea')
         const metaItems =
           drawerElement?.querySelectorAll(
-            '.workflow-task-current__responsibility strong, .workflow-task-current__responsibility > span, .erp-task-action-drawer__receipt-context > span'
+            '.workflow-task-current--facts .workflow-task-info-facts > div:first-child dd, .erp-task-action-drawer__receipt-context > span'
           ).length || 0
         const stepItems =
           drawerElement?.querySelectorAll('.erp-task-action-drawer__step')
@@ -864,7 +873,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           ).filter(isVisible).length,
           timingKeys: Array.from(
             drawerElement?.querySelectorAll(
-              '.erp-task-timing [data-task-time]'
+              '[data-task-time]'
             ) || []
           ).map((row) => row.dataset.taskTime),
           stepItems,
@@ -877,7 +886,8 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
 
     assert(
-      metrics.scopeRect?.width > 0 && metrics.scopeRect?.height > 0,
+      metrics.scopeRect?.width > 0 && metrics.scopeRect?.height > 0 &&
+        metrics.scopeRect.left >= 0 && metrics.scopeRect.right <= metrics.viewport.width + 2,
       `${scenarioName} 任务处理抽屉不可见: ${JSON.stringify(metrics)}`
     )
     assert(
@@ -891,9 +901,8 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       `${scenarioName} 任务处理抽屉缺少关键分区: ${JSON.stringify(metrics)}`
     )
     const isContext = metrics.activeStep === 'erp-task-action-step-context'
-    const showSteps = !isContext || metrics.hasActionReceipt
     for (const [name, box] of [['guide', metrics.guide], ['guideSteps', metrics.guideSteps], ['tabList', metrics.tabList]]) {
-      assert.equal(Boolean(box?.height), showSteps, `${scenarioName} ${name} 只在办理或已有回执时展示: ${JSON.stringify(metrics)}`)
+      assert.equal(Boolean(box?.height), true, `${scenarioName} ${name} 从详情首屏起持续展示三步导航: ${JSON.stringify(metrics)}`)
     }
     if (isContext || metrics.hasActionReceipt) {
       assert(
@@ -903,7 +912,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       assert(
         metrics.timingKeys.includes('arrived') &&
           metrics.timingKeys.includes('due'),
-        `${scenarioName} 核对任务和办理回执应显示入岗和处理截止时间: ${JSON.stringify(metrics)}`
+        `${scenarioName} 核对任务和办理回执应保留入岗与截止时间，入岗可从任务信息展开: ${JSON.stringify(metrics)}`
       )
     } else {
       assert.equal(

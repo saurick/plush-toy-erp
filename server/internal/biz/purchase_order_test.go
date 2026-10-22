@@ -233,7 +233,7 @@ func TestPurchaseOrderUsecaseLifecycleGuards(t *testing.T) {
 	if _, err := uc.ClosePurchaseOrder(ctx, 3); err != nil || repo.nextStatus != PurchaseOrderStatusClosed {
 		t.Fatalf("expected approved -> closed allowed, status=%s err=%v", repo.nextStatus, err)
 	}
-	if _, err := uc.ApprovePurchaseOrder(ctx, 1); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.ApprovePurchaseOrder(ctx, 1); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected draft -> approved rejected, got %v", err)
 	}
 	if _, err := uc.CancelPurchaseOrder(ctx, 1); err != nil || repo.nextStatus != PurchaseOrderStatusCanceled {
@@ -242,7 +242,7 @@ func TestPurchaseOrderUsecaseLifecycleGuards(t *testing.T) {
 	if IsValidPurchaseOrderStatus("shipped") || IsPurchaseOrderLifecycleTransitionAllowed(PurchaseOrderStatusApproved, "shipped") {
 		t.Fatalf("shipped must not be a purchase order lifecycle status")
 	}
-	if _, err := uc.CancelPurchaseOrder(ctx, 4); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CancelPurchaseOrder(ctx, 4); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
 	}
 }
@@ -280,7 +280,7 @@ func TestPurchaseOrderUsecaseItemGuards(t *testing.T) {
 		t.Fatalf("expected purchased quantity retained, got %s", repo.createdItem.PurchasedQuantity)
 	}
 
-	if _, err := uc.AddPurchaseOrderItem(ctx, &PurchaseOrderItemMutation{PurchaseOrderID: 2, LineNo: 1, MaterialID: 100, UnitID: 200, PurchasedQuantity: qty}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.AddPurchaseOrderItem(ctx, &PurchaseOrderItemMutation{PurchaseOrderID: 2, LineNo: 1, MaterialID: 100, UnitID: 200, PurchasedQuantity: qty}); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected closed order item add rejected, got %v", err)
 	}
 	if _, err := uc.AddPurchaseOrderItem(ctx, &PurchaseOrderItemMutation{PurchaseOrderID: 1, LineNo: 1, MaterialID: 999, UnitID: 200, PurchasedQuantity: qty}); !errors.Is(err, ErrMaterialNotFound) {
@@ -372,10 +372,10 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	if _, err := uc.SavePurchaseOrderWithItems(ctx, 1, &PurchaseOrderMutation{PurchaseOrderNo: "PO-NO-VERSION", SupplierID: 1000, PurchaseDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing version rejected, got %v", err)
 	}
-	if _, err := uc.SavePurchaseOrderWithItems(ctx, 2, &PurchaseOrderMutation{PurchaseOrderNo: "PO-CLOSED", SupplierID: 1000, PurchaseDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SavePurchaseOrderWithItems(ctx, 2, &PurchaseOrderMutation{PurchaseOrderNo: "PO-CLOSED", SupplierID: 1000, PurchaseDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected closed order save rejected, got %v", err)
 	}
-	if _, err := uc.SavePurchaseOrderWithItems(ctx, 3, &PurchaseOrderMutation{PurchaseOrderNo: "PO-SUBMITTED", SupplierID: 1000, PurchaseDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SavePurchaseOrderWithItems(ctx, 3, &PurchaseOrderMutation{PurchaseOrderNo: "PO-SUBMITTED", SupplierID: 1000, PurchaseDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected submitted purchase contract to be frozen, got %v", err)
 	}
 	if _, err := uc.SavePurchaseOrderWithItems(ctx, 1, &PurchaseOrderMutation{PurchaseOrderNo: "PO-WRONG-ITEM", SupplierID: 1000, PurchaseDate: orderDate, ExpectedVersion: 1}, []*PurchaseOrderItemSaveMutation{

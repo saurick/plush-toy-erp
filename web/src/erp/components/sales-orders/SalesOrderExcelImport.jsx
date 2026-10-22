@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { UploadOutlined } from '@ant-design/icons'
-import { Select, Space, Typography } from 'antd'
+import { Space, Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import SalesOrderBatchImportEditor from './SalesOrderBatchImportEditor.jsx'
 import { SalesOrderImportImage } from './SalesOrderSourceEvidence.jsx'
@@ -258,6 +259,7 @@ export default function SalesOrderExcelImport({
               </Typography.Text>
             ) : null}
             <Select
+              label="原表缺少单位时使用"
               aria-label="原表缺少单位时使用"
               placeholder="原表缺少单位时，统一选择单位"
               style={{ width: '100%' }}
@@ -269,6 +271,7 @@ export default function SalesOrderExcelImport({
               onChange={setDefaultUnitID}
             />
             <Select
+              label="原表缺少币种时使用"
               aria-label="原表缺少币种时使用"
               placeholder="原表缺少币种时，统一选择币种"
               style={{ width: '100%' }}

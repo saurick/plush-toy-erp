@@ -390,7 +390,6 @@ export default function DevQualityGatesPage() {
           className="erp-dev-quality-tabs"
         />
         <Button
-          type="primary"
           icon={<ReloadOutlined />}
           loading={refreshing}
           onClick={refresh}
@@ -440,10 +439,11 @@ export default function DevQualityGatesPage() {
               {summaryError ? <Text strong>请刷新状态；当前数据尚未重新核实。</Text> : displayedStatus?.recommendation ? (
                 <Text strong>下一步：{displayedStatus.recommendation}</Text>
               ) : null}
-              {!summaryError && displayedStatus?.notProven?.length ? (
-                <Text type="secondary">
-                  尚未证明：{displayedStatus.notProven.join('、')}
-                </Text>
+              {!summaryError && activeView !== 'server' && displayedStatus?.notProven?.length ? (
+                <details>
+                  <summary>证据边界</summary>
+                  <Text type="secondary">尚未证明：{displayedStatus.notProven.join('、')}</Text>
+                </details>
               ) : null}
             </Space>
           }
@@ -479,6 +479,8 @@ export default function DevQualityGatesPage() {
                   initialLoading={initialLoading}
                   canRun={canRun}
                   actionProfile={actionProfile}
+                  profile={parsed.values.profile || 'strict'}
+                  onProfileChange={(profile) => updateViewValues({ profile })}
                   onStart={start}
                 />
                 <RunView

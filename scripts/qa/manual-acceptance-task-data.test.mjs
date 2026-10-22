@@ -909,8 +909,7 @@ function createMockRuntime(options = {}) {
       const matched = [...tasks.values()].filter(
         (task) =>
           task.owner_role_key === params.owner_role_key &&
-          task.source_type === params.source_type &&
-          task.source_id === params.source_id,
+          task.task_code.includes(params.search),
       );
       assert.equal(actorRole, params.owner_role_key);
       assert.equal(params.limit, 200);
@@ -940,13 +939,15 @@ function createMockRuntime(options = {}) {
           `create_task must not send ${forbiddenKey}`,
         );
       }
-      assert.equal(params.payload.simulated_only, true);
-      assert.equal(params.payload.real_customer_data, false);
+      assert.equal(Object.hasOwn(params.payload, "simulated_only"), false);
+      assert.equal(Object.hasOwn(params.payload, "real_customer_data"), false);
       assert.equal(typeof params.idempotency_key, "string");
       assert.ok(params.idempotency_key.trim());
       assert.equal(tasks.has(params.task_code), false);
       const task = {
         ...structuredClone(params),
+        source_type: params.source_type || "",
+        source_id: params.source_id || 0,
         id: nextTaskID,
         version: 1,
         assignee_id: params.assignee_id ?? null,
@@ -1125,7 +1126,7 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     new Set(
       plan.tasks
         .filter((task) => task.roleKey === "production")
-        .map((task) => task.createParams.payload.acceptance_scenario_key),
+        .map((task) => task.scenarioKey),
     ),
     new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.production),
   );
@@ -1203,7 +1204,7 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
   );
 });
 
-test("uses short yoyoosun-style copy while keeping every task visibly synthetic", () => {
+test("uses short yoyoosun-style copy without data-nature fields or copy", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     runId: "COPY-SIMPLIFIED",
     dataVersion: "2026.07.15-v3",
@@ -1224,11 +1225,10 @@ test("uses short yoyoosun-style copy while keeping every task visibly synthetic"
         task.createParams.task_code.startsWith(
           `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[task.roleKey]}-`,
         ) &&
-        task.createParams.source_type ===
-          "simulated-manual-acceptance-task-batch" &&
-        task.createParams.source_no.startsWith("样例-") &&
-        task.createParams.payload.simulated_only === true &&
-        task.createParams.payload.real_customer_data === false,
+        task.createParams.source_type === null &&
+        task.createParams.source_no === null &&
+        !Object.hasOwn(task.createParams.payload, "simulated_only") &&
+        !Object.hasOwn(task.createParams.payload, "real_customer_data"),
     ),
     true,
   );
@@ -1448,15 +1448,14 @@ test("warehouse scenarios stay in the trial namespace and never fill the formal 
   assert.equal(plan.summary.byTaskGroup.shipment_release, undefined);
   assert(
     warehouseTasks.every((task) => {
-      const scenarioKey = task.createParams.payload.acceptance_scenario_key;
+      const scenarioKey = task.scenarioKey;
       return (
         task.createParams.task_group ===
           getManualAcceptanceTaskGroup("warehouse", scenarioKey) &&
         task.createParams.business_status_key ===
           getManualAcceptanceTaskBusinessStatus("warehouse", scenarioKey) &&
         task.createParams.owner_role_key === "warehouse" &&
-        task.createParams.source_type ===
-          "simulated-manual-acceptance-task-batch" &&
+        task.createParams.source_type === null &&
         task.createParams.payload.shipment_release === undefined &&
         task.createParams.payload.finished_goods === undefined
       );
@@ -1465,7 +1464,7 @@ test("warehouse scenarios stay in the trial namespace and never fill the formal 
   assert.deepEqual(
     new Set(
       warehouseTasks.map(
-        (task) => task.createParams.payload.acceptance_scenario_key,
+        (task) => task.scenarioKey,
       ),
     ),
     new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.warehouse),
@@ -1504,10 +1503,10 @@ test("task plan fails closed when a catalog role scenario is missing", () => {
   for (const task of plan.tasks.filter(
     (item) =>
       item.roleKey === "production" &&
-      item.createParams.payload.acceptance_scenario_key ===
+      item.scenarioKey ===
         "outsourcing_return",
   )) {
-    task.createParams.payload.acceptance_scenario_key = "today_production";
+    task.scenarioKey = "today_production";
     task.createParams.task_group = getManualAcceptanceTaskGroup(
       "production",
       "today_production",
@@ -1529,7 +1528,7 @@ test("formal source task groups and codes are rejected from simulated plans", ()
   const inbound = shippingMismatch.tasks.find(
     (task) =>
       task.roleKey === "warehouse" &&
-      task.createParams.payload.acceptance_scenario_key === "inbound",
+      task.scenarioKey === "inbound",
   );
   inbound.createParams.task_group = "shipment_finance_approval";
   assert.throws(
@@ -1544,7 +1543,7 @@ test("formal source task groups and codes are rejected from simulated plans", ()
   const normalProduction = productionMismatch.tasks.find(
     (task) =>
       task.roleKey === "production" &&
-      task.createParams.payload.acceptance_scenario_key === "today_production",
+      task.scenarioKey === "today_production",
   );
   normalProduction.createParams.task_group = "production_exception";
   assert.throws(
@@ -2130,9 +2129,9 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
     mock.seedPlannedTask(keepPlan, task, { final: true });
     const legacyTask = structuredClone(task);
     legacyTask.createParams.task_code = `${legacyBatch.prefix}-${task.roleKey.toUpperCase()}-${String(task.index).padStart(2, "0")}`;
-    legacyTask.createParams.source_id = legacyBatch.sourceID;
+    legacyTask.createParams.source_id = null;
     legacyTask.createParams.task_name = `【试用】${task.roleKey}：旧任务（${String(task.index).padStart(2, "0")}）`;
-    legacyTask.createParams.source_no = `试用任务单-${task.roleKey}-${task.index}`;
+    legacyTask.createParams.source_no = null;
     mock.seedPlannedTask(keepPlan, legacyTask, { final: true });
   }
 
@@ -2168,7 +2167,7 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
   assert.equal(report.retiredBatch.sourceID, legacyBatch.sourceID);
   assert.equal(
     [...mock.tasks.values()]
-      .filter((task) => task.source_id === legacyBatch.sourceID)
+      .filter((task) => task.task_code.startsWith(legacyBatch.prefix))
       .every((task) => ["done", "rejected"].includes(task.task_status_key)),
     true,
   );
@@ -2301,7 +2300,7 @@ test("long-lived workbench supersession is a no-op only when the whole legacy ba
     partialLegacyTask.roleKey,
     partialLegacyTask.index,
   );
-  partialLegacyTask.createParams.source_id = legacyBatch.sourceID;
+  partialLegacyTask.createParams.source_id = null;
   mock.seedPlannedTask(keepPlan, partialLegacyTask, { final: true });
   await assert.rejects(
     () =>

@@ -530,38 +530,38 @@ func (d *jsonrpcDispatcher) qualityErrorResult(ctx context.Context, err error) *
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrQualityInspectionSourceConflict):
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该业务来源已存在未取消的质检单"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "该业务来源已存在未取消的质检单"}
 	case errors.Is(err, biz.ErrQualityInspectionSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检来源与业务记录不一致，请刷新来源后重试"}
 	case errors.Is(err, biz.ErrQualityInspectionSourceState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源业务记录当前状态不允许发起质检"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "来源业务记录当前状态不允许发起质检"}
 	case errors.Is(err, biz.ErrProductionWIPInvalidRoute):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产路线或质量关口不完整，请刷新生产订单后核对"}
 	case errors.Is(err, biz.ErrProductionWIPInvalidTransition):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前在制批次状态已变化，不能重复办理该质量关口，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前在制批次状态已变化，不能重复办理该质量关口，请刷新后重试"}
 	case errors.Is(err, biz.ErrProductionWIPQualityGateIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "前置质量关口尚未通过，不能越级办理当前检验"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "前置质量关口尚未通过，不能越级办理当前检验"}
 	case errors.Is(err, biz.ErrShipmentReleaseAlreadySubmitted):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已提交放行，不能再新增出货前检验"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货单已提交放行，不能再新增出货前检验"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[quality] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrQualityInspectionNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "质检单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库行不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库行不存在"}
 	case errors.Is(err, biz.ErrOutsourcingFactNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货记录不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "委外回货记录不存在"}
 	case errors.Is(err, biz.ErrShipmentNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "出货单不存在"}
 	case errors.Is(err, biz.ErrInventoryLotNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存批次不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "库存批次不存在"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前批次状态不允许提交质检"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前批次状态不允许提交质检"}
 	case errors.Is(err, biz.ErrQualityInspectionRecordConflict):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检单号或待检批次已存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "质检单号或待检批次已存在"}
 	default:
 		return nil
 	}

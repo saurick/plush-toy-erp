@@ -1,3 +1,4 @@
+import { openERPAppearance } from './themeAssertions.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -16,8 +17,7 @@ async function selectSegment(dialog, name, label) {
 }
 
 async function setTableLines(page, label) {
-  const trigger = page.getByRole('button', { name: '外观与密度', exact: true })
-  await trigger.click()
+  const trigger = await openERPAppearance(page)
   const dialog = page.getByRole('dialog', { name: '外观与密度' })
   await selectSegment(dialog, '表格线条', label)
   await dialog
@@ -175,9 +175,7 @@ export function createTableLinesScenarios(deps) {
       )
       assert(before.cells.every((cell) => cell.verticalLine === '0px'))
 
-      await page
-        .getByRole('button', { name: '外观与密度', exact: true })
-        .click()
+      await openERPAppearance(page)
       const dialog = page.getByRole('dialog', { name: '外观与密度' })
       await waitForFiniteAnimations(page)
       await assertLineSwitchMotion(dialog)
@@ -303,9 +301,7 @@ export function createTableLinesScenarios(deps) {
       assertGrid(await measure(business))
       await setTableLines(page, '简洁')
       await page.emulateMedia({ reducedMotion: 'reduce' })
-      await page
-        .getByRole('button', { name: '外观与密度', exact: true })
-        .click()
+      await openERPAppearance(page)
       await assertLineSwitchMotion(dialog, true)
       await dialog
         .locator('.ant-modal-footer')
@@ -372,9 +368,7 @@ export function createTableLinesScenarios(deps) {
         await table.locator('.ant-table-row').first().waitFor()
         await setTableLines(page, '网格')
         for (const label of ['暗色', '浅色']) {
-          await page
-            .getByRole('button', { name: '外观与密度', exact: true })
-            .click()
+          await openERPAppearance(page)
           const dialog = page.getByRole('dialog', { name: '外观与密度' })
           await selectSegment(dialog, '主题模式', label)
           await dialog
@@ -402,9 +396,7 @@ export function createTableLinesScenarios(deps) {
             ),
           })
         }
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
         await selectSegment(dialog, '表格密度', '紧凑')
         await dialog
@@ -422,9 +414,7 @@ export function createTableLinesScenarios(deps) {
           await page.locator('html').getAttribute('data-erp-accent'),
           'pink'
         )
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         await dialog.waitFor()
         await waitForFiniteAnimations(page)
         assert(

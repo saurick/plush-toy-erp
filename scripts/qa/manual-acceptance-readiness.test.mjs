@@ -1263,7 +1263,7 @@ function createReadinessFetch(runtimeOptions = {}) {
           payload: {
             acceptance_scenario_key:
               runtimeOptions.taskScenarioKey ||
-              task.createParams.payload.acceptance_scenario_key,
+              task.scenarioKey,
           },
         })),
         total: runtimeOptions.taskResponseTotal ?? count,
@@ -1600,7 +1600,7 @@ test("readiness binds the explicit long-lived workbench batch identity and prefi
   );
   assert.equal(
     byID.get("mobile-tasks:production").exactSourceID,
-    report.sourceID,
+    null,
   );
 });
 
@@ -2058,8 +2058,8 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
     },
     expectedMinimum: 20,
     expectedExact: 20,
-    batchEvidence: "exact_source",
-    exactSourceType: "simulated-manual-acceptance-task-batch",
+    batchEvidence: "exact_task_codes",
+    exactSourceType: null,
     exactSourceID: 123456,
     exactTaskCodePrefix: "YS-V5-XS",
     exactOwnerRoleKey: "sales",
@@ -2070,8 +2070,8 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
   const batchTasks = TASK_STATUSES.map((status, index) => ({
     id: index + 1,
     task_code: `YS-V5-XS-${String(index + 1).padStart(2, "0")}`,
-    source_type: "simulated-manual-acceptance-task-batch",
-    source_id: 123456,
+    source_type: null,
+    source_id: null,
     owner_role_key: "sales",
     task_group: "trial_sales_work",
     task_status_key: status,
@@ -2114,13 +2114,7 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
 
   const missingScenario = batchTasks.map((item) => ({
     ...item,
-    payload: {
-      ...item.payload,
-      acceptance_scenario_key:
-        item.payload.acceptance_scenario_key === "delivery_date_reply"
-          ? "customer_details"
-          : item.payload.acceptance_scenario_key,
-    },
+    task_code: item.payload.acceptance_scenario_key === "delivery_date_reply" ? "YS-V5-XS-01" : item.task_code,
   }));
   const missingScenarioFailure = evaluateManualAcceptanceDataset(probe, {
     tasks: missingScenario,
@@ -2134,14 +2128,14 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
   assert.equal(missingScenarioFailure.enoughScenarios, false);
 
   const unknownScenario = structuredClone(batchTasks);
-  unknownScenario[0].payload.acceptance_scenario_key = "unknown_scenario";
+  unknownScenario[0].task_code = "YS-V5-XS-99";
   const unknownScenarioFailure = evaluateManualAcceptanceDataset(probe, {
     tasks: unknownScenario,
     total: 20,
   });
   assert.equal(unknownScenarioFailure.status, "fail");
   assert.deepEqual(unknownScenarioFailure.unknownScenarios, [
-    "unknown_scenario",
+    "unknown_task",
   ]);
 
   const unknownTaskGroup = structuredClone(batchTasks);
@@ -2418,11 +2412,8 @@ test("explicit verification reports page data, nine role totals, and honest manu
           );
         }
         return (
-          item.params.source_type ===
-            "simulated-manual-acceptance-task-batch" &&
-          item.params.source_id ===
-            manualAcceptanceTaskBatchIdentity(CURRENT_MANUAL_ACCEPTANCE_RUN_ID)
-              .sourceID &&
+          String(item.params.search || "").startsWith("YS-") &&
+          !("source_type" in item.params) && !("source_id" in item.params) &&
           Boolean(item.params.owner_role_key) &&
           !("customer_key" in item.params)
         );

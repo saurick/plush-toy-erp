@@ -1,3 +1,4 @@
+import { createDensityCompletionScenarios } from './densityCompletionScenarios.mjs'
 import { createMobileTaskConsistencyScenarios } from './mobileTaskConsistencyScenarios.mjs'
 import { createGlobalDensityOptimizationScenarios } from './globalDensityOptimizationScenarios.mjs'
 import { createInformationDensityExtras } from './informationDensityExtras.mjs'
@@ -31,6 +32,9 @@ import { createHistoryRecordScenarios } from './historyRecordScenarios.mjs'
 import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
+import { createBusinessListStickyScenarios } from './businessListStickyScenarios.mjs'
+import { createDesktopListStickyScenarios } from './desktopListStickyScenarios.mjs'
+import { createWorkCenterTableScenarios } from './workCenterTableScenarios.mjs'
 import { createScrollEdgeScenarios } from './scrollEdgeScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingScenarios.mjs'
@@ -92,6 +96,8 @@ import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
 import { createAccountAppearanceScenarios } from './accountAppearanceScenarios.mjs'
 import { createAccountIdentityScenarios } from './accountIdentityScenarios.mjs'
 import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
+import { createSalesOrderExportScenarios } from './salesOrderExportScenarios.mjs'
+import { createGrowthValidationScenarios } from './growthValidationScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
   const {
@@ -407,11 +413,13 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
-    ...createPageHeaderScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow }),
+    ...createPageHeaderScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir }),
     ...createBusinessColumnSettingsScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createSalesOrderExportScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createGrowthValidationScenarios(deps),
     ...createBusinessStatusCountsScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
@@ -558,6 +566,9 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
       clickERPThemeOption,
     }),
+    ...createBusinessListStickyScenarios({ outputDir, customerRuntimeEffectiveSession }),
+    ...createDesktopListStickyScenarios({ outputDir, customerRuntimeEffectiveSession }),
+    ...createWorkCenterTableScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createAuthenticationEntryScenarios({
       expectHeading,
       expectButton,
@@ -894,5 +905,5 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
   ]
-  return [...scenarios, ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
+  return [...scenarios, ...createScrollEdgeScenarios(scenarios, { outputDir }), ...createGlobalDensityOptimizationScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession }), ...createDensityCompletionScenarios(scenarios, { ...deps, customerRuntimeEffectiveSession })]
 }

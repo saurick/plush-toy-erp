@@ -5,9 +5,9 @@ import {
   Form,
   Input,
   Radio,
-  Select,
   Typography,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { ProductionOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
@@ -16,7 +16,7 @@ import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
@@ -252,6 +252,7 @@ export default function ProductionCompletionModal({
             rules={[{ required: true, message: '请选择要完工的生产明细' }]}
           >
             <Select
+              placeholder="请选择生产明细"
               disabled={editing}
               showSearch
               optionFilterProp="label"

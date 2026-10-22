@@ -429,12 +429,16 @@ export default function PurchaseOrdersPage() {
 
   const loadArrivalOrders = useCallback(
     async ({ signal }) => {
+      if (routePurchaseOrderID) {
+        const order = await getPurchaseOrder({ id: routePurchaseOrderID }, { signal })
+        return order ? [order] : []
+      }
       const result = await listAllPurchaseOrders(orderListParams, { signal })
       return Array.isArray(result?.purchase_orders)
         ? result.purchase_orders
         : []
     },
-    [orderListParams]
+    [orderListParams, routePurchaseOrderID]
   )
 
   const arrivalData = useBusinessVisualizationData({
@@ -918,10 +922,11 @@ export default function PurchaseOrdersPage() {
         )
       }
       if (isCreatingOrder) {
+        reloadArrivalData()
         setPagination((current) => ({ ...current, current: 1 }))
       } else {
         const refreshEffect =
-          await settleSourceDocumentPostSaveEffect(loadOrders)
+          await settleSourceDocumentPostSaveEffect(refreshPageData)
         if (refreshEffect.status === 'rejected') {
           message.warning(
             getActionErrorMessage(refreshEffect.error, '刷新采购订单列表')
@@ -977,7 +982,7 @@ export default function PurchaseOrdersPage() {
           )
         }
       }
-      const refreshEffect = await settleSourceDocumentPostSaveEffect(loadOrders)
+      const refreshEffect = await settleSourceDocumentPostSaveEffect(refreshPageData)
       if (refreshEffect.status === 'rejected') {
         message.warning(
           getActionErrorMessage(refreshEffect.error, '刷新采购订单列表')
@@ -1148,11 +1153,14 @@ export default function PurchaseOrdersPage() {
   ])
 
   const selectedOrders = useMemo(
-    () => orders.filter((record) => selectedRowKeys.includes(record.id)),
-    [orders, selectedRowKeys]
+    () => (contentView === 'arrival'
+      ? arrivalData.loading || arrivalData.error ? [] : arrivalData.rows
+      : orders)
+      .filter((record) => selectedRowKeys.includes(record.id)),
+    [arrivalData.error, arrivalData.loading, arrivalData.rows, contentView, orders, selectedRowKeys]
   )
   const singleSelectedOrder = getSingleSelectedPurchaseOrder({
-    selectedOrder,
+    selectedOrder: contentView === 'arrival' ? null : selectedOrder,
     selectedOrders,
     selectedRowKeys,
   })
@@ -1362,7 +1370,12 @@ export default function PurchaseOrdersPage() {
         { value: 'list', label: '订单列表' },
         { value: 'arrival', label: '到货计划' },
       ]}
-      onChange={setContentView}
+      onChange={(view) => {
+        if (recordActionBusy) return
+        applySelectedRowKeys([])
+        setSelectedOrder(null)
+        setContentView(view)
+      }}
     />
   )
 
@@ -1376,6 +1389,7 @@ export default function PurchaseOrdersPage() {
       />
 
       <PurchaseOrderOperationPanel
+        showListTools={contentView === 'list'}
         adminProfile={adminProfile}
         statusCounts={statusCounts}
         statusLoading={loading}
@@ -1471,11 +1485,27 @@ export default function PurchaseOrdersPage() {
         {contentView === 'arrival' ? (
           <PurchaseArrivalCalendar
             viewState={arrivalViewState}
-            onViewStateChange={setArrivalViewState}
+            onViewStateChange={(state) => {
+              if (recordActionBusy) return
+              applySelectedRowKeys([])
+              setSelectedOrder(null)
+              setArrivalViewState(state)
+            }}
             orders={arrivalData.rows}
             loading={arrivalData.loading}
             error={arrivalData.error}
             onRetry={arrivalData.reload}
+            selectedRowKeys={selectedRowKeys}
+            selectionDisabled={recordActionBusy}
+            hasQueryFilters={hasActiveFilters}
+            onClearQuery={clearFilters}
+            onSelect={(row) => {
+              if (recordActionBusy || !row) return
+              const order = arrivalData.rows.find((item) => Number(item.id) === Number(row.id))
+              if (!order) return
+              applySelectedRowKeys([order.id])
+              setSelectedOrder(order)
+            }}
             onOpen={(row) =>
               openPurchaseOrderDetails(
                 arrivalData.rows.find(
@@ -1582,7 +1612,7 @@ export default function PurchaseOrdersPage() {
 
       {columnOrderModal}
 
-      <PurchaseOrderTermsModal order={termsOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setTermsOrder(null)} onChanged={loadOrders} />
+      <PurchaseOrderTermsModal order={termsOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setTermsOrder(null)} onChanged={refreshPageData} />
       <PurchaseOrderEditor
         open={modalOpen}
         form={form}

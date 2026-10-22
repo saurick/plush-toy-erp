@@ -1,3 +1,4 @@
+import { openERPAppearance } from './themeAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
@@ -414,9 +415,8 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
 }
 
 export async function verifyMermaidDarkTheme(page, diagram, assert) {
-  const trigger = page.getByRole('button', { name: '外观与密度', exact: true })
   const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
-  await trigger.click()
+  await openERPAppearance(page)
   const previousMode = await dialog
     .getByRole('radiogroup', { name: '主题模式', exact: true })
     .evaluate((node) => node.querySelector('input:checked').closest('label').textContent.trim())
@@ -432,7 +432,7 @@ export async function verifyMermaidDarkTheme(page, diagram, assert) {
   } finally {
     const close = diagram.locator('[data-mermaid-fullscreen-action="close"]')
     if (await close.count()) await close.press('Escape')
-    await trigger.click()
+    await openERPAppearance(page)
     await dialog.getByText(previousMode, { exact: true }).click()
     await dialog.getByRole('button', { name: '关闭', exact: true }).click()
     await waitForMermaidFit(page, diagram)

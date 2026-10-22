@@ -3,6 +3,7 @@ import { Alert, Button, Empty, Spin } from 'antd'
 import { LeftOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { getWorkflowTaskCalendar } from '../../api/workflowApi.mjs'
@@ -15,6 +16,8 @@ import {
 } from '../../utils/workflowTaskCalendar.mjs'
 import { WORKFLOW_TASKS_CHANGED } from '../../utils/workflowTaskChanges.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
+import { getWorkflowTaskReason } from '../../utils/workflowTaskBoard.mjs'
+import { buildWorkflowTaskResponsibilityItems } from '../../utils/workflowTaskEventPresentation.mjs'
 import WorkflowTaskCard from './WorkflowTaskCard.jsx'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
@@ -63,7 +66,7 @@ export default function WorkflowTaskCalendar({
   const today = currentBusinessDate()
   const refresh = () => setRevision((value) => value + 1)
 
-  const load = async (append = false) => {
+  const load = async (append = false, { showRefreshFeedback = false } = {}) => {
     requestRef.current?.abort()
     const controller = new AbortController()
     requestRef.current = controller
@@ -93,19 +96,44 @@ export default function WorkflowTaskCalendar({
         items: append && !restarted ? [...items, ...added] : result.items,
       })
       setRequestState({ key: queryKey, loading: false, error: '' })
+      if (showRefreshFeedback) {
+        message.success({
+          key: 'workflow-task-calendar-refresh',
+          content: '待办日历已刷新',
+        })
+      }
     } catch (err) {
       if (
         !controller.signal.aborted &&
         requestRef.current === controller &&
         !isRpcAbortError(err)
       ) {
+        const errorMessage = getActionErrorMessage(
+          err,
+          showRefreshFeedback
+            ? '待办日历刷新失败，请重试'
+            : '待办日历加载失败，请重试'
+        )
         setRequestState({
           key: queryKey,
           loading: false,
-          error: getActionErrorMessage(err, '待办日历加载失败，请重试'),
+          error: errorMessage,
         })
+        if (showRefreshFeedback) {
+          message.error({
+            key: 'workflow-task-calendar-refresh',
+            content: errorMessage,
+          })
+        }
       }
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null
     }
+  }
+
+  const handleRefresh = () => {
+    if (loading || requestRef.current) return
+    return load(false, { showRefreshFeedback: true })
   }
 
   const loadFeedback = usePageLoadFeedback({ error, retry: load })
@@ -257,8 +285,10 @@ export default function WorkflowTaskCalendar({
           </strong>
           <Button
             aria-label="刷新待办日历"
+            aria-busy={loading}
             icon={<ReloadOutlined />}
-            onClick={refresh}
+            onClick={handleRefresh}
+            disabled={loading}
             loading={
               loading && Boolean(calendar) && !requestState?.append
                 ? { delay: 180 }
@@ -293,27 +323,27 @@ export default function WorkflowTaskCalendar({
               {items.map((task) => (
                 <WorkflowTaskCard
                   key={task.id}
+                  compact
                   className="workflow-task-calendar__task"
                   label={`查看${getWorkflowTaskDisplayName(task)}详情`}
                   data-task-id={task.id}
                   onOpen={() => onOpenTask(task)}
                 >
-                  <div className="workflow-task-calendar__identity">
-                    <WorkflowTaskIdentity
-                      task={task}
-                      keyword={query.keyword}
-                      compact
-                      copyable={false}
-                      showTaskName
-                    />
-                    <span>
-                      {task.task_status_key === WorkflowTaskStatus.BLOCKED ? '受阻' : '待处理'}
-                    </span>
+                  <WorkflowTaskIdentity
+                    task={task}
+                    keyword={query.keyword}
+                    compact
+                    layout="card"
+                    copyable={false}
+                    showTaskName
+                    status={<span>{task.task_status_key === WorkflowTaskStatus.BLOCKED ? '受阻' : '待处理'}</span>}
+                    source={<WorkflowTaskSource task={task} copyable={false} showUnavailable={false} />}
+                  />
+                  {getWorkflowTaskReason(task) ? <div className="workflow-task-calendar__reason">{getWorkflowTaskReason(task)}</div> : null}
+                  <div className="erp-task-card__footer">
+                    <span>{buildWorkflowTaskResponsibilityItems(task).slice(0, 2).map((item) => item.value).join(' · ')}</span>
+                    <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
                   </div>
-                  <div className="workflow-task-calendar__source">
-                    <WorkflowTaskSource task={task} copyable={false} />
-                  </div>
-                  <WorkflowTaskTiming task={task} />
                 </WorkflowTaskCard>
               ))}
             </div>

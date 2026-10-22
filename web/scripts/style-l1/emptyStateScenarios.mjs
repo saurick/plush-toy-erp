@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
@@ -26,6 +27,7 @@ export function createEmptyStateScenarios({
       }
       return {
         font: getComputedStyle(text).fontSize,
+        lineHeight: getComputedStyle(text).lineHeight,
         color: getComputedStyle(text).color,
         background: getComputedStyle(surface).backgroundColor,
         padding: getComputedStyle(node).padding,
@@ -37,6 +39,7 @@ export function createEmptyStateScenarios({
     const actual = await snapshot.jsonValue()
     await snapshot.dispose()
     assert.equal(actual.font, '14px')
+    assert.equal(actual.lineHeight, '22px')
     assert.equal(actual.imageHeight, 40)
     assert.equal(actual.padding, '24px 16px')
     assert.ok(actual.imageVisible)
@@ -76,7 +79,10 @@ export function createEmptyStateScenarios({
         await page.screenshot({
           path: path.join(outputDir, `empty-risk-${themeMode}.png`),
         })
-        await page.getByRole('tab', { name: /超时/ }).click()
+        await page
+          .getByRole('group', { name: '风险类别', exact: true })
+          .getByRole('button', { name: /^超时，/ })
+          .click()
         await inspectEmpty(page, '暂无超时任务')
         await page.getByTestId('mobile-role-nav-progress').click()
         await inspectEmpty(page, '当前范围暂无记录')
@@ -136,12 +142,33 @@ export function createEmptyStateScenarios({
       workflowTaskFixtures: [],
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await inspectEmpty(page, '当前范围暂无记录')
-        await inspectEmpty(page, '暂无可查看的阶段摘要')
+        const orders = await inspectEmpty(page, '当前范围暂无记录')
+        await page.getByRole('tab', { name: '生产执行', exact: true }).click()
+        assert.deepEqual(await inspectEmpty(page, '当前范围暂无记录'), orders)
         await assertNoHorizontalOverflow(page, 'empty-desktop-progress')
         await page.screenshot({
           path: path.join(outputDir, 'empty-desktop.png'),
         })
+      },
+    },
+    {
+      name: 'dev-ui-design-pressure-controls-desktop',
+      path: '/__dev/ui-design?page=workbench',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('#sidebar').getByRole('button', { name: '质量验证', exact: true }).click()
+        await frame.getByRole('tab', { name: '压力测试', exact: true }).click()
+        const load = frame.getByRole('combobox', { name: '负载档位示意' })
+        await chooseSelectOption(load, 'capacity')
+        assert.equal(await frame.locator('[data-action="dev-pressure-preview"]').count(), 1)
+        await frame.getByText('尚未演示压力报告', { exact: true }).waitFor()
+        await frame.getByRole('button', { name: '运行压测演示', exact: true }).click()
+        await frame.getByText('容量样例', { exact: false }).waitFor()
+        await chooseSelectOption(load, 'quick')
+        await frame.getByRole('button', { name: '运行压测演示', exact: true }).click()
+        await frame.getByText('短档样例', { exact: false }).waitFor()
+        await assertNoHorizontalOverflow(page, '压测原型单一执行入口')
       },
     },
     {
@@ -390,9 +417,8 @@ export function createEmptyStateScenarios({
           .locator('.dev-design-settings > summary')
           .filter({ hasText: '演示设置与边界' })
           .click()
-        await frame
-          .getByRole('combobox', { name: '工作台状态预览' })
-          .selectOption('error')
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '工作台状态预览' }), 'error')
         await frame.getByRole('alert').waitFor()
         assert.equal(
           await frame.getByText('当前范围暂无记录', { exact: true }).count(),

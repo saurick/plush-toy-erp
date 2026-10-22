@@ -97,14 +97,10 @@ test("percentile uses nearest-rank semantics", () => {
 
 test("capacity idempotency probe uses only the same-batch ready trial PMC task", () => {
   const batch = {
-    sourceType: "simulated-manual-acceptance-task-batch",
+    sourceType: "capacity_fixture",
     sourceID: 20260715,
   };
-  const payload = {
-    simulated_only: true,
-    real_customer_data: false,
-    trial_task: true,
-  };
+  const payload = {};
   const tasks = [
     ...[
       "production_scheduling",
@@ -146,7 +142,7 @@ test("capacity idempotency probe uses only the same-batch ready trial PMC task",
   );
   assert.equal(
     selectCapacityIdempotencyTask(
-      [{ ...tasks.at(-1), payload: { ...payload, simulated_only: false } }],
+      [{ ...tasks.at(-1), owner_role_key: "warehouse" }],
       batch,
     ),
     undefined,

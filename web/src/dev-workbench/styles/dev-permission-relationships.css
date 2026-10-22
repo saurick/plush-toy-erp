@@ -542,3 +542,41 @@
     padding: 10px;
   }
 }
+
+.erp-dev-permission-overview,
+.erp-dev-permission-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  min-width: 0;
+}
+
+.erp-dev-permission-counts {
+  flex: 1 1 auto;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-permission-counts strong {
+  margin-left: 4px;
+  color: var(--erp-text);
+}
+
+.erp-dev-permission-counts > span {
+  white-space: nowrap;
+}
+
+.erp-dev-permission-overview .erp-dev-permission-evidence-disclosure[open] {
+  flex-basis: 100%;
+}
+
+.erp-dev-permission-legend > summary {
+  min-height: 32px;
+  align-content: center;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.erp-dev-permission-legend[open] > summary {
+  margin-bottom: 8px;
+}

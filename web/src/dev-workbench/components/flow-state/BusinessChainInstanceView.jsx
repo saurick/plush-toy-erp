@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Empty, Select, Space, Spin, Tag } from 'antd'
+import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
 import { Link } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import {
   getWorkflowTask,
@@ -204,8 +205,9 @@ export default function BusinessChainInstanceView({
           ))}
         </Space>
         <Select
+          label="环节或分支"
           aria-label="选择业务环节或异常分支"
-          placeholder="全部环节与分支"
+          placeholder="环节或分支"
           allowClear
           showSearch
           optionFilterProp="label"

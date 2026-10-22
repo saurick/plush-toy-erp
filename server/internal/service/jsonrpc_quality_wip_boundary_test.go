@@ -16,13 +16,14 @@ func TestMapQualityErrorUsesReadableProductionWIPBoundaries(t *testing.T) {
 	for _, test := range []struct {
 		err     error
 		message string
+		code    int32
 	}{
-		{biz.ErrProductionWIPInvalidRoute, "生产路线或质量关口不完整，请刷新生产订单后核对"},
-		{biz.ErrProductionWIPInvalidTransition, "当前在制批次状态已变化，不能重复办理该质量关口，请刷新后重试"},
-		{biz.ErrProductionWIPQualityGateIncomplete, "前置质量关口尚未通过，不能越级办理当前检验"},
+		{biz.ErrProductionWIPInvalidRoute, "生产路线或质量关口不完整，请刷新生产订单后核对", errcode.InvalidParam.Code},
+		{biz.ErrProductionWIPInvalidTransition, "当前在制批次状态已变化，不能重复办理该质量关口，请刷新后重试", errcode.BusinessRuleViolation.Code},
+		{biz.ErrProductionWIPQualityGateIncomplete, "前置质量关口尚未通过，不能越级办理当前检验", errcode.BusinessRuleViolation.Code},
 	} {
 		result := dispatcher.mapQualityError(context.Background(), test.err)
-		if result.Code != errcode.InvalidParam.Code || result.Message != test.message {
+		if result.Code != test.code || result.Message != test.message {
 			t.Fatalf("error %v result = %#v", test.err, result)
 		}
 	}

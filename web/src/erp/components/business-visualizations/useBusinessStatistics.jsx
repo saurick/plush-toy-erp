@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Empty, Popover, Select, Tag } from 'antd'
+import { Alert, Button, Empty, Popover, Tag, Tooltip } from 'antd'
 import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
@@ -26,10 +27,11 @@ import {
   STATISTICS_AGES,
   STATISTICS_STATUSES,
 } from '../../utils/businessStatistics.mjs'
-import { DateRangeFilter } from '../business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import WorkflowTaskPagination from '../workflow/WorkflowTaskPagination.jsx'
 import { BusinessViewSurface } from './BusinessVisualizationFrame.jsx'
 import '../../styles/app/business-statistics.css'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const clearGroup = {
   group_key: '',
@@ -41,9 +43,9 @@ const clearGroup = {
   source_to: '',
 }
 const displayOptions = [
-  { label: '图表与表格', value: 'combined' },
   { label: '表格', value: 'table' },
   { label: '图表', value: 'chart' },
+  { label: '表格与图表', value: 'combined' },
 ]
 const deliverySegments = [
   ['done', '已交齐'],
@@ -56,7 +58,8 @@ const sourceStatus = (key) => (key === 'unknown_due' ? 'undated' : key)
 const groupValue = (group, key) =>
   key === 'pending_not_late' ? group.pending - group.overdue : group[key]
 
-function StatisticsChart({ groups, report, onDrill }) {
+function StatisticsChart({ groups, report, currency, onDrill }) {
+  const [activeSegment, setActiveSegment] = useState(null)
   const ages = report === 'receivables'
   const segments = (ages ? STATISTICS_AGES : deliverySegments).filter(
     ([key]) =>
@@ -86,46 +89,9 @@ function StatisticsChart({ groups, report, onDrill }) {
           </span>
         ))}
       </div>
-      <div
-        className="erp-statistics-plot"
-        style={{ '--statistics-columns': Math.max(groups.length, 1) }}
-      >
+      <div className="erp-statistics-plot">
         {groups.map((group) => (
           <div className="erp-statistics-column" key={group.key}>
-            <Button
-              type="link"
-              className="erp-statistics-chart-number"
-              onClick={() => onDrill(group)}
-            >
-              {number(ages ? group.balance : group.count)}
-            </Button>
-            <div className="erp-statistics-bar-track">
-              <div
-                className="erp-statistics-stack"
-                style={{
-                  height: `${statisticsRatio(ages ? group.balance : String(group.count), maximum)}%`,
-                }}
-              >
-                {segments.map(([key, label]) => {
-                  const value = ages ? group[key] : groupValue(group, key)
-                  return statisticsRatio(
-                    String(value),
-                    ages ? group.balance : String(group.count)
-                  ) > 0 ? (
-                    <button
-                      type="button"
-                      key={key}
-                      className={`erp-statistics-tone-${key}`}
-                      style={{
-                        height: `${statisticsRatio(String(value), ages ? group.balance : String(group.count))}%`,
-                      }}
-                      aria-label={`${group.name} · ${label} ${number(value)}${ages ? '' : ' 单'}`}
-                      onClick={() => onDrill(group, sourceStatus(key))}
-                    />
-                  ) : null
-                })}
-              </div>
-            </div>
             <Button
               type="link"
               className="erp-statistics-chart-name"
@@ -133,6 +99,83 @@ function StatisticsChart({ groups, report, onDrill }) {
               onClick={() => onDrill(group)}
             >
               {group.name}
+            </Button>
+            <div className="erp-statistics-bar-track">
+              <div
+                className="erp-statistics-stack"
+                style={{
+                  width: `${statisticsRatio(ages ? group.balance : String(group.count), maximum)}%`,
+                }}
+              >
+                {segments.map(([key, label]) => {
+                  const value = ages ? group[key] : groupValue(group, key)
+                  const total = ages ? group.balance : String(group.count)
+                  const share = statisticsRatio(String(value), total)
+                  const segmentKey = `${group.key}:${key}`
+                  return share > 0 ? (
+                    <Tooltip
+                      key={key}
+                      trigger={['hover', 'focus']}
+                      placement="top"
+                      classNames={{ root: 'erp-statistics-chart-tooltip' }}
+                      destroyOnHidden
+                      open={activeSegment === segmentKey}
+                      onOpenChange={(open) =>
+                        setActiveSegment((current) =>
+                          open
+                            ? segmentKey
+                            : current === segmentKey
+                              ? null
+                              : current
+                        )
+                      }
+                      title={
+                        <div className="erp-statistics-chart-tooltip-content">
+                          <strong className="erp-statistics-chart-tooltip-name">
+                            {group.name}
+                          </strong>
+                          <div className="erp-statistics-chart-tooltip-value">
+                            <span>{label}</span>
+                            <strong>
+                              {number(value, ages)} {ages ? currency : '单'}
+                            </strong>
+                          </div>
+                          <span className="erp-statistics-chart-tooltip-total">
+                            当前筛选{ages ? '未结' : '共'} {number(total, ages)}{' '}
+                            {ages ? currency : '单'} · 占本行 {number(share)}%
+                          </span>
+                          <span className="erp-statistics-chart-tooltip-action">
+                            {ages
+                              ? '点击查看来源应收'
+                              : `点击查看这 ${number(value)} 单`}
+                          </span>
+                        </div>
+                      }
+                    >
+                      <button
+                        type="button"
+                        className={`erp-statistics-tone-${key}`}
+                        style={{ width: `${share}%` }}
+                        aria-label={`${group.name} · ${label} ${number(value, ages)} ${ages ? currency : '单'}`}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') setActiveSegment(null)
+                        }}
+                        onClick={() => {
+                          setActiveSegment(null)
+                          onDrill(group, sourceStatus(key))
+                        }}
+                      />
+                    </Tooltip>
+                  ) : null
+                })}
+              </div>
+            </div>
+            <Button
+              type="link"
+              className="erp-statistics-chart-number"
+              onClick={() => onDrill(group)}
+            >
+              {number(ages ? group.balance : group.count, ages)}
             </Button>
           </div>
         ))}
@@ -178,9 +221,9 @@ export default function useBusinessStatistics({
       fallbackSize: query.limit,
     })
   const sourcePage = sourceOffset / sourcePageSize + 1
-  const display = ['chart', 'table'].includes(params.get('display'))
+  const display = ['chart', 'table', 'combined'].includes(params.get('display'))
     ? params.get('display')
-    : 'combined'
+    : 'table'
   const requestKey = JSON.stringify([
     queryKey,
     groupKey,
@@ -195,6 +238,7 @@ export default function useBusinessStatistics({
   const [error, setError] = useState('')
   const begin = useLatestRequestCoordinator()
   const bodyRef = useRef(null)
+  const tableSticky = useMemo(() => ({ getContainer: () => bodyRef.current }), [])
   const data =
     active && state?.key === requestKey && state?.profile === adminProfile
       ? state.data
@@ -368,56 +412,118 @@ export default function useBusinessStatistics({
     }
   }, [active, allowed, canSales, canFinance, update]) // Same source permissions as the formal pages.
   const toolbar = (
-    <>
-      <span className="erp-statistics-toolbar-spacer" />
-      <label htmlFor="statistics-report">统计内容</label>
-      <Select
-        id="statistics-report"
-        aria-label="统计内容"
-        value={query.report}
-        options={reportOptions}
-        onChange={switchReport}
-      />
-      <span className="erp-statistics-meta">
-        <span>
-          {data
-            ? `截至 ${dayjs(data.snapshot_at).format('YYYY-MM-DD HH:mm')}`
-            : loading
-              ? '正在查询…'
-              : '等待查询'}
-        </span>
-      </span>
-      <Popover
-        trigger="click"
-        title="统计口径"
-        content={
-          <div className="erp-statistics-help">
-            <p>
-              订单按有效明细的实际出货判断交齐，草稿、未生效和取消订单不计入；交期按未交付明细的最早交期筛选。逾期与
-              7 天内交付仅计算仍待交付的订单。
-            </p>
-            <p>
-              客户按档案归组，产品按产品档案归组。产品汇总按订单去重，同一订单可能出现在多个产品行；底部合计再次去重。
-            </p>
-            <p>
-              客户金额使用订单冻结总额；产品金额使用明细货品金额，不分摊税费、运费。已出货金额使用出货快照，缺失时显示“—”。
-            </p>
-            <p>
-              应收按当前已过账的未结余额计算，扣除核销和红冲并计入冲正。按中国日期划分账龄，未填到期日单列；不同币种分开查看。
-            </p>
-            <p>
-              图表显示当前页，合计包含筛选后的完整数据。选择数字可查看同一筛选下的来源。
-            </p>
-          </div>
-        }
-      >
-        <Button
-          type="text"
-          icon={<InfoCircleOutlined />}
-          aria-label="查看统计口径"
+    <div className="erp-statistics-filters">
+      <div className="erp-statistics-filter-field">
+        <label htmlFor="statistics-report">统计内容</label>
+        <Select
+          allowClear={false}
+          placeholder="统计内容"
+          id="statistics-report"
+          aria-label="统计内容"
+          value={query.report}
+          options={reportOptions}
+          onChange={switchReport}
         />
-      </Popover>
-    </>
+        <Popover
+          trigger="click"
+          title="统计口径"
+          content={
+            <div className="erp-statistics-help">
+              <p>
+                订单按有效明细的实际出货判断交齐，草稿、未生效和取消订单不计入；交期按未交付明细的最早交期筛选。逾期与
+                7 天内交付仅计算仍待交付的订单。
+              </p>
+              <p>
+                客户按档案归组，产品按产品档案归组。产品汇总按订单去重，同一订单可能出现在多个产品行；底部合计再次去重。
+              </p>
+              <p>
+                客户金额使用订单冻结总额；产品金额使用明细货品金额，不分摊税费、运费。已出货金额使用出货快照，缺失时显示“—”。
+              </p>
+              <p>
+                应收按当前已过账的未结余额计算，扣除核销和红冲并计入冲正。按中国日期划分账龄，未填到期日单列；不同币种分开查看。
+              </p>
+              <p>
+                图表显示当前页，合计包含筛选后的完整数据。选择数字可查看同一筛选下的来源。
+              </p>
+            </div>
+          }
+        >
+          <Button
+            type="text"
+            icon={<InfoCircleOutlined />}
+            aria-label="查看统计口径"
+          />
+        </Popover>
+      </div>
+      {!ages && (
+        <>
+          <div className="erp-statistics-filter-field">
+            <span>订单交期</span>
+            <FilterSelect
+              emptyValue="all"
+              label="交期范围"
+              placeholder="交期范围"
+              aria-label="交期范围"
+              value={query.period}
+              options={[
+                { value: 'month', label: '本月' },
+                { value: 'soon', label: '未来 7 天' },
+                { value: 'all', label: '全部交期' },
+                { value: 'custom', label: '自定义' },
+              ]}
+              onChange={(period) => update({ period, ...clearGroup })}
+            />
+          </div>
+          <DateRangeFilter
+            startValue={
+              query.period === 'custom' ? query.date_from : data?.date_from || ''
+            }
+            endValue={
+              query.period === 'custom' ? query.date_to : data?.date_to || ''
+            }
+            onStartChange={(value) =>
+              update({
+                period: 'custom',
+                stfrom: value,
+                stto: query.date_to || data?.date_to || '',
+                ...clearGroup,
+              })
+            }
+            onEndChange={(value) =>
+              update({
+                period: 'custom',
+                stto: value,
+                stfrom: query.date_from || data?.date_from || '',
+                ...clearGroup,
+              })
+            }
+          />
+        </>
+      )}
+      <SearchInput
+        aria-label={query.group_by === 'product' ? '搜索产品' : '搜索客户'}
+        placeholder={query.group_by === 'product' ? '搜索产品' : '搜索客户'}
+        allowClear
+        maxLength={100}
+        value={search.value}
+        onChange={search.onChange}
+        onCompositionStart={search.onCompositionStart}
+        onCompositionEnd={search.onCompositionEnd}
+        onPressEnter={search.onPressEnter}
+      />
+      <Select
+        allowClear={false}
+        label="统计币种"
+        placeholder="统计币种"
+        aria-label="统计币种"
+        value={query.currency}
+        options={['CNY', 'USD', 'HKD'].map((currency) => ({
+          value: currency,
+          label: `币种 ${currency}`,
+        }))}
+        onChange={(currency) => update({ currency, ...clearGroup })}
+      />
+    </div>
   )
   const counts = board?.counts
   const metricItems = ages
@@ -445,75 +551,7 @@ export default function useBusinessStatistics({
         ['overdue', '当前逾期', counts?.overdue],
       ]
   const controls = (
-    <>
-      <div className="erp-statistics-filters">
-        {!ages && (
-          <>
-            <span>订单交期</span>
-            <Select
-              aria-label="交期范围"
-              value={query.period}
-              options={[
-                { value: 'month', label: '本月' },
-                { value: 'soon', label: '未来 7 天' },
-                { value: 'all', label: '全部交期' },
-                { value: 'custom', label: '自定义' },
-              ]}
-              onChange={(period) => update({ period, ...clearGroup })}
-            />
-            <DateRangeFilter
-              startValue={
-                query.period === 'custom'
-                  ? query.date_from
-                  : data?.date_from || ''
-              }
-              endValue={
-                query.period === 'custom' ? query.date_to : data?.date_to || ''
-              }
-              onStartChange={(value) =>
-                update({
-                  period: 'custom',
-                  stfrom: value,
-                  stto: query.date_to || data?.date_to || '',
-                  ...clearGroup,
-                })
-              }
-              onEndChange={(value) =>
-                update({
-                  period: 'custom',
-                  stto: value,
-                  stfrom: query.date_from || data?.date_from || '',
-                  ...clearGroup,
-                })
-              }
-            />
-          </>
-        )}
-        <SearchInput
-          aria-label={query.group_by === 'product' ? '搜索产品' : '搜索客户'}
-          placeholder={query.group_by === 'product' ? '搜索产品' : '搜索客户'}
-          allowClear
-          maxLength={100}
-          value={search.value}
-          onChange={search.onChange}
-          onCompositionStart={search.onCompositionStart}
-          onCompositionEnd={search.onCompositionEnd}
-          onPressEnter={search.onPressEnter}
-        />
-        <span className="erp-statistics-toolbar-spacer" />
-        <span className="erp-statistics-meta">
-          {ages ? '当前已过账未结余额' : '按订单交期范围，交付以实际出货为准'}
-        </span>
-        <Select
-          aria-label="统计币种"
-          value={query.currency}
-          options={['CNY', 'USD', 'HKD'].map((currency) => ({
-            value: currency,
-            label: `币种 ${currency}`,
-          }))}
-          onChange={(currency) => update({ currency, ...clearGroup })}
-        />
-      </div>
+    <div className="erp-statistics-summary-row">
       {!groupKey ? (
         <div className="erp-statistics-metrics" aria-label="统计概览">
           {metricItems.map(([key, label, value]) => (
@@ -552,7 +590,16 @@ export default function useBusinessStatistics({
           <span>沿用汇总筛选查看来源{!ages && '订单'}</span>
         </div>
       )}
-    </>
+      <span className="erp-statistics-meta">
+        <span>
+          {data
+            ? `截至 ${dayjs(data.snapshot_at).format('YYYY-MM-DD HH:mm')}`
+            : loading
+              ? '正在查询…'
+              : '等待查询'}
+        </span>
+      </span>
+    </div>
   )
   const valueLink = (row, key, asMoney = false) => (
     <Button
@@ -816,8 +863,11 @@ export default function useBusinessStatistics({
           )}
           <span className="erp-statistics-toolbar-spacer" />
           {groupKey ? (
-            <Select
+            <FilterSelect
+              label="来源状态"
+              placeholder="来源状态"
               aria-label="来源状态"
+              emptyValue="all"
               value={sourceFilter}
               options={statusOptions}
               onChange={(source_status) =>
@@ -828,6 +878,9 @@ export default function useBusinessStatistics({
             <>
               {!ages && (
                 <Select
+                  allowClear={false}
+                  label="汇总维度"
+                  placeholder="汇总维度"
                   aria-label="汇总维度"
                   value={query.group_by}
                   options={[
@@ -838,6 +891,9 @@ export default function useBusinessStatistics({
                 />
               )}
               <Select
+                allowClear={false}
+                label="统计排序"
+                placeholder="统计排序"
                 aria-label="统计排序"
                 value={`${query.sort}:${query.direction}`}
                 options={[
@@ -885,13 +941,6 @@ export default function useBusinessStatistics({
             <Empty description="当前筛选暂无记录" />
           ) : (
             <>
-              {!groupKey && display !== 'table' && (
-                <StatisticsChart
-                  groups={board.groups}
-                  report={query.report}
-                  onDrill={drill}
-                />
-              )}
               {!groupKey && (
                 <div className="erp-statistics-context">
                   <span>
@@ -909,6 +958,7 @@ export default function useBusinessStatistics({
               )}
               {(groupKey || display !== 'chart') && (
                 <Table
+                  sticky={tableSticky}
                   className="erp-statistics-table"
                   size="small"
                   bordered
@@ -941,6 +991,14 @@ export default function useBusinessStatistics({
                         )
                       : undefined
                   }
+                />
+              )}
+              {!groupKey && display !== 'table' && (
+                <StatisticsChart
+                  groups={board.groups}
+                  report={query.report}
+                  currency={query.currency}
+                  onDrill={drill}
                 />
               )}
               {!groupKey &&

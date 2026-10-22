@@ -1,3 +1,4 @@
+import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
 import { captureInformationDensityHelp, createInformationDensityScenarios } from './informationDensityScenarios.mjs'
 
 export function createInformationDensityExtras(deps) {
@@ -61,7 +62,7 @@ export function createInformationDensityExtras(deps) {
         await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/u }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame.locator('[data-action="open-mobile-tasks"]').click()
+        await openUIDesignMobileTasks(frame)
         await page.setViewportSize({ width, height: 844 })
         await frame.locator('[data-action="mobile-open-task"][data-id="M02"]').waitFor()
         await page.screenshot({ path: path.join(outputDir, `formal-design-list-mobile-${width}.png`), animations: 'disabled' })

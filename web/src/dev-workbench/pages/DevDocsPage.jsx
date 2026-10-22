@@ -21,6 +21,7 @@ import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
+  DEV_DOCS_HOME_PATH,
   DEV_DOCS_LIFECYCLE_ARCHIVE,
   DEV_DOCS_LIFECYCLE_CURRENT,
   DEV_DOCS_LIFECYCLE_REVIEW,
@@ -36,6 +37,7 @@ import {
   filterDevDocsByLifecycle,
   filterDevDocsItems,
   getDevDocsTitle,
+  getDevDocsDisplayTitle,
   getDefaultDevDocsPinnedPaths,
   normalizeDevDocsLifecycle,
   normalizeDevDocsExpandedDirKeys,
@@ -296,6 +298,7 @@ function DevDocsTreeNode({
         <button
           type="button"
           data-dev-doc-dir={node.path}
+          title={node.path}
           className="erp-dev-docs-tree__row erp-dev-docs-tree__folder"
           style={{ '--depth-offset': `${depth * 14}px` }}
           aria-expanded={expanded}
@@ -303,7 +306,7 @@ function DevDocsTreeNode({
         >
           {expanded ? <DownOutlined /> : <RightOutlined />}
           {expanded ? <FolderOpenOutlined /> : <FolderOutlined />}
-          <span className="erp-dev-docs-tree__name">{node.name}</span>
+          <span className="erp-dev-docs-tree__name">{node.label}</span>
           <span className="erp-dev-docs-tree__count">{node.docCount}</span>
         </button>
         {expanded ? (
@@ -341,15 +344,15 @@ function DevDocsTreeNode({
       <button
         type="button"
         className="erp-dev-docs-tree__row erp-dev-docs-tree__doc"
+        title={`${node.item.title}\n${node.item.path}`}
         aria-current={active ? 'true' : undefined}
         onClick={() => onSelectDoc(node.item.key)}
       >
         <FileMarkdownOutlined />
         <span className="erp-dev-docs-tree__doc-copy">
           <span className="erp-dev-docs-tree__doc-title">
-            {node.item.title}
+            {getDevDocsDisplayTitle(node.item.title)}
           </span>
-          <span className="erp-dev-docs-tree__doc-path">{node.item.path}</span>
         </span>
       </button>
       <Tooltip title={pinned ? '取消置顶' : '置顶文档'}>
@@ -928,6 +931,15 @@ export default function DevDocsPage() {
               开发文档
             </Title>
           </Space>
+          <Button
+            type="link"
+            onClick={() => {
+              setKeyword('')
+              selectDoc(`doc:${DEV_DOCS_HOME_PATH}`)
+            }}
+          >
+            文档首页
+          </Button>
           <details className="erp-dev-docs-boundary-details">
             <summary>收录范围</summary>
             <Paragraph>
@@ -940,7 +952,6 @@ export default function DevDocsPage() {
         </div>
         <div className="erp-dev-docs-controls" role="group" aria-label="开发文档检索">
           <div className="erp-dev-docs-lifecycle">
-            <Text type="secondary">文档层级</Text>
             <Segmented
               size="small"
               aria-label="开发文档层级"
@@ -949,9 +960,6 @@ export default function DevDocsPage() {
               value={lifecycle}
               onChange={selectLifecycle}
             />
-            <Text type="secondary" className="erp-dev-docs-lifecycle__count">
-              {lifecycleDocs.length} / {docs.length} 篇
-            </Text>
           </div>
           <SearchInput
             allowClear
@@ -967,7 +975,6 @@ export default function DevDocsPage() {
             className="erp-dev-docs-search"
           />
           <div className="erp-dev-docs-search-scope">
-            <Text type="secondary">搜索范围</Text>
             <Segmented
               size="small"
               aria-label="开发文档搜索范围"
@@ -1022,7 +1029,6 @@ export default function DevDocsPage() {
                   <PushpinOutlined className="erp-dev-docs-sidebar__section-icon" />
                   置顶文档
                 </span>
-                <span>{pinnedDocs.length}</span>
               </summary>
               <div className="erp-dev-docs-pinned__list">
                 {pinnedDocs.map((item) => (
@@ -1038,6 +1044,7 @@ export default function DevDocsPage() {
                     <button
                       type="button"
                       className="erp-dev-docs-pinned__open"
+                      title={`${item.title}\n${item.path}`}
                       aria-current={
                         item.key === selectedDoc?.key ? 'true' : undefined
                       }
@@ -1046,10 +1053,7 @@ export default function DevDocsPage() {
                       <FileMarkdownOutlined />
                       <span className="erp-dev-docs-pinned__copy">
                         <span className="erp-dev-docs-pinned__title">
-                          {item.title}
-                        </span>
-                        <span className="erp-dev-docs-pinned__path">
-                          {item.path}
+                          {getDevDocsDisplayTitle(item.title)}
                         </span>
                       </span>
                     </button>
@@ -1073,7 +1077,7 @@ export default function DevDocsPage() {
           {isSearching ? (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--results">
               <div className="erp-dev-docs-sidebar__section-head">
-                <Text strong>搜索结果 / Search Results</Text>
+                <Text strong>搜索结果</Text>
                 <Text type="secondary">
                   {visibleDocs.length} / {lifecycleDocs.length}
                 </Text>
@@ -1093,6 +1097,7 @@ export default function DevDocsPage() {
                       <button
                         type="button"
                         className="erp-dev-docs-list__open"
+                        title={item.title}
                         aria-current={
                           item.key === selectedDoc?.key ? 'true' : undefined
                         }
@@ -1100,22 +1105,11 @@ export default function DevDocsPage() {
                       >
                         <span className="erp-dev-docs-list__title">
                           <FileMarkdownOutlined />
-                          {item.title}
+                          {getDevDocsDisplayTitle(item.title)}
                         </span>
                         <span className="erp-dev-docs-list__meta">
-                          <Tag
-                            color={item.pinned ? 'green' : 'default'}
-                            className="erp-dev-docs-list__tag"
-                          >
-                            {item.pinned ? '置顶' : item.group}
-                          </Tag>
-                          {item.pinned ? (
-                            <Tag className="erp-dev-docs-list__tag">
-                              {item.group}
-                            </Tag>
-                          ) : null}
                           <Tag className="erp-dev-docs-list__tag">
-                            {LIFECYCLE_LABELS[item.lifecycle]}
+                            {item.group}
                           </Tag>
                         </span>
                         <span className="erp-dev-docs-list__path">
@@ -1204,11 +1198,13 @@ export default function DevDocsPage() {
                   className="erp-dev-docs-reader__name"
                   title={selectedDoc.title}
                 >
-                  {selectedDoc.title}
+                  {getDevDocsDisplayTitle(selectedDoc.title)}
                 </Text>
-                <Tag className="erp-dev-docs-reader__lifecycle">
-                  {LIFECYCLE_LABELS[selectedDoc.lifecycle]}
-                </Tag>
+                {selectedDoc.lifecycle !== DEV_DOCS_LIFECYCLE_CURRENT ? (
+                  <Tag className="erp-dev-docs-reader__lifecycle">
+                    {LIFECYCLE_LABELS[selectedDoc.lifecycle]}
+                  </Tag>
+                ) : null}
                 <Text
                   type="secondary"
                   className="erp-dev-docs-reader__path"
@@ -1273,11 +1269,13 @@ export default function DevDocsPage() {
                     key={heading.id}
                     className="erp-dev-docs-toc__tag"
                     data-dev-doc-heading-id={heading.id}
+                    data-dev-doc-heading-level={heading.level}
+                    style={{ '--heading-depth': Math.max(0, heading.level - 2) }}
                     aria-current={heading.id === activeHeadingId ? 'location' : undefined}
                     title={heading.title}
                     onClick={() => scrollToHeading(heading.id)}
                   >
-                    {heading.title}
+                    {getDevDocsDisplayTitle(heading.title)}
                   </button>
                 ))}
               </div>
@@ -1297,7 +1295,9 @@ export default function DevDocsPage() {
 
           {selectedDoc?.source ? (
             <article className="erp-dev-docs-markdown" ref={markdownRef}>
-              <Markdown source={selectedDoc.source} />
+              <div className="erp-dev-docs-document">
+                <Markdown source={selectedDoc.source} />
+              </div>
             </article>
           ) : selectedDoc && selectedSourceLoadState?.status === 'error' ? (
             <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">

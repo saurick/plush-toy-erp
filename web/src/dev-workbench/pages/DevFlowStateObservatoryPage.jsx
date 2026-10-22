@@ -5,9 +5,10 @@ import {
   DownOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Dropdown, Empty, Modal, Popover, Space, Tag } from 'antd'
+import { Alert, Button, Drawer, Dropdown, Empty, Popover, Space, Tag } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
+import Modal from '@/common/components/modal/AppModal'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
 import { FactsView } from '../components/flow-state/FactsView.jsx'
 import { RuntimeView } from '../components/flow-state/RuntimeView.jsx'

@@ -60,15 +60,14 @@ export function PreflightPanel({
         <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-package-checks">
           <div className="erp-dev-customer-panel__head">
             <CheckCircleOutlined aria-hidden="true" />
-            <Text strong>配置包检查与能力范围</Text>
+            <Text strong>配置包检查</Text>
           </div>
           <div className="erp-dev-tool-table-wrap">
             <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="客户配置预检步骤">
               <thead>
                 <tr>
                   <th scope="col">核对项</th>
-                  <th scope="col">范围</th>
-                  <th scope="col">检查 / 开放状态</th>
+                  <th scope="col">结果</th>
                 </tr>
               </thead>
               <tbody>
@@ -76,14 +75,10 @@ export function PreflightPanel({
                   <tr key={item.key}>
                     <th scope="row">{item.label}</th>
                     <td>
-                      {item.key === 'schema-lint'
-                        ? '校验结构与配置边界'
-                        : item.key === 'publish'
-                          ? '正式配置需检查发布证据，再由受控执行器操作'
-                          : item.note}
-                    </td>
-                    <td>
                       <StatusTag status={item.status} />
+                      {item.status === 'blocked' && item.key !== 'schema-lint' ? (
+                        <Text type="danger">{item.note}</Text>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -95,13 +90,20 @@ export function PreflightPanel({
               type="error"
               showIcon
               message={`配置包存在 ${boundaryIssueCount} 项边界问题`}
-              description="展开配置包边界查看具体项，处理后再继续试跑或发布检查。"
+              description="展开“配置范围与依据”查看具体项，处理后再继续试跑或发布检查。"
             />
           ) : null}
-          <DevStaticGuidance
-            title="配置包边界"
-            hint={`${customerPackageSummary.boundaries.length} 项声明与检查命令`}
-          >
+          <DevStaticGuidance title="配置范围与依据">
+            <Text strong>操作范围</Text>
+            <dl className="erp-dev-customer-preflight-notes">
+              {consoleSummary.preflightStages.map((item) => (
+                <div key={item.key}>
+                  <dt>{item.label}</dt>
+                  <dd>{item.key === 'schema-lint' ? '校验结构与配置边界' : item.note}</dd>
+                </div>
+              ))}
+            </dl>
+            <Text strong>配置包边界</Text>
             <div className="erp-dev-customer-package-guards">
               <div className="erp-dev-customer-guard-list">
                 {customerPackageSummary.boundaries.map((item) => (
@@ -115,21 +117,13 @@ export function PreflightPanel({
               </div>
               <CommandBlock command={customerPackageSummary.qaCommand} />
             </div>
-          </DevStaticGuidance>
-          <DevStaticGuidance
-            title="客户包资产范围"
-            hint={`${consoleSummary.assetSummary.length} 类配置`}
-          >
+            <Text strong>客户包资产范围</Text>
             <div className="erp-dev-customer-asset-grid">
               {consoleSummary.assetSummary.map((item) => (
                 <AssetTile item={item} key={item.key} />
               ))}
             </div>
-          </DevStaticGuidance>
-          <DevStaticGuidance
-            title="客户包对象"
-            hint={`${consoleSummary.packageAssetScope.length} 类对象与执行边界`}
-          >
+            <Text strong>客户包对象</Text>
             <Alert
               type="info"
               showIcon

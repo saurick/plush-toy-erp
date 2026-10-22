@@ -171,16 +171,16 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 	switch {
 	case errors.Is(err, biz.ErrProcessRuntimeRequired):
 		l.Warnf("[operational_fact] process runtime required err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该动作必须通过业务流程任务办理，请刷新流程状态"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该动作必须通过业务流程任务办理，请刷新流程状态"}
 	case errors.Is(err, biz.ErrProcessSourceLifecycleDependency):
 		l.Warnf("[operational_fact] linked process blocks source lifecycle change err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单据仍有未收口的业务流程，请先在任务中心完成或驳回流程后再操作"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该单据仍有未收口的业务流程，请先在任务中心完成或驳回流程后再操作"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		l.Warnf("[operational_fact] idempotency payload conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrFinanceFactSourceConflict):
 		l.Warnf("[operational_fact] active finance fact source conflict err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该业务来源已生成同类型的有效财务记录"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "该业务来源已生成同类型的有效财务记录"}
 	case errors.Is(err, biz.ErrOperationalFactVersionConflict):
 		l.Warnf("[operational_fact] lifecycle version conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "业务记录版本已变化，请刷新后重试"}
@@ -188,31 +188,47 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 		l.Warnf("[operational_fact] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrInventoryInsufficientStock):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "库存不足"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "批次状态不允许扣减"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "批次状态不允许扣减"}
 	case errors.Is(err, biz.ErrOperationalInboundLotRequired):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请选择已有批次或填写新批次号"}
-	case errors.Is(err, biz.ErrCustomerNotFound), errors.Is(err, biz.ErrCustomerInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该客户已停用，不能用于新业务；历史单据仍保留原引用"}
-	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该材料已停用，不能新增引用；历史事实仍保留原引用"}
-	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该产品已停用，不能用于新业务；历史单据仍保留原引用"}
-	case errors.Is(err, biz.ErrProductSKUNotFound), errors.Is(err, biz.ErrProductSKUInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该 SKU 已停用，不能用于新业务；历史单据仍保留原引用"}
-	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该供应商已停用，不能用于新业务；历史单据仍保留原引用"}
-	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单位已停用，不能新增引用；历史单据仍保留原引用"}
-	case errors.Is(err, biz.ErrWarehouseNotFound), errors.Is(err, biz.ErrWarehouseInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该仓库已停用，不能用于新业务"}
+	case errors.Is(err, biz.ErrCustomerNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选客户不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrCustomerInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该客户已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrMaterialNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选材料不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该材料已停用，不能新增引用；历史事实仍保留原引用"}
+	case errors.Is(err, biz.ErrProductNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该产品已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrProductSKUNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品规格不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductSKUInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该 SKU 已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrSupplierNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选供应商不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrSupplierInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该供应商已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该单位已停用，不能新增引用；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrWarehouseNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选仓库不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrWarehouseInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该仓库已停用，不能用于新业务"}
 	case errors.Is(err, biz.ErrProductionFactNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产事实不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "生产事实不存在"}
 	case errors.Is(err, biz.ErrProductionExceptionNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常审批不存在"}
-	case errors.Is(err, biz.ErrProductionExceptionConflict), errors.Is(err, biz.ErrProductionExceptionInvalidState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常审批状态已变化，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "生产异常审批不存在"}
+	case errors.Is(err, biz.ErrProductionExceptionConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "生产异常申请重复或审批状态已变化，请刷新后核对已有申请"}
+	case errors.Is(err, biz.ErrProductionExceptionInvalidState):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "生产异常审批当前状态不允许此操作，请刷新后核对"}
 	case errors.Is(err, biz.ErrProductionExceptionSourceInvalid), errors.Is(err, biz.ErrProductionExceptionApprovalAmount):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常来源或批准数量不符合当前业务状态"}
 	case errors.Is(err, biz.ErrProductionExceptionSelfApproval):
@@ -220,137 +236,137 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 	case errors.Is(err, biz.ErrProductionExceptionCancelOwner):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有生产异常申请人可以撤回尚未审批的申请"}
 	case errors.Is(err, biz.ErrProductionExceptionWIPDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该在制批次已有返工或下游批次，不能再执行或撤销本次异常处置"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该在制批次已有返工或下游批次，不能再执行或撤销本次异常处置"}
 	case errors.Is(err, biz.ErrProductionExceptionFactDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该在制批次已支撑完工入库，请先取消相关完工事实后再撤销让步"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该在制批次已支撑完工入库，请先取消相关完工事实后再撤销让步"}
 	case errors.Is(err, biz.ErrProductionExceptionAllowanceUsed):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该超领额度已被领料使用；请先冲正超出原计划的领料记录后再撤销额度"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该超领额度已被领料使用；请先冲正超出原计划的领料记录后再撤销额度"}
 	case errors.Is(err, biz.ErrProductionOrderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "生产订单不存在"}
 	case errors.Is(err, biz.ErrProductionOrderFactSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单明细与完工来源不一致，请刷新订单后重试"}
 	case errors.Is(err, biz.ErrProductionOrderMaterialRequirementNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单物料需求不存在，请刷新订单后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "生产订单物料需求不存在，请刷新订单后重试"}
 	case errors.Is(err, biz.ErrProductionOrderMaterialRequirementInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单物料需求与订单、材料或单位不一致，请刷新订单后重试"}
 	case errors.Is(err, biz.ErrProductionOrderMaterialRequirementsNeedReview):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该历史生产订单缺少完整的物料需求快照，请复核后再领料"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该历史生产订单缺少完整的物料需求快照，请复核后再领料"}
 	case errors.Is(err, biz.ErrProductionOrderInvalidState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单当前状态不允许登记或确认生产记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "生产订单当前状态不允许登记或确认生产记录"}
 	case errors.Is(err, biz.ErrProductionOrderQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次完工将超过生产订单明细剩余可完工数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次完工将超过生产订单明细剩余可完工数量"}
 	case errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次领料将超过生产订单物料需求剩余可领数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次领料将超过生产订单物料需求剩余可领数量"}
 	case errors.Is(err, biz.ErrProductionReworkSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工来源与原完工记录不一致，请刷新后重试"}
 	case errors.Is(err, biz.ErrProductionReworkSourceState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "原完工记录尚未过账或已取消，不能办理返工"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "原完工记录尚未过账或已取消，不能办理返工"}
 	case errors.Is(err, biz.ErrProductionReworkQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次返工数量将超过来源完工批次剩余可返工数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次返工数量将超过来源完工批次剩余可返工数量"}
 	case errors.Is(err, biz.ErrProductionReworkDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该完工记录已有未取消的返工，请先取消返工后再撤销完工"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该完工记录已有未取消的返工，请先取消返工后再撤销完工"}
 	case errors.Is(err, biz.ErrProductionReworkExecutionDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工批次已经开始、拆分、流转、质检或补完工，不能再取消；请按当前返工进度继续办理"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "返工批次已经开始、拆分、流转、质检或补完工，不能再取消；请按当前返工进度继续办理"}
 	case errors.Is(err, biz.ErrOutsourcingFactNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外事实不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "委外事实不存在"}
 	case errors.Is(err, biz.ErrOutsourcingDispositionNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货异常处置不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "委外回货异常处置不存在"}
 	case errors.Is(err, biz.ErrOutsourcingDispositionConflict):
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "委外回货异常处置已被其他人处理，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "委外回货异常处置已被其他人处理，请刷新后重试"}
 	case errors.Is(err, biz.ErrOutsourcingDispositionState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货异常处置状态已变化，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外回货异常处置状态已变化，请刷新后重试"}
 	case errors.Is(err, biz.ErrOutsourcingDispositionSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货、质检或返工批次来源不一致"}
 	case errors.Is(err, biz.ErrOutsourcingOrderNotFound), errors.Is(err, biz.ErrOutsourcingOrderItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同或明细不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "委外合同或明细不存在"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外记录与合同明细不一致，请刷新来源后重试"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactInvalidState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同或明细当前状态不允许登记或确认"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同或明细当前状态不允许登记或确认"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次数量将超过委外合同明细剩余可办理数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次数量将超过委外合同明细剩余可办理数量"}
 	case errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该外发发料已用于在制生产，撤销后将不足，不能取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该外发发料已用于在制生产，撤销后将不足，不能取消"}
 	case errors.Is(err, biz.ErrOutsourcingReturnQualityDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该委外回货已有未取消的质检单，请先完成或取消质检后再撤销回货"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该委外回货已有未取消的质检单，请先完成或取消质检后再撤销回货"}
 	case errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该委外回货已有未取消的应付记录，请先取消应付后再撤销回货"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该委外回货已有未取消的应付记录，请先取消应付后再撤销回货"}
 	case errors.Is(err, biz.ErrOutsourcingReturnQualityPending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"}
 	case errors.Is(err, biz.ErrOutsourcingReturnQualityRejected):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该委外回货质检不合格，请先完成返工、退回等质量处置"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该委外回货质检不合格，请先完成返工、退回等质量处置"}
 	case errors.Is(err, biz.ErrShipmentNotFound), errors.Is(err, biz.ErrShipmentItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单或出货行不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "出货单或出货行不存在"}
 	case errors.Is(err, biz.ErrShipmentSourceMismatch):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货来源与销售订单、客户或订单行不一致，请刷新来源后重试"}
 	case errors.Is(err, biz.ErrShipmentOrderNotActive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单尚未生效或已关闭，不能确认出货"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单尚未生效或已关闭，不能确认出货"}
 	case errors.Is(err, biz.ErrShipmentQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货将超过销售订单行剩余可出货数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次出货将超过销售订单行剩余可出货数量"}
 	case errors.Is(err, biz.ErrShipmentReservationSplit):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"}
 	case errors.Is(err, biz.ErrShipmentFinanceDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未取消的应收或发票记录，请先取消相关财务记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货单已有未取消的应收或发票记录，请先取消相关财务记录"}
 	case errors.Is(err, biz.ErrShipmentDraftDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货草稿已进入质检或出货审批流程，内容已冻结；请取消后重新登记"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货草稿已进入质检或出货审批流程，内容已冻结；请取消后重新登记"}
 	case errors.Is(err, biz.ErrShipmentQualityPending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
 	case errors.Is(err, biz.ErrShipmentQualityRejected):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
 	case errors.Is(err, biz.ErrShipmentPackingPending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货超过可发数量，请先完成对应成品的检验、查货和包装"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次出货超过可发数量，请先完成对应成品的检验、查货和包装"}
 	case errors.Is(err, biz.ErrShipmentFinanceReleaseRequired):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货财务审批尚未通过，不能确认出货"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "出货财务审批尚未通过，不能确认出货"}
 	case errors.Is(err, biz.ErrShipmentFinanceReleaseConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "出货财务审批版本已变化，请刷新后重试"}
 	case errors.Is(err, biz.ErrShipmentReleaseRequired):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先在出货单提交出货放行，再确认出货"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先在出货单提交出货放行，再确认出货"}
 	case errors.Is(err, biz.ErrShipmentReleasePending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务尚未完成，请先完成或解除阻塞"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "出货放行任务尚未完成，请先完成或解除阻塞"}
 	case errors.Is(err, biz.ErrShipmentReleaseRejected):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务已退回，请取消当前出货单后重新登记"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "出货放行任务已退回，请取消当前出货单后重新登记"}
 	case errors.Is(err, biz.ErrShipmentCancellationProcessActive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单仍有进行中的成品出货流程，请先完成流程后再取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货单仍有进行中的成品出货流程，请先完成流程后再取消"}
 	case errors.Is(err, biz.ErrShipmentCancellationTaskActive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"}
 	case errors.Is(err, biz.ErrProductionExceptionTaskRequired):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该返工记录缺少来源生成的异常协同任务，请联系管理员核对"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该返工记录缺少来源生成的异常协同任务，请联系管理员核对"}
 	case errors.Is(err, biz.ErrProductionExceptionTaskActive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先完成或退回生产异常任务，再取消已确认的返工记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先完成或退回生产异常任务，再取消已确认的返工记录"}
 	case errors.Is(err, biz.ErrStockReservationNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存预留不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "库存预留不存在"}
 	case errors.Is(err, biz.ErrStockReservationSourceMismatch):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存预留与销售订单或订单行不一致，请刷新来源后重试"}
 	case errors.Is(err, biz.ErrStockReservationQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "预留数量与已出货数量合计超过销售订单行数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "预留数量与已出货数量合计超过销售订单行数量"}
 	case errors.Is(err, biz.ErrFinanceFactNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "财务事实不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "财务事实不存在"}
 	case errors.Is(err, biz.ErrFinanceFactSourceInvalid):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "财务记录缺少有效业务来源，不能过账或结清"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "财务记录缺少有效业务来源，不能过账或结清"}
 	case errors.Is(err, biz.ErrFinanceFactShipmentAmountInvalid):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货金额快照不完整或币种不一致，不能生成财务记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "出货金额快照不完整或币种不一致，不能生成财务记录"}
 	case errors.Is(err, biz.ErrFinanceFactPaymentTermMissing):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单未填写账期天数，请先补齐后再生成应收"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单未填写账期天数，请先补齐后再生成应收"}
 	case errors.Is(err, biz.ErrFinanceFactInvoiceCategoryMissing):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请选择发票类别"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请选择发票类别"}
 	case errors.Is(err, biz.ErrFinanceFactSourceAmountInvalid):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源单据金额不完整或有效金额不大于零，不能生成财务记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "来源单据金额不完整或有效金额不大于零，不能生成财务记录"}
 	case errors.Is(err, biz.ErrPurchaseReceiptInboundIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "收货单仍有未入库或未处置的明细，请完成后再生成应付"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "收货单仍有未入库或未处置的明细，请完成后再生成应付"}
 	case errors.Is(err, biz.ErrPurchaseReceiptNotFound):
 		return d.purchaseErrorResult(ctx, err)
 	case errors.Is(err, biz.ErrPurchaseReceiptFinanceDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该采购入库已有未取消的应付记录，请先取消应付后再更正或撤销来源"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该采购入库已有未取消的应付记录，请先取消应付后再更正或撤销来源"}
 	case errors.Is(err, biz.ErrFinanceReconciliationDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录已有未取消的单笔核对，请先取消核对记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该财务记录已有未取消的单笔核对，请先取消核对记录"}
 	case errors.Is(err, biz.ErrFinanceAllocationDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录已有未冲正的收付款核销，请先冲正对应收付款"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该财务记录已有未冲正的收付款核销，请先冲正对应收付款"}
 	case errors.Is(err, biz.ErrFinanceCreditNoteDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录已有未反向的贷项或红冲，请先完成反向处理"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该财务记录已有未反向的贷项或红冲，请先完成反向处理"}
 	case errors.Is(err, biz.ErrFinanceReconciliationSourceInvalid):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录当前不能生成单笔核对，请确认已过账且往来方和金额完整"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该财务记录当前不能生成单笔核对，请确认已过账且往来方和金额完整"}
 	case errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该类财务记录不支持结清操作"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该类财务记录不支持结清操作"}
 	default:
 		return nil
 	}

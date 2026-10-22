@@ -2,6 +2,7 @@ import appearanceContract from '../../../../server/internal/biz/admin_erp_appear
 import { normalizeERPThemeMode } from './erpThemeMode.mjs'
 
 export const ERP_APPEARANCE_STORAGE_KEY = 'plush_erp_appearance'
+export const WORKBENCH_APPEARANCE_STORAGE_KEY = 'plush_workbench_appearance'
 
 export const ERP_ACCENTS = Object.freeze({
   blue: {

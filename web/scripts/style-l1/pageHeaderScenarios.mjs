@@ -1,8 +1,33 @@
 import assert from 'node:assert/strict'
+import { writeFile } from 'node:fs/promises'
+import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 import { assertBusinessHeaderCompact } from './businessTableAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
-export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow }) {
-  return [
+async function measureHeaderSpacing(page) {
+  const header = page.locator('.erp-business-page-header-card:not(.erp-business-page-header-card--secondary)').first()
+  await header.waitFor()
+  await waitForFiniteAnimations(page)
+  return header.evaluate((node) => {
+    const inFlow = (element) => element.getBoundingClientRect().height > 0 &&
+      !['absolute', 'fixed'].includes(getComputedStyle(element).position)
+    let content = node.nextElementSibling
+    while (content && !inFlow(content)) content = content.nextElementSibling
+    if (content?.matches('.erp-business-page-layout')) {
+      content = [...content.children].find(inFlow)
+    }
+    const headerBox = node.getBoundingClientRect()
+    return {
+      title: node.querySelector('h1')?.textContent,
+      expectedGap: parseFloat(getComputedStyle(node).getPropertyValue('--erp-page-gap')),
+      gap: content ? content.getBoundingClientRect().top - headerBox.bottom : null,
+      contentClass: content?.className,
+    }
+  })
+}
+
+export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir }) {
+  const headers = [
     ['customers', '/erp/master/partners/customers', '基础资料', 'light'],
     ['workbench', '/erp/dashboard', '工作台', 'light'],
     ['product-core', '/erp/dashboard', '工作台', 'light'],
@@ -76,4 +101,40 @@ export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, ass
       await assertNoHorizontalOverflow(page)
     },
   }))
+  const businessPages = getNavigationSections().flatMap((section) => section.items)
+    .filter((entry) => entry.path.startsWith('/erp/') && entry.key !== 'print-center')
+    .concat({ key: 'history', path: '/erp/history', label: '历史记录中心' })
+  const spacing = [
+    { key: 'desktop', width: 1920, themeMode: 'light', pages: businessPages },
+    { key: 'narrow-dark', width: 390, themeMode: 'dark', pages: businessPages.filter((entry) => ['shipments', 'inventory', 'finance-payments', 'permission-center'].includes(entry.key)) },
+  ].map(({ key, width, themeMode, pages }) => ({
+    name: `page-header-business-spacing-${key}`,
+    path: pages[0].path,
+    auth: 'admin',
+    effectiveSession: customerRuntimeEffectiveSession,
+    viewport: { width, height: 1080 },
+    deviceScaleFactor: 2,
+    themeMode,
+    verify: async (page) => {
+      const results = []
+      for (const entry of pages) {
+        if (new URL(page.url()).pathname !== entry.path) {
+          await page.goto(new URL(entry.path, page.url()).href)
+        }
+        await page.locator('.erp-business-page-header-card:not(.erp-business-page-header-card--secondary)').first().waitFor()
+        await page.waitForFunction(() => [...document.querySelectorAll('.erp-admin-content .ant-spin-spinning')].every((node) => !node.checkVisibility()))
+        const metrics = { page: entry.label, path: entry.path, ...await measureHeaderSpacing(page) }
+        results.push(metrics)
+        console.info(`[style:l1:header-spacing] ${entry.key}: ${metrics.gap}px / ${metrics.expectedGap}px`)
+        assert(metrics.gap !== null && Math.abs(metrics.gap - metrics.expectedGap) <= 0.5,
+          `页头与首个内容区必须保留一次统一间距：${JSON.stringify(metrics)}`)
+        await assertNoHorizontalOverflow(page)
+        if (entry.key === 'shipments') {
+          await page.screenshot({ path: `${outputDir}/page-header-spacing-shipment-${key}.png`, animations: 'disabled' })
+        }
+      }
+      await writeFile(`${outputDir}/page-header-spacing-${key}.json`, JSON.stringify(results, null, 2))
+    },
+  }))
+  return [...headers, ...spacing]
 }

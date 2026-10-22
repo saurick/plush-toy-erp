@@ -85,9 +85,10 @@ func TestWorkflowFollowupPublicCreateAuthorizationAndReplay(t *testing.T) {
 		}
 	}
 	repo.source.Status = "closed"
+	repo.createInput = nil
 	_, closed, _ := d.handleWorkflow(ctx, "create_followup_task", "closed", mustJSONRPCStruct(t, valid()))
-	if closed.Code == errcode.OK.Code {
-		t.Fatal("closed source accepted")
+	if closed.Code != errcode.BusinessRuleViolation.Code || repo.createInput != nil {
+		t.Fatalf("closed source result=%v write=%v", closed, repo.createInput)
 	}
 	repo.replay = &biz.WorkflowTask{ID: 99, TaskStatusKey: "ready"}
 	_, replay, err := d.handleWorkflow(ctx, "create_followup_task", "replay", mustJSONRPCStruct(t, valid()))

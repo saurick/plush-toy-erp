@@ -183,16 +183,8 @@
     display: none;
   }
 
-  .erp-admin-header {
-    padding: 0 12px;
-  }
-
-  .erp-admin-header__menu-button {
+  .erp-page-actions__navigation.ant-btn {
     display: inline-flex;
-  }
-
-  .erp-admin-header__meta {
-    gap: 8px;
   }
 
   .erp-admin-content {

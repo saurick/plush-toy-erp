@@ -55,6 +55,10 @@ func TestSafeServerTracingClassifiesRPCEnvelopeAndPreservesReply(t *testing.T) {
 		{name: "request canceled", outcome: "canceled", code: errcode.RequestCanceled.Code, status: codes.Ok},
 		{name: "system error in HTTP 200", outcome: "error", code: errcode.Internal.Code, status: codes.Error},
 		{name: "domain system error", outcome: "error", code: errcode.UserListFailed.Code, status: codes.Error},
+		{name: "SMS dependency unavailable", outcome: "error", code: errcode.AuthSMSServiceUnavailable.Code, status: codes.Error},
+		{name: "SMS dependency quota", outcome: "error", code: errcode.AuthSMSServiceQuotaExceeded.Code, status: codes.Error},
+		{name: "SMS cooldown", outcome: "rejected", code: errcode.AuthSMSCodeTooFrequent.Code, status: codes.Ok},
+		{name: "business condition", outcome: "rejected", code: errcode.BusinessRuleViolation.Code, status: codes.Ok},
 		{name: "reply error", outcome: "error", replyError: "private-reply-error", status: codes.Error},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

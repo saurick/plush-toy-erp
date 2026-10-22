@@ -1,3 +1,4 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import {
   assertBusinessFormPage,
@@ -194,12 +195,12 @@ export function createPermissionCenterScenarios({
         )
         const backup = dialog.locator('[data-approval-strategy="1"]')
         const escalation = dialog.locator('[data-approval-strategy="2"]')
-        assert.equal(await backup.inputValue(), '未设置')
+        assert.equal(await readSelectValue(backup), '未设置')
         assert.equal(await escalation.inputValue(), '未设置')
-        await backup.selectOption('老板 / 管理层')
+        await chooseSelectOption(backup, '老板 / 管理层')
         await dialog.getByRole('button', { name: '保留调整', exact: true }).click()
         await expectText(frame.locator('body'), '主办、备用和升级责任不能重复')
-        await backup.selectOption('未设置')
+        await chooseSelectOption(backup, '未设置')
         await dialog
           .getByRole('textbox', { name: '审批起始金额', exact: true })
           .fill('-1')
@@ -329,7 +330,7 @@ export function createPermissionCenterScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '权限管理')
-        await expectText(page.getByRole('tab', { name: /员工账号/u }), '7')
+        await page.getByRole('tab', { name: '员工账号', exact: true }).waitFor()
         assert.equal(await page.getByRole('tab', { name: /审批责任/ }).getAttribute('aria-selected'), 'true', '审批责任深链应直接进入对应页签')
         await expectText(page, '设置审批条件，以及主办、备用和升级责任')
         await expectText(page, '销售订单审批')

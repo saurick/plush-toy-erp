@@ -1004,7 +1004,7 @@ test('devCustomerConfig: 主操作各有唯一入口并保留写入保护', asyn
   assert.equal(source.match(/onClick=\{onCheckReleaseReadiness\}/gu)?.length, 1)
   assert.match(source, /disabled=\{disabled \|\| !importSummary\.canApplyTestConfig\}/u)
   assert.match(source, /所选批次有历史检查记录，请重新检查当前工作区/u)
-  assert.match(source, /disabled=\{!passed \|\| disabled\}/u)
+  assert.match(source, /passed \?[^]*disabled=\{disabled\}[^]*复制配置执行器模板/u)
   assert.match(source, /重新运行样本试跑/u)
   assert.match(source, /重新应用本地配置/u)
   assert.match(source, /重新检查发布条件/u)

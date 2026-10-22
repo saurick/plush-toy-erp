@@ -11,6 +11,7 @@ import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
 import { assertMobileEditableInputSize } from './inputControlAssertions.mjs'
 import { createTaskIdentitySearchScenarios } from './taskIdentitySearchScenarios.mjs'
+import { createTaskItemSemanticsScenarios } from './taskItemSemanticsScenarios.mjs'
 import {
   assertReadableOnBackground,
   isDarkControlBackground,
@@ -37,6 +38,7 @@ export function createMobileTaskScenarios({
 }) {
   return [
     ...createTaskIdentitySearchScenarios({ assert }),
+    ...createTaskItemSemanticsScenarios({ assert }),
     mobileTaskListOptionsScenario({ assert, path, outputDir }),
     mobileTaskRefreshScenario({ assert, path, outputDir }),
     mobileTaskHistoryFiltersScenario({ assert, path, outputDir }),
@@ -235,6 +237,7 @@ export function createMobileTaskScenarios({
               wrapperShadow: wrapperStyle.boxShadow,
               wrapperBorder: wrapperStyle.borderColor,
               wrapperHeight: wrapper.getBoundingClientRect().height,
+              controlHeight: parseFloat(wrapperStyle.getPropertyValue('--erp-form-control-height')),
               formOutline: getComputedStyle(form).outlineWidth,
               formOutlineStyle: getComputedStyle(form).outlineStyle,
             }
@@ -260,8 +263,8 @@ export function createMobileTaskScenarios({
             `搜索表单不应绘制第二层 outline：${JSON.stringify(focusStyle)}`
           )
           assert(
-            focusStyle.wrapperHeight >= 42 && focusStyle.wrapperHeight <= 44,
-            `搜索框高度应保持在移动端可触控的紧凑范围：${JSON.stringify(
+            focusStyle.controlHeight >= 44 && Math.abs(focusStyle.wrapperHeight - focusStyle.controlHeight) <= 1,
+            `搜索框高度应遵循共享手机控件尺寸：${JSON.stringify(
               focusStyle
             )}`
           )
@@ -329,15 +332,8 @@ export function createMobileTaskScenarios({
         )
         assert.equal(await rows.count(), 1)
         const taskTime = rows.first().locator('.erp-task-timing')
-        assert.deepEqual(await taskTime.locator('dt').allTextContents(), [
-          '进入岗位',
-        ])
-        assert.match(await taskTime.locator('time').innerText(), /^工程 · /u)
-        assert.equal(
-          await taskTime.locator('time').getAttribute('datetime'),
-          new Date(1_788_840_000_000).toISOString(),
-          '列表入岗时间应使用任务创建值，未设置截止时不添加占位'
-        )
+        await taskTime.getByText('未设置截止', { exact: true }).waitFor()
+        assert.equal(await taskTime.locator('time').count(), 0, '截止缺失保留明确提示，不借用入岗时间')
         await page.setViewportSize({ width: 320, height: 700 })
         const timeGeometry = await taskTime.evaluate((node) => ({
           width: node.clientWidth,
@@ -536,7 +532,7 @@ export function createMobileTaskScenarios({
         for (const [keyword, label, state] of [
           ['占位产品', '暂无图', 'empty'],
           ['占位物料', '物料', 'empty'],
-          ['占位加载失败', '加载失败', 'failed'],
+          ['占位加载失败', '重试图片', 'failed'],
         ]) {
           const readsBefore = page.__imageReads.length
           await search.fill(keyword)
@@ -548,7 +544,8 @@ export function createMobileTaskScenarios({
           )
           await frame.waitFor({ state: 'visible' })
           assert.equal((await frame.innerText()).trim(), label)
-          assert.equal(await frame.locator('img, button').count(), 0)
+          assert.equal(await frame.locator('img').count(), 0)
+          assert.equal(await frame.getByRole('button', { name: '重试占位加载失败图片', exact: true }).count(), state === 'failed' ? 1 : 0)
           const geometry = await frame.boundingBox()
           assert.equal(geometry.width, 48)
           assert.equal(geometry.height, 48)
@@ -559,7 +556,7 @@ export function createMobileTaskScenarios({
               '默认占位不请求图片'
             )
           }
-          await clickTaskCardContent(placeholderRow, frame)
+          await clickTaskCardContent(placeholderRow, state === 'failed' ? placeholderRow.locator('.erp-task-identity__heading') : frame)
           const placeholderDetail = page.getByTestId(
             'mobile-task-detail-screen'
           )
@@ -599,7 +596,8 @@ export function createMobileTaskScenarios({
         )
         const materialDetail = page.getByTestId('mobile-task-detail-screen')
         await materialDetail.waitFor({ state: 'visible' })
-        assert.equal(await materialDetail.getByRole('button', { name: '复制款号', exact: true }).count(), 0)
+        assert.equal(await materialDetail.getByRole('button', { name: '复制款号', exact: true }).count(), 1)
+        await assertTaskCopy(page, materialDetail.getByRole('button', { name: '复制款号', exact: true }), '示例织造AB-001#-02#米白')
         await assertTaskMenuCopy(
           page,
           materialDetail,
@@ -2621,6 +2619,7 @@ export function createMobileTaskScenarios({
             const blockedReason = params.blocked_reason || ''
             const createParams = {
               ...params,
+              idempotency_key: `style-l1-mobile-dark-create-${params.task_code}`,
               task_status_key: 'ready',
             }
             delete createParams.blocked_reason
@@ -3159,7 +3158,8 @@ export function createMobileTaskScenarios({
           .waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '请联系 业务岗位，确认卡点和恢复条件。')
         const mobileContactRoleMetrics = await page
-          .locator('.workflow-task-current__contact strong')
+          .getByTestId('workflow-task-exception-contact')
+          .locator('strong')
           .first()
           .evaluate((node) => {
             const contactStyle = node.parentElement
@@ -3175,21 +3175,19 @@ export function createMobileTaskScenarios({
             }
           })
         assert(
-          mobileContactRoleMetrics.roleWeight >= 800 &&
+          mobileContactRoleMetrics.roleWeight >= 600 &&
             mobileContactRoleMetrics.roleWeight >
               mobileContactRoleMetrics.contactWeight &&
-            mobileContactRoleMetrics.roleColor !==
-              mobileContactRoleMetrics.contactColor &&
             mobileContactRoleMetrics.text === '业务岗位',
-          `移动端应以字重和同色系对比突出联系岗位: ${JSON.stringify(
+          `手机版异常原因区用字重突出实际联系岗位: ${JSON.stringify(
             mobileContactRoleMetrics
           )}`
         )
+        await assertDarkThemeContrast(page, { scenarioName: 'mobile-tasks-dark-contact', selector: '.workflow-task-info-cause', minRatio: 4.5 })
         const mobileEventMeta = page
           .getByTestId('workflow-task-event-trail')
           .locator('.workflow-task-event-trail__meta')
           .first()
-        await page.getByTestId('workflow-task-event-trail').locator('summary').click()
         await mobileEventMeta.waitFor({ state: 'visible', timeout: 10_000 })
         await assertTaskEventTrailMarkers(
           page.getByTestId('workflow-task-event-trail'),
@@ -3247,7 +3245,7 @@ export function createMobileTaskScenarios({
           '移动端紧凑异常区不应重复“异常处理”前缀'
         )
         assert.equal(
-          await page.locator('.workflow-task-current--blocked').count(),
+          await page.getByTestId('mobile-task-detail-screen').locator('.workflow-task-info-cause').count(),
           1,
           '阻塞原因和异常处理应合并为一个紧凑区域'
         )

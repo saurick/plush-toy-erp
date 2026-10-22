@@ -64,11 +64,17 @@ test('RPC review query restores range and method without accepting duplicates or
 test('RPC execution only presents current receipt as current success and keeps historical outcomes separate', () => {
   const value = report()
   value.execution = {
-    status: 'passed', current: false, methods: [], registered: [],
+    status: 'passed',
+    current: false,
+    methods: [],
+    registered: [],
     receipt: 'output/dev-workbench/contracts/examples.json',
   }
   assert.deepEqual(getRPCExecutionPresentation(value), {
-    current: false, status: 'missing', label: '本轮未验证', historical: true,
+    current: false,
+    status: 'missing',
+    label: '本轮未验证',
+    historical: true,
     message: '历史回执未覆盖当前比较对象。',
   })
   value.execution.current = true

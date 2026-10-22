@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Form, Select } from 'antd'
+import { Form } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { FinancePaymentKind } from '@/common/consts/statuses.generated.mjs'
 import {
   listAllSalesOrders,
@@ -107,6 +108,7 @@ export default function FinancePaymentSourceFields({ form, profile, open, source
         rules={[{ required: true, message: '请选择单据类型' }]}
       >
         <Select
+          placeholder="请选择关联单据"
           disabled={Boolean(sourceContext)}
           options={Object.entries(sources)
             .filter(([key]) =>
@@ -128,6 +130,7 @@ export default function FinancePaymentSourceFields({ form, profile, open, source
         help={error || '首款、分期款及发货前尾款均关联原订单；币种随订单带入。'}
       >
         <Select
+          placeholder="请选择订单 / 合同"
           showSearch
           optionFilterProp="label"
           loading={loading}

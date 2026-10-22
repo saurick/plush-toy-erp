@@ -4,20 +4,14 @@ import test from 'node:test'
 import {
   formatWorkflowTaskSource,
   getWorkflowTaskSourceTypeLabel,
+  getWorkflowTaskSourceNo,
   resolveWorkflowTaskEntryPath,
   resolveWorkflowTaskSourceEntryPath,
 } from './dashboardTaskDisplay.mjs'
 import { canOpenWorkflowTaskEntry } from './workflowTaskEntryAccess.mjs'
 
-test('formatWorkflowTaskSource keeps simulated markers out of employee copy', () => {
-  assert.equal(
-    formatWorkflowTaskSource({
-      source_type: 'simulated-manual-acceptance-task-batch',
-      source_no: 'SIM-001',
-      payload: { simulated_only: true },
-    }),
-    '任务记录'
-  )
+test('standalone task has no fabricated business source', () => {
+  assert.equal(formatWorkflowTaskSource({ source_type: null, source_id: null, source_no: null }), '未关联业务单据')
 })
 
 const INTENT_HASH = 'b'.repeat(64)
@@ -287,4 +281,13 @@ test('dashboardTaskDisplay: 出货财务审批只信任 ProcessRuntime 关联来
 test('unselected business task has no source entry', () => {
   assert.equal(resolveWorkflowTaskEntryPath(null), '')
   assert.equal(resolveWorkflowTaskSourceEntryPath(null), '')
+})
+
+test('source display follows business references and unavailable sources', () => {
+  const linked = { source_type: 'sales_order', source_id: 43, source_no: 'SO-043' }
+  assert.equal(formatWorkflowTaskSource(linked), '销售订单 · SO-043')
+  assert.equal(getWorkflowTaskSourceNo(linked), 'SO-043')
+  assert.equal(formatWorkflowTaskSource({ source_type: null, source_id: null, source_no: null }), '未关联业务单据')
+  assert.equal(formatWorkflowTaskSource({ ...linked, display_context: { available: false, source_no: 'STALE' } }), '关联单据已不可用')
+  assert.equal(getWorkflowTaskSourceNo({ ...linked, display_context: { available: true, source_no: '' } }), '')
 })

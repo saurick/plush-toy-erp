@@ -1,7 +1,7 @@
-import { QuestionCircleOutlined } from '@ant-design/icons'
-import { Button, Card, Popover, Space, Tag, Typography } from 'antd'
+import { Card, Space, Tag, Typography } from 'antd'
 import { Link as RouterLink } from 'react-router-dom'
-import DevDeliveryTimestamp from '../../../components/DevDeliveryTimestamp.jsx'
+import DevTimestamp from '../../../components/DevTimestamp.jsx'
+import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
 import {
   formatDeliveryBytes,
   shortGitSha,
@@ -27,6 +27,28 @@ export function VersionOverview({
   targetPassed,
   versions,
 }) {
+  const capacitySummary = (
+    <Text type="secondary">
+      可用空间{' '}
+      {formatDeliveryBytes(
+        target?.remote?.capacity?.availableBytes ??
+          initializationPreflight?.remote?.capacity?.availableBytes
+      )}
+      {' / '}最低要求{' '}
+      {formatDeliveryBytes(
+        target?.remote?.capacity?.minimumAvailableBytes ??
+          initializationPreflight?.remote?.capacity?.minimumAvailableBytes
+      )}
+    </Text>
+  )
+  const publicCheckSummary = (
+    <Text type="secondary">
+      页面健康{' '}
+      {publicEntry?.health === 'passed' ? '通过' : '未通过'}
+      {' · '}短信 Provider{' '}
+      {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
+    </Text>
+  )
   return (
     <Card className="erp-dev-version-overview">
       <div className="erp-dev-version-overview__main">
@@ -52,9 +74,6 @@ export function VersionOverview({
                       <Tag color="error">身份未证明</Tag>
                     )}
                   </div>
-                  <Text type="secondary">
-                    只有 clean HEAD 才能触发 exact-SHA 发布。
-                  </Text>
                 </td>
               </tr>
               <tr className="erp-dev-version-fact" data-kind="release">
@@ -64,21 +83,11 @@ export function VersionOverview({
                     <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
                     <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
                   </div>
-                  <DevDeliveryTimestamp
-                    value={versions[0]?.publishedAt}
-                    action="发布于"
-                    missing="发布时间未证明"
-                    className="erp-dev-latest-version-published-at"
-                  />
-                  <Text type="secondary">
-                    {versions[0]?.completeAssets
-                      ? versions[0]?.promotionEligible
-                        ? 'v2 七资产齐全，演练回执已绑定'
-                        : versions[0]?.assets.includes('release-rehearsal.json')
-                          ? 'v2 七资产存在，但演练证据未闭合'
-                          : 'v1 六资产齐全，仅保留读取与旧版回滚'
-                      : '等待完整 release assets'}
-                  </Text>
+                  {!versions[0]?.completeAssets || !versions[0]?.promotionEligible ? (
+                    <Text type="secondary">
+                      {versions[0]?.completeAssets ? '仅可回滚或演练证据待补齐' : '完整制品未证明'}
+                    </Text>
+                  ) : null}
                 </td>
               </tr>
               <tr className="erp-dev-version-fact" data-kind="target">
@@ -104,20 +113,7 @@ export function VersionOverview({
                           : '目标预检阻断'}
                     </Tag>
                   </div>
-                  <Text type="secondary">
-                    可用空间{' '}
-                    {formatDeliveryBytes(
-                      target?.remote?.capacity?.availableBytes ??
-                        initializationPreflight?.remote?.capacity
-                          ?.availableBytes
-                    )}
-                    {' / '}最低要求{' '}
-                    {formatDeliveryBytes(
-                      target?.remote?.capacity?.minimumAvailableBytes ??
-                        initializationPreflight?.remote?.capacity
-                          ?.minimumAvailableBytes
-                    )}
-                  </Text>
+                  {!targetPassed ? capacitySummary : null}
                 </td>
               </tr>
               <tr className="erp-dev-version-fact" data-kind="public-entry">
@@ -135,12 +131,7 @@ export function VersionOverview({
                         : '入口未完成证明'}
                     </Tag>
                   </div>
-                  <Text type="secondary">
-                    页面健康{' '}
-                    {publicEntry?.health === 'passed' ? '通过' : '未通过'}
-                    {' · '}短信 Provider{' '}
-                    {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
-                  </Text>
+                  {publicEntry?.status !== 'passed' ? publicCheckSummary : null}
                   <Link
                     href={
                       publicEntry?.endpoint || selectedTargetDefinition.endpoint
@@ -155,6 +146,36 @@ export function VersionOverview({
             </tbody>
           </table>
         </div>
+        <DevStaticGuidance title="版本与目标详情">
+          <Text strong>不可变制品</Text>
+          <DevTimestamp
+            value={versions[0]?.publishedAt}
+            action="发布于"
+            missing="发布时间未证明"
+            className="erp-dev-latest-version-published-at"
+          />
+          <Text type="secondary">
+            {versions[0]?.completeAssets
+              ? versions[0]?.promotionEligible
+                ? 'v2 七资产齐全，演练回执已绑定'
+                : versions[0]?.assets.includes('release-rehearsal.json')
+                  ? 'v2 七资产存在，但演练证据未闭合'
+                  : 'v1 六资产齐全，仅保留读取与旧版回滚'
+              : '等待完整 release assets'}
+          </Text>
+          {targetPassed ? (
+            <>
+              <Text strong>目标容量</Text>
+              {capacitySummary}
+            </>
+          ) : null}
+          {publicEntry?.status === 'passed' ? (
+            <>
+              <Text strong>公网检查</Text>
+              {publicCheckSummary}
+            </>
+          ) : null}
+        </DevStaticGuidance>
       </div>
 
       <aside
@@ -162,41 +183,8 @@ export function VersionOverview({
         data-decision={releaseDecision.color}
         aria-label="当前发布结论与下一步"
       >
-        <Tag color={releaseDecision.color}>{releaseDecision.label}</Tag>
-        <Text type="secondary">当前结论 / 下一步</Text>
         <Title level={3}>{releaseDecision.title}</Title>
         <Paragraph>{releaseDecision.description}</Paragraph>
-        <div className="erp-dev-version-next__actions">
-          <Popover
-            placement="bottomRight"
-            trigger={['hover', 'click']}
-            content={
-              <Space direction="vertical" size={4} style={{ maxWidth: 360 }}>
-                <Text strong>先发布制品，不会直接部署到任一目标</Text>
-                <Text>
-                  代码推送不会自动部署；部署前需另行核对具体目标与计划。
-                </Text>
-                <Text>
-                  系统会将当前干净提交的 exact SHA 交给
-                  {deliveryProviderName}
-                  ，执行严格质量门禁并生成不可变镜像、Release manifest、checksum
-                  和 SBOM。
-                </Text>
-                <Text type="secondary">
-                  制品发布完成后，仍需在版本列表中依次执行“准备部署”和“确认部署”。
-                </Text>
-              </Space>
-            }
-          >
-            <Button
-              type="link"
-              icon={<QuestionCircleOutlined aria-hidden="true" />}
-              aria-label="查看发布当前版本制品说明"
-            >
-              发布说明
-            </Button>
-          </Popover>
-        </div>
 
         <section
           className="erp-dev-version-quality-gate-summary"
@@ -214,18 +202,21 @@ export function VersionOverview({
               {strictSummaryLabel}
             </Tag>
           </Space>
-          <Text type="secondary">
-            实际耗时{' '}
-            {formatQualityGateDuration(strictProof?.receipt?.durationMs)}
-            {' · '}
-            {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
-          </Text>
-          <DevDeliveryTimestamp
-            value={strictProof?.receipt?.finishedAt}
-            action="完成于"
-            missing="完成时间未证明"
-            className="erp-dev-quality-gate-finished-at"
-          />
+          <details className="erp-dev-delivery-inline-details">
+            <summary>时间与耗时</summary>
+            <Text type="secondary">
+              实际耗时{' '}
+              {formatQualityGateDuration(strictProof?.receipt?.durationMs)}
+              {' · '}
+              {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
+            </Text>
+            <DevTimestamp
+              value={strictProof?.receipt?.finishedAt}
+              action="完成于"
+              missing="完成时间未证明"
+              className="erp-dev-quality-gate-finished-at"
+            />
+          </details>
           <RouterLink to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}>
             查看质量门禁详情
           </RouterLink>

@@ -475,7 +475,7 @@ function buildSuppliers(prefix, count) {
       name,
       short_name: name,
       supplier_type: supplierType,
-      address: "模拟工业区加工路 8 号",
+      address: "加工路 8 号",
       default_payment_method: index % 3 === 0 ? "月结" : "银行转账",
       default_payment_term_days: [0, 30, 45, 60][offset % 4],
       default_invoice_required: index % 3 !== 0,
@@ -721,7 +721,7 @@ function buildSalesOrders(prefix, count, customers, products, anchorDate) {
       order_no: `${prefix}-XD-${pad(index, 3)}`,
       customerRef: customer.code,
       customer_order_no: `${["MY", "SY", "XC", "TM", "QK"][offset % 5]}${anchorDate.slice(2, 7).replace("-", "")}${pad(index, 3)}`,
-      customer_snapshot: { name: customer.name, simulated_only: true },
+      customer_snapshot: { name: customer.name },
       sales_owner: ["小陈", "小李", "小周", "小林", "小何", "小吴"][index % 6],
       contact_snapshot: customer.contacts[0]
         ? {
@@ -800,10 +800,9 @@ function buildPurchaseOrders(
       supplier_snapshot: {
         name: supplier.name,
         short_name: supplier.short_name,
-        contact_name: supplier.contacts[0]?.name || "演示联系人",
+        contact_name: supplier.contacts[0]?.name || "采购联系人",
         contact_phone: "0769-00000000",
-        address: "模拟工业区加工路 8 号",
-        simulated_only: true,
+        address: "加工路 8 号",
       },
       currency: "CNY",
       payment_method: supplier.default_payment_method,
@@ -812,12 +811,12 @@ function buildPurchaseOrders(
       invoice_category: supplier.default_invoice_category,
       supplier_confirmed_arrival_date:
         index % 3 === 0 ? isoDate(6 + (index % 15), anchorDate) : undefined,
-      delivery_address: "模拟工业区收货路 1 号",
+      delivery_address: "收货路 1 号",
       contract_party_snapshot: {
-        buyerCompany: "永绅演示工厂",
+        buyerCompany: "永绅玩具工厂",
         buyerContact: "采购部",
         buyerPhone: "0769-00000000",
-        buyerAddress: "演示地址",
+        buyerAddress: "收货路 1 号",
         buyerSigner: "采购部",
       },
       purchase_date: isoDate(-index + 2, anchorDate),
@@ -902,17 +901,16 @@ function buildOutsourcingOrders(
       supplier_snapshot: {
         name: supplier.name,
         short_name: supplier.short_name,
-        contact_name: supplierContact?.name || "演示联系人",
+        contact_name: supplierContact?.name || "采购联系人",
         contact_phone: "0769-00000000",
-        address: "演示加工地址",
-        signer_name: supplierContact?.name || "演示联系人",
-        simulated_only: true,
+        address: "加工路 8 号",
+        signer_name: supplierContact?.name || "采购联系人",
       },
       contract_party_snapshot: {
-        buyerCompany: "永绅演示工厂",
+        buyerCompany: "永绅玩具工厂",
         buyerContact: "采购部",
         buyerPhone: "0769-00000000",
-        buyerAddress: "演示地址",
+        buyerAddress: "收货路 1 号",
         buyerSigner: "采购部",
       },
       source_order_no: sourceOrder.customer_order_no,
@@ -2594,8 +2592,8 @@ async function advanceLifecycle({
 }
 
 const SOURCE_ORDER_SHORT_CLOSE_REASON =
-  "验收样例：保留未履约源单的短关闭终态。";
-const SOURCE_ORDER_CANCEL_REASON = "验收样例：保留源单取消终态。";
+  "剩余数量不再履约，按当前数量结束。";
+const SOURCE_ORDER_CANCEL_REASON = "订单取消，不再安排后续业务。";
 
 export async function applySourceOrderLifecycleAction({
   plan,
@@ -2988,7 +2986,7 @@ async function completeSalesOrderProcessTask({
       `no trial account can complete ${task.owner_role_key} process task`,
     );
   }
-  const reason = "验收样例：当前流程节点已核对完成。";
+  const reason = "当前流程节点已核对完成。";
   const data = await rpcCall({
     backendURL: plan.backendURL,
     domain: "workflow",

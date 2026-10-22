@@ -1,3 +1,4 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { expandPrintToolSection } from './printToolHelpers.mjs'
 
 export function createPrintWorkspaceGroupScenarios({
@@ -56,7 +57,7 @@ export function createPrintWorkspaceGroupScenarios({
     assert.equal(baseline, 0, '本场景使用完整中性样例，留白增量可精确核对')
     await expandPrintToolSection(page, '条款编辑')
     await tools.getByRole('button', { name: '新增分组', exact: true }).click()
-    const fastKey = await select.inputValue()
+    const fastKey = await readSelectValue(select)
     await name.fill('快速分组')
     await items(fastKey).first().fill('正文保留在条目中')
     await page.evaluate(
@@ -73,9 +74,9 @@ export function createPrintWorkspaceGroupScenarios({
     assert.deepEqual(await values(fastKey), ['正文保留在条目中'])
     await tools.getByRole('button', { name: '删除分组', exact: true }).click()
     await expectBlanks(page, 0)
-    await select.selectOption('delivery')
+    await chooseSelectOption(select, 'delivery')
     await tools.getByRole('button', { name: '新增分组', exact: true }).click()
-    const key = await select.inputValue()
+    const key = await readSelectValue(select)
     assert(key.startsWith('group-'))
     await page.waitForFunction(
       () => document.activeElement?.getAttribute('aria-label') === '分组名称'
@@ -93,9 +94,7 @@ export function createPrintWorkspaceGroupScenarios({
     )
     await title(key).fill('包装要求')
     await title(key).press('Tab')
-    await select
-      .getByRole('option', { name: '包装要求（1 条）', exact: true })
-      .waitFor({ state: 'attached' })
+    await tools.locator('.ant-select-selection-item', { hasText: '包装要求（1 条）' }).waitFor()
     assert.equal(await name.inputValue(), '包装要求', '纸面改名同步左侧')
     await name.fill('验收与包装')
     await page.waitForFunction(
@@ -200,7 +199,7 @@ export function createPrintWorkspaceGroupScenarios({
     await page.reload()
     await page.locator('.erp-print-shell--ready').waitFor()
     await expandPrintToolSection(page, '条款编辑')
-    await select.selectOption(key)
+    await chooseSelectOption(select, key)
     assert.equal(await name.inputValue(), '验收与包装')
     assert.deepEqual(await visibleKeys(), [
       'delivery',
@@ -222,14 +221,16 @@ export function createPrintWorkspaceGroupScenarios({
     await page.reload()
     await page.locator('.erp-print-shell--ready').waitFor()
     await expandPrintToolSection(page, '条款编辑')
-    await select.selectOption(key)
+    await chooseSelectOption(select, key)
     assert.equal(await name.inputValue(), '暂存空组')
     assert.equal(await group(key).count(), 0)
     await tools.getByRole('button', { name: '新增条目', exact: true }).click()
     await expectBlanks(page, 1)
     await tools.getByRole('button', { name: '删除分组', exact: true }).click()
     await expectBlanks(page, 0)
-    assert.equal(await select.locator(`option[value="${key}"]`).count(), 0)
+    await select.press('ArrowDown')
+    assert.equal(await page.locator('.ant-select-dropdown:visible').locator(`[data-select-value="${key}"]`).count(), 0)
+    await select.press('Escape')
     for (let index = 0; index < 3; index += 1) {
       await tools.getByRole('button', { name: '删除分组', exact: true }).click()
     }
@@ -252,7 +253,7 @@ export function createPrintWorkspaceGroupScenarios({
     )
     await expandPrintToolSection(page, '条款编辑')
     await tools.getByRole('button', { name: '新增分组', exact: true }).click()
-    const restoredKey = await select.inputValue()
+    const restoredKey = await readSelectValue(select)
     await name.fill('补充要求')
     await expectBlanks(page, 1)
     assert.equal((await title(restoredKey).innerText()).trim(), '补充要求')
@@ -291,7 +292,7 @@ export function createPrintWorkspaceGroupScenarios({
         )
         return {
           controls: doc.body.querySelectorAll(
-            'button,input,select,[data-print-tool],[data-print-editor-only],[data-print-blank-notice]'
+            "button,input,.ant-select,[data-print-tool],[data-print-editor-only],[data-print-blank-notice]"
           ).length,
           text: first.textContent,
           groupCount: first.querySelectorAll('[data-print-clause-group]')

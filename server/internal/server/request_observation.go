@@ -25,7 +25,7 @@ func requestOutcome(req, reply any, err error) string {
 		return "success"
 	}
 	response, _ := reply.(*v1.PostJsonrpcReply)
-	if response == nil || response.GetResult() == nil || response.GetError() != "" || response.GetResult().GetCode() >= errcode.Internal.Code {
+	if response == nil || response.GetResult() == nil || response.GetError() != "" || errcode.IsSystemFailureCode(response.GetResult().GetCode()) {
 		return "error"
 	}
 	if response.GetResult().GetCode() == errcode.RequestCanceled.Code {

@@ -6,6 +6,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import { getWorkflowTaskAssigneeLabel } from '../../utils/workflowTaskEventPresentation.mjs'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import {
@@ -15,7 +16,7 @@ import {
   resolveMobileTaskStatusLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
-import MobileTaskContextCard, { mobileTaskAssigneeLabel } from './MobileTaskContextCard.jsx'
+import MobileTaskContextCard from './MobileTaskContextCard.jsx'
 import MobileTaskAttachments from './MobileTaskAttachments.jsx'
 import { WorkflowTaskCopySummary } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
@@ -105,6 +106,8 @@ export default function MobileTaskReceiptScreen({
   const approvalAction =
     !businessResult && isWorkflowApprovalTask(task) && ['done', 'rejected'].includes(actionKey)
   const confirmed = outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
+  const feedbackText = String(feedback || '').trim()
+  const reasonText = String(reason || '').trim()
   const canContinueBusiness = confirmed && typeof onOpenTaskForm === 'function'
   const hasProcessAnchor = Boolean(
     task?.id && task?.process_instance_id && task?.process_node_instance_id
@@ -165,7 +168,7 @@ export default function MobileTaskReceiptScreen({
         onOpenProcess={canContinueBusiness ? onOpenTaskForm : onOpenProcess}
         processUnavailableLabel="结果已确认"
         title="结果回执"
-        trailing={task ? <WorkflowTaskCopySummary task={task} assigneeLabel={mobileTaskAssigneeLabel(task)} compact /> : null}
+        trailing={task ? <WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact /> : null}
       />
 
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
@@ -221,37 +224,25 @@ export default function MobileTaskReceiptScreen({
           </section>
         ) : null}
 
-        <MobileTaskContextCard task={task} status={<span className={confirmed ? (task?.task_status_key === WorkflowTaskStatus.DONE ? 'text-emerald-600' : getTaskSeverityView(task || {}).badgeClass) : outcomeMeta.iconClass}>{taskStatus}</span>}>
+        <MobileTaskContextCard task={task} status={<span className={confirmed ? (task?.task_status_key === WorkflowTaskStatus.DONE ? 'text-emerald-600' : getTaskSeverityView(task || {}).badgeClass) : outcomeMeta.iconClass}>{confirmed ? taskStatus : `已知状态：${taskStatus}`}</span>}>
           <section aria-label="办理结果"><h3>本次办理</h3>
             <dl className="mobile-detail-facts">
               <div className="mobile-task-receipt-row mobile-detail-fact">
-                <dt>
-                  {outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
-                    ? '办理方式'
-                    : '本次办理'}
-                </dt>
+                <dt>办理方式</dt>
                 <dd>{actionLabel}</dd>
               </div>
-              <div className="mobile-task-receipt-row mobile-detail-fact">
-                <dt>
-                  {outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
-                    ? businessResult ? '任务状态' : '确认状态'
-                    : '已知任务状态'}
-                </dt>
-                <dd>{taskStatus}</dd>
-              </div>
-              {String(feedback || '').trim() ? (
+              {feedbackText ? (
                 <div className="mobile-task-receipt-row mobile-detail-fact">
                   <dt>{approvalAction ? '审批意见' : '办理说明'}</dt>
                   <dd className="whitespace-pre-wrap">
-                    {String(feedback).trim()}
+                    {feedbackText}
                   </dd>
                 </div>
               ) : null}
-              {String(reason || '').trim() ? (
+              {reasonText && reasonText !== feedbackText ? (
                 <div className="mobile-task-receipt-row mobile-detail-fact">
                   <dt>办理说明</dt>
-                  <dd className="whitespace-pre-wrap">{String(reason).trim()}</dd>
+                  <dd className="whitespace-pre-wrap">{reasonText}</dd>
                 </div>
               ) : null}
               {Array.isArray(evidenceRefs) && evidenceRefs.length > 0 ? (

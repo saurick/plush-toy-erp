@@ -199,59 +199,65 @@ func (d *jsonrpcDispatcher) purchaseErrorResult(ctx context.Context, err error) 
 		l.Warnf("[purchase] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrPurchaseReceiptNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库行不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库行不存在"}
 	case errors.Is(err, biz.ErrPurchaseReturnNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购退货单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购退货单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReturnItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购退货行不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购退货行不存在"}
 	case errors.Is(err, biz.ErrPurchaseReturnQualitySourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "不合格质检与采购入库、入库行或批次不一致，请刷新来源后重试"}
 	case errors.Is(err, biz.ErrPurchaseReturnQualitySourceState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仅已驳回且仍处于不合格批次状态的来料质检可生成采购退货"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "仅已驳回且仍处于不合格批次状态的来料质检可生成采购退货"}
 	case errors.Is(err, biz.ErrPurchaseReturnQualitySourceConflict):
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该不合格质检已生成未取消的采购退货单"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "该不合格质检已生成未取消的采购退货单"}
 	case errors.Is(err, biz.ErrPurchaseReturnQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次退货数量超过该入库行剩余可退数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次退货数量超过该入库行剩余可退数量"}
 	case errors.Is(err, biz.ErrPurchaseRejectionDispositionNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料拒收处置单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "来料拒收处置单不存在"}
 	case errors.Is(err, biz.ErrPurchaseRejectionSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "拒收质检与待入库单据不一致，请刷新后重试"}
 	case errors.Is(err, biz.ErrPurchaseRejectionSourceState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仅首次来料未入库且质检不合格时可办理退厂处置"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "仅首次来料未入库且质检不合格时可办理退厂处置"}
 	case errors.Is(err, biz.ErrPurchaseRejectionCancelOrderState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源采购单或明细已不允许收货，不能撤销拒收处置"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "来源采购单或明细已不允许收货，不能撤销拒收处置"}
 	case errors.Is(err, biz.ErrPurchaseRejectionConflict):
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "来料拒收处置已被其他人处理，或该质检已有有效处置单，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "来料拒收处置已被其他人处理，或该质检已有有效处置单，请刷新后重试"}
 	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库调整单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整行不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库调整行不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptCorrectionDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库仍有未取消的退货、调整或拒收补换处置，不能取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购入库仍有未取消的退货、调整或拒收补换处置，不能取消"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成，不能入库过账"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "来料质检尚未逐行完成，不能入库过账"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityRejected):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检存在拒收行，不能入库过账"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "来料质检存在拒收行，不能入库过账"}
 	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
-	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该材料已停用，不能新增引用；历史入库仍保留原引用"}
-	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单位已停用，不能新增引用；历史入库仍保留原引用"}
-	case errors.Is(err, biz.ErrWarehouseNotFound), errors.Is(err, biz.ErrWarehouseInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该仓库已停用，不能用于新入库"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购订单不存在"}
+	case errors.Is(err, biz.ErrMaterialNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选材料不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该材料已停用，不能新增引用；历史入库仍保留原引用"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该单位已停用，不能新增引用；历史入库仍保留原引用"}
+	case errors.Is(err, biz.ErrWarehouseNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选仓库不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrWarehouseInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该仓库已停用，不能用于新入库"}
 	case errors.Is(err, biz.ErrInventoryLotNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存批次不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "库存批次不存在"}
 	case errors.Is(err, biz.ErrInventoryTxnNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库库存流水不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库库存流水不存在"}
 	case errors.Is(err, biz.ErrInventoryInsufficientStock):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足，无法完成本次采购库存操作"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "库存不足，无法完成本次采购库存操作"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前批次状态不允许扣减库存"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前批次状态不允许扣减库存"}
 	case errors.Is(err, biz.ErrPurchaseRecordConflict):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库、退货或调整单号及行号已存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "采购入库、退货或调整单号及行号已存在"}
 	default:
 		return nil
 	}

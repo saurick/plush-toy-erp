@@ -32,46 +32,47 @@ func (d *jsonrpcDispatcher) mapWorkflowError(ctx context.Context, err error) *v1
 	switch {
 	case errors.Is(err, biz.ErrWorkflowTaskSourceGeneratedOnly):
 		l.Warnf("[workflow] source-generated task create rejected err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该任务由业务来源生成，请回到对应业务页面办理"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该任务由业务来源生成，请回到对应业务页面办理"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[workflow] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	case errors.Is(err, biz.ErrWorkflowTaskNotFound):
 		l.Warnf("[workflow] task not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "任务不存在"}
 	case errors.Is(err, biz.ErrWorkflowTaskExists):
 		l.Warnf("[workflow] task exists err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务编码已存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "任务编码已存在"}
 	case errors.Is(err, biz.ErrWorkflowTaskSettled):
 		l.Warnf("[workflow] task settled err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务已结束，不能再次变更状态"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "任务已结束，不能再次变更状态"}
 	case errors.Is(err, biz.ErrWorkflowTaskConflict):
 		l.Warnf("[workflow] task version conflict err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务已被其他人更新，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "任务已被其他人更新，请刷新后重试"}
 	case errors.Is(err, biz.ErrWorkflowTaskAssignmentNoop):
 		l.Warnf("[workflow] assignment unchanged err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务处理人没有变化，请重新选择"}
 	case errors.Is(err, biz.ErrWorkflowAssigneeIneligible):
 		l.Warnf("[workflow] assignee ineligible err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选接收人已不可用，请重新选择"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "所选接收人已不可用，请重新选择"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		l.Warnf("[workflow] idempotency intent conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrProcessTaskOwnerRoleNotFound):
 		l.Warnf("[workflow] process task owner role not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"}
 	case errors.Is(err, biz.ErrProcessTaskOwnerRoleAmbiguous):
 		l.Warnf("[workflow] process task owner role ambiguous err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"}
+	case errors.Is(err, biz.ErrProcessNodeInstanceConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "关联流程已被其他操作更新，请刷新后核对"}
 	case errors.Is(err, biz.ErrProcessInstanceSettled),
-		errors.Is(err, biz.ErrProcessNodeInstanceConflict),
 		errors.Is(err, biz.ErrProcessNodeInstanceSettled),
 		errors.Is(err, biz.ErrProcessNodeInstanceNotActive):
 		l.Warnf("[workflow] linked process state conflict err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "关联流程状态冲突，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "关联流程已结束或当前步骤不可办理，请刷新后核对流程进度"}
 	case errors.Is(err, biz.ErrWorkflowBusinessStateFound):
 		l.Warnf("[workflow] business state exists err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "业务状态快照已存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "业务状态快照已存在"}
 	default:
 		if result := d.processBusinessErrorResult(ctx, err); result != nil {
 			return result

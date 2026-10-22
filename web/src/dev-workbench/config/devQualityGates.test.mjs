@@ -1263,8 +1263,8 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.charts, /buildQualityGateHistoryTrend/u)
   assert.match(sources.charts, /buildQualityGateCoverageMatrix/u)
   assert.match(sources.execution, /当前正式回执/u)
-  assert.match(sources.server, /GitLab CI 门禁/u)
-  assert.match(sources.server, /正式主路径/u)
+  assert.match(sources.server, /aria-label="GitLab CI 质量证据"/u)
+  assert.match(sources.server, /evidence\.pipeline \? \(/u)
   assert.match(
     sources.pipeline,
     /状态与耗时来自实际\s+Pipeline/u
@@ -1272,7 +1272,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.pipeline, /依赖不可读时不绘制推测连线/u)
   assert.match(sources.server, /aria-label="服务器门禁详情"/u)
   assert.match(sources.guide, /<Drawer/u)
-  assert.match(sources.server, />\s*Job 说明\s*</u)
+  assert.match(sources.server, />\s*流程与原理\s*</u)
   assert.match(sources.pipeline, /aria-label=\{`查看 \$\{job\.name\} 说明`\}/u)
   assert.match(sources.guide, /先看阶段，再按需查看单个 Job/u)
   assert.match(sources.presentation, /核对子 Job 回执并形成领域结论/u)
@@ -1288,7 +1288,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.presentation, /missing: '未产生 CI 记录'/u)
   assert.match(sources.presentation, /unavailable: '读取失败'/u)
   assert.match(sources.presentation, /连接正常 · 当前提交无 CI/u)
-  assert.match(sources.server, /GitLab 读取正常/u)
+  assert.match(sources.presentation, /连接正常 · 当前提交无 CI/u)
   assert.match(sources.presentation, /GitLab CI 正在读取服务器证据/u)
   assert.match(sources.history, /最近 CI/u)
   assert.match(sources.history, /历史结果不代表当前提交已通过/u)
@@ -1296,7 +1296,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.presentation, /serverHistoryFailureLabel/u)
   assertNoSourceMatches(/missing: '暂无当前 CI'/u)
   assertNoSourceMatches(/unavailable: '待读取'/u)
-  assert.match(sources.run, /本机诊断（按需）/u)
+  assert.match(sources.run, /aria-label="诊断范围"/u)
   assert.match(sources.run, /本机最近诊断/u)
   assertNoSourceMatches(/严格门禁：发版前验证/u)
   assert.match(sources.run, /\? '预计剩余'[\s\S]*?: '运行状态'/u)

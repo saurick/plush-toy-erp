@@ -59,7 +59,7 @@ func TestCustomerConfigProcessSourceValidationUsesDomainTruth(t *testing.T) {
 		}{
 			{name: "not found", err: biz.ErrSalesOrderNotFound},
 			{name: "wrong id", order: &biz.SalesOrder{ID: 43, OrderNo: "SO-43", LifecycleStatus: biz.SalesOrderStatusDraft}, err: biz.ErrBadParam},
-			{name: "wrong state", order: &biz.SalesOrder{ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusClosed}, err: biz.ErrBadParam},
+			{name: "wrong state", order: &biz.SalesOrder{ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusClosed}, err: biz.ErrSourceOrderStateInvalid},
 			{name: "draft", order: &biz.SalesOrder{ID: 42, OrderNo: " SO-42 ", LifecycleStatus: biz.SalesOrderStatusDraft}, want: "SO-42"},
 			{name: "submitted replay", order: &biz.SalesOrder{ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusSubmitted}, want: "SO-42"},
 			{name: "active replay", order: &biz.SalesOrder{ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusActive}, want: "SO-42"},
@@ -86,7 +86,7 @@ func TestCustomerConfigProcessSourceValidationUsesDomainTruth(t *testing.T) {
 		}{
 			{name: "not found", err: biz.ErrPurchaseOrderNotFound},
 			{name: "wrong id", order: &biz.PurchaseOrder{ID: 5002, PurchaseOrderNo: "PO-5002", LifecycleStatus: biz.PurchaseOrderStatusDraft}, err: biz.ErrBadParam},
-			{name: "wrong state", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusApproved}, err: biz.ErrBadParam},
+			{name: "wrong state", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusApproved}, err: biz.ErrSourceOrderStateInvalid},
 			{name: "draft", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: " PO-5001 ", LifecycleStatus: biz.PurchaseOrderStatusDraft}, want: "PO-5001"},
 			{name: "submitted replay", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusSubmitted}, want: "PO-5001"},
 		} {
@@ -261,8 +261,8 @@ func TestCustomerConfigProcessStartsRequireEnabledSourceModuleBeforeSourceOrRunt
 				t.Fatalf("NewStruct: %v", err)
 			}
 			_, result, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, tt.name), tt.method, "module", pb)
-			if err != nil || result.Code != errcode.InvalidParam.Code {
-				t.Fatalf("result = %#v, err=%v, want invalid param", result, err)
+			if err != nil || result.Code != errcode.BusinessRuleViolation.Code {
+				t.Fatalf("result = %#v, err=%v, want business rule rejection", result, err)
 			}
 			if calls := sourceCalls(); calls != 0 {
 				t.Fatalf("invalid source module reached source repository %d times", calls)
@@ -277,7 +277,7 @@ func TestCustomerConfigProcessStartsRequireEnabledSourceModuleBeforeSourceOrRunt
 func TestMapCustomerConfigErrorPurchaseOrderNotFound(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(nil, nil)
 	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrPurchaseOrderNotFound)
-	if result.Code != errcode.InvalidParam.Code || result.Message != "采购订单不存在" {
+	if result.Code != errcode.ResourceNotFound.Code || result.Message != "采购订单不存在" {
 		t.Fatalf("result = %#v", result)
 	}
 }

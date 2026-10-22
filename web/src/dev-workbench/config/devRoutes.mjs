@@ -1,3 +1,5 @@
+export const DEV_WORKBENCH_FAVICON_HREF = '/favicon-dev.svg'
+
 export const DEV_HUB_ROUTE = '/__dev'
 export const DEV_PRODUCT_ENGINEERING_ROUTE = '/__dev/product-engineering'
 export const DEV_PRODUCT_CORE_ROUTE = '/__dev/product-core'
@@ -177,28 +179,6 @@ function normalizeDevPathname(pathname = '') {
   return rawPath.replace(/\/+$/, '')
 }
 
-export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
-  [DEV_HUB_ROUTE]: '/favicon-dev.svg',
-  [DEV_PRODUCT_ENGINEERING_ROUTE]: '/favicon-dev.svg',
-  [DEV_PRODUCT_CORE_ROUTE]: '/favicon-dev.svg',
-  [DEV_INTEGRATION_ROUTE]: '/favicon-dev.svg',
-  [DEV_PERMISSION_RELATIONSHIPS_ROUTE]: '/favicon-dev.svg',
-  [DEV_QUALITY_ROUTE]: '/favicon-dev.svg',
-  [DEV_DELIVERY_ROUTE]: '/favicon-dev.svg',
-  [DEV_STATUS_FLOWS_ROUTE]: '/favicon-dev.svg',
-  [DEV_BUSINESS_USABILITY_ROUTE]: '/favicon-dev.svg',
-  [DEV_DOCS_ROUTE]: '/favicon-docs.svg',
-  [DEV_TESTING_ROUTE]: '/favicon-testing.svg',
-  [DEV_BUSINESS_CHAIN_AUDIT_ROUTE]: '/favicon-testing.svg',
-  [DEV_QUALITY_GATES_ROUTE]: '/favicon-testing.svg',
-  [DEV_DATA_PREPARATION_ROUTE]: '/favicon-testing.svg',
-  [DEV_UI_DESIGN_ROUTE]: '/favicon-ui-design.svg',
-  [DEV_CUSTOMER_CONFIG_ROUTE]: '/favicon-customer-config.svg',
-  [DEV_DATABASE_MIGRATION_ROUTE]: '/favicon-dev.svg',
-  [DEV_VERSION_CENTER_ROUTE]: '/favicon-dev.svg',
-  [DEV_DRILL_RECOVERY_ROUTE]: '/favicon-dev.svg',
-})
-
 export function resolveDevWorkbenchAreaKey(pathname = '') {
   const normalizedPath = normalizeDevPathname(pathname)
   const primaryItem = DEV_WORKSPACE_NAV_ITEMS.find(
@@ -221,11 +201,4 @@ export function getDevSecondaryNavItems(areaKey = '') {
 export function resolveDevPageTitle(pathname, appTitle) {
   const devTitle = DEV_PAGE_TITLE_BY_ROUTE[normalizeDevPathname(pathname)]
   return devTitle ? `${devTitle} · ${appTitle}` : appTitle
-}
-
-export function resolveDevPageFavicon(pathname = '') {
-  return (
-    DEV_PAGE_FAVICON_BY_ROUTE[normalizeDevPathname(pathname)] ||
-    '/favicon-dev.svg'
-  )
 }

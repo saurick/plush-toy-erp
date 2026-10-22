@@ -1,8 +1,5 @@
-import { useState } from 'react'
-import { CopyOutlined, FileTextOutlined } from '@ant-design/icons'
-import { Alert, Button, Typography } from 'antd'
+import { Alert, Typography } from 'antd'
 import DevTimestamp from '../../components/DevTimestamp.jsx'
-import { copyText } from './presentation.jsx'
 
 const { Text } = Typography
 
@@ -30,8 +27,6 @@ export function buildDryRunReportPreviewLines(result = {}) {
 }
 
 export function DryRunSummary({ dryRunState }) {
-  const [showReportPreview, setShowReportPreview] = useState(false)
-
   if (dryRunState.status === 'idle') return null
 
   if (dryRunState.status === 'running') {
@@ -78,27 +73,6 @@ export function DryRunSummary({ dryRunState }) {
         action="生成于"
         missing="试跑生成时间未证明"
       />
-      <div className="erp-dev-customer-dry-run-actions">
-        <Button
-          icon={<CopyOutlined aria-hidden="true" />}
-          onClick={() => copyText(result.outputPath || '')}
-        >
-          复制输出目录
-        </Button>
-        <Button
-          icon={<CopyOutlined aria-hidden="true" />}
-          onClick={() => copyText(result.reportPath || '')}
-        >
-          复制报告路径
-        </Button>
-        <Button
-          icon={<FileTextOutlined aria-hidden="true" />}
-          disabled={!hasReportPreview}
-          onClick={() => setShowReportPreview((visible) => !visible)}
-        >
-          {showReportPreview ? '收起报告摘要' : '查看报告摘要'}
-        </Button>
-      </div>
       <div className="erp-dev-customer-dry-run-metrics">
         <div>
           <Text type="secondary">来源行</Text>
@@ -120,12 +94,12 @@ export function DryRunSummary({ dryRunState }) {
         </div>
       </div>
       <details className="erp-dev-customer-result-details">
-        <summary>报告文件与未决项</summary>
+        <summary>报告详情</summary>
         <div className="erp-dev-customer-dry-run-paths">
           <Text type="secondary">输出目录</Text>
-          <Text code>{result.outputPath}</Text>
+          <Text code copyable={result.outputPath ? { text: result.outputPath, tooltips: ['复制输出目录', '已复制'] } : false}>{result.outputPath || '未生成'}</Text>
           <Text type="secondary">报告</Text>
-          <Text code>{result.reportPath}</Text>
+          <Text code copyable={result.reportPath ? { text: result.reportPath, tooltips: ['复制报告路径', '已复制'] } : false}>{result.reportPath || '未生成'}</Text>
           <Text type="secondary">未决队列</Text>
           <Text>
             block {unresolvedCounts.block || 0} / defer{' '}
@@ -133,12 +107,12 @@ export function DryRunSummary({ dryRunState }) {
             {unresolvedCounts.review || 0}
           </Text>
         </div>
+        {hasReportPreview ? (
+          <pre className="erp-dev-customer-dry-run-report">
+            {reportPreviewLines.join('\n')}
+          </pre>
+        ) : null}
       </details>
-      {showReportPreview && hasReportPreview ? (
-        <pre className="erp-dev-customer-dry-run-report">
-          {reportPreviewLines.join('\n')}
-        </pre>
-      ) : null}
     </div>
   )
 }

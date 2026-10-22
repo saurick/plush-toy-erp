@@ -202,33 +202,47 @@ func (d *jsonrpcDispatcher) outsourcingOrderErrorResult(ctx context.Context, err
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderStateInvalid):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同当前状态不允许此操作，请刷新后核对可办理的操作"}
 	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同尚未全部回货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同尚未全部回货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrOutsourcingOrderIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工合同信息不完整，请补齐甲乙方信息、预计回货日期和每条明细的加工项目后再提交或确认"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "加工合同信息不完整，请补齐甲乙方信息、预计回货日期和每条明细的加工项目后再提交或确认"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[outsourcing_order] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrOutsourcingOrderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "委外合同不存在"}
 	case errors.Is(err, biz.ErrOutsourcingOrderItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同明细不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "委外合同明细不存在"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同仍有未结清的发料或回货记录；关闭前请完成或取消草稿，取消合同前请先取消或冲正相关记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同仍有未结清的发料或回货记录；关闭前请完成或取消草稿，取消合同前请先取消或冲正相关记录"}
 	case errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同已关联在制批次，完成相关生产办理前不能取消、关闭或改写"}
-	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工厂不存在或已停用"}
-	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品不存在或已停用"}
-	case errors.Is(err, biz.ErrProductSKUNotFound), errors.Is(err, biz.ErrProductSKUInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品规格不存在、已停用，或与产品和单位不匹配"}
-	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "材料不存在或已停用"}
-	case errors.Is(err, biz.ErrProcessNotFound), errors.Is(err, biz.ErrProcessInactive), errors.Is(err, biz.ErrProcessNotOutsourcingEnabled):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "工序不存在、已停用或未启用委外"}
-	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "单位不存在或已停用"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "委外合同已关联在制批次，完成相关生产办理前不能取消、关闭或改写"}
+	case errors.Is(err, biz.ErrSupplierNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选供应商不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrSupplierInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "加工厂已停用"}
+	case errors.Is(err, biz.ErrProductNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品已停用"}
+	case errors.Is(err, biz.ErrProductSKUNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品规格不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductSKUInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品规格不存在、已停用，或与产品和单位不匹配"}
+	case errors.Is(err, biz.ErrMaterialNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选材料不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "材料已停用"}
+	case errors.Is(err, biz.ErrProcessNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选工序不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProcessInactive), errors.Is(err, biz.ErrProcessNotOutsourcingEnabled):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "工序不存在、已停用或未启用委外"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "单位已停用"}
 	default:
 		return nil
 	}

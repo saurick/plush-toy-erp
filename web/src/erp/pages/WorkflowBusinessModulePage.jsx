@@ -30,13 +30,13 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
@@ -1230,6 +1230,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 icon={<CheckCircleOutlined />}
                 data-business-action-key="workflow-task-complete"
                 data-business-action-role="primary"
+                data-business-action-group="collaboration"
                 loading={taskActionLoadingID === selectedTask?.id}
                 disabled={
                   !canCompleteSelected ||
@@ -1270,6 +1271,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 icon={<ExclamationCircleOutlined />}
                 data-business-action-key="workflow-task-block"
                 data-business-action-role="danger"
+                data-business-action-group="collaboration"
                 disabled={
                   !canBlockSelected ||
                   taskActionLoadingID > 0 ||
@@ -1308,6 +1310,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 icon={<ExclamationCircleOutlined />}
                 data-business-action-key="workflow-task-reject"
                 data-business-action-role="danger"
+                data-business-action-group="collaboration"
                 disabled={
                   !canRejectSelected ||
                   taskActionLoadingID > 0 ||
@@ -1346,6 +1349,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 icon={<RedoOutlined />}
                 data-business-action-key="workflow-task-resume"
                 data-business-action-role="primary"
+                data-business-action-group="collaboration"
                 disabled={
                   !canResumeSelected ||
                   taskActionLoadingID > 0 ||
@@ -1377,6 +1381,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 icon={<SendOutlined />}
                 data-business-action-key="workflow-task-urge"
                 data-business-action-role="secondary"
+                data-business-action-group="collaboration"
                 loading={urgingTaskID === selectedTask?.id}
                 disabled={
                   !canUrgeSelected ||

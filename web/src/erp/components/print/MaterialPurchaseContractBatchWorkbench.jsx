@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { getPrintToolbarButtonClassName, PrintToolButton } from './PrintWorkspaceTools.jsx'
+import Select from '@/common/components/select/AppSelect'
+import {
+  getPrintToolbarButtonClassName,
+  PrintToolButton,
+} from './PrintWorkspaceTools.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -513,28 +517,26 @@ export default function MaterialPurchaseContractBatchWorkbench({
           {batches.length > 1 ? (
             <label className="erp-material-contract-batch-pages">
               输出批次
-              <select
+              <Select
+                allowClear={false}
+                placeholder="输出批次"
                 aria-label="输出批次"
+                virtual={false}
+                data-value={batchIndex}
                 value={batchIndex}
                 disabled={pdfAction !== ''}
-                onChange={(event) => {
-                  const index = Number(event.target.value)
+                onChange={(index) => {
                   setBatchDraft((current) => ({
                     ...current,
                     batchIndex: index,
                   }))
                 }}
-              >
-                {batches.map((batch, index) => (
-                  <option key={index} value={index}>
-                    第 {index + 1} 批 / 共 {batches.length} 批（第{' '}
-                    {index * MATERIAL_PURCHASE_CONTRACT_BATCH_MAX + 1}–
-                    {index * MATERIAL_PURCHASE_CONTRACT_BATCH_MAX +
-                      batch.length}{' '}
-                    份）
-                  </option>
-                ))}
-              </select>
+                options={batches.map((batch, index) => ({
+                  value: index,
+                  label: `第 ${index + 1} 批 / 共 ${batches.length} 批（第 ${index * MATERIAL_PURCHASE_CONTRACT_BATCH_MAX + 1}–${index * MATERIAL_PURCHASE_CONTRACT_BATCH_MAX + batch.length} 份）`,
+                  'data-select-value': String(index),
+                }))}
+              />
             </label>
           ) : null}
         </div>

@@ -97,23 +97,27 @@ func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *
 		l.Warnf("[masterdata] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	case errors.Is(err, biz.ErrCustomerNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "客户不存在"}
 	case errors.Is(err, biz.ErrSupplierNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "供应商不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "供应商不存在"}
 	case errors.Is(err, biz.ErrMaterialNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "材料不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "材料不存在"}
 	case errors.Is(err, biz.ErrMaterialIdentityConflict):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "物料编号或厂商、料号、色号组合已存在，请选择已有物料"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "物料编号或厂商、料号、色号组合已存在，请选择已有物料"}
 	case errors.Is(err, biz.ErrProcessNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "工序不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "工序不存在"}
 	case errors.Is(err, biz.ErrProductSKUNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "SKU 不存在"}
-	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品不存在或已停用"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "SKU 不存在"}
+	case errors.Is(err, biz.ErrProductNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品已停用"}
 	case errors.Is(err, biz.ErrContactNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "联系人不存在"}
-	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "默认单位不存在或已停用"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "联系人不存在"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "默认单位已停用"}
 	default:
 		l.Errorf("[masterdata] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}

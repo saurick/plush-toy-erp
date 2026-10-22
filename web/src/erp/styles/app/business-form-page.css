@@ -10,6 +10,10 @@
   min-height: 0;
 }
 
+.erp-admin-content[data-business-form-editing='true'] .erp-business-module-header .erp-page-actions {
+  display: none;
+}
+
 .erp-business-page-layout[data-business-form-editing='true'] {
   height: 100%;
   grid-template-rows: minmax(0, 1fr);
@@ -41,11 +45,12 @@
 }
 
 .erp-admin-shell[data-business-form-fullscreen='true'] .erp-admin-sider,
-.erp-admin-shell[data-business-form-fullscreen='true'] .erp-admin-header,
 .erp-admin-shell[data-business-form-fullscreen='true'] .erp-admin-page-head,
-.erp-admin-shell[data-business-form-fullscreen='true'] .erp-business-module-header,
 .erp-admin-shell[data-business-form-fullscreen='true']
-  .erp-admin-content > .erp-business-inline-note {
+  .erp-business-module-header,
+.erp-admin-shell[data-business-form-fullscreen='true']
+  .erp-admin-content
+  > .erp-business-inline-note {
   display: none;
 }
 
@@ -163,20 +168,12 @@
   font-size: var(--erp-font-small);
 }
 
-.erp-business-form-page__section-picker select {
+.erp-business-form-page__section-picker .ant-select {
   flex: 1;
   min-width: 0;
-  height: 34px;
-  padding: 0 8px;
-  border: 1px solid var(--erp-border-strong);
-  border-radius: 6px;
-  background: var(--erp-surface-bg);
-  color: var(--erp-text);
-  font: inherit;
 }
 
-.erp-business-form-page__section-links button:focus-visible,
-.erp-business-form-page__section-picker select:focus-visible {
+.erp-business-form-page__section-links button:focus-visible {
   outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }

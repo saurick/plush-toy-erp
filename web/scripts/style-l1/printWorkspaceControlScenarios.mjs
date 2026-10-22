@@ -1,3 +1,4 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { writeFile } from 'node:fs/promises'
 import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 import { measureEmptyEditorHints } from './printEmptyEditorAssertions.mjs'
@@ -210,13 +211,13 @@ export function createPrintWorkspaceControlScenarios({
           )
           const report = { key: template.key, fields: count, states: [] }
           const zoomControl = page.locator(
-            '.erp-print-shell__zoom-control select'
+            '.erp-print-shell__zoom-control .ant-select'
           )
           // 非编辑控件承接真实焦点和失焦事件，避免自动滚回工具栏或恢复编辑焦点。
           const blurEditor = () =>
             zoomControl.evaluate((node) => node.focus({ preventScroll: true }))
           for (const scale of ['1', '0.75', '1.25', '1.5']) {
-            await zoomControl.selectOption(scale)
+            await chooseSelectOption(zoomControl, scale)
             await assertEditorInventory(`${scale} 缩放清空前`)
             for (let index = 0; index < count; index += 1) {
               const editor = editors.nth(index)
@@ -404,14 +405,14 @@ export function createPrintWorkspaceControlScenarios({
               )
             }
           }
-          const zoom = page.getByLabel('显示比例')
+          const zoom = page.getByRole('combobox', { name: "显示比例", exact: true })
           assert(
             await zoom.evaluate((node) =>
               Boolean(node.closest('.erp-print-shell__toolbar-actions'))
             ),
             '显示比例与 PDF 操作同在顶栏'
           )
-          await zoom.selectOption('1')
+          await chooseSelectOption(zoom, '1')
           const controls = await page.evaluate(() => {
             const styles = (node) => {
               const style = getComputedStyle(node)
@@ -437,12 +438,9 @@ export function createPrintWorkspaceControlScenarios({
             const panel = document.querySelector(
               '.erp-print-shell__record-panel'
             )
-            const hint = getComputedStyle(
-              document.querySelector('.print-zoom-select'),
-              '::after'
-            )
+            const hint = getComputedStyle(document.querySelector('.print-zoom-select .ant-select-arrow'))
             return {
-              zoom: styles(document.querySelector('.print-zoom-select select')),
+              zoom: styles(document.querySelector('.print-zoom-select .ant-select-selector')),
               button: styles(panel.querySelector('.erp-print-shell__button')),
               panel: {
                 width: panel.getBoundingClientRect().width,
@@ -457,11 +455,7 @@ export function createPrintWorkspaceControlScenarios({
               },
             }
           })
-          assert.equal(
-            controls.zoom.appearance,
-            'none',
-            '缩放框不继承宿主原生外观'
-          )
+          assert.equal(await page.locator('select').count(), 0, '打印工具不再打开系统原生菜单')
           assert.equal(controls.zoom.width, '120px')
           assert.equal(controls.zoom.height, '32px')
           assert.equal(
@@ -469,23 +463,38 @@ export function createPrintWorkspaceControlScenarios({
             '6px',
             '逻辑圆角不能被全局控件样式覆盖'
           )
-          assert.equal(controls.zoom.lineHeight, '20px')
           assert.equal(controls.arrow.pointerEvents, 'none', '箭头不截获点击')
           assert.equal(controls.panel.width, 248, '所有模板使用共享侧栏宽度')
           assert.equal(controls.panel.padding, '12px')
           assert.equal(controls.button.fontSize, '13px')
           assert.equal(controls.button.height, '32px')
-          await zoom.focus()
-          await zoom.press('Space')
-          assert(
-            await zoom.evaluate((node) => node.matches(':open')),
-            '键盘可展开原生缩放列表'
+          await page.mouse.move(0, 0)
+          await zoom.press('ArrowDown')
+          const activeOption = page.locator('.ant-select-dropdown:visible .ant-select-item-option-active')
+          await activeOption.waitFor()
+          // 单选列表打开后先恢复当前选项，再验证下一次方向键。
+          await page.evaluate(() => new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+          ))
+          await page.waitForFunction(() =>
+            document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-active')
+              ?.dataset.selectValue === '1'
           )
-          // macOS headless 不分发原生弹出列表内的按键；选择回调单独验证。
-          await zoom.evaluate((node) => node.blur())
-          await zoom.selectOption('1.25')
+          await zoom.press('ArrowDown')
+          await page.waitForFunction(() =>
+            document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-active')
+              ?.dataset.selectValue === '1.25'
+          )
+          assert.equal(await activeOption.getAttribute('data-select-value'), '1.25', '方向键可定位目标比例')
+          await zoom.press('Enter')
+          await page.waitForFunction(() => {
+            const control = document.querySelector('.print-zoom-select .ant-select')
+            const stage = document.querySelector('.erp-print-shell__stage')
+            return control?.dataset.value === '1.25' &&
+              stage?.style.getPropertyValue('--print-view-scale') === '1.25'
+          })
           assert.equal(
-            await zoom.inputValue(),
+            await readSelectValue(zoom),
             '1.25',
             '缩放选择能更新当前比例'
           )
@@ -516,7 +525,7 @@ export function createPrintWorkspaceControlScenarios({
           )
           const hints = []
           for (const scale of ['1', '1.25']) {
-            await zoom.selectOption(scale)
+            await chooseSelectOption(zoom, scale)
             for (const index of chosen) {
               const field = page.locator(selector).nth(index)
               await field.fill('')
@@ -674,6 +683,10 @@ export function createPrintWorkspaceControlScenarios({
             )
             await action.click()
             await page.keyboard.press('Escape')
+            await page.waitForFunction(() =>
+              document.querySelector('[data-print-workspace-mode]').dataset
+                .printWorkspaceMode === 'edit'
+            )
             assert.equal(
               await page
                 .getByRole('button', { name: '返回编辑', exact: true })
@@ -727,7 +740,7 @@ export function createPrintWorkspaceControlScenarios({
             '打印不输出工具栏'
           )
           await page.emulateMedia({ media: 'screen' })
-          await zoom.selectOption('fit')
+          await chooseSelectOption(zoom, 'fit')
           await panel.scrollIntoViewIfNeeded()
           await page.screenshot({
             path: path.join(outputDir, `print-controls-${template.key}.png`),
@@ -741,13 +754,13 @@ export function createPrintWorkspaceControlScenarios({
             ),
             '窄窗口没有整页水平溢出'
           )
-          const narrowZoom = await zoom.boundingBox()
+          const narrowZoom = await page.locator('.print-zoom-select .ant-select').boundingBox()
           assert(
             Math.abs(narrowZoom.width - 120) < 1,
             '窄窗口的缩放控件保持完整宽度'
           )
-          await zoom.selectOption('1.5')
-          assert.equal(await zoom.inputValue(), '1.5', '窄窗口仍可调整缩放')
+          await chooseSelectOption(zoom, '1.5')
+          assert.equal(await readSelectValue(zoom), '1.5', '窄窗口仍可调整缩放')
           records.push({ template: template.key, controls, hints })
         }
         await writeFile(

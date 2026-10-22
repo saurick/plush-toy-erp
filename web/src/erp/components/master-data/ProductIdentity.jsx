@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
+import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { listProductImageReferences } from '../../api/attachmentApi.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
@@ -36,8 +37,8 @@ function ProductPicture({ productID, name, code, read, preview }) {
           .then((id) => {
             if (active) setImage({ id, state: 'empty' })
           })
-          .catch(() => {
-            if (active) setImage({ id: 0, state: 'failed' })
+          .catch((error) => {
+            if (active) setImage({ id: 0, state: Number(error?.code) === RpcErrorCode.PERMISSION_DENIED ? 'denied' : 'failed' })
           })
       },
       { rootMargin: '120px' }
@@ -78,7 +79,7 @@ function ProductPicture({ productID, name, code, read, preview }) {
           aria-label={`重试${name || '产品'}图片`}
           title="图片加载失败，点击重试"
           onDoubleClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}
           onClick={(event) => {
             event.stopPropagation()
             setImage({ id: 0, state: 'loading' })
@@ -113,7 +114,7 @@ export function ProductThumbnail({ productId, name, code, preview = true }) {
     />
   ) : (
     <span className="erp-product-identity__picture">
-      <WorkflowTaskProductImage item={{ name }} preview={preview} />
+      <WorkflowTaskProductImage item={{ kind: 'product', productID, name }} preview={preview} />
     </span>
   )
 }
@@ -125,10 +126,11 @@ export default function ProductIdentity({
   children,
   compact = false,
   preview = true,
+  className = '',
 }) {
   return (
     <span
-      className={`erp-product-identity${compact ? ' erp-product-identity--compact' : ''}`}
+      className={`erp-product-identity${compact ? ' erp-product-identity--compact' : ''}${className ? ` ${className}` : ''}`}
     >
       <ProductThumbnail
         productId={productId}

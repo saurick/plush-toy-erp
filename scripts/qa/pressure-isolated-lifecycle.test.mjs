@@ -53,6 +53,27 @@ test("candidate source copies from a temporary checkout without including local 
     assert.notEqual(pressureBuildSourceFingerprint(source), fingerprint);
   }
 });
+test("local database role credentials are neither copied nor part of build identity", (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "plush-pressure-local-roles-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const source = path.join(directory, "server"), snapshot = path.join(directory, "snapshot");
+  mkdirSync(path.join(source, "configs", "dev"), { recursive: true });
+  const publicConfig = path.join(source, "configs", "dev", "roles.json");
+  writeFileSync(publicConfig, '{"roles":["app"]}\n');
+  const fingerprint = pressureBuildSourceFingerprint(source);
+  const localCredentials = path.join(source, "configs", "dev", "database-roles.local.json");
+  writeFileSync(localCredentials, '{"password":"synthetic-first"}\n');
+  assert.equal(pressureBuildSourceFingerprint(source), fingerprint);
+  writeFileSync(localCredentials, '{"password":"synthetic-rotated"}\n');
+  assert.equal(pressureBuildSourceFingerprint(source), fingerprint);
+  copyPressureBuildSource(source, snapshot);
+  assert.equal(existsSync(path.join(snapshot, "configs", "dev", "database-roles.local.json")), false);
+  assert.equal(pressureBuildSourceFingerprint(snapshot), fingerprint);
+  assert.equal(readFileSync(path.join(snapshot, "configs", "dev", "roles.json"), "utf8"), readFileSync(publicConfig, "utf8"));
+  writeFileSync(publicConfig, '{"roles":["app","migrator"]}\n');
+  assert.notEqual(pressureBuildSourceFingerprint(source), fingerprint);
+});
+
 test("public progress keeps fixed phases, bounded counts and cleanup separate from business acceptance", () => {
   let progress = updatePressureProgress(null, { step: "build", status: "started", secret: "private" });
   progress = updatePressureProgress(progress, { step: "build", status: "completed" });

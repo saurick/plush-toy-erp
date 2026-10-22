@@ -251,7 +251,125 @@ export function createDevWorkbenchDesktopScenarios({
           qualityToolCount
         )
       }
+      if (item.route === '/__dev/business-chain-audit') {
+        const batch = 'ui-controls-fixture'
+        let batches = []
+        const chains = ['采购', '出货'].map((label, index) => ({
+          key: `fixture_${index}`,
+          label: `${label}测试链`,
+          summary: `${label}模拟读回`,
+          status: 'failed',
+          stepCount: 1,
+          scenarios: [],
+          evidence: [],
+          steps: [{
+            key: `step_${index}`,
+            number: 1,
+            label: `${label}步骤`,
+            responsibleRole: '测试岗位',
+            status: 'failed',
+            level: '页面夹具',
+            observed: '测试未通过',
+            fromLabel: '准备',
+            toLabel: '读回',
+            preconditions: [],
+            actions: [],
+            results: [],
+            facts: [],
+          }],
+        }))
+        const data = {
+          batch,
+          files: [],
+          freshness: 'historical',
+          definitionComparison: { status: 'unverified', chains: [] },
+          currentRepository: { commit: 'b'.repeat(40), dirty: true },
+          report: {
+            generatedAt: '2026-10-22T03:00:00Z',
+            verdict: '模拟失败用于验证筛选',
+            scope: {
+              sourceCommit: 'a'.repeat(40), customer: 'demo', data: '页面夹具',
+              mode: 'fixture', terminal: '读回', notIncluded: ['真实业务'],
+              chainCount: 2, stepCount: 2, registeredScenarioCount: 0,
+            },
+            metrics: { stepStates: { failed: 2 } },
+            chains,
+            lineage: [],
+            findings: [],
+            coverageLimits: ['仅证明页面操作'],
+          },
+        }
+        await page.route('**/__dev/api/qa/business-chain-audit**', (route) => route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            new URL(route.request().url()).pathname.endsWith('/report') ? data : { batches }
+          ),
+        }))
+        await page.reload()
+        await page.getByText('尚无链路实跑报告。将完整批次及证据清单放入本地报告目录后重新读取。', { exact: true }).waitFor()
+        assert.equal(await page.getByRole('combobox', { name: '实跑批次' }).count(), 0)
+        assert.equal(await page.getByRole('tab', { name: '链路结果', exact: true }).count(), 0)
+        batches = [{ id: batch, status: 'valid' }]
+        await page.getByRole('button', { name: '重新读取', exact: true }).click()
+        await page.getByRole('heading', { name: '本批次链路与结果', exact: true }).waitFor()
+        assert.equal(await page.getByRole('combobox', { name: '实跑批次' }).count(), 0, '只有一个批次时无需选择')
+        assert.equal(await page.getByRole('combobox', { name: '筛选链路' }).count(), 0)
+        await page.getByRole('button', { name: '采购测试链', exact: true }).click()
+        await page.getByRole('cell', { name: '采购步骤', exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('chain'), 'fixture_0')
+        const stepTable = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: '实际操作与读回', exact: true }) })
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor({ state: 'hidden' })
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1)
+        await page.reload()
+        await page.getByRole('button', { name: '全部链路', exact: true }).click()
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2)
+        await page.setViewportSize({ width: 1100, height: 800 })
+        await assertNoHorizontalOverflow(page, '链路唯一选择入口与窄窗口')
+      }
       if (item.route === DEV_TESTING_ROUTE) {
+        const primaryNav = page.locator('.erp-dev-testing-primary-nav')
+        const validation = page.getByRole('region', { name: '本轮验证固定动作' })
+        await validation.waitFor()
+        assert.equal(await validation.getByRole('row').count(), 5)
+        assert.equal(await validation.getByRole('columnheader').count(), 3)
+        const fieldTrigger = validation.getByRole('button', { name: '查看字段联动专项详情', exact: true })
+        const fieldDetails = validation.locator('#testing-action-field-linkage-details')
+        assert.equal(await fieldTrigger.getAttribute('aria-expanded'), 'false')
+        await fieldTrigger.click()
+        await fieldDetails.getByText('字段来源、覆盖、清空、回显与打印。', { exact: true }).waitFor()
+        await fieldDetails.getByText('不连接数据库、不启动真实业务浏览器，也不代替端到端验收。', { exact: true }).waitFor()
+        const detailCell = await fieldDetails.locator('..').boundingBox()
+        const actionTable = await validation.getByRole('table').boundingBox()
+        assert(detailCell.width > actionTable.width * 0.95, '检查详情应使用整行宽度，避免挤在名称列')
+        await fieldTrigger.click()
+        assert.equal(await page.locator('.erp-dev-testing-disclosure').count(), 0, '默认执行页不堆放教程折叠区')
+        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', 3)
+        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', 0, true)
+        await primaryNav.getByRole('tab', { name: '使用指引', exact: true }).click()
+        const guideNav = page.getByRole('tablist', { name: '测试指引主题' })
+        await guideNav.getByRole('tab', { name: '真机回归', exact: true }).click()
+        await page.getByRole('table', { name: '真机回归场景范围', exact: true }).waitFor()
+        assert.equal(await page.getByRole('table', { name: '自动化测试方式', exact: true }).count(), 0)
+        await page.reload()
+        await guideNav.getByRole('tab', { name: '真机回归', exact: true, selected: true }).waitFor()
+        await guideNav.getByRole('tab', { name: '常用命令', exact: true }).click()
+        await page.locator('.erp-dev-testing-presets article').first().waitFor()
+        const totalPresets = await page.locator('.erp-dev-testing-presets article').count()
+        const presetSearch = page.getByPlaceholder('搜索常用检查')
+        await presetSearch.fill('没有这种检查xyz')
+        await page.getByText('没有匹配的常用检查', { exact: true }).waitFor()
+        await presetSearch.fill('字段')
+        await page.getByText('没有匹配的常用检查', { exact: true }).waitFor({ state: 'hidden' })
+        const presets = page.locator('.erp-dev-testing-presets')
+        assert((await presets.locator('article').count()) > 0)
+        assert((await presets.locator('article').count()) < totalPresets)
+        await presets.locator('summary').first().click()
+        await presets.locator('pre').first().waitFor({ state: 'visible' })
+        await assertNoHorizontalOverflow(page, '测试使用指引与命令详情')
+        await presetSearch.fill('')
+        await primaryNav.getByRole('tab', { name: '本轮验证', exact: true }).click()
         const counts = {
           status: 'passed',
           total: 1,
@@ -431,9 +549,12 @@ export function createDevWorkbenchDesktopScenarios({
           1,
           true
         )
-        await coverage
-          .getByText('隔离源码快照', { exact: true })
-          .waitFor({ state: 'visible' })
+        const reportDetails = coverage.locator('.erp-dev-testing-coverage-report-details')
+        await reportDetails.locator('summary').click()
+        await reportDetails.locator('.erp-dev-testing-coverage-identity').waitFor({ state: 'visible' })
+        assert.match(await reportDetails.innerText(), /历史隔离验证/u)
+        await reportDetails.getByText(snapshot.repository.fingerprint, { exact: true }).waitFor()
+        await reportDetails.locator('summary').click()
         const readsBeforeTabs = { workspaceReads, snapshotReads }
         await switchEvidence('业务场景')
         assert.equal(
@@ -457,9 +578,7 @@ export function createDevWorkbenchDesktopScenarios({
         const business = coverage
           .locator('.erp-dev-testing-coverage-card')
           .filter({ hasText: '业务来源' })
-        await business
-          .locator('.erp-dev-testing-coverage-scenarios > summary')
-          .click()
+        assert.equal(await business.locator('.erp-dev-testing-coverage-scenarios > summary').count(), 0, '选中业务域后直接显示场景，避免二次展开')
         await business.getByRole('checkbox', { name: '仅看未通过场景' }).check()
         await business
           .getByText('没有未通过场景。', { exact: true })
@@ -480,18 +599,18 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(new URL(page.url()).searchParams.get('coverage'), 'rules')
         await switchEvidence('验证门禁', true)
         await coverage
-          .getByText('本轮 T0-T8 门禁 / Required Gates', { exact: true })
+          .getByRole('region', { name: '验证门禁', exact: true })
           .waitFor()
         await switchEvidence('运行与验收')
         assert((await coverage.innerText()).includes('RPC 夹具只证明页面协作'))
         await page.goBack()
         await coverage
-          .getByText('本轮 T0-T8 门禁 / Required Gates', { exact: true })
+          .getByRole('region', { name: '验证门禁', exact: true })
           .waitFor()
         assert.equal(new URL(page.url()).searchParams.get('coverage'), 'gates')
         await page.goForward()
         await coverage
-          .getByText('运行态与验收 / Runtime & Acceptance', { exact: true })
+          .getByRole('region', { name: '运行与验收', exact: true })
           .waitFor()
         await evidenceTab('运行与验收').press('Home')
         await coverage.getByText('文件监听资源不足', { exact: true }).waitFor()
@@ -510,30 +629,24 @@ export function createDevWorkbenchDesktopScenarios({
         await page.reload()
         await coverage.getByText('当前工作区尚未验证', { exact: true }).waitFor()
         await source.getByText('历史隔离验证', { exact: true }).click()
-        await coverage.getByText('隔离源码快照', { exact: true }).waitFor()
+        await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()
         await domainTable.waitFor()
         assert.equal(
           new URL(page.url()).searchParams.get('coverage'),
           'business'
         )
-        const domainPicker = coverage.getByRole('combobox', {
-          name: '查看业务域',
-        })
-        await domainPicker.focus()
-        await domainPicker.press('ArrowDown')
-        await page.locator('.ant-select-dropdown [title="采购"]').click()
+        assert.equal(await coverage.getByRole('combobox', { name: '查看业务域' }).count(), 0)
+        await domainTable.getByRole('button', { name: '查看 采购 场景与证据', exact: true }).click()
         const procurement = coverage
           .locator('.erp-dev-testing-coverage-card')
           .filter({ hasText: '采购' })
-        await procurement
-          .locator('.erp-dev-testing-coverage-scenarios > summary')
-          .click()
+        await procurement.getByRole('checkbox', { name: '仅看未通过场景' }).waitFor()
         await coverage
           .getByText('按供应商生成采购结果', { exact: true })
           .waitFor()
         await evidenceTab('业务场景').press('End')
         await coverage
-          .getByText('运行态与验收 / Runtime & Acceptance', { exact: true })
+          .getByRole('region', { name: '运行与验收', exact: true })
           .waitFor()
         await assertNoHorizontalOverflow(page, '覆盖证据五类标签与业务域详情')
         const finalBox = await source.boundingBox()
@@ -554,7 +667,7 @@ export function createDevWorkbenchDesktopScenarios({
           .getByRole('button', { name: '重新读取', exact: true })
           .click()
         await coverage
-          .getByText('隔离源码快照', { exact: true })
+          .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
         snapshotStatus = 'missing'
         await coverage.getByRole('button', { name: '重新读取', exact: true }).click()
@@ -562,7 +675,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(await coverage.getByText('当前工作区尚未验证', { exact: true }).count(), 0)
         snapshotStatus = 'snapshot'
         await coverage.getByRole('button', { name: '重新读取', exact: true }).click()
-        await coverage.getByText('隔离源码快照', { exact: true }).waitFor()
+        await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()
         workspaceStatus = 'network-error'
         await Promise.all([
           page.waitForResponse((response) =>
@@ -573,7 +686,7 @@ export function createDevWorkbenchDesktopScenarios({
             .click(),
         ])
         await coverage
-          .getByText('隔离源码快照', { exact: true })
+          .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
         await source.getByText('当前工作区', { exact: true }).click()
         await coverage
@@ -588,7 +701,7 @@ export function createDevWorkbenchDesktopScenarios({
           .waitFor({ state: 'visible' })
         await source.getByText('历史隔离验证', { exact: true }).click()
         await coverage
-          .getByText('隔离源码快照', { exact: true })
+          .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
         const postponedReady = new Promise((resolve) => {
           markPostponedReady = resolve
@@ -608,7 +721,7 @@ export function createDevWorkbenchDesktopScenarios({
         await coverage.getByText('当前工作区尚未验证', { exact: true }).waitFor()
         await source.getByText('历史隔离验证', { exact: true }).click()
         await coverage
-          .getByText('隔离源码快照', { exact: true })
+          .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
         await reply(postponedResponse.route, {
           status: 'failed',
@@ -627,10 +740,10 @@ export function createDevWorkbenchDesktopScenarios({
           '迟到的旧报告不得覆盖新读取'
         )
         await coverage
-          .getByText('隔离源码快照', { exact: true })
+          .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
-        await mainViews.getByText('本轮验证', { exact: true }).click()
-        await page.locator('.erp-dev-testing-disclosure--tools > summary').click()
+        await mainViews.getByText('使用指引', { exact: true }).click()
+        await page.getByRole('tab', { name: '常用命令', exact: true }).click()
         await page
           .getByRole('button', { name: '查专项命令', exact: true })
           .click()
@@ -774,9 +887,28 @@ export function createDevWorkbenchDesktopScenarios({
         await page.reload()
         await page.waitForFunction(() => document.querySelectorAll('.erp-dev-product-core-filters .erp-filter-chip')[1]?.getAttribute('aria-pressed') === 'true')
         assert.equal(await filters.nth(1).getAttribute('aria-pressed'), 'true')
-        assert((await page.locator('.erp-dev-product-core-table tbody tr').evaluateAll((rows) => rows.every((row) => row.dataset.membership === 'entered'))), '筛选与返回必须保持同一能力范围')
+        assert((await page.locator('.erp-dev-product-core-group').evaluateAll((groups) => groups.every((group) => group.dataset.membership === 'entered'))), '筛选与返回必须保持同一能力范围')
+        assert.equal(await page.getByRole('dialog').count(), 0, '默认能力目录不同时铺开详情')
+        const capability = page.locator('.erp-dev-product-core-group button').nth(2)
+        const name = await capability.innerText()
+        await capability.click()
+        assert.equal(new URL(page.url()).searchParams.get('capability'), name)
+        await page.getByRole('dialog', { name, exact: true }).waitFor()
+        await page.reload()
+        const detail = page.getByRole('dialog', { name, exact: true })
+        await detail.waitFor()
+        await detail.getByRole('heading', { name: '当前边界', exact: true }).waitFor()
+        await detail.getByRole('button', { name: '返回能力目录', exact: true }).click()
+        await detail.waitFor({ state: 'hidden' })
+        assert.equal(new URL(page.url()).searchParams.get('status'), 'entered')
+        assert.equal(new URL(page.url()).searchParams.has('capability'), false)
+        const catalogFits = await page.locator('.erp-dev-product-core-groups').evaluate((element) => element.scrollWidth <= element.clientWidth + 1)
+        assert(catalogFits, '能力目录不依赖横向滚动')
       }
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
+        const visibleTools = await page.locator('.erp-dev-product-tools a').evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort())
+        const registeredTools = DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === 'product-engineering' && entry.showInNavigation !== false).map((entry) => entry.route).sort()
+        assert.deepEqual(visibleTools, registeredTools, '按用途分组后全部常驻工具仍各有一个入口')
         await verifyProjectGraphDirectory(page, { assert, assertNoHorizontalOverflow })
       }
       if (item.route === DEV_INTEGRATION_ROUTE) {

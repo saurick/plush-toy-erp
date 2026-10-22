@@ -188,7 +188,7 @@ func TestFinanceBusinessSourceRPCMissingPurchaseReceipt(t *testing.T) {
 	_, result, err := dispatcher.handleOperationalFact(workflowJSONRPCAdminContext(), "create_payable_from_purchase_receipt", "missing-source", mustJSONRPCStruct(t, map[string]any{
 		"customer_key": biz.DefaultCustomerKey, "fact_no": "AP-MISSING", "purchase_receipt_id": float64(2147483647), "idempotency_key": "AP-MISSING",
 	}))
-	if err != nil || result == nil || result.Code != errcode.InvalidParam.Code || result.Message != "采购入库单不存在" {
+	if err != nil || result == nil || result.Code != errcode.ResourceNotFound.Code || result.Message != "采购入库单不存在" {
 		t.Fatalf("missing purchase source result=%#v err=%v", result, err)
 	}
 	if repo.createFinanceFactCalls != 0 {

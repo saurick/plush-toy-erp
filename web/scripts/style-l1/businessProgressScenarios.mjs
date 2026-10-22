@@ -1,6 +1,6 @@
-import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
@@ -22,7 +22,7 @@ export function createBusinessProgressScenarios({
 }) {
   const make = (
     name,
-    { dark = false, failed = false, restricted = false, mobile = false } = {}
+    { dark = false, failed = false, restricted = false, narrow = false } = {}
   ) => {
     let failNext = failed
     const calls = []
@@ -31,10 +31,10 @@ export function createBusinessProgressScenarios({
       path: '/erp/business-dashboard',
       auth: 'admin',
       themeMode: dark ? 'dark' : 'light',
-      viewport: mobile
+      viewport: narrow
         ? { width: 390, height: 844 }
         : { width: 1440, height: 900 },
-      deviceScaleFactor: mobile ? 3 : 3840 / 1440,
+      deviceScaleFactor: narrow ? 3 : 3840 / 1440,
       effectiveSession: {
         ...customerRuntimeEffectiveSession,
         actions: [
@@ -44,11 +44,35 @@ export function createBusinessProgressScenarios({
           'pmc.plan.read',
           'production.wip.read',
           'workflow.task.read',
+          'product.read',
         ],
       },
       beforeNavigate: async (page) => {
         failNext = failed
         calls.length = 0
+        const productImage = await page.evaluate(() => {
+          const canvas = document.createElement('canvas')
+          canvas.width = 128
+          canvas.height = 128
+          const context = canvas.getContext('2d')
+          context.fillStyle = '#edf4ee'
+          context.fillRect(0, 0, 128, 128)
+          context.fillStyle = '#81a48b'
+          context.beginPath()
+          context.arc(64, 64, 40, 0, Math.PI * 2)
+          context.fill()
+          return canvas.toDataURL('image/png').split(',')[1]
+        })
+        await page.route('**/rpc/attachment', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (!['list_product_image_references', 'download_attachment'].includes(method)) return route.fallback()
+          const data = method === 'list_product_image_references' ? {
+            images: (params.product_ids || []).map((productID) => ({ product_id: productID, image_attachment_id: productID === 9 ? 0 : 880000 + productID })),
+          } : {
+            attachment: { id: Number(params.id), owner_type: 'product', owner_id: Number(params.id) - 880000, mime_type: 'image/png', content_base64: productImage },
+          }
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: '', data } } })
+        })
         await page.route('**/rpc/business', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           if (!['list_progress', 'get_progress'].includes(method)) {
@@ -74,6 +98,7 @@ export function createBusinessProgressScenarios({
           if (!restricted) {
             const rows = data.rows || [data.row]
             for (const row of rows) {
+              if (row.id === 5) Object.assign(row, { customer: '', product: '', sales_owner: '' })
               if (row.id === 2) {
                 Object.assign(row, {
                   attention_task: 'engineering_data',
@@ -110,10 +135,21 @@ export function createBusinessProgressScenarios({
         }
         await progressCard('SO-0001').waitFor()
         assert.equal(await board.locator('.erp-progress-summary').count(), 0)
-        assert.equal(await board.locator('.erp-progress-list img').count(), 0)
+        const firstImage = board.locator('.erp-progress-row').first().locator('.erp-product-identity img')
+        await firstImage.waitFor()
+        await page.waitForFunction(() => {
+          const image = document.querySelector('.erp-progress-row .erp-product-identity img')
+          return image?.complete && image.naturalWidth > 0
+        })
+        assert.equal(await board.locator('.erp-progress-identity-cell button button').count(), 0, '产品图片和进度入口不嵌套按钮')
+        await board.locator('.erp-progress-row').first().getByRole('button', { name: /查看.+大图/ }).click()
+        await page.getByRole('button', { name: '关闭图片预览', exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.has('selected'), false, '点图只预览图片，不打开完整进度')
+        await page.keyboard.press('Escape')
+        await page.getByRole('button', { name: '关闭图片预览', exact: true }).waitFor({ state: 'hidden' })
         const density = await board.locator('.erp-progress-row').evaluateAll((rows) => rows.slice(0, 4).map((row) => ({ height: row.getBoundingClientRect().height, overflow: row.scrollWidth - row.clientWidth })))
         assert(density.every((row) => row.overflow <= 1), JSON.stringify(density))
-        if (!mobile) assert(density.every((row) => row.height < 135), JSON.stringify(density))
+        if (!narrow) assert(density.every((row) => row.height < 135), JSON.stringify(density))
         await assertNoHorizontalOverflow(page, name)
         await page.screenshot({ path: path.join(outputDir, `${name}-overview.png`) })
         if (restricted) {
@@ -130,7 +166,10 @@ export function createBusinessProgressScenarios({
           return
         }
         await board.getByText('面料交期尚未确认', { exact: true }).waitFor()
-        await board.getByText('采购待领取', { exact: false }).first().waitFor()
+        await board.getByText('采购 · 办理人未提供', { exact: false }).first().waitFor()
+        const missing = board.locator('.erp-progress-row').filter({ hasText: 'SO-0005' })
+        for (const label of ['产品名称未填写', '未定交期', '业务负责人未提供']) await missing.getByText(label, { exact: true }).waitFor()
+        assert.match(await missing.locator('.erp-progress-customer').innerText(), /^客户未填写/u)
         await board.getByText('工程资料', { exact: true }).waitFor()
         assert.equal(await board.getByText('engineering_data', { exact: true }).count(), 0)
         const listReadCount = calls.filter((call) => call.method === 'list_progress').length
@@ -225,7 +264,7 @@ export function createBusinessProgressScenarios({
         await board.getByRole('button', { name: /^筛选进度/ }).click()
         await page.getByPlaceholder('输入姓名').waitFor()
         await assertNoHorizontalOverflow(page, `${name}-filters-open`)
-        if (mobile) {
+        if (narrow) {
           await page.getByRole('button', { name: '自定义交期日期', exact: true }).click()
           const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
           await dates.waitFor()
@@ -268,6 +307,6 @@ export function createBusinessProgressScenarios({
     make('erp-business-dashboard-workflow-unavailable-desktop', {
       restricted: true,
     }),
-    make('erp-business-dashboard-mobile', { mobile: true }),
+    make('erp-business-dashboard-narrow', { narrow: true }),
   ]
 }

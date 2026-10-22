@@ -1,3 +1,4 @@
+import { findVisibleBusinessPage } from '../businessNavigation.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import {
@@ -1135,17 +1136,7 @@ export function createBusinessFormPagesScenarios(deps) {
       effectiveSession: deps.customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        const openModule = async (label) => {
-          await page.locator('.erp-module-catalog-trigger:visible').click()
-          const catalog = page.getByRole('dialog', {
-            name: '全部模块',
-            exact: true,
-          })
-          await catalog.waitFor({ state: 'visible' })
-          await catalog
-            .getByRole('button', { name: label, exact: true })
-            .click()
-        }
+        const openModule = async (label) => (await findVisibleBusinessPage(page, label)).click()
         await openModule('物料清单（BOM）')
         await page.getByRole('button', { name: '新建 BOM' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
@@ -1154,7 +1145,7 @@ export function createBusinessFormPagesScenarios(deps) {
         await page
           .getByRole('button', { name: '继续编辑', exact: true })
           .click()
-        await openModule('材料档案')
+        await page.locator('.erp-admin-sider .erp-admin-menu').getByRole('menuitem', { name: '基础资料', exact: true }).click()
         await page
           .getByRole('button', { name: '继续编辑', exact: true })
           .click()

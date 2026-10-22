@@ -1,3 +1,5 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
+import { openUIDesignAppearance } from './devUIDesignNavigation.mjs'
 import assert from 'node:assert/strict'
 
 async function observeSlidingNav(
@@ -382,9 +384,7 @@ export function createPermissionUnifiedScenarios({
           await page.getByRole('button', { name: /全屏预览/ }).click()
         }
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame
-          .getByRole('button', { name: '外观设置', exact: true })
-          .click()
+        await openUIDesignAppearance(frame)
         await frame
           .locator(`[data-action="set-mode"][data-value="${themeMode}"]`)
           .click()
@@ -396,15 +396,7 @@ export function createPermissionUnifiedScenarios({
           .locator('.modal-foot')
           .getByRole('button', { name: '关闭', exact: true })
           .click()
-        if (themeMode === 'dark') {
-          await frame.locator('[data-action="open-nav"]').click()
-        }
-        await frame
-          .getByRole('button', { name: '全部模块', exact: true })
-          .click()
-        await frame
-          .locator('[data-action="catalog-nav"][data-page="permissions"]')
-          .click()
+        await frame.locator('#sidebar [data-action="nav"][data-page="permissions"]').click()
         await frame
           .locator('[data-action="permission-role"][data-value="finance"]')
           .click()
@@ -415,9 +407,8 @@ export function createPermissionUnifiedScenarios({
         assert.equal(await frame.getByRole('combobox', { name: '岗位导航排列方式' }).count(), 0)
         assert.equal(await frame.getByRole('button', { name: '保存岗位设置', exact: true }).isDisabled(), true)
         await frame.getByRole('tab', { name: '页面访问', exact: true }).click()
-        await frame
-          .getByRole('combobox', { name: '筛选业务模块' })
-          .selectOption('财务管理')
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '筛选业务模块' }), '财务管理')
         assert.equal(
           await frame
             .locator(
@@ -1178,12 +1169,7 @@ export function createPermissionUnifiedScenarios({
         // Measure the product at this viewport, without the surrounding workbench.
         await page.getByRole('button', { name: /全屏预览/ }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame
-          .getByRole('button', { name: '全部模块', exact: true })
-          .click()
-        await frame
-          .locator('[data-action="catalog-nav"][data-page="permissions"]')
-          .click()
+        await frame.locator('#sidebar [data-action="nav"][data-page="permissions"]').click()
         const geometry = await frame
           .locator('.permission-groups')
           .evaluate((node) => {
@@ -1241,7 +1227,7 @@ export function createPermissionUnifiedScenarios({
         const scopeMode = scopeDialog.getByRole('combobox', {
           name: '仓库范围模式',
         })
-        await scopeMode.selectOption('warehouses')
+        await chooseSelectOption(scopeMode, 'warehouses')
         await scopeDialog
           .getByRole('checkbox', { name: '原料仓', exact: true })
           .check()
@@ -1258,7 +1244,7 @@ export function createPermissionUnifiedScenarios({
             .isChecked(),
           true
         )
-        await scopeMode.selectOption('all')
+        await chooseSelectOption(scopeMode, 'all')
         assert.equal(await frame.locator('#permission-scope-value').count(), 0)
         await scopeDialog
           .locator('.modal-foot')
@@ -1294,12 +1280,7 @@ export function createPermissionUnifiedScenarios({
       viewport: { width: 1486, height: 1000 },
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame
-          .getByRole('button', { name: '全部模块', exact: true })
-          .click()
-        await frame
-          .locator('[data-action="catalog-nav"][data-page="permissions"]')
-          .click()
+        await frame.locator('#sidebar [data-action="nav"][data-page="permissions"]').click()
         const tabs = frame.getByRole('tablist', {
           name: '权限管理',
           exact: true,
@@ -1415,12 +1396,12 @@ export function createPermissionUnifiedScenarios({
         const scopeMode = scopeDialog.getByRole('combobox', {
           name: '仓库范围模式',
         })
-        await scopeMode.selectOption('all')
+        await chooseSelectOption(scopeMode, 'all')
         assert.equal(
           await scopeDialog.locator('#permission-scope-value').count(),
           0
         )
-        await scopeMode.selectOption('warehouses')
+        await chooseSelectOption(scopeMode, 'warehouses')
         await scopeDialog
           .getByRole('alert')
           .getByText('请选择至少一个允许的仓库', { exact: true })

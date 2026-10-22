@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import { runInNewContext } from 'node:vm'
 import standardUnits from '../../../../server/internal/unitpolicy/units.json' with { type: 'json' }
 import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCatalog.mjs'
 import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
@@ -15,8 +16,11 @@ import {
   DEV_UI_DESIGN_ROUTE,
   UI_DESIGN_ASSET,
   UI_DESIGN_DIRECTORY,
+  UI_DESIGN_PREVIEW_PAGES,
   prepareUIDesignSandboxSource,
+  resolveUIDesignPreviewPage,
 } from './devUIDesign.mjs'
+import { DEV_WORKSPACE_NAV_ITEMS, getDevSecondaryNavItems } from './devRoutes.mjs'
 import {
   filterUIDesignEntries,
   findUIDesignChapter,
@@ -427,16 +431,12 @@ test('empty or headless design inputs keep sandbox initialization deterministic'
   assert.ok(html.indexOf('createMemoryStorage') < html.indexOf('<title>'))
 })
 
-test('business, task handling, mobile, help, login and workbench use the same isolated design asset', () => {
+test('every documented preview entry uses the same isolated design asset', () => {
   const source = '<html><head></head><body></body></html>'
-  for (const entry of [
-    'workspace',
-    'task-handling',
-    'mobile-tasks',
-    'login',
-    'help',
-    'workbench',
-  ]) {
+  const documented = [...read(`${UI_DESIGN_DIRECTORY}/README.md`).matchAll(/\/__dev\/ui-design\?page=([\w-]+)/gu)]
+    .map((match) => match[1]).filter((entry) => entry !== 'controls')
+  for (const entry of documented) assert.equal(resolveUIDesignPreviewPage(entry), entry)
+  for (const { value: entry } of UI_DESIGN_PREVIEW_PAGES) {
     const prepared = prepareUIDesignSandboxSource(source, { page: entry })
     assert.ok(prepared.includes(`window.__ERP_UI_DESIGN_ENTRY__ = "${entry}"`))
     assert.match(prepared, /connect-src 'none'/)
@@ -446,6 +446,40 @@ test('business, task handling, mobile, help, login and workbench use the same is
   })
   assert.ok(prepared.includes('window.__ERP_UI_DESIGN_ENTRY__ = "workspace"'))
   assert.doesNotMatch(prepared, /unexpected/)
+})
+
+test('production preview opens the same module as the ERP design navigation', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const initialPage = html.match(/page: (.*?), status: 'all'/u)?.[1]
+  assert.ok(initialPage)
+  assert.equal(runInNewContext(initialPage, {
+    window: { __ERP_UI_DESIGN_ENTRY__: 'production-hub' },
+    taskHandlingPreview: false,
+  }), 'production-hub')
+  assert.equal(resolveUIDesignPreviewPage('controls'), 'workspace')
+  assert.equal(resolveUIDesignPreviewPage(undefined), 'workspace')
+})
+
+test('workbench design navigation matches the formal area and visible tool order', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const definitions = html.slice(html.indexOf('    const devDesignAreas ='), html.indexOf('    let devInlineObserved='))
+  const actual = JSON.parse(runInNewContext(`${definitions}\nJSON.stringify(Object.keys(devDesignAreas).map(key => ({label: devDesignAreas[key].label, tools: devDesignNavigationRows(key).map(row => row.title)})))`))
+  assert.deepEqual(actual, DEV_WORKSPACE_NAV_ITEMS.map((area) => ({
+    label: area.label,
+    tools: getDevSecondaryNavItems(area.key).map((item) => item.label),
+  })))
+})
+
+test('preview document identity follows its entry and reset without accepting injected revisions', () => {
+  const source = '<html><head></head><body></body></html>'
+  const identity = (options) => prepareUIDesignSandboxSource(source, options)
+    .match(/window\.__ERP_UI_DESIGN_PREVIEW_ID__ = ("[^"]+")/u)?.[1]
+  assert.equal(identity({ page: 'help' }), '"help-0"')
+  assert.equal(identity({ page: 'help', revision: 1 }), '"help-1"')
+  assert.equal(identity({ page: 'login', revision: 1 }), '"login-1"')
+  for (const revision of [-1, NaN, Infinity, '</script>', 0.5]) {
+    assert.equal(identity({ page: 'help', revision }), '"help-0"')
+  }
 })
 
 test('design does not reach the formal ERP routes or production import graph', () => {

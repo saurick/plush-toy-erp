@@ -162,6 +162,26 @@ async function assertDevPageUsesGlobalThemeOnly(
   await assertNoHorizontalOverflow(page, `${scenarioName}-theme`)
 }
 
+export async function openERPAppearance(page) {
+  if (await page.locator('.erp-admin-shell').count()) {
+    const desktop = page.getByTestId('desktop-account-menu-trigger')
+    const drawer = page.getByTestId('drawer-account-menu-trigger')
+    if (await desktop.isVisible()) {
+      await desktop.click()
+    } else {
+      if (!(await drawer.isVisible())) {
+        await page.getByRole('button', { name: '打开导航菜单', exact: true }).click()
+      }
+      await drawer.click()
+    }
+    await page.getByRole('menuitem', { name: '外观与密度', exact: true }).click()
+    return (await desktop.isVisible()) ? desktop : drawer
+  }
+  const trigger = page.getByRole('button', { name: /^外观(?:与密度|设置)$/, exact: true })
+  await trigger.click()
+  return trigger
+}
+
 async function clickERPThemeOption(page, label) {
   const expectedModeByLabel = {
     跟系统: 'system',
@@ -173,16 +193,7 @@ async function clickERPThemeOption(page, label) {
   if ((await inlineSettings.count()) > 0) {
     await inlineSettings.getByText(label, { exact: true }).click()
   } else {
-    const appearanceTrigger = page.getByRole('button', {
-      name: /^外观(?:与密度|设置)$/,
-      exact: true,
-    })
-    assert.equal(
-      await appearanceTrigger.count(),
-      1,
-      `外观入口数量异常，无法切换到 ${label}`
-    )
-    await appearanceTrigger.click()
+    await openERPAppearance(page)
     const dialog = page.getByRole('dialog', { name: /^外观(?:与密度|设置)$/ })
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     await dialog.getByText(label, { exact: true }).click()

@@ -129,15 +129,26 @@ revision,
       },
       verify: async (page) => {
         const switcher = '[aria-label="待办显示方式"]'
+        const verifyLayout = async (layout) => {
+          if (!mobile) return
+          const button = page.getByRole('button', { name: layout === 'calendar' ? '切换到列表' : '切换到日历', exact: true })
+          await button.waitFor()
+          assert.equal(await button.getAttribute('aria-pressed'), String(layout === 'calendar'), '日历按钮的选中状态与当前内容一致')
+          assert.equal(await button.locator('svg').getAttribute('data-icon'), layout === 'calendar' ? 'calendar' : 'unordered-list', '图标表示当前视图')
+          assert.equal(await page.getByRole('region', { name: '待办日历', exact: true }).count(), layout === 'calendar' ? 1 : 0)
+          assert.equal(new URL(page.url()).searchParams.get('layout'), layout === 'calendar' ? 'calendar' : null)
+        }
         if (mobile) await page.getByRole('button', { name: '切换到日历', exact: true }).waitFor()
         else await page.locator(switcher).waitFor()
         assert.equal(await page.getByRole('region', { name: '待办日历', exact: true }).count(), 0)
+        await verifyLayout('list')
         const initial = { started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = initial
         if (mobile) await page.getByRole('button', { name: '切换到日历', exact: true }).click()
         else await verifyMobileNavigationMotion(page, assert, switcher, 1)
         const calendar = page.getByRole('region', { name: '待办日历', exact: true })
         await initial.started.promise
+        await verifyLayout('calendar')
         try {
           assert.equal(await calendar.locator('.workflow-task-calendar__count').count(), 0, 'initial load leaves unavailable counts blank')
           await calendar.locator('.ant-spin-spinning').waitFor()
@@ -243,9 +254,47 @@ revision,
         tasks[0].task_status_key = 'done'
         await page.evaluate((event) => window.dispatchEvent(new Event(event)), WORKFLOW_TASKS_CHANGED)
         await calendar.locator(`button[data-date="${today}"]`).getByText('64 项', { exact: true }).waitFor()
+        const refreshSuccess = page.getByRole('status').filter({ hasText: '待办日历已刷新' })
+        assert.equal(await refreshSuccess.count(), 0, 'initial loads, date changes and automatic updates do not announce manual refresh success')
         tasks[0].task_status_key = 'ready'
-        await calendar.getByRole('button', { name: '刷新待办日历', exact: true }).click()
+        const refreshButton = calendar.getByRole('button', { name: '刷新待办日历', exact: true })
+        const refreshing = { started: Promise.withResolvers(), release: Promise.withResolvers() }
+        heldNext = refreshing
+        await refreshButton.click()
+        await refreshing.started.promise
+        try {
+          assert.equal(await refreshButton.isDisabled(), true, 'refresh stays disabled for the whole request')
+          assert.equal(await refreshButton.getAttribute('aria-busy'), 'true')
+          await refreshButton.locator('.anticon-loading').waitFor()
+          assert.equal(await refreshSuccess.count(), 0, 'success is not shown before the response')
+          assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30, 'refresh retains the current agenda')
+        } finally {
+          refreshing.release.resolve()
+        }
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
+        await refreshSuccess.waitFor()
+        assert.equal(await refreshSuccess.count(), 1)
+        assert.equal(await refreshButton.isEnabled(), true)
+        await page.waitForFunction(() => {
+          const notice = [...document.querySelectorAll('[role="status"]')].find((node) => node.textContent === '待办日历已刷新')
+          if (!notice) return false
+          for (let node = notice; node; node = node.parentElement) {
+            if (Number(getComputedStyle(node).opacity) < 0.99) return false
+          }
+          return true
+        })
+        await page.screenshot({ path: path.join(outputDir, `${name}-refresh-success.png`), fullPage: false })
+        failNext = true
+        await refreshButton.click()
+        const refreshFailure = page.locator('.ant-message-error [role="alert"]')
+        await refreshFailure.waitFor()
+        await calendar.getByRole('alert').waitFor()
+        assert.equal(await refreshFailure.textContent(), await calendar.locator('.ant-alert-message').textContent(), 'refresh failure has one consistent error explanation')
+        assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30, 'a failed refresh retains loaded tasks')
+        assert.equal(await refreshButton.isEnabled(), true, 'a failed refresh can be retried')
+        await refreshButton.click()
+        await refreshSuccess.waitFor()
+        await calendar.getByRole('alert').waitFor({ state: 'hidden' })
         if (mobile) {
           await page.getByTestId('mobile-task-list-filter-trigger').click()
           const filters = page.getByRole('dialog', { name: '筛选任务', exact: true })
@@ -263,6 +312,8 @@ revision,
         }
         await selectBucket('undated')
         await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
+        await calendar.locator('.erp-task-timing').getByText('未设置截止', { exact: true }).waitFor()
+        assert.equal(await calendar.locator('.erp-task-timing time').count(), 0)
         await calendar.locator('.erp-task-card__open').click()
         if (mobile) {
           await page.getByTestId('mobile-task-detail-screen').waitFor()
@@ -275,6 +326,7 @@ revision,
         else await calendar.getByRole('button', { name: /^未设置截止/, pressed: true }).waitFor()
         await page.reload()
         await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
+        await verifyLayout('calendar')
         await selectBucket('overdue')
         await calendar.getByText('上月尚未处理的跟进', { exact: true }).waitFor()
         if (mobile) {
@@ -335,7 +387,11 @@ revision,
         if (mobile) {
           await page.getByTestId('mobile-role-scroll').evaluate((node) => node.scrollTo({ top: 0 }))
           await page.getByRole('button', { name: '切换到列表', exact: true }).click()
+          await verifyLayout('list')
+          await page.reload()
+          await verifyLayout('list')
           await page.getByRole('button', { name: '切换到日历', exact: true }).click()
+          await verifyLayout('calendar')
         } else {
           await page.locator(switcher).scrollIntoViewIfNeeded()
           await verifyMobileNavigationMotion(page, assert, switcher, 0, true)

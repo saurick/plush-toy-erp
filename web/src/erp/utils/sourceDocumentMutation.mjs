@@ -1,5 +1,7 @@
+import { RpcErrorCode } from '../../common/consts/errorCodes.js'
+
 export function isResourceVersionConflict(error) {
-  return Number(error?.code || 0) === 40922
+  return Number(error?.code || 0) === RpcErrorCode.RESOURCE_VERSION_CONFLICT
 }
 
 export function isMutationResultUnknown(error) {

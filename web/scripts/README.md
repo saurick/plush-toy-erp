@@ -4,17 +4,19 @@
 
 ## 脚本分类
 
-| 类型 | 入口 | 用途 | 边界 |
-| --- | --- | --- | --- |
-| 源码单元与合同测试 | `pnpm test` / `runUnitTests.mjs` | 自动发现源码测试；覆盖率采集复用同一入口 | 发现范围、产物隔离和筛选见[源码测试](#源码测试--unit-tests) |
-| 样式边界检查 | `pnpm css` / `stylelint/` | 在现有 Stylelint 中检查模块作用域和共享控件样式归属；同目录行为测试由 `pnpm test` 自动发现 | 规则与职责见[共享控件样式边界](../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)，浏览器仍需验证实际层叠结果 |
-| 页面级浏览器回归（Style L1） | `pnpm style:l1` / `styleL1.mjs` / `style-l1/` | 启动前端并用 Playwright 覆盖登录、业务页、暗色、打印、移动端和局部页面交互 | 默认使用 mock / 前端态验证；失败要先分清页面回归、mock wiring 和浏览器基础设施问题 |
-| 真实登录 smoke | `realLoginSmokeShared.mjs --print-input-template` / `--preflight-report <path>`、`mobileAuthLoginRouteSmoke.mjs --print-input-template` / `--preflight-report <path>`、`purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` / `--preflight-report <path>`、`pnpm smoke:purchase-contract-real-login`、`pnpm smoke:processing-contract-real-login`、`pnpm smoke:mobile-auth-login-route` | 先打印共享登录、移动端认证回跳或采购入库真实写入前置，再验证合同编辑联动、在线预览、下载 PDF、浏览器打印入口、岗位任务端入口和认证回跳 | 输入模板不读配置、不调后端、不启动浏览器、不登录、不写库；shared preflight 只探测 backend health 和凭据来源候选；mobile-auth preflight 只写本地角色路由 / 视口计划；采购入库 preflight 只探测 health、显式管理员凭据 env、持久测试数据确认和页面目标安全性；合同 smoke 依赖本地后端和开发账号，验证预览 / 下载 / 打印入口但不替代 PDF 版式坐标审阅、RBAC / usecase 单测或目标环境 evidence；mobile-auth route smoke 使用 mock RPC 验证生产单端口岗位路由 |
-| 移动端 Workflow smoke | `pnpm smoke:mobile-workflow-runtime-browser` / `mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template` / `mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report <path>` | 创建 `simulated_only` workflow 任务，用真实浏览器验证 任务列表进入详情页查看 / 处理 / 可信回执、完成反馈校验、阻塞 / 退回 / 完成、跨角色催办及返回列表状态恢复 | 输入模板不登录、不调用后端、不启动浏览器、不写库；preflight 只探测 health、前置缺口和模拟任务动作计划 coverage；真实 smoke 只写本地 / 试用模拟 workflow 证据，不能替代真实岗位账号视觉验收、目标环境 smoke 或客户 UAT |
-| 真实写入 e2e | `purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` / `--preflight-report <path>` / `pnpm smoke:purchase-receipt-real-write` | 先打印持久测试数据确认和真实写入前置，再写 no-write 前置报告，最后准备采购入库测试草稿并通过浏览器过账和取消模拟单据 | 输入模板和 preflight 不启动浏览器、不调 JSON-RPC、不写库；真实命令会写本地 / 开发库模拟采购入库事实，只能按脚本显式参数和 README 边界执行，禁止跑生产或客户正式环境 |
-| 本地服务 | `pnpm start`、`pnpm start:frontend-only`、`pnpm start:yoyoosun`、`pnpm audit:yoyoosun-entry`、`pnpm serve:prod`、`pnpm preview:yoyoosun` | 默认前端入口、永绅 yoyoosun 热更新开发、端口审计和静态包预览 | `pnpm start` 与 `start:yoyoosun` 启动 Vite 前共用 schema / migration / backend health / ready 只读预检；已分类的本机可恢复阻断只开放迁移页，其它路径 fail closed。`start:frontend-only` 是不验证登录 / RPC 的显式降级模式；`start:yoyoosun` 另检查永绅静态客户配置与公开资源；`preview:yoyoosun` 构建并预览生产包形态；`audit:yoyoosun-entry` 只读检查端口归属、customer-config、asset 和 health。所有开发入口都不 apply migration，不 publish / activate 后端 customer config |
-| QA 报告生成 | `buildFieldLinkageCoverageReport.mjs` | 由顶层 `scripts/qa/erp-field-linkage.mjs` runner 调用，生成字段联动结构化证据到 ignored `output/qa/coverage/field-linkage.latest.json` | 要求 runner 传入当前 repository identity；只证明字段联动专项，不写 `public/qa`、不进入生产构建，也不等于整仓代码、业务场景、目标环境或 UAT 覆盖 |
-| 公共契约源码检查 | `test/publicContractSource.mjs` | 将真实生成模块的静态成员解析为源码合同测试的公开值，覆盖状态、权限、RPC、附件、数值与密码 / 打印限制 | 不执行页面代码，不改写源码；测试继续保留独立的预期值，规范见[跨层公共契约](../../docs/engineering/跨层公共契约与生成规范.md) |
+先按任务选择入口，再阅读对应的执行和写入边界。
+
+| 任务 | 主要入口 | 说明 |
+| --- | --- | --- |
+| 源码单元与合同测试 | `pnpm test` / `runUnitTests.mjs` | [自动发现、筛选与覆盖率](#源码测试--unit-tests) |
+| 样式边界检查 | `pnpm css` / `stylelint/` | [共享控件样式边界](../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)；实际层叠仍须浏览器核对 |
+| 页面级浏览器回归（Style L1） | `pnpm style:l1` / `style-l1/` | [场景组织](#style-l1-场景组织)；默认 mock / 前端态，失败区分页面、mock wiring 与浏览器基础设施 |
+| 合同登录与移动认证 | `smoke:purchase-contract-real-login` / `smoke:processing-contract-real-login` / `smoke:mobile-auth-login-route` | [输入预检和执行边界](#写入和输出边界) |
+| 移动端 Workflow | `smoke:mobile-workflow-runtime-browser` | [任务动作与模拟证据](#执行范围与真实写入) |
+| 采购入库真实写入 | `smoke:purchase-receipt-real-write` | [持久测试数据、过账和取消边界](#执行范围与真实写入) |
+| 本地服务和客户预览 | `pnpm start` / `start:frontend-only` / `start:yoyoosun` / `audit:yoyoosun-entry` / `serve:prod` / `preview:yoyoosun` | [本地启动](#本地启动与进程范围)与[客户前端](#客户前端调试与预览) |
+| 字段联动报告 | `buildFieldLinkageCoverageReport.mjs` | [报告身份和输出范围](#报告与公共契约) |
+| 公共契约源码检查 | `test/publicContractSource.mjs` | [公开值读取与独立预期](#报告与公共契约) |
 
 ## 源码测试 / Unit Tests
 
@@ -56,36 +58,79 @@ pnpm preview:yoyoosun --print-plan
 pnpm preview:yoyoosun
 ```
 
-`STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
+`STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。
 
-`STYLE_L1_BROWSER=chromium|webkit` 选择浏览器引擎，默认 `chromium`，结果 JSON 标记实际引擎。宽度不超过 600px 的场景默认启用移动设备和触摸模拟，可由场景显式覆盖。WebKit 首次运行前执行 `pnpm exec playwright install webkit`；剪贴板场景使用既有受控探针，不能据此确认 iPhone 系统剪贴板权限。共享下拉刷新和图片多指处理在 Chromium 使用原生 CDP 触摸，在 WebKit 使用 DOM 事件验证处理逻辑；报告的 `gestureDriver` 分别标记 `chromium-native-cdp` / `webkit-dom-touch-events`。`mobile-task-touch-refresh` 另有原生滚动、手势竞争与取消断言，只能在 Chromium 运行，WebKit 选择场景时须排除它。WebKit 桌面引擎的移动模拟不替代 iPhone Safari / Chrome 真机、软键盘、浏览器工具栏或系统文件选择器验收；两种引擎的报告分别使用不同输出目录。
+默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
+
+`STYLE_L1_BROWSER=chromium|webkit` 选择浏览器引擎，默认 `chromium`，结果 JSON 标记实际引擎。宽度不超过 600px 的场景默认启用移动设备和触摸模拟，可由场景显式覆盖。WebKit 首次运行前执行 `pnpm exec playwright install webkit`；剪贴板场景使用既有受控探针，不能据此确认 iPhone 系统剪贴板权限。
+
+共享下拉刷新和图片多指处理在 Chromium 使用原生 CDP 触摸，在 WebKit 使用 DOM 事件验证处理逻辑；报告的 `gestureDriver` 分别标记 `chromium-native-cdp` / `webkit-dom-touch-events`。
+
+`mobile-task-touch-refresh` 另有原生滚动、手势竞争与取消断言，只能在 Chromium 运行，WebKit 选择场景时须排除它。WebKit 桌面引擎的移动模拟不替代 iPhone Safari / Chrome 真机、软键盘、浏览器工具栏或系统文件选择器验收；两种引擎的报告分别使用不同输出目录。
 
 `mobile-input-controls-light` / `mobile-input-controls-dark` 通过现有 fixture 入口加载真实移动任务处理组件和样式，拦截流程上下文读取，验证多行输入、聚焦字号、必填提示、批准数量的六位小数和可选清空、错误后的焦点与提示关联、动作切换，以及缩小视口后的提交区。fixture 的提交仅写组件本地状态，不写业务数据库；缩小视口的结果不能替代 iPhone 软键盘实测。
 
-受管前端脚本的默认辅助端口按用途分开：共享真实登录 `15210`、采购合同 `15211`、委外合同 `15212`、采购入库 E2E `15213`、移动认证 `15220`、试用浏览器 `15230`、移动 Workflow `15240`，CI Browser 三条隔离 lane 使用 `15250`、`15251`、`15252`。`start:yoyoosun` 固定使用 `15200`，可用 `--port` 指定辅助块内其他固定端口；`preview:yoyoosun` 从 `15200` 起探测，但不会越过 `15299`。所有 Vite 入口的统一配置会拒绝主前端 `5175`、样式 `6175` 和本项目辅助块之外的受管监听端口。
+受管前端脚本的默认辅助端口按用途分开：共享真实登录 `15210`、采购合同 `15211`、委外合同 `15212`、采购入库 E2E `15213`、移动认证 `15220`、试用浏览器 `15230`、移动 Workflow `15240`，CI Browser 三条隔离 lane 使用 `15250`、`15251`、`15252`。
+
+`start:yoyoosun` 固定使用 `15200`，可用 `--port` 指定辅助块内其他固定端口；`preview:yoyoosun` 从 `15200` 起探测，但不会越过 `15299`。所有 Vite 入口的统一配置会拒绝主前端 `5175`、样式 `6175` 和本项目辅助块之外的受管监听端口。
 
 ## 写入和输出边界
 
-- `style:l1` 默认输出浏览器截图、日志和报告到 `web/output/playwright/style-l1/`，不纳入 git；CI 三条 Browser lane 分别写入仓库 `output/` 下按 pipeline/job/lane 隔离的受管目录，取消、超时、成功或失败都按已验证进程组清理浏览器、Vite、端口、lock 与临时目录。
-- `realLoginSmokeShared.mjs --print-input-template` 只打印真实登录 smoke 所需输入和命令模板，不读取本地配置、不校验账号、不调用后端、不启动浏览器、不登录、不写数据库。
-- `realLoginSmokeShared.mjs --preflight-report <path>` 只写本地前置报告，探测后端 health 和管理员凭据来源候选是否存在；不读取 config 内容、不读取密码值、不校验账号、不调用 auth JSON-RPC、不启动 Vite / Playwright、不登录、不写数据库，报告不保存密码、token 或 Authorization header。
-- `mobileAuthLoginRouteSmoke.mjs --print-input-template` 只打印移动端认证回跳 smoke 所需输入、岗位任务端角色和命令模板，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。
-- `mobileAuthLoginRouteSmoke.mjs --preflight-report <path>` 只写本地前置报告，记录脚本是否存在、岗位任务端角色路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径；不启动 Vite / Playwright、不调用后端 / JSON-RPC、不读取密码、不登录、不保存 token 或 Authorization header、不写数据库，也不证明真实 RBAC / customer config active revision。
-- 真实 `smoke:mobile-auth-login-route` 使用 mock auth / workflow RPC 验证 `/m/<role>/tasks` 生产单端口路由、phone/iPad 布局和登录回跳。
-- `mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report <path>` 只写本地前置检查报告，记录后端 health 是否可达、是否存在演示密码 env、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，以及模拟任务动作计划是否覆盖老板阻塞 / 完成 / 退回、跨角色催办、reason 必填、完成反馈、阻塞 / 退回原因事件、动作页不出现证据输入、新动作不生成 evidence refs 和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，报告不保存 token 或 Authorization header。
-- `purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` 只打印采购入库页面真实写入 e2e 所需输入、持久测试数据确认、`PR-BROWSER-*` 记录边界和后续真实命令，不读取本地配置、不校验账号、不调用后端、不启动 Vite、不启动 Playwright、不登录、不写数据库。
-- `purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report <path>` 只写本地前置检查报告，记录后端 health 是否可达、显式管理员账号密码 env 是否齐全、是否已确认持久测试数据、页面目标是否为本机或已显式允许外部测试目标；不读取本地配置、不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建或过账采购入库单、不写数据库，报告不保存 token 或 Authorization header。
-- 真实登录 smoke 可能读取本地开发配置中的管理员账号，也可能通过环境变量覆盖账号密码；不要把账号、token 或截图里的敏感信息提交。
-- 真实登录 smoke 的 `REAL_LOGIN_SMOKE_BASE_URL` 和 `REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL` 不得包含 URL 账号密码；账号密码只能走显式环境变量或本地开发配置读取。
-- `smoke:purchase-receipt-real-write` 会用采购入库 RPC 准备带 `PR-BROWSER-*` 前缀的模拟草稿，再到入库管理页完成过账和取消；收尾口径是取消冲正并保留可追踪记录，不物理删除已过账单据。入库管理页本身不提供页面级“新建入库单”，真实业务草稿从采购订单“生成入库”入口产生。
-- `start:yoyoosun` 默认固定使用 `15200`；同配置进程已占用时复用，旧配置、旧代码或没有实例摘要的本工作区 Vite 在归属核验后自动停止并重新启动，其他程序或工作区的占用明确报错。同配置也需要重新启动时使用 `pnpm restart:yoyoosun`。它复用同一 runtime preflight，再检查 `config/customers/yoyoosun/customer-config.example.js` 和 `public-assets/`，通过 dev-only middleware 提供 `/customer-config.js`、`/customer-assets/yoyoosun/*`；客户工程图和来源资料不会公开提供。它保留 HMR，不构建生产包，不调用 `customer_config.validate / publish / activate / rollback`，不写数据库。同 key `builtin_rbac_fallback` 只允许进入带警示的 DEV 桌面预览壳，不升级为 active customer runtime；工作台 / 任务看板不发出 Workflow RPC，客户业务数据页和岗位任务端仍 fail closed。静态包通过不代表后端 active revision 已就绪。
+本目录脚本遵循后端 RBAC、schema、migration、Workflow / Fact usecase 和客户配置边界。前置报告只证明输入是否就绪，不是实际执行或验收结果。
+
+### 输入模板与前置报告
+
+`realLoginSmokeShared.mjs`、`mobileAuthLoginRouteSmoke.mjs`、`mobileWorkflowRuntimeBrowserSmoke.mjs` 和 `purchaseReceiptRealWriteBrowserE2E.mjs` 均提供 `--print-input-template` 与 `--preflight-report <path>`。
+
+输入模板只打印所需输入和后续命令，不读取本地配置、不校验账号、不调用后端、不启动 Vite / Playwright、不登录、不写数据库。采购入库模板额外说明持久测试数据确认和 `PR-BROWSER-*` 记录；移动认证模板列出岗位任务端角色。
+
+前置报告只写本地文件，不读取密码值或 config 内容，不校验账号、不调用 auth / 业务 JSON-RPC、不启动 Vite / Playwright、不登录、不写数据库，也不保存密码、token 或 Authorization header。各自允许的探测如下：
+
+| 脚本 | 前置报告内容 |
+| --- | --- |
+| `realLoginSmokeShared.mjs` | backend health、管理员凭据来源候选是否存在 |
+| `mobileAuthLoginRouteSmoke.mjs` | 脚本是否存在、角色路由、phone / iPad 视口和 mock RPC 计划；不访问真实后端，不证明 RBAC 或 active revision |
+| `mobileWorkflowRuntimeBrowserSmoke.mjs` | backend health、演示密码 env 是否存在、是否托管 Vite、试用 customer-config 脚本及模拟任务动作计划 |
+| `purchaseReceiptRealWriteBrowserE2E.mjs` | backend health、显式管理员凭据 env、持久测试数据确认，以及页面是否为本机或显式允许的外部测试目标 |
+
+Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reason 必填、完成反馈与原因事件，以及动作页不出现证据输入、新动作不生成 evidence refs 和内部 `notification_type` 线索。预检不会创建任务。
+
+### 执行范围与真实写入
+
+- 合同真实登录 smoke 依赖本地后端和开发账号，验证合同编辑联动、在线预览、PDF 下载和浏览器打印入口；它不替代 PDF 坐标审阅、RBAC / usecase 单测或目标环境 evidence。
+- `smoke:mobile-auth-login-route` 使用 mock auth / workflow RPC，验证 `/m/<role>/tasks` 生产单端口路由、phone / iPad 布局与登录回跳。
+- `smoke:mobile-workflow-runtime-browser` 创建普通字段的模拟 Workflow 任务，验证列表进入详情、处理与可信回执、完成反馈、阻塞 / 退回 / 完成、跨角色催办和返回列表状态恢复。它只写本地 / 试用模拟 Workflow 证据，不替代真实岗位视觉验收、目标环境 smoke 或客户 UAT。
+- `smoke:purchase-receipt-real-write` 先用采购入库 RPC 准备 `PR-BROWSER-*` 模拟草稿，再从入库管理页过账和取消。真实命令只用于显式确认的本地 / 开发库，禁止生产或客户正式环境；收尾保留取消冲正和追踪记录，不物理删除已过账单据。真实业务草稿来自采购订单“生成入库”，入库管理页不提供页面级新建。
+
+真实登录 smoke 可从本地开发配置或环境变量读取管理员凭据。`REAL_LOGIN_SMOKE_BASE_URL` 和 `REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL` 不得含 URL 账号密码；账号、token 和截图敏感信息不得提交。
+
+### 报告与公共契约
+
+`style:l1` 默认写入 ignored `web/output/playwright/style-l1/`；CI 三条 Browser lane 按 pipeline/job/lane 隔离到仓库 `output/`。取消、超时、成功或失败均按已验证进程组清理浏览器、Vite、端口、lock 和临时目录。
+
+`buildFieldLinkageCoverageReport.mjs` 由顶层 `scripts/qa/erp-field-linkage.mjs` runner 调用，要求当前 repository identity，写入 ignored `output/qa/coverage/field-linkage.latest.json`。报告只证明字段联动专项，不写 `public/qa`、不进入生产构建，也不证明整仓、目标环境或 UAT 覆盖。
+
+`test/publicContractSource.mjs` 静态读取生成模块的公开状态、权限、RPC、附件、数值与密码 / 打印限制，不执行页面或改写源码。测试保留独立预期值，遵循[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md)。
+
+### 客户入口与只读审计
+
+- `start:yoyoosun` 默认固定使用 `15200`；同配置进程已占用时复用，旧配置、旧代码或没有实例摘要的本工作区 Vite 在归属核验后自动停止并重新启动，其他程序或工作区的占用明确报错。同配置也需要重新启动时使用 `pnpm restart:yoyoosun`。
+
+  它复用同一 runtime preflight，再检查 `config/customers/yoyoosun/customer-config.example.js` 和 `public-assets/`，通过 dev-only middleware 提供 `/customer-config.js`、`/customer-assets/yoyoosun/*`；客户工程图和来源资料不会公开提供。
+
+  它保留 HMR，不构建生产包，不调用 `customer_config.validate / publish / activate / rollback`，不写数据库。
+
+  同 key `builtin_rbac_fallback` 只允许进入带警示的 DEV 桌面预览壳，不升级为 active customer runtime；工作台 / 任务看板不发出 Workflow RPC，客户业务数据页和岗位任务端仍 fail closed。静态包通过不代表后端 active revision 已就绪。
 - 两个 yoyoosun 入口的 `--print-plan` 都会按计划端口输出 `verify customer config` 和 `verify customer asset` 两条 `curl` 命令；客户开发入口的计划端口固定，静态预览入口会探测可用端口。验证通过只证明当前前端端口注入了 yoyoosun 静态配置和资产，不证明后端 active revision、真实 RBAC、真实登录或 release evidence 已完成。
-- `audit:yoyoosun-entry` 默认只读检查主开发保留区 `5175-5179` 与本项目辅助块起点附近 `15200-15204`，汇总每个端口的监听进程 cwd / 命令、`/customer-config.js` 分类、yoyoosun favicon content-type 和 `8300/healthz`。它不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写报告、不写数据库；使用 `pnpm --silent audit:yoyoosun-entry -- --json` 可输出机器可读的本地诊断结果，仍不证明后端 active revision、真实 RBAC、真实登录或 release evidence。
-- 本目录脚本不能绕过后端 RBAC、schema、migration、Workflow / Fact usecase 或客户配置边界。
+- `audit:yoyoosun-entry` 默认只读检查主开发保留区 `5175-5179` 与本项目辅助块起点附近 `15200-15204`，汇总每个端口的监听进程 cwd / 命令、`/customer-config.js` 分类、yoyoosun favicon content-type 和 `8300/healthz`。
+
+  它不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写报告、不写数据库；使用 `pnpm --silent audit:yoyoosun-entry -- --json` 可输出机器可读的本地诊断结果，仍不证明后端 active revision、真实 RBAC、真实登录或 release evidence。
 
 ## 维护规则
 
-`startWebDev.mjs` 管理固定主入口、Codex / `--isolated` 辅助端口和重复启动；`devWebInstance.mjs` 校验实例配置摘要与显式重启的进程归属，`viteParentLifetime.mjs` 通过 IPC 处理启动器异常退出。`start:yoyoosun` 复用同一 Vite 子进程生命周期。日常 `pnpm start`、安全重启 `pnpm start:restart` 与临时验证 `pnpm start:isolated` 的完整约定见 [`web/README.md`](../README.md#启动命令)。实例摘要不包含路径或凭据，不承担业务健康或发布证据语义。
+`startWebDev.mjs` 管理固定主入口、Codex / `--isolated` 辅助端口和重复启动；`devWebInstance.mjs` 校验实例配置摘要与显式重启的进程归属，`viteParentLifetime.mjs` 通过 IPC 处理启动器异常退出。`start:yoyoosun` 复用同一 Vite 子进程生命周期。
+
+日常 `pnpm start`、安全重启 `pnpm start:restart` 与临时验证 `pnpm start:isolated` 的完整约定见 [`web/README.md`](../README.md#启动命令)。实例摘要不包含路径或凭据，不承担业务健康或发布证据语义。
 
 前端启动日志复用仓库 `terminal-log.mjs`：访问地址使用青色加粗，预检通过和已验证服务复用使用绿色，迁移恢复或仅前端模式的复用提示使用黄色，启动错误使用红色加粗。非终端输出、设置 `NO_COLOR`、`FORCE_COLOR=0` 或 `TERM=dumb` 时保留纯文本，`--print-plan` 保留原有计划格式。
 
@@ -98,7 +143,9 @@ pnpm preview:yoyoosun
 
 ## Style L1 场景组织
 
-`style-l1/scenarios.mjs` 只组合场景工厂和共享输入。登录、客户权限、工作台、移动任务、权限中心、打印和业务表单分别位于同目录对应的 `*Scenarios.mjs`。物料明细、色卡和作业指导书编辑各有独立的 `*InteractionScenario.mjs`，按命名交互步骤调用断言，每个场景使用自己的页面和 PDF 请求记录。场景名称、顺序与请求计数的生命周期保持独立；通过 `STYLE_L1_SCENARIOS` 选择受影响场景，完整运行遵循 QA 的高成本授权规则。
+`style-l1/scenarios.mjs` 只组合场景工厂和共享输入。登录、客户权限、工作台、移动任务、权限中心、打印和业务表单分别位于同目录对应的 `*Scenarios.mjs`。物料明细、色卡和作业指导书编辑各有独立的 `*InteractionScenario.mjs`，按命名交互步骤调用断言，每个场景使用自己的页面和 PDF 请求记录。
+
+场景名称、顺序与请求计数的生命周期保持独立；通过 `STYLE_L1_SCENARIOS` 选择受影响场景，完整运行遵循 QA 的高成本授权规则。
 
 `businessFormalScenarios.mjs` 组合主数据、订单、库存、生产、出货及附件恢复的领域场景；共享断言位于 `businessFormalAssertions.mjs`。跨业务页的 `businessCorePagesScenarios.mjs` 按固定顺序调用各领域的 `businessCore*Checks.mjs`，请求记录与局部夹具归对应检查持有，保留场景名称、顺序、分页及权限断言。
 
@@ -106,7 +153,9 @@ pnpm preview:yoyoosun
 
 `printWorkspaceGroupScenarios.mjs` 覆盖采购、加工与采购批量窗口的自定义分组新增、双向改名、调序、删除、空组恢复及全部删空后的刷新恢复，并核对名称留白、条目留白、纸面顺序导航、长名称换行和批量隔离。输出请求与打印入口同样使用受控探针；真实 PDF 服务、下载落盘及打印页面内容另行验证。
 
-帮助目录的岗位范围由 `help-manual-role-filter-desktop-light` 覆盖，包括切岗搜索、深链恢复和手机章节选择；全部模块的搜索、权限与内部深链边界由 `moduleCatalogScenarios.mjs` 覆盖。移动导航在短屏下实际滚动菜单后核对底部入口位置，再恢复标准手机视口检查目录尺寸与跳转；导航与岗位预期按[菜单与正式入口合同](../../docs/product/菜单与正式入口合同.md)和当前配置维护。
+帮助目录的岗位范围由 `help-manual-role-filter-desktop-light` 覆盖，包括切岗搜索、深链恢复和手机章节选择；侧栏、模块页签、账号底部和权限边界由 `sidebarNavigationScenarios.mjs` 覆盖，试用浏览器流程通过 `businessNavigation.mjs` 沿真实导航逐页核对获准页面。
+
+移动导航在短屏下实际滚动菜单后核对底部账号位置，再恢复标准手机视口检查模块与页签跳转；导航与岗位预期按[菜单与正式入口合同](../../docs/product/菜单与正式入口合同.md)和当前配置维护。
 
 `test/reactRuntime.mjs` 为 Node 组件与 hook 行为测试提供 JSX 加载和可恢复的 DOM 环境。`createReactTestHarness(t)` 统一管理 React root、当前事件循环的刷新及测试后的卸载和环境恢复；完整页面布局、焦点几何和浏览器交互由对应 Style L1 场景验证。这些 helper 不进入产品运行时。
 
@@ -116,9 +165,15 @@ happy-dom 的文本框 computed style 会将 `none` / `hidden` 边框宽度保�
 
 `information-density-desktop`、`information-density-mobile-390`、`information-density-mobile-320` 和 `information-density-business-desktop` 使用相同隔离样例核对任务来源、责任与截止、记录、办理返回及详情/表单展示，并输出带区域名称的截图。该组不写真实业务数据；前后比较应使用固定源码快照、同一场景和相同视口/DPR，帮助展开与错误状态分别核对。
 
-`global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
+`global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。
 
-`global-scroll-edges-surfaces-light` / `global-scroll-edges-surfaces-dark` 通过 `test/ScrollEdgesFixture.jsx` 检查共享滚动提示的双轴边界、固定列、动态内容、缩放与嵌套裁切、弹窗／抽屉、排除区域、卸载恢复、打印和减少动态效果。`global-scroll-edges-table-desktop` / `-dark` / `-short` / `-mobile` 复用实际出货列表及现有表格滚动回归，验证横纵滚动提示与表格导航共存；桌面截图为 `1920×1080`、DPR `2` 的原生 `3840×2160`。这些浏览器场景使用模拟 RPC 数据，不证明真实数据库、发布或客户验收。
+场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。
+
+可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
+
+`global-scroll-edges-surfaces-light` / `global-scroll-edges-surfaces-dark` 通过 `test/ScrollEdgesFixture.jsx` 检查共享滚动提示的双轴边界、固定列、动态内容、缩放与嵌套裁切、弹窗／抽屉、排除区域、卸载恢复、打印和减少动态效果。
+
+`global-scroll-edges-table-desktop` / `-dark` / `-short` / `-mobile` 复用实际出货列表及现有表格滚动回归，验证横纵滚动提示与表格导航共存；桌面截图为 `1920×1080`、DPR `2` 的原生 `3840×2160`。这些浏览器场景使用模拟 RPC 数据，不证明真实数据库、发布或客户验收。
 
 `dev-page-docs-desktop-light` 与 `inventory-visible-copy-desktop` 另在实际页面逐帧检查选中后不被旧 URL 拉回、指示条不反向、页签条持续挂载及位置和尺寸稳定，并覆盖深链、刷新和前进后退。库存窄屏切换由 `inventory-compact-header-dark-mobile` 覆盖；业务记录查询 hook 的同名测试检查有效与未启用视图及来源参数保留。这些检查使用模拟接口，不写业务数据。
 
@@ -136,11 +191,23 @@ pnpm start
 
 默认地址：`http://127.0.0.1:5175`。开发服务器会把 `http://localhost:5175` 自动规范到同一 IPv4 地址。
 
-本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供。人工终端的 `pnpm start` 固定使用 `5175`，通过同一预检后，若已有同一工作区、后端、客户配置、启动参数、开发服务代码和恢复状态的前端，会输出地址并成功退出，继续使用原服务。实例摘要覆盖 `web/dev-server`、Vite / 启动入口及迁移服务在进程内加载的共享脚本；文档、页面和测试变化不影响复用。其他程序、其他工作区、不同启动配置或旧服务代码的占用会明确阻断并提示重启，保持 `strictPort`，不会自动停止占用者或把主入口顺延。
+本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供。人工终端的 `pnpm start` 固定使用 `5175`，通过同一预检后，若已有同一工作区、后端、客户配置、启动参数、开发服务代码和恢复状态的前端，会输出地址并成功退出，继续使用原服务。
 
-需要重新加载主入口启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。客户辅助入口的 `pnpm start:yoyoosun` 会自动替换过期实例；`pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart` 也会重启同配置实例。两者都使用指定端口（默认 `15200`），不会顺延到新端口。入口先完成运行预检，客户入口还检查客户配置；随后通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间。macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描；Linux 使用 `lsof` 定位监听 PID 和工作目录。逐进程检查均有超时，仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。启动竞争失败后的实例查询只允许复用同配置赢家，不触发自动替换。
+实例摘要覆盖 `web/dev-server`、Vite / 启动入口及迁移服务在进程内加载的共享脚本；文档、页面和测试变化不影响复用。其他程序、其他工作区、不同启动配置或旧服务代码的占用会明确阻断并提示重启，保持 `strictPort`，不会自动停止占用者或把主入口顺延。
 
-日常主前端重启使用 `pnpm start:restart`，`pnpm restart` 具有相同的实际行为。人工启动、重启和复用已运行服务均使用下述浏览器页签策略，不因 `--restart` 一律禁开页。pnpm 原生会执行 stop / restart / start 生命周期，启动器仅让 restart 阶段执行完整重启，其前后两个阶段立即返回，防止重复停服或退出后再次启动。`pnpm stop` 停止主前端，`pnpm stop:yoyoosun` 停止客户辅助前端；指定辅助端口可执行 `pnpm start:yoyoosun --stop --port 15201`。停止入口仅检查端口、PID、工作目录、Vite 命令和启动时间，不运行数据库预检、读取客户包或启动后端；数据库故障不阻断停止前端。前端停止后后端仍独立管理，状态与停止命令见 [服务端入口](../../server/README.md#快速开始)。
+需要重新加载主入口启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。
+
+客户辅助入口的 `pnpm start:yoyoosun` 会自动替换过期实例；`pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart` 也会重启同配置实例。两者都使用指定端口（默认 `15200`），不会顺延到新端口。
+
+入口先完成运行预检，客户入口还检查客户配置；随后通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间。macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描；Linux 使用 `lsof` 定位监听 PID 和工作目录。逐进程检查均有超时，仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。
+
+启动竞争失败后的实例查询只允许复用同配置赢家，不触发自动替换。
+
+日常主前端重启使用 `pnpm start:restart`，`pnpm restart` 具有相同的实际行为。人工启动、重启和复用已运行服务均使用下述浏览器页签策略，不因 `--restart` 一律禁开页。pnpm 原生会执行 stop / restart / start 生命周期，启动器仅让 restart 阶段执行完整重启，其前后两个阶段立即返回，防止重复停服或退出后再次启动。
+
+`pnpm stop` 停止主前端，`pnpm stop:yoyoosun` 停止客户辅助前端；指定辅助端口可执行 `pnpm start:yoyoosun --stop --port 15201`。停止入口仅检查端口、PID、工作目录、Vite 命令和启动时间，不运行数据库预检、读取客户包或启动后端；数据库故障不阻断停止前端。
+
+前端停止后后端仍独立管理，状态与停止命令见 [服务端入口](../../server/README.md#快速开始)。
 
 修改迁移页服务端插件或上述启动代码后，交付前须在用户实际使用的端口显式重启并复验；页面热更新和辅助端口验证不会更新已运行进程中的 Node 模块。仅刷新浏览器不能加载这些服务端改动。
 
@@ -148,31 +215,55 @@ pnpm start
 
 主入口和客户辅助入口在每次迁移准备、执行或后端重启请求前，都会核对本进程加载时的开发服务代码摘要。代码已变化或无法读取时，拒绝动作并提示重新启动当前前端；仍允许查看状态和访问已验证的日常业务。Vite 配置热重载不能更新该摘要，必须重新启动前端进程。`make dev_restart` 只恢复后端，不会更新仍在运行的前端开发服务。
 
-Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人工临时验证可用 `pnpm start:isolated`。辅助端口只从 `15200-15299` 中选取，终端输出实际 URL，HMR 与监听端口同步；耗尽时阻断。启动器直接管理 Vite 子进程，通过信号和 IPC 在中断、终端关闭或启动器被强制结束后释放其监听端口；不会清理其他会话的服务。直接运行 Vite 时也会按 Codex 环境选择并固定辅助端口，生命周期由调用方管理。
+Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人工临时验证可用 `pnpm start:isolated`。辅助端口只从 `15200-15299` 中选取，终端输出实际 URL，HMR 与监听端口同步；耗尽时阻断。
+
+启动器直接管理 Vite 子进程，通过信号和 IPC 在中断、终端关闭或启动器被强制结束后释放其监听端口；不会清理其他会话的服务。直接运行 Vite 时也会按 Codex 环境选择并固定辅助端口，生命周期由调用方管理。
 
 明确需要固定辅助端口时，设置 `ERP_VITE_PORT`；显式端口优先于自动分配。只覆盖 Vite CLI 的 `--port` 会在启动期被拒绝，避免监听端口脱离启动器选定的端口。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
 
 HMR 默认跟随浏览器加载页面模块的协议、主机和端口，因此从服务器 IP、域名或转发端口访问时无需单独配置；端口转发或反向代理须同时转发 WebSocket upgrade。需要显式覆盖时可设置 `ERP_VITE_HMR_HOST` 和 `ERP_VITE_HMR_CLIENT_PORT`；显式客户端端口仍须与 `ERP_VITE_PORT` 一致。普通和客户开发启动器只固定监听端口，不自动注入 HMR 地址。
 
-Codex（`CODEX_THREAD_ID` / `CODEX_CI`）、CI、`NODE_ENV=test` 或 Node 测试进程启动 Vite 时，只输出服务地址，不自动打开系统浏览器；普通入口、客户入口和直接运行 Vite 共用此策略。该策略约束 CLI 与 inline config 合并后的开发和预览配置，显式 `--open` 也不能绕过自动化禁开页边界。测试启动器使用 `BROWSER=none`，不要用 `--open false` 关闭开页：Vite 会将 `false` 当作页面路径。需要实际页面验证时，由浏览器工具按会话创建和回收标签，不以系统自动开页代替。
+Codex（`CODEX_THREAD_ID` / `CODEX_CI`）、CI、`NODE_ENV=test` 或 Node 测试进程启动 Vite 时，只输出服务地址，不自动打开系统浏览器；普通入口、客户入口和直接运行 Vite 共用此策略。该策略约束 CLI 与 inline config 合并后的开发和预览配置，显式 `--open` 也不能绕过自动化禁开页边界。
 
-人工终端的 `pnpm start`、`pnpm start:restart` / `pnpm restart`、`pnpm start:frontend-only`、`pnpm start:isolated` 与客户启动 / 重启入口共用 `openDevBrowser.js`；复用已有服务进程时也会检查浏览器页签。macOS 检查已运行的 Chrome、Edge、Brave、Chromium、Vivaldi 与 Safari，以协议和实际端口精确匹配服务，`127.0.0.1` / `localhost` / `[::1]` 视为本机别名；命中后保留页面路径、查询、锚点及焦点，由 HMR 恢复连接，没有同服务页签才后台新开。页签读取失败时提示检查终端的浏览器自动化权限，保留服务，不以重复新开掩盖失败。直接运行 Vite 也加载同一入口。
+测试启动器使用 `BROWSER=none`，不要用 `--open false` 关闭开页：Vite 会将 `false` 当作页面路径。需要实际页面验证时，由浏览器工具按会话创建和回收标签，不以系统自动开页代替。
+
+人工终端的 `pnpm start`、`pnpm start:restart` / `pnpm restart`、`pnpm start:frontend-only`、`pnpm start:isolated` 与客户启动 / 重启入口共用 `openDevBrowser.js`；复用已有服务进程时也会检查浏览器页签。
+
+macOS 检查已运行的 Chrome、Edge、Brave、Chromium、Vivaldi 与 Safari，以协议和实际端口精确匹配服务，`127.0.0.1` / `localhost` / `[::1]` 视为本机别名；命中后保留页面路径、查询、锚点及焦点，由 HMR 恢复连接，没有同服务页签才后台新开。页签读取失败时提示检查终端的浏览器自动化权限，保留服务，不以重复新开掩盖失败。
+
+直接运行 Vite 也加载同一入口。
 
 Windows / WSL 保留已有 Chrome、Edge、Brave 的受管复用方式：仅检查属于本项目的候选标题，再精确核对本机地址和端口；命中时激活、刷新，未命中或 UI Automation 不可用时使用系统默认新页。原生 Linux 有桌面时使用平台默认浏览器，无图形桌面时只输出地址。显式 `BROWSER=none` 或自定义 `BROWSER` 优先；不输出已有页面内容、关闭历史重复标签或修改用户窗口布局。
 
-`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。受限模式保留 `/__dev/database-migration` 恢复页、固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status`；其它 DEV API 继续阻断。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
+`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。
+
+预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。
+
+受限模式保留 `/__dev/database-migration` 恢复页、固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status`；其它 DEV API 继续阻断。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。
+
+恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。
+
+如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
 普通业务页和开发工作台均从当前工作区加载，Vite 提供热更新；固定运行制品不会截获开发页面。后端代码通过 `make dev_restart` 按需构建并生效；无编译输入变化时复用制品，数据库迁移仍须“检查并准备 → 确认执行”。辅助端口只隔离前端监听，不产生第二个日常数据库。预检或构建失败时保留已有后端，但不会将其标成最新工作区代码。
 
-`pnpm start` 和客户热更新入口在数据库预检通过、登记的本地 HTTP 后端确实未监听时，自动执行一次 `make run ARGS=--source=frontend`，复用后端构建、运行身份和业务验证链路，并记录启动来源；通过完整预检后才开放电脑版和手机版。此构建阶段独立于 15 秒只读预检，最多等待 10 分钟并在终端显示进度。后端启动链路在共享锁内和构建后再次检查监听状态，保留并核对期间出现的后端；已运行后端不会因前端启动而重启。构建失败、启动后复验失败、预检超时和待迁移状态保留恢复页，不自动重试。停止命令、`--frontend-only`、外部或非登记 `API_ORIGIN` 不会启动共享后端。
+`pnpm start` 和客户热更新入口在数据库预检通过、登记的本地 HTTP 后端确实未监听时，自动执行一次 `make run ARGS=--source=frontend`，复用后端构建、运行身份和业务验证链路，并记录启动来源；通过完整预检后才开放电脑版和手机版。此构建阶段独立于 15 秒只读预检，最多等待 10 分钟并在终端显示进度。
 
-开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`。普通与客户开发入口（`pnpm start`、`pnpm start:yoyoosun`）共用凭据加载逻辑。macOS 未显式提供时读取固定钥匙串 service `plush-toy-erp.gitlab-read-api`，account 为当前登录用户名。Linux 读取当前服务用户的 `~/.config/plush-toy-erp/dev-gitlab-read-token`，也可用 `PLUSH_GITLAB_READ_TOKEN_FILE` 指定受控绝对路径；文件须属于当前用户、为普通文件、权限为 `0600` 或 `0400`，不得使用软链接。显式 `PLUSH_GITLAB_READ_TOKEN` 优先于两种存储来源，缺失时继续业务开发并明确显示读取未就绪。
+后端启动链路在共享锁内和构建后再次检查监听状态，保留并核对期间出现的后端；已运行后端不会因前端启动而重启。构建失败、启动后复验失败、预检超时和待迁移状态保留恢复页，不自动重试。停止命令、`--frontend-only`、外部或非登记 `API_ORIGIN` 不会启动共享后端。
+
+开发工作台读取 GitLab CI、不可变版本目录与流水线耗时证据时，使用独立的 `PLUSH_GITLAB_READ_TOKEN`。普通与客户开发入口（`pnpm start`、`pnpm start:yoyoosun`）共用凭据加载逻辑。macOS 未显式提供时读取固定钥匙串 service `plush-toy-erp.gitlab-read-api`，account 为当前登录用户名。
+
+Linux 读取当前服务用户的 `~/.config/plush-toy-erp/dev-gitlab-read-token`，也可用 `PLUSH_GITLAB_READ_TOKEN_FILE` 指定受控绝对路径；文件须属于当前用户、为普通文件、权限为 `0600` 或 `0400`，不得使用软链接。
+
+显式 `PLUSH_GITLAB_READ_TOKEN` 优先于两种存储来源，缺失时继续业务开发并明确显示读取未就绪。
 
 凭据只授予本项目的最小读取权限，保存在操作系统钥匙串或受控服务端文件及 DEV 服务私有内存。版本中心将它映射给不含发布方法的只读 Provider；凭据值和文件路径不进入浏览器、仓库、日志、质量门禁或部署子进程。Linux 服务无法读取访问者 Mac 的钥匙串。创建新发布仍需独立短期 `PLUSH_GITLAB_TOKEN`；缺少写凭据只停用发布按钮，不把已正常取得的只读证据显示成全局故障。
 
 ## 客户前端调试与预览
 
-本地预览永绅 yoyoosun 前端包可使用一键脚本。它会先检查 `http://127.0.0.1:8300/healthz`，再构建桌面和岗位任务端产物、注入 `config/customers/yoyoosun/customer-config.example.js` 和客户静态资产，并从本项目独占辅助块 `15200-15299` 起自动选择可用端口启动静态服务；该脚本只处理前端静态包，不会调用后端 `customer_config.validate / publish / activate / rollback`，也不会导入业务数据：
+本地预览永绅 yoyoosun 前端包可使用一键脚本。
+
+它会先检查 `http://127.0.0.1:8300/healthz`，再构建桌面和岗位任务端产物、注入 `config/customers/yoyoosun/customer-config.example.js` 和客户静态资产，并从本项目独占辅助块 `15200-15299` 起自动选择可用端口启动静态服务；该脚本只处理前端静态包，不会调用后端 `customer_config.validate / publish / activate / rollback`，也不会导入业务数据：
 
 ```bash
 cd "$(git rev-parse --show-toplevel)/web"
@@ -186,9 +277,15 @@ pnpm preview:yoyoosun
 PORT=15202 API_ORIGIN=http://127.0.0.1:8300 pnpm preview:yoyoosun
 ```
 
-`preview:yoyoosun --print-plan` 会按实际可用端口输出 `verify customer config` 和 `verify customer asset` 两条 `curl` 命令。打开页面前先用这两条命令确认当前端口的 `/customer-config.js` 已是 yoyoosun 配置、`/customer-assets/yoyoosun/favicon-yoyoosun.svg` 返回 SVG content-type；如果返回默认占位配置、资产 404，或 asset 命令只命中 Vite HTML fallback，说明当前打开的是 Product Core / 旧静态服务 / 错误端口，而不是本次 yoyoosun 预览。
+`preview:yoyoosun --print-plan` 会按实际可用端口输出 `verify customer config` 和 `verify customer asset` 两条 `curl` 命令。
 
-如果本机已经开了多个前端端口，先跑只读端口审计。它默认同时检查主开发保留区 `5175-5179` 和本项目辅助块起点附近 `15200-15204` 的监听进程、`/customer-config.js`、yoyoosun favicon 和 `8300/healthz`，用于区分 Product Core dev、yoyoosun dev / preview、遗留占用或其他项目；不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写数据库。需要保存当前端口归属证据时，可追加 `--report output/yoyoosun-local-entry-audit/current.json` 写本地 no-write 报告；该报告不得写进 `deployments/**/evidence/**`：
+打开页面前先用这两条命令确认当前端口的 `/customer-config.js` 已是 yoyoosun 配置、`/customer-assets/yoyoosun/favicon-yoyoosun.svg` 返回 SVG content-type；如果返回默认占位配置、资产 404，或 asset 命令只命中 Vite HTML fallback，说明当前打开的是 Product Core / 旧静态服务 / 错误端口，而不是本次 yoyoosun 预览。
+
+如果本机已经开了多个前端端口，先跑只读端口审计。
+
+它默认同时检查主开发保留区 `5175-5179` 和本项目辅助块起点附近 `15200-15204` 的监听进程、`/customer-config.js`、yoyoosun favicon 和 `8300/healthz`，用于区分 Product Core dev、yoyoosun dev / preview、遗留占用或其他项目；不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写数据库。
+
+需要保存当前端口归属证据时，可追加 `--report output/yoyoosun-local-entry-audit/current.json` 写本地 no-write 报告；该报告不得写进 `deployments/**/evidence/**`：
 
 ```bash
 pnpm --silent audit:yoyoosun-entry -- --json
@@ -212,11 +309,21 @@ pnpm start:yoyoosun --print-plan
 pnpm start:yoyoosun
 ```
 
-本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.133:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
+本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.133:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。
 
-`start:yoyoosun` 固定使用 `15200`（或显式 `--port`），不会因重复启动而顺延端口；同配置服务会被复用，过期的本工作区 Vite 会经核验自动替换，其他程序或工作区占用时会报错。它保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition check / activate or rollback / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
+确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
 
-未显式应用时，后端若只返回同 key 的 `builtin_rbac_fallback`，DEV 桌面端会进入带警示的本地预览壳，避免把成功登录误报成工作台故障；该 fallback 不视为 active revision，工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端仍 fail closed。页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
+`start:yoyoosun` 固定使用 `15200`（或显式 `--port`），不会因重复启动而顺延端口；同配置服务会被复用，过期的本工作区 Vite 会经核验自动替换，其他程序或工作区占用时会报错。它保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。
+
+启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。
+
+登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition check / activate or rollback / active readback。
+
+该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
+
+未显式应用时，后端若只返回同 key 的 `builtin_rbac_fallback`，DEV 桌面端会进入带警示的本地预览壳，避免把成功登录误报成工作台故障；该 fallback 不视为 active revision，工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端仍 fail closed。
+
+页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
 
 `start:yoyoosun --print-plan` 只输出同一组按固定端口生成的 `curl` 验证命令，不停止服务。实际启动会自动替换已确认的本工作区过期 Vite，再按输出地址验证；同配置实例需要重新启动时使用 `pnpm restart:yoyoosun`。
 
@@ -225,6 +332,10 @@ pnpm start:yoyoosun
 
 真实 smoke 在 `web/` 执行，依赖后端和经确认的测试账号。管理员凭据由受控本地配置或 `REAL_LOGIN_ADMIN_USERNAME / REAL_LOGIN_ADMIN_PASSWORD` 提供；报告不得保存密码或 token。`REAL_LOGIN_PREVIEW_MAX_MS` 可覆盖合同 PDF 预览默认 `10000ms` 阈值。
 
-采购入库真实写入 smoke 会保留 `PR-BROWSER-*` 记录，以取消冲正收口；`pnpm smoke:purchase-receipt-real-write` 已传 `--accept-persistent-test-data`，直接运行脚本时需显式传入该参数或 `PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1`。默认只允许 loopback；扩展到已准备的开发 / 测试地址需要 `--allow-external-base-url`，不能直接用于生产或目标客户库。缺少主数据时可用同一命令的 `--seed-core-demo` 准备模拟前置。
+采购入库真实写入 smoke 会保留 `PR-BROWSER-*` 记录，以取消冲正收口；`pnpm smoke:purchase-receipt-real-write` 已传 `--accept-persistent-test-data`，直接运行脚本时需显式传入该参数或 `PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1`。
 
-完整的 no-write 前置报告、模拟 Workflow 动作与脱敏回执命令统一见 [QA 岗位登录核验](../../scripts/qa/README.md#角色演示账号与登录核验)。Mock / Style L1 保留 React StrictMode；真实后端 Vite 使用单次挂载，重复请求由 `trialDemoAccountBrowserSmoke.mjs` 的逐页采样单独验证。Style L1 的当前覆盖以 `style-l1/scenarios.mjs` 和同名场景为准，不在 README 复制一份随时漂移的页面清单。
+默认只允许 loopback；扩展到已准备的开发 / 测试地址需要 `--allow-external-base-url`，不能直接用于生产或目标客户库。缺少主数据时可用同一命令的 `--seed-core-demo` 准备模拟前置。
+
+完整的 no-write 前置报告、模拟 Workflow 动作与脱敏回执命令统一见 [QA 岗位登录核验](../../scripts/qa/README.md#角色演示账号与登录核验)。Mock / Style L1 保留 React StrictMode；真实后端 Vite 使用单次挂载，重复请求由 `trialDemoAccountBrowserSmoke.mjs` 的逐页采样单独验证。
+
+Style L1 的当前覆盖以 `style-l1/scenarios.mjs` 和同名场景为准，不在 README 复制一份随时漂移的页面清单。

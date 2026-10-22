@@ -2,11 +2,13 @@ import React, { useMemo, useState } from 'react'
 import {
   CodeOutlined,
   CopyOutlined,
+  DownOutlined,
   FileSearchOutlined,
   FileTextOutlined,
   LeftOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
+  RightOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import {
@@ -15,7 +17,6 @@ import {
   Checkbox,
   Empty,
   Progress,
-  Select,
   Skeleton,
   Space,
   Tag,
@@ -34,6 +35,7 @@ import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
+import DevTestingStrategyGuide from '../components/DevTestingStrategyGuide.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COMMAND_PAGE_QUERY_KEY,
@@ -63,7 +65,6 @@ import {
   DEV_DELIVERY_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_INTEGRATION_ROUTE,
-  DEV_QUALITY_GATES_ROUTE,
 } from '../config/devRoutes.mjs'
 import {
   createDevCoverageIdempotencyKey,
@@ -72,7 +73,6 @@ import {
   isDevCoverageOperationActive,
   normalizeOptionalDevCoverageOperation,
 } from '../config/devCoverageOperation.mjs'
-import { formatDevTimestamp } from '../config/devTimestamp.mjs'
 import {
   DEV_TESTING_GIT_CLOSEOUT_STAGES,
   DEV_TESTING_GIT_HOOK_PATH_COMMAND,
@@ -92,6 +92,7 @@ const VIEW_COMMANDS = 'commands'
 const VIEW_CLOSEOUT = 'closeout'
 const VIEW_COVERAGE = 'coverage'
 const VIEW_PRESSURE = 'pressure'
+const VIEW_GUIDE = 'guide'
 const VIEW_QUERY_KEY = 'view'
 const DOCUMENT_ROLE_QUERY_KEY = 'role'
 const COMMAND_QUERY_KEY = 'q'
@@ -100,6 +101,14 @@ const VIEW_OPTIONS = [
   { label: '本轮验证', value: VIEW_TIERS },
   { label: '证据与覆盖', value: VIEW_COVERAGE },
   { label: '压力测试', value: VIEW_PRESSURE },
+  { label: '使用指引', value: VIEW_GUIDE },
+]
+const GUIDE_OPTIONS = [
+  { label: '测试方式', value: 'methods' },
+  { label: '真机回归', value: 'devices' },
+  { label: '增长验证', value: 'growth' },
+  { label: '验证范围', value: 'tiers' },
+  { label: '常用命令', value: 'presets' },
 ]
 const AUXILIARY_VIEW_VALUES = new Set([VIEW_COMMANDS, VIEW_CLOSEOUT])
 const VIEW_VALUES = new Set([
@@ -189,17 +198,19 @@ function TierCard({ tier }) {
 
 function QuickPreset({ preset }) {
   return (
-    <button
-      type="button"
-      className="erp-dev-testing-preset"
-      onClick={() => runCopy(preset.commands.join('\n'))}
-    >
-      <span className="erp-dev-testing-preset__head">
+    <article className="erp-dev-testing-preset">
+      <div className="erp-dev-testing-preset__head">
         <span className="erp-dev-testing-preset__label">{preset.label}</span>
-        <CopyOutlined />
-      </span>
-      <span className="erp-dev-testing-preset__desc">{preset.description}</span>
-    </button>
+        <Button size="small" icon={<CopyOutlined />} onClick={() => runCopy(preset.commands.join('\n'))}>
+          复制
+        </Button>
+      </div>
+      <details>
+        <summary>用途与命令</summary>
+        <p>{preset.description}</p>
+        <pre><code>{preset.commands.join('\n')}</code></pre>
+      </details>
+    </article>
   )
 }
 
@@ -211,17 +222,14 @@ function CommandBlock({ block, onOpenSource }) {
     >
       <div className="erp-dev-testing-command-block__purpose">
         <Text strong>{block.context || block.title}</Text>
-        <span>解决什么问题</span>
       </div>
       <div className="erp-dev-testing-command-block__source">
-        <span>当前来源</span>
         <div className="erp-dev-testing-command-block__path">
           {block.sourceLabel || block.title || '测试命令来源'}
         </div>
       </div>
       <div className="erp-dev-testing-command-block__scope">
         <strong>{block.commands.length} 条固定命令</strong>
-        <span>结果以命令回执和来源合同分别判断</span>
       </div>
       <div className="erp-dev-testing-command-block__actions">
         <Space size={8} wrap>
@@ -254,50 +262,15 @@ function CommandBlock({ block, onOpenSource }) {
 
 function CommandLibraryGuide() {
   return (
-    <section
-      className="erp-dev-testing-command-guide"
-      aria-labelledby="command-library-guide-title"
-    >
-      <div>
-        <Text className="erp-dev-testing-validation__eyebrow">
-          三步定位，不通读命令墙
-        </Text>
-        <Title level={2} id="command-library-guide-title">
-          专项检查库
-        </Title>
-      </div>
-      <ol>
-        <li>
-          <b>1</b>
-          <span>
-            <strong>搜索问题</strong>
-            <small>按命令、来源或验收词定位</small>
-          </span>
-        </li>
-        <li>
-          <b>2</b>
-          <span>
-            <strong>筛选职责</strong>
-            <small>只保留当前来源类型</small>
-          </span>
-        </li>
-        <li>
-          <b>3</b>
-          <span>
-            <strong>打开或复制</strong>
-            <small>先看用途，需要时展开命令</small>
-          </span>
-        </li>
-      </ol>
-    </section>
+    <Text type="secondary">按问题搜索，核对来源后复制命令；复制不会执行检查。</Text>
   )
 }
 
 const COVERAGE_METRIC_LABELS = Object.freeze({
-  statements: 'Statements',
-  lines: 'Lines',
-  branches: 'Branches',
-  functions: 'Functions',
+  statements: '语句',
+  lines: '行',
+  branches: '分支',
+  functions: '函数',
   scenarios: '业务场景',
   modules: '业务模块',
 })
@@ -327,12 +300,12 @@ function CoverageStatusTag({ status }) {
       className={`erp-dev-testing-coverage-status erp-dev-testing-coverage-status--${meta.tone}`}
       color={coverageTagColor(meta.tone)}
     >
-      {meta.label}
+      {meta.label.split(' / ')[0]}
     </Tag>
   )
 }
 
-function CoverageEvidenceCard({ item }) {
+function CoverageEvidenceCard({ item, showScenarios = false }) {
   const [onlyIncomplete, setOnlyIncomplete] = useState(false)
   const scenarios = item?.scenarios || []
   const visibleScenarios = onlyIncomplete
@@ -342,7 +315,12 @@ function CoverageEvidenceCard({ item }) {
   const counts = Object.entries(item?.counts || {}).filter(
     ([, value]) => value !== null
   )
+  const summaryCounts = counts.filter(([key, value]) =>
+    key === 'executed' || key === 'passed' ||
+    (key === 'total' ? value !== item?.counts?.executed : value > 0)
+  )
   const evidence = Array.isArray(item?.evidence) ? item.evidence : []
+  const ScenarioContainer = showScenarios ? 'section' : 'details'
 
   return (
     <article
@@ -372,7 +350,7 @@ function CoverageEvidenceCard({ item }) {
         ) : null}
         {counts.length > 0 ? (
           <div className="erp-dev-testing-coverage-card__counts">
-            {counts.map(([key, value]) => (
+            {summaryCounts.map(([key, value]) => (
               <span key={key}>
                 {COVERAGE_COUNT_LABELS[key] || key} {value}
               </span>
@@ -381,42 +359,34 @@ function CoverageEvidenceCard({ item }) {
         ) : null}
         {metrics.length === 0 && counts.length === 0 ? (
           <span className="erp-dev-testing-coverage-card__no-reading">
-            未提供数值；以当前状态和说明判断
+            未采集数值
           </span>
         ) : null}
       </div>
       <div className="erp-dev-testing-coverage-card__conclusion">
-        <p className="erp-dev-testing-coverage-card__note">
-          {item?.note ||
-            (item?.status === 'not_applicable'
-              ? '本轮未受影响，不属于必跑门禁。'
-              : item?.status === 'not_collected' || item?.status === 'missing'
-                ? '当前报告未采集这一层；空值不是 0%，也不能计为通过。'
-                : '报告未提供补充说明。')}
-        </p>
-        {evidence.length > 0 ? (
+        {item?.note ? (
+          <p className="erp-dev-testing-coverage-card__note">{item.note}</p>
+        ) : null}
+        {evidence.length > 0 || counts.length > 0 ? (
           <details className="erp-dev-testing-coverage-card__details">
-            <summary>查看 {evidence.length} 条证据</summary>
+            <summary>证据与计数</summary>
+            {counts.length > 0 ? <p>{counts.map(([key, value]) => `${COVERAGE_COUNT_LABELS[key] || key} ${value}`).join(' · ')}</p> : null}
             <div className="erp-dev-testing-coverage-card__evidence">
               {evidence.map((entry) => (
                 <code key={entry}>{entry}</code>
               ))}
             </div>
           </details>
-        ) : (
-          <small className="erp-dev-testing-coverage-card__no-evidence">
-            没有附加证据路径
-          </small>
-        )}
+        ) : null}
       </div>
       {scenarios.length > 0 ? (
-        <details
+        <ScenarioContainer
           className="erp-dev-testing-coverage-scenarios"
           open={
-            item.key === 'go' && item.status === 'failed' ? true : undefined
+            !showScenarios && item.key === 'go' && item.status === 'failed' ? true : undefined
           }
         >
-          <summary>查看 {scenarios.length} 个场景明细</summary>
+          {showScenarios ? <Text strong>{scenarios.length} 个场景</Text> : <summary>查看 {scenarios.length} 个场景明细</summary>}
           <Checkbox
             checked={onlyIncomplete}
             onChange={(event) => setOnlyIncomplete(event.target.checked)}
@@ -444,21 +414,17 @@ function CoverageEvidenceCard({ item }) {
                         <CoverageStatusTag status={scenario.status} />
                       </td>
                       <td>
-                        <details>
-                          <summary>
-                            {scenario.matchedTests.length} 条记录
-                          </summary>
-                          {scenario.package ? (
-                            <code>{scenario.package}</code>
-                          ) : null}
-                          <ul>
-                            {scenario.matchedTests.map((test) => (
-                              <li key={test}>
-                                <code>{test}</code>
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
+                        {scenario.matchedTests.length > 0 || scenario.package ? (
+                          <details>
+                            <summary>{scenario.matchedTests.length} 条记录</summary>
+                            {scenario.package ? <code>{scenario.package}</code> : null}
+                            <ul>
+                              {scenario.matchedTests.map((test) => (
+                                <li key={test}><code>{test}</code></li>
+                              ))}
+                            </ul>
+                          </details>
+                        ) : <Text type="secondary">未记录</Text>}
                       </td>
                     </tr>
                   ))}
@@ -468,7 +434,7 @@ function CoverageEvidenceCard({ item }) {
           ) : (
             <p>没有未通过场景。</p>
           )}
-        </details>
+        </ScenarioContainer>
       ) : null}
     </article>
   )
@@ -477,19 +443,12 @@ function CoverageEvidenceCard({ item }) {
 function CoverageSection({
   title,
   description,
-  status,
   matrix = true,
   children,
 }) {
   return (
-    <section className="erp-dev-testing-coverage-section">
-      <div className="erp-dev-testing-coverage-section__head">
-        <div>
-          <Title level={3}>{title}</Title>
-          {description ? <Paragraph>{description}</Paragraph> : null}
-        </div>
-        {status ? <CoverageStatusTag status={status} /> : null}
-      </div>
+    <section className="erp-dev-testing-coverage-section" aria-label={title}>
+      {description ? <Text type="secondary">{description}</Text> : null}
       {matrix ? (
         <div className="erp-dev-testing-coverage-matrix__head" aria-hidden>
           <span>检查项与状态</span>
@@ -726,7 +685,7 @@ function coverageReportAlert(state, source) {
       type: 'info',
       title: '正在查看历史隔离验证',
       description:
-        '这里的通过与失败仅对应下方记录的源码快照，不代表当前工作区状态；提交后 CI 和目标环境仍需各自核验。',
+        '仅对应报告中的源码快照，不能作为当前工作区结果。',
     }
   }
   if (state?.status === 'current') {
@@ -734,7 +693,7 @@ function coverageReportAlert(state, source) {
       type: 'success',
       title: '报告与当前仓库指纹匹配',
       description:
-        'Current 只表示报告身份新鲜；各层是否通过仍以本页分项状态为准。空值表示未采集，不是 0%。',
+        '是否通过请看分项结果；空值表示未采集。',
     }
   }
   if (state?.status === 'stale') {
@@ -743,7 +702,7 @@ function coverageReportAlert(state, source) {
       title: '覆盖报告已过期',
       description: `${
         state.message || '报告未绑定当前工作区，数值只能作为历史参考。'
-      } 空值表示未采集，不是 0%。`,
+      }`,
     }
   }
   if (state?.status === 'failed') {
@@ -766,9 +725,7 @@ function coverageReportAlert(state, source) {
   return {
     type: 'info',
     title: '当前工作区尚未验证',
-    description: `${
-      state?.message || '当前还没有可展示的覆盖证据'
-    }；空值表示未采集，不是 0%。请在代码基本稳定的检查点采集本地覆盖基线；“重新读取”仍只读取本地报告。`,
+    description: state?.message || '代码稳定后可采集本地覆盖基线；空值表示未采集，不是 0%。',
   }
 }
 
@@ -847,22 +804,21 @@ function CoverageOperationPanel({ operation, error }) {
   )
 }
 
-function ValidationPlanPanel({ plan, tiers, loading, error, busy, onGenerate }) {
+function ValidationPlanPanel({ plan, tiers, loading, error, busy, onGenerate, children }) {
   const shortCommit = plan?.repository?.commit?.slice(0, 12) || '未生成'
   return (
-    <section className="erp-dev-testing-validation-plan">
+    <section className="erp-dev-testing-validation-plan" aria-label="验证计划">
       <div className="erp-dev-testing-validation-plan__head">
-        <div>
-          <Title level={3}>验证计划</Title>
-        </div>
         <Button
           type="primary"
           icon={<FileSearchOutlined />}
           loading={loading}
           onClick={onGenerate}
+          aria-label={plan ? '重新生成计划' : '生成本轮验证计划'}
         >
-          {plan ? '重新生成计划' : '生成本轮验证计划'}
+          {plan ? '更新验证计划' : '生成验证计划'}
         </Button>
+        {children}
       </div>
       {busy?.active ? (
         <Alert
@@ -971,17 +927,15 @@ function ValidationPlanPanel({ plan, tiers, loading, error, busy, onGenerate }) 
             </p>
           </details>
         </div>
-      ) : (
-        <p className="erp-dev-testing-validation-plan__empty">
-          尚未生成计划
-        </p>
-      )}
+      ) : null}
     </section>
   )
 }
 
 function ValidationActionRow({ action, operation, disabled, starting, onRun }) {
+  const [expanded, setExpanded] = useState(false)
   const presentation = getDevTestingOperationPresentation(operation)
+  const detailId = `testing-action-${action.key}-details`
   const tagColor = {
     primary: 'blue',
     success: 'green',
@@ -989,58 +943,69 @@ function ValidationActionRow({ action, operation, disabled, starting, onRun }) {
     danger: 'red',
   }[presentation.tone]
   return (
-    <tr className="erp-dev-testing-validation-row" data-action-key={action.key}>
-      <th scope="row">
-        <strong>{action.label}</strong>
-        <p>{action.description}</p>
-      </th>
-      <td>
-        <Tag color={action.priority === 'P0' ? 'blue' : 'default'}>
-          {action.priority === 'P0' ? '优先' : '按需'}
-        </Tag>
-        <Tag color={tagColor}>{action.key === 'rpc-examples' && operation
-          ? `最近执行 · ${presentation.label}` : presentation.label}
-        </Tag>
-        {operation?.message && action.key !== 'rpc-examples' ? <p role="status">{operation.message}</p> : null}
-      </td>
-      <td>
-        <details className="erp-dev-testing-validation-row__details">
-          <summary>证据与时间</summary>
-          <p>{action.boundary}</p>
-          {operation ? (
-            <Space direction="vertical" size={2}>
-              <DevTimestamp
-                value={operation.createdAt}
-                action="开始于"
-                missing="开始时间未证明"
-              />
-              <DevTimestamp
-                value={operation.finishedAt || operation.updatedAt}
-                action={operationUpdateAction(operation)}
-                missing="更新时间未证明"
-              />
-            </Space>
-          ) : (
-            <p>尚无本项执行回执</p>
-          )}
-        </details>
-      </td>
-      <td>
-        {action.key === 'rpc-examples' ? (
-          <Link to={`${DEV_INTEGRATION_ROUTE}?view=changes`}>查看并运行</Link>
-        ) : (
+    <>
+      <tr className="erp-dev-testing-validation-row" data-action-key={action.key}>
+        <th scope="row">
           <Button
-            icon={<PlayCircleOutlined />}
-            loading={starting || presentation.active}
-            disabled={disabled || presentation.active}
-            aria-label={action.label}
-            onClick={() => onRun(action.key)}
+            type="link"
+            className="erp-dev-testing-action-details-trigger"
+            icon={expanded ? <DownOutlined /> : <RightOutlined />}
+            aria-label={`查看${action.label}详情`}
+            aria-expanded={expanded}
+            aria-controls={detailId}
+            onClick={() => setExpanded((value) => !value)}
           >
-            {presentation.active ? '运行中…' : '运行检查'}
+            {action.shortLabel}
           </Button>
-        )}
-      </td>
-    </tr>
+        </th>
+        <td>
+          <Tag color={tagColor}>{presentation.label}</Tag>
+          {operation?.message && presentation.tone !== 'success' && action.key !== 'rpc-examples' ? <p role="status">{operation.message}</p> : null}
+        </td>
+        <td>
+          {action.key === 'rpc-examples' ? (
+            <Link to={`${DEV_INTEGRATION_ROUTE}?view=changes`}>查看并运行</Link>
+          ) : (
+            <Button
+              icon={<PlayCircleOutlined />}
+              loading={starting || presentation.active}
+              disabled={disabled || presentation.active}
+              aria-label={action.label}
+              onClick={() => onRun(action.key)}
+            >
+              {presentation.active ? '运行中…' : '运行'}
+            </Button>
+          )}
+        </td>
+      </tr>
+      {expanded ? (
+        <tr>
+          <td colSpan={3}>
+            <div id={detailId} className="erp-dev-testing-validation-row__details">
+              <p>{action.description}</p>
+              <p>{action.boundary}</p>
+              {operation?.message ? <p>{operation.message}</p> : null}
+              {operation ? (
+                <Space direction="vertical" size={2}>
+                  <DevTimestamp
+                    value={operation.createdAt}
+                    action="开始于"
+                    missing="开始时间未证明"
+                  />
+                  <DevTimestamp
+                    value={operation.finishedAt || operation.updatedAt}
+                    action={operationUpdateAction(operation)}
+                    missing="更新时间未证明"
+                  />
+                </Space>
+              ) : (
+                <p>尚无本项执行回执</p>
+              )}
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </>
   )
 }
 
@@ -1081,7 +1046,17 @@ function ValidationWorkspace({
         error={planError}
         busy={busy}
         onGenerate={onGeneratePlan}
-      />
+      >
+        <DevCustomerScopeSelector
+          compact
+          scope={customerScope}
+          onChange={customerScope.selectCustomer}
+          disabled={customerSelectorDisabled}
+          label="权限检查客户"
+          note=""
+          invalidDescription="岗位权限与任务可见性巡检已停止；开发门禁与字段联动专项仍可独立运行。"
+        />
+      </ValidationPlanPanel>
       {summaryError ? (
         <Alert
           showIcon
@@ -1090,30 +1065,12 @@ function ValidationWorkspace({
           description="后台任务可能仍在运行；状态恢复前请勿重复发起。"
         />
       ) : null}
-      <div className="erp-dev-testing-validation__action-intro">
-        <div>
-          <Text strong>可运行检查</Text>
-          <Text type="secondary">
-            按本轮改动选择，结果分别保留。
-          </Text>
-        </div>
-        <DevCustomerScopeSelector
-          compact
-          scope={customerScope}
-          onChange={customerScope.selectCustomer}
-          disabled={customerSelectorDisabled}
-          label="权限检查客户"
-          note="仅影响岗位权限与任务可见性检查。"
-          invalidDescription="岗位权限与任务可见性巡检已停止；开发门禁与字段联动专项仍可独立运行。"
-        />
-      </div>
       <div className="erp-dev-testing-validation__actions erp-dev-tool-table-wrap">
         <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="固定检查与独立证据">
           <thead>
             <tr>
-              <th scope="col">检查与用途</th>
-              <th scope="col">选择与状态</th>
-              <th scope="col">证据</th>
+              <th scope="col">检查</th>
+              <th scope="col">最近结果</th>
               <th scope="col">操作</th>
             </tr>
           </thead>
@@ -1139,6 +1096,7 @@ function ValidationWorkspace({
 }
 
 function CoverageReportView({
+  strategySource,
   state,
   snapshotState,
   section,
@@ -1172,11 +1130,6 @@ function CoverageReportView({
       aria-label="测试覆盖状态"
       aria-busy={loading || operationPresentation.active}
     >
-      <div className="erp-dev-testing-coverage-heading">
-        <div>
-          <Title level={2}>证据与覆盖</Title>
-        </div>
-      </div>
       <div className="erp-dev-testing-coverage-overview">
         <div className="erp-dev-testing-coverage-toolbar">
           <Segmented
@@ -1217,12 +1170,6 @@ function CoverageReportView({
             >
               重新读取
             </Button>
-            <Button
-              icon={<CopyOutlined aria-hidden="true" />}
-              onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}
-            >
-              复制备用命令
-            </Button>
           </div>
         </div>
         <Alert
@@ -1231,45 +1178,15 @@ function CoverageReportView({
           message={alert.title}
           description={alert.description}
         />
-        <CoverageOperationPanel operation={operation} error={operationError} />
-        <details className="erp-dev-testing-coverage-boundary">
-          <summary>查看采集、覆盖目标与判定规则</summary>
-          <div className="erp-dev-testing-coverage-scope-map">
-            <section>
-              <strong>本页证明</strong>
-              <ul>
-                <li>报告是否绑定当前仓库身份</li>
-                <li>各层证据的状态、读数与缺口</li>
-              </ul>
-            </section>
-            <section>
-              <strong>本页不证明</strong>
-              <ul>
-                <li>未采集的数据库、浏览器或目标环境结果</li>
-                <li>发布、恢复可用或客户 UAT 已完成</li>
-              </ul>
-            </section>
-          </div>
-          <Paragraph>
-            空值表示未采集，不是 0%。采集本地覆盖基线固定运行真实本地 baseline
-            测试并自动聚合报告，但不会执行数据库写入、真实业务浏览器、目标环境部署或客户
-            UAT；切换页面不会停止后台任务，“重新读取”只读取本地报告。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
-            和 0 tests executed
-            均不能算通过。应在代码基本稳定的检查点运行，不必每次编辑后执行；备用命令
-            {DEV_TESTING_COVERAGE_COLLECT_COMMAND}{' '}
-            用于开发接口不可用时手工执行同一采集器。
-          </Paragraph>
-          {report?.policy.length > 0 ? (
-            <div className="erp-dev-testing-coverage-policy-list">
-              {report.policy.map((item) => (
-                <article key={item.key}>
-                  <strong>{item.label}</strong>
-                  <p>{item.note}</p>
-                </article>
-              ))}
-            </div>
-          ) : null}
-        </details>
+        {operationError || (operation && operation.status !== 'completed') ? (
+          <CoverageOperationPanel operation={operation} error={operationError} />
+        ) : operation ? (
+          <details className="erp-dev-testing-coverage-last-run">
+            <summary>上次采集：{operationPresentation.label}</summary>
+            <CoverageOperationPanel operation={operation} error={operationError} />
+          </details>
+        ) : null}
+
       </div>
 
       <DevTaskNav
@@ -1302,6 +1219,10 @@ function CoverageReportView({
       >
         {section === 'rules' ? <DevBusinessRulesPanel report={report} reportCurrent={source === 'workspace' && activeState?.status === 'current'} /> : null}
 
+        {section === 'acceptance' ? (
+          <DevTestingStrategyGuide source={strategySource} evidence />
+        ) : null}
+
         {loading && !report && section !== 'rules' ? (
           <section
             className="erp-dev-testing-coverage-loading"
@@ -1315,57 +1236,27 @@ function CoverageReportView({
           <div className="erp-dev-testing-coverage-empty">
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected"
+              description="尚未采集覆盖报告"
             />
           </div>
         ) : null}
 
         {report && section !== 'rules' ? (
           <>
-            <section className="erp-dev-testing-coverage-identity">
-              <span>
-                <small>报告状态</small>
-                {source === 'snapshot' ? (
-                  <Tag color="blue">隔离源码快照</Tag>
-                ) : (
-                  <CoverageStatusTag status={activeState.status} />
-                )}
-              </span>
-              <span>
-                <small>生成时间</small>
-                <DevTimestamp
-                  value={report.generatedAt}
-                  missing="生成时间未证明"
-                  strong
-                />
-              </span>
-              <span>
-                <small>Commit</small>
-                <code>{shortCommit}</code>
-              </span>
-              <span>
-                <small>验证源码</small>
-                <b>
-                  {repository.dirty === null
-                    ? '未记录'
-                    : repository.dirty
-                      ? 'Dirty'
-                      : 'Clean'}
-                </b>
-              </span>
-              <details className="erp-dev-testing-coverage-identity__details">
-                <summary>查看完整报告身份</summary>
-                <span>
-                  <small>Fingerprint</small>
-                  <code>{repository.fingerprint || '未记录'}</code>
-                </span>
-              </details>
-            </section>
+            <details className="erp-dev-testing-coverage-report-details">
+              <summary>报告详情 · <DevTimestamp value={report.generatedAt} missing="时间未记录" /></summary>
+              <div className="erp-dev-testing-coverage-identity">
+                <span><small>来源</small>{source === 'snapshot' ? '历史隔离验证' : '工作区报告'}</span>
+                <span><small>提交</small><code>{shortCommit}</code></span>
+                <span><small>源码</small>{repository.dirty === null ? '未记录' : repository.dirty ? '有未提交改动' : '干净'}</span>
+                <span><small>Fingerprint</small><code>{repository.fingerprint || '未记录'}</code></span>
+              </div>
+            </details>
 
             {section === 'code' ? (
               <CoverageSection
-                title="代码覆盖 / Code Coverage"
-                description="Go 全包语句可能包含生成物；Web 只统计实际加载模块。两者不等于本轮改动覆盖，空值表示未采集。"
+                title="代码覆盖"
+                description="Go 含生成物，Web 仅计已加载模块；均不等于本轮改动覆盖。"
               >
                 <div className="erp-dev-testing-coverage-grid erp-dev-testing-coverage-grid--code">
                   <CoverageEvidenceCard item={report.codeCoverage.go} />
@@ -1376,37 +1267,18 @@ function CoverageReportView({
 
             {section === 'business' ? (
               <CoverageSection
-                title="业务合同与关键场景 / Business Coverage"
+                title="业务场景"
                 description="按业务域看适用合同、关键场景和模块覆盖，不以代码行覆盖替代。"
-                status={report.businessCoverage.status}
                 matrix={false}
               >
                 {domains.length > 0 ? (
-                  <>
-                    <div className="erp-dev-testing-coverage-domain-picker">
-                      <label htmlFor="dev-testing-coverage-domain">
-                        查看业务域
-                      </label>
-                      <Select
-                        id="dev-testing-coverage-domain"
-                        value={selectedDomain?.key || ''}
-                        onChange={setRequestedDomain}
-                        options={[
-                          { value: '', label: '全部业务域总览' },
-                          ...domains.map(({ key, label }) => ({
-                            value: key,
-                            label,
-                          })),
-                        ]}
-                      />
-                      {selectedDomain ? (
-                        <Button onClick={() => setRequestedDomain('')}>
+                    selectedDomain ? (
+                      <>
+                        <Button className="erp-dev-testing-coverage-domain-back" type="link" icon={<LeftOutlined aria-hidden="true" />} onClick={() => setRequestedDomain('')}>
                           返回业务域总览
                         </Button>
-                      ) : null}
-                    </div>
-                    {selectedDomain ? (
-                      <CoverageEvidenceCard item={selectedDomain} />
+                        <CoverageEvidenceCard key={selectedDomain.key} item={selectedDomain} showScenarios />
+                      </>
                     ) : (
                       <div className="erp-dev-testing-coverage-domain-table-wrap">
                         <table
@@ -1421,13 +1293,20 @@ function CoverageReportView({
                               <th scope="col">执行 / 声明</th>
                               <th scope="col">通过</th>
                               <th scope="col">失败 / 跳过 / 受阻 / 缺失</th>
-                              <th scope="col">场景与证据</th>
                             </tr>
                           </thead>
                           <tbody>
                             {domains.map((item) => (
                               <tr key={item.key}>
-                                <th scope="row">{item.label}</th>
+                                <th scope="row">
+                                  <Button
+                                    type="link"
+                                    aria-label={`查看 ${item.label} 场景与证据`}
+                                    onClick={() => setRequestedDomain(item.key)}
+                                  >
+                                    {item.label}
+                                  </Button>
+                                </th>
                                 <td>
                                   <CoverageStatusTag status={item.status} />
                                 </td>
@@ -1442,22 +1321,12 @@ function CoverageReportView({
                                   {item.counts.blocked ?? '—'} /{' '}
                                   {item.counts.missing ?? '—'}
                                 </td>
-                                <td>
-                                  <Button
-                                    size="small"
-                                    aria-label={`查看 ${item.label} 场景与证据`}
-                                    onClick={() => setRequestedDomain(item.key)}
-                                  >
-                                    查看详情
-                                  </Button>
-                                </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                    )}
-                  </>
+                    )
                 ) : (
                   <CoverageEvidenceCard item={report.businessCoverage} />
                 )}
@@ -1466,7 +1335,7 @@ function CoverageReportView({
 
             {section === 'gates' ? (
               <CoverageSection
-                title="本轮 T0-T8 门禁 / Required Gates"
+                title="验证门禁"
                 description="只对报告声明的本轮 required gates 判断执行结果；没有回执就是未采集。"
               >
                 {report.gates.length > 0 ? (
@@ -1491,7 +1360,7 @@ function CoverageReportView({
 
             {section === 'acceptance' ? (
               <CoverageSection
-                title="运行态与验收 / Runtime & Acceptance"
+                title="运行与验收"
                 description="PostgreSQL、浏览器、readiness、目标环境与 UAT 各自独立，不由本地绿色替代。"
               >
                 <div className="erp-dev-testing-coverage-grid">
@@ -1507,6 +1376,45 @@ function CoverageReportView({
           </>
         ) : null}
       </div>
+      <details className="erp-dev-testing-coverage-boundary">
+        <summary>采集与判定说明</summary>
+        <div className="erp-dev-testing-coverage-scope-map">
+          <section>
+            <strong>本页证明</strong>
+            <ul>
+              <li>报告是否绑定当前仓库身份</li>
+              <li>各层证据的状态、读数与缺口</li>
+            </ul>
+          </section>
+          <section>
+            <strong>本页不证明</strong>
+            <ul>
+              <li>未采集的数据库、浏览器或目标环境结果</li>
+              <li>发布、恢复可用或客户 UAT 已完成</li>
+            </ul>
+          </section>
+        </div>
+        <Paragraph>
+          空值表示未采集，不是 0%。采集本地覆盖基线固定运行真实本地 baseline
+          测试并自动聚合报告，但不会执行数据库写入、真实业务浏览器、目标环境部署或客户
+          UAT；切换页面不会停止后台任务，“重新读取”只读取本地报告。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
+          和 0 tests executed
+          均不能算通过。应在代码基本稳定的检查点运行，不必每次编辑后执行；备用命令
+          {DEV_TESTING_COVERAGE_COLLECT_COMMAND}{' '}
+          用于开发接口不可用时手工执行同一采集器。
+        </Paragraph>
+        <Button icon={<CopyOutlined />} onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}>复制备用命令</Button>
+        {report?.policy.length > 0 ? (
+          <div className="erp-dev-testing-coverage-policy-list">
+            {report.policy.map((item) => (
+              <article key={item.key}>
+                <strong>{item.label}</strong>
+                <p>{item.note}</p>
+              </article>
+              ))}
+          </div>
+          ) : null}
+      </details>
     </div>
   )
 }
@@ -1566,6 +1474,7 @@ export default function DevTestingPage() {
   const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
   const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_TIERS
   const coverageSection = parseDevTestingCoverageSection(searchParams)
+  const guideTopic = GUIDE_OPTIONS.find((item) => item.value === searchParams.get('guide'))?.value || 'methods'
   const customerScope = useDevCustomerScope({
     searchParams,
     setSearchParams,
@@ -1581,6 +1490,12 @@ export default function DevTestingPage() {
     ? requestedDocumentRole
     : 'all'
   const keyword = searchParams.get(COMMAND_QUERY_KEY) || ''
+  const matchingPresets = useMemo(() => {
+    const query = keyword.trim().toLowerCase()
+    return DEV_TESTING_COPY_PRESETS.filter((preset) =>
+      `${preset.label} ${preset.description} ${preset.commands.join(' ')}`.toLowerCase().includes(query)
+    )
+  }, [keyword])
   const roleFilteredDocs = useMemo(
     () => filterDevTestingDocs(docs, { documentRole }),
     [docs, documentRole]
@@ -1593,9 +1508,6 @@ export default function DevTestingPage() {
       }),
     [keyword, roleFilteredDocs]
   )
-  const matchedSourceCount = new Set(
-    allCommandBlocks.map((block) => block.sourcePath)
-  ).size
   const commandPage = useMemo(
     () => buildDevTestingCommandPage(allCommandBlocks, searchParams),
     [allCommandBlocks, searchParams]
@@ -1946,20 +1858,6 @@ export default function DevTestingPage() {
     }
   }
 
-  const coverageOperationPresentation =
-    getDevCoverageOperationPresentation(coverageOperation)
-  const coverageToolbarText = coverageOperationPresentation.active
-    ? coverageOperationPresentation.stageLabel
-    : coverageLoading
-      ? '正在读取本地覆盖报告…'
-      : coverageState?.report
-        ? `${formatDevTimestamp(coverageState.report.generatedAt, {
-            missing: '生成时间未证明',
-          })} · ${
-            coverageState.report.repository.commit?.slice(0, 12) ||
-            'commit 未记录'
-          }`
-        : getDevTestingCoverageStatusMeta(coverageState?.status).label
   const hookReadyCount =
     testingSummary?.hooks?.checks?.filter((check) => check.status === 'ready')
       .length || 0
@@ -1995,9 +1893,6 @@ export default function DevTestingPage() {
             value={isAuxiliaryView ? VIEW_TIERS : view}
             onChange={selectView}
           />
-          {isCoverageView ? (
-            <Text type="secondary">当前工作区：{coverageToolbarText}</Text>
-          ) : null}
         </div>
         <div
           className="erp-dev-testing-auxiliary-nav"
@@ -2011,9 +1906,9 @@ export default function DevTestingPage() {
             <Button
               type="link"
               icon={<LeftOutlined aria-hidden="true" />}
-              onClick={() => selectView(VIEW_TIERS)}
+              onClick={() => selectView(VIEW_GUIDE)}
             >
-              返回本轮验证
+              返回使用指引
             </Button>
           )}
           <Text type="secondary">
@@ -2041,58 +1936,51 @@ export default function DevTestingPage() {
                 onGeneratePlan={generateTestingPlan}
                 onRunAction={runTestingAction}
               />
-              <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--tools">
-                <summary>更多检查</summary>
-                <Space wrap size={16}>
-                  <Link to={DEV_BUSINESS_USABILITY_ROUTE}>页面说明检查</Link>
-                  <Link
-                    to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}
-                  >
-                    完整或严格门禁
-                  </Link>
-                  <Button type="link" onClick={() => selectView(VIEW_COMMANDS)}>
-                    查专项命令
-                  </Button>
-                </Space>
-              </details>
-
-              <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--presets">
-                <summary>
-                  <span>
-                    <strong>复制专项检查命令</strong>
-                    <small>
-                      {DEV_TESTING_COPY_PRESETS.length}{' '}
-                      组固定预设，按改动类型选择
-                    </small>
-                  </span>
-                  <span>按需展开</span>
-                </summary>
-                <div
-                  className="erp-dev-testing-presets"
-                  aria-label="常用测试命令预设"
-                >
-                  {DEV_TESTING_COPY_PRESETS.map((preset) => (
-                    <QuickPreset key={preset.key} preset={preset} />
-                  ))}
-                </div>
-              </details>
-              <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--tiers">
-                <summary>
-                  <span>
-                    <strong>了解验证范围</strong>
-                    <small>
-                      T0–T8 是内部选测键，不是完成进度，也不是逐级验收
-                    </small>
-                  </span>
-                  <span>按需展开</span>
-                </summary>
-                <div className="erp-dev-testing-tier-grid">
-                  {tiers.map((tier) => (
-                    <TierCard key={tier.key} tier={tier} />
-                  ))}
-                </div>
-              </details>
             </div>
+          ) : null}
+
+          {view === VIEW_GUIDE ? (
+            <section className="erp-dev-testing-guide" aria-label="测试使用指引">
+              <DevTaskNav
+                compact
+                idPrefix="dev-testing-guide"
+                ariaLabel="测试指引主题"
+                items={GUIDE_OPTIONS}
+                value={guideTopic}
+                onChange={(topic) => {
+                  const next = new URLSearchParams(searchParams)
+                  next.set('guide', topic)
+                  setSearchParams(next)
+                }}
+              />
+              <div id={`dev-testing-guide-panel-${guideTopic}`} role="tabpanel" aria-labelledby={`dev-testing-guide-tab-${guideTopic}`}>
+                {['methods', 'devices', 'growth'].includes(guideTopic) ? (
+                  <DevTestingStrategyGuide source={strategySource} topic={guideTopic} />
+                ) : guideTopic === 'tiers' ? (
+                  <section className="erp-dev-testing-guide-tiers">
+                    <Paragraph type="secondary">T0–T8 是内部选测键，不是完成进度；按改动选择范围。</Paragraph>
+                    <div className="erp-dev-testing-tier-grid">
+                      {tiers.map((tier) => <TierCard key={tier.key} tier={tier} />)}
+                    </div>
+                  </section>
+                ) : (
+                  <section className="erp-dev-testing-guide-presets">
+                    <div className="erp-dev-testing-related">
+                      <SearchInput allowClear placeholder="搜索常用检查" value={keyword} onChange={(event) => setCommandKeyword(event.target.value)} />
+                      <Button onClick={() => selectView(VIEW_COMMANDS)}>查专项命令</Button>
+                    </div>
+                    <div className="erp-dev-testing-presets" aria-label="常用测试命令预设">
+                      {matchingPresets.map((preset) => <QuickPreset key={preset.key} preset={preset} />)}
+                    </div>
+                    {matchingPresets.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的常用检查" /> : null}
+                  </section>
+                )}
+              </div>
+              <footer className="erp-dev-testing-related">
+                <Text type="secondary">{summary.tierCount} 个验证范围 · {summary.docCount} 个来源 · {summary.commandBlockCount} 个命令块</Text>
+                <Link to={DEV_BUSINESS_USABILITY_ROUTE}>页面说明检查</Link>
+              </footer>
+            </section>
           ) : null}
 
           {view === VIEW_COMMANDS ? (
@@ -2179,6 +2067,7 @@ export default function DevTestingPage() {
 
           {view === VIEW_COVERAGE ? (
             <CoverageReportView
+              strategySource={strategySource}
               section={coverageSection}
               onSectionChange={selectCoverageSection}
               state={coverageState}
@@ -2203,25 +2092,7 @@ export default function DevTestingPage() {
               onOpenDocs={() => navigate(`${DEV_DOCS_ROUTE}?path=${encodeURIComponent('scripts/qa/README.md')}#pressure-testing`)}
             />
           ) : null}
-          <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--help">
-            <summary>工具说明与来源</summary>
-            <Paragraph>
-              本机开发工具只接受固定检查，不接受自定义命令、路径或凭据。验证范围和命令需要时再查阅。
-            </Paragraph>
-            <Paragraph>
-              {summary.tierCount} 个验证范围 · {summary.docCount} 个当前来源 ·{' '}
-              {summary.commandBlockCount} 个命令块
-              {view === VIEW_COMMANDS
-                ? `；当前筛选涉及 ${matchedSourceCount} 个来源。`
-                : '。'}
-            </Paragraph>
-            <Button
-              type="link"
-              onClick={() => openSourceDoc(DEV_TESTING_STRATEGY_SOURCE_PATH)}
-            >
-              查看验证策略
-            </Button>
-          </details>
+
         </section>
       </main>
     </div>

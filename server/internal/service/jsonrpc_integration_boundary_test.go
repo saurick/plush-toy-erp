@@ -109,7 +109,7 @@ func TestIntegrationSourceOrderWriteRechecksCurrentAuthorizationBeforeReplay(t *
 				activateOperationalFactTestCustomerConfig(t, d, customerConfigPublishParamsWithRevisionAndModuleState(
 					t, customerConfigPublishParams(t), "integration-sales-read-only", "sales_orders", "read_only",
 				))
-				want = errcode.InvalidParam.Code
+				want = errcode.BusinessRuleViolation.Code
 			}
 			_, result, err = d.handleSalesOrder(withAdminPermissionCache(ctx), "cancel_sales_order", "retry", params)
 			if err != nil || result == nil || result.Code != want || (repo.action != nil) != (want == errcode.OK.Code) {

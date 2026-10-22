@@ -1,7 +1,8 @@
 import React from 'react'
-import { Form, Input, InputNumber, Radio, Select } from 'antd'
+import { Form, Input, InputNumber, Radio } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { IncomingCheckItemsForm } from './IncomingCheckItems.jsx'
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import {
@@ -155,6 +156,7 @@ export function QualityInspectionDecisionForm({
           rules={[{ required: true, message: '请选择判定结果' }]}
         >
           <Select
+            placeholder="请选择判定结果"
             options={
               allowConcession
                 ? RESULT_DECISION_OPTIONS

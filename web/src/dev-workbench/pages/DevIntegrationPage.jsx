@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftOutlined, CloseOutlined, QuestionCircleOutlined } from '@ant-design/icons'
-import { Button, Drawer, Empty, Select, Tag, Tooltip, Typography } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
+import { Button, Drawer, Empty, Space, Tag, Typography } from 'antd'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
@@ -46,6 +46,7 @@ import {
 } from '../config/devIntegration.mjs'
 import '../styles/dev-integration.css'
 import { RpcInspection } from '../config/rpcInspection.generated.mjs'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const graph = buildProjectGraph('integration')
 const entries = buildIntegrationEntries(RpcMethod, apiSource, RpcInspection)
@@ -74,22 +75,6 @@ const detailViews = [
   ['response', '返回结果'],
   ['governance', '权限与证据'],
 ]
-
-function ColumnHelp({ label, children }) {
-  return (
-    <span className="erp-dev-integration__column-title">
-      {label}
-      <Tooltip title={children} trigger={['hover', 'focus', 'click']}>
-        <Button
-          type="text"
-          size="small"
-          icon={<QuestionCircleOutlined aria-hidden="true" />}
-          aria-label={`${label}说明`}
-        />
-      </Tooltip>
-    </span>
-  )
-}
 
 export default function DevIntegrationPage() {
   const navigate = useNavigate()
@@ -222,9 +207,9 @@ export default function DevIntegrationPage() {
     [setParams]
   )
   const selectNode = useCallback((node) => updateQuery({ node }), [updateQuery])
-  const openMethod = (event, entry, section = '') => {
+  const openMethod = (event, entry) => {
     detailOpener.current = { element: event.currentTarget, key: entry.key }
-    updateQuery({ rpc: entry.key, detail: section ? 'governance' : '', section })
+    updateQuery({ rpc: entry.key, detail: '', section: '' })
   }
   const closeDetails = () => updateQuery({ rpc: '', detail: '', section: '' })
   const updateFilters = (values, replace = false) =>
@@ -310,74 +295,44 @@ export default function DevIntegrationPage() {
   }
   const columns = [
     {
-      title: '业务域',
-      dataIndex: 'domain',
-      width: 160,
-      render: (domain, entry) => (
-        <span className="erp-dev-integration__identity">
-          <span>{entry.domainLabel}</span>
-          {entry.domainLabel !== domain ? <code>{domain}</code> : null}
-        </span>
-      ),
-    },
-    {
       title: '方法',
       dataIndex: 'method',
-      width: 300,
+      width: '46%',
       render: (method, entry) => (
         <Button type="link" onClick={(event) => openMethod(event, entry)}>
           <span className="erp-dev-integration__identity">
             {entry.label ? <span>{entry.label}</span> : null}
-            <code>{method}</code>
+            <code>{entry.domain}.{method}</code>
           </span>
         </Button>
       ),
     },
     {
-      title: (
-        <ColumnHelp label="关联权限">
-          后端业务权限的关联摘要。多项权限的或、且关系以及对象与状态限制需在详情核对，登记不代表调用获准。
-        </ColumnHelp>
-      ),
+      title: '关联权限',
       key: 'permissions',
-      width: 230,
+      width: '24%',
       render: (_, entry) => (
-        <Button type="link" className="erp-dev-integration__cell-link" onClick={(event) => openMethod(event, entry, 'permissions')}>
-          {permissionText(entry)}
-        </Button>
+        <span>
+          {!permissionState.loading && !permissionState.error && (permissionMap.get(entry.key)?.length || 0) > 1
+            ? `${permissionMap.get(entry.key).length} 项权限`
+            : permissionText(entry)}
+        </span>
       ),
     },
     {
-      title: (
-        <ColumnHelp label="正式合同">
-          接口字段与行为的正式约定，包含入参、返回及并发重试规则。关联文档不代表字段或验证已完整，缺口仍会标注。
-        </ColumnHelp>
-      ),
+      title: '合同与验证',
       key: 'contract',
-      width: 120,
+      width: '30%',
       render: (_, entry) => (
-        <Button type="link" className={!entry.contract || entry.contract.kind === 'chapter' ? 'erp-dev-integration__cell-link--missing' : ''} onClick={(event) => openMethod(event, entry, 'contract')}>
-          {entry.contract ? contractLabel(entry.contract) : '未逐项登记'}
-        </Button>
-        ),
-    },
-    {
-      title: (
-        <ColumnHelp label="验证来源">
-          关联的回归用例与运行回执。有回归来源不代表已经执行，通过结果还需核对代码版本、环境与运行时间。
-        </ColumnHelp>
+        <Space wrap>
+          <span className={!entry.contract || entry.contract.kind === 'chapter' ? 'erp-dev-integration__contract--missing' : ''}>
+            {entry.contract ? contractLabel(entry.contract) : '未逐项登记'}
+          </span>
+          <span className="erp-dev-integration__note">
+            {entry.contract?.references.length ? `${entry.contract.references.length} 项来源` : '未关联来源'}
+          </span>
+        </Space>
       ),
-      key: 'evidence',
-      width: 150,
-      render: (_, entry) => (
-        <Button
-          type="link"
-          className="erp-dev-integration__cell-link"
-          onClick={(event) => openMethod(event, entry, 'evidence')}
-        >
-          {entry.contract?.references.length ? `${entry.contract.references.length} 项回归来源` : '未关联回归来源'}
-        </Button>
-        ),
     },
   ]
 
@@ -406,7 +361,6 @@ export default function DevIntegrationPage() {
             </button>
           ))}
         </SlidingTabList>
-        <p className="erp-dev-integration__note">接入身份与范围见正式合同</p>
       </header>
       <main className="erp-dev-integration__main">
         <div
@@ -421,7 +375,7 @@ export default function DevIntegrationPage() {
                 <div className="erp-dev-integration__filter-controls">
                   <div className="erp-dev-integration__filter">
                     <label htmlFor="integration-domain">业务域</label>
-                    <Select
+                    <FilterSelect
                       id="integration-domain"
                       aria-label="筛选业务域"
                       allowClear
@@ -429,7 +383,7 @@ export default function DevIntegrationPage() {
                       virtual={false}
                       filterOption={(input, option) => `${option.label} ${option.value}`.toLowerCase().includes(input.toLowerCase())}
                       value={query.domain || undefined}
-                      placeholder="全部业务域"
+                      placeholder="业务域"
                       options={[{ label: '全部业务域', value: '' }, ...domains]}
                       onChange={(domain) => updateFilters({ domain })}
                     />
@@ -453,14 +407,11 @@ export default function DevIntegrationPage() {
                       ? `找到 ${filtered.length} 个接口 · 共 ${entries.length} 个`
                       : `共 ${entries.length} 个接口`}
                   </span>
-                  <Button
-                    type="text"
-                    aria-label="重置筛选"
-                    disabled={!query.domain && !query.q}
-                    onClick={clearFilters}
-                  >
-                    重置
-                  </Button>
+                  {query.domain || query.q ? (
+                    <Button type="text" aria-label="重置筛选" onClick={clearFilters}>
+                      重置
+                    </Button>
+                  ) : null}
                 </div>
               </div>
               <div className={`erp-dev-integration__inventory-surface${selected ? ' erp-dev-integration__inventory-surface--open' : ''}`} ref={inventorySurface}>
@@ -473,16 +424,17 @@ export default function DevIntegrationPage() {
                     bordered
                     columns={columns}
                     dataSource={filtered}
-                    scroll={{ x: 945 }}
+                    scroll={{ x: 700 }}
                     pagination={{
                     ...DEV_PAGINATION,
                     current: page,
                     pageSize: INTEGRATION_PAGE_SIZE,
                     showSizeChanger: false,
+                    hideOnSinglePage: true,
                     onChange: (nextPage) => updateQuery({ page: nextPage === 1 && !query.rpc ? '' : nextPage }),
                   }}
                     locale={{
-                    emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的接口，请调整或清除筛选"><Button onClick={clearFilters}>重置并查看全部接口</Button></Empty>,
+                    emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的接口，请调整或清除筛选" />,
                   }}
                   />
                   <div className="erp-dev-integration__source erp-dev-integration__permission-source" aria-label="权限来源">
@@ -513,6 +465,7 @@ export default function DevIntegrationPage() {
           selected ? (
             <div className="erp-dev-integration__drawer-identity">
               <h2>{selected.label || selected.method}</h2>
+              <span>{selected.domainLabel}</span>
               <code>{selected.domain} / {selected.method}</code>
               <p>{selected.description || '当前方法用途尚未登记。'}</p>
             </div>
@@ -524,8 +477,7 @@ export default function DevIntegrationPage() {
                   styles={{ wrapper: { top: 'var(--integration-drawer-top, 0px)', bottom: 'auto', height: 'var(--integration-drawer-height, 600px)', maxWidth: '100%' } }}
                   width={640}
                   closable={false}
-                  extra={<Button ref={closeButton} type="text" icon={<CloseOutlined aria-hidden="true" />} aria-label="关闭" onClick={closeDetails} />}
-                  footer={<Button icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={closeDetails}>返回接口清单</Button>}
+                  extra={<Button ref={closeButton} type="text" icon={<ArrowLeftOutlined aria-hidden="true" />} onClick={closeDetails}>返回接口清单</Button>}
                   onClose={closeDetails}
                   afterOpenChange={(open) => {
                     if (document.activeElement?.closest('.erp-dev-integration__filters')) return
@@ -554,9 +506,6 @@ export default function DevIntegrationPage() {
                       </div>
                       <div className="erp-dev-integration__access-summary">
                         <span>按正式合同鉴权 · 未关联实际适配器</span>
-                        <Button type="link" onClick={() => updateQuery({ detail: 'governance', section: 'access' })}>
-                          查看接入关系
-                        </Button>
                       </div>
                       {selectedPosition < 0 ? (
                         <div className="erp-dev-integration__access-summary" role="status">

@@ -171,11 +171,6 @@ export function createBusinessModuleNavigationScenarios({
         const menu = page.locator('.erp-admin-sider .erp-admin-menu')
         assert.equal(await menu.getByRole('menuitem').filter({ hasText: /^基础资料$/u }).count(), 1)
         assert.equal(await menu.getByRole('menuitem').filter({ hasText: /^(财务管理|采购管理)$/u }).count(), 0)
-        await page.getByRole('button', { name: '全部模块', exact: true }).click()
-        const catalog = page.locator('.erp-module-catalog')
-        await catalog.getByRole('button', { name: '材料档案', exact: true }).waitFor()
-        assert.equal(await catalog.getByRole('button', { name: '客户档案', exact: true }).count(), 0)
-        await page.keyboard.press('Escape')
         await page.goto(new URL('/erp/master/partners/customers', page.url()).href)
         await page.waitForURL('**/erp/master/materials')
         await moduleTabs(page).getByRole('tab', { name: '材料档案', exact: true, selected: true }).waitFor()
@@ -284,13 +279,13 @@ export function createBusinessModuleNavigationScenarios({
             const main = document.querySelector(
               '.erp-admin-shell > .ant-layout'
             )
-            const header = document.querySelector('.erp-admin-header')
+            const header = document.querySelector('.erp-business-page-header-card')
             const outlet = document.querySelector('.erp-admin-outlet')
             const menu = sider?.querySelector('.erp-admin-menu')
             const selected = sider?.querySelector('.ant-menu-item-selected')
             const selectedIcon = selected?.querySelector('.anticon')
             const collapse = sider?.querySelector('.erp-admin-brand__collapse')
-            const catalog = sider?.querySelector('.erp-module-catalog-trigger')
+            const account = sider?.querySelector('.erp-admin-account')
             const siderBox = sider?.getBoundingClientRect()
             const mainBox = main?.getBoundingClientRect()
             const headerBox = header?.getBoundingClientRect()
@@ -356,8 +351,8 @@ export function createBusinessModuleNavigationScenarios({
                   : Number.POSITIVE_INFINITY,
               collapseLabel: collapse?.getAttribute('aria-label') || '',
               collapseFocused: document.activeElement === collapse,
-              catalogText: catalog?.textContent?.trim() || '',
-              catalogLabel: catalog?.getAttribute('aria-label') || '',
+              accountText: account?.textContent?.trim() || '',
+              accountLabel: account?.getAttribute('aria-label') || '',
               documentOverflow:
                 document.documentElement.scrollWidth -
                 document.documentElement.clientWidth,
@@ -370,7 +365,7 @@ export function createBusinessModuleNavigationScenarios({
         assert.equal(expanded.brandCopyVisible, true)
         assert(expanded.visibleGroupTitleCount > 0, JSON.stringify(expanded))
         assert.equal(expanded.collapseLabel, '收起侧边菜单')
-        assert.match(expanded.catalogText, /全部模块/u)
+        assert.match(expanded.accountLabel, /^账号菜单：/u)
         assert(
           Math.abs(expanded.siderWidth - 206) < 1,
           JSON.stringify(expanded)
@@ -413,8 +408,7 @@ export function createBusinessModuleNavigationScenarios({
         assert.equal(collapsed.selectedText, expanded.selectedText)
         assert.equal(collapsed.collapseLabel, '展开侧边菜单')
         assert.equal(collapsed.collapseFocused, true)
-        assert.equal(collapsed.catalogText, '')
-        assert.equal(collapsed.catalogLabel, '全部模块')
+        assert.equal(collapsed.accountLabel, expanded.accountLabel)
         assert(
           collapsed.selectedIconCenterDelta < 1.5,
           JSON.stringify(collapsed)
@@ -429,7 +423,7 @@ export function createBusinessModuleNavigationScenarios({
           JSON.stringify({ expanded, collapsed })
         )
         assert(
-          Math.abs(collapsed.headerWidth - collapsed.mainWidth) < 1,
+          Math.abs(collapsed.headerWidth - collapsed.outletWidth) < 1,
           JSON.stringify(collapsed)
         )
         assert(
@@ -462,12 +456,12 @@ export function createBusinessModuleNavigationScenarios({
           brandCopyVisible: Boolean(
             node.querySelector('.erp-admin-brand__logo-copy')
           ),
-          catalogText:
-            node.querySelector('.erp-module-catalog-trigger')?.textContent || '',
+          accountLabel:
+            node.querySelector('.erp-admin-account')?.getAttribute('aria-label') || '',
         }))
         assert.equal(drawerMetrics.menuCollapsed, false)
         assert.equal(drawerMetrics.brandCopyVisible, true)
-        assert.match(drawerMetrics.catalogText, /全部模块/u)
+        assert.match(drawerMetrics.accountLabel, /^账号菜单：/u)
         await page.keyboard.press('Escape')
         await drawer.locator('.ant-drawer-content').waitFor({ state: 'hidden' })
 

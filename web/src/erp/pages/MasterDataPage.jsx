@@ -1160,6 +1160,7 @@ export default function MasterDataPage({ type }) {
                   size="small"
                   className="erp-business-module-status-action"
                   data-business-action-role="secondary"
+                  data-business-action-group="business"
                   disabled={!selectedRecord || saving}
                   icon={
                     selectedRecord?.is_active === false ? (

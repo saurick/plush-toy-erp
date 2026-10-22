@@ -1,7 +1,8 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { CalendarOutlined, UnorderedListOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Form, Grid, Input, Select, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, Button, Empty, Form, Grid, Input, Space, Spin, Tag, Typography } from 'antd'
 import { useLocation } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import useWorkflowTaskAssignmentAccess from '../../hooks/useWorkflowTaskAssignmentAccess.js'
 import EngineeringMaterialTaskAction from '../sales-orders/EngineeringMaterialTaskAction.jsx'
 import EngineeringMaterialTaskSummaryEntry from '../sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
@@ -18,15 +19,17 @@ import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
-import { DateTimeInput, SelectionActionOverlayContext } from '../business-list/BusinessListLayout.jsx'
+import { SelectionActionOverlayContext } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 import WorkflowTaskActionDrawer, { getWorkflowTaskActionMeta } from './WorkflowTaskActionDrawer.jsx'
 import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
+import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
 import WorkflowSourceProgressButton from './WorkflowSourceProgressButton.jsx'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
 import { useSourceOrderWorkflowActions } from './useSourceOrderWorkflowActions.mjs'
 import { getWorkflowTaskCreateOptions, createWorkflowFollowupTask, listWorkflowTasks } from '../../api/workflowApi.mjs'
 import { canCreateFollowupFromRecord, followupSource, businessTaskSource, requireFollowupTaskPage } from '../../utils/workflowFollowup.mjs'
-import { hasActionPermission, formatUnixDate } from '../../utils/masterDataOrderView.mjs'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { getWorkflowTaskOwnerRoleLabel, getWorkflowTaskStatusMeta, writeWorkflowTaskBoardFiltersToSearch } from '../../utils/workflowTaskBoard.mjs'
 import { isWorkflowTaskMutationResultUnknown, workflowTaskMutationUUID } from '../../utils/workflowTaskMutation.mjs'
 import { buildWorkflowDeadlineQuickOptions } from '../../utils/workflowTaskTiming.mjs'
@@ -285,14 +288,14 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
     { title: '任务事项', key: 'name', width: '40%', render: (_, item) => <Button type="link" className="business-task-panel__task-name" onClick={() => openTask(item)}>{getWorkflowTaskDisplayName(item)}</Button> },
     { title: '责任岗位', key: 'role', width: '18%', render: (_, item) => getWorkflowTaskOwnerRoleLabel(item) },
     { title: '状态', key: 'state', width: '18%', render: (_, item) => <Tag>{getWorkflowTaskStatusMeta(item).label}</Tag> },
-    { title: '截止时间', dataIndex: 'due_at', width: '24%', render: (value) => value ? formatUnixDate(value) : '未设置' },
+    { title: '处理时间', key: 'timing', width: '24%', render: (_, item) => <WorkflowTaskTiming task={item} includeKeys={['due', 'ended']} /> },
   ]
   const createAction = canCreate ? (
     <Button size="small" icon={<CalendarOutlined />} data-business-action-key="create-followup" disabled={disabled || sourceLoading || !matchingSource || (!pending && !canCreateFollowupFromRecord(sourceType, record))} title={!source ? '请先选择一张单据' : !canCreateFollowupFromRecord(sourceType, record) ? '当前单据已结束，可查看已有任务' : undefined} onClick={() => openView('create')}>{pending ? '确认创建结果' : '新建跟进任务'}</Button>
   ) : null
   return (
     <>
-      {panelOpen === undefined ? <Button size="small" icon={<UnorderedListOutlined />} data-business-action-key="related-tasks" disabled={disabled || (!source && !pending)} title={!source && !pending ? '请先选择一张单据' : undefined} onClick={() => openView(pending ? 'create' : 'related')}>{pending ? '确认任务创建结果' : '相关任务'}</Button> : null}
+      {panelOpen === undefined ? <Button size="small" className="erp-business-task-collaboration-entry" icon={<UnorderedListOutlined />} data-business-action-key="related-tasks" disabled={disabled || (!source && !pending)} title={!source && !pending ? '请先选择一张单据' : undefined} onClick={() => openView(pending ? 'create' : 'related')}>{pending ? '确认任务创建结果' : '任务协作'}</Button> : null}
       <BusinessFormModal
         open={open}
         forceRender
@@ -325,9 +328,9 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
               <Form form={form} layout="vertical" initialValues={{ assignee_id: 'pool', priority: 0 }} disabled={saving || pending || loading || !options?.can_create} className="erp-business-task-form">
                 <Form.Item name="task_name" label="任务事项" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请填写任务事项' }]}><Input maxLength={128} placeholder="例如：补充包装稿、确认交期变化" /></Form.Item>
                 <Form.Item name="owner_role_key" label="责任岗位" rules={[{ required: true, message: '请选择责任岗位' }]}><Select placeholder="请选择责任岗位" options={(options?.roles || []).map((role) => ({ value: role.role_key, label: role.label }))} onChange={() => form.setFieldsValue({ assignee_id: 'pool' })} /></Form.Item>
-                <Form.Item name="assignee_id" label="办理人"><Select options={[{ value: 'pool', label: '由岗位人员处理' }, ...(selectedRole?.assignees || []).map((person) => ({ value: person.admin_id, label: person.display_name }))]} /></Form.Item>
+                <Form.Item name="assignee_id" label="办理人"><Select placeholder="请选择办理人" options={[{ value: 'pool', label: '由岗位人员处理' }, ...(selectedRole?.assignees || []).map((person) => ({ value: person.admin_id, label: person.display_name }))]} /></Form.Item>
                 <Form.Item name="deadline" label="截止时间" rules={[{ required: true, message: '请选择截止时间' }]}><DateTimeInput quickOptions={WORKFLOW_DEADLINE_QUICK_OPTIONS} quickOptionsLabel="快捷截止" showNow={false} /></Form.Item>
-                <Form.Item name="priority" label="优先级"><Select options={[{ value: 0, label: '普通' }, { value: 10, label: '紧急' }]} /></Form.Item>
+                <Form.Item name="priority" label="优先级"><Select placeholder="请选择优先级" options={[{ value: 0, label: '普通' }, { value: 10, label: '紧急' }]} /></Form.Item>
                 <Form.Item name="description" label="需要对方完成什么" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请写清任务要求和期望结果' }]}><Input.TextArea maxLength={2000} showCount autoSize={{ minRows: 3, maxRows: 7 }} /></Form.Item>
               </Form>
             </Spin>
@@ -346,7 +349,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
                   <article role="listitem" key={item.id} className="business-task-panel__mobile-task">
                     <Button type="link" className="business-task-panel__task-name" onClick={() => openTask(item)}>{getWorkflowTaskDisplayName(item)}</Button>
                     <div><span>{getWorkflowTaskOwnerRoleLabel(item)}</span><Tag>{getWorkflowTaskStatusMeta(item).label}</Tag></div>
-                    <small>截止时间：{item.due_at ? formatUnixDate(item.due_at) : '未设置'}</small>
+                    <WorkflowTaskTiming task={item} includeKeys={['due', 'ended']} />
                   </article>
                 ))}
                 {!visibleTasks.length && !listLoading ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={sourceID ? '当前单据暂无可见任务' : sourceEmptyText} /> : null}
@@ -385,5 +388,5 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   )
 }
 
-BusinessTaskActions.selectionActionRole = 'related'
+BusinessTaskActions.selectionActionRole = 'collaboration'
 BusinessTaskActions.selectionActionVisible = ({ adminProfile }) => hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)

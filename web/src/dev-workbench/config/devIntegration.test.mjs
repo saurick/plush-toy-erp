@@ -79,6 +79,25 @@ test('integration selection reads the formal guide and links to its chapter', ()
   assert.doesNotMatch(guide.source, /## 命名/u)
 })
 
+test('integration keeps every field across grouped tables and excludes explanatory tables', () => {
+  const source = [
+    '#### 示例 `admin.set_disabled`', '', '##### 请求参数', '',
+    '**账号**', '', '| 字段 | 类型 | 必填条件 | 说明 |', '| --- | --- | --- | --- |',
+    '| `id` | integer | 必填 | 账号标识。 |', '',
+    '**状态**', '', '| 字段 | 类型 | 必填条件 | 说明 |', '| --- | --- | --- | --- |',
+    '| `disabled` | boolean &#124; null | 条件必填 | 新状态。 |', '',
+    '| 情况 | 处理 |', '| --- | --- |', '| 停用 | 撤销访问 |', '',
+    '```json', '{"jsonrpc":"2.0","method":"set_disabled","params":{"id":1,"disabled":true},"id":"grouped"}', '```',
+  ].join('\n')
+  const { request } = readIntegrationCallDetails(source, RpcMethod).get('admin.set_disabled')
+  assert.deepEqual(request.fields.map(({ name, type }) => ({ name, type })), [
+    { name: 'id', type: 'integer' }, { name: 'disabled', type: 'boolean | null' },
+  ])
+  assert.equal(request.example.params.id, 1)
+  assert.match(request.notesSource, /停用.*撤销访问/u)
+  assert.doesNotMatch(request.notesSource, /\| `id`/u)
+})
+
 test('integration selection respects Markdown fences and chapter boundaries and marks absent guidance', () => {
   const heading = '### 接入方式选择 / Integration Selection'
   const body = '正文\n\n#### 业务含义\n\n保留本节内容\n\n```md\n### 示例标题\n```'

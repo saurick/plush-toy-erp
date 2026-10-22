@@ -1443,10 +1443,7 @@ export function evaluateDashboardTaskCurrentBatchEvidence({
   const currentBatchBound =
     currentBatch?.dataStatus === "pass" &&
     taskProbe?.status === "pass" &&
-    taskProbe?.batchEvidence === "exact_source" &&
-    taskProbe?.exactSourceType === TASK_SOURCE_TYPE &&
-    Number.isSafeInteger(taskProbe?.exactSourceID) &&
-    taskProbe.exactSourceID > 0 &&
+    taskProbe?.batchEvidence === "exact_task_codes" &&
     taskProbe?.exactOwnerRoleKey === roleKey &&
     taskProbe?.exactTaskCodePrefix === expectedPrefix &&
     (taskGroup === null || taskProbe?.exactTaskGroup === taskGroup);
@@ -1823,10 +1820,7 @@ export function evaluateMobileCurrentBatchEvidence({
     currentBatch?.dataStatus === "pass" &&
     currentBatch?.actual === minimumRecords &&
     taskProbe?.status === "pass" &&
-    taskProbe?.batchEvidence === "exact_source" &&
-    taskProbe?.exactSourceType === TASK_SOURCE_TYPE &&
-    Number.isSafeInteger(taskProbe?.exactSourceID) &&
-    taskProbe.exactSourceID > 0 &&
+    taskProbe?.batchEvidence === "exact_task_codes" &&
     taskProbe?.exactTaskCodePrefix === taskCodePrefix &&
     taskProbe?.exactOwnerRoleKey === roleKey;
   const minimumSatisfied =
@@ -2011,7 +2005,7 @@ export function resolveCurrentBatchListFilter(
   }
   const taskProbe = currentBatch.probes.find(
     (probe) =>
-      probe.batchEvidence === "exact_source" && probe.exactTaskCodePrefix,
+      probe.batchEvidence === "exact_task_codes" && probe.exactTaskCodePrefix,
   );
   if (taskProbe) {
     return {

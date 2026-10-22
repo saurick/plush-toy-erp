@@ -28,7 +28,7 @@ func TestInventoryConflictErrorsKeepPublicMessages(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.mapError(t.Context(), fmt.Errorf("save record: %w", tt.conflict))
-			if result.Code != errcode.InvalidParam.Code || result.Message != tt.message {
+			if result.Code != errcode.ResourceConflict.Code || result.Message != tt.message {
 				t.Fatalf("unexpected public error: %+v", result)
 			}
 		})

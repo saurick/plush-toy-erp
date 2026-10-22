@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import fs from 'node:fs/promises'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
@@ -630,7 +631,8 @@ async function assertDesktopActionState(
 
 async function assertUnselectedActions(page, assert) {
   const layout = await captureActionLayout(page)
-  assert.equal(await page.locator('.erp-business-selection-action-bar--placeholder:visible').count(), 1, '有记录未选择时保留常驻操作栏')
+  assert.equal(await page.locator('.erp-business-selection-action-bar--empty:visible').count(), 1, '有记录未选择时保留常驻操作栏')
+  assert(layout.buttons.filter((button) => button.key !== '更多操作').every((button) => button.disabled), '未选择时记录动作不可执行')
   assert.equal(
     await page.locator('[data-business-action-key="clear-selection"]:visible').count(),
     0,
@@ -853,6 +855,46 @@ export function createBusinessActionStabilityScenarios(deps) {
   const productionIdentity = roleIdentity('production')
 
   return [
+    ...['light', 'dark'].map((themeMode) => ({
+      name: `business-action-inline-groups-sales-${themeMode}`,
+      themeMode,
+      path: SALES_ORDER_PATH,
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page)
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '销售订单')
+        await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
+        const bar = page.locator('.erp-business-selection-action-bar__record-actions').first()
+        const groups = bar.locator('.erp-business-selection-action-bar__group')
+        await settleActionSpace(page)
+        assert.deepEqual(await groups.locator('.erp-business-selection-action-bar__group-heading').allTextContents(), ['任务协作', '业务办理', '查看与关联', '单据处理'])
+        assert.equal(await groups.filter({ has: page.locator('[data-business-action-key="reserve-stock"]') }).getAttribute('data-business-action-group'), 'business')
+        assert.equal(await groups.filter({ has: page.locator('[data-business-action-key="view-details"]') }).getAttribute('data-business-action-group'), 'query')
+        assert.equal(await groups.filter({ has: page.locator('[data-business-action-key="lifecycle-cancel"]') }).getAttribute('data-business-action-group'), 'lifecycle')
+        assert.equal(await bar.locator('.erp-business-selection-action-bar__compact-more').count(), 0, '宽屏直接分类，不强制折叠')
+        await page.screenshot({ path: path.join(outputDir, `sales-action-visible-groups-${themeMode}-4k.png`), fullPage: false })
+        await page.locator('.erp-business-module-current-action:visible').screenshot({ path: path.join(outputDir, `sales-action-visible-groups-${themeMode}-detail.png`) })
+        const expected = (await assertActionSpace(page, assert, '销售分类1920')).inline.sort()
+        for (const width of [1440, 1280, 991, 768, 390, 320, 1920]) {
+          await page.setViewportSize({ width, height: 1080 })
+          const current = await assertActionSpace(page, assert, `销售分类${width}`)
+          assert.deepEqual([...current.inline, ...current.overflow].sort(), expected, '分类与收纳不丢失操作')
+          const geometry = await groups.evaluateAll((nodes) => nodes.map((node) => {
+            const caption = node.querySelector('.erp-business-selection-action-bar__group-heading')
+            const body = node.querySelector('.erp-business-selection-action-bar__group-actions')
+            const rect = node.getBoundingClientRect()
+            return { label: caption?.textContent, headingBottom: caption?.getBoundingClientRect().bottom, bodyTop: body.getBoundingClientRect().top, left: rect.left, right: rect.right, captionWidth: caption?.scrollWidth, groupWidth: rect.width }
+          }))
+          assert.ok(geometry.every((group) => group.headingBottom <= group.bodyTop && group.captionWidth <= group.groupWidth + 1), `分类标题与按钮不重叠或裁切: ${JSON.stringify(geometry)}`)
+          await assertNoHorizontalOverflow(page, `销售分类${width}`)
+        }
+      },
+    })),
     {
       name: 'business-action-space-shipments-wide-narrow',
       path: SHIPMENT_PATH,
@@ -878,8 +920,9 @@ export function createBusinessActionStabilityScenarios(deps) {
             await page.setViewportSize({ width, height: 1080 })
             const current = await assertActionSpace(page, assert, `出货${suffix}-${width}`)
             assert.deepEqual([...current.inline, ...current.overflow].sort(), expected, '缩放只调整位置，不遗漏或新增动作')
-            if (current.more && suffix === 'DRAFT') {
-              assert.ok(current.inline.some((key) => ['shipment-release', 'shipment-ship'].includes(key)) || current.inline.length === 0, '空间不足时优先保留当前办理动作')
+            if (current.more && suffix === 'DRAFT' && width >= 768) {
+              const directBusinessActions = current.inline.filter((key) => key !== 'related-tasks')
+              assert.ok(directBusinessActions.some((key) => ['shipment-release', 'shipment-ship'].includes(key)) || directBusinessActions.length === 0, '保留任务协作后，剩余空间优先分配当前办理动作')
             }
             await assertNoHorizontalOverflow(page, `出货${suffix}-${width}`)
           }
@@ -932,6 +975,7 @@ export function createBusinessActionStabilityScenarios(deps) {
             const metrics = await assertActionSpace(page, assert, `出货只读${suffix}-${width}`)
             assert.equal(metrics.more, false, '少量只读按钮放得下时不出现更多操作')
             assert.deepEqual(metrics.inline, ['shipment-details', 'related-records'])
+            assert.equal(await page.locator('.erp-business-selection-action-bar__record-actions .erp-business-selection-action-bar__group-heading').count(), 0, '只有一个类别时不重复增加分类标题')
             await assertNoHorizontalOverflow(page, `出货只读${suffix}-${width}`)
           }
         }
@@ -1129,9 +1173,8 @@ export function createBusinessActionStabilityScenarios(deps) {
           }
           await popup.locator('[data-print-blank-notice]').waitFor({ state: 'visible' })
           for (let number = 1; number <= 20; number++) await verifyBlankPrice(number)
-          await popup
-            .getByRole('combobox', { name: '输出批次', exact: true })
-            .selectOption('1')
+          await chooseSelectOption(popup
+            .getByRole('combobox', { name: '输出批次', exact: true }), '1')
           await popup
             .locator('[data-purchase-order-no="PO-SUMMARY-21"]')
             .waitFor({ state: 'visible' })
@@ -2236,7 +2279,9 @@ export function createBusinessActionStabilityScenarios(deps) {
           .waitFor({ state: 'visible' })
         await closeActionMenu(page)
         await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
-        assert.ok((await captureMobileActionLayout(page)).visible.includes('lifecycle-primary'))
+        assert.ok((await captureMobileActionLayout(page)).visible.includes('related-tasks'), '任务协作在窄屏仍直接可见')
+        await assertDesktopActionState(page, assert, 'lifecycle-primary', { visible: true, disabled: false })
+        assert.equal(await page.locator('[data-business-action-key="lifecycle-primary"]').evaluate((button) => button.classList.contains('ant-btn-primary')), false, '正常关闭不使用填色主按钮')
         await assertDesktopActionState(page, assert, 'edit', { visible: false })
         await assertDesktopActionState(page, assert, 'reserve-stock', {
           visible: true,

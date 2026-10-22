@@ -8,7 +8,7 @@ import {
   parseBusinessRuleSearch,
 } from './devBusinessRules.mjs'
 
-const unit = BUSINESS_RULES[0].tests[0]
+const unit = BUSINESS_RULES.find((entry) => entry.id === 'unit-quantity').tests[0]
 const database = BUSINESS_RULES.find(
   (entry) => entry.id === 'inventory-atomicity'
 ).tests[0]

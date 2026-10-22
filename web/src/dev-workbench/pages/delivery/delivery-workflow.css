@@ -65,35 +65,82 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-.erp-dev-delivery-jobs article {
+.erp-dev-delivery-job-group {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  justify-items: start;
+  align-content: start;
   min-width: 0;
   padding: 18px;
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-business-card-radius);
   background: var(--erp-surface-bg);
 }
-.erp-dev-delivery-jobs h2 {
-  margin-bottom: 4px;
-}
-.erp-dev-delivery-job-scope,
-.erp-dev-delivery-home-footer {
+.erp-dev-delivery-job-group h2 {
+  margin: 0 0 4px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+}
+.erp-dev-delivery-jobs article {
+  min-width: 0;
+  padding-block: 16px;
+}
+.erp-dev-delivery-jobs article + article {
+  border-top: 1px solid var(--erp-border);
 }
 .erp-dev-delivery-jobs p {
-  margin-top: 10px;
+  margin-top: 6px;
 }
 .erp-dev-delivery-job-link {
-  margin-top: 16px;
   font-weight: 500;
 }
 .erp-dev-delivery-home-footer {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
   display: flex;
+  align-items: start;
   justify-content: space-between;
   gap: 16px;
+}
+.erp-dev-delivery-home-footer > a {
+  flex: 0 0 auto;
+  padding-block: 8px;
+}
+.erp-dev-delivery-home-footer > details {
+  flex: 1;
+  min-width: 0;
+}
+.erp-dev-delivery-inline-details > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--erp-text-muted);
+}
+.erp-dev-delivery-inline-details > :not(summary) {
+  display: block;
+  margin-block: 6px;
+}
+.erp-dev-version-identity > details {
+  margin-top: 4px;
+}
+.erp-dev-version-overview__main > details {
+  margin-top: 12px;
+}
+.erp-dev-environment-evidence__table {
+  table-layout: fixed;
+}
+.erp-dev-environment-evidence__table [data-environment] > th > strong {
+  display: block;
+  margin-bottom: 6px;
+}
+.erp-dev-environment-detail {
+  padding: 8px 0;
+}
+.erp-dev-environment-detail dl {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+}
+.erp-dev-environment-detail .erp-dev-environment-detail__dimensions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.erp-dev-environment-detail dl > div {
+  min-width: 0;
 }
 .erp-dev-delivery-decision {
   display: flex;
@@ -123,18 +170,6 @@
 }
 .erp-dev-version-tab--versions > .erp-dev-delivery-path {
   margin-bottom: 12px;
-}
-.erp-dev-security-table th:first-child {
-  width: 18%;
-}
-.erp-dev-security-table th:nth-child(2) {
-  width: 14%;
-}
-.erp-dev-security-table th:nth-child(3) {
-  width: 36%;
-}
-.erp-dev-security-table th:nth-child(4) {
-  width: 32%;
 }
 .erp-dev-security-table td {
   vertical-align: top;

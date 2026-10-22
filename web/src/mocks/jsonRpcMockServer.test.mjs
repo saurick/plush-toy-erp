@@ -420,7 +420,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       ...resumeParams,
       idempotency_key: 'mock-resume-new-intent',
     })
-    assert.equal(newResumeIntentAfterReady.result.code, 40010)
+    assert.equal(newResumeIntentAfterReady.result.code, 42200)
 
     const rejectedTask = await createTask('MOCK-CAS-REJECTED')
     const rejected = await workflowCall('reject_task_action', {

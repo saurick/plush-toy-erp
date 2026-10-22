@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useId, useState } from 'react'
-import { Alert, Button, Select, Space, Tag } from 'antd'
+import { Alert, Button, Space, Tag } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import Pagination from '@/common/components/pagination/AppPagination'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -88,6 +89,7 @@ export default function BOMTaskPanel({ context, onContextChange, adminProfile })
             <div className="business-task-panel__order">
               <label htmlFor={selectID}>关联销售订单</label>
               <Select
+                allowClear={false}
                 id={selectID}
                 aria-label="关联销售订单"
                 value={selected?.id}

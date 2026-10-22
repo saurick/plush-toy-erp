@@ -18,19 +18,15 @@ export function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
   const [fullDagOpen, setFullDagOpen] = useState(false)
   const dag = buildQualityGateServerDag(evidence)
   const visibleStatuses = new Set(timing.flowJobs.map((job) => job.status))
+  if (!dag.chart && !timing.flowJobs.length) {
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前提交尚无实际 Job" />
+  }
   return (
     <section
       className="erp-dev-quality-server-pipeline"
       aria-labelledby="gitlab-pipeline-flow-title"
     >
-      <div className="erp-dev-quality-server-pipeline__heading">
-        <div>
-          <Text id="gitlab-pipeline-flow-title" strong>
-            本次流水线
-          </Text>
-        </div>
-      </div>
-      <div className="erp-dev-quality-server-pipeline__relationship">
+      <div id="gitlab-pipeline-flow-title" className="erp-dev-quality-server-pipeline__relationship">
         <div>
           <Text strong>
             {dag.status === 'available' ? '实际依赖已读取' : '依赖图尚未形成'}
@@ -72,7 +68,7 @@ export function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
             ) : null}
           </details>
         </div>
-      ) : (
+      ) : timing.flowJobs.length ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
@@ -81,13 +77,13 @@ export function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
               : '当前 Pipeline 的依赖关系暂不可读；下方 Job 明细仍可核对'
           }
         />
-      )}
+      ) : null}
       <div className="erp-dev-quality-server-pipeline__mapping">
         <div className="erp-dev-quality-server-pipeline__mapping-heading">
           <div>
             <Text strong>当前 Job 明细</Text>
           </div>
-          <Tag>{timing.flowJobs.length} 个</Tag>
+          {timing.flowJobs.length ? <Tag>{timing.flowJobs.length} 个</Tag> : null}
         </div>
         {timing.flowGroups.length ? (
           <div className="erp-dev-quality-server-pipeline__track">

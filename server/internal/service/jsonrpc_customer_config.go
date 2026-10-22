@@ -510,16 +510,16 @@ func (d *jsonrpcDispatcher) validateApprovalSettingsMemberEligibility(
 		roleKey := biz.NormalizeRoleKey(membership.RoleKey)
 		role, exists := roleByKey[roleKey]
 		if !exists {
-			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位不存在"}
+			return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选岗位不存在"}
 		}
 		if role.Disabled {
-			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前已停用"}
+			return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "所选岗位当前已停用"}
 		}
 		if !biz.PermissionSetHasAny(
 			biz.PermissionKeySet(role.Permissions),
 			biz.PermissionWorkflowTaskApprove,
 		) {
-			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前未开启审批功能"}
+			return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "所选岗位当前未开启审批功能"}
 		}
 		if membership.UserID > 0 {
 			var named *biz.AdminUser
@@ -529,14 +529,17 @@ func (d *jsonrpcDispatcher) validateApprovalSettingsMemberEligibility(
 					break
 				}
 			}
-			if named == nil || named.AccountStatus() == biz.AdminAccountStatusRevoked {
-				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工不存在或已离职"}
+			if named == nil {
+				return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "指定员工不存在"}
+			}
+			if named.AccountStatus() == biz.AdminAccountStatusRevoked {
+				return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "指定员工已离职"}
 			}
 			if !named.IsActive() {
-				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工当前未启用"}
+				return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "指定员工当前未启用"}
 			}
 			if !biz.AdminHasRole(named, roleKey) {
-				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工不属于所选岗位"}
+				return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "指定员工不属于所选岗位"}
 			}
 			continue
 		}
@@ -549,7 +552,7 @@ func (d *jsonrpcDispatcher) validateApprovalSettingsMemberEligibility(
 			break
 		}
 		if !matched {
-			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前没有可办理员工"}
+			return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "所选岗位当前没有可办理员工"}
 		}
 	}
 	return nil
@@ -627,7 +630,7 @@ func approvalSettingsExplanationToMap(settings *biz.ApprovalSettingsExplanation)
 
 func (d *jsonrpcDispatcher) requireCustomerConfigModulesEnabled(ctx context.Context, customerKey string, moduleKeys ...string) *v1.JsonrpcResult {
 	if d == nil || d.customerConfigUC == nil {
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
 	resolvedCustomerKey, err := runtimeCustomerKey(customerKey)
 	if err != nil {
@@ -641,7 +644,7 @@ func (d *jsonrpcDispatcher) requireCustomerConfigModulesEnabled(ctx context.Cont
 
 func (d *jsonrpcDispatcher) requireCustomerConfigModulesReadable(ctx context.Context, moduleKeys ...string) *v1.JsonrpcResult {
 	if d == nil || d.customerConfigUC == nil {
-		return invalidParamResult()
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
 	resolvedCustomerKey, err := runtimeCustomerKey("")
 	if err != nil {
@@ -684,7 +687,7 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	switch {
 	case errors.Is(err, biz.ErrWorkflowTaskSourceGeneratedOnly):
 		l.Warnf("[customer_config] source-generated task namespace rejected err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该任务由业务来源生成，请回到对应业务页面办理"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该任务由业务来源生成，请回到对应业务页面办理"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[customer_config] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
@@ -693,7 +696,7 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrCustomerConfigNotFound):
 		l.Warnf("[customer_config] revision not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户配置版本不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "客户配置版本不存在"}
 	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionRequired):
 		l.Warnf("[customer_config] active revision required for fixed customer runtime err=%v", err)
 		return &v1.JsonrpcResult{
@@ -705,19 +708,19 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 		}
 	case errors.Is(err, biz.ErrCustomerConfigRevisionImmutable):
 		l.Warnf("[customer_config] immutable revision overwrite rejected err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置版本已存在且内容不同，请使用新版本号发布"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "客户配置版本已存在且内容不同，请使用新版本号发布"}
 	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionChanged):
 		l.Warnf("[customer_config] active revision compare-and-swap rejected err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "当前激活版本已变化，请重新检查后再执行"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "当前激活版本已变化，请重新检查后再执行"}
 	case errors.Is(err, biz.ErrCustomerConfigProductVersionMismatch):
 		l.Warnf("[customer_config] expected product version mismatch err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "产品版本已变化，请重新校验后再执行"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品版本已变化，请重新校验后再执行"}
 	case errors.Is(err, biz.ErrCustomerConfigTransitionBlocked):
 		l.Warnf("[customer_config] transition preflight blocked err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置切换存在运行中阻塞，请先查看切换检查结果"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "客户配置切换存在运行中阻塞，请先查看切换检查结果"}
 	case errors.Is(err, biz.ErrCustomerConfigHashMismatch):
 		l.Warnf("[customer_config] expected config hash mismatch err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置内容已变化，请重新校验后再激活"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "客户配置内容已变化，请重新校验后再激活"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		l.Warnf("[customer_config] idempotency payload conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
@@ -726,48 +729,50 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 		return &v1.JsonrpcResult{Code: errcode.ProcessDomainCommandRecoveryRequired.Code, Message: errcode.ProcessDomainCommandRecoveryRequired.Message}
 	case errors.Is(err, biz.ErrProcessTaskOwnerRoleNotFound):
 		l.Warnf("[customer_config] process task owner role not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"}
 	case errors.Is(err, biz.ErrProcessTaskOwnerRoleAmbiguous):
 		l.Warnf("[customer_config] process task owner role ambiguous err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"}
 	case errors.Is(err, biz.ErrProcessInstanceExists):
 		l.Warnf("[customer_config] process instance exists err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程实例已存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "流程实例已存在"}
 	case errors.Is(err, biz.ErrProcessInstanceNotFound), errors.Is(err, biz.ErrProcessNodeInstanceNotFound):
 		l.Warnf("[customer_config] process runtime target not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程运行时对象不存在"}
-	case errors.Is(err, biz.ErrProcessInstanceSettled), errors.Is(err, biz.ErrProcessNodeInstanceConflict), errors.Is(err, biz.ErrProcessNodeInstanceSettled), errors.Is(err, biz.ErrProcessNodeInstanceNotActive):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "流程或办理步骤不存在，请刷新后重新打开"}
+	case errors.Is(err, biz.ErrProcessNodeInstanceConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "流程已被其他操作更新，请刷新后核对"}
+	case errors.Is(err, biz.ErrProcessInstanceSettled), errors.Is(err, biz.ErrProcessNodeInstanceSettled), errors.Is(err, biz.ErrProcessNodeInstanceNotActive):
 		l.Warnf("[customer_config] process runtime state conflict err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程运行时状态冲突"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "流程已结束或当前步骤不可办理，请刷新后核对流程进度"}
 	case errors.Is(err, biz.ErrProcessDomainCommandHandlerNotFound):
-		l.Warnf("[customer_config] process domain command handler missing err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程领域命令处理器不存在"}
+		l.Errorf("[customer_config] process domain command handler missing err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "当前流程暂时无法办理，请联系管理员"}
 	case errors.Is(err, biz.ErrSalesOrderNotFound):
 		l.Warnf("[customer_config] sales order not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "销售订单不存在"}
 	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
 		l.Warnf("[customer_config] purchase order not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购订单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptNotFound):
 		l.Warnf("[customer_config] purchase receipt not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购入库单不存在"}
 	case errors.Is(err, biz.ErrQualityInspectionNotFound):
 		l.Warnf("[customer_config] quality inspection not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "质检单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
 		l.Warnf("[customer_config] purchase receipt quality gate pending err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "来料质检尚未逐行完成"}
 	case errors.Is(err, biz.ErrShipmentNotFound), errors.Is(err, biz.ErrShipmentItemNotFound):
 		l.Warnf("[customer_config] shipment not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "出货单不存在"}
 	case errors.Is(err, biz.ErrShipmentQualityPending):
 		l.Warnf("[customer_config] shipment quality gate pending err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
 	case errors.Is(err, biz.ErrShipmentQualityRejected):
 		l.Warnf("[customer_config] shipment quality gate rejected err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
 	case errors.Is(err, biz.ErrShipmentPackingPending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货超过可发数量，请先完成对应成品的检验、查货和包装"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "本次出货超过可发数量，请先完成对应成品的检验、查货和包装"}
 	default:
 		if result := d.processBusinessErrorResult(ctx, err); result != nil {
 			return result
@@ -785,11 +790,13 @@ func (d *jsonrpcDispatcher) salesOrderProcessSourceRefNo(ctx context.Context, sa
 	if err != nil {
 		return nil, err
 	}
-	if order == nil || order.ID != salesOrderID ||
-		(order.LifecycleStatus != biz.SalesOrderStatusDraft &&
-			order.LifecycleStatus != biz.SalesOrderStatusSubmitted &&
-			order.LifecycleStatus != biz.SalesOrderStatusActive) {
+	if order == nil || order.ID != salesOrderID {
 		return nil, biz.ErrBadParam
+	}
+	if order.LifecycleStatus != biz.SalesOrderStatusDraft &&
+		order.LifecycleStatus != biz.SalesOrderStatusSubmitted &&
+		order.LifecycleStatus != biz.SalesOrderStatusActive {
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	return requiredProcessSourceRefNo(order.OrderNo)
 }
@@ -802,9 +809,11 @@ func (d *jsonrpcDispatcher) purchaseOrderProcessSourceRefNo(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if order == nil || order.ID != purchaseOrderID ||
-		(order.LifecycleStatus != biz.PurchaseOrderStatusDraft && order.LifecycleStatus != biz.PurchaseOrderStatusSubmitted) {
+	if order == nil || order.ID != purchaseOrderID {
 		return nil, biz.ErrBadParam
+	}
+	if order.LifecycleStatus != biz.PurchaseOrderStatusDraft && order.LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	return requiredProcessSourceRefNo(order.PurchaseOrderNo)
 }

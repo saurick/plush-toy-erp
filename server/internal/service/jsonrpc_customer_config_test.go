@@ -439,7 +439,7 @@ func TestMapCustomerConfigError_SourceGeneratedTaskNamespace(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
 	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrWorkflowTaskSourceGeneratedOnly)
-	if result.Code != errcode.InvalidParam.Code || result.Message != "该任务由业务来源生成，请回到对应业务页面办理" {
+	if result.Code != errcode.BusinessRuleViolation.Code || result.Message != "该任务由业务来源生成，请回到对应业务页面办理" {
 		t.Fatalf("unexpected source-generated task namespace result: %#v", result)
 	}
 }
@@ -448,7 +448,7 @@ func TestMapCustomerConfigError_RevisionImmutable(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
 	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrCustomerConfigRevisionImmutable)
-	if result.Code != errcode.IdempotencyConflict.Code || result.Message != "客户配置版本已存在且内容不同，请使用新版本号发布" {
+	if result.Code != errcode.ResourceConflict.Code || result.Message != "客户配置版本已存在且内容不同，请使用新版本号发布" {
 		t.Fatalf("unexpected immutable revision result: %#v", result)
 	}
 }
@@ -460,15 +460,16 @@ func TestMapCustomerConfigError_TransitionConflicts(t *testing.T) {
 		name    string
 		err     error
 		message string
+		code    int32
 	}{
-		{name: "active revision changed", err: biz.ErrCustomerConfigActiveRevisionChanged, message: "当前激活版本已变化，请重新检查后再执行"},
-		{name: "product version mismatch", err: biz.ErrCustomerConfigProductVersionMismatch, message: "产品版本已变化，请重新校验后再执行"},
-		{name: "transition blocked", err: biz.ErrCustomerConfigTransitionBlocked, message: "客户配置切换存在运行中阻塞，请先查看切换检查结果"},
-		{name: "hash mismatch", err: biz.ErrCustomerConfigHashMismatch, message: "客户配置内容已变化，请重新校验后再激活"},
+		{name: "active revision changed", err: biz.ErrCustomerConfigActiveRevisionChanged, code: errcode.ResourceVersionConflict.Code, message: "当前激活版本已变化，请重新检查后再执行"},
+		{name: "product version mismatch", err: biz.ErrCustomerConfigProductVersionMismatch, code: errcode.BusinessRuleViolation.Code, message: "产品版本已变化，请重新校验后再执行"},
+		{name: "transition blocked", err: biz.ErrCustomerConfigTransitionBlocked, code: errcode.BusinessRuleViolation.Code, message: "客户配置切换存在运行中阻塞，请先查看切换检查结果"},
+		{name: "hash mismatch", err: biz.ErrCustomerConfigHashMismatch, code: errcode.ResourceVersionConflict.Code, message: "客户配置内容已变化，请重新校验后再激活"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := dispatcher.mapCustomerConfigError(context.Background(), tc.err)
-			if result.Code != errcode.IdempotencyConflict.Code || result.Message != tc.message {
+			if result.Code != tc.code || result.Message != tc.message {
 				t.Fatalf("transition conflict result = %#v", result)
 			}
 		})
@@ -497,7 +498,7 @@ func TestMapCustomerConfigError_ProcessTaskOwnerRoleGuidance(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := dispatcher.mapCustomerConfigError(context.Background(), tc.err)
-			if result.Code != errcode.InvalidParam.Code || result.Message != tc.message {
+			if result.Code != errcode.BusinessRuleViolation.Code || result.Message != tc.message {
 				t.Fatalf("unexpected owner role guidance result: %#v", result)
 			}
 		})
@@ -517,7 +518,7 @@ func TestMapCustomerConfigError_ShipmentQualityGate(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := dispatcher.mapCustomerConfigError(context.Background(), tc.err)
-			if result.Code != errcode.InvalidParam.Code || result.Message != tc.message {
+			if result.Code != errcode.BusinessRuleViolation.Code || result.Message != tc.message {
 				t.Fatalf("unexpected shipment quality gate result: %#v", result)
 			}
 		})
@@ -2526,7 +2527,7 @@ func TestCustomerConfigJSONRPCPublishRevisionIsIdempotentAndImmutable(t *testing
 	if err != nil {
 		t.Fatalf("conflicting publish transport err=%v", err)
 	}
-	if conflictRes.Code != errcode.IdempotencyConflict.Code || conflictRes.Message != "客户配置版本已存在且内容不同，请使用新版本号发布" {
+	if conflictRes.Code != errcode.ResourceConflict.Code || conflictRes.Message != "客户配置版本已存在且内容不同，请使用新版本号发布" {
 		t.Fatalf("conflicting publish result=%#v", conflictRes)
 	}
 }
@@ -2820,7 +2821,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideGuardedBy
 	if err != nil {
 		t.Fatalf("execute err = %v", err)
 	}
-	if executeRes.Code != errcode.InvalidParam.Code || executeRes.Message != "流程领域命令处理器不存在" {
+	if executeRes.Code != errcode.Internal.Code || executeRes.Message != "当前流程暂时无法办理，请联系管理员" {
 		t.Fatalf("execute result = %#v", executeRes)
 	}
 	nodes, err := dispatcher.processRuntimeUC.ListProcessNodeInstances(ctx, processInstanceID)
@@ -3890,7 +3891,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("duplicate start err = %v", err)
 	}
-	if duplicateRes.Code != errcode.InvalidParam.Code || duplicateRes.Message != "流程实例已存在" {
+	if duplicateRes.Code != errcode.ResourceConflict.Code || duplicateRes.Message != "流程实例已存在" {
 		t.Fatalf("duplicate start should be rejected, code=%d msg=%s", duplicateRes.Code, duplicateRes.Message)
 	}
 }

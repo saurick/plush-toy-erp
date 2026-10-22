@@ -188,6 +188,10 @@ fi
 
 echo "[qa:fast] 运行 web 关键合同测试"
 web_tests=(
+  "$ROOT_DIR/web/src/common/components/sharedComponentBoundaries.test.mjs"
+  "$ROOT_DIR/web/scripts/navigationControls.test.mjs"
+  "$ROOT_DIR/web/src/common/components/modal/AppModal.test.mjs"
+  "$ROOT_DIR/web/src/erp/utils/selectControlContract.test.mjs"
   "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs"
   "$ROOT_DIR/web/src/erp/config/entryConfig.test.mjs"
   "$ROOT_DIR/web/src/erp/config/menuPermissions.test.mjs"

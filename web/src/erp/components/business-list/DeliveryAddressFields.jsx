@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Cascader, Form, Input, Select } from 'antd'
+import { Cascader, Form, Input } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from './BusinessTextArea.jsx'
 import { optionalContactPhoneRule } from '../../utils/contactValidation.mjs'
 import {

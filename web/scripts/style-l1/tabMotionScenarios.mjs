@@ -260,6 +260,25 @@ function assertActionBarRemountStable(samples, label) {
   )
 }
 
+async function verifyStandardModal(page, controls, outputDir) {
+  await controls.getByRole('radio', { name: '浮层与确认', exact: true }).locator('..').click()
+  const trigger = controls.getByRole('button', { name: '打开标准弹窗', exact: true })
+  await trigger.press('Enter')
+  const dialog = page.getByRole('dialog', { name: '共享标准弹窗', exact: true })
+  await dialog.waitFor()
+  await waitForFiniteAnimations(page)
+  const box = await dialog.boundingBox()
+  assert(Math.abs(box.width - 560) <= 1, '标准弹窗保留调用方尺寸')
+  assert(Math.abs(box.x - (page.viewportSize().width - box.width) / 2) <= 1, '标准弹窗水平居中')
+  assert.equal(await dialog.locator('.surface-panel').count(), 0, '标准弹窗不套用告警面板外观')
+  await page.screenshot({ path: path.join(outputDir, 'shared-standard-modal-4k.png') })
+  await dialog.getByRole('button', { name: '关闭', exact: true }).focus()
+  await page.keyboard.press('Escape')
+  await dialog.waitFor({ state: 'hidden' })
+  await waitForFiniteAnimations(page)
+  assert(await trigger.evaluate((el) => el === document.activeElement), '标准弹窗关闭后恢复触发焦点')
+}
+
 export function createTabMotionScenarios({ outputDir }) {
   return ['light', 'dark']
     .map((mode) => ({
@@ -487,6 +506,19 @@ export function createTabMotionScenarios({ outputDir }) {
     }))
     .concat([
       {
+        name: 'app-standard-modal-keyboard-contract',
+        path: '/__dev/ui-design?page=controls',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 2,
+        verify: async (page) => {
+          const controls = page.getByRole('region', { name: '控件设计', exact: true })
+          await controls.getByRole('navigation', { name: '控件设计目录' })
+            .getByRole('button', { name: /弹窗与反馈/ }).click()
+          await controls.getByRole('heading', { name: '弹窗与反馈', exact: true }).waitFor()
+          await verifyStandardModal(page, controls, outputDir)
+        },
+      },
+      {
         name: 'dev-task-tabs-pointer-focus',
         path: '/__dev/customer-config?customer=yoyoosun&view=preflight&section=evidence',
         viewport: { width: 1920, height: 1080 },
@@ -555,7 +587,7 @@ export function createTabMotionScenarios({ outputDir }) {
           const initialPreview = await openPreview()
           assert.deepEqual(
             await initialPreview.locator('.ant-select-item-option').allTextContents(),
-            ['业务界面', '任务处理', '移动端任务', '效能工作台', '登录页', '岗位帮助', '控件设计']
+            ['业务界面', '任务处理', '手机版任务', '效能工作台', '登录页', '岗位帮助', '控件设计']
           )
           await initialPreview.getByText('控件设计', { exact: true }).click()
           await initialPreview.waitFor({ state: 'hidden' })
@@ -643,10 +675,20 @@ export function createTabMotionScenarios({ outputDir }) {
 
           await choose('按钮与动作')
           const save = controls.getByRole('button', { name: /^保\s*存$/ })
+          // WebKit 的完整控件遍历使用 Option+Tab，与现有筛选键盘场景一致。
+          const tabModifier = process.platform === 'darwin' && page.context().browser().browserType().name() === 'webkit' ? 'Alt+' : ''
           await save.focus()
-          await page.keyboard.press('Shift+Tab')
-          await page.keyboard.press('Tab')
-          assert.equal(await save.evaluate((button) => getComputedStyle(button).outlineStyle), 'solid')
+          await page.keyboard.press(`${tabModifier}Shift+Tab`)
+          await page.keyboard.press(`${tabModifier}Tab`)
+          const saveFocus = await save.evaluate((button) => ({
+            focused: document.activeElement === button,
+            visible: button.matches(':focus-visible'),
+            outline: getComputedStyle(button).outlineStyle,
+            width: parseFloat(getComputedStyle(button).outlineWidth),
+          }))
+          assert(saveFocus.focused && saveFocus.visible, `键盘须实际聚焦保存按钮：${JSON.stringify(saveFocus)}`)
+          assert.equal(saveFocus.outline, 'solid')
+          assert(saveFocus.width >= 2, '保存按钮的键盘焦点框清晰可见')
           await page.keyboard.press('Enter')
           await controls.getByText('演示反馈：已保存。没有写入业务数据。').waitFor()
           assert(await controls.getByRole('button', { name: '无可操作记录' }).isDisabled())
@@ -676,6 +718,8 @@ export function createTabMotionScenarios({ outputDir }) {
           await choosePreview('控件设计', 'controls')
           await choose('弹窗与反馈')
           await controls.getByRole('button', { name: '打开编辑弹窗', exact: true }).waitFor()
+          await verifyStandardModal(page, controls, outputDir)
+          await controls.getByRole('radio', { name: '编辑与提交', exact: true }).locator('..').click()
           await assertFits()
           await page.screenshot({ path: path.join(outputDir, 'control-standards-light.png') })
           await page.setViewportSize({ width: 1024, height: 768 })

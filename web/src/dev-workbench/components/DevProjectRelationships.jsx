@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react'
-import { Checkbox, Select, Tag } from 'antd'
+import { Checkbox, Tag } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import DevProjectGraphView from './DevProjectGraphView.jsx'
 import {
   DEV_PROJECT_GRAPH_EXAMPLES,
@@ -29,7 +30,6 @@ export default function DevProjectRelationships() {
 
   return (
     <section className="erp-dev-project-relationships" aria-label="项目图视角">
-      <p className="erp-dev-project-relationships__intro">按图模型理解，再看项目示例；图的方向与结构分别判断。</p>
       <div className="erp-dev-project-relationships__workspace">
         <nav className="erp-dev-project-relationships__catalog" aria-label="图模型分类">
           {DEV_PROJECT_GRAPH_GROUPS.map((group) => (
@@ -39,20 +39,19 @@ export default function DevProjectRelationships() {
                 <button
                   type="button"
                   key={key}
+                  title={DEV_PROJECT_GRAPH_MODELS[key].summary}
                   aria-pressed={selected.modelKey === key}
                   onClick={() => {
                     if (selected.modelKey !== key) updateSelection({ modelKey: key })
                   }}
                 >
                   <strong>{DEV_PROJECT_GRAPH_MODELS[key].name}</strong>
-                  <span>{DEV_PROJECT_GRAPH_MODELS[key].summary}</span>
                 </button>
               ))}
             </section>
           ))}
         </nav>
         <section className="erp-dev-project-relationships__detail" aria-label="图模型与项目示例">
-          <div className="erp-dev-project-relationships__breadcrumb">{model.crumb}</div>
           <div className="erp-dev-project-relationships__heading">
             <h2>{model.title}</h2>
             <Tag color="blue" data-project-graph-classification>{graph.classification.label}</Tag>
@@ -63,6 +62,8 @@ export default function DevProjectRelationships() {
               <label>
                 项目示例
                 <Select
+                  allowClear={false}
+                  placeholder="项目示例"
                   aria-label="项目示例"
                   value={selected.exampleKey}
                   virtual={false}
@@ -90,7 +91,7 @@ export default function DevProjectRelationships() {
           </details>
         </section>
       </div>
-      <p className="erp-dev-project-relationships__boundary">图模型与结构示意；实际权限、业务状态、CI 和交付结果分别到正式入口核对。</p>
+      <p className="erp-dev-project-relationships__boundary">结构示例；实际结果请到对应工具核对。</p>
     </section>
   )
 }

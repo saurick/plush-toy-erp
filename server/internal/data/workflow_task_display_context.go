@@ -59,7 +59,7 @@ func workflowDisplaySourceKind(value string) string {
 		return "production_fact"
 	case "quality_inspection", "quality-inspection", "quality-inspections":
 		return "quality_inspection"
-	case "production_exception_decision", "inventory_operation":
+	case "production_exception_decision", "production_wip_batch", "inventory_operation":
 		return value
 	case "bom_header", "material-bom":
 		return "bom_header"
@@ -334,6 +334,18 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 			source := workflowDisplaySource{no: row.OrderNo}
 			for _, item := range row.Edges.Items {
 				source.items = append(source.items, workflowDisplayRef{kind: "product", id: item.ProductID, name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductCodeSnapshot), salesItemID: displayInt(item.SalesOrderItemID)})
+			}
+			out[row.ID] = source
+		}
+	case "production_wip_batch":
+		rows, err := client.ProductionWIPBatch.Query().Where(productionwipbatch.IDIn(ids...)).WithProductionOrderItem().All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			source := workflowDisplaySource{no: row.BatchNo}
+			if item := row.Edges.ProductionOrderItem; item != nil {
+				source.items = []workflowDisplayRef{{kind: "product", id: item.ProductID, name: displayString(item.ProductNameSnapshot), code: displayString(item.ProductCodeSnapshot), salesItemID: displayInt(item.SalesOrderItemID)}}
 			}
 			out[row.ID] = source
 		}

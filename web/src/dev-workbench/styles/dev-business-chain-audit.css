@@ -24,10 +24,6 @@
   max-width: 100%;
 }
 
-.erp-dev-chain-audit__chain-select {
-  width: 255px;
-}
-
 .erp-dev-chain-audit__status-select {
   width: 130px;
 }
@@ -59,11 +55,13 @@
 
 .erp-dev-chain-audit__stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 .erp-dev-chain-audit__section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   padding: 16px;

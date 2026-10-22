@@ -89,43 +89,45 @@ export default function DevDatabaseMigrationPage() {
             >
               刷新状态
             </Button>
-            <Tooltip
-              title={
-                canPrepare
-                  ? ''
-                  : !summaryFresh
-                    ? '正在核对最新状态；上次结果只供查看'
-                    : isLatest
-                      ? '没有待执行迁移；如需重新核对，请使用“刷新状态”'
-                      : readOnly
-                        ? '局域网入口只读，请在运行开发服务的本机准备迁移'
-                        : tools?.status !== 'ready'
-                          ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
-                          : hasRunningOperation
-                            ? '已有操作正在执行'
-                            : '当前目标或 migration 状态未通过检查'
-              }
-            >
-              <Button
-                type="primary"
-                icon={<SafetyCertificateOutlined aria-hidden="true" />}
-                disabled={!canPrepare}
-                loading={actionKey === 'prepare'}
-                onClick={() =>
-                  performAction('prepare', {
-                    action: 'prepare',
-                    idempotencyKey:
-                      createDatabaseMigrationIdempotencyKey('prepare'),
-                  })
+            {activeView === 'migration' && !(summaryFresh && isLatest) ? (
+              <Tooltip
+                title={
+                  canPrepare
+                    ? ''
+                    : !summaryFresh
+                      ? '正在核对最新状态；上次结果只供查看'
+                      : isLatest
+                        ? '没有待执行迁移；如需重新核对，请使用“刷新状态”'
+                        : readOnly
+                          ? '局域网入口只读，请在运行开发服务的本机准备迁移'
+                          : tools?.status !== 'ready'
+                            ? '迁移准备环境未就绪，请按下方检查项处理后刷新'
+                            : hasRunningOperation
+                              ? '已有操作正在执行'
+                              : '当前目标或 migration 状态未通过检查'
                 }
               >
-                {summaryFresh && isLatest
-                  ? '无需迁移'
-                  : readyOperation
-                    ? '重新检查并准备'
-                    : '检查并准备'}
-              </Button>
-            </Tooltip>
+                <Button
+                  type="primary"
+                  icon={<SafetyCertificateOutlined aria-hidden="true" />}
+                  disabled={!canPrepare}
+                  loading={actionKey === 'prepare'}
+                  onClick={() =>
+                    performAction('prepare', {
+                      action: 'prepare',
+                      idempotencyKey:
+                        createDatabaseMigrationIdempotencyKey('prepare'),
+                    })
+                  }
+                >
+                  {summaryFresh && isLatest
+                    ? '无需迁移'
+                    : readyOperation
+                      ? '重新检查并准备'
+                      : '检查并准备'}
+                </Button>
+              </Tooltip>
+            ) : null}
           </Space>
           <Text type="secondary" role="status" aria-live="polite">
             {refreshStatusText}
@@ -197,12 +199,13 @@ export default function DevDatabaseMigrationPage() {
               .map((check) => check.label)
               .join('、')}；请在运行检查处理后刷新。`}
             action={
-              <Button
-                disabled={activeView === 'runtime'}
-                onClick={() => selectView('runtime')}
-              >
-                查看运行检查
-              </Button>
+              activeView !== 'runtime' ? (
+                <Button
+                  onClick={() => selectView('runtime')}
+                >
+                  查看运行检查
+                </Button>
+              ) : null
             }
           />
         ) : null}
@@ -262,9 +265,11 @@ export default function DevDatabaseMigrationPage() {
               status={activeOperation.status}
               issues={activeOperation.issues}
             />
-            <Button onClick={() => selectView('migration')}>
-              查看当前操作
-            </Button>
+            {activeView !== 'migration' ? (
+              <Button onClick={() => selectView('migration')}>
+                查看当前操作
+              </Button>
+            ) : null}
           </div>
         ) : null}
 
@@ -277,7 +282,6 @@ export default function DevDatabaseMigrationPage() {
           pathOperation={pathOperation}
           readOnly={readOnly}
           readyOperation={readyOperation}
-          selectView={selectView}
           setConfirmationOperation={setConfirmationOperation}
           setConfirmationText={setConfirmationText}
           summary={summary}

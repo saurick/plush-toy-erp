@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react'
+import Select from '@/common/components/select/AppSelect'
 import {
   CONTRACT_CLAUSE_GROUPS_MAX,
   CONTRACT_CLAUSES_PER_GROUP_MAX,
@@ -126,22 +127,24 @@ export default function ContractClauseTools({
       ) : null}
       <label className="erp-print-clause-tools__field">
         <span>条款分组</span>
-        <select
+        <Select
+          allowClear={false}
           aria-label="条款分组"
-          value={groupKey}
+          virtual={false}
+          data-value={groupKey || undefined}
+          value={groupKey || undefined}
           disabled={disabled || !group}
-          onChange={(event) => {
+          placeholder="暂无分组"
+          onChange={(value) => {
             cancelAnimationFrame(focusFrameRef.current)
-            onSelect({ groupKey: event.target.value, index: 0 })
+            onSelect({ groupKey: value, index: 0 })
           }}
-        >
-          {clauses.length === 0 ? <option value="">暂无分组</option> : null}
-          {clauses.map(({ key, label, items: groupItems }) => (
-            <option key={key} value={key}>
-              {label.trim() || '未命名分组'}（{groupItems.length} 条）
-            </option>
-          ))}
-        </select>
+          options={clauses.map(({ key, label, items: groupItems }) => ({
+            value: key,
+            label: `${label.trim() || '未命名分组'}（${groupItems.length} 条）`,
+            'data-select-value': key,
+          }))}
+        />
       </label>
       {group ? (
         <label className="erp-print-clause-tools__field">
@@ -203,27 +206,24 @@ export default function ContractClauseTools({
       </p>
       <label className="erp-print-clause-tools__field">
         <span>当前条目</span>
-        <select
+        <Select
+          allowClear={false}
           aria-label="当前条目"
-          value={index ?? ''}
+          virtual={false}
+          data-value={index ?? undefined}
+          value={index ?? undefined}
           disabled={disabled || index === null}
-          onChange={(event) => {
-            const nextIndex = Number(event.target.value)
+          placeholder="本组暂无条目"
+          onChange={(nextIndex) => {
             onSelect({ groupKey, index: nextIndex })
             locate(nextIndex)
           }}
-        >
-          {items.length ? (
-            items.map((item, itemIndex) => (
-              <option key={itemIndex} value={itemIndex}>
-                第 {itemIndex + 1} 条：
-                {String(item).trim().slice(0, 18) || '留白'}
-              </option>
-            ))
-          ) : (
-            <option value="">本组暂无条目</option>
-          )}
-        </select>
+          options={items.map((item, itemIndex) => ({
+            value: itemIndex,
+            label: `第 ${itemIndex + 1} 条：${String(item).trim().slice(0, 18) || '留白'}`,
+            'data-select-value': String(itemIndex),
+          }))}
+        />
       </label>
       <div className="erp-print-shell__toolbar-group">
         {!group ? null : index === null ? (

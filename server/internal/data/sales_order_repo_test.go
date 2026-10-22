@@ -293,7 +293,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	if closed.LifecycleStatus != biz.SalesOrderStatusClosed {
 		t.Fatalf("expected closed order, got %#v", closed)
 	}
-	if _, err := uc.UpdateSalesOrder(ctx, order.ID, &biz.SalesOrderMutation{TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded), OrderNo: "SO-001-B", CustomerID: customer.ID, OrderDate: orderDate}); !errors.Is(err, biz.ErrBadParam) {
+	if _, err := uc.UpdateSalesOrder(ctx, order.ID, &biz.SalesOrderMutation{TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded), OrderNo: "SO-001-B", CustomerID: customer.ID, OrderDate: orderDate}); !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected closed sales order update rejected, got %v", err)
 	}
 }

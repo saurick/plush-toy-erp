@@ -21,6 +21,8 @@ export async function assertDevDocsDirectorySpace(page, assert) {
     return {
       headerControls: header.querySelectorAll(controls).length,
       sidebarControls: sidebar.querySelectorAll(controls).length,
+      repeatedPaths: sidebar.querySelectorAll('.erp-dev-docs-tree__doc-path, .erp-dev-docs-pinned__path').length,
+      readableDirectory: sidebar.querySelector('[data-dev-doc-dir="docs"]')?.textContent,
       treeRatio: treeBox.height / sidebarBox.height,
       directoryTop: treeBox.top - sidebarBox.top,
       bottomDelta:
@@ -38,6 +40,8 @@ export async function assertDevDocsDirectorySpace(page, assert) {
     '文档层级、搜索与搜索范围应集中在页头'
   )
   assert.equal(geometry.sidebarControls, 0, '目录栏不再重复放置检索控件')
+  assert.equal(geometry.repeatedPaths, 0, '目录只展示标题，完整路径在提示和阅读栏中保留')
+  assert(geometry.readableDirectory.includes('项目文档'), '目录以可读主题名导航')
   assert(geometry.treeRatio >= 0.78, '收起置顶时，目录应占据侧栏主要高度')
   assert(geometry.directoryTop <= 110, '目录应紧接置顶和目录标题')
   assert(Math.abs(geometry.bottomDelta) <= 1, '目录与正文应填满页头之外的视口')
@@ -133,10 +137,12 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   const focus = await chapters.first().evaluate((element) => ({
     width: getComputedStyle(element).outlineWidth,
     style: getComputedStyle(element).outlineStyle,
+    active: document.activeElement === element,
+    visible: element.matches(':focus-visible'),
   }))
   assert(
     Number.parseFloat(focus.width) >= 2 && focus.style !== 'none',
-    '键盘定位章节应有清楚焦点'
+    `键盘定位章节应有清楚焦点：${JSON.stringify(focus)}`
   )
   const hashBeforeScroll = new URL(page.url()).hash
   await page
@@ -217,7 +223,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
           tocHeight: shellBox.height,
           titlePathCenterDelta: Math.abs(center(name) - center(path)),
           chapterToggleCenterDelta: Math.abs(center(chapter) - center(toggle)),
-          titleHint: name.title === name.textContent,
+          titleHint: name.title.startsWith(name.textContent),
           pathHint: path.title === path.textContent,
           fontSize: Number.parseFloat(getComputedStyle(chapter).fontSize),
           allControlsInside: [
@@ -260,4 +266,32 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     )
   }
   await page.setViewportSize({ width: 1440, height: 900 })
+  await page.getByRole('textbox', { name: '搜索开发文档' }).fill('没有该标题 docs-governance')
+  await page.getByRole('button', { name: '文档首页', exact: true }).click()
+  const home = page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '文档入口与治理 / docs Guide', exact: true })
+  await home.waitFor()
+  assert.equal(await page.getByRole('textbox', { name: '搜索开发文档' }).inputValue(), '')
+  assert.equal(new URL(page.url()).searchParams.get('path'), 'docs/README.md')
+  await page.reload()
+  await home.waitFor()
+  await page.locator('.erp-dev-docs-markdown').getByRole('link', { name: '产品与路线', exact: true }).click()
+  await page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '产品与路线 / Product Docs', exact: true }).waitFor()
+  await page.goBack()
+  await home.waitFor()
+  const reader = page.locator('.erp-dev-docs-reader')
+  await reader.getByRole('button', { name: '取消置顶', exact: true }).click()
+  await page.reload()
+  await home.waitFor()
+  assert.equal(await reader.getByRole('button', { name: '置顶文档', exact: true }).getAttribute('aria-pressed'), 'false')
+  await reader.getByRole('button', { name: '置顶文档', exact: true }).click()
+  await page.setViewportSize({ width: 3840, height: 2160 })
+  await waitForFiniteAnimations(page)
+  await assertDevDocsDirectorySpace(page, assert)
+  const prose = await page.locator('.erp-dev-docs-document > p').first().evaluate((element) => ({
+    width: element.getBoundingClientRect().width,
+    font: parseFloat(getComputedStyle(element).fontSize),
+    line: parseFloat(getComputedStyle(element).lineHeight),
+  }))
+  assert(prose.font >= 14 && prose.width <= prose.font * 50 + 1 && prose.line >= prose.font * 1.8, `正文保持字号、适当行宽与行距：${JSON.stringify(prose)}`)
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '4K 下正文与目录不造成页面横向溢出')
 }

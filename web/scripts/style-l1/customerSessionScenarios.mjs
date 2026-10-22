@@ -1,6 +1,6 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createSessionRecoveryScenarios } from './sessionRecoveryScenarios.mjs'
-import { createModuleCatalogScenarios } from './moduleCatalogScenarios.mjs'
+import { createSidebarNavigationScenarios } from './sidebarNavigationScenarios.mjs'
 import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 
 export function createCustomerSessionScenarios({
@@ -62,7 +62,7 @@ export function createCustomerSessionScenarios({
       const rect = node.getBoundingClientRect()
       const footer = node
         .closest('.erp-admin-sider__body')
-        ?.querySelector('.erp-module-catalog-footer')
+        ?.querySelector('.erp-admin-sider__footer')
         ?.getBoundingClientRect()
       return {
         items: leaves.map((item) => String(item.textContent || '').trim()),
@@ -164,7 +164,7 @@ export function createCustomerSessionScenarios({
   let permissionSafeInventoryReferenceRequests = []
   let permissionSafeProductReferenceRequests = []
   return [
-    ...createModuleCatalogScenarios({
+    ...createSidebarNavigationScenarios({
       customerRoleAdminProfile,
       customerRoleRuntimeSession,
       roleGuidedCustomerConfig,

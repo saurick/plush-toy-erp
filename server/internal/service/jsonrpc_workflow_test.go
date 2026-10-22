@@ -805,7 +805,7 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err for read_only create gate, got %v", err)
 	}
-	if createReadOnlyRes == nil || createReadOnlyRes.Code != errcode.InvalidParam.Code {
+	if createReadOnlyRes == nil || createReadOnlyRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only create rejected, got %#v", createReadOnlyRes)
 	}
 	if repo.createInput != nil {
@@ -825,7 +825,7 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 		if callErr != nil {
 			t.Fatalf("expected nil err for read_only %s gate, got %v", mutation.method, callErr)
 		}
-		if result == nil || result.Code != errcode.InvalidParam.Code {
+		if result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("expected read_only %s rejected, got %#v", mutation.method, result)
 		}
 	}
@@ -895,7 +895,7 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 		if callErr != nil {
 			t.Fatalf("expected nil err for disabled %s gate, got %v", mutation.method, callErr)
 		}
-		if result == nil || result.Code != errcode.InvalidParam.Code {
+		if result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("expected disabled %s rejected, got %#v", mutation.method, result)
 		}
 		if repo.createInput != nil || repo.updateCalls != 0 || repo.updateInput != nil || repo.urgeInput != nil {
@@ -913,6 +913,34 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	}
 	if repo.createInput == nil || repo.createInput.TaskCode != "WF-MODULE-001" {
 		t.Fatalf("enabled workflow_tasks must call create usecase, got %#v", repo.createInput)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowCreateTaskIndependentSource(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.NewStdLogger(io.Discard)),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskCreate)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	base := map[string]any{"idempotency_key": "independent-create", "task_code": "TASK-INDEPENDENT", "task_group": "generic", "task_name": "核对包装要求", "owner_role_key": biz.SalesRoleKey}
+	_, result, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "create_task", "independent", mustJSONRPCStruct(t, base))
+	if err != nil || result.Code != errcode.OK.Code || repo.createInput == nil || repo.createInput.SourceType != "" || repo.createInput.SourceID != 0 {
+		t.Fatalf("independent create failed: result=%#v input=%#v err=%v", result, repo.createInput, err)
+	}
+	for _, extra := range []map[string]any{{"source_type": "sales_order"}, {"source_id": 8}, {"source_id": 1.5}, {"source_type": false}, {"source_id": 0}, {"source_no": "SO-001"}} {
+		params := map[string]any{}
+		for key, value := range base {
+			params[key] = value
+		}
+		for key, value := range extra {
+			params[key] = value
+		}
+		_, result, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "create_task", "invalid-source", mustJSONRPCStruct(t, params))
+		if err != nil || result.Code != errcode.InvalidParam.Code {
+			t.Fatalf("invalid source accepted: params=%#v result=%#v err=%v", extra, result, err)
+		}
 	}
 }
 
@@ -1183,7 +1211,7 @@ func TestWorkflowJSONRPCCreateTaskRejectsTransitionDrivingIdentity(t *testing.T)
 			if err != nil {
 				t.Fatalf("expected nil transport error, got %v", err)
 			}
-			if res == nil || res.Code != errcode.InvalidParam.Code {
+			if res == nil || res.Code != errcode.BusinessRuleViolation.Code {
 				t.Fatalf("expected transition identity rejected, got %#v", res)
 			}
 			if repo.createInput != nil {
@@ -2330,7 +2358,7 @@ func TestJsonrpcDispatcher_WorkflowTaskConflictReturnsRefreshGuidance(t *testing
 	}
 
 	res := dispatcher.mapWorkflowError(context.Background(), biz.ErrWorkflowTaskConflict)
-	if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != "任务已被其他人更新，请刷新后重试" {
+	if res == nil || res.Code != errcode.ResourceVersionConflict.Code || res.Message != "任务已被其他人更新，请刷新后重试" {
 		t.Fatalf("workflow task conflict must return refresh guidance, got %#v", res)
 	}
 }
@@ -2350,7 +2378,7 @@ func TestJsonrpcDispatcher_SourceGeneratedTaskGroupReturnsSourceGuidance(t *test
 		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
 	}
 	res := dispatcher.mapWorkflowError(context.Background(), biz.ErrWorkflowTaskSourceGeneratedOnly)
-	if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != "该任务由业务来源生成，请回到对应业务页面办理" {
+	if res == nil || res.Code != errcode.BusinessRuleViolation.Code || res.Message != "该任务由业务来源生成，请回到对应业务页面办理" {
 		t.Fatalf("source-generated task group must return source guidance, got %#v", res)
 	}
 }
@@ -2423,7 +2451,7 @@ func TestJsonrpcDispatcher_ProcessTaskOwnerRoleReturnsActionableGuidance(t *test
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			res := dispatcher.mapWorkflowError(context.Background(), tc.err)
-			if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != tc.message {
+			if res == nil || res.Code != errcode.BusinessRuleViolation.Code || res.Message != tc.message {
 				t.Fatalf("owner role mapping must be actionable, got %#v", res)
 			}
 		})

@@ -1,70 +1,59 @@
 # 文档入口与治理 / docs Guide
 
-先用 [当前真源与交接顺序](当前真源与交接顺序.md) 判断当前能力，再按下表进入主题。README 负责导航，专题文档负责业务和操作合同；实现与运行状态分别回到代码 / migration / 测试和目标证据核对。
+按当前任务选择入口。操作手册用于学习使用，专题文档用于查规则，代码与目标证据用于确认实际状态。
 
 ## 先读哪几份 / Reader Paths
 
-| 分类 | 要解决的问题 | 入口 |
-| --- | --- | --- |
-| 完整项目手册 | 系统学习、管理员实施与技术接手 | [三部分项目手册](manuals/README.md) |
-| 上手与项目维护 | 启动项目、判断真源、确定改动范围 | [仓库入口](../README.md)、[当前真源](当前真源与交接顺序.md)、[项目治理地图](项目治理地图.md)、[脚本入口](../scripts/README.md) |
-| 业务与领域 | 产品范围、主数据、源单、事实、状态与协作 | [产品与路线](product/README.md)、[架构与领域边界](architecture/README.md)、[工作流](workflow/README.md)、[角色](roles/README.md)、[仓库与品质](warehouse/README.md)、[财务](finance/README.md) |
-| 页面与打印 | 页面任务、菜单、移动岗位端、合同与打印实现 | [前端入口](../web/README.md)、[菜单与正式入口](product/菜单与正式入口合同.md)、[页面动作与生命周期](product/业务数据生命周期与页面动作规则.md)、[前端实现约定](engineering/前端实现与交互约定.md)、[打印文档](打印模板实现原理.md) |
-| 开发测试与运行交付 | API、数据字典、测试、CI、发布、迁移与恢复 | [后端专题](../server/docs/README.md)、[测试策略](product/自动化测试策略.md)、[QA 操作](../scripts/qa/README.md)、[工程与交付](engineering/README.md)、[部署约定](部署约定.md)、[可观测性](observability/README.md) |
-| 客户实施与验收 | 客户输入、配置差异、资料、验收与交付 | 完整仓库内的客户资料索引 `customers/README.md`、[实施流程](product/新增甲方客户实施流程.md)、[配置与权限](product/配置与权限策略.md)、[安全与隐私](security/README.md)、[客户交付包](../deployments/README.md) |
-| 参考与历史 | 样板、原型、历史决策和过程追溯 | [UI 交互设计](product/ui-design/README.md)、完整仓库内的工程样例 `customers/reference-customer/README.md`、[归档](archive/README.md) |
-
-这些是阅读分类，保留现有主题目录和稳定路径。当前长期文件、用途、归属和归档入口查 [文档清单](文档清单.md)，历史逐文件记录查最近的[归档索引](archive/README.md)；不在多个 README 重复整份清单。
-
-`docs/customers/**` 是仓库内的实施与客户资料，按 `.gitattributes` 排除在 `git archive` 源码包之外。仅持有源码包时，应使用上表随包提供的通用实施、配置与交付文档；客户资料需从完整仓库或对应受控存储取得。
-
-开发环境 `/__dev/docs` 默认展示当前长期文档；“评审与参考”“历史”分开查看，历史正文按需加载。原型是设计输入，归档与 `progress.md` 是历史 / 过程证据，都不证明当前实现。
+| 你要做什么 | 从这里开始 |
+| --- | --- |
+| 学习业务操作、培训员工 | [业务使用手册](manuals/业务使用手册.md) |
+| 配置账号、岗位和客户环境 | [管理员与实施手册](manuals/管理员与实施手册.md) |
+| 接手开发、部署或排查故障 | [技术维护与运维手册](manuals/技术维护与运维手册.md) |
+| 启动本地项目 | [仓库 README](../README.md#本地启动) |
+| 判断当前能力与证据 | [当前真源与交接顺序](当前真源与交接顺序.md) |
+| 修改功能，查应同步的规则 | [项目治理地图](项目治理地图.md) |
 
 ## 文档地图 / Documentation Map
 
-需要跨层判断时使用 [项目治理地图](项目治理地图.md)，查看表字段使用 [数据库数据字典](../server/docs/database/README.md)，查产品范围使用 [产品能力进度台账](product/产品能力进度台账.md)，规划后续工作使用 [产品完成路线图](product/产品完成路线图.md)。它们各管一类问题，不互相复制当前状态。
+| 主题 | 查阅入口 |
+| --- | --- |
+| 产品与业务规则 | [产品与路线](product/README.md)、[架构与领域边界](architecture/README.md) |
+| 岗位与业务协作 | [工作流](workflow/README.md)、[角色权限](roles/README.md)、[仓库与品质](warehouse/README.md)、[财务](finance/README.md) |
+| 页面与打印 | [前端实现约定](engineering/前端实现与交互约定.md)、[交互设计](product/ui-design/README.md)、[打印模板](打印模板实现原理.md) |
+| 开发、验证与交付 | [工程入口](engineering/README.md)、[后端专题](../server/docs/README.md)、[测试策略](product/自动化测试策略.md)、[部署约定](部署约定.md) |
+| 运维与保护 | [日志与审计](observability/README.md)、[安全与隐私](security/README.md) |
+| 客户实施 | [实施流程](product/新增甲方客户实施流程.md)、[配置与权限](product/配置与权限策略.md)、[交付包](../deployments/README.md) |
+
+查全部文件用[文档清单](文档清单.md)，查历史用[归档索引](archive/README.md)。完整仓库的 `customers/README.md` 提供客户资料入口；`docs/customers/**` 不随源码包分发，客户原件留在客户专属受控存储。
 
 ## 可视化图索引 / Visual Diagram Index
 
-流程与边界图集中在 [状态 / Workflow / Fact](architecture/状态工作流事实边界.md)、[流程建模](architecture/各类流程建模边界评审.md)、[业务链与轨迹](architecture/业务链与运行轨迹边界.md)、[业务与协同](workflow/业务与协同流程地图.md) 和 [CI/CD 设计](engineering/研发效能工作台与CI-CD设计.md)。图帮助阅读；正式文字、代码与证据仍决定行为。
+按问题查看：[业务与协同](workflow/业务与协同流程地图.md)、[状态与事实](architecture/状态工作流事实边界.md)、[流程建模](architecture/各类流程建模边界评审.md)、[业务链与轨迹](architecture/业务链与运行轨迹边界.md)、[CI/CD](engineering/研发效能工作台与CI-CD设计.md)。
 
 ## 文档写法 / Writing Rules
 
-结论、读者、当前状态和主路径前置。比较用短表格，步骤用编号，规则用短段落；命令写清工作目录、成功信号和失败入口。编号仅用于真实的机器追踪或稳定引用，业务摘要使用可读名称。
+README 只管导航，专题说明规则和操作，`progress.md` 与归档保留过程。先写结论和适用任务，再展开细则；比较用短表格，步骤用编号，命令注明工作目录、成功信号与失败入口。同一规则集中维护，其余地方直接链接。
 
-同一规则只维护一处，其余文档链接到对应章节。长期工程规则见 [AGENTS](../AGENTS.md)，按需 SOP 见 [项目 Skills](../.agents/skills/README.md)，可机械检查的约束由现有 QA / hook 守住。产品台账只在能力边界、状态或关键阻塞变化时更新；过程记录按 AGENTS 的适用条件更新。
+长期约定见 [AGENTS](../AGENTS.md)，按需操作流程见[项目 Skills](../.agents/skills/README.md)。外部建议先按本项目代码、正式文档和测试复核，再写入项目；外部原文与真实客户原件不进入产品文档。
 
 ## 索引同步 / Index Sync
 
-新增、删除、重命名、重分类长期 Markdown，或改变标题 / 职责时，同步 [文档清单](文档清单.md)、最近目录 README、引用与实际消费者。归档文件只同步最近的归档 README；主清单保留归档入口，不重复逐文件登记。仅改正文而职责不变时通常不更新清单。
-
-长期且职责容易混淆的目录保留 README。外部 GPT、其他项目原文和真实客户原件不进入产品文档；采纳结论先回到本项目核实，私密 manifest 与客户原件留在客户专属受控存储。
+新增、删除、改名或调整文档职责时，更新[文档清单](文档清单.md)、最近目录 README、引用和实际消费者；只改正文通常不动清单。归档逐文件登记在最近的归档 README。能力台账、客户矩阵和过程记录按 [AGENTS](../AGENTS.md) 的适用条件更新。
 
 ## 文件名与 metadata / Filenames And Metadata
 
-长期文档使用稳定的中文文件名与中文主体，英文术语用于搜索和稳定 anchor。README / AGENTS / CHANGELOG、归档、生成文件及已有外部稳定路径保留约定名称。
+长期文档使用稳定中文文件名；README、AGENTS、CHANGELOG、归档、生成文件和外部稳定路径沿用现有约定。英文术语用于检索和稳定锚点，只有工具实际消费时才新增 metadata。
 
-日期按信息用途保留，不给所有文档和配置统一加日期：
-
-| 信息类型 | 日期规则 |
+| 内容 | 如何追踪 |
 | --- | --- |
-| 持续维护的 README、设计、操作说明 | 文件名稳定；Git 记录修改历史，不机械写“最后更新日期” |
-| 评估快照、决策、发布、备份、验收回执与归档 | 记录实际发生 / 核验时间，并绑定版本、环境或来源；日期只证明当时状态 |
-| 运行配置与模板 | 保留程序实际消费的版本、有效期或时间字段；不为追踪修改而新增日期字段或改配置文件名 |
-| 生成文档 | 日期由生成器合同决定，不人工改生成物 |
-
-当前不要求统一 YAML frontmatter。只有 viewer、generator 或 index 实际消费时才增加 metadata；已有 `Doc Type`、`Status`、`Source` 等字段保持语义准确，避免再建一份人工维护的状态表。
+| 持续维护的设计与操作说明 | Git 记录修改历史，不逐篇补“最后更新日期” |
+| 评估、发布、备份、验收与归档 | 保留实际日期，并绑定版本、环境或来源 |
+| 配置与生成文档 | 遵循程序、生成器实际使用的版本和时间合同 |
 
 ## 产品内入口边界 / Runtime Docs Boundary
 
-帮助中心是登录用户的统一操作与项目手册入口，普通仓库专题继续留在仓库和 DEV 文档查看器：
+员工从 `/erp/help-center` 阅读操作图解和获准的三册手册；书目、正文、搜索与下载均受当前账号权限限制。内容来源、在线纠错、企业补充和导出见[手册维护](manuals/README.md)。业务页的“这页怎么用”继续复用 `businessUsabilityCatalog.mjs`。
 
-- 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- `/erp/help-center` 是当前统一帮助入口，以一层导航直接提供“操作图解”、业务手册、管理实施和技术运维；三册书目、正文和下载按当前账号的岗位及权限展示。岗位用于推荐，搜索和手册取当前账号可读岗位的并集；页面捷径仍受菜单权限限制，不设置独立业务权限码。通用章节、岗位和业务页内容分别维护在 `businessHandbook.mjs`、`roleHelpContent.mjs` 和 `businessUsabilityCatalog.mjs`，工程用料专题复用现有真源。
-- 高频业务页的“这页怎么用”和字段问号说明统一来自 `web/src/erp/config/businessUsabilityCatalog.mjs`，用于补充页面任务、完成标准、交接、公式和字段来源，不恢复第二个帮助中心，也不替代权限、岗位责任或业务链真源。`/__dev/business-usability` 只读检查这份目录的覆盖情况，不进入正式菜单或生产构建。
-- 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径不再注册运行时路由、重定向或权限别名。
-- 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
-- [业务使用手册](manuals/业务使用手册.md) 从共享帮助内容生成，在线阅读与离线下载使用同源内容；管理员与技术手册在 [manuals](manuals/README.md) 维护，并同源生成后端受控正文，供获准账号在线阅读、搜索和下载。三册导出和同步检查见[手册脚本](../scripts/docs/README.md)。
-- [项目治理地图](项目治理地图.md) 提供常见改动的参考依据、同步检查和误判边界；本地开发态可在 `/__dev/docs` 搜索或打开这份文档。
+开发文档从 `/__dev/docs` 阅读当前工作区 Markdown，新访客先进入本页；可搜索、按目录查找、置顶和跳转章节。“当前”“评审与参考”“历史”分开查看，正文按需加载。原型、归档和过程记录不证明当前实现。
 
-受控三册使用固定书目与章节，不开放任意仓库文件读取。新增其他长文档或开发验收入口时，须核对来源、导航、权限、路由、渲染与测试，不恢复旧 docs registry。
+普通仓库专题保留在仓库与 DEV 查看器；不恢复旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness`、`/erp/mobile-workbenches`、`/erp/roles/*` 路由或前端 `docRegistry`。受控三册只开放固定书目与章节，不开放任意仓库文件读取。

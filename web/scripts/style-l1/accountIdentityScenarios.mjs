@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 async function readIdentity(identity) {
   await identity.waitFor({ state: 'visible' })
@@ -76,23 +77,59 @@ export function createAccountIdentityScenarios({ customerRuntimeEffectiveSession
         assert.equal(desktop.roles, roleLabel)
         assertIdentityFits(desktop)
         assert.equal(desktop.tone, compact.tone)
-        const header = await page.locator('.erp-admin-header').evaluate((node) => {
+        const header = await page.locator('.erp-admin-sider__footer').evaluate((node) => {
           const headerBox = node.getBoundingClientRect()
           const button = node.querySelector('[data-testid="desktop-account-menu-trigger"]').getBoundingClientRect()
           return { top: headerBox.top, bottom: headerBox.bottom, buttonTop: button.top, buttonBottom: button.bottom }
         })
         assert(header.buttonTop >= header.top && header.buttonBottom <= header.bottom + 1, JSON.stringify(header))
+        const menuPositions = []
+        const verifyMenuPosition = async (button, rightSide) => {
+          await waitForFiniteAnimations(page)
+          const anchor = await button.boundingBox()
+          const popup = await page.locator('.erp-account-menu').boundingBox()
+          const viewport = page.viewportSize()
+          const geometry = { anchor, popup, viewport, rightSide }
+          assert(popup.x >= 0 && popup.y >= 0 && popup.x + popup.width <= viewport.width + 1 && popup.y + popup.height <= viewport.height + 1, JSON.stringify(geometry))
+          if (rightSide) {
+            assert(Math.abs(popup.x - (anchor.x + anchor.width) - 8) <= 1, `账号菜单应位于按钮右侧并留 8px 间距: ${JSON.stringify(geometry)}`)
+            assert(Math.abs(popup.y + popup.height - (anchor.y + anchor.height)) <= 1, `账号菜单应与按钮底边对齐: ${JSON.stringify(geometry)}`)
+          }
+          menuPositions.push(geometry)
+        }
+        await verifyMenuPosition(trigger, true)
         await page.setViewportSize({ width: 3840, height: 2160 })
+        await verifyMenuPosition(trigger, true)
         await page.screenshot({ path: `${outputDir}/${name}-desktop.png` })
         await page.locator('.erp-account-menu').screenshot({ path: `${outputDir}/${name}-identity.png` })
-        await page.keyboard.press('Escape')
+        await trigger.click()
+        await full.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '收起侧边菜单', exact: true }).click()
+        await trigger.click()
+        await full.waitFor()
+        await verifyMenuPosition(trigger, true)
+        await page.mouse.move(700, 300)
+        await page.locator('.ant-tooltip:visible').waitFor({ state: 'hidden' })
+        await page.screenshot({ path: `${outputDir}/${name}-collapsed.png` })
+        const popupBox = await page.locator('.erp-account-menu').boundingBox()
+        const cropTop = Math.floor(popupBox.y - 12)
+        await page.screenshot({
+          path: `${outputDir}/${name}-account-corner.png`,
+          clip: { x: 0, y: cropTop, width: Math.ceil(popupBox.x + popupBox.width + 16), height: page.viewportSize().height - cropTop },
+        })
+        await page.setViewportSize({ width: 1280, height: 400 })
+        await verifyMenuPosition(trigger, true)
+        await trigger.click()
         await full.waitFor({ state: 'hidden' })
         // 同一账号在窄桌面入口仍可展开完整身份。
         await page.setViewportSize({ width: 390, height: 844 })
-        await trigger.click()
+        await page.getByRole('button', { name: '打开导航菜单', exact: true }).click()
+        await page.getByTestId('drawer-account-menu-trigger').click()
         assertIdentityFits(await readIdentity(full))
+        await verifyMenuPosition(page.getByTestId('drawer-account-menu-trigger'), false)
         await assertNoHorizontalOverflow(page, `${name}-desktop-narrow`)
-        await page.keyboard.press('Escape')
+        await page.getByTestId('drawer-account-menu-trigger').click()
+        await full.waitFor({ state: 'hidden' })
 
         await page.goto(`${origin}/m/${superAdmin ? 'all' : 'warehouse'}/tasks`)
         await page.getByTestId('mobile-role-nav-mine').click()
@@ -117,7 +154,7 @@ export function createAccountIdentityScenarios({ customerRuntimeEffectiveSession
         assert.equal((await readIdentity(mobileIdentity)).roles, roleLabel)
         await page.setViewportSize({ width: 390, height: 844 })
         await page.screenshot({ path: `${outputDir}/${name}-mobile.png` })
-        await writeFile(`${outputDir}/${name}-metrics.json`, JSON.stringify({ desktop, mobile, header }, null, 2))
+        await writeFile(`${outputDir}/${name}-metrics.json`, JSON.stringify({ desktop, mobile, header, menuPositions }, null, 2))
       },
     }
   })

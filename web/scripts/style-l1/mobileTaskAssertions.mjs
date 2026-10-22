@@ -75,6 +75,7 @@ export function createMobileTaskAssertions(deps) {
           const primary = buttons.at(-1)
           const result = {
             overflow: root.scrollWidth - root.clientWidth,
+            footerGap: parseFloat(getComputedStyle(footer).columnGap),
             footerContentWidth: footer.clientWidth - parseFloat(getComputedStyle(footer).paddingLeft) - parseFloat(getComputedStyle(footer).paddingRight),
             footerButtons: buttons.map((button) => ({
               text: button.textContent.trim(),
@@ -94,7 +95,8 @@ export function createMobileTaskAssertions(deps) {
                 availableWidth:
                   choice.parentElement.getBoundingClientRect().width,
                 height: choice.getBoundingClientRect().height,
-                description: choice.querySelector('small')?.textContent,
+                label: choice.querySelector('strong')?.textContent,
+                overflow: choice.scrollWidth - choice.clientWidth,
               }))
             result.sameCard =
               root.querySelector('[role="radiogroup"]').closest('section') ===
@@ -107,12 +109,10 @@ export function createMobileTaskAssertions(deps) {
             const icon = rect('.mobile-task-receipt-outcome__icon')
             const title = rect('.mobile-task-receipt-outcome h2')
             const card = rect('.mobile-task-receipt-outcome')
-            result.iconCenterOffset = Math.abs(
-              icon.x + icon.width / 2 - card.x - card.width / 2
-            )
-            result.titleBelowIcon = title.top >= icon.bottom
+            result.outcomeSideBySide = icon.right <= title.left && title.top < icon.bottom
+            result.outcomeOverflow = card.width < root.querySelector('.mobile-task-receipt-outcome').scrollWidth
             result.sourceOutsideFacts = root.querySelector(
-              '[aria-label="办理结果"] > .mobile-detail-identity'
+              '.workflow-task-info-card__identity'
             )?.textContent
             result.status = root.querySelector(
               '.mobile-task-flow-status'
@@ -136,9 +136,8 @@ export function createMobileTaskAssertions(deps) {
               metrics.choices.length >= 2 &&
               metrics.choices.every(
                 (choice) =>
-                  Math.abs(choice.width - choice.availableWidth) < 1 &&
-                  choice.height >= 62 &&
-                  choice.description
+                  choice.width >= 120 && choice.width <= choice.availableWidth + 1 &&
+                  choice.height >= 48 && choice.overflow <= 1 && choice.label
               ),
             JSON.stringify(metrics)
           )
@@ -153,22 +152,21 @@ export function createMobileTaskAssertions(deps) {
             `${accentName} 单选标记必须跟随主题色`
           )
           await screen.getByRole('button', { name: '返回任务详情', exact: true }).click({ trial: true })
-          assert.equal(metrics.footerButtons.length, 1, '返回位于页头，办理底栏只保留当前主动作')
+          assert.equal(metrics.footerButtons.length, 2, '办理底栏保留附件和唯一主动作，返回位于页头')
           assert(
-            Math.abs(metrics.footerButtons[0].width - metrics.footerContentWidth) <= 1,
+            Math.abs(metrics.footerButtons.reduce((sum, button) => sum + button.width, 0) + metrics.footerGap - metrics.footerContentWidth) <= 1 && metrics.footerButtons[1].width > metrics.footerButtons[0].width,
             JSON.stringify(metrics)
           )
         } else {
           assert(
-            metrics.iconCenterOffset < 1 &&
-              metrics.titleBelowIcon &&
+            metrics.outcomeSideBySide && !metrics.outcomeOverflow &&
               metrics.sourceOutsideFacts &&
               metrics.status &&
               metrics.factAlignment &&
-              metrics.productCards === 0,
+              metrics.productCards <= 1,
             JSON.stringify(metrics)
           )
-          assert.equal(metrics.footerButtons[0].text, '返回任务列表')
+          assert.equal(metrics.footerButtons.at(-1).text, '返回任务列表')
           assert.notEqual(
             metrics.primaryColor,
             'rgb(255, 255, 255)',
@@ -1085,7 +1083,8 @@ export function createMobileTaskAssertions(deps) {
     )
     const warningMetrics = await readMobileTaskRiskFilterMetrics(page)
     assert.equal(warningMetrics.activeFilter, riskLabel)
-    assert.deepEqual(warningMetrics.sectionHeadings, [riskLabel])
+    assert.deepEqual(warningMetrics.sectionHeadings, [])
+    assert.deepEqual(warningMetrics.sectionLabels, [`${riskLabel}任务`])
     assert.equal(await notice.getAttribute('aria-pressed'), 'false')
   }
 
@@ -1111,10 +1110,10 @@ export function createMobileTaskAssertions(deps) {
         }
       }
       const textSelectors = [
-        '.mobile-role-message-card__tone',
-        '.mobile-role-message-card__title',
-        '.mobile-role-message-card__source',
-        '.mobile-role-message-card__reason',
+        '.erp-task-identity__status > span',
+        '.erp-task-identity__heading',
+        '.erp-task-identity__source',
+        '.mobile-task-list-row__reason',
         '.erp-task-timing dt',
         '.erp-task-timing dd',
       ].join(',')
@@ -1218,7 +1217,7 @@ export function createMobileTaskAssertions(deps) {
     await page
       .locator('.mobile-role-tasks-page--detail')
       .waitFor({ state: 'visible', timeout: 10_000 })
-    await expectText(page, '业务信息')
+    await page.getByRole('region', { name: '业务信息', exact: true }).waitFor()
     await expectText(page, '历史处理线索')
     await expectText(page, '附件（1）')
     await page
@@ -1228,6 +1227,10 @@ export function createMobileTaskAssertions(deps) {
     await assertMobileTaskVisibleTextNoTechnicalFields(page, {
       scenarioName,
       scope: '本岗位详情',
+    })
+    await page.waitForFunction(() => {
+      const attachment = document.querySelector('button[data-testid="mobile-task-attachment-action"]')
+      return attachment && getComputedStyle(attachment).flexGrow === '0'
     })
     await assertThemeReadable(page, {
       scenarioName,
@@ -1246,7 +1249,8 @@ export function createMobileTaskAssertions(deps) {
       const attachmentAction = document.querySelector(
         '[data-testid="mobile-task-attachment-action"]'
       )
-      const attachmentButton = attachmentAction?.querySelector('button')
+      const attachmentButton = attachmentAction
+      const attachmentStyle = attachmentButton ? getComputedStyle(attachmentButton) : null
       const shellRect = shell?.getBoundingClientRect()
       const headerRect = header?.getBoundingClientRect()
       const actionBarRect = actionBar?.getBoundingClientRect()
@@ -1270,6 +1274,7 @@ export function createMobileTaskAssertions(deps) {
         )
       ).map((step) => ({
         key: step.dataset.stepKey || '',
+        title: step.querySelector('.mobile-task-flow-step__title')?.textContent || '',
         state: step.dataset.state || '',
         current: step.getAttribute('aria-current') || '',
         disabled: step.disabled,
@@ -1302,10 +1307,13 @@ export function createMobileTaskAssertions(deps) {
         attachmentActionInsideHero: Boolean(
           taskHero && attachmentAction && taskHero.contains(attachmentAction)
         ),
+        attachmentActionInsideFooter: Boolean(actionBar?.contains(attachmentAction)),
+        attachmentStyle: attachmentStyle ? { flex: attachmentStyle.flex, width: attachmentStyle.width, minWidth: attachmentStyle.minWidth, maxWidth: attachmentStyle.maxWidth } : null,
         attachmentButton: attachmentButton
           ? {
               text:
                 attachmentButton.textContent?.replace(/\s+/g, ' ').trim() || '',
+              width: attachmentButton.getBoundingClientRect().width,
               height: attachmentButton.getBoundingClientRect().height,
             }
           : null,
@@ -1322,7 +1330,7 @@ export function createMobileTaskAssertions(deps) {
             .trim() || '',
         timingText:
           document.querySelector(
-            '[data-testid="mobile-task-detail-screen"] .workflow-task-current .erp-task-timing'
+            '[data-testid="mobile-task-detail-screen"] .workflow-task-info-card__details .erp-task-timing'
           )?.textContent || '',
         redundantCopy: Array.from(
           shell.querySelectorAll('h1, h2, h3, h4, [role="heading"]')
@@ -1356,29 +1364,32 @@ export function createMobileTaskAssertions(deps) {
     )
     assert.deepEqual(
       detailMetrics.buttons.map((button) => button.text),
-      ['处理任务'],
+      ['选择处理方式'],
       `${scenarioName} 详情页不应继续平铺全部写动作: ${JSON.stringify(detailMetrics)}`
     )
     assert(
       detailMetrics.summaryText.includes('业务') &&
         detailMetrics.summaryText.includes('处理截止') &&
         detailMetrics.timingText.includes('进入岗位') &&
-        detailMetrics.timingText.includes('业务 · ') &&
         detailMetrics.redundantCopy.length === 0,
       `${scenarioName} 详情页摘要缺失或仍有重复区块: ${JSON.stringify(detailMetrics)}`
     )
     assert(
-      detailMetrics.attachmentActionInsideHero &&
+      !detailMetrics.attachmentActionInsideHero &&
+        detailMetrics.attachmentActionInsideFooter &&
         detailMetrics.attachmentButton?.text === '附件（1）' &&
         detailMetrics.attachmentButton.height >= 44 &&
         detailMetrics.standaloneAttachmentSectionCount === 0,
-      `${scenarioName} 任务附件应降级为摘要内的可触控次要动作: ${JSON.stringify(detailMetrics)}`
+      `${scenarioName} 任务附件应保留在底部，触控高度不少于 44px: ${JSON.stringify(detailMetrics)}`
     )
     assert.deepEqual(
-      detailMetrics.flowSteps,
-      [],
-      `${scenarioName} 尚未办理的详情页只显示任务信息，办理步骤在进入办理后显示`
+      detailMetrics.flowSteps.map((step) => step.key),
+      ['detail', 'process', 'result'],
+      `${scenarioName} 任务详情保留完整三步导航`
     )
+    assert.deepEqual(detailMetrics.flowSteps.map((step) => step.title), ['任务信息', '任务办理', '结果回执'])
+    assert.equal(detailMetrics.flowSteps[0].current, 'step')
+    assert(detailMetrics.flowSteps.every((step) => step.height >= 44), JSON.stringify(detailMetrics.flowSteps))
     assert.equal(
       detailMetrics.inlineActionInputCount,
       0,
@@ -1402,7 +1413,7 @@ export function createMobileTaskAssertions(deps) {
     )
     detailMetrics.buttons.forEach((button) => {
       assert(
-        button.width >= 280 && button.height >= 44,
+        button.width > detailMetrics.attachmentButton.width && button.height >= 44,
         `${scenarioName} 详情页主动作点击区不稳定: ${JSON.stringify(detailMetrics)}`
       )
     })
@@ -1411,7 +1422,7 @@ export function createMobileTaskAssertions(deps) {
       0,
       `${scenarioName} 本岗位可处理任务不应显示不可代办提示: ${JSON.stringify(detailMetrics)}`
     )
-    await page.locator('.mobile-task-detail-hero').screenshot({
+    await page.getByTestId('mobile-task-detail-screen').screenshot({
       path: path.resolve(
         outputDir,
         `${scenarioName}-task-summary-attachment.png`
@@ -1419,7 +1430,6 @@ export function createMobileTaskAssertions(deps) {
     })
     const attachmentButton = page
       .getByTestId('mobile-task-attachment-action')
-      .getByRole('button', { name: '附件（1）', exact: true })
     await attachmentButton.click()
     const attachmentDialog = page.getByRole('dialog', {
       name: '任务附件',
@@ -1592,9 +1602,9 @@ export function createMobileTaskAssertions(deps) {
     )
     await doneRadio.check()
     await page.getByRole('button', { name: '确认完成本岗' }).click()
-    const completionFeedbackInput = page.getByLabel('完成反馈')
+    const completionFeedbackInput = page.getByRole('textbox', { name: '完成反馈', exact: true })
     assert.equal(
-      await page.getByLabel('现场证据').count(),
+      await page.getByRole('textbox', { name: '现场证据', exact: true }).count(),
       0,
       `${scenarioName} 处理页不应继续显示自由文本现场证据`
     )
@@ -1646,12 +1656,12 @@ export function createMobileTaskAssertions(deps) {
       .getByTestId('mobile-task-action-screen')
       .waitFor({ state: 'visible', timeout: 10_000 })
     assert.equal(
-      await page.getByLabel('完成反馈').inputValue(),
+      await page.getByRole('textbox', { name: '完成反馈', exact: true }).inputValue(),
       finalDraftFeedback,
       `${scenarioName} 系统返回、刷新详情再前进后应恢复完成反馈草稿`
     )
     assert.equal(
-      await page.getByLabel('现场证据').count(),
+      await page.getByRole('textbox', { name: '现场证据', exact: true }).count(),
       0,
       `${scenarioName} 历史恢复后不能重新出现已移除的证据输入`
     )
@@ -1760,7 +1770,7 @@ export function createMobileTaskAssertions(deps) {
         actionMetrics.flowSteps.find((step) => step.key === 'result')?.state ===
           'locked' &&
         JSON.stringify(actionMetrics.footerButtons) ===
-          JSON.stringify(['确认完成本岗']) &&
+          JSON.stringify(['附件（1）', '确认完成本岗']) &&
         actionMetrics.documentScrollWidth <=
           actionMetrics.documentClientWidth + 1,
       `${scenarioName} 独立处理页动作或布局异常: ${JSON.stringify(actionMetrics)}`
@@ -1864,7 +1874,7 @@ export function createMobileTaskAssertions(deps) {
         crossRoleMetrics.documentClientWidth + 1,
       `${scenarioName} 路径切换后任务详情造成横向溢出: ${JSON.stringify(crossRoleMetrics)}`
     )
-    await page.getByLabel('完成反馈').fill('暗色任务已完成并核对')
+    await page.getByRole('textbox', { name: '完成反馈', exact: true }).fill('暗色任务已完成并核对')
     await page
       .getByRole('button', { name: '确认完成本岗', exact: true })
       .click()
@@ -1908,7 +1918,7 @@ export function createMobileTaskAssertions(deps) {
         !receiptMetrics.text.includes('历史处理线索') &&
         receiptMetrics.handoffCount === 0 &&
         JSON.stringify(receiptMetrics.actionButtons) ===
-          JSON.stringify(['返回任务列表']) &&
+          JSON.stringify(['附件（1）', '返回任务列表']) &&
         !['结果边界', '流程锚点', '未来分支', '领域单据', '审计记录'].some(
           (copy) => receiptMetrics.text.includes(copy)
         ) &&
@@ -2097,7 +2107,7 @@ export function createMobileTaskAssertions(deps) {
         timeout: 10_000,
       })
       await recoveryActionScreen
-        .getByLabel('完成反馈')
+        .getByRole('textbox', { name: '完成反馈', exact: true })
         .fill('深页任务已完成并核对')
       await recoveryActionScreen
         .getByRole('button', { name: '确认完成本岗', exact: true })

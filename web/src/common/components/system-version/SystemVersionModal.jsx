@@ -1,13 +1,6 @@
 import React from 'react'
-import {
-  Alert,
-  Button,
-  Descriptions,
-  Modal,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Descriptions, Space, Tag, Typography } from 'antd'
+import Modal from '@/common/components/modal/AppModal'
 import {
   formatBuildCode,
   formatReleaseVersion,

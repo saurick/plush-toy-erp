@@ -91,13 +91,13 @@ export function createOperationActions({
               再次尝试
             </Button>
           </Tooltip>
-        ) : (
+        ) : status !== 'passed' ? (
           <Text type="secondary">
             {readyToExecute && !summaryFresh
               ? '等待最新状态核对'
               : deliveryRetryPresentation(retry)}
           </Text>
-        )}
+        ) : null}
       </Space>
     )
   }

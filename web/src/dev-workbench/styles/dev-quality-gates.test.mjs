@@ -86,7 +86,7 @@ test('quality gates styles: local diagnostics remain visibly secondary', () => {
   )
   assert.match(
     css,
-    /\.erp-dev-quality-context dl[\s\S]*?repeat\(auto-fit, minmax\(170px, 1fr\)\)/u
+    /\.erp-dev-quality-context dl\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/u
   )
 })
 

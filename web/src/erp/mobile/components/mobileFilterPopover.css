@@ -189,13 +189,24 @@
 .mobile-filter-panel .erp-progress-filter-fields {
   gap: 12px;
 }
-.mobile-filter-panel[data-filter-context='已办'] .erp-business-status-filters {
+.mobile-filter-select-field {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
-.mobile-filter-panel[data-filter-context='已办'] .erp-business-status-filters .erp-filter-chip {
-  flex-wrap: wrap;
-  column-gap: 3px;
-  padding-inline: 4px;
-  font-size: var(--erp-font-caption);
+
+.mobile-filter-select-field > label {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+}
+
+.mobile-filter-select-field > .ant-select {
+  min-width: 0;
+}
+
+.mobile-filter-sort-field {
+  border-top: 1px solid var(--erp-border);
+  padding-top: 12px;
 }

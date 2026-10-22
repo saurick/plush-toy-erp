@@ -78,22 +78,22 @@ test('常驻操作栏覆盖未选、选中、清空和空列表，并隔离相�
       )
     )
   const hint = () =>
-    document.querySelector('.erp-business-selection-action-bar--placeholder')
+    document.querySelector('.erp-business-selection-action-bar--empty:not([hidden]):not(.erp-business-selection-action-bar--loading)')
   await renderPage()
-  assert.equal(hint()?.textContent, '当前操作选中记录后显示可用操作')
+  assert.match(hint()?.textContent.replace(/\s+/gu, ''), /当前操作请选择一条记录.*查看/u)
   assert.ok(hint().closest('.erp-business-operation-panel__selection'))
-  assert.equal(document.querySelector('[data-business-selection-hint]'), null)
-  assert.equal(hint().querySelectorAll('button').length, 0)
+  assert.equal(Boolean(document.querySelector('[data-business-selection-hint]')), false)
+  assert.equal(hint().querySelector('[data-business-action-key="view"]').disabled, true)
   assert.equal(
     document.querySelector('.erp-business-selection-action-bar').hidden,
-    true
+    false
   )
   await act(async () =>
     document.querySelector('.ant-table-tbody .ant-radio-input').click()
   )
   await renderPage()
   assert.deepEqual(selected, [1])
-  assert.equal(hint(), null)
+  assert.equal(Boolean(hint()), false)
   assert.equal(
     document.querySelector('.erp-business-selection-action-bar').hidden,
     false
@@ -104,34 +104,34 @@ test('常驻操作栏覆盖未选、选中、清空和空列表，并隔离相�
       .click()
   )
   await renderPage()
-  assert.ok(hint(), '清空选择后恢复常驻操作栏的引导')
+  assert.ok(hint(), '清空选择后恢复常驻操作栏的禁用动作')
   for (const pending of [true, { spinning: true }]) {
     loading = pending
     await renderPage()
-    assert.equal(hint(), null, '加载时不提示操作尚未就绪的记录')
+    assert.equal(Boolean(hint()), false, '加载时不提示操作尚未就绪的记录')
     const spacer = document.querySelector('.erp-business-selection-action-bar--loading')
     assert.ok(spacer, '加载期间保留已有操作栏的布局空间')
     assert.equal(spacer.getAttribute('aria-hidden'), 'true')
-    assert.equal(spacer.querySelectorAll('button').length, 0)
+    assert.equal(spacer.querySelector('[data-business-action-key="view"]').disabled, true)
   }
   loading = { spinning: false }
   await renderPage()
   assert.ok(hint())
   rows = []
   await renderPage()
-  assert.equal(hint(), null, '无记录时只保留空结果反馈')
+  assert.equal(Boolean(hint()), false, '无记录时只保留空结果反馈')
   rows = [{ id: 1, no: 'BOM-DISCOVERY' }]
   disabled = true
   await renderPage()
-  assert.equal(hint(), null, '所有记录不可选时不作操作承诺')
+  assert.equal(Boolean(hint()), false, '所有记录不可选时不作操作承诺')
   disabled = false
   selectable = false
   await renderPage()
-  assert.equal(hint(), null)
+  assert.equal(Boolean(hint()), false)
   selectable = true
   actionable = false
   await renderPage()
-  assert.equal(hint(), null, '没有记录动作时无需提示')
+  assert.equal(Boolean(hint()), false, '没有记录动作时无需提示')
   actionable = true
   await render(
     createElement(
@@ -185,10 +185,8 @@ test('常驻操作栏覆盖未选、选中、清空和空列表，并隔离相�
   )
   const scopes = document.querySelectorAll('.erp-business-page-layout')
   assert.equal(
-    scopes[0].querySelector('.erp-business-selection-action-bar--placeholder'),
-    null
+    scopes[0].querySelector('.erp-business-selection-action-bar').hidden,
+    true
   )
-  assert.ok(
-    scopes[1].querySelector('.erp-business-selection-action-bar--placeholder')
-  )
+  assert.equal(scopes[1].querySelector('.erp-business-selection-action-bar').hidden, false)
 })

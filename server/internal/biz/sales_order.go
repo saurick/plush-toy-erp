@@ -236,11 +236,12 @@ type SalesOrderLifecycleActionRepo interface {
 }
 
 type SalesOrderUsecase struct {
-	repo SalesOrderRepo
+	repo        SalesOrderRepo
+	exportSlots chan struct{}
 }
 
 func NewSalesOrderUsecase(repo SalesOrderRepo) *SalesOrderUsecase {
-	return &SalesOrderUsecase{repo: repo}
+	return &SalesOrderUsecase{repo: repo, exportSlots: make(chan struct{}, SalesOrderExportConcurrency)}
 }
 
 func (uc *SalesOrderUsecase) CreateSalesOrder(ctx context.Context, in *SalesOrderMutation) (*SalesOrder, error) {
@@ -266,7 +267,7 @@ func (uc *SalesOrderUsecase) UpdateSalesOrder(ctx context.Context, id int, in *S
 		return nil, err
 	}
 	if !corestatus.IsSalesOrderEditable(current.LifecycleStatus) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	normalized, err := normalizeSalesOrderMutation(*in, false)
 	if err != nil {
@@ -344,7 +345,7 @@ func (uc *SalesOrderUsecase) CancelSalesOrderWithActor(ctx context.Context, id i
 		return nil, err
 	}
 	if !IsSalesOrderLifecycleTransitionAllowed(current.LifecycleStatus, SalesOrderStatusCanceled) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	repo, ok := uc.repo.(SalesOrderCancellationActorRepo)
 	if !ok {
@@ -383,7 +384,7 @@ func (uc *SalesOrderUsecase) UpdateSalesOrderItem(ctx context.Context, id int, i
 		return nil, err
 	}
 	if current.LineStatus == SalesOrderItemStatusCanceled || current.LineStatus == SalesOrderItemStatusClosed {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	normalized, err := normalizeSalesOrderItemMutation(*in)
 	if err != nil {
@@ -414,7 +415,7 @@ func (uc *SalesOrderUsecase) RemoveSalesOrderItem(ctx context.Context, id int) (
 		return current, nil
 	}
 	if current.LineStatus == SalesOrderItemStatusClosed {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	if err := uc.validateOpenSalesOrder(ctx, current.SalesOrderID); err != nil {
 		return nil, err
@@ -435,7 +436,7 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 			return nil, err
 		}
 		if !corestatus.IsSalesOrderEditable(current.LifecycleStatus) {
-			return nil, ErrBadParam
+			return nil, ErrSourceOrderStateInvalid
 		}
 	}
 	if id == 0 {
@@ -467,8 +468,11 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 			if err != nil {
 				return nil, err
 			}
-			if current.SalesOrderID != id || current.LineStatus == SalesOrderItemStatusCanceled || current.LineStatus == SalesOrderItemStatusClosed {
+			if current.SalesOrderID != id {
 				return nil, ErrBadParam
+			}
+			if current.LineStatus == SalesOrderItemStatusCanceled || current.LineStatus == SalesOrderItemStatusClosed {
+				return nil, ErrSourceOrderStateInvalid
 			}
 		}
 		mutation := item.SalesOrderItemMutation
@@ -533,7 +537,7 @@ func (uc *SalesOrderUsecase) changeSalesOrderLifecycle(ctx context.Context, id i
 		return nil, err
 	}
 	if !IsSalesOrderLifecycleTransitionAllowed(current.LifecycleStatus, next) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	if current.LifecycleStatus == next {
 		return current, nil
@@ -570,7 +574,7 @@ func (uc *SalesOrderUsecase) openSalesOrder(ctx context.Context, id int) (*Sales
 		return nil, err
 	}
 	if !corestatus.IsSalesOrderEditable(order.LifecycleStatus) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	return order, nil
 }

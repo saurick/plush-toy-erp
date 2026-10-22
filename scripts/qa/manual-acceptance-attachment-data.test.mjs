@@ -26,7 +26,7 @@ import {
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_DATABASE_NAME = "plush_erp_acceptance_local_fixture_dev";
 
-test("attachment copy stays short, ordinary, and clearly sample-only", () => {
+test("attachment copy stays short, ordinary, and free of data-nature copy", () => {
   const fixtures = buildAttachmentFixtures();
   assert.deepEqual(
     fixtures.map((item) => item.file_name),
@@ -38,7 +38,7 @@ test("attachment copy stays short, ordinary, and clearly sample-only", () => {
       "补充说明-云朵小熊大号礼盒装数量与交期.xlsx",
     ],
   );
-  assert.equal(ATTACHMENT_NOTE, "样例附件，只用于查看和下载。");
+  assert.equal(ATTACHMENT_NOTE, "按对应单据核对附件。");
   assert.equal(
     [...fixtures.map((item) => item.file_name), ATTACHMENT_NOTE].some((text) =>
       /【试用】|甲方|手工验收|名称较长用于检查/u.test(text),
@@ -236,7 +236,7 @@ function reports(overrides = {}) {
     realCustomerImport: false,
     writesFacts: false,
     ...identity,
-    sourceType: "simulated-manual-acceptance-task-batch",
+    sourceType: "",
     sourceID: 123456,
   };
   return { sourceReport, factReport, taskReport, backendURL };
@@ -526,15 +526,8 @@ test("attachment targets reject legacy generic-method fact reports", () => {
 });
 
 test("attachment workflow target uses only the same-batch ready trial PMC task", () => {
-  const batch = {
-    sourceType: "simulated-manual-acceptance-task-batch",
-    sourceID: 123456,
-  };
-  const payload = {
-    simulated_only: true,
-    real_customer_data: false,
-    trial_task: true,
-  };
+  const batch = { taskCode: "YS-V8-JH-01" };
+  const payload = {};
   const tasks = [
     ...[
       "production_scheduling",
@@ -546,8 +539,9 @@ test("attachment workflow target uses only the same-batch ready trial PMC task",
       task_group,
       task_status_key: "ready",
       owner_role_key: "pmc",
-      source_type: batch.sourceType,
-      source_id: batch.sourceID,
+      task_code: batch.taskCode,
+      source_type: null,
+      source_id: null,
       payload,
     })),
     {
@@ -555,8 +549,9 @@ test("attachment workflow target uses only the same-batch ready trial PMC task",
       task_group: "trial_pmc_work",
       task_status_key: "blocked",
       owner_role_key: "pmc",
-      source_type: batch.sourceType,
-      source_id: batch.sourceID,
+      task_code: batch.taskCode,
+      source_type: null,
+      source_id: null,
       payload,
     },
     {
@@ -564,7 +559,8 @@ test("attachment workflow target uses only the same-batch ready trial PMC task",
       task_group: "trial_pmc_work",
       task_status_key: "ready",
       owner_role_key: "pmc",
-      source_type: batch.sourceType,
+      task_code: batch.taskCode,
+      source_type: null,
       source_id: 999999,
       payload,
     },
@@ -573,8 +569,9 @@ test("attachment workflow target uses only the same-batch ready trial PMC task",
       task_group: "trial_pmc_work",
       task_status_key: "ready",
       owner_role_key: "pmc",
-      source_type: batch.sourceType,
-      source_id: batch.sourceID,
+      task_code: batch.taskCode,
+      source_type: null,
+      source_id: null,
       payload,
     },
   ];
@@ -585,7 +582,7 @@ test("attachment workflow target uses only the same-batch ready trial PMC task",
   );
   assert.equal(
     selectAttachmentWorkflowTask(
-      [{ ...tasks.at(-1), payload: { ...payload, trial_task: false } }],
+      [{ ...tasks.at(-1), task_code: "OTHER-TASK" }],
       batch,
     ),
     undefined,

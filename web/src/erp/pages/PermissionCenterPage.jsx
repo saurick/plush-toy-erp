@@ -362,7 +362,7 @@ export default function PermissionCenterPage() {
       data-permission-workspace={roleView}
       ref={setEditorContainer}
     >
-      <div className="erp-permission-page">
+      <div className="erp-permission-page" data-page-table-region>
         <PageHeaderCard
           compact
           title="权限管理"
@@ -405,6 +405,7 @@ export default function PermissionCenterPage() {
         ) : null}
         <div
           className="erp-permission-toolbar"
+          data-page-table-toolbar
           hidden={activeTabKey !== PERMISSION_CENTER_TAB_KEYS.ADMINS}
         >
           <div

@@ -16,7 +16,7 @@ export async function captureInformationDensityHelp({ page, trigger, key, expect
 export function createInformationDensityScenarios({ assert, path, outputDir, customerRuntimeEffectiveSession, assertNoHorizontalOverflow }) {
   const actions = Object.values(PermissionCode)
   const fixtures = [
-    { id: 99021, version: 3, task_code: 'TASK-DENSITY-001', task_name: '核对包装交期', task_group: 'material_check', owner_role_key: 'engineering', task_status_key: 'ready', source_type: 'simulated-manual-acceptance-task-batch', payload: { simulated_only: true }, created_at: 1790085600, due_at: 1792000000, discovery: { path: '协同跟进 / 模拟任务 / 模拟验收任务', assignee_name: '演示工程' }, display_context: { available: true, items: [{ kind: 'product', name: '海盐企鹅', code: 'P-DENSITY-001', image_attachment_id: 8801 }] } },
+    { id: 99021, version: 3, task_code: 'TASK-DENSITY-001', task_name: '核对包装交期', task_group: 'material_check', owner_role_key: 'engineering', task_status_key: 'ready', source_type: null, payload: {}, created_at: 1790085600, due_at: 1792000000, discovery: { path: '协同跟进 / 业务跟进 / 资料复核', assignee_name: '演示工程' }, display_context: { available: true, items: [{ kind: 'product', name: '海盐企鹅', code: 'P-DENSITY-001', image_attachment_id: 8801 }] } },
     { id: 99022, version: 3, task_code: 'TASK-DENSITY-002', task_name: '核对订单资料', task_group: 'material_check', owner_role_key: 'engineering', task_status_key: 'blocked', blocked_reason: '规格待核对，需业务补齐包装尺寸。', source_type: 'sales_order', source_id: 1, source_no: 'SO-DENSITY-20261018-000000001', created_at: 1790085600, due_at: 1792000000, discovery: { path: '订单履约 / 接单与用料 / 工程资料', assignee_name: '张敏' }, display_context: { available: true, source_no: 'SO-DENSITY-20261018-000000001', items: [{ kind: 'product', name: '长耳兔抱枕（多语言洗标及礼盒包装）', code: 'P-RABBIT-CUSTOM-20261018-000000002', image_attachment_id: 8801 }] } },
   ]
   const capture = async (page, name, region) => {
@@ -56,7 +56,8 @@ export function createInformationDensityScenarios({ assert, path, outputDir, cus
         })
         await capture(page, `tasks-list-${surface}`)
         assert.equal(await page.locator('.workflow-task-discovery__summary:visible').count(), 0)
-        assert.match(await page.locator(mobile ? '.mobile-task-results' : '.erp-task-board-lane').first().innerText(), /模拟任务/u)
+        assert.doesNotMatch(await page.locator(mobile ? '.mobile-task-results' : '.erp-task-board-lane').first().innerText(), /模拟|数据性质/u)
+        assert.equal(await page.locator('[aria-label="模拟数据"]').count(), 0)
         await page.getByRole('button', { name: '查看核对订单资料详情', exact: true }).click()
         const detail = mobile ? page.getByTestId('mobile-task-detail-screen') : page.locator('.erp-task-action-drawer')
         await detail.locator('.workflow-task-info-card[aria-label="任务信息"]').waitFor()

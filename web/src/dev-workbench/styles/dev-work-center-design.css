@@ -1,0 +1,94 @@
+.erp-design-work-center { container: work-center-design / inline-size; min-width: 0; }
+.erp-wc-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.erp-wc-heading h2 { margin: 0 0 6px; font-size: 18px; }
+.erp-wc-heading p { margin: 0; color: var(--erp-text-muted); }
+.erp-wc-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr); align-items: start; gap: 24px; }
+.erp-wc-figure { margin: 0; min-width: 0; }
+.erp-wc-figure.is-mobile { max-width: 390px; width: 100%; justify-self: center; }
+.erp-wc-figure figcaption { margin-top: 10px; color: var(--erp-text-muted); font-size: 12px; text-align: center; }
+.erp-wc-point { position: relative; display: grid; min-width: 0; gap: 5px; padding: 8px; border-radius: 6px; outline: 1px solid transparent; }
+.erp-wc-point.is-selected { outline-color: var(--erp-primary); background: var(--erp-primary-soft); }
+.erp-wc-point:has(> .erp-wc-marker) { padding-left: 34px; }
+.erp-wc-marker { position: absolute; top: 7px; left: 4px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--erp-primary); border-radius: 50%; color: var(--erp-primary); background: var(--erp-surface-bg); cursor: pointer; font-size: 12px; }
+.erp-wc-marker[aria-pressed="true"] { background: var(--erp-primary); color: var(--erp-on-accent); }
+.erp-wc-point-nav { display: flex; gap: 8px; margin-bottom: 18px; }
+.erp-wc-point-nav > button { width: 34px; height: 34px; border: 1px solid var(--erp-border); border-radius: 50%; color: var(--erp-text-muted); background: var(--erp-surface-bg); cursor: pointer; }
+.erp-wc-point-nav > button[aria-pressed="true"] { border-color: var(--erp-primary); color: var(--erp-on-accent); background: var(--erp-primary); }
+.erp-wc-explanation { min-width: 0; }
+.erp-wc-explanation h3 { margin: 0 0 12px; font-size: 16px; }
+.erp-wc-explanation h4 { margin: 20px 0 6px; font-size: 14px; font-weight: 500; }
+.erp-wc-explanation p { margin: 0 0 12px; line-height: 1.8; }
+.erp-wc-explanation > a { display: inline-block; margin-top: 6px; }
+.erp-wc-card-list { display: grid; gap: var(--erp-work-item-gap); }
+.erp-wc-sample-tabs { display: flex; gap: 18px; justify-content: space-between; padding: 0 6px 12px; border-bottom: 1px solid var(--erp-border); color: var(--erp-text-muted); }
+.erp-wc-sample-tabs > strong { color: var(--erp-primary); }
+.erp-wc-task-card { display: grid; align-content: start; gap: var(--erp-work-item-gap); padding: var(--erp-work-item-padding); background: var(--erp-surface-bg); border: 1px solid var(--erp-border); border-radius: var(--erp-work-item-radius); }
+.erp-wc-task-body { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.erp-wc-task-summary { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.erp-wc-product { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.erp-wc-product > strong { font-size: var(--erp-font-body); font-weight: 500; }
+.erp-wc-task-title { min-width: 0; overflow-wrap: anywhere; }
+.erp-wc-source { display: flex; align-items: baseline; gap: 6px; overflow-wrap: anywhere; }
+.erp-wc-count { display: inline-block; max-width: 100%; color: var(--erp-text-muted); font-size: var(--erp-font-caption); font-weight: 400; }
+.erp-wc-card-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; border-top: 1px solid var(--erp-border); padding-top: 4px; color: var(--erp-text-muted); }
+.erp-wc-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; min-width: 0; }
+.erp-wc-card-head > .ant-tag { margin: 0; flex-shrink: 0; }
+.erp-wc-identity { display: flex; gap: 8px; align-items: flex-start; }
+.erp-wc-identity > div { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.erp-wc-image { display: grid; justify-items: center; align-content: center; width: var(--erp-work-item-image-size); height: var(--erp-work-item-image-size); flex: 0 0 var(--erp-work-item-image-size); color: var(--erp-text-muted); background: var(--erp-surface-bg-soft); border: 1px solid var(--erp-border); border-radius: 6px; }
+.erp-wc-image small { white-space: nowrap; }
+.erp-wc-references { display: grid; gap: 4px; color: var(--erp-text-muted); overflow-wrap: anywhere; }
+.erp-wc-danger { margin: 0; padding: 8px; border-radius: 6px; background: color-mix(in srgb, var(--erp-visual-danger-text) 9%, var(--erp-surface-bg)); color: var(--erp-visual-danger-text); }
+.erp-wc-deadline { color: var(--erp-visual-danger-text); }
+.erp-wc-secondary { color: var(--erp-text-muted); }
+.erp-wc-table-wrap { overflow: auto; }
+.erp-wc-task-table { width: 100%; min-width: 540px; border-collapse: collapse; background: var(--erp-surface-bg); }
+.erp-wc-task-table th { color: var(--erp-text-muted); font-weight: 500; text-align: left; padding: 10px 8px; background: var(--erp-surface-bg-soft); }
+.erp-wc-task-table td { vertical-align: top; padding: 8px 4px; border-bottom: 1px solid var(--erp-border); overflow-wrap: anywhere; }
+.erp-wc-task-table th:first-child { width: 38%; }
+.erp-wc-task-table th:nth-child(2) { width: 24%; }
+.erp-wc-sample-panel { display: grid; gap: 14px; padding: 14px 8px; background: var(--erp-surface-bg); border: 1px solid var(--erp-border); border-radius: 10px; }
+.erp-wc-sample-stack { display: grid; gap: 12px; }
+.erp-wc-action-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid var(--erp-border); }
+.erp-wc-input { display: block; padding: 8px 10px; margin: 0; background: var(--erp-surface-bg-soft); border: 1px solid var(--erp-border); border-radius: 6px; color: var(--erp-text); }
+.erp-wc-required { color: var(--erp-visual-danger-text); font-size: 12px; }
+.erp-wc-progress { height: 5px; border-radius: 3px; overflow: hidden; background: var(--erp-border); }
+.erp-wc-progress > span { display: block; height: 100%; background: var(--erp-primary); }
+.erp-wc-chain { margin: 0; padding-left: 24px; }
+.erp-wc-chain > li { padding: 8px 0; }
+.erp-wc-chain > li[aria-current="step"] { color: var(--erp-primary); font-weight: 500; }
+.erp-wc-divider { height: 1px; margin: 6px 0; background: var(--erp-border); }
+.erp-wc-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.erp-wc-metrics > span { display: grid; gap: 4px; color: var(--erp-text-muted); }
+.erp-wc-metrics strong { color: var(--erp-text); font-size: 24px; font-weight: 500; }
+.erp-wc-calendar { display: flex; gap: 20px; }
+.erp-wc-calendar > * { padding: 8px; }
+.erp-wc-calendar > strong { color: var(--erp-on-accent); background: var(--erp-primary); border-radius: 8px; }
+.erp-wc-profile-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--erp-border); }
+@container work-center-design (max-width: 760px) {
+  .erp-wc-layout { grid-template-columns: 1fr; }
+  .erp-wc-explanation { padding-top: 8px; }
+}
+
+.erp-wc-task-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.erp-wc-task-badges > .ant-tag { margin: 0; }
+
+.erp-wc-task-examples { display: grid; gap: 12px; }
+.erp-wc-progress-examples .erp-progress-table { min-width: 540px; }
+.erp-wc-task-table tbody tr { height: var(--erp-work-item-table-height); }
+.erp-wc-task-card .erp-wc-point { padding: 0; }
+.erp-wc-progress-examples .erp-wc-point { padding: 0; }
+.erp-wc-task-table .erp-wc-point { padding: 0; margin-bottom: 0; }
+.erp-wc-task-card .erp-wc-source { min-height: 20px; font-size: var(--erp-font-caption); }
+.erp-wc-task-card .erp-wc-card-footer { padding-top: 8px; }
+.erp-wc-task-examples .erp-wc-marker { left: -32px; top: 0; }
+.erp-wc-progress-examples .erp-wc-marker { left: -32px; top: 0; }
+.erp-wc-task-examples .erp-wc-card-list { padding-inline-start: 34px; }
+.erp-wc-progress-examples .erp-wc-card-list { padding-inline-start: 34px; }
+.erp-wc-task-table td:first-child { padding-inline-start: 34px; }
+.erp-wc-task-card .erp-wc-card-footer > .erp-wc-point { font-size: var(--erp-font-caption); }
+.erp-wc-task-examples .erp-wc-point:has(> .erp-wc-marker) { padding-left: 0; }
+.erp-wc-progress-examples .erp-wc-point:has(> .erp-wc-marker) { padding-left: 0; }
+.erp-wc-progress-examples .erp-progress-table td:first-child { padding-inline-start: 34px; }
+.erp-wc-task-table td:not(:first-child) > .erp-wc-point:has(.erp-wc-marker) { margin-inline-start: 28px; }
+.erp-wc-progress-examples .erp-progress-table td:not(:first-child) > .erp-wc-point:has(.erp-wc-marker) { margin-inline-start: 28px; }

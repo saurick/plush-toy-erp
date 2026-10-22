@@ -5,9 +5,10 @@ import {
   CopyOutlined,
   DeploymentUnitOutlined,
   FileTextOutlined,
+  MoreOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { Button, theme } from 'antd'
+import { Button, Popover, theme } from 'antd'
 import { Link, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
@@ -52,6 +53,8 @@ function isPlainRouteClick(event) {
 export default function DevPageNav({ sourcePath = '', navRef = null }) {
   const location = useLocation()
   const { token } = theme.useToken()
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const toolsTriggerRef = useRef(null)
   const routedPathname = normalizePathname(location.pathname)
   const [navigationIntent, setNavigationIntent] = useState(
     EMPTY_NAVIGATION_INTENT
@@ -83,6 +86,22 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
   const sourceHref = sourcePath
     ? `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(sourcePath)}`
     : ''
+
+  useEffect(() => {
+    setToolsOpen(false)
+  }, [location.key])
+
+  useEffect(() => {
+    if (!toolsOpen) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setToolsOpen(false)
+      toolsTriggerRef.current?.focus()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [toolsOpen])
 
   useEffect(() => {
     setNavigationIntent((currentIntent) => {
@@ -119,6 +138,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
   }, [currentPathname])
 
   const handleCopyDeepLink = () => {
+    setToolsOpen(false)
     copyTextToClipboard(currentDeepLink)
       .then(() =>
         message.success({
@@ -251,35 +271,34 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
             className="erp-dev-workspace-nav__theme-toggle"
             showLabel
           />
-          {import.meta.env.MODE === 'workbench' ? (
-            <form method="post" action="/__dev/auth/logout">
-              <Button block htmlType="submit">退出登录</Button>
-            </form>
-          ) : null}
-          <Button
-            block
-            icon={<CopyOutlined />}
-            aria-label="复制当前页面链接"
-            onClick={handleCopyDeepLink}
+          <Popover
+            trigger="click"
+            placement="rightBottom"
+            open={toolsOpen}
+            onOpenChange={setToolsOpen}
+            content={
+              <div className="erp-dev-workspace-nav__tools" role="group" aria-label="页面工具">
+                <Button type="text" icon={<CopyOutlined />} aria-label="复制当前页面链接" onClick={handleCopyDeepLink}>
+                  复制链接
+                </Button>
+                {sourceHref ? (
+                  <Button type="text" href={sourceHref} icon={<FileTextOutlined />} aria-label={`在开发文档中打开来源 ${sourcePath}`}>
+                    来源文档
+                  </Button>
+                ) : null}
+                {import.meta.env.MODE === 'workbench' ? (
+                  <form method="post" action="/__dev/auth/logout">
+                    <Button block type="text" htmlType="submit">退出登录</Button>
+                  </form>
+                ) : null}
+                <p>开发工具仅供维护使用。运行结果、发布版本与目标环境，以各工具的实际记录为准。</p>
+              </div>
+            }
           >
-            复制链接
-          </Button>
-          {sourceHref ? (
-            <Button
-              block
-              href={sourceHref}
-              icon={<FileTextOutlined />}
-              aria-label={`在开发文档中打开来源 ${sourcePath}`}
-            >
-              来源文档
+            <Button ref={toolsTriggerRef} block icon={<MoreOutlined aria-hidden="true" />} aria-label="页面工具" aria-expanded={toolsOpen}>
+              页面工具
             </Button>
-          ) : null}
-          <details className="erp-dev-workspace-nav__boundary">
-            <summary>工作台说明</summary>
-            <p>
-              开发工具仅供维护使用。运行结果、发布版本与目标环境以各工具的实际记录为准。
-            </p>
-          </details>
+          </Popover>
         </div>
       </nav>
       {routePending ? (

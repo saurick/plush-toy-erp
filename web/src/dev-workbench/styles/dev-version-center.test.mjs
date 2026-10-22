@@ -12,7 +12,7 @@ const component = readFileSync(
   'utf8'
 )
 const timestampComponent = readFileSync(
-  new URL('../components/DevDeliveryTimestamp.jsx', import.meta.url),
+  new URL('../components/DevTimestamp.jsx', import.meta.url),
   'utf8'
 )
 const versionPage = readDevWorkbenchPageSource('DevVersionCenterPage.jsx')
@@ -46,9 +46,9 @@ test('manual takeover keeps the Git index lock diagram readable on its guide pag
 })
 
 test('CI/CD timing separates event timestamps from default and deep detail levels', () => {
-  assert.match(component, /DevDeliveryTimestamp/u)
-  assert.match(timestampComponent, /formatDeliveryTimestamp/u)
-  assert.match(timestampComponent, /<time dateTime=\{value\} title=\{value\}>/u)
+  assert.match(component, /DevTimestamp/u)
+  assert.match(timestampComponent, /normalizeDevTimestamp/u)
+  assert.match(timestampComponent, /<time dateTime=\{timestamp[.]dateTime\} title=\{timestamp[.]dateTime\}>/u)
   assert.match(component, /value=\{latestRun[.]finishedAt\}/u)
   assert.match(component, /value=\{release[?][.]publishedAt\}/u)
   assert.match(component, /value=\{deploymentOperation[?][.]updatedAt\}/u)
@@ -70,7 +70,7 @@ test('version rows expose one complete published timestamp without changing vers
   assert.match(versionPage, /发布于/u)
   assert.match(
     versionPage,
-    /<DevDeliveryTimestamp[\s\S]*value=\{record[.]publishedAt\}[\s\S]*action="发布于"/u
+    /<DevTimestamp[\s\S]*value=\{record[.]publishedAt\}[\s\S]*action="发布于"/u
   )
 })
 

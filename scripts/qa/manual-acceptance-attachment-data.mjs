@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import { getManualAcceptanceTaskVisibleCodePrefix } from "./manual-acceptance-task-data.mjs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { createSyntheticSourceFixture } from "../import/fixtures/synthetic/createSyntheticSourceFixture.mjs";
@@ -22,7 +23,7 @@ import {
 } from "./manual-acceptance-account-identities.mjs";
 
 export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS";
-export const ATTACHMENT_NOTE = "样例附件，只用于查看和下载。";
+export const ATTACHMENT_NOTE = "按对应单据核对附件。";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const CUSTOMER_KEY = "yoyoosun";
 const FACT_REFERENCE_KEYS = Object.freeze([
@@ -436,29 +437,14 @@ export function buildAttachmentTargets({
   ];
 }
 
-export function selectAttachmentWorkflowTask(
-  tasks = [],
-  { sourceType, sourceID } = {},
-) {
-  const expectedSourceType = String(sourceType || "").trim();
-  const expectedSourceID = Number(sourceID);
-  if (
-    !expectedSourceType ||
-    !Number.isSafeInteger(expectedSourceID) ||
-    expectedSourceID <= 0
-  ) {
-    return undefined;
-  }
-  return (Array.isArray(tasks) ? tasks : []).find(
-    (item) =>
-      item?.task_group === "trial_pmc_work" &&
-      item?.task_status_key === "ready" &&
-      item?.owner_role_key === "pmc" &&
-      item?.source_type === expectedSourceType &&
-      Number(item?.source_id) === expectedSourceID &&
-      item?.payload?.simulated_only === true &&
-      item?.payload?.real_customer_data === false &&
-      item?.payload?.trial_task === true,
+export function selectAttachmentWorkflowTask(tasks = [], { taskCode } = {}) {
+  if (typeof taskCode !== "string" || !taskCode.trim()) return undefined;
+  return (Array.isArray(tasks) ? tasks : []).find((item) =>
+    item?.task_code === taskCode &&
+    item?.task_group === "trial_pmc_work" &&
+    item?.task_status_key === "ready" &&
+    item?.owner_role_key === "pmc" &&
+    !item?.source_type && !item?.source_id,
   );
 }
 
@@ -620,15 +606,13 @@ export async function applyAttachmentData({
     domain: "workflow",
     method: "list_tasks",
     params: {
-      source_type: taskReport.sourceType,
-      source_id: taskReport.sourceID,
+      search: `${getManualAcceptanceTaskVisibleCodePrefix("pmc", taskReport.taskProfile)}-01`,
       limit: 200,
     },
     token: actorTokens.workflow_task,
   });
   const workflowTask = selectAttachmentWorkflowTask(taskList.tasks, {
-    sourceType: taskReport.sourceType,
-    sourceID: taskReport.sourceID,
+    taskCode: `${getManualAcceptanceTaskVisibleCodePrefix("pmc", taskReport.taskProfile)}-01`,
   });
   const targets = buildAttachmentTargets({
     sourceReport,

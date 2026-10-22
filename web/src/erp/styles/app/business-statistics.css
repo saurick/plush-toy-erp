@@ -1,6 +1,5 @@
 .erp-progress-board--statistics .erp-progress-toolbar {
-  flex-wrap: wrap;
-  padding-bottom: 0;
+  display: block;
 }
 .erp-statistics-toolbar-spacer {
   flex: 1;
@@ -35,33 +34,59 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 8px 12px;
+}
+.erp-statistics-filter-field {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 8px;
-  margin: 9px 0;
+}
+.erp-statistics-filter-field > label,
+.erp-statistics-filter-field > span {
+  color: var(--erp-text-muted);
+  white-space: nowrap;
+}
+.erp-statistics-filter-field > .ant-select {
+  min-width: 112px;
+}
+.erp-statistics-filters > .erp-business-date-range-filter {
+  flex: 0 1 350px;
+  min-width: min(350px, 100%);
 }
 .erp-statistics-filters > .ant-select {
-  min-width: 114px;
+  flex: 0 0 auto;
+  min-width: 106px;
 }
 .erp-statistics-filters > .ant-input-affix-wrapper {
-  width: 250px;
+  flex: 1 1 180px;
+  min-width: min(180px, 100%);
+  max-width: 280px;
 }
-.erp-statistics-metrics {
+.erp-statistics-summary-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--erp-border);
-  gap: 0;
+}
+.erp-statistics-metrics {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .erp-statistics-metrics > .erp-filter-chip {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  padding: 2px 12px;
-  margin-right: 6px;
+  gap: 6px;
+  margin: 0;
 }
 .erp-statistics-metrics strong {
-  color: var(--erp-text);
-  font-size: 24px;
+  color: inherit;
+  font-size: var(--erp-font-small);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -73,6 +98,7 @@
 }
 .erp-statistics-total-amount {
   margin-left: auto;
+  padding-left: 12px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
 }
@@ -96,7 +122,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 10px 12px 8px;
 }
 .erp-statistics-result-head > strong {
   min-width: 0;
@@ -118,7 +144,11 @@
   scrollbar-width: thin;
 }
 .erp-statistics-chart {
-  padding: 2px 14px 12px;
+  padding: 12px 16px 16px;
+}
+.erp-statistics-table + .erp-statistics-chart {
+  margin-top: 8px;
+  border-top: 1px solid var(--erp-border);
 }
 .erp-statistics-legend {
   display: flex;
@@ -140,40 +170,32 @@
 }
 .erp-statistics-plot {
   display: grid;
-  grid-template-columns: repeat(var(--statistics-columns), minmax(86px, 1fr));
-  padding: 12px 14px 0;
-  overflow-x: auto;
+  gap: 12px;
+  padding-top: 16px;
 }
 .erp-statistics-column {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(0, 1fr) minmax(48px, auto);
   min-width: 0;
-  flex-direction: column;
   align-items: center;
+  gap: 16px;
 }
 .erp-statistics-bar-track {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  align-items: center;
   width: 100%;
-  height: 100px;
-  border-bottom: 1px solid var(--erp-border);
-  background: repeating-linear-gradient(
-    to top,
-    transparent 0,
-    transparent 23px,
-    var(--erp-border) 24px
-  );
+  height: 26px;
+  background: var(--erp-surface-bg-muted);
 }
 .erp-statistics-stack {
   display: flex;
-  flex-direction: column-reverse;
-  width: 54px;
-  max-width: 65%;
+  height: 100%;
+  min-width: 0;
 }
 .erp-statistics-stack button {
   flex-shrink: 0;
-  min-height: 0;
-  width: 100%;
+  min-width: 0;
+  height: 100%;
   padding: 0;
   border: 0;
   cursor: pointer;
@@ -185,6 +207,35 @@
   outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }
+.ant-tooltip.erp-statistics-chart-tooltip {
+  max-width: min(320px, calc(100vw - 24px));
+}
+.erp-statistics-chart-tooltip .ant-tooltip-inner {
+  padding: 10px 12px;
+}
+.erp-statistics-chart-tooltip-content {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.erp-statistics-chart-tooltip-name {
+  overflow-wrap: anywhere;
+}
+.erp-statistics-chart-tooltip-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+.erp-statistics-chart-tooltip-value strong {
+  white-space: nowrap;
+}
+.erp-statistics-chart-tooltip-total,
+.erp-statistics-chart-tooltip-action {
+  opacity: 0.75;
+}
 .erp-statistics-chart .ant-btn {
   height: auto;
   padding: 3px 0;
@@ -193,19 +244,23 @@
 }
 .erp-statistics-chart-number {
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  justify-content: flex-end;
 }
 .erp-statistics-chart .erp-statistics-chart-name {
   width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
+  justify-content: flex-start;
 }
 .erp-statistics-tone-done,
 .erp-statistics-tone-not_due {
   background: var(--erp-primary);
 }
 .erp-statistics-tone-pending_not_late {
-  background: var(--erp-border-strong);
+  background: var(--erp-text-subtle);
 }
 .erp-statistics-tone-overdue,
 .erp-statistics-tone-late_7 {
@@ -232,8 +287,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 9px 12px;
-  border-top: 1px solid var(--erp-border);
+  padding: 0 12px 10px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
 }
@@ -248,6 +302,15 @@
   padding: 0;
   height: auto;
   font-size: var(--erp-font-small);
+}
+.erp-statistics-table .erp-statistics-name,
+.erp-statistics-table .erp-statistics-value:not(:disabled):not(.erp-statistics-danger) {
+  color: var(--erp-text);
+}
+.erp-statistics-table .ant-btn-link:not(:disabled):hover {
+  color: var(--erp-primary-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .erp-statistics-table .erp-statistics-name {
   max-width: 260px;
@@ -264,14 +327,14 @@
 }
 .erp-statistics-danger,
 .erp-statistics-metrics .erp-statistics-danger,
-.erp-statistics-table .erp-statistics-danger {
-  color: var(--erp-danger, #bd3838);
+.erp-statistics-table .erp-statistics-danger,
+.erp-statistics-table .erp-statistics-value.erp-statistics-danger:not(:disabled) {
+  color: var(--erp-visual-danger-text);
 }
 .erp-statistics-source-context {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding-top: 8px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
 }
@@ -299,16 +362,21 @@
     max-width: 100%;
   }
   .erp-statistics-metrics {
-    row-gap: 8px;
-  }
-  .erp-statistics-metrics > .erp-filter-chip {
-    padding: 0 10px;
-  }
-  .erp-statistics-metrics strong {
-    font-size: 20px;
+    flex-basis: 100%;
   }
   .erp-statistics-total-amount {
-    width: 100%;
-    margin-top: 8px;
+    margin-left: 0;
+    padding-left: 0;
+  }
+  .erp-statistics-column {
+    grid-template-columns: minmax(80px, 120px) minmax(0, 1fr) minmax(36px, auto);
+    gap: 8px;
+  }
+  .erp-statistics-bar-track,
+  .erp-statistics-chart .ant-btn {
+    min-height: 44px;
+  }
+  .erp-statistics-summary-row > .erp-statistics-meta {
+    margin-left: auto;
   }
 }

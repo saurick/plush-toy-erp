@@ -37,7 +37,7 @@ func TestProductionOrderJSONRPCSalesPlanningOptionContract(t *testing.T) {
 	}
 	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
 	result := d.mapProductionOrderError(context.Background(), fmt.Errorf("save: %w", biz.ErrProductionOrderPlannedQuantityExceeded))
-	if result.Code != errcode.InvalidParam.Code || result.Message != "该销售订单行的累计生产计划数量超过生产需求数量（订单数量＋船头样），请刷新可排产数量后调整" || errors.Is(biz.ErrProductionOrderPlannedQuantityExceeded, biz.ErrProductionOrderQuantityExceeded) {
+	if result.Code != errcode.BusinessRuleViolation.Code || result.Message != "该销售订单行的累计生产计划数量超过生产需求数量（订单数量＋船头样），请刷新可排产数量后调整" || errors.Is(biz.ErrProductionOrderPlannedQuantityExceeded, biz.ErrProductionOrderQuantityExceeded) {
 		t.Fatalf("planning errors must not masquerade as completion errors: %#v", result)
 	}
 }
@@ -398,18 +398,18 @@ func TestProductionOrderJSONRPCModuleStatesAndRoleMatrix(t *testing.T) {
 	_, readOnlySave, _ := d.handleProductionOrder(ctx, "release_production_order", "read-only-write", mustJSONRPCStruct(t, map[string]any{
 		"production_order_id": float64(1), "expected_version": float64(1), "idempotency_key": "read-only-write",
 	}))
-	if readOnlySave.Code != errcode.InvalidParam.Code {
+	if readOnlySave.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("read_only write=%#v", readOnlySave)
 	}
 
 	disabled := customerConfigPublishParamsWithRevisionAndModuleState(t, customerConfigPublishParams(t), "2026.07.12.production-disabled", productionOrderModuleKey, "disabled")
 	activateOperationalFactTestCustomerConfig(t, d, disabled)
 	_, disabledList, _ := d.handleProductionOrder(ctx, "list_production_orders", "disabled-list", mustJSONRPCStruct(t, map[string]any{}))
-	if disabledList.Code != errcode.InvalidParam.Code {
+	if disabledList.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("disabled list=%#v", disabledList)
 	}
 	_, disabledOptions, _ := d.handleProductionOrder(ctx, "list_production_order_reference_options", "disabled-options", optionParams)
-	if disabledOptions.Code != errcode.InvalidParam.Code {
+	if disabledOptions.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("disabled options=%#v", disabledOptions)
 	}
 }
@@ -451,7 +451,7 @@ func TestProductionOrderJSONRPCSourceTaskActionsRequireWritableWorkflowModule(t 
 					params["reason"] = "模块门禁契约验证"
 				}
 				_, result, err := d.handleProductionOrder(ctx, action.method, action.method, mustJSONRPCStruct(t, params))
-				if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+				if err != nil || result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 					t.Fatalf("%s workflow %s gate result=%#v err=%v", action.method, workflowState, result, err)
 				}
 			}
@@ -479,7 +479,7 @@ func TestMapProductionOrderErrorUsesSharedVersionConflict(t *testing.T) {
 		t.Fatalf("version conflict=%#v", result)
 	}
 	wipResult := d.mapProductionOrderError(context.Background(), biz.ErrProductionOrderWIPActive)
-	if wipResult.Code != errcode.InvalidParam.Code || wipResult.Message != "仍有未结束的在制批次，请先完成对应工序、外发回仓或质量处理后再关闭生产订单" {
+	if wipResult.Code != errcode.BusinessRuleViolation.Code || wipResult.Message != "仍有未结束的在制批次，请先完成对应工序、外发回仓或质量处理后再关闭生产订单" {
 		t.Fatalf("active WIP=%#v", wipResult)
 	}
 }

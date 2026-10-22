@@ -18,18 +18,24 @@ var (
 
 	UserSetDisabledInvalid = Definition{Name: "UserSetDisabledInvalid", Code: 40071, Message: "参数错误：user_id 无效"}
 
-	HTTPUnauthorized = Definition{Name: "HTTPUnauthorized", Code: 40101, Message: "需要管理员权限"}
-	AdminRequired    = Definition{Name: "AdminRequired", Code: 40301, Message: "需要管理员权限"}
-	AuthRequired     = Definition{Name: "AuthRequired", Code: 40302, Message: "未登录"}
-	AdminDisabled    = Definition{Name: "AdminDisabled", Code: 40303, Message: "管理员已禁用"}
-	PermissionDenied = Definition{Name: "PermissionDenied", Code: 40304, Message: "权限不足"}
-	AdminNotFound    = Definition{Name: "AdminNotFound", Code: 40410, Message: "管理员不存在"}
+	HTTPUnauthorized      = Definition{Name: "HTTPUnauthorized", Code: 40101, Message: "需要管理员权限"}
+	AdminRequired         = Definition{Name: "AdminRequired", Code: 40301, Message: "需要管理员权限"}
+	AuthRequired          = Definition{Name: "AuthRequired", Code: 40302, Message: "未登录"}
+	AdminDisabled         = Definition{Name: "AdminDisabled", Code: 40303, Message: "管理员已禁用"}
+	PermissionDenied      = Definition{Name: "PermissionDenied", Code: 40304, Message: "权限不足"}
+	AdminNotFound         = Definition{Name: "AdminNotFound", Code: 40410, Message: "管理员不存在"}
+	ResourceNotFound      = Definition{Name: "ResourceNotFound", Code: 40400, Message: "记录不存在，请刷新后重新选择"}
+	ResourceConflict      = Definition{Name: "ResourceConflict", Code: 40900, Message: "记录重复或与当前状态冲突，请核对已有记录"}
+	BusinessRuleViolation = Definition{Name: "BusinessRuleViolation", Code: 42200, Message: "当前业务条件不满足，请核对后再操作"}
 
 	MethodNotAllowed = Definition{Name: "MethodNotAllowed", Code: 40500, Message: "仅支持 POST"}
 
-	PayloadTooLarge    = Definition{Name: "PayloadTooLarge", Code: 41300, Message: "请求体过大"}
-	TemplateRenderBusy = Definition{Name: "TemplateRenderBusy", Code: 42953, Message: "当前 PDF 预览人数较多，请稍后重试"}
-	RequestCanceled    = Definition{Name: "RequestCanceled", Code: 49900, Message: "请求已取消，请刷新核对处理结果"}
+	PayloadTooLarge         = Definition{Name: "PayloadTooLarge", Code: 41300, Message: "请求体过大"}
+	TemplateRenderBusy      = Definition{Name: "TemplateRenderBusy", Code: 42953, Message: "当前 PDF 预览人数较多，请稍后重试"}
+	SalesOrderExportLimit   = Definition{Name: "SalesOrderExportLimit", Code: 41323, Message: "导出的销售订单较多，请缩小筛选范围后重试"}
+	SalesOrderExportBusy    = Definition{Name: "SalesOrderExportBusy", Code: 42923, Message: "当前导出人数较多，请稍后重试"}
+	SalesOrderExportTimeout = Definition{Name: "SalesOrderExportTimeout", Code: 40823, Message: "导出超时，请缩小筛选范围后重试"}
+	RequestCanceled         = Definition{Name: "RequestCanceled", Code: 49900, Message: "请求已取消，请刷新核对处理结果"}
 
 	AuthUserNotFound                     = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "账号不存在"}
 	AuthInvalidPassword                  = Definition{Name: "AuthInvalidPassword", Code: 10002, Message: "密码错误"}
@@ -77,9 +83,15 @@ var definitions = []Definition{
 	AdminDisabled,
 	PermissionDenied,
 	AdminNotFound,
+	ResourceNotFound,
+	ResourceConflict,
+	BusinessRuleViolation,
 	MethodNotAllowed,
 	PayloadTooLarge,
 	TemplateRenderBusy,
+	SalesOrderExportLimit,
+	SalesOrderExportBusy,
+	SalesOrderExportTimeout,
 	RequestCanceled,
 	AuthUserNotFound,
 	AuthInvalidPassword,
@@ -126,4 +138,9 @@ func IsAuthFailureCode(code int32) bool {
 	default:
 		return false
 	}
+}
+
+// IsSystemFailureCode 将外部依赖故障与系统故障归入同一观测类别。
+func IsSystemFailureCode(code int32) bool {
+	return code >= Internal.Code || code == AuthSMSServiceUnavailable.Code || code == AuthSMSServiceQuotaExceeded.Code
 }

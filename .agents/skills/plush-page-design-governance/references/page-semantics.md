@@ -86,6 +86,19 @@
 
 交付时按本次影响简述删了什么、合并了什么、移到哪里、保留了什么及原因；在真实页面或原型检查默认阅读、信息找回、操作和返回恢复。原型可用不替代两端实现验证，必要时明确未实测范围。
 
+<a id="page-growth"></a>
+
+## 功能与数据增长 / Page Growth
+
+涉及动作、筛选、页签、关联项或列表数据增长时，区分功能可扩展性与数据规模；用当前岗位、真实状态和有依据的增长场景判断，未知规模注明假设。普通文案或间距调整沿用已有边界，不另起容量评估。
+
+| 触达面 | 设计与验证重点 |
+| --- | --- |
+| 动作与导航增多 | 复用共享动作目录、业务分类与优先级，保持主要动作可发现、组内顺序稳定；按实际文字和可用宽度收纳，菜单保留分类且空组隐藏。覆盖未选、选中、清空、权限、窄屏及菜单或弹窗打开时的布局稳定；不按固定按钮数切换整套布局 |
+| 数据与关联项增多 | 核对服务端分页、搜索、汇总与返回范围，避免全量载入或把当前页当作全部结果；长列表、长链和大量选项按实际读取成本与浏览器表现选择分批、按需加载或虚拟化，保留定位、完整结果与恢复能力 |
+
+仅为本次受影响的增长场景补充验证；查询、统计、导出或批处理成本需要改变后端合同时，按领域 Skill 的[数据规模与并发](../../plush-domain-boundary-governance/SKILL.md#data-scale-and-concurrency)继续同一授权目标。交付说明采用的增长假设、现有方案的适用边界及需要升级的触发条件，示意数据不作为容量证明。
+
 ## Preserve project boundaries.
    - Do not change schema, migration, RBAC permissions, menu truth, route truth, WorkflowUsecase, or Fact usecases as a side effect of visual cleanup.
    - Do not hardcode the current customer into product-core UI.

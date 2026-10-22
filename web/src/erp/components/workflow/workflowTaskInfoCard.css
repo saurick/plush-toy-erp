@@ -1,7 +1,8 @@
 .workflow-task-info-card { min-width: 0; padding: 16px; border: 1px solid var(--erp-border); border-radius: 12px; background: var(--erp-surface-bg); color: var(--erp-text); }
 .workflow-task-info-card__heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.workflow-task-info-card__heading h2 { min-width: 0; margin: 0; font-size: 20px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.workflow-task-info-card__heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 20px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
 .workflow-task-info-card__heading .ant-tag { margin: 0; }
+.workflow-task-info-card__badges { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
 .workflow-task-info-card__identity { min-width: 0; margin-top: 12px; }
 .workflow-task-info-card__identity .erp-task-identity__summary { padding: 0; border: 0; flex-wrap: wrap; }
 .workflow-task-info-card__identity .erp-task-product-image { width: 52px; height: 52px; flex-basis: 52px; }

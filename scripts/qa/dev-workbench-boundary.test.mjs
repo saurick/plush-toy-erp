@@ -253,6 +253,39 @@ const allowedERPImports = new Set([
 ]);
 const allowedERPImportsByFile = new Map([
   [
+    "web/src/dev-workbench/components/DevUIDesignIllustrations.jsx",
+    new Set(["components/business-list/BusinessCellStack.jsx"]),
+  ],
+  [
+    "web/src/dev-workbench/standalone.jsx",
+    new Set(["styles/app.css"]),
+  ],
+  [
+    "web/src/dev-workbench/components/DevWorkCenterDesign.jsx",
+    new Set([
+      "components/business-visualizations/ProgressCompactContent.jsx",
+      "components/workflow/WorkflowTaskIdentity.jsx",
+      "components/workflow/WorkflowTaskTiming.jsx",
+      "utils/workflowTaskEventPresentation.mjs",
+      "styles/app/progress-board.css",
+      "mobile/mobileProgress.css",
+    ]),
+  ],
+  [
+    "web/src/dev-workbench/config/devWorkCenterDesign.test.mjs",
+    new Set(["utils/workflowTaskTiming.mjs", "utils/workflowTaskIdentity.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devWorkCenterDesign.mjs",
+    new Set([
+      "utils/workflowTaskIdentity.mjs",
+      "utils/dashboardTaskDisplay.mjs",
+      "utils/businessProgress.mjs",
+      "utils/workflowTaskEventPresentation.mjs",
+      "utils/roleKeys.mjs",
+    ]),
+  ],
+  [
     "web/src/dev-workbench/components/DevControlStandards.jsx",
     new Set(["utils/businessProgress.mjs"]),
   ],
@@ -309,6 +342,14 @@ const allowedERPImportsByFile = new Map([
     new Set(["utils/modalSizes.mjs"]),
   ],
   [
+    "web/src/dev-workbench/components/DevUIInputExamples.jsx",
+    new Set([
+      "components/business-list/BusinessDateInputs.jsx",
+      "utils/dateRange.mjs",
+      "utils/workflowTaskTiming.mjs",
+    ]),
+  ],
+  [
     "web/src/dev-workbench/config/devUIDesign.test.mjs",
     new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs", "config/businessHandbook.mjs"]),
   ],
@@ -360,7 +401,7 @@ test("dev workbench boundary: ERP imports stay on explicit adapters and presenta
 
   for (const { file, source } of workbenchSources) {
     for (const match of source.matchAll(
-      /(?:from\s+|import\()['"]([^'"]*erp\/[^'"]+)['"]/gu,
+      /(?:from\s+|import\s*(?:\(\s*)?)['"]([^'"]*erp\/[^'"]+)['"]/gu,
     )) {
       assert(
         isAllowedERPImport(file, match[1]),
@@ -377,12 +418,16 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     "../../utils/modalSizes.mjs",
     "./BusinessModal.jsx",
     "../../common/utils/feedbackConfig.mjs",
+    "@/common/components/modal/AppModal",
+    "@/common/components/layout/SurfacePanel",
   ]);
   for (const file of [
     "web/src/erp/components/business-list/BusinessFormModal.jsx",
     "web/src/erp/components/business-list/BusinessModal.jsx",
     "web/src/erp/utils/modalSizes.mjs",
     "web/src/common/utils/feedbackConfig.mjs",
+    "web/src/common/components/modal/AppModal.jsx",
+    "web/src/common/components/layout/SurfacePanel.jsx",
   ]) {
     const source = read(file);
     for (const match of source.matchAll(
@@ -408,16 +453,63 @@ test("feedback sample modal dependencies remain presentation-only", () => {
   );
 });
 
-test("work-center presentation samples cannot import copy action modules", () => {
+test("typography samples only reuse the presentation-only cell stack", () => {
+  const component = "web/src/erp/components/business-list/BusinessCellStack.jsx";
+  const allowed = new Set(["react", "./businessCellStack.css"]);
+  const source = read(component);
+  for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
+    assert(allowed.has(match[1]), `${component} imports a non-presentation dependency`);
+  }
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
+  const sample = "web/src/dev-workbench/components/DevUIDesignIllustrations.jsx";
+  assert.equal(isAllowedERPImport(sample, "@/erp/components/business-list/BusinessCellStack.jsx"), true);
+  assert.equal(isAllowedERPImport(sample, "@/erp/pages/SalesOrdersPage.jsx"), false);
+  assert.equal(isAllowedERPImport(sample, "@/erp/api/salesOrderApi.mjs"), false);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/components/business-list/BusinessCellStack.jsx"), false);
+});
+
+test("date input samples keep shared pickers free of business dependencies", () => {
+  const dependencies = new Map([
+    ["web/src/erp/components/business-list/BusinessDateInputs.jsx", new Set([
+      "react", "antd", "@ant-design/icons", "../../utils/dateRange.mjs",
+      "@/common/components/select/AppSelect",
+    ])],
+    ["web/src/erp/utils/dateRange.mjs", new Set([
+      "dayjs", "dayjs/plugin/customParseFormat.js",
+    ])],
+    ["web/src/common/components/select/AppSelect.jsx", new Set([
+      "react", "antd", "./app-select.css",
+    ])],
+  ]);
+  for (const [file, allowed] of dependencies) {
+    const source = read(file);
+    for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
+      assert(allowed.has(match[1]), `${file} imports a non-presentation dependency`);
+    }
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
+  }
+  const sample = read("web/src/dev-workbench/components/DevUIInputExamples.jsx");
+  assert.doesNotMatch(sample, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+});
+
+test("work-center samples keep direct business actions outside the presentation adapter", () => {
   for (const file of [
     "web/src/dev-workbench/components/DevWorkCenterDesign.jsx",
     "web/src/dev-workbench/config/devWorkCenterDesign.mjs",
   ]) {
     assert.equal(isAllowedERPImport(file, "@/erp/components/workflow/WorkflowTaskCopy.jsx"), false);
+    assert.equal(isAllowedERPImport(file, "@/erp/api/attachmentApi.mjs"), false);
+    assert.equal(isAllowedERPImport(file, "@/erp/pages/WorkflowTasksPage.jsx"), false);
+    assert.doesNotMatch(read(file), /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|useOutletContext)\b/u);
   }
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/components/workflow/WorkflowTaskIdentity.jsx"), false);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/mobile/mobileProgress.css"), false);
 });
 
 test("dev workbench boundary: resolved imports preserve module and file scope", () => {
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/components/DevUIInputExamples.jsx", "@/erp/components/business-list/BusinessDateInputs.jsx"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/components/DevControlStandards.jsx", "@/erp/components/business-list/BusinessDateInputs.jsx"), false);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/components/DevUIInputExamples.jsx", "@/erp/pages/PurchaseOrdersPage.jsx"), false);
   assert.equal(
     isAllowedERPImport("web/src/dev-workbench/config/devUIDesign.test.mjs", "../../erp/config/businessHandbook.mjs"),
     true,

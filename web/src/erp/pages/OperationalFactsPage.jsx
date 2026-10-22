@@ -47,13 +47,13 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
@@ -1412,7 +1412,7 @@ export function OperationalFactWorkspace({
                 size="small"
                 icon={<PrinterOutlined />}
                 data-business-action-key="outsourcing-contract-print"
-                data-business-action-role="secondary"
+                data-business-action-role="output"
                 disabled={!activeSelectedRow}
                 onClick={openProcessingContractPrint}
               >
@@ -1429,6 +1429,7 @@ export function OperationalFactWorkspace({
                 size="small"
                 data-business-action-key="outsourcing-payable"
                 data-business-action-role="action"
+                data-business-action-group="query"
                 disabled={outsourcingPayableViewAvailability.disabled}
                 onClick={() => viewOutsourcingPayable(activeSelectedRow)}
               >

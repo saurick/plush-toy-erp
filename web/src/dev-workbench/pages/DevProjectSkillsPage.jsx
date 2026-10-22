@@ -7,6 +7,7 @@ import { MermaidDiagram } from '@/common/components/markdown'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTimestamp from '../components/DevTimestamp.jsx'
 import { buildDevDocsLocation } from './devDocsNavigation.mjs'
 import {
   DEV_PROJECT_SKILLS_API,
@@ -24,7 +25,7 @@ export default function DevProjectSkillsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [reload, setReload] = useState(0)
-  const [graphOpen, setGraphOpen] = useState(true)
+  const [graphOpen, setGraphOpen] = useState(false)
   const keyword = params.get('q') || ''
   const selectedName = params.get('skill') || ''
 
@@ -90,7 +91,7 @@ export default function DevProjectSkillsPage() {
       await copyTextToClipboard(`$${selected.name}`)
       message.success('Skill 调用名称已复制')
     } catch {
-      message.error('复制失败，请手动复制下方调用名称')
+      message.error('复制失败，请展开“关联与引用”后手动复制调用名称')
     }
   }
 
@@ -106,14 +107,6 @@ export default function DevProjectSkillsPage() {
                 ? '结构检查通过'
                 : '结构检查需处理'}
             </Tag>
-            <Text>{skills.length} 个项目 Skill</Text>
-            <Text type="secondary">
-              检查于{' '}
-              {new Date(snapshot.checkedAt).toLocaleString('zh-CN', {
-                hour12: false,
-              })}{' '}
-              · 当前工作区
-            </Text>
           </div>
         ) : null}
         <Button
@@ -183,11 +176,11 @@ export default function DevProjectSkillsPage() {
                     key={skill.name}
                     type="button"
                     className="erp-dev-skills__item"
+                    title={skill.summary || skill.scope}
                     aria-pressed={selected?.name === skill.name}
                     onClick={() => updateQuery({ skill: skill.name })}
                   >
                     <strong>{skill.title}</strong>
-                    <span>{skill.summary || skill.scope}</span>
                     {skill.issues.length ? (
                       <Tag color="warning">需处理</Tag>
                     ) : null}
@@ -232,81 +225,57 @@ export default function DevProjectSkillsPage() {
                       </Button>
                     </Space>
                   </div>
-                  <code className="erp-dev-skills__name">${selected.name}</code>
-                  <section>
-                    <Title level={3}>适用任务</Title>
-                    <p>{selected.scope || '适用范围尚未登记，请查看原文。'}</p>
-                  </section>
-                  <section>
-                    <Title level={3}>正文提及的其他 Skill</Title>
-                    <Text type="secondary">
-                      按原文中的条件选用；提及关系不代表固定执行顺序。
-                    </Text>
-                    <div className="erp-dev-skills__related">
-                      {selected.relatedSkills.map((name) => (
-                        <Button
-                          key={name}
-                          size="small"
-                          onClick={() => updateQuery({ skill: name, q: '' })}
-                        >
-                          {skills.find((skill) => skill.name === name)?.title ||
-                            name}
-                        </Button>
-                      ))}
-                      {!selected.relatedSkills.length ? (
-                        <Text type="secondary">
-                          入口正文未提及其他项目 Skill
-                        </Text>
-                      ) : null}
-                    </div>
-                  </section>
+                  <p>{selected.scope || '适用范围尚未登记，请查看原文。'}</p>
                   <details
                     className="erp-dev-skills__disclosure"
                     open={graphOpen}
                     onToggle={(event) => setGraphOpen(event.currentTarget.open)}
                   >
-                    <summary>查看职责与引用关系图</summary>
-                    {graphOpen ? (
-                      <MermaidDiagram
-                        chart={chart}
-                        label={`${selected.title}职责与引用关系图`}
-                        initialZoom="fit"
-                        flowchartHtmlLabels={false}
-                        showSourceOnError={false}
-                      />
-                    ) : null}
-                  </details>
-                  <details className="erp-dev-skills__disclosure" open>
-                    <summary>
-                      引用依据（{selected.references.length} 项）
-                    </summary>
-                    <ul className="erp-dev-skills__references">
-                      {selected.references.map((reference) => (
-                        <li key={`${reference.path}#${reference.headingId}`}>
-                          <Link
-                            to={buildDevDocsLocation({
-                              path: reference.path,
-                              headingId: reference.headingId,
-                            })}
-                          >
-                            {reference.path}
-                            {reference.headingId
-                              ? ` #${reference.headingId}`
-                              : ''}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                    {!selected.references.length ? (
-                      <Text type="secondary">
-                        入口正文未引用其他 Markdown 文件
+                    <summary>关联与引用</summary>
+                    <div className="erp-dev-skills__sources">
+                      <code className="erp-dev-skills__name">${selected.name}</code>
+                      {selected.relatedSkills.length ? (
+                        <section>
+                          <Title level={3}>相关 Skill</Title>
+                          <Text type="secondary">按原文中的条件选用，不代表固定执行顺序。</Text>
+                          <div className="erp-dev-skills__related">
+                            {selected.relatedSkills.map((name) => (
+                              <Button key={name} size="small" onClick={() => updateQuery({ skill: name, q: '' })}>
+                                {skills.find((skill) => skill.name === name)?.title || name}
+                              </Button>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+                      {selected.references.length ? (
+                        <section>
+                          <Title level={3}>引用文档</Title>
+                          <ul className="erp-dev-skills__references">
+                            {selected.references.map((reference) => (
+                              <li key={`${reference.path}#${reference.headingId}`}>
+                                <Link to={buildDevDocsLocation({ path: reference.path, headingId: reference.headingId })}>
+                                  {reference.path}{reference.headingId ? ` #${reference.headingId}` : ''}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      ) : null}
+                      {graphOpen ? (
+                        <MermaidDiagram
+                          chart={chart}
+                          label={`${selected.title}职责与引用关系图`}
+                          initialZoom="fit"
+                          flowchartHtmlLabels={false}
+                          showSourceOnError={false}
+                        />
+                      ) : null}
+                      <Text type="secondary" className="erp-dev-skills__boundary">
+                        来源：{selected.sourcePath}。结构检查只核对文件、metadata、索引与引用；执行和验收以任务证据为准。
+                        <DevTimestamp value={snapshot.checkedAt} action="检查于" />
                       </Text>
-                    ) : null}
+                    </div>
                   </details>
-                  <Text type="secondary" className="erp-dev-skills__boundary">
-                    来源：{selected.sourcePath}。结构检查复用
-                    skill-health，只核对文件、metadata、索引与引用；实际执行和验收需查看对应任务证据。
-                  </Text>
                 </>
               ) : filtered.length ? (
                 <Empty

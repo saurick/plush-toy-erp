@@ -17,6 +17,7 @@ import {
   listProcesses,
   listPurchaseOrders,
   listSalesOrders,
+  exportSalesOrders,
   listSuppliers,
 } from '../api/masterDataOrderApi.mjs'
 import { listBOMVersions } from '../api/bomApi.mjs'
@@ -272,6 +273,10 @@ export default function HistoryRecordsPage() {
   const loadExportRows = useCallback(
     async ({ signal }) => {
       if (!activeSource) return []
+      if (activeSource.key === 'sales_orders') {
+        const rows = await exportSalesOrders(listParams, { signal })
+        return normalizeHistoryRecords(activeSource, rows)
+      }
       const result = await listAllPaginatedRecords(
         HISTORY_SOURCE_LOADERS[activeSource.key],
         listParams,
@@ -312,6 +317,7 @@ export default function HistoryRecordsPage() {
           <>
             <HistoryQueryFilters inline>
               <SelectFilter
+                allowClear={false}
                 aria-label="历史记录类型"
                 prefix="记录类型"
                 value={activeSource?.key}
@@ -365,7 +371,11 @@ export default function HistoryRecordsPage() {
           selectedCount={selectedRecord ? 1 : 0}
           selectedLabel={selectedRecord?.primary}
         >
-          <SelectionClearAction onClick={() => setSelectedKey(null)} />
+          <SelectionClearAction
+            selectedCount={selectedRecord ? 1 : 0}
+            selectionLabel="历史记录"
+            onClear={() => setSelectedKey(null)}
+          />
           <BusinessActionTooltip
             disabled={!selectedRecord || loading}
             disabledReason="请先选择一条历史记录"

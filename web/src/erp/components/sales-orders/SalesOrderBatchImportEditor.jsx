@@ -5,7 +5,8 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Alert, Button, Form, Select, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Form, Space, Tag, Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
@@ -316,6 +317,9 @@ export default function SalesOrderBatchImportEditor({
           上一单
         </Button>
         <Select
+          allowClear={false}
+          label="切换导入订单"
+          placeholder="切换导入订单"
           aria-label="切换导入订单"
           showSearch
           optionFilterProp="label"

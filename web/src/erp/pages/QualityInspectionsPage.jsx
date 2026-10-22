@@ -17,12 +17,12 @@ import {
   Dropdown,
   Form,
   Popconfirm,
-  Select,
   Space,
   Tag,
   Typography,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { PurchaseReceiptStatus, PurchaseReturnStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
@@ -55,7 +55,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -63,6 +62,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
@@ -1380,7 +1380,7 @@ export default function QualityInspectionsPage() {
                 { label: '全部入库单', value: '' },
                 ...purchaseReceiptOptions,
               ]}
-              placeholder="全部入库单"
+              placeholder="入库单"
               disabled={Boolean(
                 inspectionTypeFilter && inspectionTypeFilter !== 'INCOMING'
               )}
@@ -1396,7 +1396,7 @@ export default function QualityInspectionsPage() {
               className="erp-business-filter-control--status"
               value={materialFilter}
               options={[{ label: '全部材料', value: '' }, ...materialOptions]}
-              placeholder="全部材料"
+              placeholder="材料"
               disabled={Boolean(
                 inspectionTypeFilter && inspectionTypeFilter !== 'INCOMING'
               )}
@@ -1412,7 +1412,7 @@ export default function QualityInspectionsPage() {
               className="erp-business-filter-control--status"
               value={warehouseFilter}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
-              placeholder="全部仓库"
+              placeholder="仓库"
               disabled={inspectionTypeFilter === 'PRODUCTION_STAGE'}
               showSearch
               optionFilterProp="label"
@@ -1429,7 +1429,7 @@ export default function QualityInspectionsPage() {
                 { label: '全部批次', value: '' },
                 ...inventoryLotOptions,
               ]}
-              placeholder="全部批次"
+              placeholder="批次"
               disabled={inspectionTypeFilter === 'PRODUCTION_STAGE'}
               showSearch
               optionFilterProp="label"
@@ -1702,7 +1702,7 @@ export default function QualityInspectionsPage() {
           ) : null}
           {canHandleQualityException && [QualityInspectionStatus.PASSED, QualityInspectionStatus.REJECTED].includes(selectedQualityStatus) ? (
             <BusinessActionTooltip disabled={correctionDisabled} disabledReason="仅未被替代且无生效下游业务的已判定质检可发起纠正；工序质量按原异常处理流程办理。">
-              <Button data-business-action-key="quality-correction" data-business-action-role="secondary" disabled={correctionDisabled} onClick={() => setCorrectionInspection(selectedRow)}>发起纠正复检</Button>
+              <Button data-business-action-key="quality-correction" data-business-action-role="secondary" data-business-action-group="business" disabled={correctionDisabled} onClick={() => setCorrectionInspection(selectedRow)}>发起纠正复检</Button>
             </BusinessActionTooltip>
           ) : null}
           {showQualityDispositionAction ? (
@@ -1792,6 +1792,8 @@ export default function QualityInspectionsPage() {
         <label className="mobile-detail-section">
           选择本次收货的质检单
           <Select
+            allowClear={false}
+            placeholder="选择本次收货的质检单"
             aria-label="选择本次收货的质检单"
             value={selectedRow?.id}
             disabled={loading || saving}

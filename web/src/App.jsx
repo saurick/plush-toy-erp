@@ -20,6 +20,7 @@ import {
   useERPWorkspace,
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
+import { WORKBENCH_APPEARANCE_STORAGE_KEY } from '@/common/theme/erpAppearance.mjs'
 import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import '@/common/components/empty/empty-state.css'
@@ -168,12 +169,19 @@ function ThemedApp() {
   )
 }
 
-const App = () => (
-  <ERPWorkspaceProvider>
-    <ERPThemeProvider>
-      <ThemedApp />
-    </ERPThemeProvider>
-  </ERPWorkspaceProvider>
-)
+const App = () => {
+  const { pathname } = useLocation()
+  const browserStorageKey =
+    import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(pathname)
+      ? WORKBENCH_APPEARANCE_STORAGE_KEY
+      : ''
+  return (
+    <ERPWorkspaceProvider>
+      <ERPThemeProvider browserStorageKey={browserStorageKey}>
+        <ThemedApp />
+      </ERPThemeProvider>
+    </ERPWorkspaceProvider>
+  )
+}
 
 export default App

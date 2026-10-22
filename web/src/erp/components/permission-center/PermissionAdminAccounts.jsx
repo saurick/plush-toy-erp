@@ -8,7 +8,6 @@ import {
   Empty,
   Form,
   Input,
-  Select,
   Space,
   Switch,
   Tag,
@@ -22,10 +21,12 @@ import React, {
   useState,
 } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import SearchInput from '@/common/components/SearchInput.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import useBusinessListStickyHeader from '../business-list/useBusinessListStickyHeader.js'
 import {
   TABLE_PAGE_SIZE_OPTIONS,
   IS_PRODUCTION_BUILD,
@@ -82,6 +83,7 @@ import {
   PERMISSION_CENTER_ADMIN_DIALOG,
   permissionCenterAdminDialogReducer,
 } from '../../utils/permissionCenterAdminDialog.mjs'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 export default function PermissionAdminAccounts({
   toolbarContainer,
@@ -98,6 +100,8 @@ export default function PermissionAdminAccounts({
   filterRequest,
 }) {
   const outletContext = useOutletContext()
+  const tableCardRef = useRef(null)
+  const sticky = useBusinessListStickyHeader(tableCardRef, active)
 
   const [creating, setCreating] = useState(false)
   const passwordResetPendingRef = useRef(false)
@@ -935,7 +939,10 @@ export default function PermissionAdminAccounts({
             setTablePagination((prev) => ({ ...prev, current: 1 }))
           }}
         />
-        <Select
+        <FilterSelect
+          emptyValue="all"
+          label="账号状态"
+          placeholder="账号状态"
           aria-label="账号状态"
           value={adminStatusFilter}
           options={adminStatusOptions}
@@ -966,7 +973,8 @@ export default function PermissionAdminAccounts({
 
   const adminAccountTab = (
     <Card
-      className="erp-permission-section erp-permission-section--admins"
+      ref={tableCardRef}
+      className={`erp-permission-section erp-permission-section--admins${sticky ? ' erp-business-data-table-card--sticky' : ''}`}
       variant="borderless"
     >
       {toolbarContainer
@@ -978,6 +986,7 @@ export default function PermissionAdminAccounts({
         操作记录归属实际登录账号。新账号分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。
       </Paragraph>
       <Table
+        sticky={sticky}
         rowKey="id"
         columns={columns}
         dataSource={filteredAdmins}

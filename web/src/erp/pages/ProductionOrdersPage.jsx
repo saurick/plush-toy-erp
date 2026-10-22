@@ -22,12 +22,12 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectionActionBar,
   SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
@@ -1847,6 +1847,7 @@ export default function ProductionOrdersPage() {
               <Button
                 data-business-action-key="route-execution"
                 data-business-action-role="action"
+                data-business-action-group={productionRouteReadOnly ? 'query' : 'business'}
                 disabled={productionRouteActionAvailability.disabled}
                 onClick={() => setProductionRouteOpen(true)}
               >
@@ -1988,6 +1989,7 @@ export default function ProductionOrdersPage() {
               <Button
                 data-business-action-key="close"
                 data-business-action-role="secondary"
+                data-business-action-group="lifecycle"
                 className="erp-business-module-status-action"
                 disabled={
                   !selected ||
@@ -2055,7 +2057,7 @@ export default function ProductionOrdersPage() {
             </BusinessActionTooltip>
           ) : null}
           {canReadProductionWip && canReadProductionFacts ? (
-            <Button size="small" disabled={!selected} onClick={() => viewProductionProcess()}>
+            <Button size="small" data-business-action-group="query" disabled={!selected} onClick={() => viewProductionProcess()}>
               查看生产执行
             </Button>
           ) : null}

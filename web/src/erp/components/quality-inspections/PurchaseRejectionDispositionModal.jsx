@@ -6,10 +6,10 @@ import {
   Form,
   Input,
   Popconfirm,
-  Select,
   Space,
   Tag,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { PurchaseRejectionStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import { sumNumeric20Scale6Values,
@@ -432,6 +432,7 @@ export default function PurchaseRejectionDispositionModal({
           rules={[{ required: true, message: '请选择处置方式' }]}
         >
           <Select
+            placeholder="请选择处置方式"
             disabled={Boolean(record)}
             options={[
               { value: 'RETURN_TO_VENDOR', label: '退回供应商' },

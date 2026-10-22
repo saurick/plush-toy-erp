@@ -1,3 +1,4 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSession, assertNoHorizontalOverflow, outputDir, path }) {
@@ -227,13 +228,13 @@ export function createBOMRevisionScenarios({ assert, customerRuntimeEffectiveSes
       await edit.click()
       const dialog = frame.getByRole('dialog', { name: /^(选择要编辑的 BOM 草稿|创建 BOM 修订草稿)$/u })
       assert.equal(await dialog.locator('#business-draft option').count(), 3, '同产品多个草稿供明确选择')
-      await dialog.locator('#business-draft').selectOption('bom-13')
+      await chooseSelectOption(dialog.locator('#business-draft'), 'bom-13')
       await confirm()
       await frame.locator('[data-form-field="usage-0"]').fill('1.26')
       await save()
       await enable()
       await edit.click()
-      assert.equal(await dialog.locator('#business-draft').inputValue(), 'bom-1', '只有一个草稿时预选该版本')
+      assert.equal(await readSelectValue(dialog.locator('#business-draft')), 'bom-1', '只有一个草稿时预选该版本')
       await confirm()
       await frame.locator('[data-form-field="bom-version"]').fill('V9')
       await frame.locator('[data-form-field="usage-0"]').fill('2.5')

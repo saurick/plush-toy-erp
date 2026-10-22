@@ -210,10 +210,7 @@ export function selectCapacityIdempotencyTask(
       task?.task_status_key === "ready" &&
       task?.owner_role_key === "pmc" &&
       task?.source_type === expectedSourceType &&
-      Number(task?.source_id) === expectedSourceID &&
-      task?.payload?.simulated_only === true &&
-      task?.payload?.real_customer_data === false &&
-      task?.payload?.trial_task === true,
+      Number(task?.source_id) === expectedSourceID,
   );
 }
 

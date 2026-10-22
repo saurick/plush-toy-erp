@@ -407,6 +407,17 @@ test('所有动作放得下时直接显示，辅助、例外和危险动作不�
   assert.deepEqual(selectStableBusinessActionIndexes(actions, { availableWidth: 256 }), [0, 1, 2])
 })
 
+test('分类标题与组间留白参与测宽，少量同类动作仍完整直达', () => {
+  const actions = [
+    { index: 0, actionable: true, group: 'business', score: 100, width: 52 },
+    { index: 1, actionable: true, group: 'query', score: 60, width: 52 },
+  ]
+  const space = { availableWidth: 160, moreWidth: 60, gap: 8, groupGap: 16, groupMinWidths: { business: 64, query: 80 } }
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, space), [0, 1])
+  assert.deepEqual(selectStableBusinessActionIndexes(actions, { ...space, availableWidth: 159 }), [0])
+  assert.deepEqual(selectStableBusinessActionIndexes(actions.map((item) => ({ ...item, group: 'query' })), { ...space, availableWidth: 112 }), [0, 1])
+})
+
 test('分组原子性、隐藏空组和更多入口宽度共同参与空间计算', () => {
   const groups = [
     { index: 0, actionable: true, score: 100, width: 160 },

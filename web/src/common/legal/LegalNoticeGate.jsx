@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Modal, Space, Typography } from 'antd'
+import { Alert, Button, Space, Typography } from 'antd'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import Modal from '@/common/components/modal/AppModal'
 import { RpcDomain } from '../consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE, getStoredAdminProfile, logout } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'

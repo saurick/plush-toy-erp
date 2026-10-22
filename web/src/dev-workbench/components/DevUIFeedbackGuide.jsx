@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Alert, Button, Form, Input, Select, Slider } from 'antd'
+import { Alert, Button, Form, Input, Slider } from 'antd'
 import { Link } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { MermaidDiagram } from '@/common/components/markdown'
 import { ERP_MODAL_WIDTHS } from '@/erp/utils/modalSizes.mjs'
@@ -41,6 +42,9 @@ function Anatomy({ rationale, size, onSize }) {
       <div className="erp-feedback-guide-tools">
         <label htmlFor="feedback-modal-size">任务尺寸</label>
         <Select
+          placeholder="弹窗宽度"
+          aria-label="弹窗宽度"
+          allowClear={false}
           id="feedback-modal-size"
           value={size}
           onChange={onSize}

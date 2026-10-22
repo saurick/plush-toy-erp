@@ -11,6 +11,7 @@
 .erp-progress-controls {
   container: progress-controls / inline-size;
   flex: 0 0 auto;
+  margin-top: var(--erp-page-gap);
   margin-bottom: var(--erp-page-gap);
   padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
   border: 1px solid var(--erp-border);
@@ -140,6 +141,10 @@
   border-collapse: collapse;
 }
 .erp-progress-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--erp-border);
   padding: 10px 12px;
   color: var(--erp-text-muted);
   background: var(--erp-table-header-bg, var(--erp-surface-bg-soft));
@@ -164,7 +169,7 @@
 }
 .erp-progress-table td {
   min-width: 0;
-  padding: 10px 12px;
+  padding: var(--erp-table-cell-padding-block) var(--erp-work-item-padding);
   border-top: 1px solid var(--erp-border);
   vertical-align: middle;
   overflow-wrap: anywhere;
@@ -187,6 +192,27 @@
   display: grid;
   min-width: 0;
   gap: 3px;
+}
+.erp-progress-product {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--erp-work-item-association-height);
+}
+.erp-progress-product:where(.erp-product-identity--compact) .erp-task-product-image,
+.erp-progress-product--empty > .erp-task-product-image {
+  width: var(--erp-work-item-image-size);
+  height: var(--erp-work-item-image-size);
+  flex-basis: var(--erp-work-item-image-size);
+}
+.erp-progress-product--empty > .erp-task-product-image {
+  font-size: 22px;
+}
+.erp-progress-table .erp-progress-row {
+  height: var(--erp-work-item-table-height);
+}
+.erp-progress-table .erp-progress-product {
+  align-items: center;
 }
 .erp-progress-identity > strong {
   color: var(--erp-text);
@@ -312,9 +338,10 @@
   }
   .erp-progress-table .erp-progress-row {
     display: grid;
+    height: auto;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 9px;
-    padding: 12px;
+    gap: var(--erp-work-item-gap);
+    padding: var(--erp-work-item-padding);
     border-bottom: 1px solid var(--erp-border);
   }
   .erp-progress-table td {
@@ -499,7 +526,7 @@
 .erp-progress-attention.is-blocked > .erp-progress-attention-reason {
   color: var(--erp-visual-danger-text);
 }
-.erp-progress-row-open:hover .erp-progress-identity > strong {
+.erp-progress-identity-cell:hover .erp-progress-identity > strong {
   color: var(--erp-primary-strong);
   text-decoration: underline;
   text-underline-offset: 3px;

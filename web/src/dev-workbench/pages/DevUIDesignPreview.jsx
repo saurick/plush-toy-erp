@@ -1,20 +1,65 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { DownloadOutlined, FullscreenOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Space } from 'antd'
+import { Button, Dropdown, Result, Space } from 'antd'
+import { Loading } from '@/common/components/loading'
 import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
-import { prepareUIDesignSandboxSource } from '../config/devUIDesign.mjs'
+import { prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
 
 export default function DevUIDesignPreview({ active, page, pageSelector }) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewRevision, setPreviewRevision] = useState(0)
+  const previewId = `${page}-${previewRevision}`
+  const [previewState, setPreviewState] = useState(null)
+  const previewStatus = previewState?.id === previewId ? previewState.status : 'loading'
   const frameRef = useRef(null)
   const readerRef = useRef(null)
   const fullscreenButtonRef = useRef(null)
   const source = useMemo(
-    () => prepareUIDesignSandboxSource(designHTML, { page }),
-    [page]
+    () => prepareUIDesignSandboxSource(designHTML, { page, revision: previewRevision }),
+    [page, previewRevision]
   )
+
+  useEffect(() => {
+    if (!active) return undefined
+    const frame = frameRef.current
+    let timeout
+    const finish = (status, reason) => {
+      window.clearTimeout(timeout)
+      setPreviewState({
+        id: previewId,
+        status,
+        reason: ['script', 'empty', 'layout', 'timeout'].includes(reason) ? reason : undefined,
+      })
+    }
+    const check = () => {
+      window.clearTimeout(timeout)
+      if (document.hidden) return
+      setPreviewState({ id: previewId, status: 'loading' })
+      timeout = window.setTimeout(() => finish('failed', 'timeout'), UI_DESIGN_PREVIEW_TIMEOUT_MS)
+      frame?.contentWindow?.postMessage({ type: 'ui-design-preview-check', previewId }, '*')
+    }
+    const onMessage = (event) => {
+      if (
+        document.hidden ||
+        event.source !== frame?.contentWindow ||
+        event.data?.type !== 'ui-design-preview-status' ||
+        event.data.previewId !== previewId ||
+        !['ready', 'failed'].includes(event.data.status)
+      ) return
+      finish(event.data.status, event.data.reason)
+    }
+    window.addEventListener('message', onMessage)
+    document.addEventListener('visibilitychange', check)
+    frame?.addEventListener('load', check)
+    check()
+    return () => {
+      window.clearTimeout(timeout)
+      window.removeEventListener('message', onMessage)
+      document.removeEventListener('visibilitychange', check)
+      frame?.removeEventListener('load', check)
+    }
+  }, [active, previewId])
 
   useEffect(() => {
     if (!active) setFullscreen(false)
@@ -109,6 +154,23 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
       <div className="erp-dev-ui-design-toolbar">
         {pageSelector}
         <Space wrap>
+          {page === 'workspace' ? (
+            <Dropdown
+              trigger={['click']}
+              getPopupContainer={(trigger) => trigger.parentElement}
+              menu={{
+                items: [
+                  ['data', '正常'], ['loading', '加载中'], ['empty', '空结果'],
+                  ['error', '读取失败'], ['forbidden', '无权限'], ['stress', '边界压力'],
+                ].map(([key, label]) => ({ key, label })),
+                onClick: ({ key }) => frameRef.current?.contentWindow?.postMessage(
+                  { type: 'ui-design-data-state', value: key }, '*'
+                ),
+              }}
+            >
+              <Button disabled={previewStatus !== 'ready'}>状态模拟</Button>
+            </Dropdown>
+          ) : null}
           {['task-handling', 'mobile-tasks'].includes(page) ? <TaskFulfillmentGuideButton /> : null}
           <Button icon={<ReloadOutlined />} onClick={() => setPreviewRevision((value) => value + 1)}>
             重置演示
@@ -123,14 +185,40 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
           </Button>
         </Space>
       </div>
-      <iframe
-        ref={frameRef}
-        key={`html-${previewRevision}`}
-        title="ERP 最新可交互设计"
-        sandbox="allow-scripts allow-downloads"
-        srcDoc={source}
-        className="erp-dev-ui-design-frame"
-      />
+      <div
+        className="erp-dev-ui-design-stage"
+        aria-busy={previewStatus === 'loading'}
+        data-preview-failure={previewStatus === 'failed' ? previewState?.reason : undefined}
+      >
+        <iframe
+          ref={frameRef}
+          key={previewId}
+          title="ERP 最新可交互设计"
+          tabIndex={previewStatus === 'ready' ? 0 : -1}
+          aria-hidden={previewStatus !== 'ready' || undefined}
+          sandbox="allow-scripts allow-downloads"
+          srcDoc={source}
+          className="erp-dev-ui-design-frame"
+        />
+        {previewStatus !== 'ready' ? (
+          <div className="erp-dev-ui-design-feedback">
+            {previewStatus === 'loading' ? (
+              <Loading title="正在加载交互预览" description="正在准备设计内容，请稍候…" />
+            ) : (
+              <Result
+                status="warning"
+                title="交互预览未能显示"
+                subTitle="请重新加载预览后继续查看。"
+                extra={(
+                  <Button icon={<ReloadOutlined />} onClick={() => setPreviewRevision((value) => value + 1)}>
+                    重新加载预览
+                  </Button>
+                )}
+              />
+            )}
+          </div>
+        ) : null}
+      </div>
       {fullscreen ? (
         <button
           type="button"

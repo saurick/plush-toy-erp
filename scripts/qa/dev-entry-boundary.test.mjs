@@ -149,7 +149,7 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   );
   assertIncludes(
     devRoutesSource,
-    "applyDevWorkbenchFavicon(document, faviconHref)",
+    "applyDevWorkbenchFavicon(document, DEV_WORKBENCH_FAVICON_HREF)",
     "dev workbench favicon owner",
   );
   assert(

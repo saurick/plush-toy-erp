@@ -4,7 +4,6 @@ import {
   Card,
   Empty,
   Input,
-  Select,
   Tag,
   Typography,
 } from 'antd'
@@ -18,6 +17,7 @@ import Table from '@/common/components/table/AppTable'
 import { DEV_PAGINATION } from '../../../config/devPagination.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { DeliveryTaskPath } from '../DeliveryTaskPath.jsx'
+import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
 import DevPipelineTimingPanel, {
   DevPipelineStatusStrip,
 } from '../../../components/DevPipelineTimingPanel.jsx'
@@ -31,6 +31,7 @@ import {
   DEV_VERSION_CENTER_VIEW_VERSIONS,
   deliveryReadOnlyReleasePresentation,
 } from '../../../config/devDelivery.mjs'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const { Text } = Typography
 
@@ -72,28 +73,10 @@ export function buildVersionWorkspace({
           className="erp-dev-version-tab erp-dev-version-tab--versions"
           aria-label="版本与部署"
         >
-          {!operations.some((operation) =>
-            OPEN_OPERATION_STATUSES.has(operation.status)
-          ) ? (
-            <DeliveryTaskPath
-              title="部署现有版本"
-              items={[
-                { title: '选择版本', description: '选择已发布的不可变制品。' },
-                {
-                  title: '准备部署计划',
-                  description: '检查目标、迁移、备份与回滚点。',
-                },
-                {
-                  title: '确认部署并读回',
-                  description: '执行后核对运行版本与业务结果。',
-                },
-              ]}
-            />
-          ) : null}
           <Card
             title="可部署版本"
             className="erp-dev-version-table-card"
-            extra={<Text type="secondary">最多展示最近 20 个</Text>}
+            extra={<Text type="secondary">最近 20 个版本</Text>}
           >
             <Table
               rowKey="gitSha"
@@ -121,9 +104,20 @@ export function buildVersionWorkspace({
                   />
                 ),
               }}
-              scroll={{ x: 1120 }}
+              scroll={{ x: 980 }}
             />
           </Card>
+          {!operations.some((operation) => OPEN_OPERATION_STATUSES.has(operation.status)) ? (
+            <DevStaticGuidance title="部署步骤">
+              <DeliveryTaskPath
+                items={[
+                  { title: '选择版本' },
+                  { title: '准备部署计划' },
+                  { title: '确认部署并读回' },
+                ]}
+              />
+            </DevStaticGuidance>
+          ) : null}
         </section>
       ),
     },
@@ -219,7 +213,10 @@ export function buildVersionWorkspace({
                     </div>
                     <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--action">
                       <Text type="secondary">动作</Text>
-                      <Select
+                      <FilterSelect
+                        emptyValue="all"
+                        label="动作"
+                        placeholder="动作"
                         aria-label="筛选动作"
                         value={operationHistoryFilters.action}
                         options={OPERATION_HISTORY_ACTION_OPTIONS}
@@ -233,7 +230,10 @@ export function buildVersionWorkspace({
                     </div>
                     <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
                       <Text type="secondary">目标</Text>
-                      <Select
+                      <FilterSelect
+                        emptyValue="all"
+                        label="目标"
+                        placeholder="目标"
                         aria-label="筛选目标"
                         value={operationHistoryFilters.target}
                         options={OPERATION_HISTORY_TARGET_OPTIONS}
@@ -273,13 +273,14 @@ export function buildVersionWorkspace({
                         ? `显示 ${String(filteredHistoryOperations.length)} / 共 ${String(historyOperations.length)} 条记录`
                         : `共 ${String(historyOperations.length)} 条记录`}
                     </Text>
-                    <Button
-                      type="link"
-                      disabled={!hasOperationHistoryFilters}
-                      onClick={clearOperationHistoryFilters}
-                    >
-                      清空筛选
-                    </Button>
+                    {hasOperationHistoryFilters ? (
+                      <Button
+                        type="link"
+                        onClick={clearOperationHistoryFilters}
+                      >
+                        清空筛选
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 <Table

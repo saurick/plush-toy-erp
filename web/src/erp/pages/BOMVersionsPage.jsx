@@ -9,12 +9,13 @@ import {
   UnorderedListOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Form, Popconfirm, Select, Space } from 'antd'
+import { Alert, Button, Form, Popconfirm, Space } from 'antd'
 import {
   useLocation,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -1229,6 +1230,7 @@ export default function BOMVersionsPage() {
             />
             <Select
               allowClear
+              label="产品"
               optionFilterProp="label"
               options={productOptions}
               placeholder="按产品筛选"
@@ -1402,7 +1404,8 @@ export default function BOMVersionsPage() {
               size="small"
               icon={<UnorderedListOutlined />}
               data-business-action-key="related-tasks"
-              data-business-action-role="related"
+              data-business-action-role="collaboration"
+              className="erp-business-task-collaboration-entry"
               disabled={
                 selectedRowKeys.length !== 1 || !activeActionVersion || saving
               }
@@ -1410,7 +1413,7 @@ export default function BOMVersionsPage() {
                 setTaskContext({ bomID: activeActionVersion.id, page: 1 })
               }
             >
-              相关任务
+              任务协作
             </Button>
           ) : null}
           {canCreate &&
@@ -1435,6 +1438,7 @@ export default function BOMVersionsPage() {
               <Button
                 data-business-action-key="copy"
                 data-business-action-role="secondary"
+                data-business-action-group="business"
                 size="small"
                 icon={<CopyOutlined />}
                 disabled={
@@ -1472,7 +1476,7 @@ export default function BOMVersionsPage() {
                 >
                   <Button
                     data-business-action-key={`print-${templateKey}`}
-                    data-business-action-role="secondary"
+                    data-business-action-role="output"
                     size="small"
                     icon={<PrinterOutlined />}
                     disabled={
@@ -1562,6 +1566,7 @@ export default function BOMVersionsPage() {
                 <Button
                   data-business-action-key="archive"
                   data-business-action-role="secondary"
+                  data-business-action-group="lifecycle"
                   size="small"
                   icon={<InboxOutlined />}
                   disabled={
@@ -1780,7 +1785,7 @@ export default function BOMVersionsPage() {
                 setTaskContext({ bomID: modalActionVersion.id, page: 1 })
               }
             >
-              相关任务
+              任务协作
             </Button>
           ) : null}
           <BOMHeaderFormFields

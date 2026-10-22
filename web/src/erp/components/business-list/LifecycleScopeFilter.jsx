@@ -9,6 +9,7 @@ import {
 export default function LifecycleScopeFilter({ value, onChange, ...props }) {
   return (
     <SelectFilter
+      emptyValue="all"
       aria-label="记录范围"
       className="erp-business-filter-control--status"
       options={LIFECYCLE_SCOPE_OPTIONS}

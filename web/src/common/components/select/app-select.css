@@ -1,0 +1,17 @@
+.app-select .ant-select-clear {
+  color: var(--erp-text-muted, #4d5d53);
+  opacity: 1;
+}
+
+.app-select:has(.ant-select-clear) .ant-select-arrow {
+  opacity: 0;
+}
+
+.app-select__label {
+  color: var(--erp-text-muted, #4d5d53);
+  white-space: nowrap;
+}
+
+.app-select__label::after {
+  content: '：';
+}

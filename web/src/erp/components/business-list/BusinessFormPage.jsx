@@ -13,6 +13,7 @@ import { message, modal } from '@/common/utils/antdApp'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import { BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 import BusinessFormBody from './BusinessFormBody.jsx'
+import ERPPageActions from '../ERPPageActions.jsx'
 import '../../styles/app/business-form-page.css'
 
 function captureFormScroll(page, previous) {
@@ -447,6 +448,7 @@ export default function BusinessFormPage({
       ) : null}
       <header className="erp-business-form-page__header">
         <h1 tabIndex={-1}>{title}</h1>
+        {open ? <ERPPageActions /> : null}
         {canFullscreen ? (
           <Button
             size="small"

@@ -75,5 +75,5 @@ func warehouseClassificationError(err error) *v1.JsonrpcResult {
 	if message == "" {
 		return nil
 	}
-	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: message}
+	return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: message}
 }

@@ -13,7 +13,7 @@ test('environment evidence distinguishes target facts from workbench history', (
   assert.match(panel, /最严重阻断/u)
   assert.match(panel, /最后核对/u)
   assert.match(panel, /查看工作台操作记录/u)
-  assert.match(panel, /远端流水线耗时/u)
+  assert.match(panel, /流水线耗时/u)
   assert.match(panel, /Release \/ SHA/u)
   assert.match(panel, /客户配置 revision/u)
   assert.match(panel, /数据版本 \/ run/u)

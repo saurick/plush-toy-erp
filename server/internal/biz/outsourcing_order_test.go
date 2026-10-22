@@ -365,7 +365,7 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	if _, err := uc.CloseOutsourcingOrder(ctx, 3); err != nil || repo.nextStatus != OutsourcingOrderStatusClosed {
 		t.Fatalf("expected confirmed -> closed allowed, status=%s err=%v", repo.nextStatus, err)
 	}
-	if _, err := uc.ConfirmOutsourcingOrder(ctx, 1); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.ConfirmOutsourcingOrder(ctx, 1); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected draft -> confirmed rejected, got %v", err)
 	}
 	if _, err := uc.CancelOutsourcingOrder(ctx, 1); err != nil || repo.nextStatus != OutsourcingOrderStatusCanceled {
@@ -374,7 +374,7 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	if IsValidOutsourcingOrderStatus("posted") || IsOutsourcingOrderLifecycleTransitionAllowed(OutsourcingOrderStatusConfirmed, "posted") {
 		t.Fatalf("posted must not be an outsourcing order lifecycle status")
 	}
-	if _, err := uc.CancelOutsourcingOrder(ctx, 4); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CancelOutsourcingOrder(ctx, 4); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
 	}
 	if _, err := uc.SubmitOutsourcingOrder(ctx, 5); !errors.Is(err, ErrOutsourcingOrderIncomplete) {
@@ -383,7 +383,7 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 1, &OutsourcingOrderMutation{}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing version rejected, got %v", err)
 	}
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 2, &OutsourcingOrderMutation{ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 2, &OutsourcingOrderMutation{ExpectedVersion: 1}, nil); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected submitted outsourcing contract to be frozen, got %v", err)
 	}
 }

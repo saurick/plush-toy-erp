@@ -9,7 +9,7 @@
   width: 100%;
   min-width: 0;
   flex: 1 1 auto;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
@@ -26,9 +26,8 @@
   flex-wrap: wrap;
 }
 
-.erp-business-selection-action-bar--active
-  .erp-business-selection-action-bar__copy {
-  max-width: 45%;
+.erp-business-selection-action-bar__copy {
+  max-width: 36%;
   flex: 0 1 auto;
 }
 
@@ -43,9 +42,45 @@
   display: flex;
   min-width: 0;
   flex: 0 1 auto;
-  align-items: stretch;
+  align-items: flex-end;
   flex-wrap: wrap;
+  gap: 16px;
+}
+
+.erp-business-selection-action-bar__group {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.erp-business-selection-action-bar__group + .erp-business-selection-action-bar__group::before {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -8px;
+  width: 1px;
+  background: var(--erp-border);
+  content: '';
+}
+
+.erp-business-selection-action-bar__group-heading {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.erp-business-selection-action-bar__group-actions {
+  display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.erp-business-selection-action-bar__actions--grouped {
+  align-items: flex-end;
 }
 
 .erp-business-selection-action-bar__action-item,
@@ -95,6 +130,22 @@
   border-radius: 8px;
 }
 
+.erp-business-selection-action-menu__group + .erp-business-selection-action-menu__group {
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-business-selection-action-menu__heading {
+  padding: 8px 12px 4px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-weight: 600;
+}
+
+.erp-business-task-collaboration-entry.ant-btn:not(:disabled) {
+  border-color: var(--erp-primary);
+  color: var(--erp-primary);
+}
+
 .erp-business-selection-action-menu__item .erp-business-action-tooltip-anchor {
   width: 100%;
   border-radius: 8px;
@@ -109,7 +160,7 @@
   text-align: left;
 }
 
-@media screen and (max-width: 991px) {
+@media screen and (max-width: 600px) {
   .erp-business-selection-action-bar__row {
     align-items: stretch;
     flex-direction: column;
@@ -125,8 +176,7 @@
     justify-content: flex-start;
   }
 
-  .erp-business-selection-action-bar--active
-    .erp-business-selection-action-bar__copy {
+  .erp-business-selection-action-bar__copy {
     max-width: 100%;
   }
 
@@ -134,7 +184,9 @@
     width: 100%;
     flex: 0 0 auto;
   }
+}
 
+@media screen and (max-width: 991px) {
   .erp-business-selection-action-bar__actions--responsive .ant-btn {
     min-width: 44px;
     min-height: 44px;
@@ -763,28 +815,10 @@ body
 }
 
 @media screen and (max-width: 768px) {
-  .erp-admin-header__refresh-label,
-  .erp-admin-breadcrumb li:not(:last-child) {
-    display: none;
-  }
-
-  .erp-admin-breadcrumb ol {
-    flex-wrap: nowrap;
-  }
-
-  .erp-admin-breadcrumb li:last-child {
-    overflow: hidden;
-    min-width: 0;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .erp-admin-header__theme-toggle .ant-segmented-item,
   .mobile-app-layout__theme-toggle .ant-segmented-item {
     min-width: 40px;
   }
 
-  .erp-admin-header__theme-toggle .erp-theme-toggle__option > span:last-child,
   .mobile-app-layout__theme-toggle .erp-theme-toggle__option > span:last-child {
     display: none;
   }

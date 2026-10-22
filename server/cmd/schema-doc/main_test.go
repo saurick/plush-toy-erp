@@ -32,11 +32,11 @@ func TestRepositoryCatalogAndGeneratedOutputsAreCurrent(t *testing.T) {
 
 	wantMetrics := schemaMetrics{
 		Tables:         79,
-		Columns:        1316,
-		ForeignKeys:    161,
+		Columns:        1319,
+		ForeignKeys:    163,
 		Indexes:        351,
 		PartialIndexes: 34,
-		Checks:         319,
+		Checks:         321,
 	}
 	if got := db.metrics(); got != wantMetrics {
 		t.Fatalf("schema metrics changed without an intentional data-dictionary review: got %+v want %+v", got, wantMetrics)
@@ -59,6 +59,21 @@ func TestRepositoryCatalogAndGeneratedOutputsAreCurrent(t *testing.T) {
 	}
 	if !report.clean() {
 		t.Fatalf("generated outputs are not current: %s", formatOutputReport(report))
+	}
+}
+
+func TestInlineCodePreservesLiteralContentWithoutHTML(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct{ value, want string }{
+		{"long_constraint_name", "`long_constraint_name`"},
+		{"<private>&value", "`<private>&value`"},
+		{"a|b", "`a`&#124;`b`"},
+		{"|a||b|", "&#124;`a`&#124;&#124;`b`&#124;"},
+		{"`literal`", "`` `literal` ``"},
+	} {
+		if got := inlineCode(test.value); got != test.want {
+			t.Errorf("inlineCode(%q) = %q, want %q", test.value, got, test.want)
+		}
 	}
 }
 

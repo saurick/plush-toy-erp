@@ -1126,7 +1126,7 @@ export function createDevQualityGateScenarios({
         )
 
         const jobGuideButton = serverPanel.getByRole('button', {
-          name: 'Job 说明',
+          name: '流程与原理',
         })
         await jobGuideButton.click()
         const jobGuideDrawer = page.locator('.erp-dev-quality-job-guide-drawer')
@@ -1291,7 +1291,7 @@ export function createDevQualityGateScenarios({
         await jobGuideDrawer.locator('.ant-drawer-close').click()
         await jobGuideDrawer.waitFor({ state: 'hidden' })
         await page.waitForFunction(() =>
-          document.activeElement?.textContent?.includes('Job 说明')
+          document.activeElement?.textContent?.includes('流程与原理')
         )
 
         const coreGuideButton = serverPanel.getByRole('button', {
@@ -1399,7 +1399,7 @@ export function createDevQualityGateScenarios({
           await page.getByText('先恢复 GitLab 读取链路', { exact: false }).count(),
           0
         )
-        await panel.getByText('QA_MODE=full', { exact: false }).waitFor()
+        await page.locator('.erp-dev-quality-status-banner strong').getByText('QA_MODE=full', { exact: false }).waitFor()
         const docsDiagram = panel.locator('[data-mermaid-status="rendered"]')
         await docsDiagram.waitFor()
         assert.equal(await docsDiagram.locator('svg g.node').count(), 3)
@@ -1414,6 +1414,20 @@ export function createDevQualityGateScenarios({
           .waitFor()
         await drawer.getByText('3 个 Job', { exact: false }).first().waitFor()
         await assertNoHorizontalOverflow(page, 'dev-quality-gates-desktop-light')
+        await drawer.locator('.ant-drawer-close').click()
+        await drawer.waitFor({ state: 'hidden' })
+        await page.getByRole('tab', { name: '本机诊断', exact: true }).click()
+        const diagnosticActions = page.getByRole('region', { name: '本机质量诊断操作', exact: true })
+        await diagnosticActions.getByRole('button', { name: /运行本机/u }).waitFor()
+        assert.equal(await diagnosticActions.getByRole('button', { name: /运行本机/u }).count(), 1)
+        await diagnosticActions.getByRole('combobox', { name: '诊断范围', exact: true }).press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible').getByText('完整诊断', { exact: true }).click()
+        await diagnosticActions.getByRole('button', { name: '运行本机完整诊断', exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('profile'), 'full')
+        await page.reload()
+        await diagnosticActions.getByRole('button', { name: '运行本机完整诊断', exact: true }).waitFor()
+        assert.equal(await diagnosticActions.getByRole('button', { name: '运行本机严格诊断', exact: true }).count(), 0)
+        await assertNoHorizontalOverflow(page, '单一诊断入口与范围恢复')
       },
     },
   ]

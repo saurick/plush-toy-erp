@@ -1,116 +1,95 @@
-.erp-dev-fulfillment-guide { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--erp-border); border-radius: 10px; background: var(--erp-surface-bg); container: fulfillment-guide / inline-size; }
-.erp-dev-fulfillment-guide__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.erp-dev-fulfillment-guide__navigation { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.erp-dev-fulfillment-guide { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--erp-border); border-radius: 10px; background: var(--erp-surface-bg); container: fulfillment-guide / inline-size; }
+.erp-dev-fulfillment-guide__heading, .erp-dev-fulfillment-guide__navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .erp-dev-fulfillment-guide h2 { margin: 0; font-size: 18px; }
 .erp-dev-fulfillment-guide p { margin: 0; line-height: 1.7; }
-.erp-dev-fulfillment-guide__steps { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; list-style: none; margin: 0; padding: 0; scroll-margin-top: 16px; }
-.erp-dev-fulfillment-guide__steps button { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 6px 8px; width: 100%; height: 100%; min-height: 66px; align-content: center; align-items: center; text-align: left; padding: 10px; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg-soft); color: var(--erp-text); font-size: var(--erp-font-small); line-height: 1.5; cursor: pointer; }
-.erp-dev-fulfillment-guide__steps strong { font-size: inherit; overflow-wrap: anywhere; }
-.erp-dev-fulfillment-guide__step-number { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--erp-surface-bg-soft); color: var(--erp-text-muted); font-variant-numeric: tabular-nums; }
-.erp-dev-fulfillment-guide__step-copy { display: grid; gap: 3px; min-width: 0; }
-.erp-dev-fulfillment-guide__step-copy small { font-size: var(--erp-font-caption); font-weight: 400; }
-.erp-dev-exception-directory__stages button { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: baseline; width: 100%; height: 100%; min-height: 44px; padding: 12px; border: 1px solid var(--erp-border); border-radius: 6px; text-align: left; background: var(--erp-surface-bg); color: var(--erp-text); cursor: pointer; font: inherit; }
-.erp-dev-exception-directory__list button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 16px 8px; text-align: left; border: 0; border-bottom: 1px solid var(--erp-border); background: var(--erp-surface-bg); color: var(--erp-text); cursor: pointer; font: inherit; }
-.erp-dev-exception-directory__stages button:hover { background: var(--erp-interactive-bg-hover); }
-.erp-dev-exception-directory__stages button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 2px; }
-.erp-dev-exception-directory__list button:hover { background: var(--erp-interactive-bg-hover); }
-.erp-dev-exception-directory__list button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: -2px; }
-.erp-dev-fulfillment-guide__steps button:hover { background: var(--erp-interactive-bg-hover); }
-.erp-dev-fulfillment-guide__steps button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 2px; }
-.erp-dev-fulfillment-guide__steps li[data-role-match="false"] button { color: var(--erp-text-muted); }
-.erp-dev-fulfillment-guide__steps li[data-role-match="true"] button { color: var(--erp-primary); background: var(--erp-primary-soft); }
-.erp-dev-fulfillment-guide__steps button[aria-pressed="true"] { outline: 2px solid var(--erp-primary); outline-offset: 2px; }
-.erp-dev-fulfillment-guide__scope-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; color: var(--erp-primary); font-size: var(--erp-font-small); }
-.erp-dev-fulfillment-guide__legend, .erp-dev-fulfillment-guide__legend > span { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.erp-dev-fulfillment-guide__legend { gap: 14px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
-.erp-dev-fulfillment-guide__legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--erp-primary-soft); border: 1px solid var(--erp-primary); }
-.erp-dev-fulfillment-guide__legend .erp-dev-fulfillment-guide__selected-mark { border-width: 2px; background: var(--erp-surface-bg); }
-.erp-dev-fulfillment-guide__stage-context, .erp-dev-fulfillment-guide__stage-context > span { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
-.erp-dev-fulfillment-guide__stage-context { gap: 8px 18px; font-size: var(--erp-font-caption); color: var(--erp-text-muted); }
-.erp-dev-fulfillment-guide__stage-context .erp-dev-fulfillment-guide__related { flex-basis: 100%; }
-.erp-dev-fulfillment-guide__related .ant-btn { border-style: dashed; }
-.erp-dev-fulfillment-guide__result { display: grid; gap: 16px; padding: 16px; background: var(--erp-surface-bg-soft); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; font-size: var(--erp-font-body); scroll-margin-top: 16px; }
-.erp-dev-fulfillment-guide__detail-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; padding-bottom: 12px; border-bottom: 1px solid var(--erp-border); }
-.erp-dev-fulfillment-guide__detail-heading p { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
-.erp-dev-fulfillment-guide__detail-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; min-width: 0; }
-.erp-dev-fulfillment-guide__detail-title > :where(span:first-child) { color: var(--erp-text-muted); font-size: var(--erp-font-small); white-space: nowrap; }
-.erp-dev-fulfillment-guide__detail-title > h3 { overflow-wrap: anywhere; }
-.erp-dev-fulfillment-guide__detail-content { display: grid; gap: 16px 32px; min-width: 0; }
-.erp-dev-fulfillment-guide__detail-content > * { min-width: 0; }
-.erp-dev-fulfillment-guide__detail-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; }
-.erp-dev-fulfillment-guide__back-to-overview { display: none; }
-.erp-dev-fulfillment-guide__subflow { display: grid; gap: 12px; min-width: 0; }
-.erp-dev-fulfillment-guide__subflow-workspace { display: grid; gap: 16px; align-items: start; min-width: 0; }
-.erp-dev-fulfillment-guide#task-fulfillment-guide .fulfillmentRoleMatch .label-container { fill: var(--erp-primary-soft); stroke: var(--erp-primary); }
-.erp-dev-fulfillment-guide__substep-detail { display: grid; gap: 9px; min-width: 0; padding-top: 12px; border-top: 1px solid var(--erp-border); }
-.erp-dev-fulfillment-guide__substep-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
-.erp-dev-fulfillment-guide__substep-heading > label { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
-.erp-dev-fulfillment-guide__substep-heading .ant-select { flex: 1 1 240px; max-width: 420px; min-width: 0; }
-.erp-dev-fulfillment-guide__node-facts { display: grid; grid-template-columns: minmax(64px,100px) minmax(0,1fr); gap: 8px 16px; margin: 0; line-height: 1.7; }
-.erp-dev-fulfillment-guide__node-facts dt { color: var(--erp-text-muted); }
-.erp-dev-fulfillment-guide__node-facts dd { margin: 0; }
-.erp-dev-fulfillment-guide__instructions summary { padding: 6px 0; cursor: pointer; }
-.erp-dev-fulfillment-guide__instructions > section { margin-top: 10px; }
-.erp-dev-fulfillment-guide__boundary { color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
-.erp-dev-fulfillment-guide__heading p { margin-top: 4px; font-size: var(--erp-font-small); color: var(--erp-text-muted); }
+.erp-dev-fulfillment-guide__workspace { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+.erp-dev-fulfillment-guide__overview, .erp-dev-fulfillment-guide__panel { min-width: 0; }
+.erp-dev-fulfillment-guide__panel { position: sticky; top: 16px; padding: 18px; border: 1px solid var(--erp-border); border-radius: 8px; background: var(--erp-surface-bg-soft); scroll-margin-top: 16px; }
+.erp-dev-fulfillment-guide__empty { color: var(--erp-text-muted); padding-block: 24px; }
+.erp-dev-fulfillment-guide__result, .erp-dev-fulfillment-guide__directory, .erp-dev-fulfillment-guide__detail-content, .erp-dev-fulfillment-guide__exception, .erp-dev-fulfillment-guide__handling, .erp-dev-fulfillment-guide__subflow { display: grid; gap: 14px; min-width: 0; overflow-wrap: anywhere; }
+.erp-dev-fulfillment-guide__detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.erp-dev-fulfillment-guide__detail-title { display: grid; gap: 4px; min-width: 0; }
+.erp-dev-fulfillment-guide__detail-title > span, .erp-dev-fulfillment-guide__owner { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__result h3 { margin: 0; font-size: 17px; line-height: 1.5; }
+.erp-dev-fulfillment-guide__result h4 { margin: 0; font-size: var(--erp-font-body); }
+.erp-dev-fulfillment-guide__scope-bar { color: var(--erp-text-muted); font-size: var(--erp-font-small); margin-bottom: 10px; }
 .erp-dev-fulfillment-guide__role { display: flex; align-items: center; gap: 10px; }
 .erp-dev-fulfillment-guide__role .ant-select { width: 160px; }
-.erp-dev-fulfillment-guide__body { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; align-items: start; }
-.erp-dev-fulfillment-guide__steps li { min-width: 0; }
-.erp-dev-fulfillment-guide__result ol { margin: 0; padding-left: 20px; line-height: 1.7; }
-.erp-dev-fulfillment-guide__result h3 { margin: 0; font-size: 17px; }
-.erp-dev-fulfillment-guide__result h4 { margin: 0 0 5px; font-size: var(--erp-font-small); color: var(--erp-text-muted); }
-.erp-dev-fulfillment-guide__owner { color: var(--erp-text-muted); }
-.erp-dev-fulfillment-guide__focus { padding: 8px 12px; border-radius: 6px; background: var(--erp-surface-bg-soft); font-size: var(--erp-font-small); }
-.erp-dev-fulfillment-guide__approval { display: grid; gap: 5px; padding-top: 10px; border-top: 1px solid var(--erp-border); font-size: var(--erp-font-small); }
-.erp-dev-fulfillment-guide__detail-content .erp-dev-fulfillment-guide__approval { font-size: inherit; }
-.erp-dev-fulfillment-guide__links { display: flex; gap: 8px 14px; flex-wrap: wrap; font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__mode { justify-self: start; max-width: 100%; }
+.erp-dev-fulfillment-guide__involved, .erp-dev-fulfillment-guide__choices { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-width: 0; }
+.erp-dev-fulfillment-guide__involved > span, .erp-dev-fulfillment-guide__choices > span { flex-basis: 100%; color: var(--erp-text-muted); font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__involved .ant-btn { padding-inline: 0; max-width: 100%; white-space: normal; height: auto; text-align: left; }
+.erp-dev-fulfillment-guide__choices .ant-btn { height: auto; min-height: 32px; max-width: 100%; white-space: normal; }
+.erp-dev-fulfillment-guide__choices .ant-btn[aria-pressed="true"] { color: var(--erp-primary); border-color: var(--erp-primary); background: var(--erp-primary-soft); }
+.erp-dev-fulfillment-guide__focus { padding: 10px 12px; border-left: 2px solid var(--erp-primary); background: var(--erp-surface-bg); font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__node-facts { display: grid; grid-template-columns: minmax(0,1fr); gap: 5px; margin: 0; line-height: 1.7; }
+.erp-dev-fulfillment-guide__node-facts dt { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__node-facts dd { margin: 0 0 8px; }
+.erp-dev-fulfillment-guide__instructions { font-size: var(--erp-font-small); line-height: 1.7; }
+.erp-dev-fulfillment-guide__instructions summary { padding: 6px 0; cursor: pointer; color: var(--erp-text-muted); }
+.erp-dev-fulfillment-guide__instructions p + p { margin-top: 8px; }
+.erp-dev-fulfillment-guide__instructions ol { padding-left: 20px; }
+.erp-dev-fulfillment-guide__approval { display: grid; gap: 5px; padding-top: 10px; }
+.erp-dev-fulfillment-guide__detail-actions { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--erp-border); justify-items: start; }
+.erp-dev-fulfillment-guide__detail-actions > .ant-btn { padding-inline: 0; }
+.erp-dev-fulfillment-guide__links { display: flex; gap: 6px 12px; flex-wrap: wrap; font-size: var(--erp-font-small); }
 .erp-dev-fulfillment-guide__links > span { color: var(--erp-text-muted); }
-.erp-dev-fulfillment-guide__detail-actions .erp-dev-fulfillment-guide__links { font-size: inherit; }
-.erp-dev-fulfillment-guide__links > strong { flex-basis: 100%; }
+.erp-dev-fulfillment-guide__boundary { color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
+.erp-dev-fulfillment-guide__continuation { display: grid; gap: 8px; padding-top: 12px; }
+.erp-dev-fulfillment-guide__continuation > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--erp-text-muted); font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__substeps, .erp-dev-fulfillment-guide__transitions, .erp-dev-fulfillment-guide__topic-nodes { list-style: none; padding: 0; margin: 0; }
+.erp-dev-fulfillment-guide__substeps { display: grid; gap: 6px; }
+.erp-dev-fulfillment-guide__substeps button { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; width: 100%; padding: 9px 10px; border: 1px solid var(--erp-border); border-radius: 5px; background: var(--erp-surface-bg); color: var(--erp-text); font: inherit; text-align: left; cursor: pointer; }
+.erp-dev-fulfillment-guide__steps button { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 8px; width: 100%; height: 100%; min-height: 66px; align-content: center; text-align: left; padding: 10px; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg); color: var(--erp-text); font: inherit; cursor: pointer; }
+.erp-dev-exception-directory__list button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 14px 10px; text-align: left; border: 0; border-bottom: 1px solid var(--erp-border); background: var(--erp-surface-bg); color: var(--erp-text); cursor: pointer; font: inherit; }
+.erp-dev-fulfillment-guide__substeps button[aria-pressed="true"] { border-color: var(--erp-primary); background: var(--erp-primary-soft); }
+.erp-dev-fulfillment-guide__substeps small { max-width: 100%; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
+.erp-dev-fulfillment-guide__substeps button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 2px; }
+.erp-dev-fulfillment-guide__transitions { display: grid; gap: 6px; font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__transitions li { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.erp-dev-fulfillment-guide__transitions strong { color: var(--erp-text-muted); font-weight: 400; }
+.erp-dev-fulfillment-guide__topic-nodes { display: grid; gap: 8px; }
+.erp-dev-fulfillment-guide__topic-nodes li { padding-left: 12px; border-left: 2px solid var(--erp-border); }
+.erp-dev-fulfillment-guide__steps { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; list-style: none; margin: 0; padding: 0; scroll-margin-top: 16px; }
+.erp-dev-fulfillment-guide__steps li { min-width: 0; }
+.erp-dev-fulfillment-guide__steps button:hover { background: var(--erp-interactive-bg-hover); }
+.erp-dev-fulfillment-guide__steps button:focus-visible, .erp-dev-fulfillment-guide__steps button[aria-pressed="true"] { outline: 2px solid var(--erp-primary); outline-offset: 2px; }
+.erp-dev-fulfillment-guide__step-number { color: var(--erp-text-muted); font-variant-numeric: tabular-nums; }
+.erp-dev-fulfillment-guide__step-copy { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.erp-dev-fulfillment-guide__step-copy small { color: var(--erp-text-muted); }
+.erp-dev-exception-directory > .ant-select { width: min(100%,320px); margin-bottom: 8px; }
+.erp-dev-exception-directory h3 { margin: 20px 0 4px; font-size: var(--erp-font-small); color: var(--erp-text-muted); }
+.erp-dev-exception-directory__list { list-style: none; margin: 0; padding: 0; }
+.erp-dev-exception-directory__list button:hover { background: var(--erp-interactive-bg-hover); }
+.erp-dev-exception-directory__list button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: -2px; }
+.erp-dev-fulfillment-guide__steps li[data-role-match="true"] button { background: var(--erp-primary-soft); }
+.erp-dev-exception-directory__list button[aria-pressed="true"] { background: var(--erp-primary-soft); color: var(--erp-primary); }
+.erp-dev-exception-directory__list small { display: block; margin-top: 6px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); line-height: 1.6; }
+.erp-dev-exception-directory__list :where(button) > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .erp-dev-fulfillment-drawer .ant-drawer-title { text-align: center; padding-right: 44px; }
 .erp-dev-fulfillment-drawer .ant-drawer-close { min-width: 44px; min-height: 44px; margin: 0; }
-.erp-dev-exception-directory .ant-drawer-title { text-align: center; padding-right: 44px; }
-.erp-dev-exception-directory .ant-drawer-close { min-width: 44px; min-height: 44px; margin: 0; }
-.erp-dev-exception-directory__scope { margin-bottom: 16px; max-width: 100%; }
-.erp-dev-exception-directory__stages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; }
-.erp-dev-exception-directory__stages[data-current] { grid-template-columns: minmax(0, 1fr); }
-.erp-dev-exception-directory__stage-copy { display: grid; gap: 6px; min-width: 0; line-height: 1.6; }
-.erp-dev-exception-directory__stage-copy small { color: var(--erp-text-muted); font: inherit; }
-.erp-dev-exception-directory__stages li[data-role-match="false"] button { color: var(--erp-text-muted); }
-.erp-dev-exception-directory__stages li[data-role-match="true"] button { background: var(--erp-primary-soft); }
-.erp-dev-exception-directory__boundary { margin-top: 20px; color: var(--erp-text-muted); line-height: 1.7; }
-.erp-dev-fulfillment-guide__mode { justify-self: start; max-width: 100%; }
-.erp-dev-fulfillment-guide__handling { display: grid; gap: 16px; scroll-margin-block: 16px; }
-.erp-dev-fulfillment-guide__handling-entry { justify-self: start; padding-inline: 0; }
-.erp-dev-exception-directory__list { list-style: none; margin: 0; padding: 0; }
-.erp-dev-exception-directory__list small { display: block; margin-top: 6px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); line-height: 1.6; }
-.erp-dev-exception-directory__marks { display: flex; flex-wrap: wrap; justify-content: end; flex-shrink: 0; gap: 6px 10px; max-width: 104px; color: var(--erp-primary); font-size: var(--erp-font-caption); }
-.erp-dev-exception-directory__list :where(button) > strong { min-width: 0; overflow-wrap: anywhere; }
-.erp-dev-fulfillment-guide#task-fulfillment-guide .exceptionEntry .label-container { stroke: var(--erp-text); stroke-width: 2px; }
-.erp-dev-fulfillment-guide#task-fulfillment-guide .exceptionReturn .label-container,
-.erp-dev-fulfillment-guide#task-fulfillment-guide .exceptionReentry .label-container { stroke: var(--erp-primary); stroke-width: 2px; stroke-dasharray: 5 3; }
-.erp-dev-fulfillment-guide#task-fulfillment-guide .exceptionTerminal .label-container,
-.erp-dev-fulfillment-guide#task-fulfillment-guide .exceptionTerminal .label-container path { fill: var(--erp-surface-bg-soft); stroke: var(--erp-text-muted); }
-@container fulfillment-guide (min-width: 480px) {
-  .erp-dev-fulfillment-guide__steps { grid-template-columns: repeat(3,minmax(0,1fr)); }
+@container fulfillment-guide (max-width: 879px) {
+  .erp-dev-fulfillment-guide__workspace { grid-template-columns: minmax(0,1fr); }
+  .erp-dev-fulfillment-guide__panel { position: static; }
+  .erp-dev-fulfillment-guide__empty { padding-block: 4px; }
 }
-@container fulfillment-guide (min-width: 640px) {
-  .erp-dev-fulfillment-guide__steps { grid-template-columns: repeat(4,minmax(0,1fr)); }
-}
-@container fulfillment-guide (min-width: 840px) {
-  .erp-dev-fulfillment-guide__steps { grid-template-columns: repeat(5,minmax(0,1fr)); }
-}
-@container fulfillment-guide (min-width: 1000px) {
-  .erp-dev-fulfillment-guide__steps { grid-template-columns: repeat(6,minmax(0,1fr)); }
-}
-@container fulfillment-guide (max-width: 639px) {
-  .erp-dev-fulfillment-guide__steps button { grid-template-columns: 20px minmax(0,1fr); padding: 10px; gap: 6px; }
-  .erp-dev-fulfillment-guide__step-number { width: 20px; }
-  .erp-dev-fulfillment-guide__back-to-overview { display: inline-flex; }
-}
-@media (max-width: 800px) {
-  .erp-dev-exception-directory__stages { grid-template-columns: minmax(0, 1fr); }
+@container fulfillment-guide (max-width: 479px) {
+  .erp-dev-fulfillment-guide :is(button, .ant-btn) { min-width: 44px; min-height: 44px; }
+  .erp-dev-fulfillment-guide__links a { display: inline-flex; align-items: center; min-height: 44px; }
   .erp-dev-fulfillment-guide__role { width: 100%; }
   .erp-dev-fulfillment-guide__role .ant-select { flex: 1; }
+  .erp-dev-fulfillment-guide__panel { padding: 12px; }
 }
+[data-flow-print-current] .erp-dev-fulfillment-guide { display: block; padding: 0; border: 0; }
+[data-flow-print-current] .erp-dev-fulfillment-guide :is(.erp-dev-fulfillment-guide__heading, .erp-dev-fulfillment-guide__navigation) { margin-bottom: 8px; }
+[data-flow-print-current] .erp-dev-fulfillment-guide :is([data-stage-card], .erp-dev-fulfillment-guide__steps button, .erp-dev-fulfillment-guide__substeps button, .erp-dev-chain__handling-steps button, .erp-dev-exception-directory__list button) { display: grid; }
+[data-flow-print-current] .erp-dev-fulfillment-guide :is(.erp-dev-fulfillment-guide__choices button[aria-pressed="true"], .erp-dev-fulfillment-guide__involved button, .erp-dev-chain__independent button) { display: inline-block; }
+[data-flow-print-current] .erp-dev-fulfillment-guide :is(.erp-dev-fulfillment-guide__role, .ant-segmented, .erp-dev-chain__stage-branch, .erp-dev-fulfillment-guide__empty) { display: none; }
+[data-flow-print-current] .erp-dev-fulfillment-guide__workspace { display: block; }
+[data-flow-print-current] .erp-dev-fulfillment-guide__panel { position: static; padding: 12px; margin-top: 0; break-before: page; }
+[data-flow-print-current] .erp-dev-fulfillment-guide__panel:has(.erp-dev-fulfillment-guide__empty) { display: none; }
+[data-flow-print-current] .erp-dev-fulfillment-guide :is(.erp-dev-fulfillment-guide__result, .erp-dev-fulfillment-guide__detail-content, .erp-dev-fulfillment-guide__exception, .erp-dev-fulfillment-guide__handling) { gap: 8px; }
+[data-flow-print-current] .erp-dev-fulfillment-guide__instructions:not([open]) { display: none; }
+[data-flow-print-current] .erp-dev-chain__handling-steps { grid-template-columns: repeat(3,minmax(0,1fr)); }
+[data-flow-print-current] .erp-dev-chain__reentry-note { grid-column: 1 / -1; }
+[data-flow-print-current] .erp-dev-fulfillment-guide__panel li, [data-flow-print-current] .erp-dev-fulfillment-guide__continuation { break-inside: avoid; }

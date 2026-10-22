@@ -26,9 +26,9 @@ const (
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
 	unitCode := flag.String("unit-code", defaultUnitCode, "simulated unit code")
-	unitName := flag.String("unit-name", "试用模拟单位", "simulated unit name")
+	unitName := flag.String("unit-name", "只", "simulated unit name")
 	productCode := flag.String("product-code", defaultProduct, "simulated product code")
-	productName := flag.String("product-name", "试用模拟产品", "simulated product name")
+	productName := flag.String("product-name", "毛绒小熊", "simulated product name")
 	allowProd := flag.Bool("allow-prod", false, "allow seeding when config path or environment looks like production")
 	timeout := flag.Duration("timeout", 15*time.Second, "database operation timeout")
 	flag.Parse()

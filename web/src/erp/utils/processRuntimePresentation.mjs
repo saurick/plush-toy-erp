@@ -108,13 +108,6 @@ function invalidProcessContext() {
   throw new Error('业务轨迹暂时无法确认，请刷新后重试')
 }
 
-export function isDisplayOnlyWorkflowTask(task = {}) {
-  return Boolean(
-    task?.payload?.simulated_only === true ||
-    String(task?.source_type || '') === 'simulated-manual-acceptance-task-batch'
-  )
-}
-
 export function requireWorkflowProcessContext(value) {
   const instance = value?.process_instance
   const source = value?.source

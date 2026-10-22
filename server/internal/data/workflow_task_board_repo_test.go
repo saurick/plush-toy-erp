@@ -21,6 +21,53 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func TestWorkflowRepo_IndependentTaskBoardCountsAndPayloadSearch(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_independent_board?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	now := time.Now()
+	overdue, later := now.Add(-time.Hour), now.Add(7*24*time.Hour)
+	fixtures := []struct {
+		status string
+		group  string
+		due    *time.Time
+	}{
+		{status: "ready", group: "generic"},
+		{status: "ready", group: "generic", due: &overdue},
+		{status: "ready", group: "generic", due: &later},
+		{status: "blocked", group: "generic"},
+		{status: "ready", group: biz.WorkflowExceptionTaskGroups()[0]},
+		{status: "done", group: "generic"},
+		{status: "rejected", group: "generic"},
+	}
+	for index, fixture := range fixtures {
+		client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("INDEPENDENT-%d", index)).SetTaskGroup(fixture.group).
+			SetTaskName("核对包装要求").SetTaskStatusKey(fixture.status).SetOwnerRoleKey(biz.SalesRoleKey).
+			SetNillableDueAt(fixture.due).SetPayload(map[string]any{"product_name": "云端小熊"}).SaveX(ctx)
+	}
+	for _, keyword := range []string{"", "云端小熊"} {
+		board, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Keyword: keyword, Limit: 50, SnapshotAt: now})
+		if err != nil {
+			t.Fatalf("independent task board keyword=%q: %v", keyword, err)
+		}
+		if board.Total != len(fixtures) || board.Counts != (biz.WorkflowTaskBoardCounts{Actionable: 2, Due: 1, Exception: 2, Finished: 2}) {
+			t.Fatalf("independent tasks were not classified exactly once: keyword=%q total=%d counts=%+v", keyword, board.Total, board.Counts)
+		}
+		if len(board.SourceTypes) != 0 {
+			t.Fatalf("independent tasks fabricated source facets: %v", board.SourceTypes)
+		}
+		for _, lane := range board.Lanes {
+			for _, task := range lane.Tasks {
+				classified, err := biz.ClassifyWorkflowTaskBoardLane(task, now)
+				if err != nil || classified != lane.Key {
+					t.Fatalf("SQL and task classification disagree: %s %s %v", classified, lane.Key, err)
+				}
+			}
+		}
+	}
+}
+
 func TestWorkflowRepo_ExceptionLaneKeepsReadyExceptionsUntilTerminal(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_ready_exceptions?mode=memory&cache=shared&_fk=1")

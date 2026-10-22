@@ -190,17 +190,21 @@ func (d *jsonrpcDispatcher) salesOrderErrorResult(ctx context.Context, err error
 	case errors.Is(err, biz.ErrForbidden):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前用料待办已指定其他处理人，请刷新后核对"}
 	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先关联有效产品、上传产品主图并补齐该产品的 BOM 物料，再开始打样"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先关联有效产品、上传产品主图并补齐该产品的 BOM 物料，再开始打样"}
 	case errors.Is(err, biz.ErrMaterialRequestNotReady):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先核对订单、样品确认、材料厂商和单位，再提交用料审批"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先核对订单、样品确认、材料厂商和单位，再提交用料审批"}
 	case errors.Is(err, biz.ErrMaterialRequestConflict):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单、材料或审批资料已变化，请重新读取后核对"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "订单、材料或审批资料已变化，请重新读取后核对"}
+	case errors.Is(err, biz.ErrMaterialRequestNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "用料审批不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrMaterialRequestReviewReasonRequired):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请填写退回原因"}
 	case errors.Is(err, biz.ErrMaterialRequestReviewInvalid):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请核对审批顺序、两位审批人、采购数量和调整原因"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前审批条件不满足，请核对审批顺序和两位审批人"}
 	case errors.Is(err, biz.ErrSalesOrderEngineeringTransition):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请依次保存工程资料、开始打样、确认样品；确认或退回重做时请填写打样说明，切换产品或 BOM 后需重新准备"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请依次保存工程资料、开始打样、确认样品；确认或退回重做时请填写打样说明，切换产品或 BOM 后需重新准备"}
 	case errors.Is(err, biz.ErrSalesOrderEngineeringDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单明细已有用料审批、生产、备货或出货记录，请先处理关联单据再更换工程资料"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "订单明细已有用料审批、生产、备货或出货记录，请先处理关联单据再更换工程资料"}
 	case errors.Is(err, biz.ErrSalesOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete):
@@ -211,29 +215,37 @@ func (d *jsonrpcDispatcher) salesOrderErrorResult(ctx context.Context, err error
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单仍有未填写单价的产品明细，请补齐后再提交"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderStateInvalid):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单当前状态不允许此操作，请刷新后核对可办理的操作"}
 	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单尚未全部出货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单尚未全部出货；若确定不再履行剩余数量，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[sales_order] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrSalesOrderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "销售订单不存在"}
 	case errors.Is(err, biz.ErrSalesOrderItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单行不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "销售订单行不存在"}
 	case errors.Is(err, biz.ErrSalesOrderCancellationShipmentDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单已有未取消的出货单，不能取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单已有未取消的出货单，不能取消"}
 	case errors.Is(err, biz.ErrSalesOrderCancellationReservationDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单仍有生效库存预留，请先释放后再取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单仍有生效库存预留，请先释放后再取消"}
 	case errors.Is(err, biz.ErrSalesOrderCancellationProductionDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单已有未取消的生产订单，不能取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单已有未取消的生产订单，不能取消"}
 	case errors.Is(err, biz.ErrSalesOrderCancellationProcessDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单仍有进行中的审批流程，不能取消"}
-	case errors.Is(err, biz.ErrCustomerNotFound), errors.Is(err, biz.ErrCustomerInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户不存在或已停用"}
-	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive), errors.Is(err, biz.ErrProductSKUNotFound), errors.Is(err, biz.ErrProductSKUInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品不存在或已停用"}
-	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "单位不存在或已停用"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "销售订单仍有进行中的审批流程，不能取消"}
+	case errors.Is(err, biz.ErrCustomerNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选客户不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrCustomerInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "客户已停用"}
+	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductSKUNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品或产品规格不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductInactive), errors.Is(err, biz.ErrProductSKUInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品已停用"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "单位已停用"}
 	default:
 		return nil
 	}

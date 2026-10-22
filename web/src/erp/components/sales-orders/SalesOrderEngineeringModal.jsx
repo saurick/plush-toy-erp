@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { App, Button, Checkbox, Form, Input, Select, Space, Spin, Tag } from 'antd'
+import { App, Button, Checkbox, Form, Input, Space, Spin, Tag } from 'antd'
 import { useLocation, useOutletContext } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import { SalesOrderItemStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import EngineeringBOMAction from './EngineeringBOMAction.jsx'
@@ -93,6 +94,7 @@ function EngineeringRow({ field, form, context, bomPermissions, disabled, onOpen
         </div>,
         <Form.Item label="规格（选填）" name={[field.name, 'product_sku_id']}>
           <Select
+            placeholder="请选择规格（选填）"
             allowClear
             disabled={!productID}
             options={(context?.skus || [])
@@ -154,7 +156,7 @@ function EngineeringRow({ field, form, context, bomPermissions, disabled, onOpen
           name={[field.name, 'engineering_status']}
           rules={[{ required: true }]}
         >
-          <Select options={SALES_ORDER_ENGINEERING_OPTIONS} />
+          <Select placeholder="请选择工程 / 打样进度" options={SALES_ORDER_ENGINEERING_OPTIONS} />
         </Form.Item>,
       ]}
     >

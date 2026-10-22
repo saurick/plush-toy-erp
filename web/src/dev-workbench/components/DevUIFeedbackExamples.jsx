@@ -7,15 +7,16 @@ import {
   Dropdown,
   Form,
   Input,
-  Select,
   Space,
   Tooltip,
   Upload,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import BusinessFormModal from '@/erp/components/business-list/BusinessFormModal'
 import BusinessModal from '@/erp/components/business-list/BusinessModal'
 import AlertDialog from '@/common/components/modal/AlertDialog'
+import AppModal from '@/common/components/modal/AppModal'
 import {
   MESSAGE_CONFIG,
   NOTIFICATION_CONFIG,
@@ -138,6 +139,8 @@ function EditorExample({ size = 'localAction' }) {
       <Space wrap>
         <label htmlFor={`scenario-${key}`}>保存结果</label>
         <Select
+          allowClear={false}
+          placeholder="样例保存结果"
           id={`scenario-${key}`}
           aria-label="样例保存结果"
           value={scenario}
@@ -215,6 +218,7 @@ function EditorExample({ size = 'localAction' }) {
           </Form.Item>
           <Form.Item name="category" label="事项">
             <Select
+              placeholder="请选择事项"
               options={['交期', '包装', '其他'].map((value) => ({
                 value,
                 label: value,
@@ -356,6 +360,7 @@ function FeedbackExample() {
 function OverlayExample() {
   const { modal } = App.useApp()
   const [drawer, setDrawer] = useState(false)
+  const [standard, setStandard] = useState(false)
   const [preview, setPreview] = useState(false)
   const [alert, setAlert] = useState(false)
   const [cancelled, setCancelled] = useState(false)
@@ -365,6 +370,7 @@ function OverlayExample() {
   return (
     <div className="erp-feedback-example" data-feedback-example="overlays">
       <Space wrap>
+        <Button onClick={() => setStandard(true)}>打开标准弹窗</Button>
         <Dropdown
           menu={{
             items: [
@@ -434,6 +440,15 @@ function OverlayExample() {
       >
         <Button>选择演示附件</Button>
       </Upload>
+      <AppModal
+        open={standard}
+        title="共享标准弹窗"
+        width={560}
+        onCancel={() => setStandard(false)}
+        footer={<Button onClick={() => setStandard(false)}>关闭</Button>}
+      >
+        <p>系统设置与只读信息使用标准弹窗，尺寸和内容按当前任务提供。</p>
+      </AppModal>
       <Drawer
         title="采购单上下文摘要"
         open={drawer}

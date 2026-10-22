@@ -3,7 +3,7 @@ import {
   ArrowRightOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Empty, Select, Space, Tag, Typography } from 'antd'
+import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
@@ -31,6 +31,7 @@ import {
   parseDevBusinessUsabilitySearch,
 } from '../config/devBusinessUsability.mjs'
 import '../styles/dev-business-usability.css'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -198,7 +199,7 @@ export default function DevBusinessUsabilityPage() {
           <Paragraph>
             岗位标签只表示该页面被哪些岗位帮助列为常用入口；实际能否进入和操作仍以正式权限为准。业务上下游继续到
             <Link to="/__dev/status-flows">业务链观察</Link>
-            核对。
+            核对。界面值的含义和布局取舍到<Link to="/__dev/ui-design?view=specification&topic=task-cards">工作中心设计说明</Link>对照。
           </Paragraph>
         </details>
 
@@ -226,13 +227,19 @@ export default function DevBusinessUsabilityPage() {
             aria-label="搜索页面说明"
             onChange={(event) => updateQuery({ keyword: event.target.value })}
           />
-          <Select
+          <FilterSelect
+            emptyValue="all"
+            label="说明覆盖状态"
+            placeholder="说明覆盖状态"
             value={status}
             options={DEV_BUSINESS_USABILITY_STATUS_OPTIONS}
             aria-label="按说明覆盖状态筛选"
             onChange={(value) => updateQuery({ status: value })}
           />
-          <Select
+          <FilterSelect
+            emptyValue="all"
+            label="岗位帮助"
+            placeholder="岗位帮助"
             showSearch
             optionFilterProp="label"
             value={role}

@@ -1,10 +1,12 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Alert, Button, Tag } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
-import { BusinessOperationPanel, SearchInput, SelectFilter, DateRangeFilter } from '../business-list/BusinessListLayout.jsx'
+import { BusinessOperationPanel, SearchInput, SelectFilter } from '../business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import { clearTrackingFilters, readTrackingFilters, writeTrackingFilters, readTrackingPagination, writeTrackingPagination, TRACKING_STATUS_OPTIONS, TRACKING_SCOPE_OPTIONS, TRACKING_ROLE_OPTIONS, TRACKING_ATTENTION_OPTIONS, TRACKING_SOURCE_OPTIONS } from '../../utils/workflowTrackingFilters.mjs'
 import { listWorkflowTracking } from '../../api/workflowApi.mjs'
 import { formatWorkflowTaskEventTime } from '../../utils/workflowTaskEventPresentation.mjs'
@@ -17,16 +19,18 @@ import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mj
 import WorkflowTrackingDrawer from './WorkflowTrackingDrawer.jsx'
 import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 import WorkflowInitiator from './WorkflowInitiator.jsx'
-import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
+import WorkflowTaskIdentity, { WorkflowTaskAssociation } from './WorkflowTaskIdentity.jsx'
 import WorkflowTaskPagination from './WorkflowTaskPagination.jsx'
 import { WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import './workflowTracking.css'
+import useBusinessListStickyHeader from '../business-list/useBusinessListStickyHeader.js'
 
-export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, onOpenTask, onScopeChange, taskHandlingOpen = false }) {
+export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, onOpenTask, onScopeChange, taskHandlingOpen = false, toolbarContainer = null }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [result, setResult] = useState(null)
   const [reload, setReload] = useState(0)
   const panelRef = useRef(null)
+  const sticky = useBusinessListStickyHeader(panelRef, true)
   const pageScrollPending = useRef(false)
   const returnEntry = useRef('')
   const drawerOpen = useRef(false)
@@ -96,7 +100,7 @@ export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, o
     queueMicrotask(() => {
       if (drawerOpen.current) return
       const entry = panelRef.current?.querySelector(`[data-tracking-entry="${returnEntry.current}"]`)
-      const target = entry || panelRef.current?.querySelector('input')
+      const target = entry || toolbarContainer?.querySelector('input') || panelRef.current?.querySelector('input')
       target?.focus({ preventScroll: true })
     })
   }
@@ -115,7 +119,7 @@ export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, o
 key: 'identity',
 width: 320,
 render: (_, entry) => entry.display_context
-      ? <WorkflowTaskIdentity task={entry} keyword={keyword} compact showStyleNo /> : '—' },
+      ? <WorkflowTaskIdentity task={entry} keyword={keyword} compact showStyleNo /> : <span className="erp-task-identity erp-task-identity--compact"><WorkflowTaskAssociation task={entry} emptyLabel="关联内容未提供" /></span> },
     { title: '当前状态', key: 'status', width: 130, render: (_, entry) => <Tag color={trackingStatusColor(entry)}>{trackingStatus(entry)}</Tag> },
     { title: '当前去向 / 办理人', key: 'owner', render: (_, entry) => entry.current_tasks.length ? <WorkflowResponsibilities items={entry.current_tasks.map(trackingResponsibilityParts)} /> : trackingHandoff(entry) },
     { title: '发起人', key: 'initiator', width: 150, render: (_, entry) => <WorkflowInitiator summary={entry} /> },
@@ -140,30 +144,36 @@ render: (_, entry) => (
   />
     ) },
   ]
-  return (
-    <div ref={panelRef} className="erp-workflow-tracking-panel">
-      <div className="erp-workflow-tracking-controls">
-        <BusinessOperationPanel
-          compact
-          clearFiltersDisabled={!hasFilters}
-          onClearFilters={() => setSearchParams((current) => clearTrackingFilters(current, scope), { replace: true })}
-          filters={(
-            <>
-              {onScopeChange ? <SelectFilter aria-label="跟踪范围" value={scope} options={TRACKING_SCOPE_OPTIONS} onChange={onScopeChange} /> : null}
-              <SearchInput placeholder="单号 / 任务 / 产品 / 款号" value={search.value} onChange={search.onChange} onCompositionStart={search.onCompositionStart} onCompositionEnd={search.onCompositionEnd} onPressEnter={search.onPressEnter} />
-              <SelectFilter aria-label="当前岗位" value={filters.owner_role_key} disabled={filters.status === 'completed'} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => changeFilters({ owner_role_key })} />
-              {!source.source_id ? <SelectFilter aria-label="单据类型" value={filters.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => changeFilters({ source_type })} /> : null}
-              <SelectFilter aria-label="关注事项" value={filters.attention} disabled={filters.status === 'completed'} options={TRACKING_ATTENTION_OPTIONS} onChange={(attention) => changeFilters({ attention })} />
-              <DateRangeFilter options={[{ value: 'started_at', label: '发起时间' }]} value="started_at" startValue={filters.date_from} endValue={filters.date_to} onStartChange={(date_from) => changeFilters({ date_from })} onEndChange={(date_to) => changeFilters({ date_to })} />
-            </>
-          )}
-          actions={source.source_id ? <Button onClick={() => { const next = new URLSearchParams(searchParams); next.delete('track_source_type'); next.delete('track_source_id'); for (const view of ['started', 'participated', 'visible']) next.delete(`track_page_${view}`); setSearchParams(next) }}>清除单据范围</Button> : null}
-        />
-      </div>
-      <BusinessStatusFilter aria-label="流转状态" allLabel="全部状态" value={filters.status} options={TRACKING_STATUS_OPTIONS} counts={resolveBusinessStatusCounts(page)} loading={!current} onChange={(status) => changeFilters({ status })} />
+  const controls = (
+    <div className="erp-workflow-tracking-controls" data-page-table-toolbar={toolbarContainer ? undefined : true}>
+      <BusinessOperationPanel
+        compact
+        clearFiltersDisabled={!hasFilters}
+        onClearFilters={() => setSearchParams((current) => clearTrackingFilters(current, scope), { replace: true })}
+        filters={(
+          <>
+            <BusinessStatusFilter inline aria-label="流转状态" allLabel="全部状态" value={filters.status} options={TRACKING_STATUS_OPTIONS} counts={resolveBusinessStatusCounts(page)} loading={!current} onChange={(status) => changeFilters({ status })} />
+            {onScopeChange ? <SelectFilter allowClear={false} aria-label="跟踪范围" value={scope} options={TRACKING_SCOPE_OPTIONS} onChange={onScopeChange} /> : null}
+            <SearchInput placeholder="单号 / 任务 / 产品 / 款号" value={search.value} onChange={search.onChange} onCompositionStart={search.onCompositionStart} onCompositionEnd={search.onCompositionEnd} onPressEnter={search.onPressEnter} />
+            <SelectFilter aria-label="当前岗位" value={filters.owner_role_key} disabled={filters.status === 'completed'} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => changeFilters({ owner_role_key })} />
+            {!source.source_id ? <SelectFilter aria-label="单据类型" value={filters.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => changeFilters({ source_type })} /> : null}
+            <SelectFilter aria-label="关注事项" value={filters.attention} disabled={filters.status === 'completed'} options={TRACKING_ATTENTION_OPTIONS} onChange={(attention) => changeFilters({ attention })} />
+            <DateRangeFilter options={[{ value: 'started_at', label: '发起时间' }]} value="started_at" startValue={filters.date_from} endValue={filters.date_to} onStartChange={(date_from) => changeFilters({ date_from })} onEndChange={(date_to) => changeFilters({ date_to })} />
+          </>
+        )}
+        actions={source.source_id ? <Button onClick={() => { const next = new URLSearchParams(searchParams); next.delete('track_source_type'); next.delete('track_source_id'); for (const view of ['started', 'participated', 'visible']) next.delete(`track_page_${view}`); setSearchParams(next) }}>清除单据范围</Button> : null}
+      />
       {scope !== 'visible' ? <p className="erp-workflow-tracking-scope-summary" aria-label="当前跟踪范围">{TRACKING_SCOPE_OPTIONS.find((option) => option.value === scope)?.label}</p> : null}
+    </div>
+  )
+  return (
+    <div ref={panelRef} className="erp-workflow-tracking-panel" data-page-table-region={toolbarContainer ? undefined : true}>
+      {toolbarContainer ? createPortal(controls, toolbarContainer) : controls}
       {current?.error ? <Alert type="error" showIcon message="任务进度加载失败" action={<Button onClick={() => setReload((value) => value + 1)}>重新读取</Button>} /> : (
         <Table
+          className="erp-work-center-table"
+          sticky={sticky}
+          scrollToolbar
           rowKey={(entry) => `${entry.kind}:${entry.id}`}
           columns={columns}
           dataSource={page?.items || []}

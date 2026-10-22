@@ -237,8 +237,6 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(getPresetCopyText('frontend'), /pnpm style:l1/)
   assert.equal(presetsByKey.has('full-local-gate'), false)
   assert.equal(presetsByKey.has('release'), false)
-  assert.match(testingPageSource, /完整或严格门禁/u)
-  assert.match(testingPageSource, /view=run&profile=strict/u)
   assert.match(
     getPresetCopyText('workflow-backend-actions'),
     /TestWorkflowRepo_/
@@ -1357,11 +1355,11 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   )
   assert.match(
     testingPageSource,
-    /erp-dev-testing-disclosure--presets[\s\S]*?DEV_TESTING_COPY_PRESETS\.map/
+    /erp-dev-testing-guide-presets[\s\S]*?matchingPresets\.map/
   )
   assert.match(
     testingPageSource,
-    /erp-dev-testing-disclosure--tiers[\s\S]*?tiers\.map/
+    /erp-dev-testing-guide-tiers[\s\S]*?tiers\.map/
   )
   assert.match(testingPageSource, /T0–T8 是内部选测键，不是完成进度/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_API_PATH/)
@@ -1369,17 +1367,16 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /createDevCoverageOperationClient/)
   assert.match(testingPageSource, /useDevTestingOperations/)
   assert.match(testingPageSource, /生成本轮验证计划/)
-  assert.match(testingPageSource, /可运行检查/)
   assert.match(testingPageSource, /固定检查与独立证据/)
   assert.doesNotMatch(testingPageSource, /<ValidationJourney/)
   assert.match(testingPageSource, /DEV_TESTING_FIXED_ACTIONS\.map/)
   assert.match(testingPageSource, /改动到验证建议的映射/)
   assert.match(testingPageSource, /T0–T8 只表示选测范围/)
   assert.match(testingPageSource, /查看建议命令、待补证据与计划身份/)
-  assert.match(testingPageSource, /三步定位，不通读命令墙/)
+  assert.match(testingPageSource, /复制不会执行检查/)
   assert.match(testingPageSource, /erp-dev-testing-command-matrix__head/)
   assert.match(testingPageSource, /查看固定命令/)
-  assert.match(testingPageSource, /结果以命令回执和来源合同分别判断/)
+  assert.match(testingPageSource, /value: VIEW_GUIDE/)
   assert.match(testingPageSource, /DEV_TESTING_GIT_CLOSEOUT_STAGES\.map/)
   assert.match(testingPageSource, /getGitStageWiring/)
   assert.match(testingPageSource, /查看边界与来源/)
@@ -1409,9 +1406,9 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /本页证明/)
   assert.match(testingPageSource, /本页不证明/)
   assert.match(testingPageSource, /buildDevTestingCoverageSectionSummaries\(report\)/u)
-  assert.match(testingPageSource, /查看采集、覆盖目标与判定规则/)
+  assert.match(testingPageSource, /采集与判定说明/)
   assert.match(testingPageSource, /erp-dev-testing-coverage-matrix__head/)
-  assert.match(testingPageSource, /查看完整报告身份/)
+  assert.match(testingPageSource, /报告详情/)
   assert.match(testingPageSource, /erp-dev-testing-coverage-policy-list/)
   assert.match(testingPageSource, /切换页面不会停止后台任务/)
   assert.match(testingPageSource, /空值表示未采集，不是 0%/)

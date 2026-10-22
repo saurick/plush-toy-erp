@@ -29,7 +29,7 @@ export function assertSourceOrderEvidence(report) {
   assert.deepEqual(Object.keys(report.factsBefore).sort(), [...factTables].sort());
   assert.deepEqual(report.factsAfter, report.factsBefore);
   for (const flow of report.flows) {
-    for (const field of ["passed", "draftCAS", "forbiddenUnchanged", "invalidQuantityUnchanged", "saveRecovered", "saveKeptBusinessValues", "submitRecovered", "replayExact", "changedIntentRejected", "factsUnchanged", "frozenAfterSubmit", "terminalGuard"]) assert.equal(flow[field], true, `${flow.key}.${field}`);
+    for (const field of ["passed", "draftCAS", "conflictMessageShownOnce", "forbiddenUnchanged", "invalidQuantityUnchanged", "saveRecovered", "saveKeptBusinessValues", "submitRecovered", "replayExact", "changedIntentRejected", "factsUnchanged", "frozenAfterSubmit", "terminalGuard"]) assert.equal(flow[field], true, `${flow.key}.${field}`);
     assert.ok(Number.isSafeInteger(flow.sourceID) && flow.sourceID > 0);
     for (const fault of [flow.saveFault, flow.submitFault]) {
       assert.equal(fault.injected, true);
@@ -153,6 +153,7 @@ async function run(options) {
       } else await selectRow(page, order.id);
       return page;
     };
+    const formAction = (page, form, mobile, name) => (mobile ? page.locator(".mobile-task-business-form-footer:visible") : form).getByRole("button", { name, exact: true });
     const closeReceipt = async page => {
       const receipt = page.locator('.ant-modal:visible');
       if (await receipt.count()) await receipt.getByRole("button", { name: /知道了|关闭|确定|完成/u }).last().click();
@@ -203,7 +204,7 @@ async function run(options) {
         await expect.poll(() => page.pendingRPC.size).toBe(0);
         await page.screenshot({ path: path.join(options.outputDir, `mobile-${orderNo}-${action}.png`), fullPage: false });
         const back = page.getByTestId("mobile-task-receipt-screen")
-          .locator(".mobile-role-action-bar")
+          .locator(".mobile-task-flow-header")
           .getByRole("button", { name: "返回任务列表", exact: true });
         await expect(back).toHaveCount(1);
         await back.click();
@@ -265,12 +266,19 @@ async function run(options) {
       await page.screenshot({ path: path.join(options.outputDir, `${flow.key}-edit.png`), fullPage: false });
       const remote = await client.rpc(config.role, config.domain, `save_${config.domain}_with_items`, { ...params, note: "模拟另一次正式更新" });
       const winner = snapshot(config, order.id);
-      await clickRPC(page, `save_${config.domain}_with_items`, () => form.getByRole("button", { name: "保存草稿", exact: true }).click(), CODE.RESOURCE_VERSION_CONFLICT);
+      await clickRPC(page, `save_${config.domain}_with_items`, () => formAction(page, form, mobile, "保存草稿").click(), CODE.RESOURCE_VERSION_CONFLICT);
       report.expectedFailures.push({ actor: config.role, domain: config.domain, method: `save_${config.domain}_with_items`, code: CODE.RESOURCE_VERSION_CONFLICT, browser: true });
+      const conflictAlert = page.locator(".erp-feedback-message [role=alert]");
+      await expect(conflictAlert).toHaveCount(1);
+      await expect(conflictAlert).toBeVisible();
+      await expect(conflictAlert).toContainText("更新");
+      await expect(conflictAlert).toContainText("核对最新单据");
+      flow.conflictMessage = await conflictAlert.innerText();
+      flow.conflictMessageShownOnce = true;
       await expect(form).toBeVisible();
       await expect(note).toHaveValue("模拟本地未保存内容");
       assert.deepEqual(snapshot(config, order.id), winner);
-      await form.getByRole("button", { name: mobile ? "返回办理" : "返回列表", exact: true }).click();
+      await formAction(page, form, mobile, mobile ? "返回办理" : "返回列表").click();
       const discard = page.locator('.ant-modal-confirm:visible');
       await discard.getByRole("button", { name: /放弃|离开/u }).click();
       await expect(form).toBeHidden();
@@ -283,7 +291,7 @@ async function run(options) {
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟另一次正式更新");
       await form.getByRole("textbox", { name: "备注", exact: true }).fill("模拟丢失响应后已确认保存");
       const saveFault = await dropRealResponse(page, options, config.domain, `save_${config.domain}_with_items`);
-      await form.getByRole("button", { name: "保存草稿", exact: true }).click();
+      await formAction(page, form, mobile, "保存草稿").click();
       await expect.poll(() => Boolean(saveFault.state.captured)).toBe(true);
       await saveFault.remove();
       flow.saveFault = faultEvidence(saveFault.state);
@@ -300,7 +308,7 @@ async function run(options) {
       flow.draftVersions.recovered = snapshot(config, order.id).header.version;
       await expect(form).toHaveAttribute("aria-busy", "false");
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟丢失响应后已确认保存");
-      await form.getByRole("button", { name: mobile ? "返回办理" : "返回列表", exact: true }).click();
+      await formAction(page, form, mobile, mobile ? "返回办理" : "返回列表").click();
       await page.locator('.ant-modal-confirm:visible').getByRole("button", { name: "放弃修改", exact: true }).click();
       await expect(form).toBeHidden();
       order = await read(config, order.id);
@@ -308,7 +316,7 @@ async function run(options) {
       await pageAction(page, "编辑");
       form = page.getByRole("region", { name: config.title, exact: true });
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟丢失响应后已确认保存");
-      await form.getByRole("button", { name: mobile ? "返回办理" : "返回列表", exact: true }).click();
+      await formAction(page, form, mobile, mobile ? "返回办理" : "返回列表").click();
       await expect(form).toBeHidden();
       flow.saveRecovered = true;
       const submitFault = await dropRealResponse(page, options, kind === "outsourcing" ? config.domain : "customer_config", config.execute);
@@ -342,7 +350,7 @@ async function run(options) {
         assert.equal(client.query(`SELECT to_json(count(*)) FROM process_instances WHERE business_ref_type='${config.domain}' AND business_ref_id=${order.id}`), 1);
       }
       flow.changedIntentRejected = true;
-      await expectFailure(config.role, config.domain, `save_${config.domain}_with_items`, { ...params, expected_version: frozen.header.version, note: "提交后不得修改" }, CODE.INVALID_PARAM);
+      await expectFailure(config.role, config.domain, `save_${config.domain}_with_items`, { ...params, expected_version: frozen.header.version, note: "提交后不得修改" }, CODE.BUSINESS_RULE_VIOLATION);
       assert.deepEqual(snapshot(config, order.id), frozen);
       flow.frozenAfterSubmit = true;
       if (kind !== "outsourcing") {
@@ -371,7 +379,7 @@ async function run(options) {
         assert.ok(rejected.items.every(item => item.line_status === "canceled"));
         const process = client.query(`SELECT row_to_json(r) FROM (SELECT status,resolution_kind FROM process_instances WHERE business_ref_type='${config.domain}' AND business_ref_id=${alternative.order.id}) r`);
         assert.deepEqual(process, { status: "completed", resolution_kind: "rejected" });
-        await expectFailure(config.role, "customer_config", config.start, { [kind === "sales" ? "sales_order_id" : "purchase_order_id"]: alternative.order.id, customer_key: "yoyoosun", business_ref_no: alternative.order[config.no], idempotency_key: `${prefix}:${flow.key}:terminal` }, CODE.INVALID_PARAM);
+        await expectFailure(config.role, "customer_config", config.start, { [kind === "sales" ? "sales_order_id" : "purchase_order_id"]: alternative.order.id, customer_key: "yoyoosun", business_ref_no: alternative.order[config.no], idempotency_key: `${prefix}:${flow.key}:terminal` }, CODE.BUSINESS_RULE_VIOLATION);
         assert.deepEqual(snapshot(config, alternative.order.id), rejected);
         flow.rejectionSettled = flow.terminalGuard = true;
       } else {
@@ -380,7 +388,7 @@ async function run(options) {
         assert.equal((await read(config, order.id)).lifecycle_status, "confirmed");
         flow.confirmed = true;
         const confirmed = snapshot(config, order.id);
-        await expectFailure(config.role, config.domain, "close_outsourcing_order", { id: order.id, expected_version: confirmed.header.version, idempotency_key: `${prefix}:${flow.key}:incomplete-close`, close_mode: "normal" }, CODE.INVALID_PARAM);
+        await expectFailure(config.role, config.domain, "close_outsourcing_order", { id: order.id, expected_version: confirmed.header.version, idempotency_key: `${prefix}:${flow.key}:incomplete-close`, close_mode: "normal" }, CODE.BUSINESS_RULE_VIOLATION);
         assert.deepEqual(snapshot(config, order.id), confirmed);
         flow.incompleteCloseBlocked = true;
         await expectFailure("warehouse", config.domain, "cancel_outsourcing_order", { id: order.id, expected_version: confirmed.header.version, idempotency_key: `${prefix}:${flow.key}:forbidden-cancel`, reason: "越权取消" }, CODE.PERMISSION_DENIED);
@@ -391,7 +399,7 @@ async function run(options) {
         assert.equal(canceled.header.lifecycle_status, "canceled");
         await client.rpc(config.role, config.domain, "cancel_outsourcing_order", cancel);
         assert.deepEqual(snapshot(config, order.id), canceled);
-        await expectFailure(config.role, config.domain, "confirm_outsourcing_order", { id: order.id, expected_version: canceled.header.version, idempotency_key: `${prefix}:${flow.key}:terminal` }, CODE.INVALID_PARAM);
+        await expectFailure(config.role, config.domain, "confirm_outsourcing_order", { id: order.id, expected_version: canceled.header.version, idempotency_key: `${prefix}:${flow.key}:terminal` }, CODE.BUSINESS_RULE_VIOLATION);
         assert.deepEqual(snapshot(config, order.id), canceled);
         flow.terminalGuard = true;
       }
@@ -417,7 +425,7 @@ async function run(options) {
       assert.equal(preview.status, "PREVIEW");
       const countRequests = () => client.query(`SELECT to_json(count(*)) FROM engineering_material_requests WHERE sales_order_id=${source.id}`);
       assert.equal(countRequests(), 0);
-      await expectFailure("engineering", "sales_order", "submit_engineering_material_request", { sales_order_id: source.id, expected_version: preview.source_order_version, expected_source_hash: "0".repeat(64) }, CODE.INVALID_PARAM);
+      await expectFailure("engineering", "sales_order", "submit_engineering_material_request", { sales_order_id: source.id, expected_version: preview.source_order_version, expected_source_hash: "0".repeat(64) }, CODE.RESOURCE_VERSION_CONFLICT);
       assert.equal(countRequests(), 0);
       entry.staleSourceRejected = true;
       const openMaterial = async actor => {
@@ -500,7 +508,7 @@ async function run(options) {
       assert.equal(request.status, "SUBMITTED");
       const submitted = structuredClone(request);
       await expectFailure("finance", "sales_order", "boss_review_engineering_material_request", { id: request.id, expected_version: request.version, action: "BOSS_APPROVE" }, CODE.PERMISSION_DENIED);
-      await expectFailure("finance", "sales_order", "finance_review_engineering_material_request", { id: request.id, expected_version: request.version, action: "FINANCE_APPROVE" }, CODE.INVALID_PARAM);
+      await expectFailure("finance", "sales_order", "finance_review_engineering_material_request", { id: request.id, expected_version: request.version, action: "FINANCE_APPROVE" }, CODE.BUSINESS_RULE_VIOLATION);
       assert.deepEqual(await getRequest(), submitted);
       entry.permissionDenied = entry.approvalOrdered = true;
       ui = await openMaterial("boss");
@@ -561,7 +569,7 @@ async function run(options) {
       await client.rpc("finance", "sales_order", "finance_review_engineering_material_request", fault.state.params);
       assert.deepEqual(await getRequest(), approved);
       assert.equal(client.query("SELECT to_json(md5(json_agg(p ORDER BY id)::text)) FROM purchase_orders p"), purchaseSnapshot);
-      await expectFailure("finance", "sales_order", "finance_review_engineering_material_request", { ...fault.state.params, note: "模拟同一审批回执改变意见" }, CODE.INVALID_PARAM);
+      await expectFailure("finance", "sales_order", "finance_review_engineering_material_request", { ...fault.state.params, note: "模拟同一审批回执改变意见" }, CODE.RESOURCE_VERSION_CONFLICT);
       assert.deepEqual(snapshot(configs.purchase, generatedID), generated);
       assert.deepEqual(await getRequest(), approved);
       entry.changedReviewRejected = true;

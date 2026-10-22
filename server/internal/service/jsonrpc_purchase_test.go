@@ -798,7 +798,7 @@ func TestJsonrpcDispatcher_AddPurchaseReceiptItemRequiresEnabledPurchaseOrdersMo
 				"quantity":               "1",
 				"idempotency_key":        "module-gate-add-purchase-receipt-item",
 			}))
-			if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+			if err != nil || result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 				t.Fatalf("%s purchase_orders module result=%#v err=%v", sourceModule.name, result, err)
 			}
 			if captureRepo.addItemCalls != 0 {
@@ -849,7 +849,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected module read_only create rejected, got %#v", createRes)
 	}
 	if count := client.PurchaseReceipt.Query().Where(purchasereceipt.ReceiptNo("PR-MODULE-READONLY")).CountX(ctx); count != 0 {
@@ -915,7 +915,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
+	if cancelRes == nil || cancelRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected quality read_only draft cancellation rejected, got %#v", cancelRes)
 	}
 	if status := client.PurchaseReceipt.GetX(ctx, receiptID).Status; status != biz.PurchaseReceiptStatusDraft {
@@ -937,7 +937,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if postRes == nil || postRes.Code != errcode.InvalidParam.Code {
+	if postRes == nil || postRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected inventory read_only post rejected, got %#v", postRes)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.PurchaseReceiptSourceType), inventorytxn.SourceID(receiptID)).CountX(ctx); count != 0 {

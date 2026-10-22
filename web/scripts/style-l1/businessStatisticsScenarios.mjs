@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { setTimeout as pause } from 'node:timers/promises'
 import { statisticsFixtureData } from './businessStatisticsFixtures.mjs'
 
@@ -18,11 +19,33 @@ async function select(page, name, label) {
     )
   })
 }
+async function verifyChartTooltip(page, stats, assert, { value, total, share, action }) {
+  const segment = stats.locator('.erp-statistics-stack button').first()
+  const tooltip = page.getByRole('tooltip')
+  assert.equal(await segment.getAttribute('title'), null, '使用统一浮层，不叠加浏览器原生提示')
+  await segment.hover()
+  await tooltip.waitFor()
+  assert.match(await tooltip.innerText(), /晨星礼品/u)
+  assert((await tooltip.innerText()).includes(value))
+  assert((await tooltip.innerText()).includes(total))
+  assert((await tooltip.innerText()).includes(`占本行 ${share}%`))
+  assert((await tooltip.innerText()).includes(action))
+  const bounds = await tooltip.boundingBox()
+  const viewport = page.viewportSize()
+  assert(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width + 1 && bounds.y + bounds.height <= viewport.height + 1, '提示浮层保持在视口内')
+  await page.mouse.move(0, 0)
+  await tooltip.waitFor({ state: 'hidden' })
+  await segment.focus()
+  await tooltip.waitFor()
+  await page.keyboard.press('Escape')
+  await tooltip.waitFor({ state: 'hidden' })
+  assert(await segment.evaluate((button) => document.activeElement === button), '关闭提示后保留图表焦点')
+}
 async function verifyMotion(root, assert, reduced = false) {
   const value = await root.evaluate(async (root) => {
     const group = root.querySelector('.ant-segmented-group')
     const buttons = group.querySelectorAll('.ant-segmented-item')
-    const target = buttons[2]
+    const target = [...buttons].find((button) => button.textContent.trim() === '图表')
     const before = root.getBoundingClientRect()
     const read = () => {
       const style = getComputedStyle(group, '::before')
@@ -69,7 +92,7 @@ async function verifyMotion(root, assert, reduced = false) {
             .every((duration) => parseFloat(duration) === 0)
         )
       : value.frames.some(
-          (frame) => frame.x > value.start + 1 && frame.x < value.target - 1
+          (frame) => frame.x > Math.min(value.start, value.target) + 1 && frame.x < Math.max(value.start, value.target) - 1
         ),
     JSON.stringify(value)
   )
@@ -173,7 +196,36 @@ export function createBusinessStatisticsScenarios({
           await stats.locator('.erp-statistics-metrics').innerText(),
           /订单总数\s*48/
         )
+        assert.equal(await stats.locator('.erp-statistics-chart').count(), 0, '默认先显示可核对的汇总表')
+        const riskTone = await stats.locator('.erp-statistics-table .erp-statistics-danger:not(:disabled)').first().evaluate((button) => ({
+          button: getComputedStyle(button).color,
+          text: getComputedStyle(button.querySelector('span') || button).color,
+          metric: getComputedStyle(document.querySelector('.erp-statistics-metrics .erp-statistics-danger')).color,
+        }))
+        assert.equal(riskTone.text, riskTone.metric, `逾期数值应保留与概览一致的风险色：${JSON.stringify(riskTone)}`)
+        if (!narrow) {
+          const firstRow = await stats.locator('.erp-statistics-table tbody tr.ant-table-row').first().boundingBox()
+          assert(firstRow.y < page.viewportSize().height / 2, '首屏应直接读到汇总数据')
+        }
+        if (!narrow && !dark && !restricted) {
+          await page.screenshot({ path: `${outputDir}/statistics-table-desktop.png` })
+        }
+        await stats.getByText('表格与图表', { exact: true }).click()
+        await stats.locator('.erp-statistics-column').first().waitFor()
         assert.equal(await stats.locator('.erp-statistics-column').count(), 8)
+        const chartTrack = await stats.locator('.erp-statistics-bar-track').first().boundingBox()
+        assert(chartTrack.width > chartTrack.height, '客户和账龄使用可横向比较的条形图')
+        const beforeHover = calls.length
+        await verifyChartTooltip(page, stats, assert, { value: '3 单', total: '当前筛选共 10 单', share: 30, action: '点击查看这 3 单' })
+        assert.equal(calls.length, beforeHover, '悬停和聚焦不重新查询统计')
+        await stats.locator('.erp-statistics-stack button').first().click()
+        await stats.getByRole('button', { name: '返回汇总', exact: true }).waitFor()
+        await stats.locator('.erp-statistics-body[aria-busy="false"] .ant-table-row').first().waitFor()
+        assert.equal(calls.at(-1).method, 'list_delivery_statistics_sources')
+        assert.equal(calls.at(-1).params.source_status, 'done')
+        await page.getByRole('tooltip').waitFor({ state: 'hidden' })
+        await stats.getByRole('button', { name: '返回汇总', exact: true }).click()
+        await stats.locator('.erp-statistics-column').first().waitFor()
         const summaryPager = stats.getByRole('navigation', {
           name: '统计汇总分页',
         })
@@ -363,7 +415,7 @@ export function createBusinessStatisticsScenarios({
           assert
         )
         assert.equal(await stats.locator('.erp-statistics-table').count(), 0)
-        await stats.getByText('图表与表格', { exact: true }).click()
+        await stats.getByText('表格与图表', { exact: true }).click()
         const pageSizeResponse = page.waitForResponse((response) => {
           if (!response.url().endsWith('/rpc/business')) return false
           const body = response.request().postDataJSON() || {}
@@ -395,7 +447,8 @@ export function createBusinessStatisticsScenarios({
           await stats.getByRole('combobox', { name: '交期范围' }).count(),
           0
         )
-        await stats.getByText('图表与表格', { exact: true }).click()
+        await stats.getByText('表格与图表', { exact: true }).click()
+        await verifyChartTooltip(page, stats, assert, { value: '18,000.00 CNY', total: '当前筛选未结 72,000.00 CNY', share: 25, action: '点击查看来源应收' })
         await page.screenshot({
           path: `${outputDir}/statistics-aging-desktop.png`,
         })
@@ -493,11 +546,19 @@ export function createBusinessStatisticsScenarios({
           await frame.locator('.erp-statistics-metrics').innerText(),
           /订单总数\s*48/
         )
+        await frame.getByRole('tab', { name: '图表', exact: true }).click()
+        const designSegment = frame.locator('[data-statistics-tooltip]').first()
+        await designSegment.hover()
+        await frame.getByRole('tooltip').waitFor()
+        assert.match(await frame.getByRole('tooltip').innerText(), /占本行 30%/u)
+        await designSegment.focus()
+        await page.keyboard.press('Escape')
+        await frame.getByRole('tooltip').waitFor({ state: 'hidden' })
         await frame.getByRole('tab', { name: '表格', exact: true }).click()
         assert.equal(await frame.locator('.erp-statistics-chart').count(), 0)
         const pager = frame.getByRole('navigation', { name: '统计汇总分页' })
-        assert.match(await pager.innerText(), /第 1–8 项，共 10 项/)
-        await pager.getByRole('button', { name: '下一页', exact: true }).click()
+        assert.match(await pager.innerText(), /第 1-8 条 \/ 共 10 条/)
+        await pager.locator('.ant-pagination-next button').click()
         assert.equal(
           await frame.locator('.statistics-design-table tbody tr').count(),
           2
@@ -506,23 +567,20 @@ export function createBusinessStatisticsScenarios({
           .locator('.statistics-design-table tbody')
           .getByRole('button', { name: '时光百货', exact: true })
           .click()
-        await frame
-          .getByRole('combobox', { name: '每页来源订单数' })
-          .selectOption('20')
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '每页来源订单数' }), '20')
         await frame
           .getByRole('button', { name: '返回汇总', exact: true })
           .click()
-        assert.match(await pager.innerText(), /第 9–10 项，共 10 项/)
-        await frame
-          .getByRole('combobox', { name: '每页统计汇总数' })
-          .selectOption('20')
+        assert.match(await pager.innerText(), /第 9-10 条 \/ 共 10 条/)
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '每页统计汇总数' }), '20')
         assert.equal(
           await frame.locator('.statistics-design-table tbody tr').count(),
           10
         )
-        await frame
-          .getByRole('combobox', { name: '每页统计汇总数' })
-          .selectOption('8')
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '每页统计汇总数' }), '8')
         await frame
           .locator('.statistics-design-table tbody')
           .getByRole('button', { name: '晨星礼品', exact: true })
@@ -535,9 +593,8 @@ export function createBusinessStatisticsScenarios({
           await frame.locator('.statistics-design-table tbody tr').count(),
           2
         )
-        await frame
-          .getByRole('combobox', { name: '每页来源订单数' })
-          .selectOption('20')
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '每页来源订单数' }), '20')
         assert.equal(
           await frame.locator('.statistics-design-table tbody tr').count(),
           10
@@ -545,7 +602,7 @@ export function createBusinessStatisticsScenarios({
         await frame
           .getByRole('button', { name: '返回汇总', exact: true })
           .click()
-        await frame.locator('#statistics-report').selectOption('receivables')
+        await chooseSelectOption(frame.locator('#statistics-report'), 'receivables')
         assert.match(
           await frame.locator('.erp-statistics-metrics').innerText(),
           /358,100.00/

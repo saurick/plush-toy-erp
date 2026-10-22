@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Select, Spin } from 'antd'
+import { Alert, Button, Spin } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { getSalesOrder, getPurchaseOrder, getOutsourcingOrder } from '../../api/masterDataOrderApi.mjs'
 import { getShipment } from '../../api/operationalFactApi.mjs'
 import { getPurchaseReceipt } from '../../api/purchaseApi.mjs'
@@ -86,6 +87,8 @@ sourceContext: context,
             <label className="mobile-task-payment-kind">
               本次收付款用途
               <Select
+                allowClear={false}
+                placeholder="本次收付款用途"
                 aria-label="本次收付款用途"
                 value={kind}
                 disabled={loading}

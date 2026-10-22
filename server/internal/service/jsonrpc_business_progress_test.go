@@ -63,7 +63,7 @@ func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 		t.Fatalf("internal=%+v %v", res, err)
 	}
 	_, res, err = d.handleBusiness(ctx, "get_progress", "missing", newDataStruct(map[string]any{"id": 19}))
-	if err != nil || res.Code != errcode.InvalidParam.Code {
+	if err != nil || res.Code != errcode.ResourceNotFound.Code {
 		t.Fatalf("missing=%+v %v", res, err)
 	}
 	for _, state := range []string{"anonymous", "disabled", "denied"} {

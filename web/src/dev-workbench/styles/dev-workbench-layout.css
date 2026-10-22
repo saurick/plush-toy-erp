@@ -133,7 +133,6 @@
 }
 .erp-dev-environment-evidence__table th,
 .erp-dev-environment-evidence__table td {
-  width: 16.6%;
   border-bottom: 1px solid var(--erp-border);
   padding: 6px 14px;
   text-align: left;
@@ -212,9 +211,8 @@
   font-size: var(--erp-font-caption);
   font-weight: 600;
 }
-.erp-dev-recovery-table tbody th {
-  width: 30%;
-  min-width: 260px;
+.erp-dev-recovery-table {
+  table-layout: fixed;
 }
 .erp-dev-tool-table .erp-dev-testing-validation-row th {
   width: 38%;
@@ -275,9 +273,6 @@
 .erp-dev-tool-table .erp-dev-tool-table__usage {
   width: 168px;
 }
-.erp-dev-recovery-table td:nth-last-child(2) {
-  width: 220px;
-}
 .erp-dev-tool-table tbody th a:hover {
   color: var(--erp-primary);
 }
@@ -316,15 +311,6 @@
   flex-wrap: wrap;
   gap: 8px 16px;
   margin-bottom: 8px;
-}
-
-.erp-dev-tool-page .erp-dev-product-core-table {
-  min-width: 760px;
-}
-
-.erp-dev-tool-page .erp-dev-product-core-status {
-  justify-items: start;
-  text-align: left;
 }
 
 .erp-dev-tool-page .erp-permission-relationship__summary {
@@ -384,7 +370,7 @@
 }
 
 .erp-dev-tool-page .erp-dev-ui-design-page-select {
-  width: 190px;
+  width: 260px;
   max-width: 100%;
 }
 

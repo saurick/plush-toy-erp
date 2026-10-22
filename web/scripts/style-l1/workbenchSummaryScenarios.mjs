@@ -1,6 +1,6 @@
-import { exerciseTableScrollControls, exerciseTableScrollPagination } from './tableScrollControlAssertions.mjs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { exerciseTableScrollControls, exerciseTableScrollPagination } from './tableScrollControlAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertTableSemanticAlignment } from './businessTableAssertions.mjs'
@@ -310,7 +310,7 @@ export function createWorkbenchSummaryScenarios({
         const tableCard = region.locator('.erp-business-data-table-card')
         const tableGeometry = await tableCard.evaluate((card) => {
           const wrapper = card.querySelector('.ant-table-wrapper')
-          const content = card.querySelector('.ant-table-content')
+          const content = card.querySelector('.ant-table-body, .ant-table-content')
           const cardBox = card.getBoundingClientRect()
           const wrapperBox = wrapper.getBoundingClientRect()
           return {
@@ -321,8 +321,8 @@ export function createWorkbenchSummaryScenarios({
           }
         })
         assert.ok(
-          tableGeometry.leftInset >= 11 && tableGeometry.topInset >= 9,
-          `${name} 表格应保留左上内边距: ${JSON.stringify(tableGeometry)}`
+          Math.abs(tableGeometry.leftInset - 1) <= 0.5 && Math.abs(tableGeometry.topInset - 1) <= 0.5,
+          `${name} 主表应紧贴卡片边框: ${JSON.stringify(tableGeometry)}`
         )
         assert.equal(tableGeometry.pageOverflow, false)
         const scrollActions = region.getByRole('group', {
@@ -337,7 +337,7 @@ export function createWorkbenchSummaryScenarios({
           await exerciseTableScrollControls(
             page,
             tableCard.locator('.ant-table-wrapper'),
-            tableCard.locator('.ant-table-content')
+            tableCard.locator('.ant-table-body, .ant-table-content')
           )
         }
         const search = region.getByRole('searchbox', {
@@ -379,7 +379,9 @@ export function createWorkbenchSummaryScenarios({
           wrapper: tableCard.locator('.ant-table-wrapper'),
           trigger: region.locator('.ant-pagination-item-2'),
           ready: region.getByText('模拟产品 21', { exact: true }),
-          endpoint: '**/rpc/sales_order', method: 'list_sales_order_summary', offset: 20,
+          endpoint: '**/rpc/sales_order',
+          method: 'list_sales_order_summary',
+          offset: 20,
           shorterPage: true,
         })
         assert.equal(calls.at(-1).params.offset, 20)

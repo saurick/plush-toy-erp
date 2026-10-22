@@ -219,7 +219,7 @@ func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Conte
 		return entOutsourcingOrderToBiz(row), nil
 	}
 	if !biz.IsOutsourcingOrderLifecycleTransitionAllowed(row.LifecycleStatus, lifecycleStatus) {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled && len(dependencyBatchIDs) > 0 {
 		return nil, biz.ErrProductionWIPOutsourcingSourceDependency
@@ -355,7 +355,7 @@ func (r *outsourcingOrderRepo) ApplyOutsourcingOrderLifecycleAction(
 		return nil, biz.ErrOutsourcingOrderConflict
 	}
 	if !biz.IsOutsourcingOrderLifecycleTransitionAllowed(current.LifecycleStatus, lifecycleStatus) || current.LifecycleStatus == lifecycleStatus {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := requireStableOutsourcingOrderWIPDependencySet(ctx, tx.client, in.ID, dependencyBatchIDs); err != nil {
 		return nil, err
@@ -583,7 +583,7 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 				return nil, err
 			}
 			if current.LifecycleStatus != biz.OutsourcingOrderStatusDraft {
-				return nil, biz.ErrBadParam
+				return nil, biz.ErrSourceOrderStateInvalid
 			}
 			if current.Version != in.ExpectedVersion {
 				return nil, biz.ErrOutsourcingOrderConflict
@@ -642,7 +642,7 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 				return nil, biz.ErrOutsourcingOrderItemNotFound
 			}
 			if current.LineStatus != biz.OutsourcingOrderItemStatusOpen {
-				return nil, biz.ErrBadParam
+				return nil, biz.ErrSourceOrderStateInvalid
 			}
 			mutation.LineNo = current.LineNo
 		} else {

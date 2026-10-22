@@ -145,6 +145,30 @@ test('a queue switch clears unrelated rows and a scope switch rejects a late res
   assert.equal(view.current.workbenchResponseState.response.queue_key, 'risk')
 })
 
+test('a failed workbench page retains its settled rows and pagination until retry succeeds', async (t) => {
+  let fail = true
+  const view = await dashboardHarness(t, (_method, params) => {
+    if (params.offset === 1 && fail) throw new Error('offline')
+    return workbenchPage(params)
+  })
+  await view.renderQuery()
+  await view.flush()
+  await view.renderQuery({ workbenchRequest: { ...workbenchRequest, offset: 1 } })
+  await view.flush()
+  assert.equal(view.current.loading, false)
+  assert(view.current.workbenchResponseState.error)
+  assert.equal(view.current.workbenchResponseState.response.offset, 0)
+  assert.equal(view.current.workbenchResponseState.response.limit, 1)
+  assert.equal(view.container.textContent, '1')
+
+  fail = false
+  await view.act(async () => view.current.reloadTaskData())
+  await view.flush()
+  assert.equal(view.current.workbenchResponseState.error, '')
+  assert.equal(view.current.workbenchResponseState.response.offset, 1)
+  assert.equal(view.container.textContent, '2')
+})
+
 test('preview and alternate views suspend task reads and resume through the same loader', async (t) => {
   const view = await dashboardHarness(t, (_method, params) =>
     workbenchPage(params)

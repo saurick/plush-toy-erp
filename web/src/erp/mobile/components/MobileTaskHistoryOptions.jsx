@@ -1,15 +1,13 @@
 import React, { useState } from 'react'
 import MobileTaskExtraFilters from './MobileTaskExtraFilters.jsx'
 import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
-import MobileFilterChoices from './MobileFilterChoices.jsx'
 import MobileFilterPopover from './MobileFilterPopover.jsx'
 import {
-  WORKFLOW_HISTORY_PERIOD_OPTIONS,
   WORKFLOW_HISTORY_STATUS_OPTIONS,
 } from '../../utils/workflowRoleTaskHistory.mjs'
 
 export default function MobileTaskHistoryOptions({ options, onChange, sourceTypes, counts, loading, count, summary, onReset, triggerRef }) {
-  const { period = '', statusKey = '' } = options
+  const { statusKey = '' } = options
   const [open, setOpen] = useState(false)
   return (
     <MobileFilterPopover
@@ -23,15 +21,6 @@ export default function MobileTaskHistoryOptions({ options, onChange, sourceType
       testId="mobile-history-filter-trigger"
       onReset={onReset}
     >
-      <fieldset role="presentation">
-        <legend>处理时间</legend>
-        <MobileFilterChoices
-          label="处理时间筛选"
-          options={WORKFLOW_HISTORY_PERIOD_OPTIONS}
-          value={period}
-          onChange={(value) => onChange({ period: value })}
-        />
-      </fieldset>
       <fieldset role="presentation">
         <legend>处理结果</legend>
         <BusinessStatusFilter

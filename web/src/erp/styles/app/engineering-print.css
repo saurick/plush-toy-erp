@@ -306,20 +306,16 @@
 }
 
 .erp-work-instruction-annotation-modal
-  :where(button:not([data-annotation-control]), select) {
+  :where(button:not([data-annotation-control])) {
   min-height: max(32px, var(--erp-touch-target, 0px));
+  padding: 5px 10px;
+  cursor: pointer;
   border: 1px solid var(--erp-border-strong);
   border-radius: 6px;
   background: var(--erp-surface-bg);
   color: var(--erp-text);
   font-size: var(--erp-font-small);
   line-height: 20px;
-}
-
-.erp-work-instruction-annotation-modal
-  :where(button:not([data-annotation-control])) {
-  padding: 5px 10px;
-  cursor: pointer;
 }
 
 .erp-work-instruction-annotation-modal .erp-print-tool-button {
@@ -331,8 +327,7 @@
   color: inherit;
 }
 
-.erp-work-instruction-annotation-modal
-  :where(button, select, input):focus-visible {
+.erp-work-instruction-annotation-modal :where(button, input):focus-visible {
   outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }
@@ -469,7 +464,7 @@
   font-weight: 600;
 }
 
-.erp-work-instruction-annotation-modal__form select,
+.erp-work-instruction-annotation-modal__form .ant-select,
 .erp-work-instruction-annotation-modal__form input[type='range'] {
   width: 100%;
 }

@@ -2,7 +2,7 @@ import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import { assertTrackingNavigation, assertTrackingExceptionContext, createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
-import { assertTaskCopy } from './taskCopyAssertions.mjs'
+import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import { assertMobileFilterSummary, assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 
@@ -104,7 +104,7 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         await card.scrollIntoViewIfNeeded()
         await waitForFiniteAnimations(page)
         await page.screenshot({ path: path.join(outputDir, `mobile-workflow-tracking-${base.themeMode}-list.png`) })
-        await card.locator('.erp-task-card__open').click()
+        await clickTaskCardContent(card, card.getByText('销售订单受理', { exact: true }))
         const drawer = page.getByRole('dialog', { name: '流程跟踪', exact: true })
         await drawer.getByText('全部节点处理记录', { exact: true }).waitFor()
         await assertTrackingNavigation(page, assert, drawer)
@@ -148,7 +148,7 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         const history = await page.evaluate(() => window.history.state.mobileWorkflowTracking)
         assert.equal(history.selection, null)
         assert.ok(history.scopes.started.loadedCount >= 40)
-        await card.locator('.erp-task-card__open').click()
+        await clickTaskCardContent(card, card.getByText('销售订单受理', { exact: true }))
         await drawer.getByText('全部节点处理记录', { exact: true }).waitFor()
         await page.goBack()
         await drawer.waitFor({ state: 'hidden' })

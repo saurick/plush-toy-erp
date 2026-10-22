@@ -235,13 +235,15 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
       dateSource: confirmedDate ? 'confirmed' : expectedDate ? 'expected' : '',
     }
     return { ...row, status: purchaseArrivalStatus(row, today) }
-  })
+  }).filter((row) => options.confirmation === 'confirmed'
+    ? Boolean(row.confirmedDate)
+    : options.confirmation === 'unconfirmed' ? !row.confirmedDate : true)
   rows.sort((left, right) => {
     const rank = left.status.rank - right.status.rank
     if (rank !== 0) return rank
     return (left.arrivalDate || '9999-12-31').localeCompare(
       right.arrivalDate || '9999-12-31'
-    )
+    ) || left.orderNo.localeCompare(right.orderNo, 'zh-CN') || left.id - right.id
   })
 
   const days = Array.from({ length: 14 }, (_, index) => {
@@ -249,7 +251,8 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
     return { dateKey, day: Number(dateKey.slice(-2)), items: [] }
   })
   const dayMap = new Map(days.map((day) => [day.dateKey, day]))
-  rows.forEach((row) => dayMap.get(row.arrivalDate)?.items.push(row))
+  rows.filter((row) => !['closed', 'cancelled'].includes(row.status.key))
+    .forEach((row) => dayMap.get(row.arrivalDate)?.items.push(row))
 
   return {
     rows,
@@ -259,6 +262,7 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
     unscheduled: rows.filter((row) => row.status.key === 'unscheduled'),
     counts: {
       total: rows.length,
+      period: days.reduce((count, day) => count + day.items.length, 0),
       overdue: rows.filter((row) => row.status.key === 'overdue').length,
       dueSoon: rows.filter((row) => row.status.key === 'dueSoon').length,
       confirmed: rows.filter(
@@ -269,6 +273,16 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
         .length,
     },
   }
+}
+
+export function filterPurchaseArrivalRows(model, { filter = 'all', selectedDate = '' } = {}) {
+  return model.rows.filter((row) => {
+    if (filter === 'all') return true
+    if (['closed', 'cancelled'].includes(row.status.key)) return false
+    if (filter === 'date') return row.arrivalDate === selectedDate
+    if (filter === 'period') return row.arrivalDate >= model.startDate && row.arrivalDate <= model.endDate
+    return row.status.key === filter
+  })
 }
 
 function financeDueStatus(row, today) {

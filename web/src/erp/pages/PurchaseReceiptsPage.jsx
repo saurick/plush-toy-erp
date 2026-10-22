@@ -46,13 +46,13 @@ import {
   BusinessOperationPanel,
   BusinessDataTable,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
@@ -1115,7 +1115,7 @@ export default function PurchaseReceiptsPage() {
               className="erp-business-filter-control--status"
               value={supplierFilter}
               options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
-              placeholder="全部供应商"
+              placeholder="供应商"
               showSearch
               optionFilterProp="label"
               onChange={(nextSupplier) => {
@@ -1128,7 +1128,7 @@ export default function PurchaseReceiptsPage() {
               className="erp-business-filter-control--status"
               value={materialFilter}
               options={[{ label: '全部材料', value: '' }, ...materialOptions]}
-              placeholder="全部材料"
+              placeholder="材料"
               showSearch
               optionFilterProp="label"
               onChange={(nextMaterial) => {
@@ -1141,7 +1141,7 @@ export default function PurchaseReceiptsPage() {
               className="erp-business-filter-control--status"
               value={warehouseFilter}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
-              placeholder="全部仓库"
+              placeholder="仓库"
               showSearch
               optionFilterProp="label"
               onChange={(nextWarehouse) => {
@@ -1157,7 +1157,7 @@ export default function PurchaseReceiptsPage() {
                 { label: '全部批次', value: '' },
                 ...inventoryLotOptions,
               ]}
-              placeholder="全部批次"
+              placeholder="批次"
               showSearch
               optionFilterProp="label"
               onChange={(nextLot) => {
@@ -1333,6 +1333,7 @@ export default function PurchaseReceiptsPage() {
               <Button
                 data-business-action-key="create-return"
                 data-business-action-role="secondary"
+                data-business-action-group="business"
                 size="small"
                 disabled={
                   !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
@@ -1362,6 +1363,7 @@ export default function PurchaseReceiptsPage() {
               <Button
                 data-business-action-key="create-adjustment"
                 data-business-action-role="secondary"
+                data-business-action-group="business"
                 size="small"
                 disabled={
                   !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
-import { Alert, Button, Modal } from 'antd'
+import { Alert, Button } from 'antd'
+import Modal from '@/common/components/modal/AppModal'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { ERP_THEME_MODE, useERPTheme } from '@/common/theme/erpTheme'
 import { ERP_ACCENTS } from '@/common/theme/erpAppearance.mjs'
@@ -43,12 +44,38 @@ const appearanceModalStyles = {
   footer: { padding: 0, margin: '12px 0 0', borderTop: 0 },
 }
 
+export function ERPAppearanceIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M12 3a9 9 0 1 0 9 9c0-1.1-.9-2-2-2h-2.2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2H12Z" />
+      <circle cx="7.5" cy="10" r=".7" />
+      <circle cx="9.5" cy="6.5" r=".7" />
+      <circle cx="7.5" cy="14" r=".7" />
+    </svg>
+  )
+}
+
 export default function ERPThemeToggle({
   className = '',
   size = 'middle',
   variant = 'button',
   showLabel = false,
   showDensity = true,
+  open: controlledOpen,
+  onOpenChange,
+  afterClose,
 }) {
   const {
     themeMode,
@@ -59,7 +86,9 @@ export default function ERPThemeToggle({
     appearanceSaveError,
     retryAppearanceSave,
   } = useERPTheme()
-  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const appearanceOpen = controlledOpen ?? internalOpen
+  const setAppearanceOpen = onOpenChange ?? setInternalOpen
   const appearanceTitle = showDensity ? '外观与密度' : '外观设置'
   const saveStatus = (
     <span
@@ -156,6 +185,7 @@ export default function ERPThemeToggle({
       width={470}
       styles={appearanceModalStyles}
       onCancel={() => setAppearanceOpen(false)}
+      afterClose={afterClose}
       footer={
         <div className="erp-appearance-footer">
           {saveStatus}
@@ -174,6 +204,7 @@ export default function ERPThemeToggle({
   )
 
   if (variant === 'settings') return settings
+  if (variant === 'dialog') return appearanceDialog
 
   return (
     <>
@@ -183,25 +214,7 @@ export default function ERPThemeToggle({
         aria-expanded={appearanceOpen}
         title={appearanceTitle}
         className={`erp-appearance-trigger ${className}`.trim()}
-        icon={
-          <svg
-            width="17"
-            height="17"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path d="M12 3a9 9 0 1 0 9 9c0-1.1-.9-2-2-2h-2.2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2H12Z" />
-            <circle cx="7.5" cy="10" r=".7" />
-            <circle cx="9.5" cy="6.5" r=".7" />
-            <circle cx="7.5" cy="14" r=".7" />
-          </svg>
-        }
+        icon={<ERPAppearanceIcon />}
         size={size}
         onClick={() => setAppearanceOpen(true)}
       >

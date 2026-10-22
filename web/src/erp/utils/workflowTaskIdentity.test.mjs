@@ -50,7 +50,7 @@ test('unlinked task snapshots keep all named products without inventing identifi
   assert.ok(identity.items.every((item) => item.styleNo === ''))
 })
 
-test('purchase task summary counts source lines instead of mixing material and product identities', () => {
+test('purchase task summary separates distinct associations from source line counts', () => {
   const display_context = {
     available: true,
     source_no: 'PO-2',
@@ -72,12 +72,13 @@ test('purchase task summary counts source lines instead of mixing material and p
       display_context,
     })
     assert.equal(summary.first.name, '浅黄填充棉')
-    assert.equal(summary.compactCountLabel, '共 2 条采购明细')
+    assert.equal(summary.compactCountLabel, '共 4 项关联内容')
+    assert.equal(summary.sourceLineCount, 2)
     assert.equal(summary.remainingItems.length, 3)
   }
 })
 
-test('purchase task summary omits an unknown line count instead of reviving the mixed identity count', () => {
+test('purchase task summary keeps association counts when source line counts are unknown', () => {
   const summary = getWorkflowTaskIdentityPresentation({
     source_type: 'purchase_order',
     display_context: {
@@ -88,7 +89,8 @@ test('purchase task summary omits an unknown line count instead of reviving the 
       ],
     },
   })
-  assert.equal(summary.compactCountLabel, '')
+  assert.equal(summary.compactCountLabel, '共 2 项关联内容')
+  assert.equal(summary.sourceLineCount, null)
 })
 
 test('non-purchase task summary makes the combined count explicit', () => {
@@ -102,7 +104,7 @@ test('non-purchase task summary makes the combined count explicit', () => {
       ],
     },
   })
-  assert.equal(summary.compactCountLabel, '共 2 项关联内容')
+  assert.equal(summary.compactCountLabel, '共 2 款产品')
 })
 
 test('search selects a matching product and its own image, counts styles and restores source order on clear', () => {
@@ -130,7 +132,7 @@ test('search selects a matching product and its own image, counts styles and res
   for (const keyword of ['', 'SO-DEER', '不存在']) {
     const summary = getWorkflowTaskIdentityPresentation(task, keyword)
     assert.equal(summary.first.name, '雪花小鹿')
-    assert.equal(summary.compactCountLabel, '共 4 项关联内容')
+    assert.equal(summary.compactCountLabel, '共 3 款产品')
   }
   assert.deepEqual(task, original)
 })
@@ -231,4 +233,26 @@ test('status receipt retains read context only for the identical source binding'
   )
   const fresh = { ...after, display_context: { available: true, items: [] } }
   assert.equal(retainWorkflowTaskIdentity(before, fresh), fresh)
+})
+
+test('distinct product and material counts preserve complete per-order association records', () => {
+  for (const kind of ['product', 'material']) {
+    const items = [
+      { kind, name: '同款', code: 'SAME', order_no: 'SO-1' },
+      { kind, name: '同款快照', code: 'SAME', order_no: 'SO-2' },
+      { kind, name: '另一款', code: 'OTHER' },
+    ]
+    const summary = getWorkflowTaskIdentityPresentation({ display_context: { available: true, items } })
+    assert.equal(summary.items.length, 3)
+    assert.equal(summary.associationCount, 2)
+    assert.equal(summary.compactCountLabel, kind === 'product' ? '共 2 款产品' : '共 2 种物料')
+  }
+})
+
+test('unavailable projections discard stale identity fields before all consumers read them', () => {
+  const summary = getWorkflowTaskIdentityPresentation({ payload: { product_name: '旧快照' }, display_context: { available: false, source_no: 'STALE', items: [{ kind: 'product', name: '旧产品', code: 'OLD', product_id: 7, image_attachment_id: 8 }] } })
+  assert.deepEqual(summary.items, [])
+  assert.equal(summary.sourceNo, '')
+  assert.equal(summary.first, undefined)
+  assert.equal(summary.associationCount, 0)
 })

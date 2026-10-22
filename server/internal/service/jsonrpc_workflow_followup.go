@@ -155,7 +155,7 @@ func (d *jsonrpcDispatcher) handleWorkflowFollowup(ctx context.Context, method, 
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "跟进任务已创建", Data: newDataStruct(map[string]any{"task": workflowTaskToMap(replayed)})}, nil
 	}
 	if !spec.CanCreate(source.Status) {
-		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前单据已结束，不能再新建跟进任务"}, nil
+		return id, &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前单据已结束，不能再新建跟进任务"}, nil
 	}
 	if !dueAt.After(time.Now()) {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "截止时间须晚于当前时间"}, nil

@@ -1076,7 +1076,7 @@ func TestEnsureCustomerConfigModuleKeysEnabledExpandsPurchaseReceiptDependencies
 				mutated[index].State = "disabled"
 			}
 		}
-		if err := ensureCustomerConfigModuleKeysEnabled([]string{"purchase_receipts"}, mutated); !errors.Is(err, ErrBadParam) {
+		if err := ensureCustomerConfigModuleKeysEnabled([]string{"purchase_receipts"}, mutated); !errors.Is(err, ErrCustomerConfigModuleDisabled) {
 			t.Fatalf("purchase receipt action must require %s, got %v", missingModuleKey, err)
 		}
 	}
@@ -1486,8 +1486,12 @@ func TestCustomerConfigUsecaseRejectsProcessStartWhenReferencedModuleNotEnabled(
 				BusinessRefID:   1001,
 				IdempotencyKey:  "sales_order:1001:sales_order_acceptance:v1",
 			})
-			if !errors.Is(err, ErrBadParam) {
-				t.Fatalf("expected ErrBadParam for %s module, got %v", tt.wantBlockedState, err)
+			wantErr := ErrCustomerConfigModuleDisabled
+			if tt.wantBlockedState == "read_only" {
+				wantErr = ErrCustomerConfigModuleReadOnly
+			}
+			if !errors.Is(err, wantErr) {
+				t.Fatalf("expected %v for %s module, got %v", wantErr, tt.wantBlockedState, err)
 			}
 		})
 	}

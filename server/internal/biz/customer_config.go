@@ -39,6 +39,8 @@ var (
 	ErrCustomerConfigHashMismatch           = errors.New("customer config hash mismatch")
 	ErrCustomerConfigActiveRevisionRequired = errors.New("customer config active revision required")
 	ErrCustomerConfigApprovalDisabled       = errors.New("customer config approval disabled")
+	ErrCustomerConfigModuleDisabled         = errors.New("customer config module disabled")
+	ErrCustomerConfigModuleReadOnly         = errors.New("customer config module read only")
 )
 
 var runtimeFieldPolicySurfaceKeys = map[string]map[string]struct{}{

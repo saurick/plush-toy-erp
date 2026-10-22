@@ -21,3 +21,5 @@
   [data-flow-print-current] .erp-dev-chain-topics__group li { break-inside: avoid; }
   [data-flow-print-current] .erp-dev-chain-topics__group button > small { display: none; }
 }
+
+.erp-dev-chain-topics [data-overview-chain][aria-pressed="true"] { border-color: var(--erp-primary); background: var(--erp-primary-soft); }

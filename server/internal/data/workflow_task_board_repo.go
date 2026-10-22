@@ -111,6 +111,7 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		SourceType string `json:"source_type"`
 	}
 	err = visibleQuery.Clone().
+		Where(workflowtask.SourceTypeNotNil()).
 		Unique(true).
 		Order(ent.Asc(workflowtask.FieldSourceType)).
 		Select(workflowtask.FieldSourceType).
@@ -413,7 +414,10 @@ func workflowTaskBoardLanePredicate(laneKey string, query biz.WorkflowTaskBoardQ
 }
 
 func workflowExceptionTaskPredicate() predicate.WorkflowTask {
-	return workflowtask.Or(workflowtask.TaskGroupIn(biz.WorkflowExceptionTaskGroups()...), workflowtask.SourceTypeIn(biz.WorkflowExceptionSourceTypes()...))
+	return workflowtask.Or(
+		workflowtask.TaskGroupIn(biz.WorkflowExceptionTaskGroups()...),
+		workflowtask.And(workflowtask.SourceTypeNotNil(), workflowtask.SourceTypeIn(biz.WorkflowExceptionSourceTypes()...)),
+	)
 }
 
 func workflowTaskBoardUnsettledStatusPredicate() predicate.WorkflowTask {

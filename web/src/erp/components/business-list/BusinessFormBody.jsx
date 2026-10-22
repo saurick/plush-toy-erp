@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
+import Select from '@/common/components/select/AppSelect'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { activeFormSectionIndex } from '../../utils/businessFormSections.mjs'
+
+function renderSectionPopup(menu) {
+  // 跳转后由分区标题接收焦点，阻止弹层再次聚焦选择框。
+  return <div onMouseDown={(event) => event.stopPropagation()}>{menu}</div>
+}
 
 export default function BusinessFormBody({ open, loading, busy, children }) {
   const bodyRef = useRef(null)
@@ -127,16 +133,22 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
           </div>
           <label className="erp-business-form-page__section-picker">
             跳转到
-            <select
+            <Select
+              allowClear={false}
+              placeholder="跳转到"
+              aria-label="跳转到"
+              disabled={busy}
+              virtual={false}
+              data-value={active}
               value={active}
-              onChange={(event) => navigate(event.target.value)}
-            >
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.title}
-                </option>
-              ))}
-            </select>
+              onSelect={navigate}
+              popupRender={renderSectionPopup}
+              options={sections.map(({ id, title }) => ({
+                value: id,
+                label: title,
+                'data-select-value': id,
+              }))}
+            />
           </label>
         </nav>
       ) : null}

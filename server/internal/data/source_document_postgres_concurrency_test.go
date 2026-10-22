@@ -138,7 +138,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 			t.Fatalf("submit sales order while stale save is paused: %v", err)
 		}
 		close(release)
-		if err := <-saveErr; !errors.Is(err, biz.ErrBadParam) {
+		if err := <-saveErr; !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 			t.Fatalf("stale sales-order save must be rejected after submit, got %v", err)
 		}
 
@@ -156,7 +156,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		if _, err := realUC.ActivateSalesOrder(ctx, order.ID); err != nil {
 			t.Fatalf("activate submitted sales order: %v", err)
 		}
-		if _, err := realRepo.UpdateSalesOrderLifecycle(ctx, order.ID, biz.SalesOrderStatusSubmitted); !errors.Is(err, biz.ErrBadParam) {
+		if _, err := realRepo.UpdateSalesOrderLifecycle(ctx, order.ID, biz.SalesOrderStatusSubmitted); !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 			t.Fatalf("stale lifecycle write must not regress active sales order, got %v", err)
 		}
 	})
@@ -216,7 +216,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 			t.Fatalf("submit purchase order while stale save is paused: %v", err)
 		}
 		close(release)
-		if err := <-saveErr; !errors.Is(err, biz.ErrBadParam) {
+		if err := <-saveErr; !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 			t.Fatalf("stale purchase-order save must be rejected after submit, got %v", err)
 		}
 
@@ -234,7 +234,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		if _, err := realUC.ApprovePurchaseOrder(ctx, order.ID); err != nil {
 			t.Fatalf("approve submitted purchase order: %v", err)
 		}
-		if _, err := realRepo.UpdatePurchaseOrderLifecycle(ctx, order.ID, biz.PurchaseOrderStatusSubmitted); !errors.Is(err, biz.ErrBadParam) {
+		if _, err := realRepo.UpdatePurchaseOrderLifecycle(ctx, order.ID, biz.PurchaseOrderStatusSubmitted); !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 			t.Fatalf("stale lifecycle write must not regress approved purchase order, got %v", err)
 		}
 	})
@@ -322,7 +322,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 			t.Fatalf("submit outsourcing order while stale save is paused: %v", err)
 		}
 		close(release)
-		if err := <-saveErr; !errors.Is(err, biz.ErrBadParam) {
+		if err := <-saveErr; !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 			t.Fatalf("stale outsourcing-order save must be rejected after submit, got %v", err)
 		}
 
@@ -340,7 +340,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		if _, err := realUC.ConfirmOutsourcingOrder(ctx, order.ID); err != nil {
 			t.Fatalf("confirm submitted outsourcing order: %v", err)
 		}
-		if _, err := realRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, biz.OutsourcingOrderStatusSubmitted); !errors.Is(err, biz.ErrBadParam) {
+		if _, err := realRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, biz.OutsourcingOrderStatusSubmitted); !errors.Is(err, biz.ErrSourceOrderStateInvalid) {
 			t.Fatalf("stale lifecycle write must not regress confirmed outsourcing order, got %v", err)
 		}
 	})

@@ -162,7 +162,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze({
     title: '本地长期基础数据',
     shortTitle: 'Core Demo',
-    purpose: '准备本地长期开发库的演示账号、标准单位和仓库',
+    purpose: '本地演示账号、标准单位与仓库。',
     retention: '稳定 upsert，可持续保留',
     cleanup:
       '不承诺按批次删除；退出时按账号停用、单据取消或冲正等正常生命周期处理。',
@@ -188,7 +188,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     title: '长期业务场景数据',
     shortTitle: 'Scenario Demo',
     purpose:
-      '在本地开发或 demo-133 固定目标上准备同一语义的长期模拟场景，不是完整验收',
+      '本地或 demo 的长期模拟场景；不是完整验收。',
     retention:
       '固定批次同批精确复用 / 读回；只补齐缺项，不清空已有数据。岗位到期时间是固定快照，不会随当天滚动。',
     cleanup:
@@ -216,7 +216,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance]: Object.freeze({
     title: '按最新业务链完整回归',
     shortTitle: 'Full Acceptance',
-    purpose: '按全部已登记业务链和场景合同，在新隔离库完成完整回归',
+    purpose: '在新隔离库回归全部已登记业务链与场景。',
     retention: '每次执行都建立新批次，只接受 clean exact commit',
     cleanup: '无论验收成功或失败都自动清理隔离库，不提供手工清理按钮。',
     scope:

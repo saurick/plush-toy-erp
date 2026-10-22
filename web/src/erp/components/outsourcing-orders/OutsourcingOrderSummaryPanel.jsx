@@ -21,10 +21,10 @@ import {
 import {
   BusinessDataTable,
   BusinessOperationPanel,
-  DateRangeFilter,
   SearchInput,
   SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
 import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'
 import {
@@ -277,7 +277,7 @@ export default forwardRef((
     recordLabel: '加工明细',
   })
   return (
-    <section aria-label="委外加工明细汇总">
+    <section aria-label="委外加工明细汇总" data-page-table-region>
       <BusinessOperationPanel
         compact
         clearFiltersDisabled={

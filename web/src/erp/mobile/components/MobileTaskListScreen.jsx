@@ -1,12 +1,11 @@
 import '../mobileMine.css'
 import React, { useEffect, useId, useRef, useState } from 'react'
-import { Button, Empty, Select } from 'antd'
+import { Button, Empty, Tag } from 'antd'
 import {
   BarChartOutlined,
   CalendarOutlined,
   UnorderedListOutlined,
   BellOutlined,
-  FileTextOutlined,
   KeyOutlined,
   InboxOutlined,
   LogoutOutlined,
@@ -17,9 +16,11 @@ import {
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS, taskListFilterRequest } from '../../utils/workflowTaskListFilters.mjs'
-import { formatWorkflowTaskListSource, getWorkflowTaskSourceTypeLabel } from '../../utils/dashboardTaskDisplay.mjs'
+import { getWorkflowTaskSourceTypeLabel } from '../../utils/dashboardTaskDisplay.mjs'
+import { getWorkflowTaskAssigneeLabel } from '../../utils/workflowTaskEventPresentation.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -55,7 +56,6 @@ import {
   MOBILE_MESSAGE_TAB_KEYS,
   MOBILE_TASK_FILTER_KEYS,
   getMobileRoleLabel,
-  getTaskQueueTone,
   getTaskSeverityView,
   resolveTaskBusinessChip,
   resolveTaskListMeta,
@@ -75,16 +75,11 @@ const MOBILE_MAIN_TAB_ITEMS = [
   { key: MOBILE_MAIN_TAB_KEYS.MINE, label: '我的', Icon: UserOutlined },
 ]
 
-function renderTaskSourceSummary(task) {
-  const assignee = task.discovery?.assignee_name || '岗位待领取'
+function renderTaskAssignee(task) {
+  const assignee = getWorkflowTaskAssigneeLabel(task)
   return (
-    <span className="mobile-task-source-summary__heading">
-      <span className="mobile-task-source-summary__source">
-        <WorkflowTaskSource task={task} label={formatWorkflowTaskListSource(task)} copyable={false} />
-      </span>
-      <span className="mobile-task-source-summary__assignee" aria-label={`办理人：${assignee}`}>
-        {assignee}{task.owner_role_key ? `（${getMobileRoleLabel(task.owner_role_key)}）` : ''}
-      </span>
+    <span className="mobile-task-source-summary__assignee" aria-label={`办理人：${assignee}`}>
+      {task.owner_role_key ? <><span>{getMobileRoleLabel(task.owner_role_key)}</span>{' · '}</> : null}<span className="mobile-task-assignee-name">{assignee}</span>
     </span>
   )
 }
@@ -194,9 +189,11 @@ export default function MobileTaskListScreen({
   const layoutToggle = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO ? (
     <Button
       className="mobile-task-layout-toggle"
-      icon={calendarState.layout === 'calendar' ? <UnorderedListOutlined /> : <CalendarOutlined />}
+      type={activeCalendar ? 'primary' : 'default'}
+      icon={activeCalendar ? <CalendarOutlined /> : <UnorderedListOutlined />}
+      aria-pressed={Boolean(activeCalendar)}
       aria-label={calendarState.layout === 'calendar' ? '切换到列表' : '切换到日历'}
-      title={calendarState.layout === 'calendar' ? '切换到列表' : '切换到日历'}
+      title={activeCalendar ? '当前为日历，点击切换到列表' : '当前为列表，点击切换到日历'}
       onClick={() => calendarState.change({ layout: calendarState.layout === 'calendar' ? 'list' : 'calendar' })}
     />
   ) : null
@@ -368,79 +365,55 @@ export default function MobileTaskListScreen({
     }
   }
 
-  const renderTaskRow = (task) => {
+  const renderTaskCard = (task, { history = false, messageTone = '' } = {}) => {
     const severity = getTaskSeverityView(task)
     const identity = getWorkflowTaskIdentity(task)
-    const listMeta =
-      !task.display_context && !identity.items.length
-        ? resolveTaskListMeta(task)
-        : ''
+    const listMeta = !task.display_context && !identity.items.length ? resolveTaskListMeta(task) : ''
     const isSelected = String(selectedTask?.id) === String(task.id)
-    const businessLabel = resolveTaskBusinessChip(task)
+    const businessLabel = history ? '' : resolveTaskBusinessChip(task)
+    const rejected = task.task_status_key === WorkflowTaskStatus.REJECTED
+    const statusLabel = history || task.task_status_key === WorkflowTaskStatus.BLOCKED
+      ? resolveMobileTaskStatusLabel(task)
+      : severity.label === '普通' ? '待处理' : severity.label
+    const tagColor = history ? rejected ? 'error' : 'success' : severity.tagColor
     return (
       <WorkflowTaskCard
         key={task.id}
-        label={`查看${getWorkflowTaskDisplayName(task)}详情`}
+        compact
+        label={`查看${getWorkflowTaskDisplayName(task)}${history ? '处理结果' : '详情'}`}
         data-mobile-task-id={task.id}
         data-task-code={task.task_code || undefined}
-        className={`erp-mobile-list-item mobile-task-list-row w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
-          isSelected ? 'ring-2 ring-emerald-500/40' : ''
-        }`}
+        className={`erp-mobile-list-item mobile-task-list-row${messageTone ? ` mobile-role-message-card mobile-role-message-card--${messageTone}` : ''}${isSelected ? ' mobile-task-list-row--selected' : ''}`}
         onOpen={() => {
           setSelectedTaskID(task.id)
           setDetailAction(null)
         }}
       >
-        <div className="mobile-task-list-row__head">
-          <span className="mobile-task-list-row__identity">
-            <WorkflowTaskIdentity
-              task={task}
-              keyword={taskKeyword}
-              compact
-              copyable={false}
-              showTaskName
-            />
-          </span>
-          <span
-            className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-sm font-semibold ${severity.badgeClass}`}
-          >
-            {task.task_status_key === WorkflowTaskStatus.BLOCKED
-              ? resolveMobileTaskStatusLabel(task)
-              : severity.label === '普通'
-                ? '待处理'
-                : severity.label}
-          </span>
-        </div>
-        <div className="mobile-task-list-row__body min-w-0">
-          <div className="mobile-task-list-row__source text-sm leading-5 text-slate-500">
-            <FileTextOutlined aria-hidden="true" />
-            <span className="mobile-task-list-row__source-text mobile-task-source-summary">
-              {renderTaskSourceSummary(task)}
-            </span>
+        <WorkflowTaskIdentity
+          task={task}
+          keyword={taskKeyword}
+          compact
+          layout="card"
+          copyable={false}
+          showTaskName
+          status={<Tag className="mobile-task-list-status" color={tagColor}>{statusLabel}</Tag>}
+          source={<WorkflowTaskSource task={task} copyable={false} showUnavailable={false} />}
+        />
+        {businessLabel && businessLabel !== resolveMobileTaskStatusLabel(task) ? <div className="mobile-task-list-row__business"><span>所属业务：</span><span className="mobile-task-list-business-value">{businessLabel}</span></div> : null}
+        {listMeta ? <div className="mobile-task-list-row__meta">{listMeta}</div> : null}
+        {!history && resolveTaskReason(task) ? (
+          <div className="mobile-task-list-row__reason">
+            {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
           </div>
-          {listMeta ? (
-            <div className="mt-2 flex min-w-0 items-start gap-1 text-sm leading-5 text-slate-600">
-              <span className="min-w-0 break-words">{listMeta}</span>
-            </div>
-          ) : null}
-          {resolveTaskReason(task) ? (
-            <div className="mobile-task-list-row__reason text-sm leading-5 text-red-500">
-              {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
-            </div>
-          ) : null}
-        </div>
-        <div className="mobile-task-list-row__footer min-w-0">
-          <div className="mobile-task-list-row__context text-sm leading-5 text-slate-500">
-            <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={task.task_status_key === WorkflowTaskStatus.BLOCKED || severity.label !== '超时'} />
-            {businessLabel &&
-            businessLabel !== resolveMobileTaskStatusLabel(task) ? (
-              <span>{businessLabel}</span>
-            ) : null}
-          </div>
+        ) : null}
+        <div className="erp-task-card__footer mobile-task-list-row__footer">
+          {renderTaskAssignee(task)}
+          <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={task.task_status_key === WorkflowTaskStatus.BLOCKED || severity.label !== '超时'} />
         </div>
       </WorkflowTaskCard>
     )
   }
+  const renderTaskRow = (task) => renderTaskCard(task)
 
   const renderTaskFilters = () => {
     return (
@@ -577,7 +550,7 @@ export default function MobileTaskListScreen({
                 )}
               </>
             ) : (
-              <div className="grid gap-3">
+              <div className="mobile-task-card-list">
                 {getVisibleListItems(filteredTasks, activeTodoListKey).map(
                   renderTaskRow
                 )}
@@ -593,56 +566,7 @@ export default function MobileTaskListScreen({
       </>
     )
 
-  const renderDoneTaskItem = (task) => {
-    const rejected = String(task.task_status_key || '').trim() === WorkflowTaskStatus.REJECTED
-    return (
-      <WorkflowTaskCard
-        key={task.id}
-        data-mobile-task-id={task.id}
-        data-task-code={task.task_code || undefined}
-        className="erp-mobile-list-item mobile-task-list-row w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left"
-        label={`查看${getWorkflowTaskDisplayName(task)}处理结果`}
-        onOpen={() => {
-          setSelectedTaskID(task.id)
-          setDetailAction(null)
-        }}
-      >
-        <div className="mobile-task-list-row__head">
-          <span className="mobile-task-list-row__identity">
-            <WorkflowTaskIdentity
-              task={task}
-              keyword={taskKeyword}
-              compact
-              copyable={false}
-              showTaskName
-            />
-          </span>
-          <span
-            className={`shrink-0 rounded-md border px-2 py-1 text-sm font-semibold ${
-              rejected
-                ? 'border-red-200 bg-red-50 text-red-700'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            }`}
-          >
-            {resolveMobileTaskStatusLabel(task)}
-          </span>
-        </div>
-        <div className="mobile-task-list-row__body min-w-0">
-          <div className="mobile-task-list-row__source text-sm leading-5 text-slate-500">
-            <FileTextOutlined aria-hidden="true" />
-            <span className="mobile-task-list-row__source-text mobile-task-source-summary">
-              {renderTaskSourceSummary(task)}
-            </span>
-          </div>
-        </div>
-        <div className="mobile-task-list-row__footer min-w-0">
-          <div className="mobile-task-list-row__context text-sm leading-5 text-slate-500">
-            <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
-          </div>
-        </div>
-      </WorkflowTaskCard>
-    )
-  }
+  const renderDoneTaskItem = (task) => renderTaskCard(task, { history: true })
 
   const renderDonePanel = () => (
     <>
@@ -743,39 +667,7 @@ export default function MobileTaskListScreen({
       ) : (
         <>
           {getVisibleListItems(riskTasks, MOBILE_LIST_KEYS.WARNING).map(
-            (task) => (
-              <WorkflowTaskCard
-                key={task.id}
-                label={`查看${getWorkflowTaskDisplayName(task)}详情`}
-                data-mobile-task-id={task.id}
-                className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white px-3 py-3 text-left"
-                onOpen={() => setSelectedTaskID(task.id)}
-              >
-                <div className="mobile-role-message-card__tone font-semibold text-amber-800">
-                  {getTaskQueueTone(task)}
-                </div>
-                <div className="mobile-role-message-card__title mt-1">
-                  <WorkflowTaskIdentity
-                    task={task}
-                    keyword={taskKeyword}
-                    compact
-                    copyable={false}
-                    showTaskName
-                  />
-                </div>
-                <div className="mobile-role-message-card__source mobile-task-source-summary mt-2 text-amber-700">
-                  {renderTaskSourceSummary(task)}
-                </div>
-                {resolveTaskReason(task) ? (
-                  <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
-                    {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
-                  </div>
-                ) : null}
-                <div className="mt-2">
-                  <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
-                </div>
-              </WorkflowTaskCard>
-            )
+            (task) => renderTaskCard(task, { messageTone: 'warning' })
           )}
           {renderListLimitControl(
             riskTasks,
@@ -801,31 +693,7 @@ export default function MobileTaskListScreen({
       ) : (
         <>
           {getVisibleListItems(overdueTasks, MOBILE_LIST_KEYS.NOTICE).map(
-            (task) => (
-              <WorkflowTaskCard
-                key={task.id}
-                label={`查看${getWorkflowTaskDisplayName(task)}详情`}
-                data-mobile-task-id={task.id}
-                className="mobile-role-message-card mobile-role-message-card--notice w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-left"
-                onOpen={() => setSelectedTaskID(task.id)}
-              >
-                <span className="min-w-0">
-                  <WorkflowTaskIdentity
-                    task={task}
-                    keyword={taskKeyword}
-                    compact
-                    copyable={false}
-                    showTaskName
-                  />
-                  <span className="mobile-role-message-card__source mobile-task-source-summary mt-2 text-slate-500">
-                    {renderTaskSourceSummary(task)}
-                  </span>
-                </span>
-                <div className="mt-2">
-                  <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
-                </div>
-              </WorkflowTaskCard>
-            )
+            (task) => renderTaskCard(task, { messageTone: 'notice' })
           )}
           {renderListLimitControl(
             overdueTasks,
@@ -861,6 +729,9 @@ export default function MobileTaskListScreen({
             <div className="mobile-admin-review">
               <label id={`${navigationId}-review-role`}>查看岗位</label>
               <Select
+                placeholder="查看岗位"
+                aria-label="查看岗位"
+                allowClear={false}
                 aria-labelledby={`${navigationId}-review-role`}
                 value={activeRoleKey}
                 onChange={handleSwitchMobileRole}

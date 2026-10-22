@@ -11,11 +11,11 @@ test('分类主文字简明，完整路径按需查看，关闭恢复焦点且�
   document.body.appendChild(host)
   const root = createRoot(host)
   t.after(async () => { await act(async () => root.unmount()); host.remove(); dom.restore() })
-  const path = '协同跟进 / 模拟任务 / 模拟验收任务'
-  const task = { id: 1, source_type: 'simulated-manual-acceptance-task-batch', discovery: { path } }
+  const path = '协同跟进 / 业务跟进 / 资料复核'
+  const task = { id: 1, discovery: { path } }
   await act(async () => root.render(createElement(Classification, { task })))
   assert.equal(host.querySelector('dt').textContent, '任务分类')
-  assert.equal(host.querySelector('dd > span').textContent, '模拟任务')
+  assert.equal(host.querySelector('dd > span').textContent, '资料复核')
   assert.equal(host.textContent.includes(path), false)
   const trigger = host.querySelector('button')
   await act(async () => { trigger.focus(); trigger.click() })

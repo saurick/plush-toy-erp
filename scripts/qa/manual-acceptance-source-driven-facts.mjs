@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { assertSeedBusinessValues } from "./seed-business-values.mjs";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -428,6 +429,9 @@ const RAW_RPC_ENDPOINTS = new Set([
 ]);
 
 export function manualAcceptanceRPCParams(domain, method, params = {}) {
+  if (domain !== "auth" && !/^(?:get_|list_|check_|explain_)/u.test(method)) {
+    assertSeedBusinessValues(params, `${domain}.${method}`);
+  }
   const key = `${domain}.${method}`;
   const formalParams = FORMAL_RPC_PARAM_ALLOWLIST[key];
   if (

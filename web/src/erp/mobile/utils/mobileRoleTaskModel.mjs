@@ -180,6 +180,7 @@ export function getTaskSeverityView(task) {
   if (isTaskOverdue(task)) {
     return {
       label: '超时',
+      tagColor: 'error',
       badgeClass: 'border-red-300 bg-red-50 text-red-600',
       rowClass: 'bg-red-50/35',
       timeClass: 'text-red-500',
@@ -188,6 +189,7 @@ export function getTaskSeverityView(task) {
   if (task.alert_level === 'critical') {
     return {
       label: '严重',
+      tagColor: 'error',
       badgeClass: 'border-red-300 bg-red-50 text-red-600',
       rowClass: 'bg-red-50/35',
       timeClass: 'text-red-500',
@@ -196,6 +198,7 @@ export function getTaskSeverityView(task) {
   if (isTaskAlerted(task)) {
     return {
       label: '预警',
+      tagColor: 'warning',
       badgeClass: 'border-amber-300 bg-amber-50 text-amber-600',
       rowClass: 'bg-emerald-50/25',
       timeClass: 'text-orange-500',

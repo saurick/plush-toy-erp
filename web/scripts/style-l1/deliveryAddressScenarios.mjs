@@ -1,3 +1,4 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import assert from 'node:assert/strict'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
@@ -226,12 +227,11 @@ export function createDeliveryAddressScenarios({
       await frame.getByRole('button', { name: '销售管理', exact: true }).click()
       await frame.getByRole('button', { name: '新建订单', exact: true }).click()
       const country = frame.locator('[data-delivery-country]')
-      assert.equal(await country.inputValue(), '中国')
-      await frame
-        .locator('[data-delivery-region]')
-        .selectOption('上海市浦东新区')
+      assert.equal(await readSelectValue(country), '中国')
+      await chooseSelectOption(frame
+        .locator('[data-delivery-region]'), '上海市浦东新区')
       await frame.locator('[data-form-field="address"]').fill('样例街 8 号')
-      await country.selectOption('美国')
+      await chooseSelectOption(country, '美国')
       assert.equal(await frame.locator('[data-delivery-region]').count(), 0)
       assert.equal(
         await frame.locator('[data-form-field="address"]').inputValue(),

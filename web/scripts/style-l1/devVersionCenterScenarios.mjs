@@ -460,16 +460,8 @@ async function waitForView(page, view) {
   await page.waitForURL((url) => url.searchParams.get('view') === view, {
     timeout: 10_000,
   })
-  await page
-    .getByRole('tab', {
-      name:
-        view === 'versions'
-          ? '版本与部署'
-          : view === 'pipeline'
-            ? '流水线耗时'
-            : '操作记录',
-    })
-    .waitFor({ state: 'visible', timeout: 10_000 })
+  const label = { versions: '版本与部署', overview: '发布检查', pipeline: '流水线耗时', history: '操作记录' }[view]
+  await page.locator('[role="tab"][aria-selected="true"]').filter({ hasText: label }).waitFor({ state: 'visible', timeout: 10_000 })
 }
 
 async function assertManualGuideViewport(page, assert) {
@@ -576,6 +568,16 @@ export function createDevVersionCenterScenarios({
           '版本清单应紧邻任务栏并在首屏出现'
         )
         assert.equal(await page.getByRole('table', { name: '发布状态摘要' }).isVisible(), false)
+        assert.equal(await page.getByRole('button', { name: '生成发布制品', exact: true }).count(), 1)
+        const versionTable = page.locator('.erp-dev-version-tab--versions .ant-table')
+        assert.equal(await versionTable.getByRole('columnheader').count(), 4)
+        assert.equal(await versionTable.getByRole('button', { name: '检查回滚', exact: true }).count(), 0)
+        const artifactDetails = page.locator('.erp-dev-version-tab--versions .erp-dev-delivery-inline-details').first()
+        assert.equal(await artifactDetails.evaluate((element) => element.open), false)
+        await artifactDetails.getByText('制品信息', { exact: true }).click()
+        await artifactDetails.getByText(/BuildKit/u).waitFor({ state: 'visible' })
+        await artifactDetails.locator('time').waitFor({ state: 'visible' })
+        await artifactDetails.getByText('制品信息', { exact: true }).click()
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0
@@ -603,6 +605,7 @@ export function createDevVersionCenterScenarios({
 
         await page.getByRole('tab', { name: '操作记录' }).click()
         await waitForView(page, 'history')
+        assert.equal(await page.getByRole('button', { name: '生成发布制品', exact: true }).count(), 0)
         await page
           .locator('.erp-dev-version-tab--history')
           .waitFor({ state: 'visible' })
@@ -632,6 +635,12 @@ export function createDevVersionCenterScenarios({
           .locator('.erp-dev-version-tab--versions')
           .getByText('2026.08.08-8', { exact: true })
           .waitFor()
+        const runningRow = versionTable.getByRole('row').filter({ hasText: '2026.08.08-7' })
+        assert.equal(await runningRow.getByText('当前运行', { exact: true }).count(), 1)
+        assert.equal(await runningRow.getByRole('button').count(), 0)
+        const rollbackRow = versionTable.getByRole('row').filter({ hasText: '2026.08.08-6' })
+        assert.equal(await rollbackRow.getByRole('button', { name: '检查回滚', exact: true }).count(), 1)
+        assert.equal(await rollbackRow.getByRole('button', { name: '准备部署', exact: true }).count(), 0)
         assert.equal(summaryRequests, initialSummaryRequests)
         await assertNoHorizontalOverflow(
           page,

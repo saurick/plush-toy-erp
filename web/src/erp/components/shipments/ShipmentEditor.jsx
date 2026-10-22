@@ -8,10 +8,10 @@ import {
   Form,
   Input,
   InputNumber,
-  Select,
   Tag,
   Typography,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -23,7 +23,7 @@ import ProductIdentity, {
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
 
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'

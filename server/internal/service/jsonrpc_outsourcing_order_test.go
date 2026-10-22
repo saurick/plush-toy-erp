@@ -450,7 +450,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesMaterialSubjectAndRequiresMat
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if blocked == nil || blocked.Code != errcode.InvalidParam.Code || len(repo.orders) != 0 {
+	if blocked == nil || blocked.Code != errcode.BusinessRuleViolation.Code || len(repo.orders) != 0 {
 		t.Fatalf("expected material subject blocked when materials module is read_only, res=%#v orders=%#v", blocked, repo.orders)
 	}
 
@@ -602,7 +602,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+	if saveRes == nil || saveRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only outsourcing_orders save rejected, got %#v", saveRes)
 	}
 	if len(repo.orders) != 0 || len(repo.items) != 0 {
@@ -653,7 +653,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if confirmRes == nil || confirmRes.Code != errcode.InvalidParam.Code {
+	if confirmRes == nil || confirmRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled outsourcing_orders confirm rejected, got %#v", confirmRes)
 	}
 	if repo.lifecycleCalls != beforeLifecycleCalls || repo.orders[orderID].LifecycleStatus != biz.OutsourcingOrderStatusSubmitted {

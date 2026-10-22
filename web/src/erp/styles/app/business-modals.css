@@ -1241,7 +1241,7 @@
 
 .erp-permission-page {
   display: grid;
-  gap: 9px;
+  gap: var(--erp-page-gap);
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
 }

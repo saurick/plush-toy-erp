@@ -110,7 +110,7 @@ func TestEngineeringMaterialWorkflowRejectResubmitKeepsHistory(t *testing.T) {
 			if err != nil || previous.Status != biz.MaterialRequestRejected || *previous.ReviewNote != reason {
 				t.Fatalf("lost history: %+v %v", previous, err)
 			}
-			if _, err := f.uc.GetEngineeringMaterialRequestByID(ctx, f.order.ID+1, request.ID); !errors.Is(err, biz.ErrMaterialRequestConflict) {
+			if _, err := f.uc.GetEngineeringMaterialRequestByID(ctx, f.order.ID+1, request.ID); !errors.Is(err, biz.ErrMaterialRequestNotFound) {
 				t.Fatalf("source/order mismatch: %v", err)
 			}
 		})

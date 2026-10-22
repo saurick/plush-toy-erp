@@ -1,0 +1,24 @@
+.erp-dev-testing-strategy-guide > .ant-typography {
+  margin: 10px 14px;
+}
+
+.erp-dev-testing-strategy-guide--topic > .ant-typography {
+  margin: 0 0 12px;
+}
+
+.erp-dev-testing-strategy-guide--topic > .ant-typography:last-child {
+  margin: 12px 0 0;
+}
+
+.erp-dev-testing-strategy-guide .erp-dev-tool-table {
+  table-layout: fixed;
+}
+
+.erp-dev-testing-strategy-guide .erp-dev-tool-table th,
+.erp-dev-testing-strategy-guide .erp-dev-tool-table td {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-strategy-guide .erp-dev-tool-table th:first-child {
+  width: 16%;
+}

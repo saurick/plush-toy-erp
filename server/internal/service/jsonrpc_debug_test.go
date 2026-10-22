@@ -14,6 +14,25 @@ import (
 
 type stubDebugJSONRPCRepo struct{}
 
+func TestMapDebugErrorCategories(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
+	for _, tc := range []struct {
+		name string
+		err  error
+		code int32
+	}{
+		{"missing scenario", biz.ErrDebugScenarioNotFound, errcode.ResourceNotFound.Code},
+		{"duplicate simulation", biz.ErrWorkflowTaskExists, errcode.ResourceConflict.Code},
+		{"missing scope", biz.ErrDebugRunIDRequired, errcode.InvalidParam.Code},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if result := d.mapDebugError(t.Context(), tc.err); result.Code != tc.code {
+				t.Fatalf("result=%#v, want code=%d", result, tc.code)
+			}
+		})
+	}
+}
+
 func (s stubDebugJSONRPCRepo) SeedBusinessChainDebugData(_ context.Context, plan biz.DebugSeedPlan, _ int) (*biz.DebugBusinessChainSeedResult, error) {
 	return &biz.DebugBusinessChainSeedResult{
 		ScenarioKey: plan.ScenarioKey,

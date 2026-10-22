@@ -138,7 +138,7 @@ export function createPermissionRelationshipScenarios({
           0
         )
         const values = await page
-          .locator('[aria-label="权限关系汇总"] .ant-statistic-content')
+          .locator('[aria-label="权限关系汇总"] strong')
           .allTextContents()
         assert.equal(values[2].trim(), '—')
         await page.getByRole('tab', { name: '实际菜单', exact: true }).click()
@@ -172,7 +172,7 @@ export function createPermissionRelationshipScenarios({
         assert.equal(
           (
             await page
-              .locator('[aria-label="权限关系汇总"] .ant-statistic-content')
+              .locator('[aria-label="权限关系汇总"] strong')
               .allTextContents()
           )[2].trim(),
           '0'

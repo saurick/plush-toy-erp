@@ -120770,9 +120770,22 @@ func (m *WorkflowTaskMutation) OldSourceType(ctx context.Context) (v string, err
 	return oldValue.SourceType, nil
 }
 
+// ClearSourceType clears the value of the "source_type" field.
+func (m *WorkflowTaskMutation) ClearSourceType() {
+	m.source_type = nil
+	m.clearedFields[workflowtask.FieldSourceType] = struct{}{}
+}
+
+// SourceTypeCleared returns if the "source_type" field was cleared in this mutation.
+func (m *WorkflowTaskMutation) SourceTypeCleared() bool {
+	_, ok := m.clearedFields[workflowtask.FieldSourceType]
+	return ok
+}
+
 // ResetSourceType resets all changes to the "source_type" field.
 func (m *WorkflowTaskMutation) ResetSourceType() {
 	m.source_type = nil
+	delete(m.clearedFields, workflowtask.FieldSourceType)
 }
 
 // SetSourceID sets the "source_id" field.
@@ -120825,10 +120838,24 @@ func (m *WorkflowTaskMutation) AddedSourceID() (r int, exists bool) {
 	return *v, true
 }
 
+// ClearSourceID clears the value of the "source_id" field.
+func (m *WorkflowTaskMutation) ClearSourceID() {
+	m.source_id = nil
+	m.addsource_id = nil
+	m.clearedFields[workflowtask.FieldSourceID] = struct{}{}
+}
+
+// SourceIDCleared returns if the "source_id" field was cleared in this mutation.
+func (m *WorkflowTaskMutation) SourceIDCleared() bool {
+	_, ok := m.clearedFields[workflowtask.FieldSourceID]
+	return ok
+}
+
 // ResetSourceID resets all changes to the "source_id" field.
 func (m *WorkflowTaskMutation) ResetSourceID() {
 	m.source_id = nil
 	m.addsource_id = nil
+	delete(m.clearedFields, workflowtask.FieldSourceID)
 }
 
 // SetSourceNo sets the "source_no" field.
@@ -123066,6 +123093,12 @@ func (m *WorkflowTaskMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *WorkflowTaskMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(workflowtask.FieldSourceType) {
+		fields = append(fields, workflowtask.FieldSourceType)
+	}
+	if m.FieldCleared(workflowtask.FieldSourceID) {
+		fields = append(fields, workflowtask.FieldSourceID)
+	}
 	if m.FieldCleared(workflowtask.FieldSourceNo) {
 		fields = append(fields, workflowtask.FieldSourceNo)
 	}
@@ -123143,6 +123176,12 @@ func (m *WorkflowTaskMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *WorkflowTaskMutation) ClearField(name string) error {
 	switch name {
+	case workflowtask.FieldSourceType:
+		m.ClearSourceType()
+		return nil
+	case workflowtask.FieldSourceID:
+		m.ClearSourceID()
+		return nil
 	case workflowtask.FieldSourceNo:
 		m.ClearSourceNo()
 		return nil

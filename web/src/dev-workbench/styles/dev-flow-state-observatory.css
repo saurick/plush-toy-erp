@@ -2525,82 +2525,84 @@
     size: A4 landscape;
     margin: 10mm;
   }
+}
 
-  body:has([data-flow-print-current]) {
-    background: white;
-  }
+/* Prepare the same geometry before window.print so measured diagrams stay aligned. */
+body:has([data-flow-print-current]) {
+  background: white;
+}
 
-  body:has([data-flow-print-current]) > :not(#root) {
-    display: none;
-  }
+body:has([data-flow-print-current]) > :not(#root) {
+  display: none;
+}
 
-  [data-flow-print-current].erp-dev-workspace-page {
-    page: flow-observation;
-    display: block;
-    width: 100%;
-    padding: 0;
-    margin: 0;
-    background: white;
-  }
+[data-flow-print-current].erp-dev-workspace-page {
+  page: flow-observation;
+  display: block;
+  /* Match A4 landscape minus page margins before measuring diagram connectors. */
+  width: 277mm;
+  padding: 0;
+  margin: 0;
+  background: white;
+}
 
-  [data-flow-print-current] :is(nav, button, .ant-select, .erp-dev-flow-header a, .erp-dev-flow-definition-selector, .erp-dev-flow-header-actions, .erp-dev-flow-nav, .erp-dev-flow-task-finder, .erp-dev-flow-chain-heading__actions, .erp-dev-flow-guidance, .erp-dev-flow-developer-details, .erp-dev-flow-evidence, .erp-dev-flow-node-technical, .erp-dev-flow-overview-relations) {
-    display: none;
-  }
+[data-flow-print-current] :is(nav, button, .ant-select, .erp-dev-flow-header a, .erp-dev-flow-definition-selector, .erp-dev-flow-header-actions, .erp-dev-flow-nav, .erp-dev-flow-task-finder, .erp-dev-flow-chain-heading__actions, .erp-dev-flow-guidance, .erp-dev-flow-developer-details, .erp-dev-flow-evidence, .erp-dev-flow-node-technical, .erp-dev-flow-overview-relations) {
+  display: none;
+}
 
-  [data-flow-print-current] .erp-dev-flow-instance-stage button,
-  [data-flow-print-current] .erp-dev-chain-topics__group button {
-    display: grid;
-  }
+[data-flow-print-current] .erp-dev-flow-instance-stage button,
+[data-flow-print-current] .erp-dev-chain-topics__group button {
+  display: grid;
+}
 
-  [data-flow-print-current] :is(.erp-dev-flow-main, .erp-dev-flow-chain-workspace, .erp-dev-flow-chain-map, .erp-dev-flow-view-stack) {
-    display: block;
-    max-width: none;
-    min-height: 0;
-    height: auto;
-    overflow: visible;
-    box-shadow: none;
-    padding: 2mm;
-  }
+[data-flow-print-current] :is(.erp-dev-flow-main, .erp-dev-flow-chain-workspace, .erp-dev-flow-chain-map, .erp-dev-flow-view-stack) {
+  display: block;
+  max-width: none;
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+  box-shadow: none;
+  padding: 2mm;
+}
 
-  [data-flow-print-current] :is(.erp-dev-flow-overview-graph, .erp-dev-flow-chain-graph, .erp-dev-flow-process-graph, .erp-dev-flow-state-graph) {
-    display: block;
-    padding: 0;
-    margin: 2mm 0;
-    overflow: visible;
-    break-inside: avoid;
-  }
+[data-flow-print-current] :is(.erp-dev-flow-overview-graph, .erp-dev-flow-chain-graph, .erp-dev-flow-process-graph, .erp-dev-flow-state-graph) {
+  display: block;
+  padding: 0;
+  margin: 2mm 0;
+  overflow: visible;
+  break-inside: avoid;
+}
 
-  [data-flow-print-current] .erp-markdown-mermaid {
-    padding: 0;
-    margin: 0;
-    border: 0;
-  }
+[data-flow-print-current] .erp-markdown-mermaid {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
 
-  [data-flow-print-current] .erp-markdown-mermaid__viewport {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
+[data-flow-print-current] .erp-markdown-mermaid__viewport {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
 
-  [data-flow-print-current] .erp-markdown-mermaid__canvas {
-    width: 100%;
-  }
+[data-flow-print-current] .erp-markdown-mermaid__canvas {
+  width: 100%;
+}
 
-  [data-flow-print-current] .erp-markdown-mermaid__canvas > svg {
-    max-height: 125mm;
-  }
+[data-flow-print-current] .erp-markdown-mermaid__canvas > svg {
+  max-height: 125mm;
+}
 
-  [data-flow-print-current] .erp-dev-flow-node-detail {
-    position: static;
-    max-height: none;
-    overflow: visible;
-  }
+[data-flow-print-current] .erp-dev-flow-node-detail {
+  position: static;
+  max-height: none;
+  overflow: visible;
+}
 
-  [data-flow-print-current] .erp-dev-flow-instance-stages {
-    display: block;
-  }
+[data-flow-print-current] .erp-dev-flow-instance-stages {
+  display: block;
+}
 
-  [data-flow-print-current] :is(.erp-dev-flow-instance-stage li, .erp-dev-flow-node-answers > section) {
-    break-inside: avoid;
-  }
+[data-flow-print-current] :is(.erp-dev-flow-instance-stage li, .erp-dev-flow-node-answers > section) {
+  break-inside: avoid;
 }

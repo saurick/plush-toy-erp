@@ -636,6 +636,9 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		{"biz/admin_password.go", "AdminPasswordPolicy", map[string]string{
 			"AdminPasswordMinLength": "minCharacters", "AdminPasswordMaxLength": "maxCharacters", "AdminPasswordMaxBytes": "maxBytes",
 		}},
+		{"biz/sales_order_export.go", "SalesOrderExportPolicy", map[string]string{
+			"SalesOrderExportMaxRows": "maxRows", "SalesOrderExportMaxBytes": "maxBytes",
+		}},
 		{"biz/help_content.go", "HelpContentPolicy", map[string]string{
 			"HelpMarkdownMaxCharacters": "markdownMaxCharacters", "HelpSummaryMaxCharacters": "summaryMaxCharacters", "HelpFeedbackMinCharacters": "feedbackMinCharacters", "HelpFeedbackMaxCharacters": "feedbackMaxCharacters", "HelpQuoteMaxCharacters": "quoteMaxCharacters", "HelpResponseMaxCharacters": "responseMaxCharacters",
 		}},

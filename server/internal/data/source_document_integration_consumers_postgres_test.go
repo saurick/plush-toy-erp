@@ -385,7 +385,7 @@ func TestSourceDocumentPostgresIntegrationSupplierDelivery(t *testing.T) {
 	}
 	// Supplier-provided quantities are declarations. They cannot bypass ERP count,
 	// quality acceptance or create an inventory ledger posting.
-	requireIntegrationCode(t, caller, "purchase", "post_purchase_receipt", map[string]any{"id": receipt["id"]}, errcode.InvalidParam.Code)
+	requireIntegrationCode(t, caller, "purchase", "post_purchase_receipt", map[string]any{"id": receipt["id"]}, errcode.BusinessRuleViolation.Code)
 	if count := f.client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.PurchaseReceiptSourceType), inventorytxn.SourceID(int(receipt["id"].(float64)))).CountX(t.Context()); count != 0 {
 		t.Fatal("unaccepted delivery wrote inventory")
 	}

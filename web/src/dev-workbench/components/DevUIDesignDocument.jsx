@@ -66,7 +66,8 @@ export default function DevUIDesignDocument({ source, specification, view }) {
   const read =
     hashChapter || params.get('read') === 'reference' ? 'reference' : 'guide'
   const topic =
-    topics.find((item) => item.key === params.get('topic')) || topics[0]
+    topics.find((item) => item.key === params.get('topic')) ||
+    topics.find((item) => item.key === (params.get('page') === 'task-handling' ? 'task-handling' : 'task-cards')) || topics[0]
   const chapter =
     hashChapter ||
     findUIDesignChapter(chapters, params.get('chapter')) ||
@@ -104,11 +105,12 @@ export default function DevUIDesignDocument({ source, specification, view }) {
       [read === 'guide' ? 'topic' : 'chapter']: entry.key || entry.id,
       read,
       q: '',
+      point: '',
     })
   const reference = (id) =>
     updateLocation({ read: 'reference', chapter: id, q: '' })
   const previewParams = new URLSearchParams(location.search)
-  ;['view', 'read', 'chapter', 'topic', 'q'].forEach((key) =>
+  ;['view', 'read', 'chapter', 'topic', 'q', 'point'].forEach((key) =>
     previewParams.delete(key)
   )
   const previewHref = `${location.pathname}${previewParams.size ? `?${previewParams}` : ''}`
@@ -244,8 +246,7 @@ export default function DevUIDesignDocument({ source, specification, view }) {
         <div className="erp-design-reader-pane">
           <div className="erp-design-reader-location">
             <span>
-              {read === 'guide' ? topic.group : '规范原文'} /{' '}
-              <strong>{read === 'guide' ? topic.title : chapter.title}</strong>
+              {read === 'guide' && topic.group === '工作中心' ? topic.group : <>{read === 'guide' ? topic.group : '规范原文'} /{' '}<strong>{read === 'guide' ? topic.title : chapter.title}</strong></>}
             </span>
             <div>
               <Button

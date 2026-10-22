@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"html"
 	"io"
 	"os"
 	"path/filepath"
@@ -891,23 +890,27 @@ func renderReadme(db databaseSchema, value catalog, index catalogIndex) ([]byte,
 	output.WriteString("\n")
 
 	output.WriteString("## 全表索引\n\n")
-	output.WriteString("| 表 | 中文名称 | 分域 | 分类 | 用途 |\n| --- | --- | --- | --- | --- |\n")
-	for _, table := range db.Tables {
-		tableValue := index.tables[table.Name]
-		domainValue := index.domains[tableValue.Domain]
-		fmt.Fprintf(
-			&output,
-			"| [`%s`](%s#%s) | %s | %s | %s | %s |\n",
-			table.Name,
-			domainValue.File,
-			tableAnchor(table.Name),
-			escapeTableCell(tableValue.Title),
-			escapeTableCell(domainValue.Title),
-			escapeTableCell(classificationLabels[tableValue.Kind]),
-			escapeTableCell(tableValue.Purpose),
-		)
+	for _, domainValue := range domains {
+		fmt.Fprintf(&output, "### %s\n\n", domainValue.Title)
+		output.WriteString("| 表 | 中文名称 | 分类 | 用途 |\n| --- | --- | --- | --- |\n")
+		for _, table := range db.Tables {
+			tableValue := index.tables[table.Name]
+			if tableValue.Domain != domainValue.Key {
+				continue
+			}
+			fmt.Fprintf(
+				&output,
+				"| [`%s`](%s#%s) | %s | %s | %s |\n",
+				table.Name,
+				domainValue.File,
+				tableAnchor(table.Name),
+				escapeTableCell(tableValue.Title),
+				escapeTableCell(classificationLabels[tableValue.Kind]),
+				escapeTableCell(tableValue.Purpose),
+			)
+		}
+		output.WriteString("\n")
 	}
-	output.WriteString("\n")
 
 	output.WriteString("## 非应用表\n\n")
 	if len(value.Exclusions) == 0 {
@@ -1015,9 +1018,18 @@ func renderTable(
 	}
 
 	output.WriteString("### 字段\n\n")
-	output.WriteString("| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |\n")
-	output.WriteString("| --- | --- | --- | --- | --- | --- | --- |\n")
-	for _, column := range table.Columns {
+	output.WriteString("类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。\n\n")
+	for columnIndex, column := range table.Columns {
+		if columnIndex%16 == 0 {
+			if columnIndex > 0 {
+				output.WriteString("\n")
+			}
+			if len(table.Columns) > 16 {
+				fmt.Fprintf(output, "#### 字段 %d–%d\n\n", columnIndex+1, min(columnIndex+16, len(table.Columns)))
+			}
+			output.WriteString("| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |\n")
+			output.WriteString("| --- | --- | --- | --- | --- | --- |\n")
+		}
 		defaultValue := "—"
 		if column.HasDefault {
 			defaultValue = inlineCode(column.Default)
@@ -1036,15 +1048,22 @@ func renderTable(
 		if note == "" {
 			note = inferredColumnNote(column.Name, foreignTargets[column.Name])
 		}
+		properties := columnTraits(column, primary, sensitive)
+		if properties != "—" {
+			if defaultValue == "—" {
+				defaultValue = properties
+			} else {
+				defaultValue += "；" + properties
+			}
+		}
 		fmt.Fprintf(
 			output,
-			"| %s | %s | %s | %s | %s | %s | %s |\n",
+			"| %s | %s | %s | %s | %s | %s |\n",
 			inlineCode(column.Name),
 			inlineCode(column.PostgresType),
 			inlineCode(column.LogicalType),
 			nullable,
 			defaultValue,
-			columnTraits(column, primary, sensitive),
 			escapeTableCell(note),
 		)
 	}
@@ -1162,7 +1181,7 @@ func inferredColumnNote(name, foreignTarget string) string {
 	case strings.HasSuffix(name, "_hash"):
 		return "用于完整性或幂等校验的摘要。"
 	default:
-		return "业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。"
+		return "—"
 	}
 }
 
@@ -1217,7 +1236,21 @@ func tableAnchor(name string) string {
 }
 
 func inlineCode(value string) string {
-	return "<code>" + html.EscapeString(value) + "</code>"
+	parts := strings.Split(value, "|")
+	for index, part := range parts {
+		if part == "" {
+			continue
+		}
+		fence := "`"
+		for strings.Contains(part, fence) {
+			fence += "`"
+		}
+		if strings.HasPrefix(part, "`") || strings.HasSuffix(part, "`") {
+			part = " " + part + " "
+		}
+		parts[index] = fence + part + fence
+	}
+	return strings.Join(parts, "&#124;")
 }
 
 func inlineCodeList(values []string) string {

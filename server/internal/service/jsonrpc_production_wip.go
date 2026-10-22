@@ -390,31 +390,33 @@ func (d *jsonrpcDispatcher) mapProductionWIPError(ctx context.Context, err error
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrProductionOrderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "生产订单不存在"}
 	case errors.Is(err, biz.ErrProductionWIPInvalidRoute), errors.Is(err, biz.ErrProductionOrderReferenceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产路线或工序档案不完整，请核对四个标准路线位置是否已分别绑定有效工序"}
 	case errors.Is(err, biz.ErrProductionWIPQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "办理数量超过当前在制批次可用数量"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "办理数量超过当前在制批次可用数量"}
 	case errors.Is(err, biz.ErrProductionWIPReturnQuantityMismatch):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "实点数量与本批次不一致，请先与业务及加工厂核对，暂不能整批送检"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "实点数量与本批次不一致，请先与业务及加工厂核对，暂不能整批送检"}
 	case errors.Is(err, biz.ErrProductionWIPExecutionModeNotAllowed):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前工序不允许所选的本厂或外发方式"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前工序不允许所选的本厂或外发方式"}
 	case errors.Is(err, biz.ErrProductionWIPOutsourcingAllocationInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "外发合同明细与当前工序或材料需求不匹配，请重新核对"}
 	case errors.Is(err, biz.ErrProductionWIPOutsourcingMaterialIssuePending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "布料加工材料尚未完成外发发料，不能开工"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "布料加工材料尚未完成外发发料，不能开工"}
 	case errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "外发合同已关联在制批次，当前不能取消或改写"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "外发合同已关联在制批次，当前不能取消或改写"}
 	case errors.Is(err, biz.ErrProductionWIPQualityGateIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前质量关口尚未全部通过，不能继续转序"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前质量关口尚未全部通过，不能继续转序"}
 	case errors.Is(err, biz.ErrProductionWIPPackagingConfirmationPending):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "包材版面和包装版本尚未完成业务确认"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "包材版面和包装版本尚未完成业务确认"}
 	case errors.Is(err, biz.ErrProductionWIPPreparedContractDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "批次已有委外草稿或合同，请先取消关联委外单，再拆分、取消批次或改为本厂加工"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "批次已有委外草稿或合同，请先取消关联委外单，再拆分、取消批次或改为本厂加工"}
 	case errors.Is(err, biz.ErrSupplierInactive), errors.Is(err, biz.ErrProcessNotOutsourcingEnabled):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请核对加工厂状态及该工序是否允许外发"}
-	case errors.Is(err, biz.ErrProductionWIPInvalidTransition), errors.Is(err, biz.ErrProductionOrderInvalidState), errors.Is(err, biz.ErrBadParam):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前在制批次状态不允许该操作，请刷新后核对"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请核对加工厂状态及该工序是否允许外发"}
+	case errors.Is(err, biz.ErrProductionWIPInvalidTransition), errors.Is(err, biz.ErrProductionOrderInvalidState):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "当前在制批次状态不允许该操作，请刷新后核对"}
+	case errors.Is(err, biz.ErrBadParam):
+		return invalidParamResult()
 	default:
 		logger.Errorf("[production_wip] operation failed classification=internal err=%v", err)
 		return productionWIPInternalResult()

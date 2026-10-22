@@ -2716,7 +2716,7 @@ test("task board binds task-code metadata to the exact current-batch total", () 
       {
         id: "boss-dashboard-tasks",
         status: "pass",
-        batchEvidence: "exact_source",
+        batchEvidence: "exact_task_codes",
         exactTaskCodePrefix: prefix,
       },
     ],
@@ -2808,7 +2808,7 @@ test("mobile current-batch proof requires an exact role source and a visible cur
       {
         id: `mobile-tasks:${roleKey}`,
         status: "pass",
-        batchEvidence: "exact_source",
+        batchEvidence: "exact_task_codes",
         exactSourceType: TASK_SOURCE_TYPE,
         exactSourceID: 202607165,
         exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey],
@@ -2921,7 +2921,7 @@ test("dashboard task evidence binds the visible page to the exact current batch"
       {
         id: "boss-dashboard-tasks",
         status: "pass",
-        batchEvidence: "exact_source",
+        batchEvidence: "exact_task_codes",
         exactSourceType: TASK_SOURCE_TYPE,
         exactSourceID: 202607165,
         exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
@@ -3002,7 +3002,7 @@ test("dashboard task evidence binds the visible page to the exact current batch"
       {
         id: "production-exception-active-tasks",
         status: "pass",
-        batchEvidence: "exact_source",
+        batchEvidence: "exact_task_codes",
         exactSourceType: TASK_SOURCE_TYPE,
         exactSourceID: 202607165,
         exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.production,

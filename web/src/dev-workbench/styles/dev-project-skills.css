@@ -53,10 +53,15 @@
 
 .erp-dev-skills__catalog,
 .erp-dev-skills__list,
-.erp-dev-skills__detail {
+.erp-dev-skills__detail,
+.erp-dev-skills__sources {
   display: grid;
   min-width: 0;
   gap: 12px;
+}
+
+.erp-dev-skills__list {
+  gap: 6px;
 }
 
 .erp-dev-skills__detail {
@@ -68,10 +73,13 @@
 }
 
 .erp-dev-skills__item {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
-  padding: 12px 14px;
+  min-height: 44px;
+  padding: 10px 14px;
   border: 1px solid var(--erp-border);
   border-radius: 8px;
   background: var(--erp-surface-bg);
@@ -107,6 +115,7 @@
 .erp-dev-skills__name,
 .erp-dev-skills__references,
 .erp-dev-skills__boundary {
+  display: block;
   overflow-wrap: anywhere;
 }
 

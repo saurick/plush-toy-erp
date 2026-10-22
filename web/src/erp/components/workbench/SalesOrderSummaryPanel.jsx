@@ -16,10 +16,10 @@ import {
 import {
   BusinessDataTable,
   BusinessOperationPanel,
-  DateRangeFilter,
   SearchInput,
   SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
 import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'

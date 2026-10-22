@@ -6,7 +6,8 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Button, Form, Input, Select, Space } from 'antd'
+import { Button, Form, Input, Space } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import { message } from '@/common/utils/antdApp'

@@ -9,7 +9,6 @@ import {
   Form,
   Input,
   Radio,
-  Select,
   Space,
   Spin,
   Steps,
@@ -18,6 +17,7 @@ import {
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { workflowTaskReturnNavigation } from '../../utils/workflowTaskNavigation.mjs'
@@ -27,6 +27,7 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import Table from '@/common/components/table/AppTable'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import ProductionOutsourcingPrepareModal from './ProductionOutsourcingPrepareModal.jsx'
 
 import { message } from '@/common/utils/antdApp'
@@ -958,6 +959,7 @@ onCancel: () => resolve(false),
                     ]}
                   >
                     <Select
+                      placeholder="请选择本次外发的材料"
                       mode="multiple"
                       optionFilterProp="label"
                       options={availableFabricRequirements.map((item) => ({
@@ -1366,18 +1368,23 @@ onCancel: () => resolve(false),
       title={
         focusedEntry ? ACTION_TITLE[activeAction] || '生产事项办理' : assignmentOnly
           ? '安排本厂或外发加工'
-          : readOnly
-            ? orderStatus === 'CLOSED'
-              ? '查看返工工序'
-              : '查看生产工序'
-            : orderStatus === 'CLOSED'
-              ? '返工工序办理'
-              : '生产工序办理'
+          : (
+            <BusinessHelpLabel
+              label={readOnly
+                ? orderStatus === 'CLOSED'
+                  ? '查看返工工序'
+                  : '查看生产工序'
+                : orderStatus === 'CLOSED'
+                  ? '返工工序办理'
+                  : '生产工序办理'}
+              description="按批次办理布料加工、缝制、手工制作和包装；成品收仓由生产登记、仓库确认，检验与包装完成后才可发货。"
+            />
+          )
       }
       description={
         focusedEntry ? '核对当前批次，完成本次办理。' : assignmentOnly
           ? '只为当前返工任务关联的在制批次选择生产方式。'
-          : '按批次办理布料加工、缝制、手工制作和包装；成品收仓由生产登记、仓库确认，检验与包装完成后才可发货。'
+          : undefined
       }
       icon={<BranchesOutlined />}
       footer={
@@ -1399,7 +1406,7 @@ onCancel: () => resolve(false),
         </div>
       ) : (
         <div className="erp-business-inline-note" role="note">
-          裁片 → 车缝 → 手工 → 成品入库 → 查货与包装。车缝、手工可本厂或委外，质量判定在“质量检验”办理。
+          裁片 → 车缝 → 手工 → 成品入库 → 查货与包装。车缝、手工可本厂或委外；成品收仓由生产登记、仓库确认，检验与包装完成后才可发货。质量判定在“质量检验”办理。
         </div>
       )}
       {orderStatus === 'CLOSED' ? (
@@ -1522,6 +1529,8 @@ onCancel: () => resolve(false),
             <Title level={5}>{assignmentOnly ? '返工批次' : '在制批次'}</Title>
             {assignmentOnly || focusedEntry ? (
               <Select
+                allowClear={false}
+                aria-label={assignmentOnly ? '返工批次' : '在制批次'}
                 value={selectedBatch?.id}
                 style={{ width: '100%' }}
                 options={displayedBatches.map((batch) => ({

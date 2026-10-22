@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Button, Select, Typography } from 'antd'
+import { Button, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import DevPageNav from '../components/DevPageNav.jsx'
@@ -15,6 +15,7 @@ import {
 } from '../config/devHub.mjs'
 import { DEV_WORKSPACE_NAV_ITEMS } from '../config/devRoutes.mjs'
 import { DEV_WORKBENCH_GUIDE } from '../config/devWorkbenchFlow.mjs'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const { Text, Title } = Typography
 const VIEW_ITEMS = [
@@ -118,7 +119,10 @@ export default function DevHubPage() {
             value={keyword}
             onChange={(event) => selectParam('q', event.target.value, true)}
           />
-          <Select
+          <FilterSelect
+            emptyValue="all"
+            label="工具分组"
+            placeholder="工具分组"
             aria-label="全部开发工具分组"
             value={group}
             options={GROUP_OPTIONS}

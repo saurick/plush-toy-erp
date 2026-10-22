@@ -1,7 +1,7 @@
 import { CloudDownloadOutlined, RollbackOutlined } from '@ant-design/icons'
 import { Button, Space, Tag, Tooltip, Typography } from 'antd'
 import { StatusTag } from './shared.jsx'
-import DevDeliveryTimestamp from '../../../components/DevDeliveryTimestamp.jsx'
+import DevTimestamp from '../../../components/DevTimestamp.jsx'
 import {
   createDeliveryIdempotencyKey,
   deliveryVersionActionKind,
@@ -33,61 +33,55 @@ export function buildVersionColumns({
       dataIndex: 'version',
       key: 'version',
       render: (value, record) => (
-        <Space direction="vertical" size={2}>
-          <Text strong>{value}</Text>
-          <Text type="secondary" code>
-            {shortGitSha(record.gitSha)}
-          </Text>
-          <DevDeliveryTimestamp
-            value={record.publishedAt}
-            action="发布于"
-            missing="发布时间未证明"
-            className="erp-dev-version-published-at"
-          />
-        </Space>
+        <div className="erp-dev-version-identity">
+          <Space wrap size={6}>
+            <Text strong>{value}</Text>
+            <Text type="secondary" code>{shortGitSha(record.gitSha)}</Text>
+          </Space>
+          <details className="erp-dev-delivery-inline-details">
+            <summary>制品信息</summary>
+            <DevTimestamp
+              value={record.publishedAt}
+              action="发布于"
+              missing="发布时间未证明"
+              className="erp-dev-version-published-at"
+            />
+            <Text>总大小 {formatDeliveryBytes(record.artifactSummary.totalBytes)}</Text>
+            <Text type="secondary">
+              Server {formatDeliveryBytes(record.artifactSummary.serverImageBytes)}
+              {' · '}Web {formatDeliveryBytes(record.artifactSummary.webImageBytes)}
+            </Text>
+            <Text type="secondary">
+              BuildKit{' '}
+              {record.buildPerformance
+                ? `${(record.buildPerformance.cacheHitRateBasisPoints / 100).toFixed(1)}% 命中`
+                : '命中率未证明'}
+            </Text>
+            <Text type="secondary">
+              {record.completeAssets
+                ? record.assets.includes('release-rehearsal.json')
+                  ? 'v2 · 7 项制品'
+                  : 'v1 · 6 项制品'
+                : '制品不完整'}
+            </Text>
+          </details>
+        </div>
       ),
     },
     {
-      title: '发布状态',
+      title: '制品状态',
       dataIndex: 'status',
       key: 'status',
-      render: (value, record) => (
-        <Space direction="vertical" size={2}>
-          <StatusTag status={value} />
-          <Text type="secondary">
-            {record.completeAssets
-              ? record.promotionEligible
-                ? 'v2 · 7 项制品 · 可部署'
-                : record.assets.includes('release-rehearsal.json')
-                  ? 'v2 · 7 项制品 · 证据未闭合'
-                  : 'v1 · 6 项制品 · 仅旧版回滚'
-              : '制品不完整'}
-          </Text>
-        </Space>
-      ),
-    },
-    {
-      align: 'left',
-      title: '制品与缓存',
-      key: 'artifacts',
-      render: (_value, record) => (
-        <Space direction="vertical" size={2}>
-          <Text strong>
-            {formatDeliveryBytes(record.artifactSummary.totalBytes)}
-          </Text>
-          <Text type="secondary">
-            Server{' '}
-            {formatDeliveryBytes(record.artifactSummary.serverImageBytes)}
-            {' · '}Web{' '}
-            {formatDeliveryBytes(record.artifactSummary.webImageBytes)}
-          </Text>
-          <Text type="secondary">
-            BuildKit{' '}
-            {record.buildPerformance
-              ? `${(record.buildPerformance.cacheHitRateBasisPoints / 100).toFixed(1)}% 命中`
-              : '命中率未证明'}
-          </Text>
-        </Space>
+      render: (value, record) => value !== 'published' ? <StatusTag status={value} /> : (
+        <Tag color={record.promotionEligible ? 'success' : 'warning'}>
+          {record.completeAssets
+            ? record.promotionEligible
+              ? '制品齐全'
+              : record.assets.includes('release-rehearsal.json')
+                ? '演练证据待补齐'
+                : '仅可回滚'
+            : '制品不完整'}
+        </Tag>
       ),
     },
     {
@@ -107,6 +101,7 @@ export function buildVersionColumns({
       align: 'center',
       render: (_value, record) => {
         const actionKind = deliveryVersionActionKind(record)
+        if (record.gitSha === currentTargetSha) return null
         const initialCustomerConfigActivationReady =
           isDevInitialCustomerConfigActivationReady(target, actionKind)
         const targetActionReady =
@@ -159,12 +154,13 @@ export function buildVersionColumns({
                           : ''
         return (
           <Space wrap>
-            <Tooltip title={promotionEligible ? '' : promotionExplanation}>
-              <Button
-                icon={<CloudDownloadOutlined aria-hidden="true" />}
-                disabled={!promotionEligible}
-                loading={actionKey === `prepare:${record.gitSha}`}
-                onClick={() =>
+            {actionKind !== 'rollback' ? (
+              <Tooltip title={promotionEligible ? '' : promotionExplanation}>
+                <Button
+                  icon={<CloudDownloadOutlined aria-hidden="true" />}
+                  disabled={!promotionEligible}
+                  loading={actionKey === `prepare:${record.gitSha}`}
+                  onClick={() =>
                   performAction(
                     `prepare:${record.gitSha}`,
                     'prepare-promotion',
@@ -176,12 +172,13 @@ export function buildVersionColumns({
                     }
                   )
                 }
-              >
-                {actionKind === 'initialize' ? '准备首次部署' : '准备部署'}
-              </Button>
-            </Tooltip>
-            <Tooltip
-              title={
+                >
+                  {actionKind === 'initialize' ? '准备首次部署' : '准备部署'}
+                </Button>
+              </Tooltip>
+            ) : (
+              <Tooltip
+                title={
                 rollbackEligible
                   ? '只准备资格检查；migration 或客户配置指纹不一致会阻断'
                   : currentTargetRelease
@@ -190,12 +187,12 @@ export function buildVersionColumns({
                       : promotionExplanation
                     : `${selectedTargetDefinition.shortLabel}当前 SHA 没有完整不可变 manifest，不能普通回滚`
               }
-            >
-              <Button
-                icon={<RollbackOutlined aria-hidden="true" />}
-                disabled={!rollbackEligible}
-                loading={actionKey === `rollback:${record.gitSha}`}
-                onClick={() =>
+              >
+                <Button
+                  icon={<RollbackOutlined aria-hidden="true" />}
+                  disabled={!rollbackEligible}
+                  loading={actionKey === `rollback:${record.gitSha}`}
+                  onClick={() =>
                   performAction(
                     `rollback:${record.gitSha}`,
                     'prepare-rollback',
@@ -209,10 +206,11 @@ export function buildVersionColumns({
                     }
                   )
                 }
-              >
-                检查回滚
-              </Button>
-            </Tooltip>
+                >
+                  检查回滚
+                </Button>
+              </Tooltip>
+            )}
           </Space>
         )
       },

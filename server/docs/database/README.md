@@ -27,7 +27,7 @@ go run ./cmd/schema-doc --write
 | 外键 | 163 |
 | 显式索引 | 351 |
 | 其中 partial index | 34 |
-| 命名 / 表级 CHECK | 320 |
+| 命名 / 表级 CHECK | 321 |
 
 ## 分域入口
 
@@ -43,90 +43,122 @@ go run ./cmd/schema-doc --write
 
 ## 全表索引
 
-| 表 | 中文名称 | 分域 | 分类 | 用途 |
-| --- | --- | --- | --- | --- |
-| [`access_entitlements`](账号权限与配置.md#table-access-entitlements) | 有效能力授权投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的角色能力、范围和启用状态，供运行时授权判断。 |
-| [`admin_sessions`](账号权限与配置.md#table-admin-sessions) | 管理员会话 | 账号、权限与配置 | Fact / 事实 | 保存可撤销管理员访问令牌的服务端会话真源。 |
-| [`admin_user_roles`](账号权限与配置.md#table-admin-user-roles) | 管理员角色绑定 | 账号、权限与配置 | Config / 配置 | 保存管理员账号与 RBAC 角色之间的多对多绑定。 |
-| [`admin_users`](账号权限与配置.md#table-admin-users) | 管理员账号 | 账号、权限与配置 | Config / 配置 | 保存后台登录身份、认证版本、超级管理员标记和账号状态。 |
-| [`bom_headers`](主数据与BOM.md#table-bom-headers) | BOM 版本 | 主数据与 BOM | MasterData / 主数据 | 保存产品 BOM 的版本、有效期、状态及工程资料头信息。 |
-| [`bom_items`](主数据与BOM.md#table-bom-items) | BOM 物料明细 | 主数据与 BOM | MasterData / 主数据 | 保存材料在各部位的单位用量、损耗、片数和工艺资料；界面按材料分组复用主数据。 |
-| [`business_attachments`](流程运行时.md#table-business-attachments) | 业务附件证据 | 流程运行时、协同与审计 | Fact / 事实 | 保存挂接到业务对象的文件元数据、私有对象 key、哈希、上传审计和撤销审计；文件内容存入 RAID5 上的 S3 对象存储。 |
-| [`contacts`](主数据与BOM.md#table-contacts) | 联系人 | 主数据与 BOM | MasterData / 主数据 | 保存客户或供应商联系人、联系方式、主联系人标记和启用状态。 |
-| [`customer_config_revisions`](账号权限与配置.md#table-customer-config-revisions) | 客户配置版本 | 账号、权限与配置 | Config / 配置 | 保存规范化客户配置的版本、哈希、编译快照和发布状态。 |
-| [`customers`](主数据与BOM.md#table-customers) | 客户 | 主数据与 BOM | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |
-| [`deployment_module_states`](账号权限与配置.md#table-deployment-module-states) | 模块状态投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的模块 enabled、read_only 或 disabled 状态。 |
-| [`engineering_material_request_items`](销售与采购.md#table-engineering-material-request-items) | 工程用料汇总明细 | 销售与采购 | Source Document / 源单据 | 按材料和单位归并本订单各部位用料，冻结厂商、规格快照和应需数量；财务批准时直接以应需数量生成采购行。 |
-| [`engineering_material_requests`](销售与采购.md#table-engineering-material-requests) | 工程用料审批 | 销售与采购 | Source Document / 源单据 | 保存订单用料汇总的提交、老板审核、财务审核、退回和不可改写的来源快照。 |
-| [`finance_allocations`](出货与财务.md#table-finance-allocations) | 财务核销分配 | 出货与财务 | Fact / 事实 | 保存结算款过账核销或已过账首款后续抵扣一条应收应付的金额，以及撤销原因。 |
-| [`finance_credit_notes`](出货与财务.md#table-finance-credit-notes) | 财务红冲 | 出货与财务 | Fact / 事实 | 保存针对财务事实的红冲及反向红冲记录。 |
-| [`finance_facts`](出货与财务.md#table-finance-facts) | 业务财务事实 | 出货与财务 | Fact / 事实 | 保存来源可追溯的应收、应付、发票和对账事实。 |
-| [`finance_payments`](出货与财务.md#table-finance-payments) | 收付款单 | 出货与财务 | Source Document / 源单据 | 保存结算款、关联订单的首款或预付款、关联原款的实际退款及其登记、审批、过账、账户凭据和金额。 |
-| [`help_feedbacks`](账号权限与配置.md#table-help-feedbacks) | 帮助章节纠错 | 账号、权限与配置 | Source Document / 源单据 | 保存员工对可读章节的纠错、所读版本和维护人员处理回复。 |
-| [`help_supplement_revisions`](账号权限与配置.md#table-help-supplement-revisions) | 企业补充修订记录 | 账号、权限与配置 | Fact / 事实 | 不可变保存每次草稿保存、发布和历史恢复的正文、说明、来源身份及操作者。 |
-| [`help_supplements`](账号权限与配置.md#table-help-supplements) | 章节企业补充 | 账号、权限与配置 | Config / 配置 | 保存章节的当前草稿、并发版本和已发布修订指向。 |
-| [`inventory_balances`](库存与质检.md#table-inventory-balances) | 库存余额投影 | 库存与质检 | Derived / 派生投影 | 按物料或产品、SKU、仓库、批次和单位保存当前库存余额。 |
-| [`inventory_lot_status_events`](库存与质检.md#table-inventory-lot-status-events) | 库存批次状态事件 | 库存与质检 | Fact / 事实 | 追加保存命名批次动作的前后状态、版本、原因、actor、幂等键和关联质检证据。 |
-| [`inventory_lots`](库存与质检.md#table-inventory-lots) | 库存批次 | 库存与质检 | Fact / 事实 | 保存库存批次身份、物料或产品粒度、供应商批号及质量可用状态。 |
-| [`inventory_operation_items`](库存与质检.md#table-inventory-operation-items) | 库存作业明细 | 库存与质检 | Source Document / 源单据 | 保存库存作业的物料或产品、仓库、批次、账面数、实盘数或调整量。 |
-| [`inventory_operations`](库存与质检.md#table-inventory-operations) | 库存作业单 | 库存与质检 | Source Document / 源单据 | 保存盘点、调拨和手工调整的来源作业、原因、明细与审批阶段。 |
-| [`inventory_txns`](库存与质检.md#table-inventory-txns) | 库存流水 | 库存与质检 | Fact / 事实 | 保存入、出、调整、调拨和冲正的不可变库存数量变动。 |
-| [`materials`](主数据与BOM.md#table-materials) | 物料 | 主数据与 BOM | MasterData / 主数据 | 保存可复用材料名称、厂商、厂商料号、色号、规格、默认单位、库存类别和默认入库仓。 |
-| [`outsourcing_facts`](生产与委外.md#table-outsourcing-facts) | 委外收发事实 | 生产与委外 | Fact / 事实 | 保存委外发料和委外回货的真实发生记录。 |
-| [`outsourcing_order_items`](生产与委外.md#table-outsourcing-order-items) | 委外合同明细 | 生产与委外 | Source Document / 源单据 | 保存委外合同的产品或物料、工序、数量、价格和预计回货信息。 |
-| [`outsourcing_orders`](生产与委外.md#table-outsourcing-orders) | 委外加工合同 | 生产与委外 | Source Document / 源单据 | 保存供应商或加工厂承担加工任务的合同承诺。 |
-| [`outsourcing_return_dispositions`](生产与委外.md#table-outsourcing-return-dispositions) | 委外回货不合格处置 | 生产与委外 | Source Document / 源单据 | 保存委外回货质检不合格后的退回供应商或返工处置。 |
-| [`permissions`](账号权限与配置.md#table-permissions) | 权限目录 | 账号、权限与配置 | Config / 配置 | 保存系统正式 RBAC capability key、模块和动作描述。 |
-| [`process_instances`](流程运行时.md#table-process-instances) | 流程实例 | 流程运行时、协同与审计 | Workflow / 流程运行时 | 保存一次业务来源流程的版本、客户配置快照、整体状态和幂等锚点。 |
-| [`process_node_instances`](流程运行时.md#table-process-node-instances) | 流程节点实例 | 流程运行时、协同与审计 | Workflow / 流程运行时 | 保存流程节点 attempt、状态、责任池、动作合同以及领域命令的持久结果和恢复证据。 |
-| [`processes`](主数据与BOM.md#table-processes) | 生产工序 | 主数据与 BOM | MasterData / 主数据 | 保存可复用生产工序、路线位置绑定、内制或委外能力和质检要求。 |
-| [`product_skus`](主数据与BOM.md#table-product-skus) | 产品规格（SKU） | 主数据与 BOM | MasterData / 主数据 | 保存产品下的规格、颜色、尺码、条码和客户 SKU 等显式库存粒度。 |
-| [`production_exception_decisions`](生产与委外.md#table-production-exception-decisions) | 生产异常申请与决策 | 生产与委外 | Source Document / 源单据 | 保存报废、超领或 WIP 让步的申请、审批决定及后续执行状态。 |
-| [`production_facts`](生产与委外.md#table-production-facts) | 生产事实 | 生产与委外 | Fact / 事实 | 保存生产领料、完工入库和返工等实际生产发生。 |
-| [`production_order_events`](生产与委外.md#table-production-order-events) | 生产订单命令回执 | 生产与委外 | Fact / 事实 | 保存生产订单 CREATE、SAVE、RELEASE、CLOSE、CANCEL 的版本和幂等回执。 |
-| [`production_order_items`](生产与委外.md#table-production-order-items) | 生产订单明细 | 生产与委外 | Source Document / 源单据 | 保存生产订单的产品、SKU、数量、销售来源、BOM 和路线选择。 |
-| [`production_order_material_requirements`](生产与委外.md#table-production-order-material-requirements) | 生产订单物料需求快照 | 生产与委外 | Derived / 派生投影 | 保存生产订单发布时从 BOM 冻结出的物料需求及明确工序归属。 |
-| [`production_order_operations`](生产与委外.md#table-production-order-operations) | 生产订单工艺路线快照 | 生产与委外 | Derived / 派生投影 | 保存生产订单发布时冻结的路线、步骤、工序快照和质量门禁。 |
-| [`production_orders`](生产与委外.md#table-production-orders) | 生产订单 | 生产与委外 | Source Document / 源单据 | 保存生产承诺、计划日期、产品行及来源销售订单或 BOM 引用。 |
-| [`production_packaging_confirmations`](生产与委外.md#table-production-packaging-confirmations) | 包材版本业务确认 | 生产与委外 | Fact / 事实 | 保存生产订单行在包装工序使用的包材图稿或版本确认。 |
-| [`production_wip_batches`](生产与委外.md#table-production-wip-batches) | 生产在制品批次 | 生产与委外 | Fact / 事实 | 保存生产订单行在显式工艺路线中的数量批次、当前工序和执行状态。 |
-| [`production_wip_events`](生产与委外.md#table-production-wip-events) | 在制品事件回执 | 生产与委外 | Fact / 事实 | 保存 WIP 拆批、安排、开始、完成、移交、回货、返工和异常执行的命令回执。 |
-| [`production_wip_outsourcing_allocations`](生产与委外.md#table-production-wip-outsourcing-allocations) | 在制品委外分配 | 生产与委外 | Fact / 事实 | 将一个 WIP 批次不可变地绑定到已确认委外合同行及分配数量。 |
-| [`products`](主数据与BOM.md#table-products) | 产品 | 主数据与 BOM | MasterData / 主数据 | 保存产品或款号主档，供 SKU、BOM、订单、生产、库存和出货引用。 |
-| [`purchase_order_items`](销售与采购.md#table-purchase-order-items) | 采购订单明细 | 销售与采购 | Source Document / 源单据 | 保存采购订单的物料、数量、单位、价格和预计到货信息。 |
-| [`purchase_orders`](销售与采购.md#table-purchase-orders) | 采购订单 | 销售与采购 | Source Document / 源单据 | 保存向供应商采购物料的业务承诺、日期、交付和结算条件。 |
-| [`purchase_receipt_adjustment_items`](库存与质检.md#table-purchase-receipt-adjustment-items) | 采购入库调整明细 | 库存与质检 | Source Document / 源单据 | 保存每条入库调整引用的原入库行、物料、仓库、批次和调整数量。 |
-| [`purchase_receipt_adjustments`](库存与质检.md#table-purchase-receipt-adjustments) | 采购入库调整单 | 库存与质检 | Source Document / 源单据 | 保存采购入库数量、批次或仓库纠正的可审计调整来源单。 |
-| [`purchase_receipt_items`](库存与质检.md#table-purchase-receipt-items) | 采购入库明细 | 库存与质检 | Source Document / 源单据 | 保存采购收货的物料、数量、仓库、批次、价格和采购订单行来源。 |
-| [`purchase_receipts`](库存与质检.md#table-purchase-receipts) | 采购入库单 | 库存与质检 | Source Document / 源单据 | 保存采购收货来源单，并在显式过账时形成库存入库事实。 |
-| [`purchase_rejection_dispositions`](库存与质检.md#table-purchase-rejection-dispositions) | 采购拒收处置 | 库存与质检 | Source Document / 源单据 | 保存采购 IQC 不合格后的退回供应商或要求补货处置。 |
-| [`purchase_return_items`](库存与质检.md#table-purchase-return-items) | 采购退货明细 | 库存与质检 | Source Document / 源单据 | 保存采购退货引用的原入库行、物料、仓库、批次和退货数量。 |
-| [`purchase_returns`](库存与质检.md#table-purchase-returns) | 采购退货单 | 库存与质检 | Source Document / 源单据 | 保存从采购入库或不合格质检来源退回供应商的来源单。 |
-| [`quality_inspections`](库存与质检.md#table-quality-inspections) | 质量检验 | 库存与质检 | Fact / 事实 | 保存采购、委外、出货前成品或生产 WIP 的质量检查、结论和纠正链。 |
-| [`role_data_scopes`](账号权限与配置.md#table-role-data-scopes) | 角色数据范围 | 账号、权限与配置 | Config / 配置 | 保存角色对 warehouse 等资源的 ALL、ASSIGNED 或 NONE 数据范围。 |
-| [`role_permissions`](账号权限与配置.md#table-role-permissions) | 角色权限绑定 | 账号、权限与配置 | Config / 配置 | 保存角色和正式权限目录之间的多对多绑定。 |
-| [`role_profiles`](账号权限与配置.md#table-role-profiles) | 角色画像投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的角色显示、岗位和启用画像。 |
-| [`roles`](账号权限与配置.md#table-roles) | 角色 | 账号、权限与配置 | Config / 配置 | 保存 RBAC 角色定义、类型、导航模式、排序和禁用状态。 |
-| [`runtime_audit_events`](流程运行时.md#table-runtime-audit-events) | 运行时审计事件 | 流程运行时、协同与审计 | Fact / 事实 | 保存账号管理、客户配置、Workflow break-glass 和运行控制面的审计事件。 |
-| [`runtime_markers`](流程运行时.md#table-runtime-markers) | 运行时一次性标记 | 流程运行时、协同与审计 | Fact / 事实 | 记录受控初始化或一次性运行动作已经执行的稳定 marker。 |
-| [`sales_order_items`](销售与采购.md#table-sales-order-items) | 销售订单明细 | 销售与采购 | Source Document / 源单据 | 保存客户需求、客户款号、新单或返单、订单数量、船头样和工程产品关联；产品可在接单后补建。 |
-| [`sales_orders`](销售与采购.md#table-sales-orders) | 销售订单 | 销售与采购 | Source Document / 源单据 | 保存客户订单承诺、交付计划、付款方式和销售责任信息。 |
-| [`shipment_items`](出货与财务.md#table-shipment-items) | 出货明细 | 出货与财务 | Source Document / 源单据 | 保存销售订单行以及产品、SKU、仓库、批次、数量和商业快照。 |
-| [`shipments`](出货与财务.md#table-shipments) | 出货单 | 出货与财务 | Source Document / 源单据 | 保存销售交付的来源单、财务放行状态和显式出货时间。 |
-| [`source_order_lifecycle_events`](销售与采购.md#table-source-order-lifecycle-events) | 来源订单生命周期回执 | 销售与采购 | Source Document / 源单据 | 追加保存销售、采购和委外订单强动作，以及采购补价的版本、经办人、幂等意图与逐行结果。 |
-| [`stock_reservations`](库存与质检.md#table-stock-reservations) | 库存预留 | 库存与质检 | Fact / 事实 | 保存销售订单或显式需求对库存可用量的数量预留。 |
-| [`supplier_process_capabilities`](主数据与BOM.md#table-supplier-process-capabilities) | 供应商工序能力关联 | 主数据与 BOM | MasterData / 主数据 | 保存供应商或加工厂能够承接哪些生产工序的多对多关系。 |
-| [`suppliers`](主数据与BOM.md#table-suppliers) | 供应商与加工厂 | 主数据与 BOM | MasterData / 主数据 | 保存采购、委外和应付引用的供应商或加工厂主档。 |
-| [`units`](主数据与BOM.md#table-units) | 计量单位 | 主数据与 BOM | MasterData / 主数据 | 保存物料、产品、BOM、订单、库存和事实共用的计量单位。 |
-| [`warehouses`](主数据与BOM.md#table-warehouses) | 仓库 | 主数据与 BOM | MasterData / 主数据 | 保存库存、入库、调拨、出货和数据范围引用的仓库主档。 |
-| [`work_pool_memberships`](账号权限与配置.md#table-work-pool-memberships) | 责任池成员投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本下责任池与角色或用户的成员关系。 |
-| [`work_pools`](账号权限与配置.md#table-work-pools) | 责任池投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的流程责任池和模块归属。 |
-| [`workflow_business_states`](流程运行时.md#table-workflow-business-states) | 业务协同进度投影 | 流程运行时、协同与审计 | Derived / 派生投影 | 保存业务来源对象当前对岗位展示的协同阶段。 |
-| [`workflow_task_events`](流程运行时.md#table-workflow-task-events) | 协同任务事件 | 流程运行时、协同与审计 | Workflow / 流程运行时 | 保存任务创建、状态动作、催办、升级、转交、版本和幂等 replay receipt。 |
-| [`workflow_tasks`](流程运行时.md#table-workflow-tasks) | 协同任务 | 流程运行时、协同与审计 | Workflow / 流程运行时 | 保存岗位任务箱、责任池、角色、处理人、状态、截止时间和来源引用。 |
+### 账号、权限与配置
+
+| 表 | 中文名称 | 分类 | 用途 |
+| --- | --- | --- | --- |
+| [`access_entitlements`](账号权限与配置.md#table-access-entitlements) | 有效能力授权投影 | Derived / 派生投影 | 保存客户配置版本编译出的角色能力、范围和启用状态，供运行时授权判断。 |
+| [`admin_sessions`](账号权限与配置.md#table-admin-sessions) | 管理员会话 | Fact / 事实 | 保存可撤销管理员访问令牌的服务端会话真源。 |
+| [`admin_user_roles`](账号权限与配置.md#table-admin-user-roles) | 管理员角色绑定 | Config / 配置 | 保存管理员账号与 RBAC 角色之间的多对多绑定。 |
+| [`admin_users`](账号权限与配置.md#table-admin-users) | 管理员账号 | Config / 配置 | 保存后台登录身份、认证版本、超级管理员标记和账号状态。 |
+| [`customer_config_revisions`](账号权限与配置.md#table-customer-config-revisions) | 客户配置版本 | Config / 配置 | 保存规范化客户配置的版本、哈希、编译快照和发布状态。 |
+| [`deployment_module_states`](账号权限与配置.md#table-deployment-module-states) | 模块状态投影 | Derived / 派生投影 | 保存客户配置版本编译出的模块 enabled、read_only 或 disabled 状态。 |
+| [`help_feedbacks`](账号权限与配置.md#table-help-feedbacks) | 帮助章节纠错 | Source Document / 源单据 | 保存员工对可读章节的纠错、所读版本和维护人员处理回复。 |
+| [`help_supplement_revisions`](账号权限与配置.md#table-help-supplement-revisions) | 企业补充修订记录 | Fact / 事实 | 不可变保存每次草稿保存、发布和历史恢复的正文、说明、来源身份及操作者。 |
+| [`help_supplements`](账号权限与配置.md#table-help-supplements) | 章节企业补充 | Config / 配置 | 保存章节的当前草稿、并发版本和已发布修订指向。 |
+| [`permissions`](账号权限与配置.md#table-permissions) | 权限目录 | Config / 配置 | 保存系统正式 RBAC capability key、模块和动作描述。 |
+| [`role_data_scopes`](账号权限与配置.md#table-role-data-scopes) | 角色数据范围 | Config / 配置 | 保存角色对 warehouse 等资源的 ALL、ASSIGNED 或 NONE 数据范围。 |
+| [`role_permissions`](账号权限与配置.md#table-role-permissions) | 角色权限绑定 | Config / 配置 | 保存角色和正式权限目录之间的多对多绑定。 |
+| [`role_profiles`](账号权限与配置.md#table-role-profiles) | 角色画像投影 | Derived / 派生投影 | 保存客户配置版本编译出的角色显示、岗位和启用画像。 |
+| [`roles`](账号权限与配置.md#table-roles) | 角色 | Config / 配置 | 保存 RBAC 角色定义、类型、导航模式、排序和禁用状态。 |
+| [`work_pool_memberships`](账号权限与配置.md#table-work-pool-memberships) | 责任池成员投影 | Derived / 派生投影 | 保存客户配置版本下责任池与角色或用户的成员关系。 |
+| [`work_pools`](账号权限与配置.md#table-work-pools) | 责任池投影 | Derived / 派生投影 | 保存客户配置版本编译出的流程责任池和模块归属。 |
+
+### 主数据与 BOM
+
+| 表 | 中文名称 | 分类 | 用途 |
+| --- | --- | --- | --- |
+| [`bom_headers`](主数据与BOM.md#table-bom-headers) | BOM 版本 | MasterData / 主数据 | 保存产品 BOM 的版本、有效期、状态及工程资料头信息。 |
+| [`bom_items`](主数据与BOM.md#table-bom-items) | BOM 物料明细 | MasterData / 主数据 | 保存材料在各部位的单位用量、损耗、片数和工艺资料；界面按材料分组复用主数据。 |
+| [`contacts`](主数据与BOM.md#table-contacts) | 联系人 | MasterData / 主数据 | 保存客户或供应商联系人、联系方式、主联系人标记和启用状态。 |
+| [`customers`](主数据与BOM.md#table-customers) | 客户 | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |
+| [`materials`](主数据与BOM.md#table-materials) | 物料 | MasterData / 主数据 | 保存可复用材料名称、厂商、厂商料号、色号、规格、默认单位、库存类别和默认入库仓。 |
+| [`processes`](主数据与BOM.md#table-processes) | 生产工序 | MasterData / 主数据 | 保存可复用生产工序、路线位置绑定、内制或委外能力和质检要求。 |
+| [`product_skus`](主数据与BOM.md#table-product-skus) | 产品规格（SKU） | MasterData / 主数据 | 保存产品下的规格、颜色、尺码、条码和客户 SKU 等显式库存粒度。 |
+| [`products`](主数据与BOM.md#table-products) | 产品 | MasterData / 主数据 | 保存产品或款号主档，供 SKU、BOM、订单、生产、库存和出货引用。 |
+| [`supplier_process_capabilities`](主数据与BOM.md#table-supplier-process-capabilities) | 供应商工序能力关联 | MasterData / 主数据 | 保存供应商或加工厂能够承接哪些生产工序的多对多关系。 |
+| [`suppliers`](主数据与BOM.md#table-suppliers) | 供应商与加工厂 | MasterData / 主数据 | 保存采购、委外和应付引用的供应商或加工厂主档。 |
+| [`units`](主数据与BOM.md#table-units) | 计量单位 | MasterData / 主数据 | 保存物料、产品、BOM、订单、库存和事实共用的计量单位。 |
+| [`warehouses`](主数据与BOM.md#table-warehouses) | 仓库 | MasterData / 主数据 | 保存库存、入库、调拨、出货和数据范围引用的仓库主档。 |
+
+### 销售与采购
+
+| 表 | 中文名称 | 分类 | 用途 |
+| --- | --- | --- | --- |
+| [`engineering_material_request_items`](销售与采购.md#table-engineering-material-request-items) | 工程用料汇总明细 | Source Document / 源单据 | 按材料和单位归并本订单各部位用料，冻结厂商、规格快照和应需数量；财务批准时直接以应需数量生成采购行。 |
+| [`engineering_material_requests`](销售与采购.md#table-engineering-material-requests) | 工程用料审批 | Source Document / 源单据 | 保存订单用料汇总的提交、老板审核、财务审核、退回和不可改写的来源快照。 |
+| [`purchase_order_items`](销售与采购.md#table-purchase-order-items) | 采购订单明细 | Source Document / 源单据 | 保存采购订单的物料、数量、单位、价格和预计到货信息。 |
+| [`purchase_orders`](销售与采购.md#table-purchase-orders) | 采购订单 | Source Document / 源单据 | 保存向供应商采购物料的业务承诺、日期、交付和结算条件。 |
+| [`sales_order_items`](销售与采购.md#table-sales-order-items) | 销售订单明细 | Source Document / 源单据 | 保存客户需求、客户款号、新单或返单、订单数量、船头样和工程产品关联；产品可在接单后补建。 |
+| [`sales_orders`](销售与采购.md#table-sales-orders) | 销售订单 | Source Document / 源单据 | 保存客户订单承诺、交付计划、付款方式和销售责任信息。 |
+| [`source_order_lifecycle_events`](销售与采购.md#table-source-order-lifecycle-events) | 来源订单生命周期回执 | Source Document / 源单据 | 追加保存销售、采购和委外订单强动作，以及采购补价的版本、经办人、幂等意图与逐行结果。 |
+
+### 库存与质检
+
+| 表 | 中文名称 | 分类 | 用途 |
+| --- | --- | --- | --- |
+| [`inventory_balances`](库存与质检.md#table-inventory-balances) | 库存余额投影 | Derived / 派生投影 | 按物料或产品、SKU、仓库、批次和单位保存当前库存余额。 |
+| [`inventory_lot_status_events`](库存与质检.md#table-inventory-lot-status-events) | 库存批次状态事件 | Fact / 事实 | 追加保存命名批次动作的前后状态、版本、原因、actor、幂等键和关联质检证据。 |
+| [`inventory_lots`](库存与质检.md#table-inventory-lots) | 库存批次 | Fact / 事实 | 保存库存批次身份、物料或产品粒度、供应商批号及质量可用状态。 |
+| [`inventory_operation_items`](库存与质检.md#table-inventory-operation-items) | 库存作业明细 | Source Document / 源单据 | 保存库存作业的物料或产品、仓库、批次、账面数、实盘数或调整量。 |
+| [`inventory_operations`](库存与质检.md#table-inventory-operations) | 库存作业单 | Source Document / 源单据 | 保存盘点、调拨和手工调整的来源作业、原因、明细与审批阶段。 |
+| [`inventory_txns`](库存与质检.md#table-inventory-txns) | 库存流水 | Fact / 事实 | 保存入、出、调整、调拨和冲正的不可变库存数量变动。 |
+| [`purchase_receipt_adjustment_items`](库存与质检.md#table-purchase-receipt-adjustment-items) | 采购入库调整明细 | Source Document / 源单据 | 保存每条入库调整引用的原入库行、物料、仓库、批次和调整数量。 |
+| [`purchase_receipt_adjustments`](库存与质检.md#table-purchase-receipt-adjustments) | 采购入库调整单 | Source Document / 源单据 | 保存采购入库数量、批次或仓库纠正的可审计调整来源单。 |
+| [`purchase_receipt_items`](库存与质检.md#table-purchase-receipt-items) | 采购入库明细 | Source Document / 源单据 | 保存采购收货的物料、数量、仓库、批次、价格和采购订单行来源。 |
+| [`purchase_receipts`](库存与质检.md#table-purchase-receipts) | 采购入库单 | Source Document / 源单据 | 保存采购收货来源单，并在显式过账时形成库存入库事实。 |
+| [`purchase_rejection_dispositions`](库存与质检.md#table-purchase-rejection-dispositions) | 采购拒收处置 | Source Document / 源单据 | 保存采购 IQC 不合格后的退回供应商或要求补货处置。 |
+| [`purchase_return_items`](库存与质检.md#table-purchase-return-items) | 采购退货明细 | Source Document / 源单据 | 保存采购退货引用的原入库行、物料、仓库、批次和退货数量。 |
+| [`purchase_returns`](库存与质检.md#table-purchase-returns) | 采购退货单 | Source Document / 源单据 | 保存从采购入库或不合格质检来源退回供应商的来源单。 |
+| [`quality_inspections`](库存与质检.md#table-quality-inspections) | 质量检验 | Fact / 事实 | 保存采购、委外、出货前成品或生产 WIP 的质量检查、结论和纠正链。 |
+| [`stock_reservations`](库存与质检.md#table-stock-reservations) | 库存预留 | Fact / 事实 | 保存销售订单或显式需求对库存可用量的数量预留。 |
+
+### 生产与委外
+
+| 表 | 中文名称 | 分类 | 用途 |
+| --- | --- | --- | --- |
+| [`outsourcing_facts`](生产与委外.md#table-outsourcing-facts) | 委外收发事实 | Fact / 事实 | 保存委外发料和委外回货的真实发生记录。 |
+| [`outsourcing_order_items`](生产与委外.md#table-outsourcing-order-items) | 委外合同明细 | Source Document / 源单据 | 保存委外合同的产品或物料、工序、数量、价格和预计回货信息。 |
+| [`outsourcing_orders`](生产与委外.md#table-outsourcing-orders) | 委外加工合同 | Source Document / 源单据 | 保存供应商或加工厂承担加工任务的合同承诺。 |
+| [`outsourcing_return_dispositions`](生产与委外.md#table-outsourcing-return-dispositions) | 委外回货不合格处置 | Source Document / 源单据 | 保存委外回货质检不合格后的退回供应商或返工处置。 |
+| [`production_exception_decisions`](生产与委外.md#table-production-exception-decisions) | 生产异常申请与决策 | Source Document / 源单据 | 保存报废、超领或 WIP 让步的申请、审批决定及后续执行状态。 |
+| [`production_facts`](生产与委外.md#table-production-facts) | 生产事实 | Fact / 事实 | 保存生产领料、完工入库和返工等实际生产发生。 |
+| [`production_order_events`](生产与委外.md#table-production-order-events) | 生产订单命令回执 | Fact / 事实 | 保存生产订单 CREATE、SAVE、RELEASE、CLOSE、CANCEL 的版本和幂等回执。 |
+| [`production_order_items`](生产与委外.md#table-production-order-items) | 生产订单明细 | Source Document / 源单据 | 保存生产订单的产品、SKU、数量、销售来源、BOM 和路线选择。 |
+| [`production_order_material_requirements`](生产与委外.md#table-production-order-material-requirements) | 生产订单物料需求快照 | Derived / 派生投影 | 保存生产订单发布时从 BOM 冻结出的物料需求及明确工序归属。 |
+| [`production_order_operations`](生产与委外.md#table-production-order-operations) | 生产订单工艺路线快照 | Derived / 派生投影 | 保存生产订单发布时冻结的路线、步骤、工序快照和质量门禁。 |
+| [`production_orders`](生产与委外.md#table-production-orders) | 生产订单 | Source Document / 源单据 | 保存生产承诺、计划日期、产品行及来源销售订单或 BOM 引用。 |
+| [`production_packaging_confirmations`](生产与委外.md#table-production-packaging-confirmations) | 包材版本业务确认 | Fact / 事实 | 保存生产订单行在包装工序使用的包材图稿或版本确认。 |
+| [`production_wip_batches`](生产与委外.md#table-production-wip-batches) | 生产在制品批次 | Fact / 事实 | 保存生产订单行在显式工艺路线中的数量批次、当前工序和执行状态。 |
+| [`production_wip_events`](生产与委外.md#table-production-wip-events) | 在制品事件回执 | Fact / 事实 | 保存 WIP 拆批、安排、开始、完成、移交、回货、返工和异常执行的命令回执。 |
+| [`production_wip_outsourcing_allocations`](生产与委外.md#table-production-wip-outsourcing-allocations) | 在制品委外分配 | Fact / 事实 | 将一个 WIP 批次不可变地绑定到已确认委外合同行及分配数量。 |
+
+### 出货与财务
+
+| 表 | 中文名称 | 分类 | 用途 |
+| --- | --- | --- | --- |
+| [`finance_allocations`](出货与财务.md#table-finance-allocations) | 财务核销分配 | Fact / 事实 | 保存结算款过账核销或已过账首款后续抵扣一条应收应付的金额，以及撤销原因。 |
+| [`finance_credit_notes`](出货与财务.md#table-finance-credit-notes) | 财务红冲 | Fact / 事实 | 保存针对财务事实的红冲及反向红冲记录。 |
+| [`finance_facts`](出货与财务.md#table-finance-facts) | 业务财务事实 | Fact / 事实 | 保存来源可追溯的应收、应付、发票和对账事实。 |
+| [`finance_payments`](出货与财务.md#table-finance-payments) | 收付款单 | Source Document / 源单据 | 保存结算款、关联订单的首款或预付款、关联原款的实际退款及其登记、审批、过账、账户凭据和金额。 |
+| [`shipment_items`](出货与财务.md#table-shipment-items) | 出货明细 | Source Document / 源单据 | 保存销售订单行以及产品、SKU、仓库、批次、数量和商业快照。 |
+| [`shipments`](出货与财务.md#table-shipments) | 出货单 | Source Document / 源单据 | 保存销售交付的来源单、财务放行状态和显式出货时间。 |
+
+### 流程运行时、协同与审计
+
+| 表 | 中文名称 | 分类 | 用途 |
+| --- | --- | --- | --- |
+| [`business_attachments`](流程运行时.md#table-business-attachments) | 业务附件证据 | Fact / 事实 | 保存挂接到业务对象的文件元数据、私有对象 key、哈希、上传审计和撤销审计；文件内容存入 RAID5 上的 S3 对象存储。 |
+| [`process_instances`](流程运行时.md#table-process-instances) | 流程实例 | Workflow / 流程运行时 | 保存一次业务来源流程的版本、客户配置快照、整体状态和幂等锚点。 |
+| [`process_node_instances`](流程运行时.md#table-process-node-instances) | 流程节点实例 | Workflow / 流程运行时 | 保存流程节点 attempt、状态、责任池、动作合同以及领域命令的持久结果和恢复证据。 |
+| [`runtime_audit_events`](流程运行时.md#table-runtime-audit-events) | 运行时审计事件 | Fact / 事实 | 保存账号管理、客户配置、Workflow break-glass 和运行控制面的审计事件。 |
+| [`runtime_markers`](流程运行时.md#table-runtime-markers) | 运行时一次性标记 | Fact / 事实 | 记录受控初始化或一次性运行动作已经执行的稳定 marker。 |
+| [`workflow_business_states`](流程运行时.md#table-workflow-business-states) | 业务协同进度投影 | Derived / 派生投影 | 保存业务来源对象当前对岗位展示的协同阶段。 |
+| [`workflow_task_events`](流程运行时.md#table-workflow-task-events) | 协同任务事件 | Workflow / 流程运行时 | 保存任务创建、状态动作、催办、升级、转交、版本和幂等 replay receipt。 |
+| [`workflow_tasks`](流程运行时.md#table-workflow-tasks) | 协同任务 | Workflow / 流程运行时 | 保存岗位任务箱、责任池、角色、处理人、状态、截止时间和来源引用。 |
 
 ## 非应用表
 
 | 表 | 说明 |
 | --- | --- |
-| <code>atlas_schema_revisions.atlas_schema_revisions</code> | Atlas migration 执行器自己的版本记录表，不属于 Product Core 业务 schema，也不由 Ent migrate.Tables 管理。 |
+| `atlas_schema_revisions.atlas_schema_revisions` | Atlas migration 执行器自己的版本记录表，不属于 Product Core 业务 schema，也不由 Ent migrate.Tables 管理。 |

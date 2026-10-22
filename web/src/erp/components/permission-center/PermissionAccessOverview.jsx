@@ -4,12 +4,12 @@ import {
   Button,
   Empty,
   Popover,
-  Select,
   Space,
   Tag,
 } from 'antd'
 import React, { useState } from 'react'
 import { QuestionCircleOutlined } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import Table from '@/common/components/table/AppTable'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -20,6 +20,7 @@ import {
   getPermissionPageEntry,
   groupPermissionPages,
 } from '../../utils/permissionNavigation.mjs'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const ROLE_PAGE_ACCESS_FILTERS = {
   ALL: 'all',
@@ -47,6 +48,7 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
         页面可进入，不等于页面内所有操作都可用；查看、创建、修改、审核、过账和取消分别控制。
       </Paragraph>
       <Table
+        sticky
         rowKey="rowID"
         size="small"
         pagination={false}
@@ -231,7 +233,10 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
         />
       ) : null}
       <div className="erp-role-effective-access__toolbar">
-        <Select
+        <FilterSelect
+          emptyValue="all"
+          label="业务模块"
+          placeholder="业务模块"
           aria-label="筛选业务模块"
           value={selectedModule}
           onChange={setModuleFilter}
@@ -439,6 +444,9 @@ function DataScopeOverview({
       >
         <Text strong>仓库范围</Text>
         <Select
+          allowClear={false}
+          label="仓库范围模式"
+          placeholder="仓库范围模式"
           aria-label="仓库范围模式"
           value={mode}
           disabled={disabled}
@@ -459,6 +467,7 @@ function DataScopeOverview({
         >
           <Text strong>允许的仓库</Text>
           <Select
+            label="允许的仓库"
             aria-label="允许的仓库"
             mode="multiple"
             maxTagCount="responsive"

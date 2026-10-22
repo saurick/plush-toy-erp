@@ -467,14 +467,16 @@ export function qualityGateViewStatus(summary, view, summaryError) {
     description: evidence?.message || '正在读取当前提交的服务器门禁证据。',
     recommendation:
       evidence?.status === 'passed'
-        ? '优先查看排队耗时、最长执行 Job 与历史退化；未提交改动请切换到“本机诊断”定位。'
+        ? '未提交改动请使用“本机诊断”。'
         : evidence?.status === 'docs_passed'
-          ? '文档检查已经完成；需要发布此 SHA 时，在 GitLab 新建 main 流水线并设置 QA_MODE=full。'
+          ? '发布前在 GitLab 新建 main 流水线，设置 QA_MODE=full。'
           : evidence?.status === 'running'
-            ? '等待当前服务器流水线结束；页面不会用本机回执替代服务器结果。'
+            ? '等待当前流水线结束。'
             : evidence?.status === 'missing'
-              ? '读取链路无需修复；该提交产生普通 push CI 后，页面才会出现服务器运行结果。'
-              : '先恢复 GitLab 读取链路，再核对当前 SHA 的服务器证据。',
+              ? '读取链路正常；等待该提交触发 CI。'
+              : evidence?.status === 'failed'
+                ? '查看未通过的 Job，修复后重新验证。'
+                : '先恢复 GitLab 读取链路，再刷新状态。',
     notProven: evidence?.notProven || [],
   }
 }

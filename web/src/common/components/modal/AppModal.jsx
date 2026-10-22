@@ -51,7 +51,7 @@ function acquireBackgroundIsolation() {
   }
 }
 
-export default function AppModal({
+function PanelModal({
   open,
   onClose,
   children,
@@ -154,4 +154,9 @@ export default function AppModal({
       </SurfacePanel>
     </Modal>
   )
+}
+
+export default function AppModal({ variant = 'standard', ...props }) {
+  if (variant === 'panel') return <PanelModal {...props} />
+  return <Modal {...props} />
 }

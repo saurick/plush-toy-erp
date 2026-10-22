@@ -9,7 +9,7 @@ import { runIsolatedTransactionBrowser, verifyTransactionRequestLogs } from "./t
 function completed() {
   const flows = SOURCE_ORDER_FLOW_KEYS.map((key, index) => ({
     key, sourceID: index + 1,
-    passed: true, draftCAS: true, forbiddenUnchanged: true, invalidQuantityUnchanged: true,
+    passed: true, draftCAS: true, conflictMessageShownOnce: true, forbiddenUnchanged: true, invalidQuantityUnchanged: true,
     saveRecovered: true, saveKeptBusinessValues: true, submitRecovered: true, replayExact: true, changedIntentRejected: true,
     factsUnchanged: true, frozenAfterSubmit: true, terminalGuard: true, blockResume: true,
     rejectionSettled: true, approvalPermissionDenied: true, reasonRequired: true,

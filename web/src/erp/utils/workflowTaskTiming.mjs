@@ -129,17 +129,19 @@ export function getWorkflowTaskTiming(
     { missing = '未记录', tone = 'neutral', prefix = '', suffix = '' } = {}
   ) => {
     const date = taskDate(value)
-    if (!date && !detail) return
+    const absent = value == null || value === 0 || (typeof value === 'string' && (!value.trim() || value.trim() === '0'))
+    const state = date ? 'recorded' : absent ? 'missing' : 'invalid'
     const formatted = formatWorkflowTaskTime(value, { exact: detail, nowMs })
     rows.push({
       key,
       label,
-      value: `${prefix}${date ? `${formatted}${suffix}` : missing}`,
+      value: `${prefix}${date ? `${formatted}${suffix}` : state === 'invalid' ? '时间待核对' : missing}`,
+      state,
       dateTime: date?.toISOString() || '',
       title: date
         ? `${label} ${prefix}${formatWorkflowTaskTime(value, { exact: true })}${suffix}`
         : '',
-      tone,
+      tone: date ? tone : 'neutral',
     })
   }
 
@@ -171,7 +173,9 @@ export function getWorkflowTaskTiming(
   }
   if (ended) {
     const label = END_LABELS[String(task.task_status_key || '').trim()]
-    add('ended', detail ? `${label}时间` : label, task.completed_at)
+    add('ended', detail ? `${label}时间` : label, task.completed_at, {
+      missing: detail ? '未记录' : '结束时间未记录',
+    })
   }
   if (detail) {
     const blockedAt = getWorkflowTaskBlockedAt(task, events)

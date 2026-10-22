@@ -5,7 +5,6 @@ import {
   Button,
   Empty,
   Progress,
-  Select,
   Skeleton,
   Space,
   Tag,
@@ -16,6 +15,7 @@ import {
   ReloadOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import DevTimestamp from './DevTimestamp.jsx'
 import DevPressureDataset from './DevPressureDataset.jsx'
 import { PRESSURE_DATA_SCALES } from '../config/devPressureData.mjs'
@@ -471,6 +471,12 @@ export default function DevPressurePanel({
   const [searchParams, setSearchParams] = useSearchParams()
   const reportQuery = searchParams.get('report') || ''
   const dataScale = Object.hasOwn(PRESSURE_DATA_SCALES, searchParams.get('scale')) ? searchParams.get('scale') : 'baseline'
+  const selectedAction = DEV_PRESSURE_ACTIONS.find((action) => action.profile === searchParams.get('load')) || DEV_PRESSURE_ACTIONS[0]
+  const selectLoad = (value) => setSearchParams((current) => {
+    const next = new URLSearchParams(current)
+    next.set('load', value)
+    return next
+  })
   const selectDataScale = (value) => setSearchParams((current) => {
     const next = new URLSearchParams(current)
     next.set('scale', value)
@@ -565,7 +571,7 @@ export default function DevPressurePanel({
   }
   const options = (state?.reports || []).map((item) => ({
     value: item.id,
-    label: `${formatDevTimestamp(item.completedAt)} · ${item.profile === 'capacity' ? '容量' : '短档'} · ${pressureScaleLabel(item.dataScale)} · ${DEV_PRESSURE_STATUS[item.status].label} · ${item.id}`,
+    label: `${formatDevTimestamp(item.completedAt)} · ${item.profile === 'capacity' ? '容量' : '短档'} · ${pressureScaleLabel(item.dataScale)} · ${DEV_PRESSURE_STATUS[item.status].label}`,
   }))
   if (
     activeReportID &&
@@ -579,20 +585,12 @@ export default function DevPressurePanel({
       aria-label="核心业务压力测试"
       aria-busy={loading || Boolean(active)}
     >
-      <header className="erp-dev-pressure-heading">
-        <div>
-          <Title level={2}>核心业务压力测试</Title>
-          <Paragraph>
-            用料计算 → 提交 → 老板审批 → 财务审批 →
-            采购读回；每次新建隔离环境和模拟订单池。
-          </Paragraph>
-        </div>
-        <Tag>隔离 PostgreSQL / S3 / 后端</Tag>
-      </header>
       <div className="erp-dev-pressure-actions">
         <Space wrap>
           <label htmlFor="dev-pressure-scale">数据规模</label>
           <Select
+            allowClear={false}
+            placeholder="数据规模"
             id="dev-pressure-scale"
             aria-label="数据规模"
             value={dataScale}
@@ -601,32 +599,32 @@ export default function DevPressurePanel({
             options={Object.entries(PRESSURE_DATA_SCALES).map(([value, scale]) =>
               ({ value, label: `${scale.label} · ${scale.historyOrders} 张历史单` }))}
           />
-          {DEV_PRESSURE_ACTIONS.map((action) => (
-            <Button
-              key={action.key}
-              type={action.profile === 'quick' ? 'primary' : 'default'}
-              icon={<PlayCircleOutlined aria-hidden="true" />}
-              disabled={disabled}
-              loading={
-                actionStarting === action.key || active?.action === action.key
-              }
-              onClick={() => onRun(action.key, dataScale)}
-            >
-              {action.label}
-            </Button>
-          ))}
+          <label htmlFor="dev-pressure-load">负载档位</label>
+          <Select
+            allowClear={false}
+            placeholder="负载档位"
+            id="dev-pressure-load"
+            aria-label="负载档位"
+            value={selectedAction.profile}
+            disabled={disabled}
+            onChange={selectLoad}
+            options={DEV_PRESSURE_ACTIONS.map((action) => ({ value: action.profile, label: action.profile === 'quick' ? '短档回归' : '10 分钟容量' }))}
+          />
+          <Button
+            type="primary"
+            icon={<PlayCircleOutlined aria-hidden="true" />}
+            disabled={disabled}
+            loading={Boolean(actionStarting || active)}
+            onClick={() => onRun(selectedAction.key, dataScale)}
+          >
+            {selectedAction.label}
+          </Button>
           <Button
             icon={<ReloadOutlined aria-hidden="true" />}
             loading={loading}
             onClick={reloadReports}
           >
             重新读取报告
-          </Button>
-          <Button
-            icon={<FileTextOutlined aria-hidden="true" />}
-            onClick={onOpenDocs}
-          >
-            使用说明
           </Button>
         </Space>
         <Text type="secondary">
@@ -635,7 +633,7 @@ export default function DevPressurePanel({
               ? '正在核对任务状态'
               : summary.busy?.active && !active
                 ? '已有其他 QA 任务运行，结束后可启动压测'
-                : '构建、造数和清理时间另计；切换页面后任务继续执行。')}
+                : '使用隔离环境；构建、造数与清理时间另计。')}
         </Text>
       </div>
       {latest ? (
@@ -679,8 +677,57 @@ export default function DevPressurePanel({
           ) : null}
         </section>
       ) : null}
+
+      {error ? (
+        <Alert
+          showIcon
+          type="error"
+          message={error}
+          description={
+            state?.report
+              ? '保留上次已读结果；本次读取尚未确认。'
+              : '没有可展示的已读结果。'
+          }
+        />
+      ) : null}
+      {options.length ? (
+        <div className="erp-dev-pressure-report-select">
+          <label htmlFor="dev-pressure-report">选择运行报告</label>
+          <Select
+            allowClear={false}
+            id="dev-pressure-report"
+            aria-label="选择运行报告"
+            value={requested || state?.report?.id || undefined}
+            options={options}
+            onChange={selectReport}
+            placeholder="尚无已完成报告"
+          />
+        </div>
+      ) : null}
+      {state?.invalidCount ? (
+        <p className="erp-dev-pressure-note">
+          {state.invalidCount}{' '}
+          份报告损坏、超限或合同不完整，已跳过；原始文件保留在本地。
+        </p>
+      ) : null}
+      {loading && !state ? (
+        <Skeleton active paragraph={{ rows: 6 }} />
+      ) : report ? (
+        <PressureReport report={report} reports={state.reports} />
+      ) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={
+            active
+              ? '本次压测正在执行，完成并清理后发布报告。'
+              : '暂无报告，可先运行短档回归。'
+          }
+        />
+      )}
       <details className="erp-dev-pressure-guide">
         <summary>档位、指标与维护规则</summary>
+        <Button type="link" icon={<FileTextOutlined />} onClick={onOpenDocs}>完整使用说明</Button>
+        <Paragraph>用料计算 → 提交 → 老板审批 → 财务审批 → 采购读回。每次新建隔离 PostgreSQL、S3、后端及模拟订单池；切换页面后任务继续执行。</Paragraph>
         <ol>
           <li>
             数据规模与负载档位独立选择。逻辑改动后先跑基础规模短档；比较规模时保持负载不变，源码稳定后按需要跑 10 分钟容量档。
@@ -706,49 +753,6 @@ export default function DevPressurePanel({
           </li>
         </ol>
       </details>
-      {error ? (
-        <Alert
-          showIcon
-          type="error"
-          message={error}
-          description={
-            state?.report
-              ? '保留上次已读结果；本次读取尚未确认。'
-              : '没有可展示的已读结果。'
-          }
-        />
-      ) : null}
-      <div className="erp-dev-pressure-report-select">
-        <label htmlFor="dev-pressure-report">选择运行报告</label>
-        <Select
-          id="dev-pressure-report"
-          aria-label="选择运行报告"
-          value={requested || state?.report?.id || undefined}
-          options={options}
-          onChange={selectReport}
-          placeholder="尚无已完成报告"
-        />
-      </div>
-      {state?.invalidCount ? (
-        <p className="erp-dev-pressure-note">
-          {state.invalidCount}{' '}
-          份报告损坏、超限或合同不完整，已跳过；原始文件保留在本地。
-        </p>
-      ) : null}
-      {loading && !state ? (
-        <Skeleton active paragraph={{ rows: 6 }} />
-      ) : report ? (
-        <PressureReport report={report} reports={state.reports} />
-      ) : (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={
-            active
-              ? '本次压测正在执行，完成并清理后发布报告。'
-              : '尚无可读压力测试报告；运行短档回归生成第一份证据。'
-          }
-        />
-      )}
     </div>
   )
 }

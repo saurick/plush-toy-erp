@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Empty, Select, Space, Spin, Tag } from 'antd'
+import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import TaskFulfillmentGuide from './TaskFulfillmentGuide.jsx'
 import BusinessChainTopics from './BusinessChainTopics.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
@@ -22,7 +23,6 @@ import { Markdown } from '@/common/components/markdown'
 
 import {
   getProcessLabel,
-  isDisplayOnlyWorkflowTask,
 } from '@/erp/utils/processRuntimePresentation.mjs'
 import {
   buildDevBusinessChainProjection,
@@ -220,6 +220,8 @@ function BusinessChainSelector({ catalog, value, onChange }) {
     <div className="erp-dev-flow-chain-selector">
       <label htmlFor="dev-flow-chain-select">切换业务流程</label>
       <Select
+        allowClear={false}
+        placeholder="切换业务流程"
         id="dev-flow-chain-select"
         aria-label="切换业务流程"
         showSearch
@@ -271,7 +273,8 @@ function BusinessChainOverviewView({
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
       <TaskFulfillmentGuide
         onExploreStage={onSelectChain}
-        renderTopics={(onOpenExceptionDirectory) => <BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} onSelectChain={onSelectChain} onOpenExceptionDirectory={onOpenExceptionDirectory} />}
+        businessChains={catalog.businessChains}
+        renderTopics={({ onSelectTopic, selectedTopicKey }) => <BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} selectedTopicKey={selectedTopicKey} onSelectChain={onSelectTopic} />}
       />
       {taskId ? (
         <section
@@ -487,12 +490,8 @@ function BusinessChainView({
           {runtime.status === 'unlinked' ? (
             <Alert
               showIcon
-              type={isDisplayOnlyWorkflowTask(selectedTask) ? 'warning' : 'info'}
-              message={
-              isDisplayOnlyWorkflowTask(selectedTask)
-                ? '模拟展示任务没有正式流程运行记录'
-                : '当前任务没有正式流程运行记录'
-            }
+              type="info"
+              message="当前任务没有正式流程运行记录"
             />
         ) : null}
           {runtime.status === 'ready' ? (

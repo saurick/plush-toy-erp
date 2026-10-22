@@ -13,7 +13,6 @@ export function MigrationUpgradePanel({
   pathOperation,
   readOnly,
   readyOperation,
-  selectView,
   setConfirmationOperation,
   setConfirmationText,
   summary,
@@ -38,21 +37,23 @@ export function MigrationUpgradePanel({
         <div className="erp-dev-delivery-decision" role="status">
           <div>
             <Title level={2}>{upgradeState.label}</Title>
-            <Text type="secondary">{upgradeState.description}</Text>
+            {!isLatest ? <Text type="secondary">{upgradeState.description}</Text> : null}
           </div>
-          {!summary || ['warning', 'error'].includes(upgradeState.type) ? (
-            <Button onClick={() => selectView('runtime')}>查看运行检查</Button>
-          ) : null}
         </div>
       ) : null}
 
-      <Card
-        title={
+      {pathOperation?.status === 'passed' && !activeOperation ? (
+        <DevStaticGuidance title="最近一次升级" hint="已完成 · 查看步骤与恢复证据">
+          {migrationFlow}
+        </DevStaticGuidance>
+      ) : (
+        <Card
+          title={
           pathOperation && !activeOperation
             ? '最近一次升级路径'
             : '本次升级路径'
         }
-        extra={
+          extra={
           pathOperation ? (
             <Space size={8} wrap>
               <Text type="secondary">
@@ -72,8 +73,8 @@ export function MigrationUpgradePanel({
             <Text type="secondary">流程示意</Text>
           )
         }
-      >
-        {pathOperation ? (
+        >
+          {pathOperation ? (
           migrationFlow
         ) : (
           <div className="erp-dev-migration-start">
@@ -82,36 +83,36 @@ export function MigrationUpgradePanel({
                 ? '当前没有待执行迁移。进入运行检查核对后端健康与开发工具。'
                 : '先检查候选版本、备份恢复和业务验证，生成计划后再确认升级。'}
             </Paragraph>
-            <Button onClick={() => selectView('runtime')}>查看运行检查</Button>
             <DevStaticGuidance title="查看升级步骤" hint="准备、确认与事务边界">
               {migrationFlow}
             </DevStaticGuidance>
           </div>
         )}
-        {readyOperation ? (
-          <div className="erp-dev-database-migration-ready">
-            <Alert
-              type="warning"
-              showIcon
-              message="升级计划已准备，等待确认"
-              description={`将从 ${readyOperation.target?.currentVersion} 升级到 ${readyOperation.target?.latestVersion}；备份 ${readyOperation.backup?.id} 已在隔离 PostgreSQL 中恢复并验证。`}
-              action={
-                <Button
-                  type="primary"
-                  danger
-                  disabled={readOnly || !summaryFresh || Boolean(actionKey)}
-                  onClick={() => {
+          {readyOperation ? (
+            <div className="erp-dev-database-migration-ready">
+              <Alert
+                type="warning"
+                showIcon
+                message="升级计划已准备，等待确认"
+                description={`将从 ${readyOperation.target?.currentVersion} 升级到 ${readyOperation.target?.latestVersion}；备份 ${readyOperation.backup?.id} 已在隔离 PostgreSQL 中恢复并验证。`}
+                action={
+                  <Button
+                    type="primary"
+                    danger
+                    disabled={readOnly || !summaryFresh || Boolean(actionKey)}
+                    onClick={() => {
                     setConfirmationOperation(readyOperation)
                     setConfirmationText('')
                   }}
-                >
-                  确认升级并重启
-                </Button>
+                  >
+                    确认升级并重启
+                  </Button>
               }
-            />
-          </div>
+              />
+            </div>
         ) : null}
-      </Card>
+        </Card>
+      )}
     </section>
   )
 }

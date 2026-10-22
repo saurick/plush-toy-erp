@@ -885,7 +885,11 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	if !workflowTaskCreateTextLengthsValid(in) {
 		return WorkflowTaskCreate{}, ErrBadParam
 	}
-	if in.TaskCode == "" || in.TaskGroup == "" || in.TaskName == "" || in.SourceType == "" || in.SourceID <= 0 || in.OwnerRoleKey == "" {
+	if in.TaskCode == "" || in.TaskGroup == "" || in.TaskName == "" || in.OwnerRoleKey == "" {
+		return WorkflowTaskCreate{}, ErrBadParam
+	}
+	if (in.SourceType == "") != (in.SourceID == 0) || in.SourceID < 0 ||
+		(in.SourceType == "" && (in.SourceNo != nil || in.ProcessInstanceID != nil)) {
 		return WorkflowTaskCreate{}, ErrBadParam
 	}
 	if !IsCreatableWorkflowTaskState(in.TaskStatusKey) || in.BlockedReason != nil {

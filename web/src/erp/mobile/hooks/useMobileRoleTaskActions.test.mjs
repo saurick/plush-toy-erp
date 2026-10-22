@@ -797,9 +797,9 @@ test('useMobileRoleTaskActions: unknown network result reuses frozen key and pay
     surface_key: 'mobile_role_tasks',
   })
   assert.deepEqual(harness.loadCalls, [])
-  assert.deepEqual(messages.warnings, [
-    '提交结果暂未确认，已保留填写内容，可直接重试',
-  ])
+  assert.deepEqual(messages.warnings, [], '结果在常驻回执中呈现，不重复浮动提示')
+  assert.equal(view.actionReceipt.status, 'unknown')
+  assert.match(view.actionReceipt.message, /网络中断.*尚未确认|网络中断.*暂未确认/u)
 
   await view.submitDetailAction()
   assert.equal(submitted.length, 3)
@@ -952,7 +952,9 @@ test('useMobileRoleTaskActions: action failure restores idle state and allows re
   assert.equal(view.updatingID, null)
   assert.equal(actionCalls, 1)
   assert.deepEqual(harness.loadCalls, [])
-  assert.deepEqual(messages.errors, ['更新任务状态失败，请稍后重试'])
+  assert.deepEqual(messages.errors, [], '失败原因已在可恢复的回执中显示')
+  assert.equal(view.actionReceipt.status, 'failed')
+  assert.equal(view.actionReceipt.message, '更新任务状态失败，请稍后重试')
 
   await view.submitDetailAction()
   view = harness.render()

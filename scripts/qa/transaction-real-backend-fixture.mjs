@@ -23,7 +23,7 @@ export async function prepareTransactionSourceTask(client, role, sourceType, sou
   assert.ok(options.roles.some((item) => item.role_key === role), `the actual source must have an eligible ${role} recipient`);
   const { task } = await client.rpc("admin", "workflow", "create_followup_task", {
     source_type: sourceType, source_id: sourceID, owner_role_key: role,
-    task_name: "模拟核对来源业务", description: "模拟在岗位任务内核对来源并办理关联业务",
+    task_name: "核对来源业务", description: "在岗位任务内核对来源并办理关联业务",
     due_at: Math.floor(Date.now() / 1000) + 3600, priority: 0, idempotency_key: `${prefix}:followup:${key}`,
   });
   assert.equal(task.source_type, sourceType);
@@ -226,7 +226,7 @@ export async function prepareTransactionSalesOrder(client, options, fixture) {
     {
       product_id: product.id,
       sku_code: `${fixture.prefix}-SKU`,
-      sku_name: "模拟浏览器规格",
+      sku_name: "标准规格",
       default_unit_id: product.default_unit_id,
       color: "白色",
     },
@@ -248,7 +248,7 @@ export async function prepareTransactionSalesOrder(client, options, fixture) {
       tax_mode: "INCLUSIVE",
       tax_rate: "13",
       freight_terms: "INCLUDED",
-      note: "模拟预收订单",
+      note: "预收订单",
       items: [
         {
           line_no: 1,
@@ -369,13 +369,13 @@ export async function prepareTransactionPurchase(client, options, configHash) {
   const prefix = `SIM-E2E-${options.runID.toUpperCase()}`;
   const { supplier } = await rpc("admin", "masterdata", "create_supplier", {
     code: `${prefix}-SUP`,
-    name: `${prefix} 模拟供应商`,
+    name: `${prefix} 材料供应商`,
     default_payment_term_days: 30,
     default_payment_method: "BANK_TRANSFER",
   });
   const { customer } = await rpc("admin", "masterdata", "create_customer", {
     code: `${prefix}-CUS`,
-    name: `${prefix} 模拟客户`,
+    name: `${prefix} 美悦礼品`,
   });
   const { materials } = await rpc("admin", "masterdata", "list_materials", {
     limit: 100,
@@ -401,7 +401,7 @@ export async function prepareTransactionPurchase(client, options, configHash) {
       supplier_id: supplier.id,
       supplier_snapshot: { code: supplier.code, name: supplier.name },
       purchase_date: new Date().toISOString().slice(0, 10),
-      note: "模拟浏览器全链路测试",
+      note: "按订单要求办理",
       items: [
         {
           line_no: 1,
@@ -434,7 +434,7 @@ export async function prepareTransactionPurchase(client, options, configHash) {
       warehouse_id: warehouse.id,
       received_at: new Date().toISOString().slice(0, 10),
       idempotency_key: `${prefix}:receipt`,
-      note: "模拟到货，不代表真实采购",
+      note: "到货",
     },
   );
   assert.equal(receipt.status, "DRAFT");
@@ -493,7 +493,7 @@ export async function prepareTransactionReceivable(client, fixture) {
     await rpc("warehouse", "inventory", "create_inventory_operation", {
       operation_no: `${prefix}-STOCK`,
       operation_type: "CYCLE_COUNT",
-      reason: "模拟应收结算期初实盘",
+      reason: "应收结算期初实盘",
       idempotency_key: `${prefix}:stock`,
       items: [
         {
@@ -523,7 +523,7 @@ export async function prepareTransactionReceivable(client, fixture) {
       customer_id: fixture.customer.id,
       customer_snapshot: fixture.customer.name,
       idempotency_key: `${prefix}:shipment`,
-      note: "模拟出货应收",
+      note: "出货应收",
       items: [
         {
           sales_order_item_id: item.id,
@@ -567,7 +567,7 @@ export async function prepareTransactionReceivable(client, fixture) {
     action_key: "complete",
     payload: {
       surface_key: "shipment-finance-approval",
-      feedback: "已核对模拟出货金额和放行条件",
+      feedback: "已核对出货金额和放行条件",
     },
   });
   shipment = (
@@ -675,7 +675,7 @@ export async function prepareTransactionProductionSource(
           unit_id: fixture.material.default_unit_id,
           quantity: "1",
           loss_rate: "0",
-          position: "模拟裁片用料",
+          position: "裁片用料",
         },
       ],
     })
@@ -773,19 +773,18 @@ export async function prepareTransactionProductionSource(
           .slice(0, 10),
         supplier_snapshot: {
           name: fixture.supplier.name,
-          contact_name: "模拟加工联系人",
+          contact_name: "加工联系人",
           contact_phone: "0769-00000000",
-          address: "模拟加工地址",
-          simulated_only: true,
+          address: "加工路 8 号",
         },
         contract_party_snapshot: {
-          buyerCompany: "模拟生产工厂",
-          buyerContact: "模拟采购",
+          buyerCompany: "毛绒玩具厂",
+          buyerContact: "采购部",
           buyerPhone: "0769-00000000",
-          buyerAddress: "模拟收货地址",
+          buyerAddress: "收货路 1 号",
         },
         source_order_no: salesOrder.order_no,
-        note: "模拟生产裁片加工前置合同",
+        note: "生产裁片加工前置合同",
         items: [
           {
             line_no: 1,
@@ -794,7 +793,7 @@ export async function prepareTransactionProductionSource(
             process_id: process.id,
             unit_id: fixture.material.default_unit_id,
             outsourcing_quantity: "2",
-            processing_item: "模拟裁片加工",
+            processing_item: "裁片加工",
             unit_price: "1",
             amount: "2",
           },
@@ -891,12 +890,12 @@ export async function prepareTransactionProductOutsourcingContract(client, sourc
     currency: 'CNY',
     order_date: new Date().toISOString().slice(0, 10),
     source_order_no: source.salesOrder.order_no,
-    note: '模拟车缝或手工委外，非客户事实',
+    note: '车缝或手工委外',
     items: [{
       line_no: 1, subject_type: 'PRODUCT', product_id: source.salesItem.product_id,
       product_sku_id: source.salesItem.product_sku_id, process_id: process.id,
       unit_id: source.salesItem.unit_id, outsourcing_quantity: String(source.quantity),
-      processing_item: `模拟${operationCode}加工`, unit_price: '1', amount: String(source.quantity),
+      processing_item: `${operationCode}加工`, unit_price: '1', amount: String(source.quantity),
     }],
   })).outsourcing_order;
   for (const [method, status] of [['submit_outsourcing_order', OutsourcingOrderStatus.SUBMITTED], ['confirm_outsourcing_order', OutsourcingOrderStatus.CONFIRMED]]) {

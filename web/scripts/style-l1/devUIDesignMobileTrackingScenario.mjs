@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 
 export function createDevUIDesignMobileTrackingScenario({
@@ -18,7 +19,7 @@ export function createDevUIDesignMobileTrackingScenario({
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       const phone = frame.locator('.role-mobile-device')
       await phone.getByRole('tab', { name: '流程跟踪', exact: true }).waitFor()
-      await frame.getByLabel('预览身份', { exact: true }).selectOption('admin')
+      await chooseSelectOption(frame.getByLabel('预览身份', { exact: true }), 'admin')
       const document = await (
         await page.locator('iframe[title="ERP 最新可交互设计"]').elementHandle()
       ).contentFrame()
@@ -285,9 +286,8 @@ export function createDevUIDesignMobileTrackingScenario({
           .count(),
         1
       )
-      await historyFilters
-        .getByRole('button', { name: '今天', exact: true })
-        .click()
+      await historyFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
+      await phone.getByRole('group', { name: '处理时间快捷筛选', exact: true }).getByRole('button', { name: '今天', exact: true }).click()
       assert.equal(
         await phone
           .getByRole('region', { name: '已办任务', exact: true })
@@ -295,7 +295,6 @@ export function createDevUIDesignMobileTrackingScenario({
           .count(),
         0
       )
-      await historyFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
       const clearAll = phone.getByRole('button', { name: '清空已办筛选', exact: true })
       assert.equal(await clearAll.count(), 1, '设计稿的面板处理结果保留右侧清空入口')
       assert.equal(await phone.locator('[data-action="mobile-options"]').getAttribute('aria-label'), '筛选已办，已应用 1 项', '快捷时间不重复计入顶部摘要')
@@ -308,7 +307,7 @@ export function createDevUIDesignMobileTrackingScenario({
         .getByRole('button', { name: '重置筛选', exact: true })
         .click()
       assert.equal(await historyFilters.getByRole('button', { name: '自定义日期', exact: true }).count(), 0)
-      assert.equal(await historyFilters.locator('input, select, textarea').count(), 0)
+      assert.equal(await historyFilters.locator("input, ui-select, textarea").count(), 0)
       await historyFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
       await phone.getByRole('tab', { name: '流程跟踪', exact: true }).click()
       await verifyMobileNavigationMotion(

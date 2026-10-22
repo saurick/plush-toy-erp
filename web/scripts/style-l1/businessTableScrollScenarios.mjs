@@ -10,6 +10,7 @@ import {
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 const tableSelector = '.erp-business-data-table-card .ant-table-wrapper'
+const contentSelector = '.ant-table-content, .ant-table-body'
 const rows = Array.from({ length: 45 }, (_, index) => ({
   id: index + 1,
   shipment_no: `SHIP-SCROLL-${String(index + 1).padStart(3, '0')}`,
@@ -26,8 +27,10 @@ const rows = Array.from({ length: 45 }, (_, index) => ({
 
 async function measureScroll(page) {
   return page.locator(tableSelector).evaluate((wrapper) => {
-    const content = wrapper.querySelector('.ant-table-content')
+    const content = wrapper.querySelector('.ant-table-content, .ant-table-body')
     const card = wrapper.closest('.erp-business-data-table-card')
+    const sticky = card.classList.contains('erp-business-data-table-card--sticky')
+    const scroller = sticky ? wrapper.closest('.erp-admin-content') : wrapper
     const pagination = wrapper.querySelector('.ant-pagination')
     const box = wrapper.getBoundingClientRect()
     const cardBox = card.getBoundingClientRect()
@@ -35,14 +38,18 @@ async function measureScroll(page) {
     const lastBox = lastRow?.getBoundingClientRect()
     const paginationBox = pagination?.getBoundingClientRect()
     return {
-      overflowY: getComputedStyle(wrapper).overflowY,
-      clientHeight: wrapper.clientHeight,
-      scrollHeight: wrapper.scrollHeight,
-      scrollTop: wrapper.scrollTop,
+      sticky,
+      overflowY: getComputedStyle(scroller).overflowY,
+      clientHeight: scroller.clientHeight,
+      scrollHeight: scroller.scrollHeight,
+      scrollTop: scroller.scrollTop,
+      wrapperScrollRange: wrapper.scrollHeight - wrapper.clientHeight,
       scrollLeft: content.scrollLeft,
       horizontalRange: content.scrollWidth - content.clientWidth,
       leftInset: box.left - cardBox.left,
       topInset: box.top - cardBox.top,
+      rightInset: cardBox.right - box.right,
+      bottomInset: cardBox.bottom - box.bottom,
       pageOverflow: document.documentElement.scrollWidth > innerWidth + 1,
       lastRowVisible: Boolean(
         lastBox && lastBox.bottom <= Math.min(box.bottom, innerHeight) + 1
@@ -61,7 +68,9 @@ async function scrollToTableEnd(page) {
   await wrapper.hover()
   await page.mouse.wheel(0, 10000)
   await page.waitForFunction((selector) => {
-    const node = document.querySelector(selector)
+    const wrapper = document.querySelector(selector)
+    const node = wrapper.closest('.erp-business-data-table-card--sticky')
+      ? wrapper.closest('.erp-admin-content') : wrapper
     return (
       node.scrollTop > 0 &&
       node.scrollHeight - node.clientHeight - node.scrollTop <= 1
@@ -111,6 +120,8 @@ export function createBusinessTableScrollScenarios({
       await page.locator('tr[data-row-key="20"]').waitFor()
       if (mode === 'dark') await clickERPThemeOption(page, '暗色')
       const initial = await measureScroll(page)
+      assert.equal(initial.sticky, mode !== 'mobile', '桌面主表应接入共享吸顶，手机保留原有滚动')
+      if (initial.sticky) assert(initial.wrapperScrollRange <= 1, '桌面只由主内容区纵向滚动')
       assert(
         initial.scrollHeight > initial.clientHeight + 100,
         '多行数据必须产生真实纵向溢出'
@@ -123,13 +134,14 @@ export function createBusinessTableScrollScenarios({
       assert.equal(initial.pageOverflow, false, '宽表不能撑出页面横向滚动')
       assert(initial.horizontalRange > 100, '宽列必须产生表内横向溢出')
       assert(
-        initial.leftInset >= 11 && initial.topInset >= 9,
-        `表格应留出左上间距: ${JSON.stringify(initial)}`
+        [initial.leftInset, initial.topInset, initial.rightInset, initial.bottomInset]
+          .every((inset) => inset >= 0 && inset <= 1.5),
+        `表格四边应贴合卡片内侧，仅保留边框: ${JSON.stringify(initial)}`
       )
       await exerciseTableScrollControls(
         page,
         page.locator(tableSelector),
-        page.locator(`${tableSelector} .ant-table-content`)
+        page.locator(tableSelector).locator(contentSelector)
       )
       if (mode === 'desktop') {
         assert.equal(
@@ -150,10 +162,29 @@ export function createBusinessTableScrollScenarios({
       }
 
       const bottom = await scrollToTableEnd(page)
+      if (bottom.sticky) {
+        const geometry = await page.locator(tableSelector).evaluate((wrapper) => {
+          const page = wrapper.closest('.erp-business-page-layout')
+          const root = page.closest('.erp-admin-content')
+          const toolbar = page.querySelector('.erp-business-operation-panel')
+          const header = wrapper.querySelector('.ant-table-sticky-holder')
+          const title = page.querySelector('.erp-business-page-header-card')
+          return {
+            rootTop: root.getBoundingClientRect().top,
+            toolbarTop: toolbar.getBoundingClientRect().top,
+            toolbarBottom: toolbar.getBoundingClientRect().bottom,
+            headerTop: header.getBoundingClientRect().top,
+            titleBottom: title?.getBoundingClientRect().bottom,
+          }
+        })
+        assert(Math.abs(geometry.toolbarTop - geometry.rootTop) <= 1, `操作栏应吸顶: ${JSON.stringify(geometry)}`)
+        assert(Math.abs(geometry.headerTop - geometry.toolbarBottom) <= 1, `表头应紧接操作栏: ${JSON.stringify(geometry)}`)
+        if (geometry.titleBottom != null) assert(geometry.titleBottom < geometry.rootTop, '页名应随正文滚走')
+      }
       await assertTableScrollDockVisible(page, page.locator(tableSelector))
       // Locator hover can scroll the last row into view and move pagination.
       // Aim the wheel at the already visible table area without moving it.
-      const wheelPoint = await page.locator(`${tableSelector} .ant-table-content`).evaluate(content => {
+      const wheelPoint = await page.locator(tableSelector).locator(contentSelector).evaluate((content) => {
         const box = content.getBoundingClientRect()
         const wrapper = content.closest('.ant-table-wrapper').getBoundingClientRect()
         return {
@@ -164,7 +195,7 @@ export function createBusinessTableScrollScenarios({
       await page.mouse.move(wheelPoint.x, wheelPoint.y)
       await page.mouse.wheel(10000, 0)
       await page.waitForFunction((selector) => {
-        const content = document.querySelector(`${selector} .ant-table-content`)
+        const content = document.querySelector(selector).querySelector('.ant-table-content, .ant-table-body')
         return (
           content.scrollLeft > 0 &&
           content.scrollWidth - content.clientWidth - content.scrollLeft <= 1
@@ -180,7 +211,7 @@ export function createBusinessTableScrollScenarios({
       )
       await assertSingleTableScrollbar(
         page.locator(tableSelector),
-        page.locator(`${tableSelector} .ant-table-content`)
+        page.locator(tableSelector).locator(contentSelector)
       )
       if (mode === 'desktop') {
         await page.screenshot({

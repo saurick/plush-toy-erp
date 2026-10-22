@@ -23,6 +23,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 | 当前任务 | 必要读取 |
 | --- | --- |
 | 页面任务、字段、动作、状态、密度、交互设计 | [Page Semantics](references/page-semantics.md) |
+| 动作、筛选、页签或页面数据规模增长 | [功能与数据增长](references/page-semantics.md#page-growth) |
 | 布局、主题、弹窗、键盘、运行交互、浏览器验证 | [Page Implementation](references/page-implementation.md) |
 | 纯文档 / Skill 修改 | 文本、metadata、引用和 scoped diff 检查 |
 
@@ -31,6 +32,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 ## Workflow
 
 1. Establish the page state and truth source.
+   - 写组件前按[组件复用与使用入口](../../../docs/engineering/前端实现与交互约定.md#组件复用与使用入口--shared-component-entrypoints)核对职责、正式入口及真实调用；先复用或扩展现有实现，确需独立实现时说明不能合理共用的原因。检查同时覆盖组件与调用页面，不以组件单测通过推定页面已正确复用。
    - 分开核对设计意图与当前代码、测试及运行证据，不以设计稿存在推定已实现。
    - 范围或页面入口不清时，用 `docs/当前真源与交接顺序.md` 与 `web/README.md` 定位；涉及交互设计时才读 `docs/product/ui-design/README.md` 与相关页面族说明。
    - Inspect the real runtime page and existing components when the task touches layout, density, spacing, styles, interactions, or visible page structure.

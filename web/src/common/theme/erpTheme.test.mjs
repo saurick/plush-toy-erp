@@ -7,6 +7,7 @@ import {
   installTestDOM,
 } from '../../../scripts/test/reactRuntime.mjs'
 import { createMockAdminSessionToken } from '../../../scripts/mockAdminSessionToken.mjs'
+import { WORKBENCH_APPEARANCE_STORAGE_KEY } from './erpAppearance.mjs'
 
 registerJSXTestLoader()
 const dom = installTestDOM()
@@ -50,7 +51,7 @@ function signIn(id, appearance = savedAppearance) {
   })
 }
 
-async function mount() {
+async function mount({ browserStorageKey = '' } = {}) {
   let theme
   const requests = []
   globalThis.fetch = (_url, options) =>
@@ -86,17 +87,19 @@ async function mount() {
     theme = useERPTheme()
     return null
   }
-  await act(async () =>
+  const render = async (key) => act(async () =>
     root.render(
       createElement(
         StrictMode,
         null,
-        createElement(ERPThemeProvider, null, createElement(Probe))
+        createElement(ERPThemeProvider, { browserStorageKey: key }, createElement(Probe))
       )
     )
   )
+  await render(browserStorageKey)
   return {
     requests,
+    setBrowserStorageKey: render,
     get theme() {
       return theme
     },
@@ -142,6 +145,141 @@ test('appearance: unsaved accounts use compact grid and saved accounts retain st
     )
     await settle(() => logout())
     assert.deepEqual(runtime.theme.appearance, newDefault)
+  } finally {
+    await runtime.close()
+  }
+})
+
+test('appearance: workbench preferences never inherit or update ERP guest and account preferences', async () => {
+  localStorage.clear()
+  localStorage.setItem('plush_erp_theme_mode', 'dark')
+  const guest = JSON.stringify({ accent: 'orange', density: 'standard', tableLines: 'simple' })
+  localStorage.setItem('plush_erp_appearance', guest)
+  signIn(1, { ...savedAppearance, accent: 'pink' })
+  const accountBefore = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')
+  const runtime = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
+  const chosen = { theme_mode: 'light', accent: 'teal', density: 'standard', tableLines: 'simple' }
+  try {
+    assert.equal(runtime.theme.themeMode, 'system')
+    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid' })
+    await settle(() => runtime.theme.setThemeMode(chosen.theme_mode))
+    await settle(() => runtime.theme.setAppearance(chosen))
+    assert.deepEqual(JSON.parse(localStorage.getItem(WORKBENCH_APPEARANCE_STORAGE_KEY)), chosen)
+    assert.deepEqual(getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences'), accountBefore)
+    assert.equal(localStorage.getItem('plush_erp_theme_mode'), 'dark')
+    assert.equal(localStorage.getItem('plush_erp_appearance'), guest)
+    for (const changeSession of [() => signIn(2), () => logout(), () => signIn(3)]) {
+      await settle(changeSession)
+      await settle(() => window.dispatchEvent(new Event('focus')))
+      assert.equal(runtime.theme.themeMode, 'light')
+      assert.equal(runtime.theme.appearance.accent, 'teal')
+      assert.equal(runtime.theme.appearance.density, 'standard')
+    }
+    assert.equal(runtime.requests.length, 0, 'workbench changes must not send account preference RPCs')
+  } finally {
+    await runtime.close()
+  }
+  const restored = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
+  try {
+    assert.equal(restored.theme.themeMode, chosen.theme_mode)
+    assert.deepEqual(restored.theme.appearance, { accent: 'teal', density: 'standard', tableLines: 'simple' })
+    assert.equal(restored.requests.length, 0)
+  } finally {
+    await restored.close()
+  }
+})
+
+test('appearance: workbench storage synchronization accepts only its own namespace', async () => {
+  localStorage.clear()
+  signIn(1)
+  const runtime = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
+  const chosen = { theme_mode: 'dark', accent: 'purple', density: 'standard', tableLines: 'simple' }
+  const storageEvent = (key) => window.dispatchEvent(new window.StorageEvent('storage', { key }))
+  try {
+    localStorage.setItem(WORKBENCH_APPEARANCE_STORAGE_KEY, JSON.stringify(chosen))
+    await settle(() => storageEvent('admin_erp_preferences'))
+    assert.equal(runtime.theme.appearance.accent, 'blue', 'ERP storage events must not reload workbench state')
+    await settle(() => storageEvent(WORKBENCH_APPEARANCE_STORAGE_KEY))
+    assert.equal(runtime.theme.appearance.accent, 'purple')
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(document.documentElement.dataset.erpDensity, 'standard')
+    localStorage.removeItem(WORKBENCH_APPEARANCE_STORAGE_KEY)
+    await settle(() => storageEvent(WORKBENCH_APPEARANCE_STORAGE_KEY))
+    assert.equal(runtime.theme.themeMode, 'system')
+    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid' })
+    assert.equal(runtime.requests.length, 0)
+  } finally {
+    await runtime.close()
+  }
+})
+
+test('appearance: invalid workbench storage uses defaults without reading the ERP account', async () => {
+  localStorage.clear()
+  signIn(1, { ...savedAppearance, theme_mode: 'dark', accent: 'orange' })
+  localStorage.setItem(WORKBENCH_APPEARANCE_STORAGE_KEY, '{broken')
+  const runtime = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
+  try {
+    assert.equal(runtime.theme.themeMode, 'system')
+    assert.deepEqual(runtime.theme.appearance, { accent: 'blue', density: 'compact', tableLines: 'grid' })
+    assert.equal(runtime.requests.length, 0)
+  } finally {
+    await runtime.close()
+  }
+})
+
+test('appearance: failed local saves retain the selection and recover through the existing retry action', async () => {
+  localStorage.clear()
+  signIn(1)
+  const runtime = await mount({ browserStorageKey: WORKBENCH_APPEARANCE_STORAGE_KEY })
+  const storageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage')
+  const restoreStorage = () => {
+    if (storageDescriptor) Object.defineProperty(window, 'localStorage', storageDescriptor)
+    else delete window.localStorage
+  }
+  try {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key) => localStorage.getItem(key),
+        setItem: () => { throw new Error('quota exceeded') },
+      },
+    })
+    await settle(() => runtime.theme.setAppearance({ accent: 'orange' }))
+    assert.match(runtime.theme.appearanceSaveError, /未保存到此浏览器/u)
+    assert.equal(runtime.theme.appearanceSaving, false)
+    await settle(() => window.dispatchEvent(new Event('focus')))
+    assert.equal(runtime.theme.appearance.accent, 'orange')
+    restoreStorage()
+    await settle(() => runtime.theme.retryAppearanceSave())
+    assert.equal(runtime.theme.appearanceSaveError, '')
+    assert.equal(JSON.parse(localStorage.getItem(WORKBENCH_APPEARANCE_STORAGE_KEY)).accent, 'orange')
+    assert.equal(runtime.requests.length, 0)
+  } finally {
+    restoreStorage()
+    await runtime.close()
+  }
+})
+
+test('appearance: switching to browser preferences isolates pending ERP responses and restores each scope', async () => {
+  localStorage.clear()
+  signIn(1, { ...savedAppearance, accent: 'pink' })
+  const chosen = { theme_mode: 'dark', accent: 'teal', density: 'compact', tableLines: 'grid' }
+  localStorage.setItem(WORKBENCH_APPEARANCE_STORAGE_KEY, JSON.stringify(chosen))
+  const runtime = await mount()
+  try {
+    await settle(() => runtime.theme.setAppearance({ accent: 'orange' }))
+    assert.equal(runtime.requests.length, 1)
+    await runtime.setBrowserStorageKey(WORKBENCH_APPEARANCE_STORAGE_KEY)
+    assert.equal(runtime.theme.appearance.accent, 'teal')
+    await settle(() => runtime.requests[0].reply({ ...savedAppearance, accent: 'orange' }))
+    assert.equal(runtime.theme.appearance.accent, 'teal')
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(runtime.theme.appearanceSaving, false)
+    await runtime.setBrowserStorageKey('')
+    assert.equal(runtime.theme.appearance.accent, 'pink')
+    await runtime.setBrowserStorageKey(WORKBENCH_APPEARANCE_STORAGE_KEY)
+    assert.equal(runtime.theme.appearance.accent, 'teal')
+    assert.deepEqual(JSON.parse(localStorage.getItem(WORKBENCH_APPEARANCE_STORAGE_KEY)), chosen)
   } finally {
     await runtime.close()
   }

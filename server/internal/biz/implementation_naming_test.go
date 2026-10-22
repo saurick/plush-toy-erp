@@ -42,3 +42,19 @@ func TestValueContainsNumberedImplementationStageLabel(t *testing.T) {
 		t.Fatal("expected nested stage label rejected")
 	}
 }
+
+func TestSeedBusinessValuesRejectDataNatureMarkers(t *testing.T) {
+	for _, value := range []any{
+		"模拟短毛绒", "核心演示原料仓", "样例订单",
+		map[string]any{"supplier_snapshot": map[string]any{"simulated_only": true}},
+		map[string]any{"payload": map[string]any{"trial_task": true}},
+		[]any{map[string]any{"note": "模拟验收记录"}},
+	} {
+		if err := ValidateSeedBusinessValues(value); err == nil {
+			t.Fatalf("expected data-nature value rejected: %#v", value)
+		}
+	}
+	if err := ValidateSeedBusinessValues(map[string]any{"name": "短毛绒", "note": "拉力测试合格", "quantity": 0}); err != nil {
+		t.Fatalf("ordinary business values rejected: %v", err)
+	}
+}

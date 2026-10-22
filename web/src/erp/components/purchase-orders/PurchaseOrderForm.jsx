@@ -4,14 +4,15 @@ import {
   DeleteOutlined,
   FolderOpenOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Input, InputNumber, Select, Space } from 'antd'
+import { Button, Form, Input, InputNumber, Space } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import {
   formatUnitQuantitySummary,
   summarizePurchaseOrderLines,
 } from '../../utils/sourceOrderAmounts.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import FieldWithUnitSuffix, {
   unitPrecisionFromOptions,
@@ -264,6 +265,7 @@ export function PurchaseOrderFormFields({
           rules={[{ required: true, message: '请选择供应商' }]}
         >
           <Select
+            placeholder="请选择供应商"
             showSearch
             options={supplierOptions}
             optionFilterProp="label"
@@ -283,7 +285,7 @@ export function PurchaseOrderFormFields({
           label="币种"
           rules={[{ required: true, message: '请选择币种' }]}
         >
-          <Select options={BUSINESS_CURRENCY_OPTIONS} />
+          <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
@@ -462,6 +464,7 @@ export function PurchaseOrderFormFields({
                   rules={[{ required: true, message: '请选择材料' }]}
                 >
                   <Select
+                    placeholder="请选择材料名称"
                     allowClear
                     showSearch
                     options={materialOptions}

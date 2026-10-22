@@ -674,16 +674,6 @@
       ]
     },
     {
-      "key": "simulation",
-      "label": "模拟验收任务",
-      "group": "模拟任务",
-      "module": "collaboration",
-      "chain": "collaboration",
-      "sources": [
-        "simulated-manual-acceptance-task-batch"
-      ]
-    },
-    {
       "key": "followup",
       "label": "跟进任务",
       "group": "业务跟进",

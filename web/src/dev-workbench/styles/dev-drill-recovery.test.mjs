@@ -18,7 +18,7 @@ test('drill recovery styles: stay page-scoped and use one imported surface', () 
 
 test('drill recovery page leads with the operational conclusion and evidence boundary', () => {
   assert.match(page, /当前恢复准备度/u)
-  assert.match(page, /下一步建议/u)
+  assert.match(page, /当前建议/u)
   assert.match(page, /<details[\s\S]*<summary>/u)
   assert.match(page, /overview\.drills\.map/u)
   assert.doesNotMatch(page, /function DrillCard|erp-dev-recovery-drills/u)
@@ -32,10 +32,10 @@ test('drill recovery page leads with the operational conclusion and evidence bou
   assert.match(page, /<details className="erp-dev-recovery-emergency">/u)
 })
 
-test('drill recovery page exposes business labels and keeps high-risk actions disabled', () => {
+test('drill recovery page exposes business labels without executable high-risk placeholders', () => {
   assert.match(page, /安全与恢复/u)
   assert.match(page, /overview.next/u)
-  assert.match(page, /return <Button disabled>\{action\.label\}<\/Button>/u)
+  assert.match(page, /return <Text type="secondary">\{action\.label\}<\/Text>/u)
   assert.match(page, /普通成功部署不自动算作演练/u)
   assert.match(page, /禁止对当前试用或正式环境临时注入故障/u)
 })

@@ -40,6 +40,7 @@ import {
   ProgressAttention,
 } from '../components/business-visualizations/ProgressCompactContent.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
+import WorkflowTaskCard from '../components/workflow/WorkflowTaskCard.jsx'
 import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
 import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
 import '../styles/app/progress-board.css'
@@ -294,11 +295,6 @@ export default function BusinessDashboardPage() {
             onChange={changeView}
             options={[
               {
-                label: '经营统计',
-                value: 'statistics',
-                disabled: !statistics.canUse,
-              },
-              {
                 label: '订单交付',
                 value: 'orders',
                 disabled: access?.sales === false,
@@ -307,6 +303,11 @@ export default function BusinessDashboardPage() {
                 label: '生产执行',
                 value: 'production',
                 disabled: access?.production === false,
+              },
+              {
+                label: '经营统计',
+                value: 'statistics',
+                disabled: !statistics.canUse,
               },
             ]}
           />
@@ -520,14 +521,13 @@ export default function BusinessDashboardPage() {
                             data-progress-order-id={row.id}
                           >
                             <td className="erp-progress-identity-cell">
-                              <button
-                                type="button"
-                                className="erp-progress-row-open"
-                                aria-label={`查看 ${row.order_no} 完整进度`}
-                                onClick={() => openDetail(row)}
+                              <WorkflowTaskCard
+                                openButtonProps={{ className: 'erp-progress-row-open' }}
+                                label={`查看 ${row.order_no} 完整进度`}
+                                onOpen={() => openDetail(row)}
                               >
                                 <ProgressIdentity row={row} />
-                              </button>
+                              </WorkflowTaskCard>
                             </td>
                             <td className="erp-progress-due-cell">
                               <ProgressDue

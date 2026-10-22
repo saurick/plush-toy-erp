@@ -71,6 +71,7 @@ test('手机任务保留办理动作和来源摘要，完整单据详情仅在�
   assert.match(container.textContent, /PR-SIM-91/u)
   assert.doesNotMatch(container.textContent, /查看详情|查看完整单据/u)
   const post = [...actionHost.querySelectorAll('button')].find((button) => button.textContent === '确认入库')
+  assert.ok(actionHost.querySelector('.erp-business-selection-action-bar__compact-visible > .erp-business-selection-action-bar__action-item'), '手机任务保留主动作的通栏布局入口')
   assert.equal(post.disabled, false)
   await act(async () => post.click())
   assert.equal(posted, 1)
@@ -83,7 +84,7 @@ test('手机任务保留办理动作和来源摘要，完整单据详情仅在�
   assert.equal(details, 1)
 })
 
-test('未选和清空选择时收起记录操作，选中后按权限展示办理动作', async (t) => {
+test('未选和清空时保留禁用操作，选中后按权限启用办理动作', async (t) => {
   const [
     { SelectionActionBar, SelectionClearAction, BusinessActionTooltip },
     { Button },
@@ -127,7 +128,7 @@ test('未选和清空选择时收起记录操作，选中后按权限展示办�
   }
   const button = (label) =>
     [...container.querySelectorAll('button')].find(
-      (node) => node.textContent.replace(/\s+/gu, '') === label
+      (node) => (node.getAttribute('aria-label') || node.textContent).replace(/\s+/gu, '') === label
     )
   t.after(async () => {
     await act(async () => root.unmount())
@@ -135,9 +136,9 @@ test('未选和清空选择时收起记录操作，选中后按权限展示办�
   })
 
   await render()
-  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, false)
   assert.equal(button('提交')?.disabled, true)
-  assert.equal(button('清空已选'), undefined)
+  assert.equal(Boolean(button('清空已选')), false)
   assert.equal(handled, 0)
 
   selected = true
@@ -148,16 +149,16 @@ test('未选和清空选择时收起记录操作，选中后按权限展示办�
   await act(async () => button('清空已选').click())
   await render()
   assert.equal(button('提交')?.disabled, true)
-  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
-  assert.equal(button('清空已选'), undefined)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, false)
+  assert.equal(Boolean(button('清空已选')), false)
 
   authorized = false
   await render()
-  assert.equal(button('提交'), undefined)
-  assert.equal(container.querySelector('[aria-label="当前记录操作"]'), null)
+  assert.equal(Boolean(button('提交')), false)
+  assert.equal(Boolean(container.querySelector('[aria-label="当前记录操作"]')), false)
   selected = true
   await render()
-  assert.equal(button('提交'), undefined)
+  assert.equal(Boolean(button('提交')), false)
   assert.equal(handled, 1)
 })
 
@@ -256,7 +257,10 @@ test('空间变大展开少量动作，变窄收纳，确认中不迁移触发�
   assert(button('保留出货'))
   await click(button('保留出货'))
   await settle()
-  assert.equal(more(), null)
+  assert(more(), '菜单仍打开时也保持动作位置，避免用户失去当前项')
+  await click(more())
+  await settle()
+  assert.equal(Boolean(more()), false)
   assert.equal(handled, 0)
   assert.equal(container.querySelectorAll('.erp-business-selection-action-bar__compact-visible button').length, 3)
   await click(button('撤销出货'))
@@ -265,12 +269,12 @@ test('空间变大展开少量动作，变窄收纳，确认中不迁移触发�
   related = false
   writable = false
   await render()
-  assert.equal(more(), null)
-  assert.equal(button('相关单据'), undefined)
-  assert.equal(button('撤销出货'), undefined)
+  assert.equal(Boolean(more()), false)
+  assert.equal(Boolean(button('相关单据')), false)
+  assert.equal(Boolean(button('撤销出货')), false)
   await act(async () => resize(200))
   await settle()
-  assert.equal(more(), null, '少量动作在窄容器仍能放下时不强制收纳')
+  assert.equal(Boolean(more()), false, '少量动作在窄容器仍能放下时不强制收纳')
 })
 
 test('放得下时完整展示动作，按钮颜色和临时忙碌不改变分组', async (t) => {
@@ -285,10 +289,11 @@ test('放得下时完整展示动作，按钮颜色和临时忙碌不改变分�
   )))
   const direct = () => [...container.querySelectorAll('.erp-business-selection-action-bar__record-actions button')].map((button) => button.textContent.replace(/\s+/gu, ''))
   await render()
-  assert.deepEqual(direct(), ['打印', '重新读取', '查看', '编辑', '判定合格', '判定不合格'])
+  assert.deepEqual(direct(), ['编辑', '判定合格', '判定不合格', '查看', '打印', '重新读取'])
+  assert.deepEqual([...container.querySelectorAll('.erp-business-selection-action-bar__group-heading')].map((node) => node.textContent), ['业务办理', '查看与关联', '其他操作'])
   busy = true
   await render()
-  assert.deepEqual(direct(), ['打印', '重新读取', '查看', '编辑', '判定合格', '判定不合格'])
+  assert.deepEqual(direct(), ['编辑', '判定合格', '判定不合格', '查看', '打印', '重新读取'])
   assert.equal([...container.querySelectorAll('button')].find((button) => button.textContent.replace(/\s+/gu, '') === '编辑').disabled, true)
 })
 
@@ -304,9 +309,9 @@ test('内部受权限控制的组件没有入口时，不生成空的更多操�
   const render = (authorized) => act(async () => root.render(createElement(SelectionActionBar, { selectedCount: 1 }, createElement(Button, { 'data-business-action-role': 'view' }, '查看详情'), createElement(Related, { authorized })
   )))
   await render(false)
-  assert.equal(container.querySelector('.erp-business-selection-action-bar__compact-more'), null)
+  assert.equal(Boolean(container.querySelector('.erp-business-selection-action-bar__compact-more')), false)
   await render(true)
-  assert.equal(container.querySelector('.erp-business-selection-action-bar__compact-more'), null)
+  assert.equal(Boolean(container.querySelector('.erp-business-selection-action-bar__compact-more')), false)
   assert([...container.querySelectorAll('button')].some((node) => node.textContent === '相关任务'))
 })
 
@@ -324,8 +329,8 @@ test('选中记录时新建降低强调，清空后恢复且保留原入口', as
   await render()
   const create = () => [...container.querySelectorAll('button')].find((button) => button.textContent === '新建订单')
   assert(create().classList.contains('ant-btn-primary'))
-  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
-  assert.equal(container.querySelector('[data-business-selection-placeholder]').childElementCount, 0)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, false)
+  assert.equal(Boolean(container.querySelector('[data-business-selection-placeholder]')), false)
   selected = true
   await render()
   assert.equal(create().classList.contains('ant-btn-primary'), false)
@@ -336,7 +341,7 @@ test('选中记录时新建降低强调，清空后恢复且保留原入口', as
   assert(create().classList.contains('ant-btn-primary'))
 })
 
-test('收起记录操作区保留内部尚未确认的办理状态，并允许非记录内容独立显示', async (t) => {
+test('清空后保留内部尚未确认的办理状态，并允许非记录内容独立显示', async (t) => {
   const [{ BusinessOperationPanel, SelectionActionBar }, { Button }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -353,7 +358,8 @@ test('收起记录操作区保留内部尚未确认的办理状态，并允许�
   await act(async () => container.querySelector('.erp-business-selection-action-bar button').click())
   selected = false
   await render()
-  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, true)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, false)
+  assert.equal(container.querySelector('.erp-business-selection-action-bar button').disabled, true)
   assert.equal(container.querySelector('.erp-business-operation-panel__selection').hidden, false)
   selected = true
   await render()
@@ -383,7 +389,7 @@ test('表格工具保留导出和列设置各自回调，禁用导出不能执�
   await open()
   await act(async () => item('列设置').click())
   assert.equal(configured, 1)
-  assert.equal(document.activeElement, container.querySelector('button'))
+  assert.equal(document.activeElement === container.querySelector('button'), true)
   disabled = true
   await render()
   await open()
@@ -684,7 +690,7 @@ test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后�
   assert.equal(more().getAttribute('aria-expanded'), 'false')
   await click(more())
   assert.equal(more().getAttribute('aria-expanded'), 'true')
-  assert.equal(document.querySelector('.ant-drawer-mask'), null)
+  assert.equal(Boolean(document.querySelector('.ant-drawer-mask')), false)
   assert(menu().querySelector('[aria-label="资料尚未补齐"]'))
   await click(button('受限操作', menu()))
   assert.equal(handled, 0)
@@ -693,7 +699,7 @@ test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后�
   await focusAndKey(button('查看详情', menu()), 'ArrowDown', 40)
   await waitFor(
     () => document.activeElement.getAttribute('aria-label') === '资料尚未补齐',
-    '向下移动后应聚焦下一项禁用原因'
+    '分组菜单的下一项禁用原因应可通过键盘聚焦'
   )
   await key(document.activeElement, 'Escape', 27)
   await waitFor(
@@ -712,8 +718,8 @@ test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后�
   assert.equal(more().getAttribute('aria-expanded'), 'false')
 
   await click(more())
-  assert.equal(button('其他状态操作', menu()), undefined)
-  assert.equal(menu().querySelector('[role="menu"]'), null)
+  assert.equal(Boolean(button('其他状态操作', menu())), false)
+  assert.equal(Boolean(menu().querySelector('[role="menu"]')), false)
   assert(menu().querySelector('[aria-label="本单暂时不能取消"]'))
   await click(button('取消测试单据', menu()))
   assert.equal(more().getAttribute('aria-expanded'), 'true')
@@ -729,4 +735,104 @@ test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后�
     document.querySelector('[role="dialog"]').textContent,
     /测试单据详情.*单据内容/u
   )
+})
+
+test('动作增长到 9、18、30 项时任务协作直达，分类完整且缩放保留输入', async (t) => {
+  const resize = installActionSpace(t, 240)
+  const [{ SelectionActionBar }, { Button, Input }] = await Promise.all([
+    import('./BusinessListLayout.jsx'), import('antd'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let count = 9
+  let selected = true
+  let handled = 0
+  function Collaboration({ disabled }) {
+    const [open, setOpen] = useState(false)
+    const [draft, setDraft] = useState('待核对的协作要求')
+    return createElement(Fragment, null, createElement(Button, { disabled, onClick: () => setOpen(!open) }, '任务协作'), open ? createElement(Input, { 'aria-label': '协作要求', value: draft, onChange: (event) => setDraft(event.target.value) }) : null)
+  }
+  Collaboration.selectionActionRole = 'collaboration'
+  const roles = ['action', 'view', 'output', 'secondary']
+  const render = () => act(async () => root.render(createElement(SelectionActionBar,
+    { selectedCount: Number(selected) },
+    createElement(Collaboration, { key: 'collaboration' }),
+    Array.from({ length: count }, (_, index) => createElement(Button, {
+      key: `growth-${index}`,
+      'data-business-action-role': roles[index % roles.length],
+      'data-business-action-group': index === count - 1 ? 'future-module' : index % roles.length === 3 ? 'lifecycle' : undefined,
+      'data-growth-action': index,
+      onClick: () => { handled += 1 },
+    }, `动作${index + 1}`)))))
+  const settle = () => act(async () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const more = () => container.querySelector('.erp-business-selection-action-bar__compact-more')
+  for (count of [9, 18, 30]) {
+    await act(async () => resize(240))
+    await render()
+    await settle()
+    const task = container.querySelector('.erp-business-selection-action-bar__compact-visible button')
+    assert.equal(task.textContent, '任务协作')
+    assert.equal(container.querySelectorAll('[data-growth-action]').length, 0)
+    await act(async () => more().click())
+    const menu = document.querySelector('.erp-business-selection-action-menu')
+    assert.equal(menu.querySelectorAll('[data-growth-action]').length, count)
+    assert.deepEqual([...menu.querySelectorAll('section')].map((section) => section.getAttribute('aria-label')),
+      ['业务办理', '查看与关联', '打印与输出', '单据处理', '其他操作'])
+    const last = menu.querySelector(`[data-growth-action="${count - 1}"]`)
+    menu.getBoundingClientRect = () => new dom.runtimeWindow.DOMRect(0, 0, 240, 120)
+    last.getBoundingClientRect = () => new dom.runtimeWindow.DOMRect(0, 310, 80, 32)
+    menu.scrollTop = 0
+    const pageScroll = dom.runtimeWindow.scrollY
+    await settle()
+    await act(async () => {
+      const first = menu.querySelector('button:not(:disabled)')
+      first.focus()
+      const event = new dom.runtimeWindow.KeyboardEvent('keydown', { key: 'End', bubbles: true })
+      Object.defineProperty(event, 'keyCode', { value: 35 })
+      first.dispatchEvent(event)
+    })
+    assert.equal(document.activeElement === last, true, `键盘可直接定位到最后一组动作，当前为 ${document.activeElement?.textContent}`)
+    assert(menu.scrollTop > 0, '长菜单应跟随键盘焦点滚动')
+    assert.equal(dom.runtimeWindow.scrollY, pageScroll, '菜单滚动不改变页面位置')
+    await act(async () => resize(2_800))
+    await settle()
+    assert.equal(menu.querySelectorAll('[data-growth-action]').length, count, '菜单打开时不移动当前项')
+    await act(async () => more().click())
+    await settle()
+    assert.equal(container.querySelectorAll('[data-growth-action]').length, count)
+    assert.equal(container.querySelector('.erp-business-selection-action-bar__compact-visible button') === task, true)
+    assert.equal(Boolean(more()), false, '空间足够时全部直接显示')
+  }
+  const task = container.querySelector('.erp-business-selection-action-bar__compact-visible button')
+  await act(async () => task.click())
+  const draft = () => container.querySelector('input[aria-label="协作要求"]')
+  assert.equal(draft()?.value, '待核对的协作要求')
+  await act(async () => resize(240))
+  await settle()
+  assert.equal(draft()?.value, '待核对的协作要求')
+  selected = false
+  await render()
+  assert.equal(draft()?.value, '待核对的协作要求')
+  assert.equal(task.disabled, true)
+  await act(async () => more().click())
+  const disabledAction = document.querySelector('.erp-business-selection-action-menu [data-growth-action]')
+  assert.equal(disabledAction.disabled, true)
+  await act(async () => disabledAction.click())
+  assert.equal(handled, 0)
+})
+
+test('结束动作降低强调，提交类动作保留主按钮', async (t) => {
+  const [{ BusinessLifecyclePrimaryAction }, { ConfigProvider }] = await Promise.all([
+    import('./BusinessListLayout.jsx'), import('antd'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  for (const key of ['normal_close', 'short_close', 'cancel', 'submit', 'confirm']) {
+    await act(async () => root.render(createElement(ConfigProvider, null, createElement(BusinessLifecyclePrimaryAction, { action: { key, label: key } }))))
+    assert.equal(container.querySelector('button').classList.contains('ant-btn-primary'), ['submit', 'confirm'].includes(key))
+  }
 })

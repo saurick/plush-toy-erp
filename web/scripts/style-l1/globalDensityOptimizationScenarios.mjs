@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { parseProductCoreCapabilities } from '../../src/dev-workbench/config/devProductCore.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
@@ -233,20 +234,24 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
   }
 
   add(find('dev-page-product-core-desktop-light'), 'product-core', async page => {
-    await page.locator('.erp-dev-product-core-table tbody tr').nth(16).waitFor()
+    const ledger = await fs.readFile(new URL('../../../docs/product/产品能力进度台账.md', import.meta.url), 'utf8')
+    const capabilities = parseProductCoreCapabilities(ledger)
+    await page.locator('.erp-dev-product-core-group button').nth(capabilities.length - 1).waitFor()
     await capture(page, 'product-core')
-    assert.equal(await page.locator('.erp-dev-product-core-table tbody tr').count(), 17)
+    assert.equal(await page.locator('.erp-dev-product-core-group button').count(), capabilities.length)
     if (!baseline) {
-      const details = page.locator('.erp-dev-product-core-scope').first()
-      const keyword = (await details.locator('li').first().innerText()).slice(0, 12)
-      await details.locator('summary').click()
-      await capture(page, 'product-core-expanded')
+      const capability = capabilities.find((item) => item.capability === '销售订单')
+      await page.getByRole('button', { name: capability.capability, exact: true }).click()
+      const detail = page.getByRole('article', { name: '当前能力详情' })
+      await detail.getByText(capability.boundary, { exact: true }).waitFor()
+      await capture(page, 'product-core-selected')
+      await page.getByRole('button', { name: '返回能力目录', exact: true }).click()
+      await detail.waitFor({ state: 'hidden' })
+      const keyword = capability.availableScope.split('；').at(-1).slice(0, 12)
       await page.getByPlaceholder('搜索能力、范围或边界').fill(keyword)
-      await page.locator('.erp-dev-product-core-scope[open] li').filter({ hasText: keyword }).first().waitFor()
+      await page.getByRole('button', { name: capability.capability, exact: true }).waitFor()
+      assert.equal(await page.getByRole('dialog').count(), 0, '搜索不自动打开能力详情')
       await capture(page, 'product-core-search')
-    } else {
-      await capture(page, 'product-core-expanded')
-      // Same query is taken from the formal source via the complete row text in baseline.
     }
   }, { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 })
 

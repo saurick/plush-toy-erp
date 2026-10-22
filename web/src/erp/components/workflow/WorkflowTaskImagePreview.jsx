@@ -1,4 +1,4 @@
-import React, { cloneElement, useEffect, useState } from 'react'
+import React, { cloneElement, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   CloseOutlined,
@@ -21,6 +21,7 @@ export default function WorkflowTaskImagePreview({
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [toolbar, setToolbar] = useState(null)
+  const focusClose = useCallback((node) => node?.focus({ preventScroll: true }), [])
   const name = item.name || '产品主图'
 
   useEffect(() => {
@@ -47,9 +48,10 @@ export default function WorkflowTaskImagePreview({
       <div className="erp-task-image-preview__header">
         <div className="erp-task-image-preview__identity">
           <strong>{name}</strong>
-          {item.code ? <span>产品编号 {item.code}</span> : null}
+          <span>{item.code ? `产品编号 ${item.code}` : '产品编号未填写'}</span>
         </div>
         <button
+          ref={focusClose}
           type="button"
           aria-label="关闭图片预览"
           onClick={() => setVisible(false)}

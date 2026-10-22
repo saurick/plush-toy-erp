@@ -369,6 +369,10 @@
   cursor: pointer;
 }
 
+.erp-task-table-row {
+  height: var(--erp-work-item-table-height);
+}
+
 .erp-task-title-entry {
   display: inline-flex;
   align-items: baseline;
@@ -399,16 +403,8 @@
 }
 
 .erp-task-title-entry--compact {
-  flex-wrap: wrap;
-  gap: 0 8px;
-}
-
-.erp-task-title-entry__type {
-  min-width: 0;
-  color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
-  font-weight: 400;
-  overflow-wrap: anywhere;
+  display: grid;
+  gap: 2px;
 }
 
 .erp-task-title-entry:hover {

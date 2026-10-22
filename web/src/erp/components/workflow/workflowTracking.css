@@ -4,11 +4,13 @@
 }
 
 .erp-workflow-tracking-controls {
-  margin-bottom: 16px;
+  display: grid;
+  gap: var(--erp-page-gap);
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
 }
 
 .erp-workflow-tracking-scope-summary {
-  margin: 0 0 8px;
+  margin: 0;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
 }

@@ -150,28 +150,10 @@
 }
 .workflow-task-calendar__items {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
-.workflow-task-calendar__task {
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--erp-border);
-  border-radius: 12px;
-  background: var(--erp-surface-bg);
-  overflow-wrap: anywhere;
-}
-.workflow-task-calendar__identity {
-  align-items: start;
-  justify-content: space-between;
-}
-.workflow-task-calendar__identity > span:last-child {
-  flex-shrink: 0;
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-}
-.workflow-task-calendar__source {
-  margin: 8px 0;
-  color: var(--erp-text-muted);
+.workflow-task-calendar__reason {
+  color: var(--erp-visual-danger-text);
   font-size: var(--erp-font-caption);
 }
 .workflow-task-calendar__results {
@@ -181,10 +163,6 @@
   margin-top: 12px;
   text-align: center;
 }
-.workflow-task-calendar-switch {
-  margin-bottom: 12px;
-}
-
 @media (width > 760px) {
   .workflow-task-calendar:not(.workflow-task-calendar--mobile) .workflow-task-calendar__heading {
     position: sticky;

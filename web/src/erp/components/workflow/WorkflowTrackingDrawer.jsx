@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { LeftOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Drawer, Empty, Select, Space, Spin, Tag, Timeline } from 'antd'
+import { Alert, Button, Drawer, Empty, Space, Spin, Tag, Timeline } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getWorkflowTask, getWorkflowTracking } from '../../api/workflowApi.mjs'
@@ -12,7 +13,7 @@ import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 import WorkflowInitiator from './WorkflowInitiator.jsx'
 import WorkflowExceptionPanel from './WorkflowExceptionPanel.jsx'
 import { getWorkflowTaskSourceNo } from '../../utils/dashboardTaskDisplay.mjs'
-import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
+import WorkflowTaskIdentity, { WorkflowTaskAssociation } from './WorkflowTaskIdentity.jsx'
 import { WorkflowTaskCopySummary, WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
@@ -162,6 +163,8 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
           {taskError ? <p role="alert" className="erp-workflow-tracking-task-error">{taskError}</p> : null}
           {availableTasks.length > 1 ? (
             <Select
+              allowClear={false}
+              label="选择当前任务"
               className="erp-workflow-tracking-task-select"
               aria-label="选择当前任务"
               placeholder="选择要进入的当前任务"
@@ -214,7 +217,9 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
               <WorkflowInitiator summary={summary} compact />
               <span className="erp-workflow-tracking-meta"><BusinessHelpLabel label={`发起于 ${formatWorkflowTaskEventTime(summary.started_at).replace(/:\d{2}$/u, '')}`} description={`精确发起时间：${formatWorkflowTaskEventTime(summary.started_at)}`} /></span>
             </div>
-            {summary.display_context ? <div className="erp-workflow-tracking-identity"><WorkflowTaskIdentity task={summary} summaryCopyable={false} /></div> : null}
+            <div className="erp-workflow-tracking-identity">
+              {summary.display_context ? <WorkflowTaskIdentity task={summary} summaryCopyable={false} /> : <WorkflowTaskAssociation task={summary} emptyLabel="关联内容未提供" />}
+            </div>
             <TrackingExceptions key={`${kind}:${id}:${refreshKey}`} trackingRef={{ kind, id }} onOpenTask={onOpenTask} refreshKey={reload} />
           </section>
           {stageModel?.items.length ? (

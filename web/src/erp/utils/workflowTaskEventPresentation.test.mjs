@@ -4,6 +4,7 @@ import {
   buildWorkflowTaskEventTrailModel,
   buildWorkflowTaskResponsibilityItems,
   formatWorkflowTaskEventTime,
+  getWorkflowTaskAssigneeLabel,
   presentWorkflowTaskEvent,
 } from './workflowTaskEventPresentation.mjs'
 
@@ -127,7 +128,7 @@ test('workflow task responsibility summary avoids exposing assignee ids', () => 
   const copy = items.map((item) => `${item.label}:${item.value}`).join('|')
 
   assert.match(copy, /当前负责岗位:品质/u)
-  assert.match(copy, /处理人:已指定处理人/u)
+  assert.match(copy, /处理人:已指定办理人/u)
   assert.match(copy, /催办情况:已催办 2 次/u)
   assert.match(copy, /当前升级责任:老板/u)
   assert.match(copy, /当前阻塞原因:等待复检/u)
@@ -155,4 +156,15 @@ test('workflow task event time makes missing or invalid timestamps explicit', ()
   assert.equal(formatWorkflowTaskEventTime(0), '时间未记录')
   assert.equal(formatWorkflowTaskEventTime('not-a-time'), '时间未记录')
   assert.notEqual(formatWorkflowTaskEventTime(1_720_000_000), '时间未记录')
+})
+
+test('assignee display follows assignment state even when the name is missing or stale', () => {
+  assert.equal(getWorkflowTaskAssigneeLabel({}), '待领取')
+  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: 0, discovery: { assignee_name: '旧办理人' } }), '待领取')
+  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: 31, discovery: { assignee_name: '  小林  ' } }), '小林')
+  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: 31, discovery: { assignee_name: '  ' } }), '已指定办理人')
+  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: -1, discovery: { assignee_name: '旧办理人' } }), '待领取')
+  for (const task_status_key of ['done', 'rejected', 'withdrawn']) {
+    assert.equal(getWorkflowTaskAssigneeLabel({ task_status_key, assignee_id: 0, discovery: { assignee_name: '旧办理人' } }), '未指定办理人')
+  }
 })

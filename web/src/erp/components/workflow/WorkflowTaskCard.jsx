@@ -6,6 +6,7 @@ export default function WorkflowTaskCard({
   children,
   className = '',
   contentClassName = '',
+  compact = false,
   label,
   onOpen,
   openButtonProps = {},
@@ -14,7 +15,7 @@ export default function WorkflowTaskCard({
   const { className: openButtonClassName = '', ...restOpenButtonProps } =
     openButtonProps
   return (
-    <Component {...props} className={`erp-task-card ${className}`}>
+    <Component {...props} className={`erp-task-card${compact ? ' erp-task-card--compact' : ''} ${className}`}>
       <button
         {...restOpenButtonProps}
         type="button"

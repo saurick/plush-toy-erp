@@ -40,7 +40,7 @@ export function DeliveryTaskPath({
                   </Tag>
                 ) : null}
               </div>
-              <p>{item.description}</p>
+              {item.description ? <p>{item.description}</p> : null}
             </div>
           </li>
         ))}

@@ -235,3 +235,7 @@ export function buildProductCoreSummary(capabilities = []) {
       '进入 Product Core 只表示产品能力事实；不能推出目标环境已发布、恢复可用或客户已验收。',
   }
 }
+
+export function resolveProductCoreCapability(capabilities = [], name = '') {
+  return capabilities.find((item) => item.capability === name) || null
+}

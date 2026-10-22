@@ -168,7 +168,7 @@ func TestJSONRPCSaveShipmentDraftMapsFrozenDependencyToReadableBusinessError(t *
 		"frozen",
 		mustJSONRPCStruct(t, shipmentDraftSaveJSONRPCParams(false)),
 	)
-	if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+	if err != nil || result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("frozen draft result=%#v err=%v", result, err)
 	}
 	if !strings.Contains(result.Message, "内容已冻结") {

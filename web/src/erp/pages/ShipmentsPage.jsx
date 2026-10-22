@@ -74,7 +74,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -82,6 +81,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
@@ -1636,7 +1636,7 @@ export default function ShipmentsPage() {
               className="erp-business-filter-control--status"
               value={customerFilter}
               options={[{ label: '全部客户', value: '' }, ...customerOptions]}
-              placeholder="全部客户"
+              placeholder="客户"
               showSearch
               optionFilterProp="label"
               onChange={(nextCustomer) => {
@@ -1649,7 +1649,7 @@ export default function ShipmentsPage() {
               className="erp-business-filter-control--status"
               value={productFilter}
               options={[{ label: '全部产品', value: '' }, ...productOptions]}
-              placeholder="全部产品"
+              placeholder="产品"
               showSearch
               optionFilterProp="label"
               onChange={(nextProduct) => {
@@ -1662,7 +1662,7 @@ export default function ShipmentsPage() {
               className="erp-business-filter-control--status"
               value={warehouseFilter}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
-              placeholder="全部仓库"
+              placeholder="仓库"
               showSearch
               optionFilterProp="label"
               onChange={(nextWarehouse) => {
@@ -1958,6 +1958,7 @@ export default function ShipmentsPage() {
                 size="small"
                 data-business-action-key="shipment-receivable"
                 data-business-action-role="secondary"
+                data-business-action-group="business"
                 disabled={shipmentActionAvailability.receivable.disabled}
                 onClick={() => openShipmentFinanceSource('receivable')}
               >
@@ -1974,6 +1975,7 @@ export default function ShipmentsPage() {
                 size="small"
                 data-business-action-key="shipment-invoice"
                 data-business-action-role="secondary"
+                data-business-action-group="business"
                 disabled={shipmentActionAvailability.invoice.disabled}
                 onClick={() => openShipmentFinanceSource('invoice')}
               >

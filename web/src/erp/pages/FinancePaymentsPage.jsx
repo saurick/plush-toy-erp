@@ -771,6 +771,7 @@ export default function FinancePaymentsPage() {
               >
                 <Button
                   data-business-action-key="credit-details"
+                  data-business-action-group="query"
                   disabled={!currentCredit}
                   onClick={() => setCreditDetail(currentCredit)}
                 >
@@ -798,6 +799,7 @@ export default function FinancePaymentsPage() {
                     danger
                     className="erp-business-module-status-action"
                     data-business-action-key="credit-reverse"
+                    data-business-action-group="lifecycle"
                     disabled={!currentCreditCanReverse || loading}
                     onClick={() => {
                       if (!currentCreditCanReverse || loading) return

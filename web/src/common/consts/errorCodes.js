@@ -26,7 +26,26 @@ export function isAdminSessionUnavailableCode(code) {
   return ADMIN_SESSION_UNAVAILABLE_ERROR_CODES.includes(Number(code))
 }
 
+// 受控业务码保留服务层提供的具体指引；登录安全错误仍使用固定公开文案。
+export const CONTEXTUAL_RPC_ERROR_CODES = Object.freeze([
+  RpcErrorCode.INVALID_PARAM,
+  RpcErrorCode.RESOURCE_NOT_FOUND,
+  RpcErrorCode.RESOURCE_CONFLICT,
+  RpcErrorCode.BUSINESS_RULE_VIOLATION,
+  RpcErrorCode.PERMISSION_DENIED,
+  RpcErrorCode.RESOURCE_VERSION_CONFLICT,
+  RpcErrorCode.IDEMPOTENCY_CONFLICT,
+  RpcErrorCode.PAYLOAD_TOO_LARGE,
+])
+
 export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
+  [RpcErrorCode.INVALID_PARAM]: '请检查填写内容后重试',
+  [RpcErrorCode.RESOURCE_NOT_FOUND]: '记录不存在，请刷新后重新选择',
+  [RpcErrorCode.RESOURCE_CONFLICT]: '记录重复或与当前状态冲突，请核对已有记录',
+  [RpcErrorCode.BUSINESS_RULE_VIOLATION]: '当前业务条件不满足，请核对后再操作',
+  [RpcErrorCode.SALES_ORDER_EXPORT_LIMIT]: '导出的销售订单较多，请缩小筛选范围后重试',
+  [RpcErrorCode.SALES_ORDER_EXPORT_BUSY]: '当前导出人数较多，请稍后重试',
+  [RpcErrorCode.SALES_ORDER_EXPORT_TIMEOUT]: '导出超时，请缩小筛选范围后重试',
   [RpcErrorCode.REQUEST_CANCELED]: '请求已取消，请刷新核对处理结果',
   [RpcErrorCode.ADMIN_REQUIRED]: '只有管理员才能操作',
   [RpcErrorCode.AUTH_REQUIRED]: '请先登录',

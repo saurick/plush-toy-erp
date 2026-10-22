@@ -1,4 +1,5 @@
-import { Alert, Descriptions, Input, Modal, Space, Typography } from 'antd'
+import { Alert, Descriptions, Input, Space, Typography } from 'antd'
+import Modal from '@/common/components/modal/AppModal'
 
 const { Text } = Typography
 

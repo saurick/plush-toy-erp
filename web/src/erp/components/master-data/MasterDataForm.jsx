@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { AutoComplete, Form, Input, InputNumber, Select, Switch } from 'antd'
+import { AutoComplete, Form, Input, InputNumber, Switch } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'

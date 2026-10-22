@@ -265,7 +265,14 @@ func (r *salesOrderRepo) populateSalesOrderItemCounts(ctx context.Context, order
 			order.ItemCount = &itemCount
 		}
 	}
-	requests, err := r.data.postgres.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderIDIn(orderIDs...)).Order(ent.Desc(engineeringmaterialrequest.FieldID)).All(ctx)
+	requests, err := r.data.postgres.EngineeringMaterialRequest.Query().
+		Where(func(s *sql.Selector) {
+			latest := sql.Table(engineeringmaterialrequest.Table).As("newer_material_request")
+			latestIDs := sql.Select(sql.Max(latest.C(engineeringmaterialrequest.FieldID))).From(latest).
+				Where(sql.InInts(latest.C(engineeringmaterialrequest.FieldSalesOrderID), orderIDs...)).
+				GroupBy(latest.C(engineeringmaterialrequest.FieldSalesOrderID))
+			s.Where(sql.In(s.C(engineeringmaterialrequest.FieldID), latestIDs))
+		}).Select(engineeringmaterialrequest.FieldID, engineeringmaterialrequest.FieldSalesOrderID, engineeringmaterialrequest.FieldStatus).All(ctx)
 	if err != nil {
 		return err
 	}
@@ -344,7 +351,7 @@ func (r *salesOrderRepo) UpdateSalesOrderLifecycle(ctx context.Context, id int, 
 		return nil, err
 	}
 	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	return entSalesOrderToBiz(row), nil
 }
@@ -410,7 +417,7 @@ func (r *salesOrderRepo) ApplySalesOrderLifecycleAction(
 		return nil, biz.ErrSalesOrderConflict
 	}
 	if !biz.IsSalesOrderLifecycleTransitionAllowed(current.LifecycleStatus, lifecycleStatus) || current.LifecycleStatus == lifecycleStatus {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if lifecycleStatus == biz.SalesOrderStatusCanceled {
 		if err := validateSalesOrderCancellationDependencies(ctx, tx, in.ID, true); err != nil {
@@ -658,7 +665,7 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 	}
 	if affected == 0 {
 		if row.LifecycleStatus != biz.SalesOrderStatusSubmitted {
-			return nil, biz.ErrBadParam
+			return nil, biz.ErrSourceOrderStateInvalid
 		}
 		node, err := getProcessNodeInstanceWithClient(ctx, tx.Client(), record.ProcessNodeInstanceID)
 		if err != nil {
@@ -718,7 +725,7 @@ func (r *salesOrderRepo) ActivateSalesOrderForProcessCommand(
 		return nil, err
 	}
 	if current.LifecycleStatus != biz.SalesOrderStatusSubmitted {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := validateSalesOrderCommercialReadinessWithClient(ctx, tx.Client(), salesOrderID); err != nil {
 		return nil, err
@@ -778,7 +785,7 @@ func (r *salesOrderRepo) RejectSalesOrderForProcessCommand(
 		return nil, err
 	}
 	if current.LifecycleStatus != biz.SalesOrderStatusSubmitted {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := validateSalesOrderCancellationDependencies(ctx, tx, salesOrderID, true); err != nil {
 		return nil, err
@@ -852,7 +859,7 @@ func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, 
 		return entSalesOrderToBiz(row), nil
 	}
 	if !containsString(allowedCurrent, row.LifecycleStatus) {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := validateSalesOrderCancellationDependencies(ctx, tx, id, false); err != nil {
 		return nil, err
@@ -1200,7 +1207,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 				return nil, err
 			}
 			if current.LifecycleStatus != biz.SalesOrderStatusDraft {
-				return nil, biz.ErrBadParam
+				return nil, biz.ErrSourceOrderStateInvalid
 			}
 			if current.Version != in.ExpectedVersion {
 				return nil, biz.ErrSalesOrderConflict
@@ -1270,7 +1277,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 				return nil, biz.ErrSalesOrderItemNotFound
 			}
 			if current.LineStatus == biz.SalesOrderItemStatusCanceled || current.LineStatus == biz.SalesOrderItemStatusClosed {
-				return nil, biz.ErrBadParam
+				return nil, biz.ErrSourceOrderStateInvalid
 			}
 			mutation.LineNo = current.LineNo
 			if _, err := saveSalesOrderItemUpdate(ctx, tx, item.ID, displayOrder, &mutation); err != nil {

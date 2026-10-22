@@ -885,9 +885,9 @@ async function verifyWorkInstructionRowImages({
     .locator('.erp-work-instruction-paper__row-image-input')
     .setInputFiles([
       path.resolve(webDir, 'public', 'favicon.svg'),
-      path.resolve(webDir, 'public', 'favicon-docs.svg'),
+      path.resolve(webDir, 'public', 'favicon-admin.svg'),
       path.resolve(webDir, 'public', 'favicon-dev.svg'),
-      path.resolve(webDir, 'public', 'favicon-testing.svg'),
+      path.resolve(webDir, 'public', 'favicon-tasks.svg'),
     ])
 
   await page.waitForFunction(
@@ -980,9 +980,11 @@ async function verifyWorkInstructionRowImages({
     '.erp-work-instruction-annotation-modal'
   )
 
-  await page
-    .getByRole('button', { name: '标注当前行图片', exact: true })
-    .click()
+  const annotationTrigger = page.getByRole('button', {
+    name: '标注当前行图片', exact: true,
+  })
+  await annotationTrigger.focus()
+  await annotationTrigger.press('Enter')
 
   await instructionImageManager.waitFor({
     state: 'visible',
@@ -1712,7 +1714,7 @@ export function createWorkInstructionInteractionScenario({
 
       assertButtonTexts(
         toolbarGroups[0],
-        ['选择行', '上插一行', '下插一行', '移除当前行'],
+        ['选择行', '上插一行', '下插一行', '移除当前行', '上移一行', '下移一行', '清空当前行'],
         '作业指导书纸面行'
       )
 

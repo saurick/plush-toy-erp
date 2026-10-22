@@ -6,7 +6,8 @@ import { DEFAULT_PRESSURE_LIMITS, runPressureLevel, verifyPressureRuntime, press
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
 import { normalizeLoopbackURL, readExecutionIdentity, startDatabaseSampler, startRuntimeMetricsSampler } from "./manual-acceptance-capacity-pressure.mjs";
 import { ENGINEERING_API, ENGINEERING_STATUS, assertEngineeringPressureReceipt, checkEngineeringDemand, createEngineeringPressureClient,
-  engineeringVerificationFingerprint, runEngineeringBusinessFlow, runEngineeringCompetition } from "./pressure-engineering-scenario.mjs";
+  engineeringVerificationFingerprint, runEngineeringBusinessFlow, runEngineeringCompetition, checkSalesOrderExportSnapshot, createSalesOrderPageProbe } from "./pressure-engineering-scenario.mjs";
+import { BusinessPaginationPolicy } from "../../web/src/common/consts/policies.generated.mjs";
 import { readEngineeringPressureLedger, checkEngineeringLedger } from "./pressure-engineering-ledger.mjs";
 import { ENGINEERING_RECIPES, engineeringDataFingerprint } from "./pressure-engineering-data.mjs";
 
@@ -50,6 +51,7 @@ export async function runEngineeringPressure({
   let competition, cursor = 2, completed = 0, failure, failureDetail, stage = "competition", databaseAfter, runtimeAfter;
   const readOrders = [...receipt.historyOrders, ...receipt.orders];
   const expectedMethods = Object.values(ENGINEERING_API).map((spec) => spec.domain + "." + spec.method);
+  let pagination;
   const requestFactory = async (index, observe, activeSignal, readOnly = false) => {
     const options = { observe, signal: activeSignal };
     if (!readOnly && index % 10 === 0) {
@@ -65,9 +67,9 @@ export async function runEngineeringPressure({
     }
     const order = readOrders[index % readOrders.length], product = receipt.products[order.kind];
     const reads = [
-      ["orders", { limit: 50, offset: (index * 50) % (Math.ceil(receipt.totalOrders / 50) * 50) },
-        (data) => Array.isArray(data.sales_orders) && data.total === receipt.totalOrders &&
-          data.sales_orders.every((item) => item.order_no.startsWith(receipt.prefix + "-"))],
+      ["export", { keyword: receipt.prefix, lifecycle_scope: "all", sort_by: "order_date", sort_direction: "asc" },
+        (data) => checkSalesOrderExportSnapshot(data, receipt)],
+      ["orders"],
       ["order", { id: order.id }, (data) => data.sales_order?.id === order.id &&
         data.sales_order.order_no === order.orderNo && data.sales_order.lifecycle_status === ENGINEERING_STATUS.salesOrderActive],
       ["bom", { id: product.bomId }, (data) => data.bom_version?.id === product.bomId &&
@@ -78,7 +80,31 @@ export async function runEngineeringPressure({
         (data) => data.purchase_order?.id === competition.purchaseOrderIDs[0] && data.purchase_order.lifecycle_status === ENGINEERING_STATUS.purchaseOrderApproved],
     ];
     const [operation, params, validate] = reads[index % reads.length];
+    if (operation === "orders") {
+      const page = pagination.next();
+      return client.call(operation, page.params, { ...options, validate: page.validate,
+        observe: (result) => { page.observe(result); observe(result); } });
+    }
     return client.call(operation, params, { ...options, validate });
+  };
+  const runLevel = async (level, readOnly = false) => {
+    pagination = createSalesOrderPageProbe(receipt);
+    let result;
+    try {
+      result = await runPressureLevel({ level, limits, signal,
+        expectedMethods: readOnly ? expectedMethods.filter((name) => !["submit", "boss", "finance", "purchaseItems"].some((key) =>
+          name === ENGINEERING_API[key].domain + "." + ENGINEERING_API[key].method)) : expectedMethods,
+        requestFactory: (index, observe, activeSignal) => requestFactory(index, observe, activeSignal, readOnly) });
+    } catch (error) {
+      if (error.pressureLevel) error.pressureLevel.pagination = pagination.summarize(error.pressureLevel.elapsedMs, limits);
+      throw error;
+    }
+    result.pagination = pagination.summarize(result.elapsedMs, limits);
+    if (!result.pagination.accepted) {
+      result.acceptance = result.accepted = result.capacityPassed = false;
+      result.acceptanceFailures.push("sales_order_pagination");
+    }
+    return result;
   };
   try {
     competition = await runEngineeringCompetition({ client, receipt, signal });
@@ -86,7 +112,7 @@ export async function runEngineeringPressure({
     for (const level of ENGINEERING_PRESSURE_PROFILES[profile]) {
       stage = level.key;
       onProgress({ step: level.key, status: "started", targetDurationMs: level.durationMs || null });
-      const result = await runPressureLevel({ level, limits, signal, expectedMethods, requestFactory });
+      const result = await runLevel(level);
       levels.push(result); onProgress({ step: level.key, status: "completed", passed: result.acceptance,
         successfulRps: result.successfulRps, businessFlows: result.completedBusinessFlows });
     }
@@ -96,12 +122,7 @@ export async function runEngineeringPressure({
     if (error.pressureLevel) levels.push(error.pressureLevel);
     if (competition && !signal?.aborted && levels.at(-1)?.key !== "recovery") {
       try {
-        levels.push(await runPressureLevel({
-          level: { key: "recovery", concurrency: 2, requests: 100, pacingMs: 100, cooldownBeforeMs: 2000 },
-          limits, signal, expectedMethods: ["sales_order.list_sales_orders", "sales_order.get_sales_order",
-            "bom.get_bom_version", "sales_order.get_engineering_material_request", "purchase_order.get_purchase_order"],
-          requestFactory: (index, observe, activeSignal) => requestFactory(index, observe, activeSignal, true),
-        }));
+        levels.push(await runLevel({ key: "recovery", concurrency: 2, requests: 100, pacingMs: 100, cooldownBeforeMs: 2000 }, true));
       } catch (error) { failure = "execution_and_recovery_failed"; failureDetail.recovery = pressureFailureDetails(error); }
     }
   } finally { await Promise.all([stopDatabase(), stopRuntime()]); }
@@ -123,7 +144,7 @@ export async function runEngineeringPressure({
     dataLogicFingerprint: receipt.dataLogicFingerprint, verificationFingerprint, loadFingerprint, fingerprintsUnchanged,
     dataset: { version: receipt.datasetVersion, prefix: receipt.prefix, counts: receipt.counts, dataScale: receipt.dataScale, history: receipt.history,
       totalOrders: receipt.totalOrders, complexity: receipt.complexity },
-    loadModel: "closed-loop-paced", mix: { businessFlows: 0.1, reads: 0.9 }, limits,
+    loadModel: "closed-loop-paced", mix: { businessFlows: 0.1, reads: 0.9 }, paginationPageSize: BusinessPaginationPolicy.maxPageSize, limits,
     competition, levels, completedBusinessFlows: completed, competitionBusinessFlows: competition?.completedBusinessFlows || 0,
     flowFailures, database: { before: databaseBefore, after: databaseAfter, sampling: databaseSampling, consistency, backgroundUnchanged },
     runtime: { sampling: runtimeSampling }, recovery: { accepted: recovery?.key === "recovery" && recovery.acceptance === true },

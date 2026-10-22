@@ -4,9 +4,9 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
-import { assertContentTabAffordance } from './controlAffordanceAssertions.mjs'
 import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import {
+  assertContentTabAffordance,
   assertSegmentAffordance,
   assertFilterAffordance,
   assertMobileSearchAffordance,
@@ -360,6 +360,7 @@ export function createMobileProgressScenarios({
           for (const row of method === 'get_progress'
             ? [data.row]
             : data.rows) {
+            if (row.id === 5) Object.assign(row, { customer: '', product: '', sales_owner: '' })
             if (row.id === 2) {
               Object.assign(row, {
                 open_tasks: 1,
@@ -473,11 +474,56 @@ export function createMobileProgressScenarios({
           calls[0].params.view,
           role === 'pmc' ? 'production' : 'orders'
         )
-        assert.equal(await panel.locator('.mobile-progress-list img').count(), 0)
-        assert.equal(imageCalls.length, 0, '紧凑列表不读取产品图片，详情按需加载')
+        const firstCardImage = panel.locator('.mobile-progress-card').first().locator('.erp-product-identity img')
+        const missing = panel.locator('.mobile-progress-card').filter({ hasText: `${prefix}-0005` })
+        for (const label of ['产品名称未填写', '未定交期', '业务负责人未提供']) await missing.getByText(label, { exact: true }).waitFor()
+        assert.match(await missing.locator('.erp-progress-customer').innerText(), /^客户未填写/u)
+        await firstCardImage.waitFor()
+        await page.waitForFunction(() => {
+          const image = document.querySelector('.mobile-progress-card .erp-product-identity img')
+          return image?.complete && image.naturalWidth > 0
+        })
+        assert(imageCalls.some(({ method, params }) => method === 'list_product_image_references' && params.product_ids?.includes(7)), '默认进度列表读取实际产品图片，不依赖搜索命中')
+        assert.equal(await panel.locator('.erp-task-product-image__zoom').count(), 0, '缩略图不覆盖放大镜角标')
+        const listImageButton = panel.locator('.mobile-progress-card').first().getByRole('button', { name: /查看.+大图/ })
+        await listImageButton.click()
+        await page.getByRole('button', { name: '关闭图片预览', exact: true }).waitFor()
+        assert.equal(await page.locator('.erp-progress-drawer--mobile').count(), 0, '点图只打开图片，不同时打开进度详情')
+        await page.keyboard.press('Escape')
+        await page.getByRole('button', { name: '关闭图片预览', exact: true }).waitFor({ state: 'hidden' })
         await panel.locator('.mobile-progress-card').nth(2).getByText('云朵小熊 等 3 项', { exact: true }).waitFor()
-        const cardGeometry = await panel.locator('.mobile-progress-card').first().evaluate((card) => ({ height: card.getBoundingClientRect().height, overflow: card.scrollWidth - card.clientWidth }))
-        assert(cardGeometry.height < 240 && cardGeometry.overflow <= 1, JSON.stringify(cardGeometry))
+        const cardGeometry = await panel.locator('.mobile-progress-card').evaluateAll((cards) => cards.slice(0, 3).map((card) => {
+          const delivery = card.querySelector('.erp-progress-delivery')
+          const footer = card.querySelector('.mobile-progress-task-entry').getBoundingClientRect()
+          const identity = card.querySelector('.mobile-progress-card-identity').getBoundingClientRect()
+          const action = delivery.querySelector('button')?.getBoundingClientRect()
+          const walker = document.createTreeWalker(delivery, NodeFilter.SHOW_TEXT)
+          const textBottoms = []
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            if (!node.textContent.trim()) continue
+            const range = document.createRange()
+            range.selectNodeContents(node)
+            textBottoms.push(range.getBoundingClientRect().bottom)
+          }
+          return {
+            height: card.getBoundingClientRect().height,
+            main: card.querySelector('.mobile-progress-card-main').getBoundingClientRect().height,
+            reason: card.querySelector('.erp-progress-attention-reason')?.getBoundingClientRect().height || 0,
+            imageSize: card.querySelector('.erp-task-product-image').getBoundingClientRect().width,
+            deliveryGap: footer.top - delivery.getBoundingClientRect().bottom,
+            textGap: footer.top - Math.max(...textBottoms),
+            touchHeight: action?.height ?? null,
+            touchOverlapsAdjacent: action ? action.top < identity.bottom - 0.5 || action.bottom > footer.top + 0.5 : false,
+            overflow: card.scrollWidth - card.clientWidth,
+          }
+        }))
+        assert(cardGeometry[1].height < 210 && cardGeometry.every((card) => card.overflow <= 1), JSON.stringify(cardGeometry))
+        assert(cardGeometry.every((card) => card.imageSize === 64 && card.deliveryGap >= 0 && card.deliveryGap <= 4.5), `图片可辨认，出货进度后不叠加空白：${JSON.stringify(cardGeometry)}`)
+        assert(cardGeometry.every((card) => card.textGap >= 6 && card.textGap <= 16.5), `按文字到分隔线核验数量行留白：${JSON.stringify(cardGeometry)}`)
+        assert(cardGeometry.every((card) => (card.touchHeight === null || card.touchHeight >= 44) && !card.touchOverlapsAdjacent), `紧凑数量行保留独立且不侵入相邻区域的触区：${JSON.stringify(cardGeometry)}`)
+        await writeFile(path.join(outputDir, `progress-quantity-spacing-${role}.json`), JSON.stringify(cardGeometry, null, 2))
+        assert(Math.max(...cardGeometry.map((card) => card.main)) - Math.min(...cardGeometry.map((card) => card.main)) <= 1, `进度身份和数量分区应对齐：${JSON.stringify(cardGeometry)}`)
+        assert(cardGeometry[0].height <= cardGeometry[1].height + cardGeometry[0].reason + 4, `异常只按真实原因增高：${JSON.stringify(cardGeometry)}`)
         await assertNoHorizontalOverflow(page, role)
         await assertContentTabAffordance(panel.locator('.mobile-progress-view-switch'))
         await assertFilterAffordance(
@@ -547,7 +593,7 @@ export function createMobileProgressScenarios({
         )
         assert(
           (await taskEntries.nth(0).innerText()).includes(
-            '采购待领取 · 共 2 项待办'
+            '采购 · 办理人未提供 · 共 2 项待办'
           )
         )
         assert.equal(
@@ -960,10 +1006,11 @@ export function createMobileProgressScenarios({
         await taskSurface
           .getByRole('heading', { name: '确认面料交期', exact: true })
           .waitFor()
-        await page.waitForFunction(() => {
+        const taskActionAllowed = permissions.includes('workflow.task.update')
+        await page.waitForFunction((expectedGrow) => {
           const attachment = document.querySelector('button[data-testid="mobile-task-attachment-action"]')
-          return attachment && getComputedStyle(attachment).flexGrow === '0'
-        })
+          return attachment && getComputedStyle(attachment).flexGrow === expectedGrow
+        }, taskActionAllowed ? '0' : '1')
         const taskLayout = await taskSurface.evaluate((root) => {
           const hero = root.querySelector('.workflow-task-info-card[aria-label="任务信息"]')
           const attachment = root.querySelector(
@@ -978,6 +1025,7 @@ export function createMobileProgressScenarios({
             heroWidth: hero.getBoundingClientRect().width,
             attachmentWidth: attachment.getBoundingClientRect().width,
             attachmentHeight: attachment.getBoundingClientRect().height,
+            footerWidth: footer.clientWidth - parseFloat(getComputedStyle(footer).paddingLeft) - parseFloat(getComputedStyle(footer).paddingRight),
             footerButtons: [...footer.querySelectorAll('button')].map((button) => {
               const box = button.getBoundingClientRect()
               return { text: button.textContent, top: box.top, height: box.height, width: box.width }
@@ -992,13 +1040,14 @@ export function createMobileProgressScenarios({
         assert.equal(taskLayout.attachmentInHero, false)
         assert.equal(taskLayout.attachmentInFooter, true)
         assert(taskLayout.attachmentHeight >= 44, JSON.stringify(taskLayout))
-        assert.equal(taskLayout.footerButtons.length, 2)
-        assert(Math.abs(taskLayout.footerButtons[0].top - taskLayout.footerButtons[1].top) <= 1, JSON.stringify(taskLayout))
-        assert(Math.abs(taskLayout.footerButtons[0].height - taskLayout.footerButtons[1].height) <= 1, JSON.stringify(taskLayout))
-        assert(
-          taskLayout.attachmentWidth < taskLayout.heroWidth / 2,
-          JSON.stringify(taskLayout)
-        )
+        assert.equal(taskLayout.footerButtons.length, taskActionAllowed ? 2 : 1)
+        if (taskActionAllowed) {
+          assert(Math.abs(taskLayout.footerButtons[0].top - taskLayout.footerButtons[1].top) <= 1, JSON.stringify(taskLayout))
+          assert(Math.abs(taskLayout.footerButtons[0].height - taskLayout.footerButtons[1].height) <= 1, JSON.stringify(taskLayout))
+          assert(taskLayout.attachmentWidth < taskLayout.heroWidth / 2, JSON.stringify(taskLayout))
+        } else {
+          assert(Math.abs(taskLayout.attachmentWidth - taskLayout.footerWidth) <= 1, JSON.stringify(taskLayout))
+        }
         assert.deepEqual(taskLayout.steps, ['任务信息', '任务办理', '结果回执'], '任务详情首屏保留完整三步引导')
         await writeFile(
           path.join(outputDir, `mobile-progress-${role}-detail-geometry.json`),
@@ -1444,7 +1493,7 @@ export function createMobileProgressScenarios({
           panel.locator('.mobile-progress-card').evaluateAll((cards) =>
             cards.map((card) => {
               const copy = card.cloneNode(true)
-              copy.querySelector('.mobile-progress-product-image')?.remove()
+              copy.querySelector('.erp-product-identity__picture')?.remove()
               return copy.textContent
             })
           )

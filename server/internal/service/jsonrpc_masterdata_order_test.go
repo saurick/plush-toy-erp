@@ -557,8 +557,8 @@ func TestJsonrpcDispatcher_ContactAPIUsesUsecaseOwnerGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if res == nil || res.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param for missing owner, got %#v", res)
+	if res == nil || res.Code != errcode.ResourceNotFound.Code {
+		t.Fatalf("expected not found for missing owner, got %#v", res)
 	}
 	if repo.createdContact != nil {
 		t.Fatalf("contact API must not bypass usecase owner guard")
@@ -710,8 +710,8 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if invalidUnitRes == nil || invalidUnitRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param for missing unit, got %#v", invalidUnitRes)
+	if invalidUnitRes == nil || invalidUnitRes.Code != errcode.ResourceNotFound.Code {
+		t.Fatalf("expected not found for missing unit, got %#v", invalidUnitRes)
 	}
 
 	j = newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{unitActive: true}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialCreate))
@@ -895,7 +895,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only processes create rejected, got %#v", createRes)
 	}
 	if repo.createdProcess != nil {
@@ -959,7 +959,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if activeRes == nil || activeRes.Code != errcode.InvalidParam.Code {
+	if activeRes == nil || activeRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled processes active toggle rejected, got %#v", activeRes)
 	}
 	if repo.processActiveCalls != 0 {
@@ -1025,7 +1025,7 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if customerCreateRes == nil || customerCreateRes.Code != errcode.InvalidParam.Code {
+	if customerCreateRes == nil || customerCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only customers create rejected, got %#v", customerCreateRes)
 	}
 	if repo.createdCustomer != nil {
@@ -1056,7 +1056,7 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if supplierSaveRes == nil || supplierSaveRes.Code != errcode.InvalidParam.Code {
+	if supplierSaveRes == nil || supplierSaveRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled suppliers aggregate save rejected, got %#v", supplierSaveRes)
 	}
 	if repo.savedSupplier != nil {
@@ -1075,7 +1075,7 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if materialCreateRes == nil || materialCreateRes.Code != errcode.InvalidParam.Code {
+	if materialCreateRes == nil || materialCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only materials create rejected, got %#v", materialCreateRes)
 	}
 	if repo.createdMaterial != nil {
@@ -1094,7 +1094,7 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if productCreateRes == nil || productCreateRes.Code != errcode.InvalidParam.Code {
+	if productCreateRes == nil || productCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled products create rejected, got %#v", productCreateRes)
 	}
 	if repo.createdProduct != nil {
@@ -1104,7 +1104,7 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if skuCreateRes == nil || skuCreateRes.Code != errcode.InvalidParam.Code {
+	if skuCreateRes == nil || skuCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled products SKU create rejected, got %#v", skuCreateRes)
 	}
 	if repo.createdSKU != nil {
@@ -1123,7 +1123,7 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if contactCreateRes == nil || contactCreateRes.Code != errcode.InvalidParam.Code {
+	if contactCreateRes == nil || contactCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected supplier contact create rejected when suppliers read_only, got %#v", contactCreateRes)
 	}
 	if repo.createdContact != nil {
@@ -1134,7 +1134,7 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if contactDisableRes == nil || contactDisableRes.Code != errcode.InvalidParam.Code {
+	if contactDisableRes == nil || contactDisableRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected supplier contact disable rejected after owner lookup, got %#v", contactDisableRes)
 	}
 	if repo.disableContactCalls != 0 {
@@ -1176,8 +1176,8 @@ func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if invalidUnitRes == nil || invalidUnitRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param for missing unit, got %#v", invalidUnitRes)
+	if invalidUnitRes == nil || invalidUnitRes.Code != errcode.ResourceNotFound.Code {
+		t.Fatalf("expected not found for missing unit, got %#v", invalidUnitRes)
 	}
 	if repo.createdProduct != nil {
 		t.Fatalf("product API must not bypass usecase unit guard")
@@ -1334,8 +1334,8 @@ func TestJsonrpcDispatcher_ProductSKUAPIRequiresPermissionAndValidRefs(t *testin
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if invalidProductRes == nil || invalidProductRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param for missing product, got %#v", invalidProductRes)
+	if invalidProductRes == nil || invalidProductRes.Code != errcode.ResourceNotFound.Code {
+		t.Fatalf("expected not found for missing product, got %#v", invalidProductRes)
 	}
 	if repo.createdSKU != nil {
 		t.Fatalf("sku API must not bypass usecase product guard")
@@ -1685,7 +1685,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+	if saveRes == nil || saveRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only sales_orders save rejected, got %#v", saveRes)
 	}
 	if len(repo.savedItems) != 0 {
@@ -1747,7 +1747,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+	if saveRes == nil || saveRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled sales_orders aggregate save rejected, got %#v", saveRes)
 	}
 	if repo.savedOrder != nil || len(repo.savedItems) != 0 {
@@ -1764,7 +1764,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
+	if cancelRes == nil || cancelRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled sales_orders cancel rejected, got %#v", cancelRes)
 	}
 	if repo.lifecycleStatus != biz.SalesOrderStatusSubmitted {
@@ -1983,8 +1983,8 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesUsecaseProductUnitGuard(t 
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if res == nil || res.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param for missing product, got %#v", res)
+	if res == nil || res.Code != errcode.ResourceNotFound.Code {
+		t.Fatalf("expected not found for missing product, got %#v", res)
 	}
 	if repo.savedOrder != nil || len(repo.savedItems) != 0 {
 		t.Fatalf("aggregate sales order save must not bypass product/unit guard")

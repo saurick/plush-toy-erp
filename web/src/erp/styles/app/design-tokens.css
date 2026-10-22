@@ -55,6 +55,12 @@
   --erp-topbar-height: 48px;
   --erp-page-padding: 12px;
   --erp-page-gap: 9px;
+  --erp-work-item-padding: 12px;
+  --erp-work-item-gap: 8px;
+  --erp-work-item-radius: 16px;
+  --erp-work-item-image-size: 64px;
+  --erp-work-item-association-height: 64px;
+  --erp-work-item-table-height: 96px;
 }
 
 @media screen and (min-width: 768px) {
@@ -90,6 +96,14 @@
 
 [data-erp-density='compact'] {
   --erp-row-height: 42px;
+  --erp-work-item-table-height: 76px;
+}
+
+@media screen and (min-width: 768px) {
+  [data-erp-density='compact'] :is(.erp-task-table-row, .erp-progress-table) {
+    --erp-work-item-image-size: 48px;
+    --erp-work-item-association-height: 48px;
+  }
 }
 
 body {

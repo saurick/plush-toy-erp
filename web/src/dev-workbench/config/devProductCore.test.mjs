@@ -12,6 +12,7 @@ import {
   isDevProductCoreEnabled,
   normalizeProductCoreMembership,
   parseProductCoreCapabilities,
+  resolveProductCoreCapability,
 } from './devProductCore.mjs'
 
 const ledgerSource = readFileSync(
@@ -22,6 +23,10 @@ const pageSource = readFileSync(
   new URL('../pages/DevProductCorePage.jsx', import.meta.url),
   'utf8'
 )
+const ledgerSection = ledgerSource.split('## 能力状态')[1]?.split('\n## ')[0] || ''
+const ledgerEntries = [...ledgerSection.matchAll(
+  /^\|\s*([^|]+?)\s*\|\s*(可试用|部分可用|当前不纳入)\s*\|/gmu
+)].map(([, capability, status]) => [capability, status])
 
 test('devProductCore: route and source stay inside the DEV-only workbench', () => {
   assert.equal(DEV_PRODUCT_CORE_ROUTE, '/__dev/product-core')
@@ -40,18 +45,19 @@ test('devProductCore: route and source stay inside the DEV-only workbench', () =
   )
 })
 
-test('devProductCore: all 17 capability rows derive from the unique ledger', () => {
+test('devProductCore: every published capability and status derives from the unique ledger', () => {
   const capabilities = parseProductCoreCapabilities(ledgerSource)
   const summary = buildProductCoreSummary(capabilities)
 
-  assert.equal(capabilities.length, 17)
-  assert.equal(new Set(capabilities.map((item) => item.key)).size, 17)
+  assert(ledgerEntries.length > 0)
+  assert.deepEqual(capabilities.map((item) => [item.capability, item.status]), ledgerEntries)
+  assert.equal(new Set(capabilities.map((item) => item.key)).size, ledgerEntries.length)
   assert.deepEqual(summary.counts, {
-    entered: 12,
-    partial: 3,
-    excluded: 2,
+    entered: ledgerEntries.filter(([, status]) => status === '可试用').length,
+    partial: ledgerEntries.filter(([, status]) => status === '部分可用').length,
+    excluded: ledgerEntries.filter(([, status]) => status === '当前不纳入').length,
   })
-  assert.equal(summary.total, 17)
+  assert.equal(summary.total, ledgerEntries.length)
   assert.equal(summary.readOnly, true)
   assert.match(summary.boundary, /不能推出目标环境已发布/u)
   assert(
@@ -76,6 +82,36 @@ test('devProductCore: all 17 capability rows derive from the unique ledger', () 
   assert.doesNotMatch(pageSource, /主要边界\s*\/\s*下一步/u)
 })
 
+test('devProductCore: parsing, summaries and filters keep the three statuses distinct', () => {
+  const capabilities = parseProductCoreCapabilities(`
+# 测试台账
+## 能力状态
+| 业务能力 | 状态 | 当前可用范围 | 当前边界 |
+| --- | --- | --- | --- |
+| 订单 | 可试用 | 草稿与提交 | 不替代出货 |
+| 资料导入 | 部分可用 | 只读提取 | 没有写入执行器 |
+| 多租户 | 当前不纳入 | 单客户部署 | 无租户隔离 |
+## 证据入口
+| 业务能力 | 状态 | 当前可用范围 | 当前边界 |
+| --- | --- | --- | --- |
+| 无关表格 | 可试用 | 不属于能力状态 | 不应进入投影 |
+`)
+  assert.deepEqual(capabilities.map((item) => [item.capability, item.membershipKey]), [
+    ['订单', 'entered'],
+    ['资料导入', 'partial'],
+    ['多租户', 'excluded'],
+  ])
+  const summary = buildProductCoreSummary(capabilities)
+  assert.equal(summary.total, 3)
+  assert.deepEqual(summary.counts, { entered: 1, partial: 1, excluded: 1 })
+  assert.deepEqual(filterProductCoreCapabilities(capabilities, {
+    membership: 'partial', keyword: '导入',
+  }).map((item) => item.capability), ['资料导入'])
+  assert.deepEqual(filterProductCoreCapabilities(capabilities, {
+    membership: 'excluded', keyword: '导入',
+  }), [])
+})
+
 test('devProductCore: filters distinguish membership and readable keywords', () => {
   const capabilities = parseProductCoreCapabilities(ledgerSource)
 
@@ -83,7 +119,7 @@ test('devProductCore: filters distinguish membership and readable keywords', () 
     filterProductCoreCapabilities(capabilities, {
       membership: 'entered',
     }).length,
-    12
+    ledgerEntries.filter(([, status]) => status === '可试用').length
   )
   assert.deepEqual(
     filterProductCoreCapabilities(capabilities, {
@@ -112,4 +148,16 @@ test('devProductCore: page consumes the searchable read-only capability projecti
   assert.match(pageSource, /selected=\{isActive\}/u)
   assert.match(pageSource, /进入 Product Core 不等于已发布或已验收/u)
   assert.doesNotMatch(pageSource, /parseProductCoreEvidenceEntries/u)
+})
+
+test('devProductCore: selection follows the filtered ledger and survives row reordering', () => {
+  const capabilities = parseProductCoreCapabilities(ledgerSource)
+  const chosen = capabilities[2]
+  assert.equal(resolveProductCoreCapability(capabilities, chosen.capability), chosen)
+  assert.equal(resolveProductCoreCapability([...capabilities].reverse(), chosen.capability), chosen)
+  const partial = filterProductCoreCapabilities(capabilities, { membership: 'partial' })
+  assert.equal(resolveProductCoreCapability(capabilities), null)
+  assert.equal(resolveProductCoreCapability(partial, chosen.capability), null)
+  assert.equal(resolveProductCoreCapability(capabilities, '已移除的能力'), null)
+  assert.equal(resolveProductCoreCapability([], chosen.capability), null)
 })

@@ -5,7 +5,7 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import {

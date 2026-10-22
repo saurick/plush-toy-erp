@@ -1,8 +1,10 @@
+import { openERPAppearance } from './themeAssertions.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { mobileAppearanceScenario } from './mobileAppearanceScenario.mjs'
 import { createMobileSurfaceScenarios } from './mobileSurfaceScenarios.mjs'
 import { createGlobalSurfaceScenarios } from './globalSurfaceScenarios.mjs'
 import { createReadabilityScenarios } from './readabilityScenarios.mjs'
+import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 
 export function createHighFidelityScenarios({
   assert,
@@ -56,6 +58,7 @@ export function createHighFidelityScenarios({
       name: 'high-fidelity-desktop-appearance',
       path: '/erp/sales/project-orders/sales-orders',
       auth: 'admin',
+      adminProfile: { erp_preferences: { appearance: { density: 'standard' } } },
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
@@ -71,7 +74,7 @@ export function createHighFidelityScenarios({
           }
           return {
             sidebar: rect('.erp-admin-sider'),
-            header: rect('.erp-admin-header'),
+            header: rect('.erp-business-page-header-card'),
             table: rect('.erp-business-data-table-card'),
             row: rect('tbody tr[data-row-key]'),
             search: rect(
@@ -80,7 +83,8 @@ export function createHighFidelityScenarios({
           }
         })
         assert.equal(dimensions.sidebar.w, 206, '高保真侧栏宽度')
-        assert.equal(dimensions.header.h, 48, '高保真顶栏高度')
+        assert.equal(dimensions.header.y, 8, '业务标题直接位于页面顶部')
+        assert.equal(await page.locator('.erp-admin-header').count(), 0, '移除独立全局顶栏')
         assert.equal(dimensions.search.h, 34, '桌面检索控件高度')
         assert.equal(dimensions.row.h, 52, '标准行密度')
         assert.ok(
@@ -88,6 +92,11 @@ export function createHighFidelityScenarios({
           `表格占据主体并将分页放在底部：${JSON.stringify(dimensions)}`
         )
         await shot(page, 'high-fidelity-sales-standard')
+        await page.setViewportSize({ width: 3840, height: 2160 })
+        await settle(page)
+        await shot(page, 'header-sidebar-desktop-4k')
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await settle(page)
 
         const filter = page.locator(
           '.erp-business-operation-panel button[aria-haspopup="dialog"]'
@@ -112,21 +121,10 @@ export function createHighFidelityScenarios({
           '关闭筛选恢复触发焦点'
         )
 
-        const appearanceTrigger = page.getByRole('button', {
-          name: '外观与密度',
-          exact: true,
-        })
-        await appearanceTrigger.click()
+        const appearanceTrigger = await openERPAppearance(page)
         const appearance = page.getByRole('dialog', { name: '外观与密度' })
         await appearance.waitFor()
-        for (const [label, key] of [
-          ['绿色', 'green'],
-          ['黄色', 'yellow'],
-          ['粉色', 'pink'],
-          ['橙色', 'orange'],
-          ['紫色', 'purple'],
-          ['蓝色', 'blue'],
-        ]) {
+        for (const [key, { label }] of Object.entries(ERP_ACCENTS)) {
           await appearance
             .getByRole('button', { name: label, exact: true })
             .click()
@@ -175,7 +173,7 @@ export function createHighFidelityScenarios({
           42,
           '刷新保留密度'
         )
-        await appearanceTrigger.press('Enter')
+        await openERPAppearance(page)
         await appearance.waitFor()
         await appearance.getByText('暗色', { exact: true }).click()
         await page.keyboard.press('Escape')
@@ -216,7 +214,7 @@ export function createHighFidelityScenarios({
           await page.setViewportSize({ width, height: 844 })
           await settle(page)
           const header = await page
-            .locator('.erp-admin-header')
+            .locator('.erp-page-actions').filter({ visible: true })
             .evaluate((node) => {
               const box = node.getBoundingClientRect()
               return {
@@ -237,10 +235,10 @@ export function createHighFidelityScenarios({
                   }),
               }
             })
-          assert.equal(header.height, 48, '窄屏仍保持顶栏高度')
+          assert(header.height >= 34 && header.height <= 48, '窄屏页面操作保持可用高度')
           assert.ok(
             header.controls.every((control) => control.contained),
-            `${width}px 顶栏操作完整可见: ${JSON.stringify(header)}`
+            `${width}px 页面操作完整可见: ${JSON.stringify(header)}`
           )
           await shot(page, `high-fidelity-sales-narrow-${width}`)
         }

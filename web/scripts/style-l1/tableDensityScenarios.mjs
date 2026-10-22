@@ -1,13 +1,15 @@
+import { openERPAppearance } from './themeAssertions.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
-import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
+import { createTaskItemSemanticsScenarios } from './taskItemSemanticsScenarios.mjs'
+import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 
 async function setDensity(page, label) {
-  await page.getByRole('button', { name: '外观与密度', exact: true }).click()
+  await openERPAppearance(page)
   const dialog = page.getByRole('dialog', { name: '外观与密度' })
   await dialog.getByText('表格密度', { exact: true }).waitFor()
   await dialog.getByText(label, { exact: true }).click()
@@ -78,9 +80,57 @@ export function createTableDensityScenarios(deps) {
     effectiveSession: customerRuntimeEffectiveSession,
     viewport: { width: 1440, height: 1000 },
   }
-  const task = createDashboardTaskScenarios(deps).find(
-    (scenario) => scenario.name === 'erp-task-board-desktop'
+  const task = createTaskItemSemanticsScenarios(deps).find(
+    (scenario) => scenario.name === 'task-item-layout-desktop-1440-light'
   )
+  const progress = createBusinessProgressScenarios(deps)[0]
+  const workItemRoundTrip = async (page, selector, name) => {
+    const rows = page.locator(selector)
+    await rows.locator('img').first().waitFor()
+    const samples = []
+    for (const label of ['标准', '紧凑', '标准']) {
+      await setDensity(page, label)
+      const metrics = await rows.evaluateAll((items) => items.filter((row) => !row.dataset.taskId || Number(row.dataset.taskId) <= 97405).slice(0, 5).map((row) => ({
+        height: row.getBoundingClientRect().height,
+        text: row.innerText,
+        longContent: row.dataset.progressOrderId === '4',
+        image: row.querySelector('.erp-task-product-image').getBoundingClientRect().width,
+        clipped: [...row.querySelectorAll('td *')].some((node) => {
+          const box = node.getBoundingClientRect()
+          const cell = node.closest('td').getBoundingClientRect()
+          return box.width > 0 && box.height > 0 && (box.top < cell.top - 1 || box.bottom > cell.bottom + 1)
+        }),
+      })))
+      assert(metrics.length > 0 && metrics.every((row) => !row.clipped), JSON.stringify(metrics))
+      samples.push(metrics)
+      if (label === '紧凑') {
+        assert(metrics.every((row) => row.image === 48 && row.height >= 72 && (row.longContent ? row.height > 80 : row.height <= 80)), `普通行保持紧凑，长产品名称完整换行：${JSON.stringify(metrics)}`)
+        if (selector.includes('erp-task-table-row')) {
+          const longRow = page.locator('tr[data-task-id="97407"]')
+          assert((await longRow.boundingBox()).height > metrics[0].height, '紧凑模式保留长内容并自然增高')
+          const associations = page.getByRole('button', { name: '查看3 款产品', exact: true })
+          await associations.click()
+          const modal = page.locator('.erp-task-linked-items-modal')
+          await modal.getByText('示例挂兔', { exact: true }).waitFor()
+          await waitForFiniteAnimations(page)
+          await page.waitForFunction(() => document.activeElement?.closest('.ant-modal-wrap')?.querySelector('.erp-task-linked-items-modal'))
+          await page.keyboard.press('Escape')
+          await modal.waitFor({ state: 'hidden' })
+        }
+        await rows.getByRole('button', { name: /查看.+大图/ }).first().click()
+        await page.getByRole('button', { name: '关闭图片预览', exact: true }).waitFor()
+        await waitForFiniteAnimations(page)
+        await page.keyboard.press('Escape')
+        await page.getByRole('button', { name: '关闭图片预览', exact: true }).waitFor({ state: 'hidden' })
+        await page.screenshot({ path: `${outputDir}/${name}-compact.png` })
+      }
+    }
+    const [standard, compact, restored] = samples
+    assert(standard.every((row, index) => row.height > compact[index].height && row.image === 64), JSON.stringify(samples))
+    assert.deepEqual(compact.map((row) => row.text), standard.map((row) => row.text), '切换密度保留可见信息')
+    assert.deepEqual(restored, standard, '恢复标准密度无残留')
+    await writeFile(`${outputDir}/${name}-metrics.json`, JSON.stringify(samples, null, 2))
+  }
   const audit = createAuditLogScenarios(deps).find(
     (scenario) => scenario.name === 'system-audit-logs-desktop'
   )
@@ -114,18 +164,25 @@ export function createTableDensityScenarios(deps) {
         )
       },
     })),
-    {
+    ...['light', 'dark'].map((themeMode) => ({
       ...task,
-      name: 'table-density-task-board',
-      path: '/erp/task-board?lane=actionable',
+      name: `table-density-task-board${themeMode === 'dark' ? '-dark' : ''}`,
+      themeMode,
       verify: async (page) => {
-        await roundTrip(
-          page,
-          '.erp-task-board-lane--focused tbody tr[data-row-key]',
-          'density-task-board'
-        )
+        await workItemRoundTrip(page, '.erp-task-table-row', `density-task-board-${themeMode}`)
       },
-    },
+    })),
+    ...['light', 'dark'].map((themeMode) => ({
+      ...progress,
+      name: `table-density-progress-${themeMode}`,
+      themeMode,
+      verify: async (page) => {
+        await workItemRoundTrip(page, '.erp-progress-row', `density-progress-${themeMode}`)
+        await page.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await page.getByRole('table', { name: '生产执行紧凑总览', exact: true }).waitFor()
+        await workItemRoundTrip(page, '.erp-progress-row', `density-production-${themeMode}`)
+      },
+    })),
     {
       ...business,
       name: 'table-density-edit-lines',

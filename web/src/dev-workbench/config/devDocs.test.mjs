@@ -10,6 +10,7 @@ import { createDevDocsMetadataPlugin } from '../../../vite.docs.mjs'
 
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
+  DEV_DOCS_HOME_PATH,
   DEV_DOCS_LIFECYCLE_ARCHIVE,
   DEV_DOCS_LIFECYCLE_CURRENT,
   DEV_DOCS_LIFECYCLE_REVIEW,
@@ -25,6 +26,7 @@ import {
   filterDevDocsByLifecycle,
   filterDevDocsItems,
   getDevDocsLifecycle,
+  getDevDocsDisplayTitle,
   getDefaultDevDocsPinnedPaths,
   isDevDocsEnabled,
   normalizeDevDocsExpandedDirKeys,
@@ -39,6 +41,24 @@ const devDocsPageSource = readFileSync(
   path.join(repoRoot, 'web/src/dev-workbench/pages/DevDocsPage.jsx'),
   'utf8'
 )
+
+test('devDocs: 新访客先读任务入口，目录保留路径且完整标题仍可搜索', () => {
+  const docs = buildDevDocsItems({
+    '../../../../README.md': '# 项目总览 / Project Overview',
+    '../../../../docs/README.md': '# 文档入口与治理 / docs Guide',
+    '../../../../docs/engineering/README.md': '# 工程说明 / Engineering Guide',
+  })
+  assert.equal(docs[0].path, DEV_DOCS_HOME_PATH)
+  assert.equal(getDevDocsDisplayTitle(docs[0].title), '文档入口与治理')
+  assert.equal(filterDevDocsItems(docs, 'Engineering Guide', DEV_DOCS_SEARCH_SCOPE_TITLE)[0].path, 'docs/engineering/README.md')
+  assert.equal(getDevDocsDisplayTitle('产品 / SKU / BOM 边界'), '产品 / SKU / BOM 边界')
+  assert.equal(getDevDocsDisplayTitle('API / RPC'), 'API / RPC')
+  const folder = buildDevDocsTree(docs).find((node) => node.path === 'docs')
+  assert.equal(folder.label, '项目文档')
+  assert.equal(folder.children[0].path, DEV_DOCS_HOME_PATH)
+  assert.equal(folder.children.find((node) => node.path === 'docs/engineering').label, '开发与交付')
+  assert.equal(normalizeDevDocsSelectedPath('README.md', docs), 'README.md')
+})
 
 test('devDocs: document build excludes customer input memos while retaining public documents', async (t) => {
   const declaration = devDocsPageSource.match(/const currentMarkdownModules = import\.meta\.glob\([\s\S]*?\n\)/u)?.[0]

@@ -130,24 +130,34 @@ export function resolveBusinessLifecycleActions({
 
 export function selectStableBusinessActionIndexes(
   descriptors = [],
-  { availableWidth = Infinity, moreWidth = 0, gap = 8 } = {}
+  { availableWidth = Infinity, moreWidth = 0, gap = 8, groupGap = gap, groupMinWidths = {} } = {}
 ) {
   const actions = descriptors.filter((item) => item?.actionable && item.width > 0)
-  const width = actions.reduce((total, item) => total + item.width, 0) +
-    Math.max(0, actions.length - 1) * gap
-  if (width <= availableWidth) return actions.map((item) => item.index)
+  const grouped = new Set(actions.map((item) => item.group || '')).size > 1
+  const widthOf = (items) => {
+    const widths = new Map()
+    for (const item of items) {
+      const key = item.group || ''
+      widths.set(key, (widths.has(key) ? widths.get(key) + gap : 0) + item.width)
+    }
+    return [...widths].reduce((total, [key, width]) => total +
+      Math.max(width, grouped ? groupMinWidths[key] || 0 : 0), 0) +
+      Math.max(0, widths.size - 1) * groupGap
+  }
+  if (widthOf(actions) <= availableWidth) return actions.map((item) => item.index)
 
-  let usedWidth = moreWidth
+  const selected = []
   return [...actions]
     .sort(
       (left, right) =>
+        Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)) ||
         Number(right?.score || 0) - Number(left?.score || 0) ||
         Number(left?.index || 0) - Number(right?.index || 0)
     )
     .filter((item) => {
-      const nextWidth = usedWidth + gap + item.width
-      if (nextWidth > availableWidth) return false
-      usedWidth = nextWidth
+      const nextWidth = widthOf([...selected, item]) + gap + moreWidth
+      if (!item.pinned && nextWidth > availableWidth) return false
+      selected.push(item)
       return true
     })
     .map((item) => item.index)

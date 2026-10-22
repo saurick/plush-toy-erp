@@ -14,14 +14,26 @@ import (
 )
 
 func (r *salesOrderRepo) GetEngineeringMaterialRequestByID(ctx context.Context, orderID, requestID int) (*biz.EngineeringMaterialRequest, error) {
-	row, err := r.data.postgres.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.ID(requestID), engineeringmaterialrequest.SalesOrderID(orderID)).Only(ctx)
+	snapshot, err := beginClientReadSnapshot(ctx, r.data)
+	if err != nil {
+		return nil, err
+	}
+	defer snapshot.Rollback()
+	row, err := snapshot.client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.ID(requestID), engineeringmaterialrequest.SalesOrderID(orderID)).Only(ctx)
 	if ent.IsNotFound(err) {
-		return nil, biz.ErrMaterialRequestConflict
+		return nil, biz.ErrMaterialRequestNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	return loadEngineeringMaterialRequest(ctx, r.data.postgres, row)
+	result, err := loadEngineeringMaterialRequest(ctx, snapshot.client, row)
+	if err != nil {
+		return nil, err
+	}
+	if err := snapshot.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func ensureEngineeringMaterialTask(ctx context.Context, client *ent.Client, request *biz.EngineeringMaterialRequest, actorID int) (*biz.WorkflowTask, error) {

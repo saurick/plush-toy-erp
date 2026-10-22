@@ -21,8 +21,8 @@ export function EmergencyPanel({
       aria-labelledby="dev-recovery-tab-emergency"
       className="erp-dev-recovery-support"
     >
-      <details open className="erp-dev-recovery-emergency">
-        <summary>疑似入侵或勒索时的处置</summary>
+      <section className="erp-dev-recovery-emergency">
+        <h2>疑似入侵或勒索时的处置</h2>
         <div className="erp-dev-recovery-emergency__content">
           <DeliveryTaskPath
             columns={2}
@@ -55,7 +55,7 @@ export function EmergencyPanel({
             阅读事件处置与恢复边界
           </Link>
         </div>
-      </details>
+      </section>
 
       <details className="erp-dev-recovery-emergency">
         <summary>

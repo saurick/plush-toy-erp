@@ -3,13 +3,13 @@ import {
   Alert,
   Button,
   Empty,
-  Select,
   Space,
   Spin,
   Tag,
   Typography,
 } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import { MermaidDiagram } from '@/common/components/markdown'
@@ -31,6 +31,7 @@ import {
   filterChainAuditSteps,
 } from '../config/devBusinessChainAudit.mjs'
 import '../styles/dev-business-chain-audit.css'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const { Title, Text } = Typography
 const SOURCE_PATH = 'docs/engineering/研发效能工作台与CI-CD设计.md'
@@ -281,22 +282,11 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
       />
       <section className="erp-dev-chain-audit__section">
         <div className="erp-dev-chain-audit__toolbar">
-          <Select
-            aria-label="筛选链路"
-            value={chain}
-            className="erp-dev-chain-audit__chain-select"
-            options={[
-              { value: 'all', label: '全部链路' },
-              ...report.chains.map((item) => ({
-                value: item.key,
-                label: item.label,
-              })),
-            ]}
-            onChange={(value) =>
-              updateQuery({ chain: value === 'all' ? null : value })
-            }
-          />
-          <Select
+          {selectedChain ? <Button onClick={() => updateQuery({ chain: null })}>全部链路</Button> : null}
+          <FilterSelect
+            emptyValue="all"
+            label="步骤结果"
+            placeholder="步骤结果"
             aria-label="筛选步骤结果"
             value={status}
             className="erp-dev-chain-audit__status-select"
@@ -507,17 +497,19 @@ export default function DevBusinessChainAuditPage() {
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-chain-audit__header">
         <Title level={1}>链路实测</Title>
-        <DevTaskNav
-          level="primary"
-          compact
-          idPrefix="chain-audit"
-          ariaLabel="链路实测视图"
-          items={CHAIN_AUDIT_TABS}
-          value={view}
-          onChange={(value) =>
+        <div hidden={!batch}>
+          <DevTaskNav
+            level="primary"
+            compact
+            idPrefix="chain-audit"
+            ariaLabel="链路实测视图"
+            items={CHAIN_AUDIT_TABS}
+            value={view}
+            onChange={(value) =>
             updateQuery({ view: value === 'chains' ? null : value })
           }
-        />
+          />
+        </div>
         <Space wrap>
           <Link to={chainDefinitionURL(chain)}>业务链观察</Link>
           <Button
@@ -530,22 +522,26 @@ export default function DevBusinessChainAuditPage() {
 
       </header>
       <div className="erp-dev-chain-audit__toolbar">
-        <label htmlFor="chain-audit-batch">实跑批次</label>
-        <Select
-          id="chain-audit-batch"
-          aria-label="实跑批次"
-          value={batch || undefined}
-          loading={catalog.loading}
-          placeholder="暂无报告"
-          className="erp-dev-chain-audit__batch-select"
-          options={catalog.batches.map((item) => ({
-            value: item.id,
-            label: `${item.id}${item.status === 'invalid' ? ' · 报告不完整' : ''}`,
-          }))}
-          onChange={(value) =>
-            updateQuery({ batch: value, q: null, status: null })
-          }
-        />
+        {catalog.batches.length > 1 || (batch && !catalog.batches.some((item) => item.id === batch)) ? (
+          <>
+            <label htmlFor="chain-audit-batch">实跑批次</label>
+            <Select
+              allowClear={false}
+              label="实跑批次"
+              id="chain-audit-batch"
+              aria-label="实跑批次"
+              value={batch || undefined}
+              loading={catalog.loading}
+              placeholder="暂无报告"
+              className="erp-dev-chain-audit__batch-select"
+              options={catalog.batches.map((item) => ({
+                value: item.id,
+                label: `${item.id}${item.status === 'invalid' ? ' · 报告不完整' : ''}`,
+              }))}
+              onChange={(value) => updateQuery({ batch: value, q: null, status: null })}
+            />
+          </>
+        ) : catalog.batches.length === 1 ? <Text>实跑批次 {catalog.batches[0].id}</Text> : null}
         {report ? (
           <>
             <Text type="secondary">生成于 {formatTime(report.generatedAt)}</Text>

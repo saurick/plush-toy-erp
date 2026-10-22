@@ -1,12 +1,14 @@
 // web/src/common/utils/errorMessage.js
 import { logout } from '../auth/auth.js'
 import {
+  CONTEXTUAL_RPC_ERROR_CODES,
   DEFAULT_RPC_ERROR_MESSAGES,
   RpcErrorCode,
   isAuthFailureCode,
 } from '../consts/errorCodes.js'
 
 const RAW_ERROR_MESSAGE_MAP = Object.freeze({
+  参数不合法: '请检查填写内容后重试',
   'business error': '请求失败，请稍后重试',
   expired: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_EXPIRED],
   forbidden: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED],
@@ -133,6 +135,14 @@ export function getUserFacingErrorMessage(
     return '请求未完成：系统当前处理请求较多。请稍候重试；如持续出现，请联系系统管理员。'
   }
   const code = Number(err?.code)
+  const message = normalizeErrorText(err?.message)
+  if (
+    CONTEXTUAL_RPC_ERROR_CODES.includes(code) &&
+    containsCjk(message) &&
+    !containsTechnicalErrorText(message)
+  ) {
+    return translateKnownErrorMessage(message)
+  }
   const mappedCodeMessage = DEFAULT_RPC_ERROR_MESSAGES[code]
   if (mappedCodeMessage && !containsTechnicalErrorText(mappedCodeMessage)) {
     return mappedCodeMessage

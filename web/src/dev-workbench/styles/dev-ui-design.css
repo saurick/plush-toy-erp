@@ -51,12 +51,26 @@
 .erp-dev-ui-design-toolbar small {
   color: var(--erp-text-muted);
 }
+.erp-dev-ui-design-stage {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
 .erp-dev-ui-design-frame {
   width: 100%;
   min-height: 0;
   flex: 1;
   border: 0;
   background: var(--erp-page-bg);
+}
+.erp-dev-ui-design-feedback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  background: var(--erp-surface-bg);
 }
 .erp-dev-ui-design-frame[hidden] {
   display: none;
@@ -358,10 +372,11 @@
   flex: 1;
   min-width: 0;
 }
-.erp-design-layout-topbar {
+.erp-design-layout-account {
   position: relative;
   display: flex;
-  height: var(--erp-topbar-height);
+  min-height: 46px;
+  margin-top: auto;
   align-items: center;
   justify-content: space-between;
   padding-inline: 12px 42px;
@@ -443,7 +458,7 @@
   position: static;
 }
 .erp-design-layout[data-highlight='navigation'] .erp-design-layout-sidebar,
-.erp-design-layout[data-highlight='header'] .erp-design-layout-topbar,
+.erp-design-layout[data-highlight='header'] .erp-design-layout-account,
 .erp-design-layout[data-highlight='spacing'] .erp-design-layout-content,
 .erp-design-layout[data-highlight='data'] .erp-design-layout-data {
   outline: 2px dashed var(--erp-primary);
@@ -502,6 +517,37 @@
 .erp-design-type-line > small {
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
+}
+.erp-design-cell-samples-title {
+  margin: 20px 0 10px;
+  font-size: var(--erp-font-emphasis);
+}
+.erp-design-cell-samples {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--erp-font-small);
+  line-height: 1.6;
+}
+.erp-design-cell-samples :is(th, td) {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--erp-border);
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.erp-design-cell-samples th {
+  font-weight: 500;
+}
+.erp-design-cell-samples thead {
+  color: var(--erp-text-muted);
+  background: var(--erp-surface-bg-soft);
+}
+.erp-design-cell-samples :where(th:first-child) {
+  width: 96px;
+}
+.erp-design-cell-samples .erp-business-cell-stack {
+  width: 180px;
 }
 .erp-design-spacing-controls {
   display: flex;

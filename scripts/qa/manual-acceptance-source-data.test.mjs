@@ -1117,14 +1117,14 @@ test("persisted source content comparison normalizes dates and decimals but reje
     order_no: "SIM-ORDER-001",
     order_date: "2026-07-15",
     ordered_quantity: "12.000",
-    snapshot: { name: "试用客户", simulated_only: true },
+    snapshot: { name: "美悦礼品" },
     optional_note: undefined,
   };
   const actual = {
     order_no: "SIM-ORDER-001",
     order_date: Date.parse("2026-07-15T00:00:00.000Z") / 1000,
     ordered_quantity: "12",
-    snapshot: { simulated_only: true, name: "试用客户" },
+    snapshot: { name: "美悦礼品" },
     optional_note: null,
   };
   assert.doesNotThrow(() =>
@@ -1812,10 +1812,10 @@ test("source-order actions reread the current version and send the exact formal 
       );
       if (method.startsWith("close_")) {
         assert.equal(body.params.close_mode, "short");
-        assert.match(body.params.reason, /验收样例/u);
+        assert.doesNotMatch(body.params.reason, /模拟|演示|样例/u);
       } else if (method.startsWith("cancel_")) {
         assert.equal(Object.hasOwn(body.params, "close_mode"), false);
-        assert.match(body.params.reason, /验收样例/u);
+        assert.doesNotMatch(body.params.reason, /模拟|演示|样例/u);
       } else {
         assert.equal(Object.hasOwn(body.params, "close_mode"), false);
         assert.equal(Object.hasOwn(body.params, "reason"), false);
@@ -1897,7 +1897,7 @@ test("sales CLOSED fixtures finish their ProcessRuntime before the formal short 
       assert.equal(init.headers.Authorization, "Bearer token-sales");
       assert.equal(body.params.expected_version, 9);
       assert.equal(body.params.close_mode, "short");
-      assert.match(body.params.reason, /验收样例/u);
+      assert.doesNotMatch(body.params.reason, /模拟|演示|样例/u);
       return ok({
         sales_order: {
           id: 42,

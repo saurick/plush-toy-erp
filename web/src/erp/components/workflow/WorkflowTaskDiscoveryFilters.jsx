@@ -1,5 +1,6 @@
 import React from 'react'
-import { Button, Select } from 'antd'
+import { Button } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import useWorkflowTaskAssignees from '../../hooks/useWorkflowTaskAssignees'
 import { taskStagePath } from '../../utils/workflowTaskDiscovery.mjs'
 import './workflowTaskDiscovery.css'
@@ -34,7 +35,7 @@ export default function WorkflowTaskDiscoveryFilters({
       )}
       <label className="workflow-task-discovery__person">
         <span>办理人</span>
-        <Select aria-label="办理人" value={value.assignee || undefined} allowClear placeholder="全部办理人" options={options} showSearch optionFilterProp="label" onChange={change} />
+        <Select aria-label="办理人" value={value.assignee || undefined} allowClear placeholder="办理人" options={options} showSearch optionFilterProp="label" onChange={change} />
       </label>
       {(peopleError || (!people && result.error)) && (
         <p role="status">办理人选项暂时未能读取。<Button type="link" size="small" onClick={onRetryPeople || result.reload}>重新读取办理人</Button></p>

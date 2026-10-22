@@ -1,13 +1,12 @@
 import { Space, Typography } from 'antd'
 import {
   StatusTag,
-  OperationIdempotencyText,
   issueDescription,
   operationActionLabel,
   deliveryTargetLabel,
   operationUpdateAction,
 } from './shared.jsx'
-import DevDeliveryTimestamp from '../../../components/DevDeliveryTimestamp.jsx'
+import DevTimestamp from '../../../components/DevTimestamp.jsx'
 import {
   deliveryOperationMessagePresentation,
   formatDeliveryDuration,
@@ -29,9 +28,6 @@ export function buildOperationColumns({ renderOperationActions }) {
               record.promotionMode,
               record.target
             )}
-          </Text>
-          <Text type="secondary" code>
-            {record.id.slice(0, 8)}
           </Text>
         </Space>
       ),
@@ -62,10 +58,9 @@ export function buildOperationColumns({ renderOperationActions }) {
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
           <StatusTag status={record.status} />
-          <OperationIdempotencyText operation={record} />
           {record.issues.length > 0 ? (
             <Text type="danger">{issueDescription(record.issues)}</Text>
-          ) : (
+          ) : record.status !== 'passed' ? (
             <Text
               type="secondary"
               title={
@@ -80,7 +75,7 @@ export function buildOperationColumns({ renderOperationActions }) {
                 ).label
               }
             </Text>
-          )}
+          ) : null}
         </Space>
       ),
     },
@@ -90,13 +85,13 @@ export function buildOperationColumns({ renderOperationActions }) {
       width: 220,
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
-          <DevDeliveryTimestamp
+          <DevTimestamp
             value={record.createdAt}
             action="开始于"
             missing="开始时间未证明"
             className="erp-dev-operation-history-time"
           />
-          <DevDeliveryTimestamp
+          <DevTimestamp
             value={record.updatedAt}
             action={operationUpdateAction(record)}
             missing="完成时间未证明"
@@ -111,11 +106,6 @@ export function buildOperationColumns({ renderOperationActions }) {
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
           <Text>{formatDeliveryDuration(record.durationMs)}</Text>
-          <Text type="secondary">
-            {record.stages.length > 0
-              ? `${String(record.stages.length)} 个可见环节`
-              : '暂无环节明细'}
-          </Text>
         </Space>
       ),
     },

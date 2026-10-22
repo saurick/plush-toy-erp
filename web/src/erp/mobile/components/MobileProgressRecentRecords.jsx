@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Empty } from 'antd'
+import { WorkflowTaskEventEntries } from '../../components/workflow/WorkflowTaskEventTrail.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
@@ -14,8 +15,8 @@ export default function MobileProgressRecentRecords({ task, canRead }) {
     if (!taskID) return undefined
     const controller = new AbortController()
     listWorkflowTaskEvents(taskID, { limit: 3, signal: controller.signal })
-      .then(({ items }) => {
-        if (!controller.signal.aborted) setResult({ task, items })
+      .then(({ items, truncated }) => {
+        if (!controller.signal.aborted) setResult({ task, items, truncated })
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
@@ -60,17 +61,10 @@ export default function MobileProgressRecentRecords({ task, canRead }) {
           </button>
         </div>
       ) : items.length ? (
-        <ol className="mobile-detail-timeline">
-          {items.map((item) => (
-            <li key={item.key}>
-              <strong>{item.label}</strong>
-              <small>
-                {item.timeLabel} · {item.actorLabel}
-              </small>
-              {item.reason ? <p>{item.reason}</p> : null}
-            </li>
-          ))}
-        </ol>
+        <>
+          <WorkflowTaskEventEntries items={items} variant="mobile" />
+          {current.truncated ? <p className="mobile-detail-muted">仅显示最近 {items.length} 条，完整记录可在关联任务中查看。</p> : null}
+        </>
       ) : (
         <Empty description="暂无处理记录" />
       )}

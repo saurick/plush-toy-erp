@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import assert from 'node:assert/strict'
 
 export function createPermissionAccessLayoutScenarios({
@@ -192,13 +193,11 @@ export function createPermissionAccessLayoutScenarios({
             blockedRows.every((row) => row.includes('不可进入'))
         )
         await filters.getByRole('button', { name: /^全部/u }).click()
-        await frame
-          .getByRole('combobox', { name: '筛选业务模块' })
-          .selectOption('基础资料')
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '筛选业务模块' }), '基础资料')
         assert.equal(await frame.locator('.permission-access-group').count(), 1)
-        await frame
-          .getByRole('combobox', { name: '筛选业务模块' })
-          .selectOption('')
+        await chooseSelectOption(frame
+          .getByRole('combobox', { name: '筛选业务模块' }), '')
         await frame.locator('.permission-access-help summary').click()
         assert.equal(
           await frame.locator('.permission-access-help').getAttribute('open'),

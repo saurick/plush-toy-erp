@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 import { ESLint } from 'eslint'
-import config from '../eslint.config.js'
 
 const filterChipSource = readFileSync(
   new URL(
@@ -107,37 +107,37 @@ test('shallow mobile task filters use the same anchored dropdown pattern', () =>
 })
 
 test('navigation lint rejects bypasses while allowing shared controls and ordinary buttons', async () => {
-  const { rules } = config.at(-1)
   const eslint = new ESLint({
-    overrideConfigFile: true,
-    overrideConfig: [
-      {
-        files: ['**/*.jsx'],
-        languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
-        rules,
-      },
-    ],
+    cwd: path.resolve(import.meta.dirname, '..'),
+    // 虚拟文件验证实际入口约束，不参与真实模块的循环依赖分析。
+    overrideConfig: { rules: { 'import/no-cycle': 'off' } },
   })
+  const lintNavigation = async (code) => {
+    const [result] = await eslint.lintText(code, {
+      filePath: 'src/pages/NavigationGuardFixture.jsx',
+    })
+    assert.equal(result.fatalErrorCount, 0)
+    return result.messages.filter(({ ruleId }) =>
+      ['no-restricted-imports', 'no-restricted-syntax'].includes(ruleId)
+    )
+  }
   for (const code of [
     "import { Tabs as PageTabs } from 'antd'",
     "import { Segmented } from 'antd'",
     'const element = <div role="tablist" />',
     'const element = <nav role="tablist" />',
   ]) {
-    const [result] = await eslint.lintText(code, {
-      filePath: 'guard-fixture.jsx',
-    })
-    assert.equal(result.errorCount, 1, JSON.stringify(result.messages))
-    assert.match(result.messages[0].message, /Sliding/u)
+    const messages = await lintNavigation(code)
+    assert.equal(messages.length, 1, JSON.stringify(messages))
+    assert.match(messages[0].message, /Sliding/u)
   }
-  const [allowed] = await eslint.lintText(
+  const allowed = await lintNavigation(
     `
     import { Button } from 'antd'
     const tabs = <SlidingTabList aria-label="视图" />
     const filter = <FilterChip selected>逾期</FilterChip>
     const action = <button type="button">刷新</button>
-  `,
-    { filePath: 'guard-fixture.jsx' }
+  `
   )
-  assert.equal(allowed.errorCount, 0)
+  assert.deepEqual(allowed, [])
 })

@@ -33,6 +33,7 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 1. 写出 single domain outcome 和 owning layer。
 2. 找到 source-of-truth fields、states、identifiers、permissions、derived values。
 3. 检查现有 table/usecase/API/helper 是否已经拥有该行为。
+   查询、统计、导出、批处理或热点并发受规模影响时，按[数据规模与并发](#data-scale-and-concurrency)评估；未触及规模敏感路径的字段与文案调整不单独触发容量分析。
    涉及版本字段或模块版号时，按[版本边界](../../../docs/engineering/跨层公共契约与生成规范.md#版本边界--version-boundaries)核对独立读写需求及存量消费者，再决定删除、复用现有身份或保留必要格式版本。
    配置启动失败时先区分运行边界错误与人工版号漂移，不用递增包名或维护“当前 / 上一版”白名单解堵。配置内容身份复用现有内容 revision 生成器；同次构建的临时响应同步生产者、消费者和结构校验。新增或保留格式版本须说明真实跨发布读写者及不兼容差异；已有持久化字段不自动产生保留理由。
 4. 按字段影响检查 defaults、edits、source switch/clear 和相关 list/detail/print/export/search；旧实验不构成兼容对象，已落库残留按正式 migration 清理。
@@ -41,6 +42,16 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
    版本治理至少运行现有命名门禁及相关回归：内容变化 / 不变、跨配置启动、冻结身份的回滚 / 完成检查 / 密码轮换、错误环境和标记拒绝。沿生产者、消费者及回执链复查，区分落盘原件与同次构建的展示投影；新写入校验不能误用于历史读取。涉及冻结快照、哈希、回执或 Schema 的删除时，补齐存量转换与回放证据，不用放宽测试代替治理。
 
 客户配置任务若进入 validate / publish / transition check / activate / readback、目标环境 migration 或 rollback，由本 skill 先确认 Product Core 与字段真源，再切 `$plush-operations-governance` 执行运行态步骤；不要另造页面私有配置真源或直接改库。
+
+<a id="data-scale-and-concurrency"></a>
+
+## 数据规模与并发 / Data Scale and Concurrency
+
+先区分数据总量、单次扫描与返回范围、批次大小、读写比例、并发和热点；结合部署资源与响应目标说明当前规模和有依据的增长假设。规模未知时记录缺口，不把“亿级”等数量直接作为分库、缓存或队列的选型依据。
+
+沿真实 repo/usecase/API 检查分页与排序、索引与过滤、汇总和导出、逐项查询与内存占用；批处理与并发写入同时守住事务、幂等、权限、冻结快照和失败恢复。前端分页或压测成功不能替代数据库查询成本及事实一致性核对。
+
+优先调整受影响主路径；引入缓存、异步任务或分区等能力前，说明已有方案的瓶颈依据、新增一致性与运维成本，以及何时需要升级。容量假设、设计取舍和升级条件归所属模块正式设计；按 `$plush-test-governance` 选择验证，未实测的规模保持未验证；新增架构仍按当前目标与授权边界判断。
 
 ## API 合同与工作台同步 / API Contract Sync
 

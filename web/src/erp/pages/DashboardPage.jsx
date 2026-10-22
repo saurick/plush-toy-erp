@@ -32,6 +32,7 @@ import WorkflowTaskLinkDrawer from '../components/workflow/WorkflowTaskLinkDrawe
 import WorkflowTaskDiscoveryFilters from '../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
 import WorkflowTaskCalendar from '../components/workflow/WorkflowTaskCalendar.jsx'
 import useWorkflowTaskCalendarView from '../hooks/useWorkflowTaskCalendarView.js'
+import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import WorkflowExceptionPanel from '../components/workflow/WorkflowExceptionPanel.jsx'
 import { TRACKING_VIEW_OPTIONS } from '../utils/workflowTrackingFilters.mjs'
 import { retainReturnedWorkflowTask } from '../utils/productionTaskHandling.mjs'
@@ -286,6 +287,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     !shouldShowProductCoreDashboard &&
     summaryOptions.length > 0 &&
     searchParams.get('view') === 'summary'
+  const workbenchSticky = useBusinessListStickyHeader(
+    workbenchListRef,
+    initialView === 'workbench' && !summaryOpen && !shouldShowProductCoreDashboard,
+  )
   const workflowWorkbenchScopeKey = useMemo(
     () =>
       JSON.stringify([
@@ -323,6 +328,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ? searchParams.get('tracking')
       : ''
   const [trackingRefresh, setTrackingRefresh] = useState(0)
+  const [trackingToolbarContainer, setTrackingToolbarContainer] = useState(null)
   const exceptionQueryRef = useRef(null)
   const taskBoardRequest = useMemo(
     () => buildWorkflowTaskBoardRequest(filters),
@@ -600,7 +606,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
   const workbenchResponse =
     workbenchResponseState?.scopeKey === workflowWorkbenchScopeKey &&
-    workbenchResponseState?.requestKey === workbenchRequestKey
+    workbenchResponseState?.response?.queue_key === workbenchQueueKey
       ? workbenchResponseState.response
       : null
   const workbenchLoadError =
@@ -634,10 +640,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     1,
     Math.ceil(workbenchQueueTotal / workbenchQueuePageSize)
   )
-  const activeWorkbenchQueuePage = Math.min(
-    workbenchQueuePage,
-    workbenchQueuePageCount
-  )
+  const displayedWorkbenchQueuePageSize = workbenchResponse?.limit || workbenchQueuePageSize
+  const activeWorkbenchQueuePage = workbenchResponse
+    ? Math.floor(workbenchResponse.offset / displayedWorkbenchQueuePageSize) + 1
+    : Math.min(workbenchQueuePage, workbenchQueuePageCount)
   const workbenchQueuePageTasks = useMemo(
     () => workbenchResponse?.items || [],
     [workbenchResponse]
@@ -666,14 +672,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     workbenchResponse,
   ])
   useEffect(() => {
-    if (!workbenchResponse || workbenchQueuePage <= workbenchQueuePageCount) {
+    if (
+      !workbenchResponse ||
+      workbenchResponse.offset !== workbenchRequest.offset ||
+      workbenchResponse.limit !== workbenchRequest.limit ||
+      workbenchQueuePage <= workbenchQueuePageCount
+    ) {
       return
     }
     if (pendingWorkbenchPageScrollRef.current) {
       pendingWorkbenchPageScrollRef.current.page = workbenchQueuePageCount
     }
     setWorkbenchQueuePage(workbenchQueuePageCount)
-  }, [workbenchQueuePage, workbenchQueuePageCount, workbenchResponse])
+  }, [workbenchQueuePage, workbenchQueuePageCount, workbenchRequest, workbenchResponse])
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedTask,
@@ -733,11 +744,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setWorkbenchQueueKey('actionable')
     setWorkbenchQueuePage(1)
   }, [visibleWorkbenchQueueOptions, workbenchQueueKey])
-
-  useEffect(() => {
-    if (workbenchQueuePage === activeWorkbenchQueuePage) return
-    setWorkbenchQueuePage(activeWorkbenchQueuePage)
-  }, [activeWorkbenchQueuePage, workbenchQueuePage])
 
   const updateFilter = (key, value) => {
     const nextFilters = {
@@ -907,10 +913,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
   const selectWorkbenchQueuePage = (
     page,
-    pageSize = workbenchQueuePageSize
+    pageSize = displayedWorkbenchQueuePageSize
   ) => {
     const nextPageSize = normalizeWorkflowTaskPageSize(pageSize)
-    if (nextPageSize !== workbenchQueuePageSize) page = 1
+    if (nextPageSize !== displayedWorkbenchQueuePageSize) page = 1
     pendingWorkbenchPageScrollRef.current = {
       queue: workbenchQueueKey,
       page,
@@ -1144,14 +1150,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           <WorkflowTaskIdentity
             task={record}
             compact
-            renderCompactTitle={(title) => (
-              <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} compact>
-                {title}
-              </TaskTitleEntry>
+            layout="table"
+            showTaskName
+            renderCompactTitle={() => (
+              <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} compact />
             )}
           />
           <Text type="secondary">
-            <WorkflowTaskSource task={record} />
+            <WorkflowTaskSource task={record} showUnavailable={false} />
           </Text>
           {getWorkflowTaskReason(record) ? (
             <Text
@@ -1260,6 +1266,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           />
           <Card
             className="erp-dashboard-card erp-workbench-command-card"
+            data-page-table-region
+            data-table-scroll-scope
             variant="borderless"
           >
             <div className="erp-workbench-command">
@@ -1272,7 +1280,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 </Suspense>
               ) : (
                 <>
-                  <div className="erp-workbench-queue-heading">
+                  <div className="erp-workbench-queue-heading" data-page-table-toolbar>
                     <div
                       className="erp-workbench-queue-filter-strip"
                       aria-label="工作台任务筛选"
@@ -1320,6 +1328,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     >
                       待办日历
                     </Button>
+                    <span data-table-scroll-toolbar />
                   </div>
 
                   <div className="erp-workbench-main-grid">
@@ -1343,6 +1352,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         />
                       ) : null}
                       <Table
+                        className="erp-work-center-table"
+                        sticky={workbenchSticky}
+                        scrollToolbar
                         size="small"
                         rowKey={(record) => record.id || record.task_code}
                         columns={workbenchTaskColumns}
@@ -1374,7 +1386,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     <WorkflowTaskPagination
                       total={workbenchQueueTotal}
                       current={activeWorkbenchQueuePage}
-                      pageSize={workbenchQueuePageSize}
+                      pageSize={displayedWorkbenchQueuePageSize}
                       loading={loading}
                       error={Boolean(workbenchLoadError)}
                       onChange={selectWorkbenchQueuePage}
@@ -1410,6 +1422,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           />
           <Card
             className="erp-dashboard-card erp-dashboard-task-board-card"
+            data-page-table-region
+            data-table-scroll-scope
             variant="borderless"
             loading={
               !trackingScope && !exceptionsView && taskBoardInitialLoading
@@ -1424,16 +1438,22 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           >
             {exceptionsView || trackingScope ? (
               <div className="erp-dashboard-block">
-                <SlidingTabList
-                  className="erp-task-tracking-views"
-                  aria-label="跟踪内容"
-                  value={exceptionsView ? 'exceptions' : 'tracking'}
-                  options={TRACKING_VIEW_OPTIONS}
-                  onChange={selectTaskView}
-                />
-                {exceptionsView ? (
+                <div className="erp-task-tracking-toolbar" data-page-table-toolbar>
+                  <div className="erp-business-operation-panel__view-switch">
+                    <SlidingTabList
+                      className="erp-task-tracking-views"
+                      aria-label="跟踪内容"
+                      value={exceptionsView ? 'exceptions' : 'tracking'}
+                      options={TRACKING_VIEW_OPTIONS}
+                      onChange={selectTaskView}
+                    />
+                  </div>
+                  <div className="erp-task-tracking-toolbar__controls" ref={setTrackingToolbarContainer} />
+                </div>
+                {trackingToolbarContainer && (exceptionsView ? (
                   <WorkflowExceptionPanel
                     key={workflowWorkbenchScopeKey}
+                    toolbarContainer={trackingToolbarContainer}
                     profile={adminProfile}
                     onOpenTask={openTaskDrawer}
                     refreshKey={trackingRefresh}
@@ -1453,6 +1473,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 ) : (
                   <WorkflowTrackingPanel
                     key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
+                    toolbarContainer={trackingToolbarContainer}
                     scope={trackingScope}
                     onScopeChange={selectTrackingScope}
                     sessionKey={workflowWorkbenchScopeKey}
@@ -1460,24 +1481,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     onOpenTask={openTaskDrawer}
                     taskHandlingOpen={Boolean(selectedTask)}
                   />
-                )}
+                ))}
               </div>
             ) : (
               <div className="erp-dashboard-block">
-                {filters.mode === 'todo' && (
-                  <div className="workflow-task-calendar-switch">
-                    <Segmented
-                      aria-label="待办显示方式"
-                      hierarchy="secondary"
-                      value={calendarState.layout}
-                      options={[
-                        { value: 'list', label: '列表' },
-                        { value: 'calendar', label: '日历' },
-                      ]}
-                      onChange={(layout) => calendarState.change({ layout })}
-                    />
-                  </div>
-                )}
                 {historyDateOpen && (
                   <FilterDateRangePicker
                     title="选择处理日期范围"
@@ -1493,11 +1500,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     }}
                   />
                 )}
-                <div className="erp-task-board-controls">
+                <div className="erp-task-board-controls" data-page-table-toolbar>
                   <div className="erp-task-board-filters">
                     <BusinessOperationPanel
                       key={`${filters.mode}:${workflowWorkbenchScopeKey}`}
                       compact
+                      viewSwitch={filters.mode === 'todo' ? (
+                        <Segmented
+                          aria-label="待办显示方式"
+                          hierarchy="secondary"
+                          value={calendarState.layout}
+                          options={[
+                            { value: 'list', label: '列表' },
+                            { value: 'calendar', label: '日历' },
+                          ]}
+                          onChange={(layout) => calendarState.change({ layout })}
+                        />
+                      ) : null}
                       filtersOpen={taskFiltersOpen}
                       onFiltersOpenChange={setTaskFiltersOpen}
                       onClearFilters={clearFilters}
@@ -1533,6 +1552,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           {roleOptions.length > 1 ? (
                             <SelectFilter
                               aria-label="负责岗位"
+                              emptyValue="all"
                               value={filters.role}
                               options={roleOptions}
                               onChange={(value) => updateFilter('role', value)}
@@ -1543,6 +1563,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           filters.lane === 'finished' ? (
                             <SelectFilter
                               aria-label="任务状态"
+                              emptyValue="all"
                               value={filters.status}
                               options={statusOptions}
                               onChange={(value) =>
@@ -1589,12 +1610,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           )}
                           {!calendarView && filters.lane !== 'finished' && <SelectFilter
                             aria-label="截止时间"
+                            emptyValue="all"
                             value={filters.due}
                             options={dueOptions}
                             onChange={(value) => updateFilter('due', value)}
                           />}
                           <SelectFilter
                             aria-label="来源单据"
+                            emptyValue="all"
                             value={filters.sourceType}
                             options={sourceOptions}
                             onChange={(value) =>
@@ -1606,6 +1629,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       actions={
                         !calendarView && taskBoardModel.focused ? (
                           <SelectFilter
+                            allowClear={false}
                             aria-label="任务排序"
                             value={filters.sort}
                             options={TASK_BOARD_SORT_OPTIONS}

@@ -755,7 +755,7 @@ export function createBusinessFormInteractionScenarios({
             '公司地址',
             '订购方签字人',
             '采购明细',
-            '从材料库添加明细',
+            '从材料库添加',
             '已录入',
             '数量合计',
             '金额合计',
@@ -764,7 +764,7 @@ export function createBusinessFormInteractionScenarios({
             await verifySourceImportPicker(page, {
               parentModal: modal,
               triggerButton: '从材料库添加',
-              titleText: '选择材料添加采购明细',
+              titleText: '从材料库添加',
               expectedTexts: ['材料编码', '材料名称', 'MAT-STYLE-L1'],
               emptyDescriptionText: '暂无可选材料',
               collapseSelectTexts: [

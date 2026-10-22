@@ -446,7 +446,7 @@ export function createDevDataPreparationScenarios({
         )
         fixture.failReads = false
         await page
-          .getByRole('button', { name: '重新读取预检', exact: true })
+          .getByRole('button', { name: '重新检查', exact: true })
           .click()
         await page
           .getByText('预检读取失败', { exact: true })
@@ -458,6 +458,17 @@ export function createDevDataPreparationScenarios({
             .isDisabled(),
           false
         )
+        fixture.operation = operationFixture({ status: 'failed', terminal: true, confirmationRequired: '' })
+        validateDevDataPreparationOperation(fixture.operation)
+        fixture.summary.currentOperations = [fixture.operation]
+        await page.getByRole('button', { name: '重新检查', exact: true }).click()
+        await page.getByRole('region', { name: '本次回执', exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('view'), 'receipts')
+        assert.equal(await page.getByRole('tab', { name: '当前批次', exact: true }).count(), 0)
+        assert.equal(await page.locator('#dev-data-panel-receipts .erp-dev-data-history-label').count(), 0, '本次回执不在历史列表重复显示')
+        assert.equal(fixture.actions.length, 1, '终态转入回执不重复执行')
+        await page.reload()
+        await page.getByRole('region', { name: '本次回执', exact: true }).waitFor()
         const readsBeforeScopeView = fixture.reads.length
         await page.getByRole('tab', { name: '准备数据', exact: true }).click()
         assert.equal(fixture.reads.length, readsBeforeScopeView, '切换视图不能重复预检或短暂锁住已有计划')

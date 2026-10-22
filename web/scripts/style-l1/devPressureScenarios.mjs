@@ -31,7 +31,19 @@ function pressureFixture() {
       p99Ms: 2300,
     },
     completedBusinessFlows: 214,
+    pagination: {
+      pageSize: 500,
+      totalRows: 762,
+      fullPages: 1,
+      tailRows: 262,
+      minPageSamples: 50,
+      accepted: true,
+      full: { ...metrics, requests: 50, successes: 50 },
+      tail: { ...metrics, requests: 50, successes: 50 },
+    },
     methods: [
+      { ...metrics, name: 'sales_order.list_sales_orders' },
+      { ...metrics, name: 'sales_order.export_sales_orders' },
       {
         ...metrics,
         name: 'sales_order.finance_review_engineering_material_request',
@@ -50,8 +62,8 @@ function pressureFixture() {
     profile: 'capacity',
     comparisonKey: 'd'.repeat(64),
     dataset: {
-      dataScale: 'growth',
-      totalOrders: 362,
+      dataScale: 'volume',
+      totalOrders: 762,
       working: {
         orders: 262,
         ordinaryOrders: 174,
@@ -60,26 +72,26 @@ function pressureFixture() {
         demandSources: 17592,
       },
       history: {
-        orders: 100,
-        ordinaryOrders: 66,
-        complexOrders: 34,
-        orderItems: 338,
-        demandSources: 6792,
-        purchaseOrders: 80,
-        purchaseItems: 120,
-        states: { PREVIEW: 20, SUBMITTED: 20, BOSS_APPROVED: 20, APPROVED: 40 },
+        orders: 500,
+        ordinaryOrders: 333,
+        complexOrders: 167,
+        orderItems: 1669,
+        demandSources: 33396,
+        purchaseOrders: 400,
+        purchaseItems: 600,
+        states: { PREVIEW: 100, SUBMITTED: 100, BOSS_APPROVED: 100, APPROVED: 200 },
       },
       reads: {
         target: {
-          workflowTasks: 15000,
-          productionFacts: 6000,
-          financeFacts: 6000,
+          workflowTasks: 50000,
+          productionFacts: 20000,
+          financeFacts: 20000,
           attachments: 1000,
         },
         actual: {
-          workflowTasks: 15000,
-          productionFacts: 6000,
-          financeFacts: 6000,
+          workflowTasks: 50000,
+          productionFacts: 20000,
+          financeFacts: 20000,
           attachments: 1000,
         },
       },
@@ -164,7 +176,9 @@ export function createDevPressureScenarios({
               failureStage: 'engineering-pressure',
               checks: { ...report.checks, databaseConsistency: false },
             }
-          : report,
+          : mode === 'no-pagination'
+            ? { ...report, engineering: { ...report.engineering, levels: report.engineering.levels.map((level) => ({ ...level, pagination: null })) } }
+            : report,
     progress:
       mode === 'running'
         ? {
@@ -290,6 +304,11 @@ export function createDevPressureScenarios({
           .waitFor()
         assert.equal(await panel.locator('.erp-dev-pressure-metric').count(), 4)
         await panel.getByRole('table', { name: '每方法延迟与样本' }).waitFor()
+        await panel.getByText(/本次完整订单导出每次核对 762 张/u).waitFor()
+        const paginationTable = panel.getByRole('table', { name: '销售订单分页容量' })
+        await paginationTable.getByRole('rowheader', { name: '整页（500 行）', exact: true }).waitFor()
+        await paginationTable.getByRole('rowheader', { name: '末页（262 行）', exact: true }).waitFor()
+        await panel.getByText(/主段每页最少 50 次成功校验/u).waitFor()
         await panel
           .getByRole('table', { name: '历史背景与当轮订单池' })
           .waitFor()
@@ -329,6 +348,10 @@ export function createDevPressureScenarios({
           panel
             .getByRole('button', { name: '重新读取报告', exact: true })
             .click()
+        mode = 'no-pagination'
+        await reload()
+        await panel.getByText('该报告未记录分页样本，不能用于证明 500 行满页容量。', { exact: true }).waitFor()
+        assert.equal(await paginationTable.count(), 0)
         mode = 'failed'
         await reload()
         await panel
@@ -352,11 +375,22 @@ export function createDevPressureScenarios({
         mode = 'empty'
         await reload()
         await panel
-          .getByText('尚无可读压力测试报告；运行短档回归生成第一份证据。', {
+          .getByText('暂无报告，可先运行短档回归。', {
             exact: true,
           })
           .waitFor()
         assert.equal(actionRequests.length, 0, '读报告和重新读取不得发起运行')
+        const loadPicker = panel.getByRole('combobox', { name: '负载档位', exact: true })
+        await loadPicker.press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible').getByText('10 分钟容量', { exact: true }).click()
+        await panel.getByRole('button', { name: '运行 10 分钟容量', exact: true }).waitFor()
+        assert.equal(await panel.getByRole('button', { name: '运行短档回归', exact: true }).count(), 0)
+        await page.reload()
+        await panel.getByRole('button', { name: '运行 10 分钟容量', exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('load'), 'capacity')
+        assert.equal(actionRequests.length, 0, '切换档位与刷新只恢复选择，不启动测试')
+        await loadPicker.press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible').getByText('短档回归', { exact: true }).click()
         mode = 'history'
         await reload()
         await panel
@@ -380,12 +414,8 @@ export function createDevPressureScenarios({
           'dataScale',
         ])
         assert.equal(actionRequests[0].payload.dataScale, 'growth')
-        assert.equal(
-          await panel
-            .getByRole('button', { name: '运行 10 分钟容量', exact: true })
-            .isDisabled(),
-          true
-        )
+        assert.equal(await panel.getByRole('combobox', { name: '负载档位', exact: true }).isDisabled(), true)
+        assert.equal(await panel.getByRole('button', { name: '运行 10 分钟容量', exact: true }).count(), 0)
         await page.reload()
         await panel.getByText('业务造数 · 20 / 42', { exact: true }).waitFor()
         assert.equal(actionRequests.length, 1, '刷新恢复运行状态不得重新启动')

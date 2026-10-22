@@ -93,7 +93,7 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 		case errors.Is(err, biz.ErrBadParam):
 			return id, invalidParamResult(), nil
 		case errors.Is(err, biz.ErrSalesOrderNotFound), errors.Is(err, biz.ErrProductionOrderNotFound):
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "记录不存在，请刷新进度列表"}, nil
+			return id, &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "记录不存在，请刷新进度列表"}, nil
 		default:
 			d.log.WithContext(ctx).Errorf("[business] progress query failed method=%s err=%v", method, err)
 			return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil

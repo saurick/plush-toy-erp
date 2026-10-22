@@ -156,19 +156,6 @@
 }
 
 
-.erp-dev-integration__column-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.erp-dev-integration__column-title .ant-btn {
-  width: 24px;
-  height: 24px;
-  padding: 2px;
-  color: var(--erp-text-muted);
-}
-
 .erp-dev-integration__graph > summary,
 .erp-dev-integration__relationships > summary,
 .erp-dev-integration__evidence-disclosure > summary {
@@ -505,17 +492,8 @@
   background: var(--erp-primary-soft);
 }
 
-.erp-dev-integration__table .erp-dev-integration__cell-link {
-  color: var(--erp-text);
-}
-
-.erp-dev-integration__table .erp-dev-integration__cell-link--missing {
+.erp-dev-integration__table .erp-dev-integration__contract--missing {
   color: var(--erp-warning-text);
-}
-
-.erp-dev-integration__table .erp-dev-integration__cell-link:hover,
-.erp-dev-integration__table .erp-dev-integration__cell-link--missing:hover {
-  color: var(--erp-primary-strong);
 }
 
 .erp-dev-integration__section--target > .erp-dev-integration__section-heading h2 {

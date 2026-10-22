@@ -15,6 +15,7 @@ import {
   progressAttention,
   progressDue,
   progressProductLabel,
+  progressIdentityPresentation,
   progressDueOptions,
   progressFilterCount,
   PROGRESS_FILTER_RESET,
@@ -28,6 +29,16 @@ test('progress search describes matching styles without changing order quantitie
   assert.equal(row.ordered_quantity, '800')
 })
 
+test('progress identity distinguishes missing fields from cleared associations', () => {
+  const row = { ...progressFixtureRow(), product: '', order_no: ' ', customer: '' }
+  assert.deepEqual(progressIdentityPresentation(row), {
+    hasProduct: true, product: '产品名称未填写', reference: '单据编号未提供', customer: '客户未填写',
+  })
+  assert.deepEqual(progressIdentityPresentation({ ...row, product: '旧产品', product_count: 0, product_id: 0, unlinked: true }), {
+    hasProduct: false, product: '未关联产品／物料', reference: '单据编号未提供', customer: '含未关联销售明细',
+  })
+})
+
 test('compact attention retains the real task, role, reason and exact single-task destination', () => {
   const row = { ...progressFixtureRow(), open_tasks: 1, attention_task_id: 31, attention_owner: '小陈', attention_task: 'engineering_data' }
   assert.deepEqual(progressAttention(row, { tasks: true }, () => '工程'), {
@@ -39,7 +50,10 @@ taskCount: 1,
 reason: row.attention_reason,
   })
   assert.equal(progressAttention({ ...row, open_tasks: 2 }, { tasks: true }).taskID, null)
-  assert.equal(progressAttention({ ...row, attention_owner: '' }, { tasks: true }, () => '工程').detail, '工程待领取')
+  assert.equal(progressAttention({ ...row, attention_owner: '' }, { tasks: true }, () => '工程').detail, '工程 · 待领取')
+  assert.equal(progressAttention({ ...row, attention_owner: '', unassigned_tasks: 0 }, { tasks: true }, () => '工程').detail, '工程 · 办理人未提供')
+  assert.equal(progressAttention({ ...row, attention_owner: '', open_tasks: 2, unassigned_tasks: 1 }, { tasks: true }, () => '工程').detail, '工程 · 办理人未提供')
+  assert.equal(progressAttention({ ...row, open_tasks: 0, sales_owner: '' }, { tasks: true }).detail, '业务负责人未提供')
   for (const value of [0, -1, '31', 1.5]) assert.equal(progressAttention({ ...row, attention_task_id: value }, { tasks: true }).taskID, null)
   const hidden = progressAttention(row, { tasks: false })
   assert.deepEqual(hidden, { title: '任务无查看权限', detail: '', taskID: null, taskCount: 0, blocked: false, reason: '' })

@@ -4,6 +4,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import { getWorkflowTaskAssigneeLabel } from '../../utils/workflowTaskEventPresentation.mjs'
 import { BusinessHelpLabel } from '../../components/help/BusinessContextHelp.jsx'
 import {
   MOBILE_TASK_ACTION_ACCESS_STATES,
@@ -22,7 +23,7 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 import { getWorkflowTaskActionOutcomeHint } from '../../utils/workflowTaskProcessingHint.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
-import MobileTaskContextCard, { mobileTaskAssigneeLabel } from './MobileTaskContextCard.jsx'
+import MobileTaskContextCard from './MobileTaskContextCard.jsx'
 import MobileTaskAttachments from './MobileTaskAttachments.jsx'
 import { WorkflowTaskCopySummary } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
@@ -435,7 +436,7 @@ function MobileWorkflowTaskActionScreen({
         onOpenReceipt={onViewReceipt}
         receiptUnavailableLabel="提交后开放"
         title="任务办理"
-        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={mobileTaskAssigneeLabel(task)} compact />}
+        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact />}
       />
 
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
@@ -729,7 +730,7 @@ export default function MobileTaskActionScreen(props) {
         onOpenDetail={onBack}
         receiptUnavailableLabel="提交后开放"
         title="任务办理"
-        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={mobileTaskAssigneeLabel(task)} compact />}
+        trailing={<WorkflowTaskCopySummary task={task} assigneeLabel={getWorkflowTaskAssigneeLabel(task)} compact />}
       />
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
         <MobileTaskContextCard task={task} />

@@ -21,7 +21,6 @@ import {
   DEV_WORKBENCH_AREA_KEYS,
   DEV_WORKSPACE_NAV_ITEMS,
   getDevSecondaryNavItems,
-  resolveDevPageFavicon,
   resolveDevPageTitle,
   resolveDevWorkbenchAreaKey,
 } from './devRoutes.mjs'
@@ -110,19 +109,9 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     resolveDevPageTitle('/__dev/quality', 'Plush Toy ERP'),
     '质量验证 · Plush Toy ERP'
   )
-  assert.equal(resolveDevPageFavicon('/__dev'), '/favicon-dev.svg')
-  assert.equal(resolveDevPageFavicon('/__dev/testing'), '/favicon-testing.svg')
   assert.equal(
     resolveDevPageTitle('/__dev/quality-gates', 'Plush Toy ERP'),
     '质量门禁 · Plush Toy ERP'
-  )
-  assert.equal(
-    resolveDevPageFavicon('/__dev/quality-gates'),
-    '/favicon-testing.svg'
-  )
-  assert.equal(
-    resolveDevPageFavicon('/__dev/customer-config'),
-    '/favicon-customer-config.svg'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/version-center', 'Plush Toy ERP'),
@@ -141,16 +130,8 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     '测试数据 · Plush Toy ERP'
   )
   assert.equal(
-    resolveDevPageFavicon('/__dev/data-preparation'),
-    '/favicon-testing.svg'
-  )
-  assert.equal(
     resolveDevPageTitle('/__dev/database-migration', 'Plush Toy ERP'),
     '数据库迁移 · Plush Toy ERP'
-  )
-  assert.equal(
-    resolveDevPageFavicon('/__dev/database-migration'),
-    '/favicon-dev.svg'
   )
 })
 

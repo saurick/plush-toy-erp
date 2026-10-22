@@ -33,7 +33,6 @@ import {
   BusinessOperationPanel,
   BusinessPageLayout,
   CollaborationTaskPanel,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -41,6 +40,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
 
@@ -757,7 +757,7 @@ export default function OutsourcingOrdersPage() {
                     { label: '全部加工厂', value: '' },
                     ...supplierOptions,
                   ]}
-                  placeholder="全部加工厂"
+                  placeholder="加工厂"
                   showSearch
                   optionFilterProp="label"
                   onChange={(value) => {
@@ -784,6 +784,7 @@ export default function OutsourcingOrdersPage() {
                   }}
                 />
                 <SelectFilter
+                  allowClear={false}
                   aria-label="排序方式"
                   className="erp-business-filter-control--sort"
                   value={sortValue}
@@ -938,7 +939,7 @@ export default function OutsourcingOrdersPage() {
               >
                 <Button
                   data-business-action-key="processing-contract-print"
-                  data-business-action-role="secondary"
+                  data-business-action-role="output"
                   size="small"
                   icon={<PrinterOutlined />}
                   disabled={!selectedRow || printingAction !== ''}
@@ -958,7 +959,7 @@ export default function OutsourcingOrdersPage() {
               >
                 <Button
                   data-business-action-key="work-instruction-print"
-                  data-business-action-role="secondary"
+                  data-business-action-role="output"
                   size="small"
                   icon={<PrinterOutlined />}
                   disabled={!selectedRow || printingAction !== ''}

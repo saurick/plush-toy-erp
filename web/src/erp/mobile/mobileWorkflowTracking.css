@@ -52,20 +52,12 @@
 
 .mobile-workflow-tracking-list {
   display: grid;
-  gap: 12px;
+  gap: var(--erp-work-item-gap);
 }
 
-.mobile-workflow-tracking-card {
-  min-width: 0;
-  padding: 12px 13px;
-  border: 1px solid var(--erp-border-strong);
-  border-radius: 16px;
-  background: var(--erp-surface-bg);
-}
-
-.mobile-workflow-tracking-card .erp-task-card__content {
+.mobile-workflow-tracking-footer {
   display: grid;
-  gap: 9px;
+  gap: 4px;
 }
 
 .mobile-workflow-tracking-heading,
@@ -89,8 +81,6 @@
 }
 
 .mobile-workflow-tracking-owner {
-  padding-top: 9px;
-  border-top: 1px solid var(--erp-border);
   font-size: var(--erp-font-small);
 }
 

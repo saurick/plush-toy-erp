@@ -55,7 +55,8 @@
 }
 
 .erp-print-center-workbench-card .ant-card-body {
-  padding: var(--erp-form-body-padding-block, 20px) var(--erp-panel-padding-inline, 20px);
+  padding: var(--erp-form-body-padding-block, 20px)
+    var(--erp-panel-padding-inline, 20px);
 }
 
 .erp-print-center-detail-eyebrow {
@@ -325,7 +326,6 @@
 }
 
 @media screen and (max-width: 720px) {
-
   .erp-print-center-section-head,
   .erp-print-center-paper-grid {
     grid-template-columns: 1fr;
@@ -713,38 +713,10 @@
   flex: 0 0 120px;
 }
 
-.erp-print-shell .print-zoom-select::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  box-sizing: border-box;
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid var(--erp-text-subtle);
-  border-bottom: 1.5px solid var(--erp-text-subtle);
-  transform: translateY(-70%) rotate(45deg);
-  pointer-events: none;
-}
-
-.erp-print-shell .print-zoom-select select {
-  appearance: none;
-  box-sizing: border-box;
-  display: block;
+.erp-print-shell .print-zoom-select .ant-select {
   width: 100%;
-  height: 32px;
   min-width: 0;
-  margin: 0;
-  padding: 4px 28px 4px 10px;
-  border: 1px solid var(--erp-border-strong);
-  border-radius: 6px;
-  background: var(--erp-surface-bg);
-  color: var(--erp-text);
-  font: inherit;
-  letter-spacing: normal;
-  line-height: 20px;
-  box-shadow: none;
-  cursor: pointer;
+  height: max(32px, var(--erp-touch-target, 0px));
 }
 
 .erp-print-clause-tools__field {
@@ -755,7 +727,6 @@
   color: var(--erp-text-muted);
 }
 
-.erp-print-shell .erp-print-clause-tools__field select,
 .erp-print-shell .erp-print-clause-tools__field input {
   box-sizing: border-box;
   width: 100%;
@@ -777,15 +748,6 @@
   vertical-align: top;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.erp-print-shell .print-zoom-select select:hover {
-  border-color: var(--erp-primary);
-}
-
-.erp-print-shell .print-zoom-select select:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
 }
 
 .erp-print-shell__feedback {
@@ -896,6 +858,10 @@
     min-width: var(--erp-print-clause-title-min-width);
     max-width: calc(100% - 3em - 2 * (var(--erp-print-focus-outset) + 1px));
     margin-inline: calc(var(--erp-print-focus-outset) + 1px);
+  }
+
+  .erp-print-shell__stage [data-print-focus-group][data-print-clause-index] {
+    --erp-print-focus-outset: 3px;
   }
 
   /* The focus frame includes the font's caret bounds without changing paper layout. */
@@ -1077,7 +1043,7 @@
   color: inherit;
 }
 
-.erp-print-shell__record-panel :is(button, summary, select):focus-visible {
+.erp-print-shell__record-panel :is(button, summary):focus-visible {
   outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
 }

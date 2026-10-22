@@ -10,15 +10,15 @@ import {
   Form,
   Input,
   InputNumber,
-  Select,
   Space,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import {
   ProductThumbnail,
   renderProductOption,
 } from '../master-data/ProductIdentity.jsx'
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
@@ -226,6 +226,7 @@ export default function OutsourcingOrderForm({
           rules={[{ required: true, message: '请选择加工厂' }]}
         >
           <Select
+            placeholder="请选择加工厂（乙方）"
             showSearch
             options={supplierOptions}
             optionFilterProp="label"
@@ -245,7 +246,7 @@ export default function OutsourcingOrderForm({
           label="币种"
           rules={[{ required: true, message: '请选择币种' }]}
         >
-          <Select options={BUSINESS_CURRENCY_OPTIONS} />
+          <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
@@ -423,6 +424,7 @@ export default function OutsourcingOrderForm({
                   rules={[{ required: true, message: '请选择加工品类' }]}
                 >
                   <Select
+                    placeholder="请选择加工品类"
                     options={[
                       {
                         value: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
@@ -465,6 +467,7 @@ export default function OutsourcingOrderForm({
                           rules={[{ required: true, message: '请选择材料' }]}
                         >
                           <Select
+                            placeholder="请选择材料"
                             allowClear
                             showSearch
                             options={materialOptions}
@@ -506,6 +509,7 @@ export default function OutsourcingOrderForm({
                           ]}
                         >
                           <Select
+                            placeholder="请选择产品 / 半成品"
                             allowClear
                             showSearch
                             options={productOptions}
@@ -540,6 +544,7 @@ export default function OutsourcingOrderForm({
                   rules={[{ required: true, message: '请选择工序' }]}
                 >
                   <Select
+                    placeholder="请选择工序"
                     allowClear
                     showSearch
                     options={processOptions}
@@ -562,6 +567,7 @@ export default function OutsourcingOrderForm({
                       rules={[{ required: true, message: '请选择单位' }]}
                     >
                       <Select
+                        placeholder="请选择单位"
                         disabled={Boolean(
                           getFieldValue(['items', field.name, 'product_sku_id'])
                         )}
@@ -729,6 +735,7 @@ export default function OutsourcingOrderForm({
                         tooltip="可选；选择规格后固定使用该规格的单位。需要调整单位时先清除规格。"
                       >
                         <Select
+                          placeholder="请选择产品规格"
                           allowClear
                           showSearch
                           disabled={!productID}

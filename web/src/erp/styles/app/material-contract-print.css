@@ -142,13 +142,9 @@
   gap: 4px;
 }
 
-.erp-material-contract-batch-pages select {
-  max-width: 100%;
-  padding: 6px;
-  border: 1px solid var(--erp-border-strong);
-  border-radius: 4px;
-  background: var(--erp-surface-bg);
-  color: var(--erp-text);
+.erp-material-contract-batch-pages .ant-select {
+  width: 100%;
+  min-width: 0;
 }
 
 .erp-material-contract-batch-output-count {

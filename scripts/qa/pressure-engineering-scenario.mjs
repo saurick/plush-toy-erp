@@ -1,17 +1,19 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { RpcErrorCode } from "../../web/src/common/consts/errorCodes.generated.js";
-import { pressureRPC, pressureLogicFingerprint } from "./pressure-runtime.mjs";
+import { pressureRPC, pressureLogicFingerprint, createPressureAccumulator } from "./pressure-runtime.mjs";
 import { pressureOrderIDs } from "./pressure-engineering-ledger.mjs";
 import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
+import { BusinessPaginationPolicy, SalesOrderExportPolicy } from "../../web/src/common/consts/policies.generated.mjs";
 import { ENGINEERING_RECIPES, engineeringDataFingerprint } from "./pressure-engineering-data.mjs";
 
 export const ENGINEERING_API = Object.freeze({
-  preview: { actor: "engineering", domain: "sales_order", method: "get_engineering_material_request" },
-  submit: { actor: "engineering", domain: "sales_order", method: "submit_engineering_material_request" },
-  boss: { actor: "boss", domain: "sales_order", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE" },
-  finance: { actor: "finance", domain: "sales_order", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE" },
+  preview: { actor: "engineering", domain: "sales_order", method: "get_engineering_material_request", customerKey: true },
+  submit: { actor: "engineering", domain: "sales_order", method: "submit_engineering_material_request", customerKey: true },
+  boss: { actor: "boss", domain: "sales_order", method: "boss_review_engineering_material_request", action: "BOSS_APPROVE", customerKey: true },
+  finance: { actor: "finance", domain: "sales_order", method: "finance_review_engineering_material_request", action: "FINANCE_APPROVE", customerKey: true },
   order: { actor: "sales", domain: "sales_order", method: "get_sales_order" },
   orders: { actor: "sales", domain: "sales_order", method: "list_sales_orders" },
+  export: { actor: "sales", domain: "sales_order", method: "export_sales_orders" },
   bom: { actor: "engineering", domain: "bom", method: "get_bom_version" },
   purchase: { actor: "purchase", domain: "purchase_order", method: "get_purchase_order" },
   purchaseItems: { actor: "purchase", domain: "purchase_order", method: "list_purchase_order_items" },
@@ -20,6 +22,7 @@ export const ENGINEERING_STATUS = Object.freeze({ salesOrderActive: "active", pu
 export const ENGINEERING_VERIFICATION_FILES = Object.freeze([
   "scripts/qa/pressure-engineering-ledger.mjs",
   "scripts/qa/pressure-engineering-scenario.mjs", "web/src/common/consts/errorCodes.generated.js",
+  "web/src/common/consts/policies.generated.mjs",
   "server/internal/core/status/sales_order.go", "server/internal/core/status/purchase_order.go",
   "server/internal/service/jsonrpc_purchase_order_shared.go", "server/internal/service/jsonrpc_purchase_order_document.go",
   "server/internal/service/jsonrpc_purchase_order_item.go", "server/internal/service/jsonrpc_bom_shared.go",
@@ -53,6 +56,74 @@ function requireResult(condition, check = "engineering_result") {
     const error = new Error("engineering pressure business result mismatch: " + check);
     error.errorClass = "consistency_mismatch"; error.check = check; throw error;
   }
+}
+
+// Advance independently of the mixed-operation index: a fixed stride through
+// that index can repeatedly select only the tail page.
+export function createSalesOrderPageProbe(receipt) {
+  const pageSize = BusinessPaginationPolicy.maxPageSize;
+  const orders = [...receipt.historyOrders, ...receipt.orders]
+    .sort((a, b) => a.orderDate - b.orderDate || b.id - a.id);
+  requireResult(orders.length === receipt.totalOrders && orders.length > 0 &&
+    new Set(orders.map(({ id }) => id)).size === orders.length &&
+    orders.every(({ orderDate }) => Number.isSafeInteger(orderDate)), "page_receipt");
+  const pages = Array.from({ length: Math.ceil(orders.length / pageSize) }, () => 0);
+  const groups = { full: createPressureAccumulator(), tail: createPressureAccumulator() };
+  let cursor = 0;
+  return {
+    next() {
+      const page = cursor++ % pages.length, offset = page * pageSize;
+      const expected = orders.slice(offset, offset + pageSize);
+      const group = expected.length === pageSize ? "full" : "tail";
+      return {
+        params: { keyword: receipt.prefix, lifecycle_scope: "all", sort_by: "order_date", sort_direction: "asc", limit: pageSize, offset },
+        validate(data) {
+          requireResult(data.total === orders.length && data.limit === pageSize && data.offset === offset &&
+            Array.isArray(data.sales_orders) && data.sales_orders.length === expected.length, "page_count_and_scope");
+          requireResult(data.sales_orders.every((row, index) => {
+            const order = expected[index];
+            return row.id === order.id && row.order_no === order.orderNo && row.order_date === order.orderDate &&
+              row.lifecycle_status === ENGINEERING_STATUS.salesOrderActive && row.item_count === ENGINEERING_RECIPES[order.kind].lines;
+          }), "page_source_and_order");
+          return true;
+        },
+        observe(result) {
+          groups[group].observe(result);
+          if (result.ok) pages[page]++;
+        },
+      };
+    },
+    summarize(elapsedMs, limits) {
+      const full = groups.full.summarize(elapsedMs), tail = groups.tail.summarize(elapsedMs);
+      const minPageSamples = Math.min(...pages);
+      const accepted = minPageSamples >= limits.minMethodSamples && [full, tail].every((value) =>
+        value.failures === 0 && (value.requests === 0 || (value.successfulLatencyMs.p95 <= limits.p95Ms && value.successfulLatencyMs.p99 <= limits.p99Ms)));
+      return { pageSize, totalRows: orders.length, fullPages: Math.floor(orders.length / pageSize),
+        tailRows: orders.length % pageSize, minPageSamples, full, tail, accepted };
+    },
+  };
+}
+
+export function checkSalesOrderExportSnapshot(data, receipt) {
+  const expected = new Map([...receipt.historyOrders, ...receipt.orders].map((order) => [order.id, order]));
+  const rows = data?.sales_orders;
+  requireResult(Array.isArray(rows) && data.total === expected.size && rows.length === expected.size &&
+    rows.length <= SalesOrderExportPolicy.maxRows &&
+    Buffer.byteLength(JSON.stringify(data), "utf8") <= SalesOrderExportPolicy.maxBytes, "export_complete_budget");
+  const seen = new Set();
+  for (const [index, row] of rows.entries()) {
+    const order = expected.get(row?.id);
+    requireResult(order && !seen.has(row.id) && row.order_no === order.orderNo &&
+      row.lifecycle_status === ENGINEERING_STATUS.salesOrderActive &&
+      row.item_count === ENGINEERING_RECIPES[order.kind].lines && Number.isSafeInteger(row.order_date), "export_source_rows");
+    seen.add(row.id);
+    if (index > 0) {
+      const previous = rows[index - 1];
+      requireResult(previous.order_date < row.order_date ||
+        (previous.order_date === row.order_date && previous.id > row.id), "export_stable_order");
+    }
+  }
+  return true;
 }
 export function checkEngineeringDemand(request, order, receipt, status = request?.status) {
   const recipe = ENGINEERING_RECIPES[order.kind], refs = receipt.references.materials;
@@ -121,7 +192,7 @@ export function createEngineeringPressureClient({ baseURL, tokens }) {
   const call = async (operation, params, options = {}) => {
     const spec = ENGINEERING_API[operation];
     if (!spec) throw new Error("unknown engineering pressure operation");
-    return pressureRPC({ baseURL, ...spec, params: { customer_key: "yoyoosun", ...params, ...(spec.action ? { action: spec.action } : {}) },
+    return pressureRPC({ baseURL, ...spec, params: { ...(spec.customerKey === true ? { customer_key: "yoyoosun" } : {}), ...params, ...(spec.action ? { action: spec.action } : {}) },
       token: tokens[options.actor || spec.actor], ...options });
   };
   const requireCall = async (operation, params, options = {}) => {
@@ -194,12 +265,12 @@ function checkCompetitionResults(results, allowedCode, operation) {
   requireResult(results.every((result) => result.ok || result.code === allowedCode), operation + "_competition_unexpected_error");
 }
 export async function runEngineeringCompetition({ client, receipt, signal }) {
-  const order = receipt.orders[0], options = { signal }, invalid = RpcErrorCode.INVALID_PARAM;
+  const order = receipt.orders[0], options = { signal }, conflict = RpcErrorCode.RESOURCE_CONFLICT;
   const preview = await client.requireCall("preview", { sales_order_id: order.id }, {
     ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "PREVIEW"),
   });
   const submits = await Promise.all(Array.from({ length: 20 }, () => client.call("submit", submitParams(order, preview), options)));
-  checkCompetitionResults(submits, invalid, "submit");
+  checkCompetitionResults(submits, conflict, "submit");
   let request = await client.requireCall("preview", { sales_order_id: order.id }, options);
   checkEngineeringDemand(request, order, receipt, "SUBMITTED");
   requireResult(new Set(submits.filter((item) => item.ok).map((item) => item.data.id)).size === 1 && request.version === 1, "submit_single_result");
@@ -207,16 +278,17 @@ export async function runEngineeringCompetition({ client, receipt, signal }) {
   const mismatched = await client.call("boss", { ...reviewParams(request), expected_version: request.version + 1 }, options);
   const wrongStage = await client.call("finance", reviewParams(request), options);
   const denied = await client.call("finance", reviewParams(request), { ...options, actor: "engineering" });
-  requireResult(!mismatched.ok && mismatched.code === invalid && !wrongStage.ok && wrongStage.code === invalid &&
-    !denied.ok && denied.code === RpcErrorCode.PERMISSION_DENIED, "version_stage_permission_rejection");
+  requireResult(!mismatched.ok && mismatched.code === conflict, "version_mismatch_rejection");
+  requireResult(!wrongStage.ok && wrongStage.code === RpcErrorCode.INVALID_PARAM, "wrong_stage_rejection");
+  requireResult(!denied.ok && denied.code === RpcErrorCode.PERMISSION_DENIED, "permission_rejection");
   requireResult(JSON.stringify(await client.requireCall("preview", { sales_order_id: order.id }, options)) === before, "rejected_action_no_mutation");
   const bosses = await Promise.all(Array.from({ length: 20 }, () => client.call("boss", reviewParams(request), options)));
-  checkCompetitionResults(bosses, invalid, "boss");
+  checkCompetitionResults(bosses, conflict, "boss");
   request = await client.requireCall("preview", { sales_order_id: order.id }, options);
   checkEngineeringDemand(request, order, receipt, "BOSS_APPROVED");
   requireResult(request.version === 2 && bosses.filter((item) => item.ok).length === 1, "boss_single_transition");
   const finances = await Promise.all(Array.from({ length: 20 }, () => client.call("finance", reviewParams(request), options)));
-  checkCompetitionResults(finances, invalid, "finance");
+  checkCompetitionResults(finances, conflict, "finance");
   for (const result of finances.filter((item) => !item.ok)) {
     const replay = await client.call("finance", reviewParams(request), options);
     requireResult(replay.ok, "finance_replay_failed");
@@ -224,7 +296,7 @@ export async function runEngineeringCompetition({ client, receipt, signal }) {
   const final = await readEngineeringPurchaseResult({ client, order, receipt, options });
   requireResult(final.request.version === 3, "finance_single_transition");
   const stale = await client.call("boss", { ...reviewParams(final.request), expected_version: final.request.version - 1 }, options);
-  requireResult(!stale.ok && stale.code === invalid &&
+  requireResult(!stale.ok && stale.code === conflict &&
     JSON.stringify(await client.requireCall("preview", { sales_order_id: order.id }, options)) === JSON.stringify(final.request), "stale_version_no_mutation");
   const ids = final.request.purchase_orders.map((item) => item.id).sort((a, b) => a - b);
   for (const result of finances.filter((item) => item.ok))

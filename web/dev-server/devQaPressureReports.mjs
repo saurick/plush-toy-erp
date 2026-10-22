@@ -73,16 +73,33 @@ export function readCurrentPressureSource(root, commit) {
   }
 }
 
-function projectLevel(level) {
-  if (!LEVELS.has(level?.key)) throw new Error('pressure level is invalid')
-  const metrics = (value) => ({
+const metrics = (value) => ({
     requests: count(value?.requests),
     successes: count(value?.successes),
     failures: count(value?.failures),
     successfulRps: number(value?.successfulRps),
     p95Ms: number(value?.successfulLatencyMs?.p95),
     p99Ms: number(value?.successfulLatencyMs?.p99),
-  })
+})
+function projectPagination(raw, level) {
+  if (!raw) return null
+  const fields = ['pageSize', 'totalRows', 'fullPages', 'tailRows', 'minPageSamples']
+  if (!fields.every((key) => count(raw[key]) !== null) || raw.pageSize < 1 || raw.totalRows < 1 ||
+      raw.fullPages !== Math.floor(raw.totalRows / raw.pageSize) || raw.tailRows !== raw.totalRows % raw.pageSize) return null
+  const full = metrics(raw.full)
+  const tail = metrics(raw.tail)
+  const method = metrics(level.methods?.['sales_order.list_sales_orders'])
+  const accepted = raw.accepted === true && raw.minPageSamples >= level.limits?.minMethodSamples &&
+    [full, tail].every((value) => value.requests !== null && value.successes !== null && value.failures === 0 &&
+      value.requests === value.successes && (value.requests === 0 ||
+        (value.p95Ms !== null && value.p99Ms !== null && value.p95Ms <= level.limits?.p95Ms && value.p99Ms <= level.limits?.p99Ms))) &&
+    (raw.fullPages > 0 ? full.successes >= raw.fullPages * raw.minPageSamples : full.requests === 0) &&
+    (raw.tailRows > 0 ? tail.successes >= raw.minPageSamples : tail.requests === 0) &&
+    full.requests + tail.requests === method.requests && full.successes + tail.successes === method.successes
+  return { ...Object.fromEntries(fields.map((key) => [key, raw[key]])), full, tail, accepted }
+}
+function projectLevel(level) {
+  if (!LEVELS.has(level?.key)) throw new Error('pressure level is invalid')
   return {
     key: level.key,
     concurrency: count(level.concurrency),
@@ -94,6 +111,7 @@ function projectLevel(level) {
     rpc: metrics(level.rpc),
     flows: metrics(level.businessFlows),
     completedBusinessFlows: count(level.completedBusinessFlows),
+    pagination: projectPagination(level.pagination, level),
     methods: Object.entries(level.methods || {})
       .filter(([name]) => /^[a-z_]+\.[a-z_]+$/u.test(name))
       .slice(0, 40)
@@ -142,6 +160,8 @@ function pressureDetail(report, lifecycle, scope) {
         level.rpc.failures === 0 &&
         level.operations.successfulRps >= level.limits.minSuccessfulRps &&
         level.methods.length > 0 &&
+        (report.paginationPageSize === undefined || (level.pagination?.accepted === true &&
+          level.pagination.pageSize === report.paginationPageSize && level.pagination.totalRows === report.dataset?.totalOrders)) &&
         level.methods.every(
           (method) =>
             method.successes >= level.limits.minMethodSamples &&
@@ -201,6 +221,7 @@ function comparisonKey(lifecycle, engineering, candidate, dataset) {
   const inputs = { candidate: { commit: candidate.commit, migration: candidate.migration, fingerprints: candidate.fingerprints },
     environment: { host: lifecycle.environment.hostFingerprint, loadRuntime: engineering.execution.hardwareFingerprint, containers, backend: lifecycle.environment.backend },
     profile: lifecycle.profile,
+    paginationPageSize: engineering.paginationPageSize ?? null,
 working: dataset.working,
 complexity: dataset.complexity,
     load: engineering.levels.map(({ key, concurrency, pacingMs, targetDurationMs, requests, limits }) =>

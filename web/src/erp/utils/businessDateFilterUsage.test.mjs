@@ -11,6 +11,10 @@ const businessListLayoutPath = resolve(
   __dirname,
   '../components/business-list/BusinessListLayout.jsx'
 )
+const businessDateInputsPath = resolve(
+  __dirname,
+  '../components/business-list/BusinessDateInputs.jsx'
+)
 const businessTaskActionsPath = resolve(
   __dirname,
   '../components/workflow/BusinessTaskActions.jsx'
@@ -152,7 +156,7 @@ test('业务日期控件统一使用 DateInput 或 DateTimeInput', () => {
   const directDatePickerPattern = /<DatePicker\b/u
   const offenders = listPageFiles(erpRoot).flatMap((filePath) => {
     const source = readFileSync(filePath, 'utf8')
-    const isSharedDateInput = filePath === businessListLayoutPath
+    const isSharedDateInput = filePath === businessDateInputsPath
     return (
       nativeDateInputPattern.test(source) ||
       (!isSharedDateInput && directDatePickerPattern.test(source))
@@ -175,7 +179,7 @@ test('只有跟进任务截止时间隐藏此刻并提供截止快捷项', () =>
     const source = readFileSync(filePath, 'utf8')
     return showNowDisabledPattern.test(source) ? [filePath] : []
   })
-  const sharedSource = readFileSync(businessListLayoutPath, 'utf8')
+  const sharedSource = readFileSync(businessDateInputsPath, 'utf8')
   const dateTimeInputDefinition = sharedSource.match(
     /export const DateTimeInput[\s\S]*?\n\)\)\n/u
   )?.[0]

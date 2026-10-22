@@ -348,6 +348,7 @@ export const RpcMethod = Object.freeze({
     BOSS_REVIEW_ENGINEERING_MATERIAL_REQUEST: 'boss_review_engineering_material_request',
     CANCEL_SALES_ORDER: 'cancel_sales_order',
     CLOSE_SALES_ORDER: 'close_sales_order',
+    EXPORT_SALES_ORDERS: 'export_sales_orders',
     FINANCE_REVIEW_ENGINEERING_MATERIAL_REQUEST: 'finance_review_engineering_material_request',
     GET_ENGINEERING_MATERIAL_REQUEST: 'get_engineering_material_request',
     GET_SALES_ORDER: 'get_sales_order',

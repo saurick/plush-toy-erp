@@ -60,6 +60,38 @@ test('errorMessage: 已知错误码优先走现有中文码表', () => {
   )
 })
 
+test('errorMessage: 业务原因保留处理责任和恢复办法', () => {
+  for (const [code, message] of [
+    [RpcErrorCode.PERMISSION_DENIED, '人工库存调整必须由另一位有权人员审批'],
+    [RpcErrorCode.RESOURCE_VERSION_CONFLICT, '盘点期间账面库存已变化，请刷新后重新盘点'],
+    [RpcErrorCode.BUSINESS_RULE_VIOLATION, '图片已用于订单样品记录，不能替换或清空；请保留原图'],
+    [RpcErrorCode.RESOURCE_CONFLICT, '该业务来源已生成同类型的有效财务记录'],
+    [RpcErrorCode.RESOURCE_NOT_FOUND, '销售订单不存在，请重新选择'],
+  ]) {
+    assert.equal(getActionErrorMessage({ code, message }, '办理'), message)
+  }
+})
+
+test('errorMessage: 业务码不能放行技术信息或覆盖登录安全提示', () => {
+  for (const code of [
+    RpcErrorCode.PERMISSION_DENIED, RpcErrorCode.RESOURCE_VERSION_CONFLICT,
+    RpcErrorCode.RESOURCE_NOT_FOUND, RpcErrorCode.RESOURCE_CONFLICT,
+    RpcErrorCode.BUSINESS_RULE_VIOLATION, RpcErrorCode.INVALID_PARAM,
+  ]) {
+    for (const message of ['', 'unexpected exception', '数据库连接异常', '办理失败 /srv/private.go:42']) {
+      assert.equal(getActionErrorMessage({ code, message }, '办理'), DEFAULT_RPC_ERROR_MESSAGES[code])
+    }
+  }
+  assert.equal(
+    getActionErrorMessage({ code: RpcErrorCode.AUTH_LOGIN_REJECTED, message: '该账号存在，但是密码错误' }, '登录'),
+    '登录信息不正确或账号不可用'
+  )
+  assert.equal(
+    getActionErrorMessage({ code: RpcErrorCode.INVALID_PARAM, message: '参数不合法' }, '保存'),
+    '请检查填写内容后重试'
+  )
+})
+
 test('errorMessage: 短信登录错误码显示精确中文提示', () => {
   const cases = [
     [RpcErrorCode.AUTH_SMS_CODE_TOO_FREQUENT, '验证码发送过于频繁，请稍后再试'],

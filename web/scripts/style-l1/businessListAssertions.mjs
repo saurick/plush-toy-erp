@@ -175,6 +175,7 @@ export function createBusinessListAssertions({ outputDir }) {
               hasActiveClass: actionBar.classList.contains(
                 'erp-business-selection-action-bar--active'
               ),
+              enabledCommands: [...actionBar.querySelectorAll('button')].filter((button) => button.checkVisibility() && !button.disabled && !button.classList.contains('erp-business-selection-action-bar__compact-more')).length,
             }
           : null
 
@@ -205,8 +206,9 @@ export function createBusinessListAssertions({ outputDir }) {
     if (expectedMode === 'empty') {
       if (metrics.selectable) {
         assert(metrics.actionBar?.hasEmptyClass && !metrics.actionBar.hasActiveClass, `${scenarioName} 未选择时保留常驻操作栏`)
-        assert.match(metrics.actionBar.text, /选中记录后显示可用操作/u)
-        assert.equal(metrics.actions, null, `${scenarioName} 未选择时不列出具体按钮`)
+        assert.match(metrics.actionBar.text, /请选择一条记录/u)
+        assert(metrics.actions, `${scenarioName} 未选择时保留动作入口`)
+        assert.equal(metrics.actionBar.enabledCommands, 0, `${scenarioName} 未选择时动作不可执行`)
       } else {
         assert.equal(metrics.actionBar, null, `${scenarioName} 无可选记录时不留操作占位`)
       }
@@ -390,7 +392,7 @@ export function createBusinessListAssertions({ outputDir }) {
         )
       }
       const buttons = Array.from(
-        document.querySelectorAll('.erp-admin-header button')
+        document.querySelectorAll('.erp-page-actions button')
       ).filter(
         (button) =>
           isVisible(button) &&
@@ -411,7 +413,7 @@ export function createBusinessListAssertions({ outputDir }) {
       assert.equal(
         metrics.count,
         0,
-        `${scenarioName} 壳层不应显示全局刷新按钮: ${JSON.stringify(metrics)}`
+        `${scenarioName} 当前页面不应显示刷新按钮: ${JSON.stringify(metrics)}`
       )
       return
     }
@@ -1257,11 +1259,11 @@ export function createBusinessListAssertions({ outputDir }) {
       const contentRefreshButtons = allButtons.filter(
         (button) =>
           button.closest('.erp-admin-content') &&
-          !button.closest('.erp-admin-header') &&
+          !button.closest('.erp-page-actions') &&
           String(button.textContent || '').trim() === '刷新'
       )
       const headerButtons = refreshButtons.filter((button) =>
-        button.closest('.erp-admin-header')
+        button.closest('.erp-page-actions')
       )
 
       return {
@@ -1289,7 +1291,7 @@ export function createBusinessListAssertions({ outputDir }) {
     assert.equal(
       metrics.headerRefreshButtonCount,
       1,
-      `${scenarioName} 业务页应复用壳层刷新按钮: ${JSON.stringify(metrics)}`
+      `${scenarioName} 业务页应在页面操作区复用刷新按钮: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.operationRefreshButtonCount,

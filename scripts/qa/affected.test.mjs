@@ -22,6 +22,97 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("sales export growth changes select existing checks and an explicit bounded load follow-up", () => {
+  for (const file of [
+    "server/internal/data/sales_order_export.go",
+    "server/internal/biz/sales_order.go",
+    "scripts/qa/engineering-pressure.mjs",
+    "scripts/qa/pressure-engineering-data.mjs",
+    "scripts/qa/pressure-isolated-lifecycle.mjs",
+    "scripts/qa/pressure-runtime.mjs",
+    "web/src/common/consts/policies.generated.mjs",
+    "web/src/dev-workbench/config/devPressureData.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const selected = selectedTests(plan);
+    assert(selected.includes("scripts/qa/pressure-engineering-scenario.test.mjs"));
+    assert(selected.includes("scripts/qa/business-rule-catalog.test.mjs"));
+    const followUp = plan.followUps.find((item) => item.id === "growth-capacity-validation");
+    assert(followUp);
+    assert(!plan.commands.some((item) => item.args?.includes("--run") && item.args.some((arg) => arg.includes("pressure-isolated-lifecycle"))));
+  }
+  const unrelated = buildAffectedPlan(["web/src/erp/utils/businessDate.mjs"], { root: ROOT });
+  assert(!unrelated.followUps.some((item) => item.id === "growth-capacity-validation"));
+});
+
+test("work-center sample and shared adapter changes retain isolation checks and focused browser coverage", () => {
+  for (const file of [
+    "web/src/dev-workbench/components/DevWorkCenterDesign.jsx",
+    "web/src/dev-workbench/components/DevWorkCenterDesign.test.mjs",
+    "web/src/dev-workbench/config/devWorkCenterDesign.mjs",
+    "web/src/dev-workbench/config/devWorkCenterDesign.test.mjs",
+    "web/src/dev-workbench/styles/dev-work-center-design.css",
+    "web/scripts/style-l1/devWorkCenterDesignScenarios.mjs",
+    "web/src/erp/components/business-visualizations/ProgressCompactContent.jsx",
+    "web/src/erp/components/master-data/ProductIdentity.jsx",
+    "web/src/erp/components/workflow/WorkflowTaskIdentity.jsx",
+    "web/src/erp/components/workflow/WorkflowTaskProductImage.jsx",
+    "web/src/erp/components/workflow/WorkflowTaskCopy.jsx",
+    "web/src/erp/components/workflow/WorkflowTaskTiming.jsx",
+    "web/src/erp/utils/workflowTaskIdentity.mjs",
+    "web/src/erp/utils/workflowTaskTiming.mjs",
+    "web/src/erp/utils/businessProgress.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const selected = selectedTests(plan);
+    for (const target of [
+      "scripts/qa/dev-workbench-boundary.test.mjs",
+      "web/src/dev-workbench/config/devWorkCenterDesign.test.mjs",
+      "web/src/dev-workbench/components/DevWorkCenterDesign.test.mjs",
+    ]) assert(selected.includes(target), `${file}: ${target}`);
+    const followUp = plan.followUps.find(({ id }) => id === "browser-regression");
+    assert.match(followUp?.text || "", /dev-ui-design-work-center-explanations,dev-ui-design-work-center-reading/u, file);
+    assert(!ids(plan).includes("full"), file);
+  }
+  const unrelated = buildAffectedPlan(["web/src/erp/utils/businessDate.mjs"], { root: ROOT });
+  assert.doesNotMatch(unrelated.followUps.find(({ id }) => id === "browser-regression")?.text || "", /dev-ui-design-work-center/u);
+});
+
+test("growth guidance and evidence changes select their real consumers and browser scenario", () => {
+  const files = [
+    "docs/product/自动化测试策略.md",
+    "scripts/qa/lib/business-rule-catalog.mjs",
+    "web/dev-server/devIntegrationEvidence.mjs",
+    "web/src/dev-workbench/pages/DevTestingPage.jsx",
+    "web/src/dev-workbench/components/DevTestingStrategyGuide.jsx",
+    "web/src/dev-workbench/components/DevBusinessRulesPanel.jsx",
+    "web/src/dev-workbench/config/devTesting.mjs",
+    "web/src/dev-workbench/config/devBusinessRules.mjs",
+    "web/scripts/style-l1/growthValidationScenarios.mjs",
+  ];
+  for (const file of files) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const selected = selectedTests(plan);
+    if (file === "scripts/qa/lib/business-rule-catalog.mjs") {
+      assert(ids(plan).includes("full"), "关键规则目录保留现有完整门禁");
+      assert(plan.prePushNodeTests.includes("scripts/qa/business-rule-catalog.test.mjs"));
+    } else {
+      for (const target of [
+        "scripts/qa/business-rule-catalog.test.mjs",
+        "web/src/dev-workbench/config/devTestingStrategy.test.mjs",
+        "web/src/dev-workbench/config/devBusinessRules.test.mjs",
+        "web/dev-server/devIntegrationEvidence.test.mjs",
+      ]) assert(selected.includes(target), `${file}: ${target}`);
+    }
+    assert.match(plan.followUps.find(({ id }) => id === "browser-regression")?.text || "", /dev-growth-correctness-evidence/u, file);
+    assert(!plan.followUps.some(({ id }) => id === "growth-capacity-validation"), file);
+  }
+  const combined = buildAffectedPlan(files, { root: ROOT });
+  assert.equal(combined.followUps.filter(({ id }) => id === "browser-regression").length, 1);
+  const unrelated = buildAffectedPlan(["docs/product/产品完成路线图.md"], { root: ROOT });
+  assert(!unrelated.followUps.some(({ id }) => id === "browser-regression"));
+});
+
 function selectedTests(plan) {
   return plan.commands
     .filter((item) => item.id.startsWith("node-tests:"))
@@ -131,7 +222,7 @@ test("affected: short push checks reuse fast classification and exclude costly g
     "scripts/qa/manual-acceptance-browser.test.mjs",
     "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
     "scripts/qa/pre-push-receipt.test.mjs",
-    "docs/product/自动化测试策略.md",
+    "docs/product/产品完成路线图.md",
   ]) {
     assert.deepEqual(buildAffectedPlan([file], { root: ROOT }).prePushNodeTests, [], file);
   }
@@ -195,8 +286,8 @@ test("affected: shared coverage contract selects its publishing and API consumer
   assert(!ids(plan).includes("full"));
 });
 
-test("affected: docs-only changes stay at T1", () => {
-  const plan = buildAffectedPlan(["docs/product/自动化测试策略.md"], {
+test("affected: documentation without executable consumers stays at T1", () => {
+  const plan = buildAffectedPlan(["docs/product/产品完成路线图.md"], {
     root: ROOT,
   });
 
@@ -603,6 +694,26 @@ test("affected: entrypoints, styles and deleted modules cannot be narrowed by ne
       }
     },
   );
+});
+
+test("affected: lint configurations select their own boundary tests and static checks", () => {
+  const eslint = buildAffectedPlan(["web/eslint.config.js"], { root: ROOT });
+  assert.equal(eslint.localGate, "focused");
+  assert(ids(eslint).includes("web-lint"));
+  assert.deepEqual(selectedTests(eslint), [
+    "web/scripts/navigationControls.test.mjs",
+    "web/src/common/components/sharedComponentBoundaries.test.mjs",
+    "web/src/erp/utils/selectControlContract.test.mjs",
+  ]);
+  const styles = buildAffectedPlan(["web/.stylelintrc"], { root: ROOT });
+  assert.equal(styles.localGate, "focused");
+  assert(ids(styles).includes("web-css"));
+  assert.deepEqual(selectedTests(styles), ["web/scripts/stylelint/styleBoundaries.test.mjs"]);
+  for (const plan of [eslint, styles]) {
+    assert(!ids(plan).includes("web-test"));
+    assert(!plan.followUps.some((item) => item.id === "browser-regression"));
+  }
+  assert.equal(buildAffectedPlan(["web/unknown-lint.config.js"], { root: ROOT }).localGate, "full");
 });
 
 test("affected: changing only a Web test does not require product lint or browser execution", () => {
@@ -1290,7 +1401,7 @@ test("affected: full subsumes focused commands but keeps browser follow-up visib
 });
 
 test("affected: focused plan selects an affected pre-push receipt", () => {
-  const plan = buildAffectedPlan(["docs/product/自动化测试策略.md"], {
+  const plan = buildAffectedPlan(["docs/product/产品完成路线图.md"], {
     root: ROOT,
   });
   assert.deepEqual(selectPrePushProfile(plan), {
@@ -1329,7 +1440,7 @@ test("affected: unresolved follow-ups require explicit full pre-push", () => {
 });
 
 test("affected: explicit full can only escalate a focused plan", () => {
-  const plan = buildAffectedPlan(["docs/product/自动化测试策略.md"], {
+  const plan = buildAffectedPlan(["docs/product/产品完成路线图.md"], {
     root: ROOT,
   });
   const selection = selectPrePushProfile(plan, { forceFull: true });

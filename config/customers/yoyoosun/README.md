@@ -28,7 +28,9 @@
 
 - `importConfig.mjs`：永绅 yoyoosun 导入与客户差异配置草案。该文件根据已提取的 Excel evidence、产品核心边界和客户台账收口导入顺序、字段映射分组、人工 review 队列、禁止自动导入目标和 deferred runtime 项；当前 `runtimeEnabled=false`，不嵌入 raw rows，不接 loader，不执行真实导入。
 
-- `customerPackage.mjs`：永绅客户包声明源。raw 包保持 `runtimeEnabled=false / previewOnly=true`；`localTestApplyEnabled=true` 只允许 `start:yoyoosun` 的 loopback 开发入口编译内容寻址的本地测试版本，并且仍需由本地 Make 入口显式开放的后端 gate 接收。默认后端和正式 manifest 路径均拒绝该 local-test 标记，正式发布仍必须通过 release-ready 与 evidence 门禁。两条路径都不改变 schema、RBAC 或 Workflow / Fact 底线。
+- `customerPackage.mjs`：永绅客户包声明源。raw 包保持 `runtimeEnabled=false / previewOnly=true`；`localTestApplyEnabled=true` 只允许 `start:yoyoosun` 的 loopback 开发入口编译内容寻址的本地测试版本，并且仍需由本地 Make 入口显式开放的后端 gate 接收。
+
+  默认后端和正式 manifest 路径均拒绝该 local-test 标记，正式发布仍必须通过 release-ready 与 evidence 门禁。两条路径都不改变 schema、RBAC 或 Workflow / Fact 底线。
   - 模块、页面、角色和责任池由 catalog、active revision 与后端 RBAC 共同收窄；客户包不安装代码或模块。
   - `roleFlowMatrix.mjs` 中每个角色的 `menuSurfaces` 使用真实 runtime page key；其 `capabilityKeys` 必须覆盖页面 catalog 登记的全部读取合同。仅为页面联查补充的客户、供应商、材料、产品、库存等窄读取权限不会自动开放对应独立菜单，最终菜单由编译后的 `rolePageProjections` 继续收窄。
   - 客户包角色能力只编译为 `access_entitlements`；`role_profiles` 没有加权字段，角色撤权使用 `revokes`，后端 RBAC 是不可突破的上限。
@@ -37,7 +39,9 @@
   - 打印默认值只覆盖采购合同、加工合同的买方 / 委托方抬头，供应商 / 加工方和明细继续来自业务快照。
   - Dry Run 不写数据库；本地测试应用只写共享开发库的客户配置控制面，并要求管理员显式确认。正式发布仍需 release readiness，rollback 只回滚配置 revision，不回滚业务数据或数据库备份。
 
-- `releasePackage.mjs`：显式评审后的正式 manifest 输入，只把同一受控包切换为 `release_ready / runtimeEnabled / publishEnabled`，并关闭本地测试应用标记。raw 包仍保持草案，正式编译只从该独立登记入口读取；`packageKey` 保持稳定；修改可发布内容（包括编译器生成的快照结构与目录元数据）后，编译器从完整内容自动生成新 revision，无需人工递增包名。已发布版本及其快照保持不变，不用当前编译器重建后覆盖旧版本。
+- `releasePackage.mjs`：显式评审后的正式 manifest 输入，只把同一受控包切换为 `release_ready / runtimeEnabled / publishEnabled`，并关闭本地测试应用标记。
+
+  raw 包仍保持草案，正式编译只从该独立登记入口读取；`packageKey` 保持稳定；修改可发布内容（包括编译器生成的快照结构与目录元数据）后，编译器从完整内容自动生成新 revision，无需人工递增包名。已发布版本及其快照保持不变，不用当前编译器重建后覆盖旧版本。
 
 未来可继续放：
 
@@ -64,4 +68,8 @@ node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode 
 node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 ```
 
-这些报告只写入 `output/`，不纳入 git。`customer-package-preview.json` 和 `--mode preview` 产物都只用于评审，不能提交给后端 validate / publish，也不会被自动升级成 runtime；只有 `--mode compile` 从 `releasePackage.mjs` 生成的 `customer-config-runtime-manifest.json` 才是正式 payload。脚本本身不调用后端、不激活、不导入业务数据。
+这些报告只写入 `output/`，不纳入 git。
+
+`customer-package-preview.json` 和 `--mode preview` 产物都只用于评审，不能提交给后端 validate / publish，也不会被自动升级成 runtime；只有 `--mode compile` 从 `releasePackage.mjs` 生成的 `customer-config-runtime-manifest.json` 才是正式 payload。
+
+脚本本身不调用后端、不激活、不导入业务数据。

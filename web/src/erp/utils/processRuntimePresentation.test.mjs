@@ -8,7 +8,6 @@ import {
   getProcessNodeStatusLabel,
   getProcessStatusLabel,
   getWorkflowTaskDisplayName,
-  isDisplayOnlyWorkflowTask,
   requireWorkflowProcessContext,
 } from './processRuntimePresentation.mjs'
 import { formatWorkflowTaskEventTime } from './workflowTaskEventPresentation.mjs'
@@ -591,12 +590,4 @@ test('process runtime presentation fails closed on foreign or invalid nodes', ()
     () => requireWorkflowProcessContext(canonicalDrift),
     /业务轨迹暂时无法确认/u
   )
-})
-
-test('simulated task catalog is explicit display-only evidence', () => {
-  assert.equal(
-    isDisplayOnlyWorkflowTask({ payload: { simulated_only: true } }),
-    true
-  )
-  assert.equal(isDisplayOnlyWorkflowTask({ process_instance_id: 10 }), false)
 })

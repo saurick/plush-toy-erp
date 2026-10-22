@@ -1,10 +1,10 @@
 import React from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
-import { formatWorkflowTaskListSource } from '../../utils/dashboardTaskDisplay.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { buildWorkflowTaskResponsibilityItems } from '../../utils/workflowTaskEventPresentation.mjs'
 import Table from '@/common/components/table/AppTable'
+import useBusinessListStickyHeader from '../business-list/useBusinessListStickyHeader.js'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
@@ -217,7 +217,6 @@ export function getWorkflowTaskStableKey(task) {
 export function TaskTitleEntry({
   task,
   onOpenTask,
-  children,
   compact = false,
 }) {
   const name = getWorkflowTaskDisplayName(task)
@@ -234,14 +233,8 @@ export function TaskTitleEntry({
         onOpenTask(task)
       }}
     >
-      <span>{children || name}</span>
-      {compact ? (
-        children ? (
-          <span className="erp-task-title-entry__type">· {name}</span>
-        ) : null
-      ) : (
-        <ArrowRightOutlined aria-hidden="true" />
-      )}
+      <span>{name}</span>
+      {!compact ? <ArrowRightOutlined aria-hidden="true" /> : null}
     </button>
   )
 }
@@ -251,13 +244,19 @@ export function openTaskTableRow(event, task, onOpenTask) {
 }
 
 export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenTask }) {
+  const tableRef = React.useRef(null)
+  const sticky = useBusinessListStickyHeader(tableRef, true)
   return (
     <section
+      ref={tableRef}
       className={`erp-task-board-lane erp-task-board-lane--${lane.key}${focused ? ' erp-task-board-lane--focused' : ''}`}
       aria-label={focused ? lane.title : '待处理预览'}
       aria-busy={loading}
     >
       <Table
+        className="erp-work-center-table"
+        sticky={sticky}
+        scrollToolbar
         size="middle"
         rowKey={getWorkflowTaskStableKey}
         loading={loading}
@@ -277,10 +276,10 @@ export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenT
                   task={task}
                   keyword={keyword}
                   compact
-                  renderCompactTitle={(title) => (
-                    <TaskTitleEntry task={task} onOpenTask={onOpenTask} compact>
-                      {title}
-                    </TaskTitleEntry>
+                  layout="table"
+                  showTaskName
+                  renderCompactTitle={() => (
+                    <TaskTitleEntry task={task} onOpenTask={onOpenTask} compact />
                   )}
                 />
               </div>
@@ -293,7 +292,7 @@ export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenT
             width: '27%',
             render: (_, task) => (
               <div className="erp-workbench-task-cell">
-                <WorkflowTaskSource task={task} label={formatWorkflowTaskListSource(task)} />
+                <WorkflowTaskSource task={task} showUnavailable={false} />
                 <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={!getWorkflowTaskStatusRiskTags(task).some((tag) => tag.key === 'overdue' || tag.key === 'due_soon')} />
               </div>
             ),

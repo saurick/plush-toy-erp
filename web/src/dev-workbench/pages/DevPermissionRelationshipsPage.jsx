@@ -10,12 +10,11 @@ import {
   Alert,
   Button,
   Empty,
-  Select,
   Space,
-  Statistic,
   Tag,
   Typography,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
@@ -40,6 +39,7 @@ import {
   getPermissionRelationshipRoleKeys,
 } from '../config/devPermissionRelationshipGraph.mjs'
 import '../styles/dev-permission-relationships.css'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -574,6 +574,7 @@ export default function DevPermissionRelationshipsPage() {
                       : '选择员工'}
                   </Text>
                   <Select
+                    allowClear={false}
                     showSearch
                     aria-label={
                       viewMode === PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE
@@ -616,55 +617,51 @@ export default function DevPermissionRelationshipsPage() {
                 />
               ) : null}
 
-              <div
-                className="erp-permission-relationship__summary"
-                aria-label="权限关系汇总"
-              >
-                {summaryItems.map((item) => (
-                  <Statistic
-                    key={item.key}
-                    title={item.label}
-                    value={item.value ?? '—'}
-                  />
+              <div className="erp-dev-permission-overview">
+                <div
+                  className="erp-dev-permission-counts"
+                  aria-label="权限关系汇总"
+                >
+                  {summaryItems.map((item) => (
+                    <span key={item.key}>{item.label} <strong>{item.value ?? '—'}</strong></span>
                 ))}
-              </div>
+                </div>
 
-              <div className="erp-dev-permission-result">
-                <Text type="secondary">结果性质</Text>
-                <Text strong>
-                  {{
+                <div className="erp-dev-permission-result">
+                  <Text strong>
+                    {{
                     ready: '最终生效结果',
                     blocked: '当前不可使用',
                     projection: '多岗位合并参考',
                     special: '系统保留账号，未读取独立会话',
                   }[globalModel.resultState] || '预览或读取不完整'}
-                </Text>
-              </div>
-              <details className="erp-dev-permission-evidence-disclosure">
-                <summary>来源与版本</summary>
-                <section
-                  className="erp-permission-relationship__evidence"
-                  aria-label="当前权限证据版本"
-                >
-                  <div>
-                    <Text type="secondary">权限结果来源</Text>
-                    <Text strong>
-                      {evidenceValue(
+                  </Text>
+                </div>
+                <details className="erp-dev-permission-evidence-disclosure">
+                  <summary>来源与版本</summary>
+                  <section
+                    className="erp-permission-relationship__evidence"
+                    aria-label="当前权限证据版本"
+                  >
+                    <div>
+                      <Text type="secondary">权限结果来源</Text>
+                      <Text strong>
+                        {evidenceValue(
                         relationshipEvidence.sources,
                         '最终结果尚未读取'
                       )}
-                    </Text>
-                  </div>
-                  <div>
-                    <Text type="secondary">客户配置版本</Text>
-                    <Text strong>
-                      {evidenceValue(relationshipEvidence.configRevisions)}
-                    </Text>
-                  </div>
-                  <div>
-                    <Text type="secondary">产品版本</Text>
-                    <Text strong>
-                      {evidenceValue([
+                      </Text>
+                    </div>
+                    <div>
+                      <Text type="secondary">客户配置版本</Text>
+                      <Text strong>
+                        {evidenceValue(relationshipEvidence.configRevisions)}
+                      </Text>
+                    </div>
+                    <div>
+                      <Text type="secondary">产品版本</Text>
+                      <Text strong>
+                        {evidenceValue([
                         ...new Set(
                           [
                             ...relationshipEvidence.productVersions,
@@ -672,29 +669,30 @@ export default function DevPermissionRelationshipsPage() {
                           ].filter(Boolean)
                         ),
                       ])}
-                    </Text>
-                  </div>
-                  <div>
-                    <Text type="secondary">岗位版本</Text>
-                    <Text strong>
-                      {evidenceValue(relationshipEvidence.roleVersions)}
-                    </Text>
-                  </div>
-                  <div>
-                    <Text type="secondary">审批设置版本</Text>
-                    <Text strong>
-                      {relationshipEvidence.approvalRevision ||
+                      </Text>
+                    </div>
+                    <div>
+                      <Text type="secondary">岗位版本</Text>
+                      <Text strong>
+                        {evidenceValue(relationshipEvidence.roleVersions)}
+                      </Text>
+                    </div>
+                    <div>
+                      <Text type="secondary">审批设置版本</Text>
+                      <Text strong>
+                        {relationshipEvidence.approvalRevision ||
                         (relationshipEvidence.approvalPartial
                           ? '读取不完整'
                           : '未绑定')}
-                    </Text>
-                  </div>
-                  <div>
-                    <Text type="secondary">最近读取时间</Text>
-                    <Text strong>{formatReadTime(currentReadAt)}</Text>
-                  </div>
-                </section>
-              </details>
+                      </Text>
+                    </div>
+                    <div>
+                      <Text type="secondary">最近读取时间</Text>
+                      <Text strong>{formatReadTime(currentReadAt)}</Text>
+                    </div>
+                  </section>
+                </details>
+              </div>
 
               <Tabs
                 className="erp-permission-relationship__tabs"
@@ -710,8 +708,11 @@ export default function DevPermissionRelationshipsPage() {
                       <div className="erp-permission-relationship__tab-panel">
                         <div className="erp-permission-relationship__tab-toolbar">
                           <div className="erp-permission-relationship__control">
-                            <Text strong>图中功能范围</Text>
-                            <Select
+                            <Text strong>功能范围</Text>
+                            <FilterSelect
+                              emptyValue="all"
+                              label="功能模块"
+                              placeholder="功能模块"
                               aria-label="选择关系图功能模块"
                               value={moduleKey}
                               options={moduleOptions}
@@ -726,17 +727,17 @@ export default function DevPermissionRelationshipsPage() {
                               }
                             />
                           </div>
-                        </div>
-                        <div className="erp-permission-relationship__legend">
-                          <Text type="secondary">图例</Text>
-                          <Space wrap size={[6, 6]}>
-                            <Tag color="blue">账号（actor）</Tag>
-                            <Tag color="purple">岗位（role）</Tag>
-                            <Tag color="green">最终可用</Tag>
-                            <Tag color="orange">岗位已选但受限</Tag>
-                            <Tag color="cyan">数据范围</Tag>
-                            <Tag color="gold">审批责任</Tag>
-                          </Space>
+                          <details className="erp-dev-permission-legend">
+                            <summary>图例</summary>
+                            <Space wrap size={[6, 6]}>
+                              <Tag color="blue">账号</Tag>
+                              <Tag color="purple">岗位</Tag>
+                              <Tag color="green">最终可用</Tag>
+                              <Tag color="orange">岗位已选但受限</Tag>
+                              <Tag color="cyan">数据范围</Tag>
+                              <Tag color="gold">审批责任</Tag>
+                            </Space>
+                          </details>
                         </div>
                         <section
                           className="erp-permission-relationship__graph"
@@ -780,7 +781,10 @@ export default function DevPermissionRelationshipsPage() {
                         <div className="erp-permission-relationship__detail-toolbar">
                           <div className="erp-permission-relationship__control">
                             <Text strong>明细功能范围</Text>
-                            <Select
+                            <FilterSelect
+                              emptyValue="all"
+                              label="功能模块"
+                              placeholder="功能模块"
                               aria-label="选择明细功能模块"
                               value={moduleKey}
                               options={moduleOptions}

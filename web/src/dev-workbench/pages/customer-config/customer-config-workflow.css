@@ -224,14 +224,6 @@
   color: var(--erp-text-muted);
 }
 
-.erp-dev-customer-step-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 0 8px;
-}
-
 .erp-dev-customer-diff-table th:first-child {
   width: 18%;
 }
@@ -255,4 +247,20 @@
   .erp-dev-customer-action-scope {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.erp-dev-customer-preflight-notes {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 20px;
+}
+.erp-dev-customer-preflight-notes > div {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(0, 4fr);
+  gap: 16px;
+}
+.erp-dev-customer-preflight-notes dd {
+  margin: 0;
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
 }

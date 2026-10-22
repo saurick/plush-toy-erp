@@ -151,6 +151,47 @@
   pointer-events: auto;
 }
 
+.erp-task-card--compact {
+  min-width: 0;
+  padding: var(--erp-work-item-padding);
+  border: 1px solid var(--erp-border-strong);
+  border-radius: var(--erp-work-item-radius);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  overflow-wrap: anywhere;
+}
+
+.erp-task-card--compact > .erp-task-card__content {
+  gap: 4px;
+}
+
+.erp-task-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-width: 0;
+  min-height: calc(var(--erp-font-caption) * 1.5 + 5px);
+  padding-top: 4px;
+  border-top: 1px solid var(--erp-border);
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
+.erp-task-card__footer:empty {
+  display: none;
+}
+
+.erp-task-source__type {
+  color: var(--erp-text-muted);
+}
+
+.erp-task-source__number {
+  color: var(--erp-text);
+}
+
 @media (max-width: 767px), (pointer: coarse) {
   .erp-task-more.ant-btn,
   .ant-dropdown.erp-task-copy-menu .ant-dropdown-menu .ant-dropdown-menu-item {

@@ -27,23 +27,39 @@ import (
 var _ biz.EngineeringMaterialRequestRepo = (*salesOrderRepo)(nil)
 
 func (r *salesOrderRepo) GetEngineeringMaterialRequest(ctx context.Context, orderID int, preview bool) (*biz.EngineeringMaterialRequest, error) {
+	snapshot, err := beginClientReadSnapshot(ctx, r.data)
+	if err != nil {
+		return nil, err
+	}
+	defer snapshot.Rollback()
+	result, err := r.getEngineeringMaterialRequest(ctx, snapshot.client, orderID, preview)
+	if err != nil {
+		return nil, err
+	}
+	if err := snapshot.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *salesOrderRepo) getEngineeringMaterialRequest(ctx context.Context, client *ent.Client, orderID int, preview bool) (*biz.EngineeringMaterialRequest, error) {
 	if !preview {
-		row, err := r.data.postgres.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(orderID)).Order(ent.Desc(engineeringmaterialrequest.FieldID)).First(ctx)
+		row, err := client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(orderID)).Order(ent.Desc(engineeringmaterialrequest.FieldID)).First(ctx)
 		if err == nil {
-			return loadEngineeringMaterialRequest(ctx, r.data.postgres, row)
+			return loadEngineeringMaterialRequest(ctx, client, row)
 		}
 		if !ent.IsNotFound(err) {
 			return nil, err
 		}
 	}
-	order, err := r.data.postgres.SalesOrder.Get(ctx, orderID)
+	order, err := client.SalesOrder.Get(ctx, orderID)
 	if ent.IsNotFound(err) {
 		return nil, biz.ErrSalesOrderNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	return r.buildEngineeringMaterialPreview(ctx, r.data.postgres, order, false)
+	return r.buildEngineeringMaterialPreview(ctx, client, order, false)
 }
 
 func (r *salesOrderRepo) lockEngineeringOrder(ctx context.Context, client *ent.Client, orderID int) (*ent.SalesOrder, error) {
@@ -305,7 +321,7 @@ func (r *salesOrderRepo) ReviewEngineeringMaterialRequest(ctx context.Context, i
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	row, err := tx.EngineeringMaterialRequest.Get(ctx, in.ID)
 	if ent.IsNotFound(err) {
-		return nil, biz.ErrMaterialRequestConflict
+		return nil, biz.ErrMaterialRequestNotFound
 	}
 	if err != nil {
 		return nil, err

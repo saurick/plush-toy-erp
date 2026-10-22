@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
 import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { createBusinessStatusCountsScenarios } from './businessStatusCountsScenarios.mjs'
@@ -30,8 +31,8 @@ async function choose(page, root, label, value) {
     return
   }
   const control = root.getByRole('combobox', { name: label, exact: true })
-  if (await control.evaluate((node) => node.tagName === 'SELECT')) {
-    await control.selectOption({ label: value })
+  if (await control.evaluate((node) => node.tagName === 'UI-SELECT')) {
+    await chooseSelectOption(control, { label: value })
   } else {
     await control.press('ArrowDown')
     await page.locator('.ant-select-dropdown:visible').getByText(value, { exact: true }).click()

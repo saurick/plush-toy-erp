@@ -77,8 +77,7 @@
   box-shadow: 10px 0 24px rgb(0 0 0 / 0.22);
 }
 
-[data-erp-theme='dark'] .erp-admin-brand,
-[data-erp-theme='dark'] .erp-admin-header {
+[data-erp-theme='dark'] .erp-admin-brand {
   background: var(--erp-shell-bg);
 }
 
@@ -97,7 +96,6 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-admin-header__user,
 [data-erp-theme='dark'] .erp-admin-page-head__pill span,
 [data-erp-theme='dark'] .erp-dashboard-summary.ant-typography,
 [data-erp-theme='dark'] .erp-mobile-muted,

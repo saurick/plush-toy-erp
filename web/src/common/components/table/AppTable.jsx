@@ -5,9 +5,15 @@ import TableScrollControls from './TableScrollControls.jsx'
 import { useAppPagination } from '../pagination/AppPagination'
 import './app-table.css'
 
+function MeasuredHeaderTable({ style, ...props }) {
+  // Ant measures the body columns. Keep those widths when content grows beyond
+  // scroll.x instead of letting the separate header redistribute them.
+  return <table data-table-lines="fixed" {...props} style={{ ...style, tableLayout: 'fixed' }} />
+}
+
 const AppTable = React.forwardRef(
   (
-    { columns, className = '', locale, scrollToolbar = false, ...props },
+    { columns, className = '', locale, components, scrollToolbar = false, ...props },
     ref
   ) => {
     const tableRef = useRef(null)
@@ -17,6 +23,10 @@ const AppTable = React.forwardRef(
       () => normalizeTableColumns(columns),
       [columns]
     )
+    const tableComponents = useMemo(() => ({
+      ...components,
+      header: { table: MeasuredHeaderTable, ...components?.header },
+    }), [components])
     const scrollRevision = useMemo(
       () => [
         alignedColumns,
@@ -41,6 +51,7 @@ const AppTable = React.forwardRef(
           ref={tableRef}
           className={`app-table ${className}`.trim()}
           columns={alignedColumns}
+          components={tableComponents}
           locale={
             typeof locale?.emptyText === 'string'
               ? {

@@ -1,6 +1,7 @@
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Checkbox, Select, Space, Tag } from 'antd'
+import { Button, Checkbox, Space, Tag } from 'antd'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { InventoryOperationStatus } from '../../../common/consts/statuses.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
@@ -10,6 +11,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listInventoryOperations } from '../../api/inventoryApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import FilterSelect from '@/common/components/select/FilterSelect'
 
 const TYPE_LABELS = Object.freeze({
   CYCLE_COUNT: '库存盘点',
@@ -243,20 +245,18 @@ export default function InventoryOperationRecordsModal({
   return (
     <BusinessModal
       className="erp-inventory-operation-records-modal"
-      title="库存作业记录"
+      title={<BusinessHelpLabel label="库存作业记录" description="库存作业是可恢复的业务记录；草稿可由创建人继续编辑，已提交、已批准或已过账内容保持只读。" />}
       open={open}
       size="lineItems"
       footer={null}
       destroyOnHidden
       onCancel={onCancel}
     >
-      <Alert
-        type="info"
-        showIcon
-        message="库存作业是可恢复的业务记录；草稿可由创建人继续编辑，已提交、已批准或已过账内容保持只读。"
-      />
+      <div className="erp-business-inline-note" role="note">仅草稿可继续编辑，已提交内容只读。</div>
       <Space wrap style={{ margin: '16px 0' }}>
-        <Select
+        <FilterSelect
+          label="作业类型"
+          placeholder="作业类型"
           aria-label="作业类型"
           value={operationType}
           options={TYPE_OPTIONS}
@@ -266,7 +266,9 @@ export default function InventoryOperationRecordsModal({
             setPagination((current) => ({ ...current, current: 1 }))
           }}
         />
-        <Select
+        <FilterSelect
+          label="作业状态"
+          placeholder="作业状态"
           aria-label="作业状态"
           value={status}
           options={STATUS_OPTIONS}

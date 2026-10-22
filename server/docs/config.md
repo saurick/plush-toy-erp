@@ -123,7 +123,13 @@
 | `BOOTSTRAP_ADMIN_ONCE` | `false` | 仅在新库首次初始化 bootstrap 管理员时临时设为 `true`；成功后写 marker 并恢复为 `false` |
 | `APP_ADMIN_PASSWORD` | 本地开发为 `adminadmin`；其它环境为空 | 本地覆盖默认密码；生产仅在 `BOOTSTRAP_ADMIN_ONCE=true` 的首次初始化窗口临时注入；已有同名管理员不会被自动重置或提权 |
 
-生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET`、阿里云 PNVS 必填配置或 bootstrap 管理员密码中的 `change-this` / placeholder，显式拒绝已知本地开发默认密码，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。如果 `admin` 或同名管理员已经存在，启动逻辑不会重置密码，也不会自动提权，应通过管理员改密或受控 SQL 更新密码哈希。本地专用重置命令无通往演示、验收或生产实例的逃逸开关。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
+生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET`、阿里云 PNVS 必填配置或 bootstrap 管理员密码中的 `change-this` / placeholder，显式拒绝已知本地开发默认密码，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。
+
+Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。
+
+只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。
+
+如果 `admin` 或同名管理员已经存在，启动逻辑不会重置密码，也不会自动提权，应通过管理员改密或受控 SQL 更新密码哈希。本地专用重置命令无通往演示、验收或生产实例的逃逸开关。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
 
 ## HTTP 安全响应头
 
@@ -139,7 +145,9 @@ CSP 当前保留 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`，
 
 ## 角色演示账号 seed
 
-三个模拟数据命令 `seed-core-demo-data`、`seed-role-demo-admins`、`seed-trial-sim-masterdata` 共用 [`internal/commandconfig`](../internal/commandconfig/postgres.go) 读取连接：`POSTGRES_DSN` 优先，其次读取指定配置与同目录的 `.local` 覆盖；直接指定 `.local` 文件时只读取该文件。无效覆盖配置会报错，避免连接到非预期目标。各命令继续在读取前检查用途、读取后通过 `devdbguard` 核对目标身份。
+三个模拟数据命令 `seed-core-demo-data`、`seed-role-demo-admins`、`seed-trial-sim-masterdata` 共用 [`internal/commandconfig`](../internal/commandconfig/postgres.go) 读取连接：`POSTGRES_DSN` 优先，其次读取指定配置与同目录的 `.local` 覆盖；直接指定 `.local` 文件时只读取该文件。
+
+无效覆盖配置会报错，避免连接到非预期目标。各命令继续在读取前检查用途、读取后通过 `devdbguard` 核对目标身份。
 
 角色演示账号不属于 `data.auth` 配置，不写入 `conf.proto`，也不进入 `server/configs/dev|prod/config.yaml`。需要切换角色或同时登录多个岗位做开发 / 验收时，应显式执行：
 
@@ -147,9 +155,13 @@ CSP 当前保留 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`，
 bash scripts/seed-role-demo-admins.sh
 ```
 
-该脚本可生成 `demo_boss`、`demo_sales`、`demo_purchase`、`demo_production`、`demo_warehouse`、`demo_quality`、`demo_finance`、`demo_pmc`、`demo_engineering` 和 `demo_admin`，每个账号只绑定对应内置角色，权限仍来自 `roles -> role_permissions` 真源。默认不生成 `debug_operator` 账号；如果确需调试权限账号，必须显式加 `--include-debug`。
+该脚本可生成 `demo_boss`、`demo_sales`、`demo_purchase`、`demo_production`、`demo_warehouse`、`demo_quality`、`demo_finance`、`demo_pmc`、`demo_engineering` 和 `demo_admin`，每个账号只绑定对应内置角色，权限仍来自 `roles -> role_permissions` 真源。
 
-无显式密码时，脚本只允许连接登记的 `192.168.0.133:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并以公开测试密码 `12345678` 生成十个角色演示账号，包括普通演示管理员 `demo_admin`；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。调试账号、人工验收账号或包含调试角色的完整回归必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。已有账号仍需加 `--reset-password` 才会重置密码。公开测试值一旦 seed 就是可登录凭据，不得写入 133 上其他实例、其他共享 / 试用、staging 或生产目标。
+默认不生成 `debug_operator` 账号；如果确需调试权限账号，必须显式加 `--include-debug`。
+
+无显式密码时，脚本只允许连接登记的 `192.168.0.133:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并以公开测试密码 `12345678` 生成十个角色演示账号，包括普通演示管理员 `demo_admin`；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。
+
+调试账号、人工验收账号或包含调试角色的完整回归必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。已有账号仍需加 `--reset-password` 才会重置密码。公开测试值一旦 seed 就是可登录凭据，不得写入 133 上其他实例、其他共享 / 试用、staging 或生产目标。
 
 安全边界：
 
@@ -166,7 +178,7 @@ bash scripts/seed-role-demo-admins.sh
 | `ERP_DEBUG_ENV` | `sql` | 仅用于能力面板展示，可显式设为 `local`、`dev`、`shared`、`remote`、`prod` 等环境名 |
 | `ERP_DEBUG_SEED_ENABLED` | `false` | 仅在受控调试环境显式设为 `true` 时允许生成调试数据 |
 | `ERP_DEBUG_CLEANUP_ENABLED` | `false` | 仅在受控调试环境显式设为 `true` 时允许按 debugRunId 清理；不再连带开启全量业务清空 |
-| `ERP_DEBUG_BUSINESS_CLEAR_ENABLED` | `false` | 全量业务清空独立开关；仅 `ERP_DEBUG_ENV=local|dev` 时可用，shared / remote / prod / 默认 `sql` 均拒绝 |
+| `ERP_DEBUG_BUSINESS_CLEAR_ENABLED` | `false` | 全量业务清空独立开关；仅 `ERP_DEBUG_ENV` 为 `local` 或 `dev` 时可用，shared / remote / prod / 默认 `sql` 均拒绝 |
 | `ERP_DEBUG_CLEANUP_SCOPE` | `debug_run` | 当前只允许 `debug_run`，表示必须按 debugRunId 清理 |
 
 ## PDF 运行环境变量
@@ -180,7 +192,9 @@ bash scripts/seed-role-demo-admins.sh
 | `ERP_PDF_WARMUP` | `async` | 正式发布预热开关；服务启动后异步跑一次中文合同 PDF 渲染，提前启动共享 Chromium 并加载 CJK 字体；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于临时故障隔离，会被 production preflight 判为非 release-ready，且不能替代真实 PDF smoke |
 | `ERP_PDF_ALLOW_LOCAL_NO_SANDBOX` | `0` | 仅由 Linux root 本地 `make run / make dev_restart` 计算为 `1`，解决 Playwright Chromium 无法以 root+sandbox 启动；服务端同时核对 Linux 与 effective UID 0，生产 Compose 不设置 |
 
-生产镜像固定以 `app`（uid / gid `10001`）运行，Chrome 参数不允许 `--no-sandbox` 或 `--disable-setuid-sandbox`。`production-preflight --runtime` 会同时拒绝 root app-server、非 `async` warmup 和偏离 Docker exact pin 的 Chromium；静态配置绿色仍不能替代容器内 sandbox 启动和受控 token 的真实 PDF smoke。
+生产镜像固定以 `app`（uid / gid `10001`）运行，Chrome 参数不允许 `--no-sandbox` 或 `--disable-setuid-sandbox`。
+
+`production-preflight --runtime` 会同时拒绝 root app-server、非 `async` warmup 和偏离 Docker exact pin 的 Chromium；静态配置绿色仍不能替代容器内 sandbox 启动和受控 token 的真实 PDF smoke。
 安全边界：
 
 - seed、debugRunId cleanup 和全量业务数据清空默认关闭，必须分别显式启用；开启 scoped cleanup 不会隐式开启全量清空。

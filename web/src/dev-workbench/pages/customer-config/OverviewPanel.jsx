@@ -1,6 +1,6 @@
 import { Button, Typography } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
-import { StatusTag } from './presentation.jsx'
+import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 
 const { Text, Title } = Typography
 
@@ -32,10 +32,9 @@ export function OverviewPanel({
             <Title level={2}>
               {checked ? '配置包可以继续验证' : '先处理配置包问题'}
             </Title>
-            <StatusTag status={checked ? 'PREVIEW_READY' : 'BLOCKED'} />
           </div>
           <Text type="secondary">
-            从配置检查开始，核对变化和界面，再选择验证与发布交接。
+            当前为工作区配置；服务器生效状态请到版本发布核对。
           </Text>
         </div>
         <Button
@@ -71,30 +70,29 @@ export function OverviewPanel({
         </dl>
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <Title level={3}>从客户配置到服务器上线</Title>
-        <ol
-          className="erp-dev-customer-delivery-flow"
-          aria-label="配置与部署的关系"
-        >
-          <li>
-            <strong>本页准备配置</strong>
-            <span>检查、预览、本地验证与发布就绪检查</span>
-            <small>当前工作区</small>
-          </li>
-          <li>
-            <strong>执行正式配置</strong>
-            <span>由受控执行器确认目标、应用配置并读回</span>
-            <small>通过检查后交接</small>
-          </li>
-          <li>
-            <strong>发布与部署版本</strong>
-            <span>由版本发布中心和 GitLab 流水线完成</span>
-            <a href={deploymentHref}>查看服务器部署 →</a>
-          </li>
-        </ol>
-        <Text type="secondary" className="erp-dev-customer-inline-note">
-          本页状态来自工作区配置与操作记录；测试服、正式服是否已生效，请到版本发布核对。
-        </Text>
+        <DevStaticGuidance title="配置如何上线">
+          <Text type="secondary">配置来源：{overview.sourceLabel}</Text>
+          <ol
+            className="erp-dev-customer-delivery-flow"
+            aria-label="配置与部署的关系"
+          >
+            <li>
+              <strong>本页准备配置</strong>
+              <span>检查、预览、本地验证与发布就绪检查</span>
+              <small>当前工作区</small>
+            </li>
+            <li>
+              <strong>执行正式配置</strong>
+              <span>由受控执行器确认目标、应用配置并读回</span>
+              <small>通过检查后交接</small>
+            </li>
+            <li>
+              <strong>发布与部署版本</strong>
+              <span>由版本发布中心和 GitLab 流水线完成</span>
+              <a href={deploymentHref}>查看服务器部署 →</a>
+            </li>
+          </ol>
+        </DevStaticGuidance>
       </section>
     </div>
   )

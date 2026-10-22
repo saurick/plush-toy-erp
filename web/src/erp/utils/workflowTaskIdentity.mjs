@@ -10,13 +10,13 @@ export function getWorkflowTaskIdentity(task = {}) {
   if (context && typeof context === 'object' && !Array.isArray(context)) {
     return {
       available: context.available === true,
-      sourceNo: text(context.source_no),
+      sourceNo: context.available === true ? text(context.source_no) : '',
       sourceLineCount:
         Number.isSafeInteger(context.source_line_count) &&
         context.source_line_count >= 0
           ? context.source_line_count
           : null,
-      items: (Array.isArray(context.items) ? context.items : [])
+      items: (context.available === true && Array.isArray(context.items) ? context.items : [])
         .filter((item) => ['product', 'material'].includes(item?.kind))
         .map((item) => ({
           kind: item.kind,
@@ -91,7 +91,9 @@ export function getWorkflowTaskIdentity(task = {}) {
 function identityItemKey(item) {
   return item.productID
     ? `product:${item.productID}`
-    : JSON.stringify([
+    : item.code
+      ? `${item.kind}:${item.code}`
+      : JSON.stringify([
         item.kind,
         item.name,
         item.code,
@@ -125,6 +127,10 @@ export function getWorkflowTaskIdentityPresentation(task = {}, keyword = '') {
   const remainingItems = identity.items.filter(
     (_, index) => index !== resolvedFirstIndex
   )
+  const kinds = new Set(identity.items.map((item) => item.kind))
+  const associationCount = new Set(identity.items.map(identityItemKey)).size
+  const associationUnit = kinds.size > 1 ? '项关联内容' : kinds.has('material') ? '种物料' : '款产品'
+  const associationCountLabel = `共 ${associationCount} ${associationUnit}`
   let compactCountLabel = ''
   if (matchedItems.length) {
     const kinds = new Set(matchedItems.map((item) => item.kind))
@@ -136,20 +142,17 @@ export function getWorkflowTaskIdentityPresentation(task = {}, keyword = '') {
     const totalCount = new Set(countedItems.map(identityItemKey)).size
     const unit = kinds.size > 1 ? '项' : kinds.has('product') ? '款' : '种物料'
     compactCountLabel = `命中 ${matchedCount} ${unit}，共 ${totalCount} ${unit}`
-  } else if (
-    purchaseOrder &&
-    Number.isSafeInteger(identity.sourceLineCount) &&
-    identity.sourceLineCount > 0
-  ) {
-    compactCountLabel = `共 ${identity.sourceLineCount} 条采购明细`
-  } else if (!purchaseOrder && identity.items.length > 1) {
-    compactCountLabel = `共 ${identity.items.length} 项关联内容`
+  } else if (associationCount > 1) {
+    compactCountLabel = associationCountLabel
   }
   return {
     ...identity,
     first,
     remainingItems,
     compactCountLabel,
+    associationCount,
+    associationCountLabel,
+    associationTitle: kinds.size > 1 ? '关联内容' : kinds.has('material') ? '关联物料' : '关联产品',
   }
 }
 

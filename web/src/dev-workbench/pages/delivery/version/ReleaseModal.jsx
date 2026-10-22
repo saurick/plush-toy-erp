@@ -1,4 +1,5 @@
-import { Alert, Input, Modal, Space } from 'antd'
+import { Alert, Input, Space, Typography } from 'antd'
+import Modal from '@/common/components/modal/AppModal'
 import { shortGitSha } from '../../../config/devDelivery.mjs'
 
 export function ReleaseModal({
@@ -46,6 +47,9 @@ export function ReleaseModal({
           message={`候选 SHA：${shortGitSha(repository?.commit)}`}
           description={`${deliveryProviderName}复用该 SHA 已完成的普通 CI 证据，只构建一次制品；各部署目标均不参与构建。`}
         />
+        <Typography.Text>
+          先发布制品，不会直接部署到任一目标。代码推送不会自动部署；制品发布完成后，仍需在版本列表中执行“准备部署”和“确认部署”。
+        </Typography.Text>
         <label htmlFor="dev-release-version">
           正式版本号（由发布目录自动生成）
         </label>

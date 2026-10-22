@@ -1,3 +1,4 @@
+import { findVisibleBusinessPage } from './businessNavigation.mjs'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -1439,19 +1440,6 @@ async function verifyDesktopAccount(browser, account) {
       ...authenticatedMenuLabels,
     ]).sort((left, right) => left.localeCompare(right, 'zh-CN'))
     await verifyRoleGuidedMenuStructure(page, account.username)
-    const catalog = await openModuleCatalog(page)
-    const actualVisibleMenus = (
-      await catalog
-        .locator('.erp-module-catalog__entry')
-        .evaluateAll((nodes) =>
-          nodes.map((node) => node.getAttribute('aria-label'))
-        )
-    ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    assert.deepEqual(
-      actualVisibleMenus,
-      expectedVisibleLeafMenus,
-      `${account.username} 全部模块入口必须与角色投影精确一致`
-    )
     for (const label of account.forbiddenMenus || []) {
       await assertNotVisibleInMenu(page, label, account.username)
     }
@@ -1461,8 +1449,6 @@ async function verifyDesktopAccount(browser, account) {
     for (const label of forbiddenLegacyMenuLabels) {
       await assertNotVisibleInMenu(page, label, account.username)
     }
-    await page.keyboard.press('Escape')
-    await catalog.waitFor({ state: 'hidden' })
     const expectedSidebarLabels = uniqueStrings(
       expectedVisibleLeafMenus.map((label) => {
         const definition = [...pageDefinitionByKey.values()].find(
@@ -1513,34 +1499,8 @@ async function verifyDesktopAccount(browser, account) {
   }
 }
 
-async function openModuleCatalog(page) {
-  await page.getByRole('button', { name: '全部模块', exact: true }).click()
-  const catalog = page.getByRole('dialog', { name: '全部模块', exact: true })
-  await catalog.waitFor({ state: 'visible' })
-  await page.waitForFunction(
-    () =>
-      document.activeElement?.getAttribute('aria-label') === '搜索功能或分组'
-  )
-  return catalog
-}
-
 async function findVisibleMenuItem(page, label) {
-  const sidebarItem = page
-    .locator('.erp-admin-menu')
-    .getByRole('menuitem', { name: label, exact: true })
-  if (await sidebarItem.count()) {
-    assert.equal(
-      await sidebarItem.count(),
-      1,
-      `侧栏必须且只能有一个“${label}”入口`
-    )
-    return sidebarItem
-  }
-  const catalog = await openModuleCatalog(page)
-  const item = catalog.getByRole('button', { name: label, exact: true })
-  assert.equal(await item.count(), 1, `全部模块必须且只能有一个“${label}”入口`)
-  await item.waitFor({ state: 'visible', timeout: 15_000 })
-  return item
+  return findVisibleBusinessPage(page, label)
 }
 
 async function verifyRoleGuidedMenuStructure(page, username) {
@@ -1602,14 +1562,14 @@ async function verifyRoleGuidedMenuStructure(page, username) {
 async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
   const measurements = []
   for (const target of routeAccess.allowedPages) {
-    const menuItem = target.sidebarVisible
-      ? await findVisibleMenuItem(page, target.label)
-      : null
     requestTracker.begin({
       username: routeAccess.username,
       label: target.label,
       path: target.path,
     })
+    const menuItem = target.sidebarVisible
+      ? await findVisibleMenuItem(page, target.label)
+      : null
     if (menuItem) {
       await menuItem.click()
     } else {
@@ -2119,12 +2079,9 @@ async function assertNotVisibleInMenu(page, label, username) {
     .locator('.erp-admin-menu')
     .getByRole('menuitem', { name: label, exact: true })
     .count()
-  const catalogCount = await page
-    .getByRole('dialog', { name: '全部模块', exact: true })
-    .getByRole('button', { name: label, exact: true })
-    .count()
+  const tabCount = await page.locator('.erp-business-module-tabs').getByRole('tab', { name: label, exact: true }).count()
   assert.equal(
-    sidebarCount + catalogCount,
+    sidebarCount + tabCount,
     0,
     `${username} 不应看到菜单: ${label}`
   )

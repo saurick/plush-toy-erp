@@ -1,6 +1,7 @@
 import React from 'react'
 import { TeamOutlined } from '@ant-design/icons'
-import { Alert, Select, Tag, Typography, theme } from 'antd'
+import { Alert, Tag, Typography, theme } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 
 const { Text } = Typography
 
@@ -62,6 +63,7 @@ export default function DevCustomerScopeSelector({
           </Text>
         ) : (
           <Select
+            allowClear={false}
             aria-label={`${label}选择`}
             value={ready ? scope.customerKey : undefined}
             placeholder={compact ? '选择已登记客户' : '选择已登记甲方'}

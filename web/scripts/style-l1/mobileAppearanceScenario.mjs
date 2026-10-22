@@ -1,3 +1,4 @@
+import { openERPAppearance } from './themeAssertions.mjs'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -204,9 +205,7 @@ export function mobileAppearanceScenario({
           'purple',
           '跨手机、桌面和效能工作台保留外观'
         )
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
         await dialog.waitFor()
         await waitForFiniteAnimations(page)

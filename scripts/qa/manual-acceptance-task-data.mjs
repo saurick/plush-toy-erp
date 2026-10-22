@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { assertSeedBusinessValues } from "./seed-business-values.mjs";
 import { findSalesOrderAcceptanceExecution } from "./manual-acceptance-sales-order-process.mjs";
 
 import { createHash } from "node:crypto";
@@ -32,7 +33,7 @@ const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/task-data";
 const CUSTOMER_KEY = "yoyoosun";
 const RUNTIME_ADMIN_USERNAME = "admin";
-export const TASK_SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
+export const TASK_SOURCE_TYPE = "";
 export const TASK_SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT-TASK";
 const SOURCE_TYPE = TASK_SOURCE_TYPE;
 const SIMULATION_PREFIX = TASK_SIMULATION_PREFIX;
@@ -890,7 +891,7 @@ export function getManualAcceptanceTaskGroupScenarioCounts(roleKey, taskGroup) {
     expectedScenarios.map((scenarioKey) => [scenarioKey, 0]),
   );
   for (let index = 1; index <= TASKS_PER_ROLE; index += 1) {
-    const scenarioKey = taskScenarioAt(roleKey, index);
+    const scenarioKey = getManualAcceptanceTaskScenario(roleKey, index);
     if (getManualAcceptanceTaskGroup(roleKey, scenarioKey) === taskGroup) {
       counts[scenarioKey] += 1;
     }
@@ -910,7 +911,7 @@ export function getManualAcceptanceTaskGroupStatusCounts(roleKey, taskGroup) {
     TASK_STATUS_KEYS.map((status) => [status, 0]),
   );
   for (let index = 1; index <= TASKS_PER_ROLE; index += 1) {
-    const scenarioKey = taskScenarioAt(roleKey, index);
+    const scenarioKey = getManualAcceptanceTaskScenario(roleKey, index);
     if (getManualAcceptanceTaskGroup(roleKey, scenarioKey) === taskGroup) {
       counts[targetStatusAt(roleKey, index)] += 1;
     }
@@ -1110,7 +1111,7 @@ export function getManualAcceptanceRoleTaskGroups(roleKey) {
   return Object.keys(getManualAcceptanceTaskGroupScenarios(roleKey));
 }
 
-function taskScenarioAt(roleKey, index) {
+export function getManualAcceptanceTaskScenario(roleKey, index) {
   const schedule = TASK_SCENARIO_SCHEDULE_BY_ROLE[roleKey];
   if (schedule) {
     if (schedule.length !== TASKS_PER_ROLE) {
@@ -1152,7 +1153,7 @@ function catalogScenarioContract() {
         scenarios: [...requiredTaskScenarios(roleKey)],
         groups: getManualAcceptanceTaskGroupScenarios(roleKey),
         schedule: Array.from({ length: TASKS_PER_ROLE }, (_, offset) =>
-          taskScenarioAt(roleKey, offset + 1),
+          getManualAcceptanceTaskScenario(roleKey, offset + 1),
         ),
       },
     ]),
@@ -1180,7 +1181,7 @@ function summarizeTaskCoverage(tasks) {
       for (const task of roleTasks.filter(
         (candidate) => candidate.createParams.task_group === taskGroup,
       )) {
-        const scenarioKey = task.createParams.payload?.acceptance_scenario_key;
+        const scenarioKey = task.scenarioKey;
         if (Object.hasOwn(counts, scenarioKey)) {
           counts[scenarioKey] += 1;
         } else {
@@ -1202,7 +1203,6 @@ function buildRoleTask({
   roleKey,
   index,
   runId,
-  sourceID,
   nowSec,
   taskProfile,
 }) {
@@ -1218,20 +1218,15 @@ function buildRoleTask({
   );
   const due = taskDueForProfile(index, nowSec, taskProfile);
   const assignmentMode = index % 2 === 0 ? "role_account" : "owner_pool";
-  const scenarioKey = taskScenarioAt(roleKey, index);
+  const scenarioKey = getManualAcceptanceTaskScenario(roleKey, index);
   const topic = taskTopicAt({ ...profile, roleKey }, scenarioKey, index);
   const taskCode = `${getManualAcceptanceTaskVisibleCodePrefix(roleKey, taskProfile)}-${pad(index)}`;
-  const sourceNo = `样例-${profile.label}-${pad(index)}`;
   const taskGroup = getManualAcceptanceTaskGroup(roleKey, scenarioKey);
   const businessStatus = getManualAcceptanceTaskBusinessStatus(
     roleKey,
     scenarioKey,
   );
   const payload = {
-    simulated_only: true,
-    real_customer_data: false,
-    trial_task: true,
-    acceptance_scenario_key: scenarioKey,
     business_summary: profile.summary,
     attention_note:
       index % 5 === 0 ? "内容较多，请逐项确认。" : "按提示处理即可。",
@@ -1251,16 +1246,17 @@ function buildRoleTask({
     index,
     targetStatus,
     assignmentMode,
+    scenarioKey,
     dueScenario: due.scenario,
     workbenchBucket: workbenchBucketForTask(index, targetStatus, taskProfile),
     action,
     createParams: {
       task_code: taskCode,
       task_group: taskGroup,
-      task_name: `${topic}（${pad(index)}）`,
-      source_type: SOURCE_TYPE,
-      source_id: sourceID,
-      source_no: sourceNo,
+      task_name: topic,
+      source_type: null,
+      source_id: null,
+      source_no: null,
       business_status_key: businessStatus,
       // create_task 只接受 ready；blocked/done/rejected 必须由正式动作产生。
       task_status_key: "ready",
@@ -1470,7 +1466,7 @@ export function validateManualAcceptanceTaskPlan(plan) {
       ) {
         throw new CliError(`${task.key} owner scope does not match its role`);
       }
-      const scenarioKey = params.payload?.acceptance_scenario_key;
+      const scenarioKey = task.scenarioKey;
       if (!Object.hasOwn(scenarioCounts, scenarioKey)) {
         throw new CliError(
           `${task.key} acceptance scenario is outside the catalog`,
@@ -1504,8 +1500,9 @@ export function validateManualAcceptanceTaskPlan(plan) {
       }
       scenarioCounts[scenarioKey] += 1;
       if (
-        params.source_type !== SOURCE_TYPE ||
-        params.source_id !== plan.sourceID
+        params.source_type !== null ||
+        params.source_id !== null ||
+        params.source_no !== null
       ) {
         throw new CliError(
           `${task.key} source boundary does not match its batch`,
@@ -1590,13 +1587,7 @@ export function validateManualAcceptanceTaskPlan(plan) {
           `${task.key} terminal target must use a formal workflow action`,
         );
       }
-      if (
-        params.payload?.simulated_only !== true ||
-        params.payload?.real_customer_data !== false ||
-        params.payload?.trial_task !== true
-      ) {
-        throw new CliError(`${task.key} simulated-data marker is invalid`);
-      }
+      assertSeedBusinessValues(params, task.key);
       for (const text of businessCopyStrings(task)) {
         if (FORBIDDEN_BUSINESS_COPY.test(text)) {
           throw new CliError(
@@ -2073,7 +2064,8 @@ function assertTaskIdentity(
     "priority",
     "due_at",
   ]) {
-    if (task?.[key] !== expected[key]) {
+    const missingSource = ["source_type", "source_id", "source_no"].includes(key) && expected[key] == null && !task?.[key];
+    if (!missingSource && task?.[key] !== expected[key]) {
       throw new CliError(
         `${plannedTask.key} persisted ${key} does not match the plan`,
       );
@@ -2100,12 +2092,7 @@ function assertTaskIdentity(
       );
     }
   }
-  if (
-    task?.payload?.simulated_only !== true ||
-    task?.payload?.real_customer_data !== false
-  ) {
-    throw new CliError(`${plannedTask.key} lost its simulated-data marker`);
-  }
+  assertSeedBusinessValues(task.payload, `${plannedTask.key}.payload`);
   const expectedAssignee =
     plannedTask.assignmentMode === "role_account"
       ? accounts[plannedTask.roleKey].id
@@ -2152,8 +2139,8 @@ async function listRoleBatch({ plan, roleKey, account, fetchImpl }) {
     method: "list_tasks",
     params: {
       owner_role_key: roleKey,
-      source_type: plan.sourceType,
-      source_id: plan.sourceID,
+      search: plan.tasks?.find((task) => task.roleKey === roleKey)?.createParams.task_code.slice(0, -2) ||
+        manualAcceptanceLegacyTaskCode(plan, roleKey, 1).slice(0, -2),
       limit: 200,
       offset: 0,
     },
@@ -2716,10 +2703,10 @@ async function mutateSalesOrderProcessTask({
   }
   const reason =
     target === "blocked"
-      ? "验收样例：等待客户补充资料。"
+      ? "等待客户补充资料。"
       : target === "rejected"
-        ? "验收样例：订单资料不完整，退回补充。"
-        : "验收样例：当前节点已核对完成。";
+        ? "订单资料不完整，退回补充。"
+        : "当前节点已核对完成。";
   const data = await rpcCall({
     backendURL: plan.backendURL,
     domain: "workflow",
@@ -3207,20 +3194,15 @@ function assertLegacyTaskBatchRecord(task, legacyBatch, roleKey, accounts) {
         roleKey,
         Number(code.slice(-2)),
       ) ||
-    task.source_type !== legacyBatch.sourceType ||
-    Number(task.source_id) !== legacyBatch.sourceID ||
+    Boolean(task.source_type) ||
+    Boolean(task.source_id) ||
+    Boolean(task.source_no) ||
     task.owner_role_key !== roleKey ||
     task.owner_pool_key !== roleKey
   ) {
     throw new CliError(`${code} is outside the exact legacy task batch`, 2);
   }
-  if (
-    task.payload?.simulated_only !== true ||
-    task.payload?.real_customer_data !== false ||
-    task.payload?.trial_task !== true
-  ) {
-    throw new CliError(`${code} is not a simulated manual-acceptance task`, 2);
-  }
+  assertSeedBusinessValues(task.payload, `${code}.payload`);
   const assigneeID = task.assignee_id ?? null;
   if (assigneeID !== null && assigneeID !== accounts[roleKey].id) {
     throw new CliError(
@@ -3436,7 +3418,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     allowAbsent,
     fetchImpl,
   });
-  const reason = "旧样例已换新版。";
+  const reason = "已完成本批任务核对。";
   const steps = [];
   let actionsApplied = 0;
   let resumed = 0;

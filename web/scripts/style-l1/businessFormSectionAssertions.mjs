@@ -1,3 +1,4 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import assert from 'node:assert/strict'
 import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 
@@ -139,20 +140,28 @@ export async function assertBusinessFormSections(page, editor, key) {
   )
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 844 })
-    const picker = nav.getByLabel('跳转到')
+    const picker = nav.getByRole('combobox', { name: "跳转到", exact: true })
     await picker.waitFor({ state: 'visible' })
     assert.equal(await lastLink.isVisible(), false)
     const target = await sections.nth(1).getAttribute('id')
-    await picker.selectOption(target)
+    await chooseSelectOption(picker, target)
     await page.waitForFunction(
       (id) =>
         document.activeElement?.closest('[data-form-section]')?.id === id &&
-        document.querySelector('.erp-business-form-page__section-picker select')
-          ?.value === id,
-      target
-    )
+        document.querySelector('.erp-business-form-page__section-picker .ant-select')
+          ?.dataset.value === id,
+      target,
+      { timeout: 5000 }
+    ).catch(async (error) => {
+      const diagnostic = await picker.evaluate((node) => ({
+        selected: node.closest('.ant-select')?.dataset.value,
+        focused: document.activeElement?.outerHTML?.slice(0, 600),
+        focusedSection: document.activeElement?.closest('[data-form-section]')?.id,
+      }))
+      throw new Error(`${error.message}; target=${target}; ${JSON.stringify(diagnostic)}`)
+    })
     await assertBusinessFormPage(page, editor)
-    assert.equal(await picker.inputValue(), target)
+    assert.equal(await readSelectValue(picker), target)
     if (width === 390 && (await attachment.count())) {
       await assertAttachmentSummary(page, attachment)
     }

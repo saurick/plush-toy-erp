@@ -12,13 +12,14 @@ import {
   DownloadOutlined,
   DownOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Select, Space, Spin, Typography } from 'antd'
+import { Button, Dropdown, Space, Spin, Typography } from 'antd'
 import {
   useLocation,
   useNavigationType,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { mobileBusinessRole } from '../utils/businessTaskRoute.mjs'
 import { getRoleHelpGuidesForProfile } from '../config/roleHelpContent.mjs'
@@ -44,6 +45,7 @@ import {
 } from '../config/projectManuals.mjs'
 import SlidingTabList from '../../common/components/navigation/SlidingTabList'
 import SearchInput from '../../common/components/SearchInput'
+import ERPPageActions from '../components/ERPPageActions.jsx'
 import {
   getHelpDocumentKindLabel,
   getHelpReadingCatalog,
@@ -501,6 +503,9 @@ export default function HelpCenterPage() {
       )}
       {guides.length > 1 ? (
         <Select
+          placeholder="岗位指南"
+          aria-label="岗位指南"
+          allowClear={false}
           id="erp-help-center-role-select"
           value={selectedGuide.key}
           options={guides.map((guide) => ({
@@ -562,6 +567,7 @@ export default function HelpCenterPage() {
           <Title level={2}>帮助中心</Title>
         </div>
         <div className="erp-help-heading-actions">
+          <ERPPageActions />
           {view === 'reference' && selectedBook && !searching ? (
             <Dropdown
               disabled={helpContent.status !== 'ready'}

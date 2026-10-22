@@ -794,7 +794,18 @@ export const Markdown = ({ source }) => {
   })
   const headingQueue = extractMarkdownHeadings(source, [1, 2, 3, 4, 5, 6])
   const renderSource = stripSupportedExplicitAnchorLines(source)
-  return React.Children.map(md.render(renderSource), (node) =>
+  const nodes = React.Children.map(md.render(renderSource), (node) =>
     addHeadingIds(node, headingQueue)
-  )
+  ) || []
+  // React refresh traverses sibling fibers recursively. Bound each group so
+  // long references remain refreshable without changing DOM or anchor order.
+  const groups = []
+  for (let index = 0; index < nodes.length; index += 128) {
+    groups.push(
+      <React.Fragment key={`markdown-group-${index}`}>
+        {nodes.slice(index, index + 128)}
+      </React.Fragment>
+    )
+  }
+  return groups
 }

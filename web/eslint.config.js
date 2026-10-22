@@ -7,27 +7,54 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 })
 
+const nativeSelectRestriction = {
+  selector: 'JSXOpeningElement[name.name="select"], CallExpression[callee.name="createElement"][arguments.0.value="select"], CallExpression[callee.property.name="createElement"][arguments.0.value="select"]',
+  message:
+    'Use AppSelect / FilterSelect for consistent clear controls, labels, theme and keyboard interaction.',
+}
+
+const nativeDialogRestriction = {
+  selector: 'JSXOpeningElement[name.name="dialog"], CallExpression[callee.name="createElement"][arguments.0.value="dialog"], CallExpression[callee.property.name="createElement"][arguments.0.value="dialog"]',
+  message: '使用 AppModal / BusinessModal；浏览器顶层原生 dialog 仅用于会话恢复隔离。',
+}
+
+const tabListRestriction = {
+  selector: 'JSXOpeningElement[name.name=/^[a-z]/]:has(JSXAttribute[name.name="role"][value.value="tablist"])',
+  message: 'Use SlidingTabList for custom tabs. The shared component owns selection motion and keyboard navigation.',
+}
+
 const nativeTableRestriction = {
   selector: 'JSXOpeningElement[name.name="table"]:not(:has(JSXAttribute[name.name="data-table-lines"][value.value=/^(appearance|fixed)$/])), CallExpression[callee.name="createElement"][arguments.0.value="table"], CallExpression[callee.property.name="createElement"][arguments.0.value="table"]',
   message: '原生数据表使用 data-table-lines="appearance" 跟随账号网格设置；纸面、图解和有固定线框的专用表使用 "fixed"。',
 }
 
-const paginationOwners = ['src/common/components/pagination/AppPagination.jsx']
-const navigationOwners = [
-  'src/common/components/navigation/SlidingSegmented.jsx',
-  'src/common/components/navigation/SlidingTabs.jsx',
-  'src/common/components/navigation/SlidingTabList.jsx',
+const sharedImports = [
+  { name: 'Select', entry: 'AppSelect / FilterSelect，业务列表沿用 SelectFilter', owners: ['src/common/components/select/AppSelect.jsx'] },
+  { name: 'Pagination', entry: 'AppPagination，表格分页由 AppTable 管理', owners: ['src/common/components/pagination/AppPagination.jsx'] },
+  { name: 'Table', entry: 'AppTable', owners: ['src/common/components/table/AppTable.jsx'] },
+  { name: 'Modal', entry: 'AppModal / BusinessModal，命令式确认使用 common/utils/antdApp 的 modal', owners: ['src/common/components/modal/AppModal.jsx'] },
+  { name: 'Tabs', entry: 'SlidingTabs', owners: ['src/common/components/navigation/SlidingTabs.jsx'] },
+  { name: 'Segmented', entry: 'SlidingSegmented', owners: ['src/common/components/navigation/SlidingSegmented.jsx'] },
+  { name: 'message', entry: 'common/utils/antdApp 的 message', owners: [] },
+  { name: 'notification', entry: 'common/utils/antdApp 的 notification', owners: [] },
 ]
-function paginationImportRestrictions(protectNavigation = false) {
+const antDesignEntrypoints = ['antd', 'antd/es', 'antd/es/index', 'antd/es/index.js', 'antd/lib', 'antd/lib/index', 'antd/lib/index.js']
+
+function sharedImportRestrictions(owner, business = false) {
+  const restricted = sharedImports.filter(({ owners }) => !owners.includes(owner))
   return ['error', {
-    paths: ['antd', 'antd/es', 'antd/es/index', 'antd/es/index.js', 'antd/lib', 'antd/lib/index', 'antd/lib/index.js'].map((name) => ({
-      name,
-      importNames: ['Pagination', 'default', ...(protectNavigation && name === 'antd' ? ['Segmented', 'Tabs'] : [])],
-      message: '分页使用 AppPagination，表格分页由 AppTable 管理；页签继续使用 SlidingTabs / SlidingSegmented。',
-    })),
-    patterns: [{ group: ['antd/es/pagination', 'antd/es/pagination/**', 'antd/lib/pagination', 'antd/lib/pagination/**'], message: '分页统一使用 AppPagination，不绕过共享入口。' }],
+    paths: antDesignEntrypoints.flatMap((moduleName) => [
+      { name: moduleName, importNames: ['default'], message: '使用 Ant Design 命名导入与对应共享入口，避免聚合默认导出绕过组件约束。' },
+      ...restricted.map(({ name, entry }) => ({ name: moduleName, importNames: [name], message: `统一使用 ${entry}；底层 ${name} 仅供对应共享实现使用。` })),
+    ]),
+    patterns: [
+      ...restricted.map(({ name, entry }) => ({ group: [`antd/es/${name.toLowerCase()}`, `antd/es/${name.toLowerCase()}/**`, `antd/lib/${name.toLowerCase()}`, `antd/lib/${name.toLowerCase()}/**`], message: `统一使用 ${entry}，不绕过共享入口导入 Ant Design 内部模块。` })),
+      ...(business && owner !== 'src/erp/components/business-list/BusinessModal.jsx' ? [{ group: ['**/common/components/modal/AppModal', '**/common/components/modal/AppModal.jsx'], message: '业务局部操作使用 BusinessModal / BusinessFormModal，主列表编辑使用 BusinessFormPage；通用系统弹窗由所属 common 组件承载。' }] : []),
+    ],
   }]
 }
+
+const sharedSyntaxRestrictions = [nativeSelectRestriction, nativeDialogRestriction, tabListRestriction, nativeTableRestriction]
 
 export default [
   ...compat.config({
@@ -133,41 +160,29 @@ export default [
   }),
   {
     files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],
-    ignores: [...navigationOwners, ...paginationOwners],
+    ignores: ['src/**/*.test.{js,jsx,mjs,ts,tsx}'],
     rules: {
-      'no-restricted-imports': paginationImportRestrictions(true),
-      'no-restricted-syntax': [
-        'error',
-        nativeTableRestriction,
-        {
-          selector:
-            'JSXOpeningElement[name.name=/^[a-z]/]:has(JSXAttribute[name.name="role"][value.value="tablist"])',
-          message:
-            'Use SlidingTabList for custom tabs. The shared component owns selection motion and keyboard navigation.',
-        },
-      ],
+      'no-restricted-imports': sharedImportRestrictions(),
+      'no-restricted-syntax': ['error', ...sharedSyntaxRestrictions],
     },
   },
   {
-    files: navigationOwners,
-    rules: { 'no-restricted-imports': paginationImportRestrictions() },
+    files: ['src/erp/**/*.{js,jsx,mjs,ts,tsx}'],
+    ignores: ['src/**/*.test.{js,jsx,mjs,ts,tsx}'],
+    rules: { 'no-restricted-imports': sharedImportRestrictions(undefined, true) },
+  },
+  ...[...new Set([...sharedImports.flatMap(({ owners }) => owners), 'src/erp/components/business-list/BusinessModal.jsx'])].map((owner) => ({
+    files: [owner],
+    rules: { 'no-restricted-imports': sharedImportRestrictions(owner, owner.startsWith('src/erp/')) },
+  })),
+  {
+    files: ['src/common/components/navigation/SlidingTabList.jsx'],
+    rules: {
+      'no-restricted-syntax': ['error', ...sharedSyntaxRestrictions.filter((rule) => rule !== tabListRestriction)],
+    },
   },
   {
-    files: paginationOwners,
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: 'antd',
-              importNames: ['Segmented', 'Tabs'],
-              message:
-                'Use SlidingSegmented or SlidingTabs for visible boundaries, selected states, keyboard and motion. See DEV UI 交互设计 → 交互控件规范.',
-            },
-          ],
-        },
-      ],
-    },
+    files: ['src/erp/components/SessionRecoveryDialog.jsx'],
+    rules: { 'no-restricted-syntax': ['error', ...sharedSyntaxRestrictions.filter((rule) => rule !== nativeDialogRestriction)] },
   },
 ]

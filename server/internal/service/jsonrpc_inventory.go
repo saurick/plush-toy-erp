@@ -177,7 +177,7 @@ func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v
 
 func (d *jsonrpcDispatcher) inventoryErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
 	if errors.Is(err, biz.ErrShipmentPackingPending) {
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "成品尚未完成检验、查货或包装，请先办理对应任务；返工请从成品入库记录发起"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "成品尚未完成检验、查货或包装，请先办理对应任务；返工请从成品入库记录发起"}
 	}
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
@@ -188,19 +188,19 @@ func (d *jsonrpcDispatcher) inventoryErrorResult(ctx context.Context, err error)
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrProcessRuntimeRequired):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该动作必须通过业务流程任务办理，请刷新流程状态"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该动作必须通过业务流程任务办理，请刷新流程状态"}
 	case errors.Is(err, biz.ErrProcessSourceLifecycleDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单据仍有未收口的业务流程，请先在任务中心完成或驳回流程后再操作"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该单据仍有未收口的业务流程，请先在任务中心完成或驳回流程后再操作"}
 	case errors.Is(err, biz.ErrDataScopeForbidden):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrInventoryOperationNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存作业单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "库存作业单不存在"}
 	case errors.Is(err, biz.ErrInventoryOperationVersionConflict):
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "库存作业已被其他人处理，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "库存作业已被其他人处理，请刷新后重试"}
 	case errors.Is(err, biz.ErrInventoryOperationStaleCount):
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "盘点期间账面库存已变化，请刷新后重新盘点"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "盘点期间账面库存已变化，请刷新后重新盘点"}
 	case errors.Is(err, biz.ErrInventoryOperationSaveOwner):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人可以编辑库存作业草稿"}
 	case errors.Is(err, biz.ErrInventoryOperationSubmitOwner):
@@ -210,7 +210,7 @@ func (d *jsonrpcDispatcher) inventoryErrorResult(ctx context.Context, err error)
 	case errors.Is(err, biz.ErrInventoryOperationCancelOwner):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人或过账人可以取消库存作业"}
 	case errors.Is(err, biz.ErrInventoryInsufficientStock):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足，无法完成本次库存作业"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "库存不足，无法完成本次库存作业"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[inventory] invalid param err=%v", err)
 		return invalidParamResult()

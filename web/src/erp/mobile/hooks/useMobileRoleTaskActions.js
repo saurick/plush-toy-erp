@@ -402,7 +402,7 @@ export default function useMobileRoleTaskActions({
         })
       } catch (error) {
         if (isWorkflowTaskMutationResultUnknown(error)) {
-          publishActionReceipt({
+          const receipt = publishActionReceipt({
             action: taskStatusKey,
             evidence_refs: [],
             feedback: completionFeedback,
@@ -412,13 +412,13 @@ export default function useMobileRoleTaskActions({
             status: 'unknown',
             task,
           })
-          message.warning('提交结果暂未确认，已保留填写内容，可直接重试')
+          if (!receipt) message.warning('提交结果暂未确认，已保留填写内容，可直接重试')
         } else {
           const errorMessage = getActionErrorMessage(
             error,
             '更新任务状态失败，请稍后重试'
           )
-          publishActionReceipt({
+          const receipt = publishActionReceipt({
             action: taskStatusKey,
             evidence_refs: [],
             feedback: completionFeedback,
@@ -427,7 +427,7 @@ export default function useMobileRoleTaskActions({
             status: 'failed',
             task,
           })
-          message.error(errorMessage)
+          if (!receipt) message.error(errorMessage)
         }
         return false
       }
@@ -555,7 +555,7 @@ export default function useMobileRoleTaskActions({
         })
       } catch (error) {
         if (isWorkflowTaskMutationResultUnknown(error)) {
-          publishActionReceipt({
+          const receipt = publishActionReceipt({
             action: 'urge',
             evidence_refs: [],
             message: '网络中断，催办结果尚未确认。本次原因已保留，可继续确认。',
@@ -563,13 +563,13 @@ export default function useMobileRoleTaskActions({
             status: 'unknown',
             task,
           })
-          message.warning('催办结果暂未确认，已保留本次操作，可直接重试')
+          if (!receipt) message.warning('催办结果暂未确认，已保留本次操作，可直接重试')
         } else {
           const errorMessage = getActionErrorMessage(
             error,
             '催办失败，请稍后重试'
           )
-          publishActionReceipt({
+          const receipt = publishActionReceipt({
             action: 'urge',
             evidence_refs: [],
             message: errorMessage,
@@ -577,7 +577,7 @@ export default function useMobileRoleTaskActions({
             status: 'failed',
             task,
           })
-          message.error(errorMessage)
+          if (!receipt) message.error(errorMessage)
         }
         return false
       }

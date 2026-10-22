@@ -12,6 +12,7 @@ import {
   listAllReferenceRecords,
 } from '../utils/referencePagination.mjs'
 import { validatePurchaseOrderReceiptProgress } from '../utils/purchaseOrderInboundPreview.mjs'
+import { validateSalesOrderExport } from '../utils/salesOrderExport.mjs'
 
 const masterDataRpc = new JsonRpc({
   url: RpcDomain.MASTERDATA,
@@ -372,6 +373,11 @@ export async function disableContact(params = {}) {
 export async function listSalesOrders(params = {}, options = {}) {
   const result = await salesOrderRpc.call(RpcMethod.sales_order.LIST_SALES_ORDERS, params, options)
   return dataOf(result)
+}
+
+export async function exportSalesOrders(params = {}, options = {}) {
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.EXPORT_SALES_ORDERS, params, options)
+  return validateSalesOrderExport(dataOf(result))
 }
 
 export async function listSalesOrderSummary(params = {}, options = {}) {

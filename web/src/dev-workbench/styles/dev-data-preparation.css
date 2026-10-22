@@ -160,10 +160,6 @@
   color: var(--dev-data-muted);
 }
 
-.erp-dev-data-chain-toolbar .ant-select {
-  width: min(360px, 100%);
-}
-
 .erp-dev-data-chain-list,
 .erp-dev-data-selected-chain,
 .erp-dev-data-reuse-rules,
@@ -416,10 +412,6 @@
     flex-direction: column;
   }
 
-  .erp-dev-data-chain-toolbar .ant-select {
-    width: 100%;
-  }
-
   .erp-dev-data-prepare-actions {
     align-items: stretch;
     flex-direction: column;
@@ -460,8 +452,7 @@
 }
 
 .erp-dev-data-workspace,
-.erp-dev-data-section,
-.erp-dev-data-result {
+.erp-dev-data-section {
   display: grid;
   gap: 16px;
   min-width: 0;
@@ -485,15 +476,15 @@
 }
 
 .erp-dev-data-profile-table th:first-child {
-  width: 23%;
+  width: 30%;
 }
 
 .erp-dev-data-profile-table th:nth-child(2) {
-  width: 32%;
+  width: 35%;
 }
 
 .erp-dev-data-profile-table th:nth-child(3) {
-  width: 33%;
+  width: 35%;
 }
 
 .erp-dev-data-profile-table td > .ant-typography,

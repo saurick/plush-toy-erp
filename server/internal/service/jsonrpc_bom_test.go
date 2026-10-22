@@ -114,7 +114,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if immutableRes == nil || immutableRes.Code != errcode.InvalidParam.Code {
+	if immutableRes == nil || immutableRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected active BOM immutable rejection, got %#v", immutableRes)
 	}
 
@@ -285,7 +285,7 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only material_bom create rejected, got %#v", createRes)
 	}
 	_, listRes, err := j.handleBOM(adminCtx, "list_bom_versions", "read-after-read-only", mustJSONRPCStruct(t, map[string]any{
@@ -338,7 +338,7 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if activateRes == nil || activateRes.Code != errcode.InvalidParam.Code {
+	if activateRes == nil || activateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled material_bom activate rejected, got %#v", activateRes)
 	}
 	_, getRes, err := j.handleBOM(adminCtx, "get_bom_version", "read-after-disabled", mustJSONRPCStruct(t, map[string]any{"id": float64(headerID)}))

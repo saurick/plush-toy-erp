@@ -1,3 +1,4 @@
+import { findVisibleBusinessPage } from '../businessNavigation.mjs'
 import {
   assertBusinessFormPage,
   closeBusinessFormPage,
@@ -520,10 +521,12 @@ export function createBusinessPageContractScenarios({
         assert.equal(await actionBar.count(), 1, '未选择订单时只展示一条常驻操作栏')
         assert.match(
           await actionBar.innerText(),
-          /选中记录后显示可用操作/u,
+          /请选择一条记录/u,
           '常驻操作栏应说明先选记录再操作'
         )
-        assert.equal(await actionBar.getByRole('button').count(), 0, '未选择订单时不展示记录操作')
+        const commands = actionBar.locator('button:not(.erp-business-selection-action-bar__compact-more):visible')
+        assert(await commands.count() > 0, '未选择订单时保留已授权的动作入口')
+        assert.equal(await commands.evaluateAll((buttons) => buttons.every((button) => button.disabled)), true, '未选择订单时动作不可执行')
         await expectText(page, '订单列表')
         for (const group of [
           '工作中心',
@@ -542,12 +545,6 @@ export function createBusinessPageContractScenarios({
         ]) {
           await expectAdminMenuText(page, group)
         }
-        await page.getByRole('button', { name: '全部模块', exact: true }).click()
-        const moduleCatalog = page.getByRole('dialog', {
-          name: '全部模块',
-          exact: true,
-        })
-        await moduleCatalog.waitFor({ state: 'visible', timeout: 10_000 })
         for (const entry of [
           '工作台',
           '任务管理',
@@ -570,12 +567,9 @@ export function createBusinessPageContractScenarios({
           '权限管理',
           '帮助中心',
         ]) {
-          await moduleCatalog
-            .getByRole('button', { name: entry, exact: true })
-            .waitFor({ state: 'visible', timeout: 10_000 })
+          await (await findVisibleBusinessPage(page, entry)).waitFor({ state: 'visible' })
         }
-        await moduleCatalog.locator('.ant-modal-close').click()
-        await moduleCatalog.waitFor({ state: 'hidden', timeout: 10_000 })
+        await (await findVisibleBusinessPage(page, '销售订单')).click()
         const tools = page.getByRole('button', { name: '表格工具', exact: true })
         await tools.click()
         await page.getByRole('menuitem', { name: /导出筛选结果/u }).waitFor()

@@ -1,3 +1,5 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
+
 async function clickDialogBackdrop(dialog) {
   await dialog.locator('xpath=..').click({ position: { x: 4, y: 4 } })
 }
@@ -255,7 +257,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await drawer.getByRole('button', { name: '完成并关闭' }).click()
         await related.getByRole('button', { name: '确认包装尺寸' }).click()
         await drawer.getByText('已核对最终尺寸，与包装稿一致。', { exact: true }).waitFor()
-        await drawer.getByRole('button', { name: '关闭', exact: true }).last().click()
+        await drawer.getByRole('button', { name: '返回列表', exact: true }).click()
         await drawer.waitFor({ state: 'hidden' })
         await related.getByRole('button', { name: '确认包装尺寸' }).waitFor()
         await page.screenshot({ path: path.join(outputDir, `business-followup-related-${page.viewportSize().width}.png`), animations: 'disabled' })
@@ -274,6 +276,8 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
+        const unselectedBar = frame.locator('.business-record-row')
+        assert.equal(await unselectedBar.locator('[data-action="open-related-tasks"]').isDisabled(), true)
         await frame.getByRole('group', { name: '状态筛选', exact: true }).getByRole('button', { name: /^已关闭，/u }).click()
         await frame.locator('[data-action="select-row"]').first().check()
         assert.equal(await frame.locator('[data-action="open-task-create"]').count(), 0)
@@ -305,10 +309,10 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await clickDialogBackdrop(discard)
         await discard.waitFor({ state: 'hidden' })
         assert.equal(await frame.locator('#task-create-name').inputValue(), '补充包装稿')
-        await frame.locator('#task-create-role').selectOption('采购')
-        await frame.locator('#task-create-assignee').selectOption('李倩')
-        await frame.locator('#task-create-role').selectOption('销售')
-        assert.equal(await frame.locator('#task-create-assignee').inputValue(), 'unassigned')
+        await chooseSelectOption(frame.locator('#task-create-role'), '采购')
+        await chooseSelectOption(frame.locator('#task-create-assignee'), '李倩')
+        await chooseSelectOption(frame.locator('#task-create-role'), '销售')
+        assert.equal(await readSelectValue(frame.locator('#task-create-assignee')), 'unassigned')
         await frame
           .getByRole('button', { name: '7 天后', exact: true })
           .click()
@@ -347,10 +351,10 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         const picker = related.getByLabel('关联销售订单', { exact: true })
         const orders = await picker.locator('option[value]:not([value=""])').evaluateAll((items) => items.map((item) => ({ value: item.value, label: item.label })))
         assert(orders.length > 0)
-        if (orders.length === 1) assert.equal(await picker.inputValue(), orders[0].value, '唯一关联订单自动选中')
+        if (orders.length === 1) assert.equal(await readSelectValue(picker), orders[0].value, '唯一关联订单自动选中')
         else {
           assert.equal(await related.locator('[data-action="open-task-create"]').isDisabled(), true)
-          await picker.selectOption(orders[0].value)
+          await chooseSelectOption(picker, orders[0].value)
         }
         const orderNo = orders[0].label
         assert.equal(await frame.locator('[role="dialog"]:visible').count(), 1)
@@ -358,12 +362,12 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         const create = frame.getByRole('dialog', { name: '新建跟进任务', exact: true })
         await create.getByText(orderNo, { exact: true }).waitFor()
         await create.getByRole('button', { name: '取消', exact: true }).click()
-        assert.equal(await picker.inputValue(), orders[0].value, '新建返回保留 BOM 和关联订单')
+        assert.equal(await readSelectValue(picker), orders[0].value, '新建返回保留 BOM 和关联订单')
         await related.getByRole('button', { name: '流程跟踪', exact: true }).click()
         const tracking = frame.getByRole('dialog', { name: '流程跟踪', exact: true })
         await tracking.getByRole('heading', { name: orderNo, exact: true }).waitFor()
         await tracking.getByRole('button', { name: '返回相关任务', exact: true }).click()
-        assert.equal(await picker.inputValue(), orders[0].value)
+        assert.equal(await readSelectValue(picker), orders[0].value)
         await page.screenshot({ path: path.join(outputDir, 'ui-design-bom-task-entry-panel.png'), animations: 'disabled' })
       },
     },
@@ -403,7 +407,10 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         const rowSelector = page.locator('.ant-table-tbody .ant-table-row input[type="radio"]:visible, .ant-table-tbody .ant-table-row input[type="checkbox"]:visible').first()
         await rowSelector.check()
         const entry = page.locator('[data-business-action-key="related-tasks"]').first()
-        if (!(await entry.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
+        assert.equal(await entry.isVisible(), true, `${key} 的任务协作应直接可见`)
+        if (key === 'sales') {
+          await page.screenshot({ path: path.join(outputDir, 'compact-sales-toolbar-4k.png'), animations: 'disabled' })
+        }
         assert.equal(await page.locator('[data-business-action-key="create-followup"]:visible').count(), 0)
         assert.equal(await page.locator('[data-business-action-key="workflow-progress"]:visible').count(), 0)
         await entry.click()

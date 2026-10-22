@@ -10,6 +10,7 @@
 | 维护权限、业务及流程状态、任务目录、RPC、数值、密码和打印限制 | [跨层公共契约与生成规范](跨层公共契约与生成规范.md) |
 | 理解 CI / 发布架构和完成标准 | [工作台与 CI/CD 设计](研发效能工作台与CI-CD设计.md)、[验收证据](研发效能工作台与CI-CD设计.md#验收证据-acceptance-evidence) |
 | 查看 DEV 页面与受控操作边界 | [本地开发入口](研发效能工作台与CI-CD设计.md#本地开发入口-dev-only-surfaces) |
+| 评估功能、数据与负载增长，核对容量证据 | [增长评估与容量证据](研发效能工作台与CI-CD设计.md#growth-and-capacity) |
 | 选择验证与执行脚本 | [测试策略](../product/自动化测试策略.md)、[QA 脚本](../../scripts/qa/README.md) |
 | 核对安全控制、扫描范围与未闭环风险 | [应用安全与验证边界](../security/应用安全与验证边界.md) |
 | 安装 GitLab / Runner、备份和恢复 | [GitLab 运维](../../server/deploy/gitlab/README.md) |

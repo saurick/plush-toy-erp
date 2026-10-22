@@ -144,10 +144,10 @@
   margin-top: 2px;
 }
 
-.erp-dev-testing-validation-plan {
-  border-color: #c9d9ee;
-  border-radius: 12px;
-  background: #fbfdff;
+.erp-dev-workspace-page .erp-dev-testing-validation .erp-dev-testing-validation-plan {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .erp-dev-testing-validation__action-intro {
@@ -161,6 +161,98 @@
 .erp-dev-testing-validation__action-intro > div {
   display: grid;
   gap: 2px;
+}
+
+.erp-dev-testing-validation-plan__head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+
+.erp-dev-testing-validation-plan__head {
+  flex-wrap: wrap;
+}
+
+.erp-dev-testing-action-details-trigger.ant-btn {
+  padding-inline: 0;
+  font-weight: 600;
+}
+
+.erp-dev-testing-validation-row__details p {
+  font-weight: normal;
+}
+
+.erp-dev-testing-validation__actions .erp-dev-tool-table {
+  table-layout: fixed;
+}
+
+.erp-dev-testing-validation__actions th:first-child {
+  width: 25%;
+}
+
+.erp-dev-testing-validation__actions th:nth-child(2) {
+  width: 60%;
+}
+
+.erp-dev-testing-coverage-last-run,
+.erp-dev-testing-coverage-report-details {
+  min-width: 0;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-testing-coverage-last-run > summary,
+.erp-dev-testing-coverage-report-details > summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.erp-dev-testing-coverage-report-details code {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.erp-dev-testing-related .ant-btn-link {
+  padding-inline: 0;
+}
+
+.erp-dev-testing-guide {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding: var(--dev-workbench-panel-padding);
+}
+
+.erp-dev-testing-guide > [role='tabpanel'],
+.erp-dev-testing-guide-presets {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.erp-dev-testing-guide .erp-dev-testing-preset {
+  align-content: start;
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  cursor: default;
+}
+
+.erp-dev-testing-guide .erp-dev-testing-preset details > summary {
+  width: fit-content;
+  color: var(--erp-text-muted);
+  cursor: pointer;
+}
+
+.erp-dev-testing-guide .erp-dev-testing-preset pre {
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .erp-dev-testing-disclosure {
@@ -855,18 +947,6 @@
   gap: 14px;
 }
 
-.erp-dev-testing-coverage-domain-picker {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.erp-dev-testing-coverage-domain-picker .ant-select {
-  width: 280px;
-  max-width: 100%;
-}
-
 .erp-dev-testing-coverage-domain-table-wrap {
   min-width: 0;
   overflow-x: auto;
@@ -1110,6 +1190,19 @@
   min-width: 0;
   border-top: 1px dashed var(--erp-border);
   padding-top: 8px;
+}
+
+.erp-dev-testing-coverage-domain-back {
+  justify-self: start;
+  padding-inline: 0;
+}
+
+.erp-dev-testing-coverage-scenarios > .ant-typography {
+  margin-inline-end: 12px;
+}
+
+.erp-dev-quality-actions__buttons .ant-select {
+  min-width: 140px;
 }
 
 .erp-dev-testing-coverage-scenarios > summary {

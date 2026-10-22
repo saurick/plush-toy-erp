@@ -187,7 +187,7 @@ func TestCustomerConfigExecuteMethodsAuthorizeInstanceRevision(t *testing.T) {
 					t.Fatalf("result=%#v err=%v", result, err)
 				}
 				if !allowed {
-					if result.Code != errcode.InvalidParam.Code || handler.executed != 0 {
+					if result.Code != errcode.BusinessRuleViolation.Code || handler.executed != 0 {
 						t.Fatalf("disabled instance revision reached command: result=%#v executions=%d", result, handler.executed)
 					}
 					return
@@ -281,8 +281,8 @@ func TestExecuteShipmentShipRejectsReadOnlyWorkflowTasksAtInstanceRevision(t *te
 	if err != nil {
 		t.Fatalf("execute err: %v", err)
 	}
-	if result == nil || result.Code != errcode.InvalidParam.Code {
-		t.Fatalf("read_only workflow_tasks result=%#v, want invalid param", result)
+	if result == nil || result.Code != errcode.BusinessRuleViolation.Code {
+		t.Fatalf("read_only workflow_tasks result=%#v, want business rule rejection", result)
 	}
 	if handler.executed != 0 {
 		t.Fatalf("read_only workflow_tasks executed shipment handler %d times", handler.executed)

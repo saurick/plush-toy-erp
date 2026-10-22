@@ -140,18 +140,6 @@
   margin-bottom: 14px;
 }
 
-.erp-dev-version-next__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 16px;
-}
-
-.erp-dev-version-next__actions .ant-btn-link {
-  padding-inline: 6px;
-}
-
 .erp-dev-version-quality-gate-summary {
   display: grid;
   gap: 5px;
@@ -978,21 +966,6 @@
 
   .erp-dev-version-next {
     padding: 12px;
-  }
-
-  .erp-dev-version-next__actions {
-    align-items: stretch;
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .erp-dev-version-next__actions > *,
-  .erp-dev-version-next__actions .ant-btn {
-    width: 100%;
-  }
-
-  .erp-dev-version-next__actions .ant-btn {
-    min-height: 44px;
   }
 
   .erp-dev-version-workspace .ant-tabs-tab {

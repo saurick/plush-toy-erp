@@ -165,3 +165,5 @@ export default function BusinessAttachmentModalButton({
     </>
   )
 }
+
+BusinessAttachmentModalButton.selectionActionGroup = 'query'

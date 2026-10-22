@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { useOutletContext } from 'react-router-dom'
 
 import {
-  CalendarOutlined,
   CheckCircleOutlined,
   CheckSquareOutlined,
   CloseOutlined,
@@ -18,12 +17,11 @@ import {
 import {
   Button,
   Card,
-  DatePicker,
+  ConfigProvider,
   Dropdown,
   Empty,
   Popconfirm,
   Popover,
-  Select,
   Space,
   Spin,
   Tag,
@@ -31,6 +29,9 @@ import {
   Typography,
   theme,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
+import FilterSelect from '@/common/components/select/FilterSelect'
+import { filterSelectOptions, isEmptyFilterValue } from '@/common/components/select/filterSelectOptions.mjs'
 import Table from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
@@ -38,20 +39,11 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
 import './businessFilterChoices.css'
 import BusinessRecordDetails from './BusinessRecordDetails.jsx'
+import ERPPageActions from '../ERPPageActions.jsx'
+import useBusinessListStickyHeader from './useBusinessListStickyHeader.js'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
-import {
-  DATE_INPUT_DISPLAY_FORMAT,
-  DATE_INPUT_VALUE_FORMAT,
-  DATE_TIME_INPUT_DISPLAY_FORMAT,
-  DATE_TIME_INPUT_VALUE_FORMAT,
-  isDateInputAfter,
-  isDateInputBefore,
-  isDateInputRangeReversed,
-  parseDateInputValue,
-  parseDateTimeInputValue,
-} from '../../utils/dateRange.mjs'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 import { formatPaginationTotal } from '@/common/utils/pagination.mjs'
 import { filterBusinessListColumns } from '../../utils/moduleTableColumns.mjs'
@@ -64,6 +56,7 @@ import {
 const { Text } = Typography
 export const SelectionActionOverlayContext = React.createContext(null)
 const BusinessFilterPanelContext = React.createContext(false)
+const BusinessSelectionAvailabilityContext = React.createContext(null)
 
 export {
   CollaborationPanelResizeHandle,
@@ -74,14 +67,36 @@ const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
 const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
 const SELECTION_ACTION_PRIORITIES = {
+  collaboration: 120,
   primary: 100,
   edit: 80,
   view: 60,
   action: 40,
   related: 30,
+  output: 20,
   secondary: 20,
   danger: 10,
   recovery: 0,
+}
+const SELECTION_ACTION_GROUPS = {
+  collaboration: '任务协作',
+  business: '业务办理',
+  query: '查看与关联',
+  output: '打印与输出',
+  lifecycle: '单据处理',
+  other: '其他操作',
+}
+const SELECTION_ACTION_ROLE_GROUPS = {
+  collaboration: 'collaboration',
+  primary: 'business',
+  edit: 'business',
+  action: 'business',
+  view: 'query',
+  related: 'query',
+  output: 'output',
+  secondary: 'other',
+  danger: 'lifecycle',
+  recovery: 'other',
 }
 
 function joinClassNames(...items) {
@@ -130,11 +145,17 @@ function inspectSelectionAction(action) {
   const actionable = action.type === Button || nestedActions.length > 0 ||
     typeof action.type === 'function' || typeof action.type === 'object'
   const role = action.props['data-business-action-role'] || action.type?.selectionActionRole
-  const priority = action.props.selectionActionPriority ?? action.type?.selectionActionPriority
+  const priorityValue = action.props.selectionActionPriority ?? action.type?.selectionActionPriority
+  const priority = typeof priorityValue === 'function' ? priorityValue(action.props) : priorityValue
+  const actionGroup = action.props['data-business-action-group'] || action.type?.selectionActionGroup ||
+    SELECTION_ACTION_ROLE_GROUPS[role] || nestedActions[0]?.group || 'business'
+  const group = Object.hasOwn(SELECTION_ACTION_GROUPS, actionGroup) ? actionGroup : 'other'
   const nestedScore = nestedActions.length ? Math.max(...nestedActions.map((item) => item.score)) : 30
   return {
     actionable,
-    dangerous: role === 'danger' || (!role && nestedActions.length > 0 && nestedActions.every((item) => item.dangerous)),
+    group,
+    pinned: role === 'collaboration' || nestedActions.some((item) => item.pinned),
+    dangerous: role === 'danger' || action.props.danger === true || action.props.action?.danger === true || (!role && nestedActions.length > 0 && nestedActions.every((item) => item.dangerous)),
     enabled: action.props.disabled !== true && action.props.loading !== true && (nestedActions.length === 0 || nestedActions.some((item) => item.enabled)),
     score: Number.isFinite(priority)
       ? priority
@@ -164,9 +185,10 @@ function partitionSelectionActions(children, space, mobile = false) {
   )
   const actions = descriptors
     .filter((item) => item.actionable && (!measured || space.widths[item.index] > 0))
-    .sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || left.index - right.index)
+    .sort((left, right) => Number(right.pinned) - Number(left.pinned) || Number(left.dangerous) - Number(right.dangerous) || left.index - right.index)
   if (mobile) {
-    const primary = [...actions].sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || Number(right.enabled) - Number(left.enabled) || right.score - left.score || left.index - right.index)[0]
+    const mobileScore = (item) => item.pinned ? SELECTION_ACTION_PRIORITIES.related : item.score
+    const primary = [...actions].sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || Number(right.enabled) - Number(left.enabled) || mobileScore(right) - mobileScore(left) || left.index - right.index)[0]
     return {
       context: descriptors.filter((item) => !item.actionable).map((item) => item.node),
       visible: primary ? [primary] : [],
@@ -267,6 +289,20 @@ function selectionActionRenderState(action) {
   ].join(':')
 }
 
+function isSelectionActionLoading(action) {
+  return React.isValidElement(action) && (Boolean(action.props.loading) ||
+    React.Children.toArray(action.props.children).some(isSelectionActionLoading))
+}
+
+function disableUnselectedAction(action) {
+  if (!React.isValidElement(action)) return action
+  const props = typeof action.type === 'string' ? {} : { disabled: true }
+  if (action.type === BusinessActionTooltip) props.disabledReason = '请先选择一条记录'
+  return React.cloneElement(action, props, action.props.children
+    ? React.Children.map(action.props.children, disableUnselectedAction)
+    : action.props.children)
+}
+
 function ResponsiveSelectionActions({ children, mobile = false }) {
   const { token } = theme.useToken()
   const [space, setSpace] = React.useState(null)
@@ -281,10 +317,11 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
   const moreActionsListRef = React.useRef(null)
   const moreActionsTriggerRef = React.useRef(null)
   const moreActionsId = React.useId()
+  const actionsBusy = React.Children.toArray(children).some(isSelectionActionLoading)
   // Moving a stateful action between the toolbar and menu unmounts its dialog.
   // Let the dialog adapt to the viewport before regrouping its trigger on close.
   const partitionSpaceRef = React.useRef(space)
-  if (!actionOverlayOpen) partitionSpaceRef.current = space
+  if (!actionOverlayOpen && !moreActionsOpen && !actionsBusy) partitionSpaceRef.current = space
   const partitionSpace = partitionSpaceRef.current
   const { context, visible, overflow } = React.useMemo(
     () => partitionSelectionActions(children, partitionSpace, mobile),
@@ -294,6 +331,14 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
     () => overflow.map((item) => selectionActionRenderState(item.node)).join('|'),
     [overflow]
   )
+  const overflowGroups = React.useMemo(() => Object.entries(SELECTION_ACTION_GROUPS)
+    .map(([key, label]) => ({ key, label, actions: overflow.filter((item) => item.group === key) }))
+    .filter((group) => group.actions.length > 0), [overflow])
+  const visibleGroups = React.useMemo(() => Object.entries(SELECTION_ACTION_GROUPS)
+    .map(([key, label]) => ({ key, label, actions: visible.filter((item) => item.group === key) }))
+    .filter((group) => group.actions.length > 0)
+    .sort((left, right) => Number(left.key === 'lifecycle') - Number(right.key === 'lifecycle')), [visible])
+  const showGroupHeadings = !mobile && new Set([...visible, ...overflow].map((item) => item.group)).size > 1
   const attachMoreActionsList = React.useCallback((node) => {
     moreActionsListRef.current = node
     if (node) setMeasurementRevision((current) => current + 1)
@@ -331,10 +376,20 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
         })
         return clone
       })
-      rail.replaceChildren(...clones)
+      const headings = Object.entries(SELECTION_ACTION_GROUPS).map(([key, label]) => {
+        const heading = document.createElement('span')
+        heading.className = 'erp-business-selection-action-bar__group-heading'
+        heading.dataset.actionGroup = key
+        heading.textContent = label
+        return heading
+      })
+      rail.replaceChildren(...clones, ...headings)
       const widths = Object.fromEntries(clones.map((node) => [
         node.dataset.selectionActionIndex,
         Math.ceil(node.getBoundingClientRect().width),
+      ]))
+      const groupMinWidths = Object.fromEntries(headings.map((heading) => [
+        heading.dataset.actionGroup, Math.ceil(heading.getBoundingClientRect().width),
       ]))
       rail.replaceChildren()
       const contextWidth = contextRef.current?.getBoundingClientRect().width || 0
@@ -342,6 +397,8 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
         availableWidth: Math.floor(width - contextWidth - (contextWidth ? gap : 0)),
         moreWidth: Math.ceil(measureMoreRef.current.getBoundingClientRect().width),
         gap,
+        groupGap: Number.parseFloat(getComputedStyle(visibleActionsRef.current).columnGap) || gap,
+        groupMinWidths,
         widths,
       }
       setSpace((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next)
@@ -399,7 +456,12 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
     if (index !== undefined) {
       event.preventDefault()
       event.stopPropagation()
-      actions[index].focus({ preventScroll: true })
+      const target = actions[index]
+      target.focus({ preventScroll: true })
+      const bounds = target.getBoundingClientRect()
+      const viewport = list.getBoundingClientRect()
+      if (bounds.top < viewport.top) list.scrollTop -= viewport.top - bounds.top
+      else if (bounds.bottom > viewport.bottom) list.scrollTop += bounds.bottom - viewport.bottom
     }
   }, [])
 
@@ -441,25 +503,30 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
           focusMoreAction(event)
         }}
       >
-        {overflow.map(({ node: action, index }) => (
-          <div
-            key={action?.key || `selection-overflow-action-${index}`}
-            data-selection-action-index={index}
-            className="erp-business-selection-action-menu__item"
-            onClick={(event) => {
-              const button = event.target.closest('button')
-              if (
-                !containsDeferredSelectionAction(action) &&
-                button &&
-                !button.disabled &&
-                !button.classList.contains('ant-btn-loading')
-              ) {
-                closeMoreActions()
-              }
-            }}
-          >
-            {wrapSelectionAction(action, closeMoreActions, setActionOverlayOpen)}
-          </div>
+        {overflowGroups.map((group) => (
+          <section key={group.key} className="erp-business-selection-action-menu__group" aria-label={group.label}>
+            <div className="erp-business-selection-action-menu__heading">{group.label}</div>
+            {group.actions.map(({ node: action, index }) => (
+              <div
+                key={action?.key || `selection-overflow-action-${index}`}
+                data-selection-action-index={index}
+                className="erp-business-selection-action-menu__item"
+                onClick={(event) => {
+                  const button = event.target.closest('button')
+                  if (
+                    !containsDeferredSelectionAction(action) &&
+                    button &&
+                    !button.disabled &&
+                    !button.classList.contains('ant-btn-loading')
+                  ) {
+                    closeMoreActions()
+                  }
+                }}
+              >
+                {wrapSelectionAction(action, closeMoreActions, setActionOverlayOpen)}
+              </div>
+            ))}
+          </section>
         ))}
       </div>
     ),
@@ -469,17 +536,23 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
       closeMoreActionsAndRestoreFocus,
       focusMoreAction,
       moreActionsId,
-      overflow,
+      overflowGroups,
       token,
     ]
+  )
+
+  const renderVisibleAction = ({ node, index }) => (
+    <div key={node?.key || `selection-action-${index}`} data-selection-action-index={index} className="erp-business-selection-action-bar__action-item">
+      {wrapSelectionAction(node, undefined, setActionOverlayOpen)}
+    </div>
   )
 
   return (
     <SelectionActionOverlayContext.Provider value={setActionOverlayOpen}>
       <div
         ref={actionsRef}
-        data-selection-layout-locked={actionOverlayOpen || undefined}
-        className="erp-business-selection-action-bar__actions erp-business-module-selection-actions erp-business-selection-action-bar__actions--responsive"
+        data-selection-layout-locked={actionOverlayOpen || moreActionsOpen || actionsBusy || undefined}
+        className={joinClassNames('erp-business-selection-action-bar__actions erp-business-module-selection-actions erp-business-selection-action-bar__actions--responsive', showGroupHeadings && 'erp-business-selection-action-bar__actions--grouped')}
       >
         {context.length > 0 ? (
           <div ref={contextRef} className="erp-business-selection-action-bar__compact-context">
@@ -487,9 +560,12 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
           </div>
         ) : null}
         <div ref={visibleActionsRef} className="erp-business-selection-action-bar__compact-visible">
-          {visible.map(({ node, index }) => (
-            <div key={node?.key || `selection-action-${index}`} data-selection-action-index={index} className="erp-business-selection-action-bar__action-item">
-              {wrapSelectionAction(node, undefined, setActionOverlayOpen)}
+          {mobile ? visible.map(renderVisibleAction) : visibleGroups.map((group) => (
+            <div key={group.key} className="erp-business-selection-action-bar__group" role="group" aria-label={group.label} data-business-action-group={group.key}>
+              {showGroupHeadings ? <div className="erp-business-selection-action-bar__group-heading">{group.label}</div> : null}
+              <div className="erp-business-selection-action-bar__group-actions">
+                {group.actions.map(renderVisibleAction)}
+              </div>
             </div>
           ))}
         </div>
@@ -513,6 +589,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
               ref={moreActionsTriggerRef}
               className="erp-business-selection-action-bar__compact-more erp-action-button"
               size="small"
+              disabled={false}
               aria-label={`更多操作，共 ${overflow.length} 项`}
               aria-expanded={moreActionsOpen}
               aria-controls={moreActionsId}
@@ -682,216 +759,18 @@ function resolveBusinessTableRowSelection(rowSelection) {
   }
 }
 
-const BusinessDatePicker = React.forwardRef(
-  (
-    {
-      value,
-      onChange,
-      parseValue,
-      valueFormat,
-      displayFormat,
-      className = '',
-      disabled,
-      placeholder,
-      allowClear = true,
-      inputReadOnly = true,
-      onClick,
-      onMouseDown,
-      onOpenChange,
-      onCalendarChange,
-      showTime,
-      quickOptions = [],
-      quickOptionsLabel = '快捷选择',
-      renderExtraFooter,
-      ...restProps
-    },
-    ref
-  ) => {
-    const [open, setOpen] = React.useState(false)
-    const pickerValue = parseValue(value)
-    const handleChange = React.useCallback(
-      (nextValue) => {
-        const formattedValue = nextValue ? nextValue.format(valueFormat) : ''
-        onChange?.(formattedValue)
-      },
-      [onChange, valueFormat]
-    )
-    const handlePointerOpen = React.useCallback(
-      (event) => {
-        if (
-          disabled === true ||
-          event.currentTarget?.classList?.contains('ant-picker-disabled')
-        ) {
-          return
-        }
-        if (event.target?.closest?.('.ant-picker-clear')) return
-        setOpen(true)
-      },
-      [disabled]
-    )
-    const handleClick = React.useCallback(
-      (event) => {
-        handlePointerOpen(event)
-        onClick?.(event)
-      },
-      [handlePointerOpen, onClick]
-    )
-    const handleMouseDown = React.useCallback(
-      (event) => {
-        handlePointerOpen(event)
-        onMouseDown?.(event)
-      },
-      [handlePointerOpen, onMouseDown]
-    )
-    const handleOpenChange = React.useCallback(
-      (nextOpen) => {
-        setOpen(nextOpen)
-        onOpenChange?.(nextOpen)
-      },
-      [onOpenChange]
-    )
-    const handleQuickOption = React.useCallback(
-      (option) => {
-        const optionDisabled =
-          typeof option?.disabled === 'function'
-            ? option.disabled()
-            : option?.disabled
-        if (optionDisabled) return
-        const rawValue =
-          typeof option?.value === 'function' ? option.value() : option?.value
-        const nextValue = parseValue(rawValue)
-        if (!nextValue) return
-        handleOpenChange(false)
-        // rc-picker emits its pending empty input once while a custom footer
-        // closes. Apply the shortcut after that close cycle so it remains the
-        // controlled Form value.
-        setTimeout(() => handleChange(nextValue), 0)
-      },
-      [handleChange, handleOpenChange, parseValue]
-    )
-    const mergedRenderExtraFooter = React.useCallback(
-      (mode) => {
-        const extraFooter = renderExtraFooter?.(mode)
-        if (!quickOptions.length) return extraFooter
-        return (
-          <>
-            <div
-              className="erp-business-date-picker-quick-options"
-              role="group"
-              aria-label={quickOptionsLabel}
-            >
-              <span className="erp-business-date-picker-quick-options__label">
-                {quickOptionsLabel}
-              </span>
-              {quickOptions.map((option) => {
-                const optionDisabled =
-                  typeof option.disabled === 'function'
-                    ? option.disabled()
-                    : option.disabled
-                return (
-                  <Button
-                    key={option.key || option.label}
-                    size="small"
-                    htmlType="button"
-                    disabled={optionDisabled}
-                    data-business-date-quick-option={
-                      option.key || option.label
-                    }
-                    title={option.title}
-                    onMouseDown={(event) => {
-                      event.preventDefault()
-                      event.stopPropagation()
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      handleQuickOption(option)
-                    }}
-                  >
-                    {option.label}
-                  </Button>
-                )
-              })}
-            </div>
-            {extraFooter}
-          </>
-        )
-      },
-      [handleQuickOption, quickOptions, quickOptionsLabel, renderExtraFooter]
-    )
-
-    return (
-      <DatePicker
-        {...restProps}
-        ref={ref}
-        needConfirm={false}
-        showTime={showTime}
-        allowClear={allowClear}
-        className={joinClassNames('erp-business-date-input', className)}
-        disabled={disabled}
-        format={displayFormat}
-        inputReadOnly={inputReadOnly}
-        open={open}
-        placeholder={placeholder}
-        suffixIcon={<CalendarOutlined />}
-        value={pickerValue}
-        onChange={handleChange}
-        onCalendarChange={(nextValue, ...args) => {
-          // Date-time pickers otherwise defer onChange until the panel closes.
-          if (showTime && nextValue?.isValid()) handleChange(nextValue)
-          onCalendarChange?.(nextValue, ...args)
-        }}
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        onOpenChange={handleOpenChange}
-        renderExtraFooter={mergedRenderExtraFooter}
-      />
-    )
-  }
-)
-
-export const DateInput = React.forwardRef((props, ref) => (
-  <BusinessDatePicker
-    {...props}
-    ref={ref}
-    displayFormat={DATE_INPUT_DISPLAY_FORMAT}
-    parseValue={parseDateInputValue}
-    placeholder={props.placeholder || '选择日期'}
-    valueFormat={DATE_INPUT_VALUE_FORMAT}
-  />
-))
-
-export const DateTimeInput = React.forwardRef((props, ref) => (
-  <BusinessDatePicker
-    {...props}
-    ref={ref}
-    className={joinClassNames(
-      'erp-business-date-time-input',
-      props.className || ''
-    )}
-    classNames={{
-      ...props.classNames,
-      popup: {
-        ...props.classNames?.popup,
-        root: joinClassNames(
-          'erp-business-date-time-picker-dropdown',
-          props.classNames?.popup?.root || ''
-        ),
-      },
-    }}
-    displayFormat={DATE_TIME_INPUT_DISPLAY_FORMAT}
-    inputReadOnly={props.inputReadOnly ?? false}
-    parseValue={parseDateTimeInputValue}
-    placeholder={props.placeholder || '选择日期和时间'}
-    showTime={{ format: 'HH:mm', ...(props.showTime || {}) }}
-    valueFormat={DATE_TIME_INPUT_VALUE_FORMAT}
-  />
-))
-
 export function BusinessPageLayout({ children, className = '' }) {
+  const [selectionAvailability, setSelectionAvailability] = React.useState({ visible: false, loading: false })
+  const selectionContext = React.useMemo(
+    () => ({ ...selectionAvailability, setSelectionAvailability }),
+    [selectionAvailability]
+  )
   return (
-    <div className={joinClassNames('erp-business-page-layout', className)} data-table-scroll-scope>
-      {children}
-    </div>
+    <BusinessSelectionAvailabilityContext.Provider value={selectionContext}>
+      <div className={joinClassNames('erp-business-page-layout', className)} data-table-scroll-scope>
+        {children}
+      </div>
+    </BusinessSelectionAvailabilityContext.Provider>
   )
 }
 
@@ -928,6 +807,7 @@ export function PageHeaderCard({
           </div>
         )}
         {viewSwitch}
+        {!insideModule ? <ERPPageActions /> : null}
       </div>
     </Card>
   )
@@ -1003,7 +883,8 @@ export function SelectFilter({
   options,
   placeholder,
   mode,
-  allowClear = false,
+  allowClear = true,
+  emptyValue = '',
   maxTagCount,
   className = '',
   onOpenChange,
@@ -1064,8 +945,8 @@ export function SelectFilter({
     )
   }
   if (inFilterPanel && shouldUseDirectFilterChoices({ options, mode, allowClear, className, ...restProps })) {
-    const choices = allowClear && !options.some((option) => option.value == null || option.value === '')
-      ? [{ value: undefined, label: '全部' }, ...options]
+    const choices = allowClear
+      ? [{ value: emptyValue, label: '不限' }, ...filterSelectOptions(options, emptyValue)]
       : options
     return (
       <fieldset role="presentation" className="erp-business-filter-field erp-business-filter-field--choices" disabled={restProps.disabled || restProps.loading}>
@@ -1074,7 +955,7 @@ export function SelectFilter({
           {choices.map((option) => (
             <FilterChip
               key={option.value ?? '__all'}
-              selected={value === option.value}
+              selected={(allowClear && isEmptyFilterValue(value, emptyValue) ? emptyValue : value) === option.value}
               disabled={restProps.disabled || restProps.loading || option.disabled}
               onClick={() => onChange?.(option.value, option)}
             >
@@ -1085,9 +966,12 @@ export function SelectFilter({
       </fieldset>
     )
   }
+  const SelectControl = allowClear ? FilterSelect : Select
   const select = (
-    <Select
+    <SelectControl
       ref={selectRef}
+      {...(allowClear ? { emptyValue } : {})}
+      label={inFilterPanel ? undefined : filterLabel}
       className={joinClassNames(
         'erp-business-filter-control erp-business-filter-control--select erp-business-filter-control--compact-select',
         className
@@ -1095,7 +979,7 @@ export function SelectFilter({
       value={value}
       onChange={onChange}
       options={options}
-      placeholder={placeholder}
+      placeholder={placeholder || filterLabel}
       mode={mode}
       allowClear={allowClear}
       maxTagCount={maxTagCount}
@@ -1112,85 +996,6 @@ export function SelectFilter({
       {select}
     </label>
   ) : select
-}
-
-export function DateRangeFilter({
-  options = [],
-  value,
-  onTypeChange,
-  startValue,
-  endValue,
-  onStartChange,
-  onEndChange,
-}) {
-  const hasMultipleDateTypes = options.length > 1
-  const selectedDateTypeLabel =
-    options.find((option) => option.value === value)?.label || options[0]?.label
-  const rangeInvalid = isDateInputRangeReversed(startValue, endValue)
-  const startDisabledDate = React.useCallback(
-    (current) => isDateInputAfter(current, endValue),
-    [endValue]
-  )
-  const endDisabledDate = React.useCallback(
-    (current) => isDateInputBefore(current, startValue),
-    [startValue]
-  )
-  return (
-    <div
-      className={joinClassNames(
-        'erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter',
-        rangeInvalid ? 'erp-business-date-range-filter--invalid' : ''
-      )}
-      role="group"
-      aria-label={selectedDateTypeLabel || '日期范围'}
-    >
-      {hasMultipleDateTypes ? (
-        <Select
-          className="erp-business-date-range-filter__type"
-          aria-label="日期类型"
-          options={options}
-          value={value || undefined}
-          onChange={onTypeChange}
-          classNames={{
-            popup: { root: 'erp-business-module-select-popup' },
-          }}
-        />
-      ) : selectedDateTypeLabel ? (
-        <span
-          className="erp-business-date-range-filter__type erp-business-date-range-filter__type-label"
-          aria-label="日期类型"
-        >
-          {selectedDateTypeLabel}
-        </span>
-      ) : null}
-      <div className="erp-business-date-range-filter__range">
-        <DateInput
-          aria-label="开始日期"
-          className="erp-business-date-range-filter__date"
-          placeholder="开始日期"
-          status={rangeInvalid ? 'error' : undefined}
-          value={startValue}
-          disabledDate={endValue ? startDisabledDate : undefined}
-          onChange={onStartChange}
-        />
-        <span
-          className="erp-business-date-range-filter__separator"
-          aria-hidden="true"
-        >
-          至
-        </span>
-        <DateInput
-          aria-label="结束日期"
-          className="erp-business-date-range-filter__date"
-          placeholder="结束日期"
-          status={rangeInvalid ? 'error' : undefined}
-          value={endValue}
-          disabledDate={startValue ? endDisabledDate : undefined}
-          onChange={onEndChange}
-        />
-      </div>
-    </div>
-  )
 }
 
 export function BusinessListToolbar({ stats = [], actions = null }) {
@@ -1237,6 +1042,7 @@ export function BusinessOperationPanel({
   onFiltersOpenChange,
 }) {
   const { mobileTaskBusiness, mobileTaskCommand } = useOutletContext() || {}
+  const selectionAvailability = React.useContext(BusinessSelectionAvailabilityContext)
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
   const hasActiveFilters = hasClearFilters && clearFiltersDisabled === false
@@ -1246,8 +1052,8 @@ export function BusinessOperationPanel({
     child.type === SelectionActionBar && flattenSelectionActions(child.props.children)
       .some((action) => action.type !== SelectionClearAction && inspectSelectionAction(action).actionable)
   )
-  const showSelectionPlaceholder = showSelection && hasRecordActions && !hasSelectedRecord
-  const visibleChildren = childActions.filter((child) => child.type !== SelectionActionBar || Number(child.props.selectedCount) > 0)
+  const showRecordActions = hasRecordActions && (hasSelectedRecord || (selectionAvailability?.visible ?? true))
+  const hasVisibleChildren = showRecordActions || childActions.some((child) => child.type !== SelectionActionBar)
   const [internalFiltersOpen, setInternalFiltersOpen] = React.useState(false)
   const filtersOpen = controlledFiltersOpen ?? internalFiltersOpen
   const setFiltersOpen = (open) => {
@@ -1421,6 +1227,7 @@ export function BusinessOperationPanel({
             ) : null}
           </Space.Compact>
         ) : null}
+        {!actions ? <span data-table-scroll-toolbar /> : null}
         {hasToolbar ? (
           <div className="erp-business-operation-panel__toolbar">
             {actions ? (
@@ -1439,13 +1246,11 @@ export function BusinessOperationPanel({
       </div>
       {showSelection && childActions.length > 0 ? (
         <div
-          className={joinClassNames('erp-business-operation-panel__selection',
-            visibleChildren.length === 0 && showSelectionPlaceholder ? 'erp-business-operation-panel__selection--placeholder' : '')}
-          hidden={visibleChildren.length === 0 && !showSelectionPlaceholder}
-          style={visibleChildren.length || showSelectionPlaceholder ? undefined : { display: 'none' }}
+          className="erp-business-operation-panel__selection"
+          hidden={!hasVisibleChildren}
+          style={hasVisibleChildren ? undefined : { display: 'none' }}
         >
           {childActions}
-          {showSelectionPlaceholder ? <div data-business-selection-placeholder /> : null}
         </div>
       ) : null}
     </Card>
@@ -1462,6 +1267,7 @@ export function SelectionActionBar({
   embedded = false,
 }) {
   const { mobileTaskBusiness } = useOutletContext() || {}
+  const selectionAvailability = React.useContext(BusinessSelectionAvailabilityContext)
   const hasSelection = Number(selectedCount) > 0
   const actionNodes = flattenSelectionActions(children).filter((action) => !mobileTaskBusiness || !isSourceDocumentDetailsAction(action))
   const clearActions = actionNodes.filter(
@@ -1469,7 +1275,14 @@ export function SelectionActionBar({
   )
   const recordActions = actionNodes.filter(
     (child) => child.type !== SelectionClearAction
-  )
+  ).map((action, index) => {
+    if (!React.isValidElement(action)) return action
+    const key = action.key || (inspectSelectionAction(action).pinned ? 'task-collaboration' : `record-action-${index}`)
+    const node = React.cloneElement(action, { key })
+    return hasSelection ? node : disableUnselectedAction(node)
+  })
+  const visible = hasSelection || (recordActions.length > 0 && (selectionAvailability?.visible ?? true))
+  const loading = !hasSelection && selectionAvailability?.loading
   if (mobileTaskBusiness) {
     if (!hasSelection || !mobileTaskBusiness.actionHost) return null
     return createPortal(
@@ -1484,19 +1297,20 @@ export function SelectionActionBar({
     hasSelection
       ? 'erp-business-selection-action-bar--active'
       : 'erp-business-selection-action-bar--empty',
-    embedded ? 'erp-business-selection-action-bar--embedded' : ''
+    embedded ? 'erp-business-selection-action-bar--embedded' : '',
+    loading ? 'erp-business-selection-action-bar--loading' : ''
   )
   const content = (
     <div className="erp-business-selection-action-bar__row">
       <div className="erp-business-selection-action-bar__copy erp-business-module-selection-block">
         <div className="erp-business-selection-action-bar__primary">
-          <Text strong>当前操作</Text>
+          {!hasSelection ? <Text strong>当前操作</Text> : null}
           <SelectedItemsSummaryTag
             selectedCount={selectedCount}
             selectedLabel={selectedLabel}
             selectedItems={selectedItems}
           />
-          {hasSelection && !mobileTaskBusiness ? clearActions : null}
+          {hasSelection ? clearActions.map((action, index) => React.cloneElement(action, { compact: true, key: action.key || `clear-selection-${index}` })) : null}
         </div>
         {summaryItems.length > 0 ? (
           <div className="erp-business-selection-action-bar__summary">
@@ -1530,19 +1344,21 @@ export function SelectionActionBar({
           role="group"
           aria-label="当前记录操作"
         >
-          <ResponsiveSelectionActions>
-            {recordActions}
-          </ResponsiveSelectionActions>
+          <ConfigProvider componentDisabled={!hasSelection}>
+            <ResponsiveSelectionActions>
+              {recordActions}
+            </ResponsiveSelectionActions>
+          </ConfigProvider>
         </div>
       ) : null}
     </div>
   )
 
   if (embedded) {
-    return <div className={className} hidden={!hasSelection} style={hasSelection ? undefined : { display: 'none' }}>{content}</div>
+    return <div className={className} aria-label="当前操作" aria-hidden={loading || undefined} hidden={!visible} style={visible ? undefined : { display: 'none' }}>{content}</div>
   }
 
-  return <Card className={className} hidden={!hasSelection} style={hasSelection ? undefined : { display: 'none' }}>{content}</Card>
+  return <Card className={className} aria-label="当前操作" aria-hidden={loading || undefined} hidden={!visible} style={visible ? undefined : { display: 'none' }}>{content}</Card>
 }
 
 export function BusinessActionTooltip({
@@ -1579,6 +1395,7 @@ export function SelectionClearAction({
   disabled = false,
   disabledReason = '',
   onClear = () => {},
+  compact = false,
 }) {
   const actionDisabled = disabled || Number(selectedCount) <= 0
   const actionDisabledReason =
@@ -1591,12 +1408,15 @@ export function SelectionClearAction({
     >
       <Button
         data-business-action-key="clear-selection"
-        type="link"
+        type="text"
         size="small"
+        aria-label={label}
+        title={compact ? label : undefined}
+        icon={compact ? <CloseOutlined /> : undefined}
         disabled={actionDisabled}
         onClick={onClear}
       >
-        {label}
+        {compact ? null : label}
       </Button>
     </BusinessActionTooltip>
   )
@@ -1635,7 +1455,7 @@ export function BusinessLifecyclePrimaryAction({
         data-business-action-key="lifecycle-primary"
         className="erp-business-module-status-action erp-action-button"
         size="small"
-        type="primary"
+        type={isClosingLifecycleAction(action) ? 'default' : 'primary'}
         danger={action?.danger === true}
         disabled={disabled}
         loading={loading}
@@ -1649,7 +1469,12 @@ export function BusinessLifecyclePrimaryAction({
   )
 }
 
-BusinessLifecyclePrimaryAction.selectionActionPriority = 100
+function isClosingLifecycleAction(action) {
+  return ['normal_close', 'short_close', 'cancel'].includes(action?.key)
+}
+
+BusinessLifecyclePrimaryAction.selectionActionPriority = ({ action }) => isClosingLifecycleAction(action) ? 20 : 100
+BusinessLifecyclePrimaryAction.selectionActionGroup = 'lifecycle'
 
 export function BusinessLifecycleSecondaryAction({
   action = null,
@@ -1676,6 +1501,7 @@ export function BusinessLifecycleSecondaryAction({
 }
 
 BusinessLifecycleSecondaryAction.selectionActionRole = 'secondary'
+BusinessLifecycleSecondaryAction.selectionActionGroup = 'lifecycle'
 
 export function SelectedItemsSummaryTag({
   selectedCount,
@@ -1704,7 +1530,7 @@ export function SelectedItemsSummaryTag({
   )
 
   if (!hasSelection || items.length === 0) {
-    return tag
+    return hasSelection ? <Tooltip title={label}>{tag}</Tooltip> : tag
   }
 
   return (
@@ -1831,21 +1657,25 @@ export function BusinessDataTable({
 }) {
   const { mobileTaskBusiness } = useOutletContext() || {}
   const tableCardRef = React.useRef(null)
-  const previousSelectionPlaceholder = React.useRef(false)
-  const [selectionPlaceholderHost, setSelectionPlaceholderHost] = React.useState(null)
+  const sticky = useBusinessListStickyHeader(tableCardRef, !mobileTaskBusiness && !scroll?.y)
+  const selectionContext = React.useContext(BusinessSelectionAvailabilityContext)
+  const setSelectionAvailability = selectionContext?.setSelectionAvailability
+  const selectionOwner = React.useId()
   const busy = typeof loading === 'object' ? Boolean(loading?.spinning) : Boolean(loading)
-  const showSelectionPlaceholder = !busy && rowSelection &&
-    !(rowSelection.selectedRowKeys?.length > 0) &&
-    dataSource?.some((record) => !rowSelection.getCheckboxProps?.(record)?.disabled)
-  const reserveLoadingSelection = busy && rowSelection &&
-    !(rowSelection.selectedRowKeys?.length > 0) && previousSelectionPlaceholder.current
+  const selectable = Boolean(rowSelection && dataSource?.some((record) => !rowSelection.getCheckboxProps?.(record)?.disabled))
   React.useLayoutEffect(() => {
-    // Keep availability with the table and preserve the mounted record actions.
-    const scope = tableCardRef.current?.closest('[data-table-scroll-scope]')
-    const host = scope?.querySelector('[data-business-selection-placeholder]') || null
-    setSelectionPlaceholderHost(host)
-    if (!host || !busy) previousSelectionPlaceholder.current = Boolean(host && showSelectionPlaceholder)
-  }, [dataSource, rowSelection, loading, mobileTaskBusiness, busy, showSelectionPlaceholder])
+    if (mobileTaskBusiness) return
+    // A table without selection (for example in a detail dialog) does not own the page toolbar.
+    setSelectionAvailability?.((current) => {
+      if (!rowSelection && current.owner !== selectionOwner) return current
+      const visible = busy ? current.visible : selectable
+      if (current.owner === selectionOwner && current.visible === visible && current.loading === busy) return current
+      return { owner: selectionOwner, visible, loading: busy }
+    })
+  }, [rowSelection, selectable, busy, mobileTaskBusiness, setSelectionAvailability, selectionOwner])
+  React.useLayoutEffect(() => () => {
+    setSelectionAvailability?.((current) => current.owner === selectionOwner ? { visible: false, loading: false } : current)
+  }, [setSelectionAvailability, selectionOwner])
   const resolvedColumns = React.useMemo(
     () => normalizeBusinessTableColumns(columns),
     [columns]
@@ -1893,28 +1723,13 @@ export function BusinessDataTable({
   }
 
   return (
-    <Card ref={tableCardRef} className="erp-business-data-table-card erp-business-module-table-card" onClickCapture={captureRowClick} onDoubleClickCapture={captureRowClick}>
-      {selectionPlaceholderHost && (showSelectionPlaceholder || reserveLoadingSelection) ? createPortal(
-        <div
-          className={joinClassNames('erp-business-selection-action-bar erp-business-module-current-action erp-business-selection-action-bar--empty erp-business-selection-action-bar--embedded',
-            reserveLoadingSelection ? 'erp-business-selection-action-bar--loading' : 'erp-business-selection-action-bar--placeholder')}
-          aria-hidden={reserveLoadingSelection || undefined}
-        >
-          <div className="erp-business-selection-action-bar__row">
-            <div className="erp-business-selection-action-bar__copy">
-              <div className="erp-business-selection-action-bar__primary">
-                <Text strong>当前操作</Text>
-                <span className="erp-business-selection-action-bar__placeholder-text">选中记录后显示可用操作</span>
-              </div>
-            </div>
-          </div>
-        </div>, selectionPlaceholderHost
-      ) : null}
+    <Card ref={tableCardRef} className={joinClassNames('erp-business-data-table-card erp-business-module-table-card', sticky && 'erp-business-data-table-card--sticky')} onClickCapture={captureRowClick} onDoubleClickCapture={captureRowClick}>
       {tableHeader ? (
         <div className="erp-business-data-table-card__header">{tableHeader}</div>
       ) : null}
       <Table
         scrollToolbar
+        sticky={sticky}
         size="small"
         loading={loading}
         rowKey={rowKey}

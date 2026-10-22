@@ -105,6 +105,18 @@ export function progressProductLabel(row) {
   }
   return `${row.product}${row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}`
 }
+
+export function progressIdentityPresentation(row) {
+  const hasProduct = row.product_count > 0 || row.product_id > 0
+  return {
+    hasProduct,
+    product: hasProduct
+      ? progressProductLabel({ ...row, product: row.product?.trim() || '产品名称未填写' })
+      : '未关联产品／物料',
+    reference: row.order_no?.trim() || '单据编号未提供',
+    customer: row.customer?.trim() || (row.unlinked ? '含未关联销售明细' : '客户未填写'),
+  }
+}
 export function requireProgressDetail(value) {
   if (
     !validEnvelope(value) ||
@@ -312,11 +324,11 @@ export function progressDue(row, snapshotAt) {
 export function progressAttention(row, access, roleLabel = (key) => getWorkflowTaskOwnerRoleLabel({ owner_role_key: key })) {
   const empty = { taskID: null, taskCount: 0, blocked: false, reason: '' }
   if (!access?.tasks) return { ...empty, title: '任务无查看权限', detail: '' }
-  if (!row.open_tasks) return { ...empty, title: '暂无可见待办', detail: row.sales_owner ? `业务负责人：${row.sales_owner}` : '' }
+  if (!row.open_tasks) return { ...empty, title: '暂无可见待办', detail: row.sales_owner ? `业务负责人：${row.sales_owner}` : '业务负责人未提供' }
   const role = row.attention_role ? roleLabel(row.attention_role) : ''
   const detail = row.attention_owner
     ? [role, row.attention_owner].filter(Boolean).join(' · ')
-    : role ? `${role}待领取` : '待分配处理岗位'
+    : role ? `${role} · ${row.unassigned_tasks === row.open_tasks ? '待领取' : '办理人未提供'}` : '负责岗位未提供'
   return {
     title: getWorkflowTaskDisplayName({ task_name: row.attention_task }),
     detail,

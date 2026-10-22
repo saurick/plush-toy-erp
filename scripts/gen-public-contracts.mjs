@@ -10,7 +10,7 @@ const outputDirectory = 'web/src/common/consts'
 const header = '// 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。\n'
 
 function jsString(value) {
-  return `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'").replaceAll('\n', '\\n').replaceAll('\r', '\\r')}'`
+  return `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'").replaceAll('\t', '\\t').replaceAll('\n', '\\n').replaceAll('\r', '\\r')}'`
 }
 
 // The generated module has no runtime dependency on Go or the generator.
@@ -52,7 +52,7 @@ export function renderCatalog(catalog) {
     'statuses.generated.mjs': moduleSource('server/internal/core/status 及 server/cmd/public-contracts 登记的 biz 领域声明', catalog.states),
     'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go', { AttachmentPolicy: catalog.attachments }),
     'numeric.generated.mjs': moduleSource('server/internal/core/value/numeric.go', { NumericContract: numeric }),
-    'policies.generated.mjs': moduleSource('server/internal/biz/business_pagination.go、server/internal/biz/work_center_pagination.go、server/internal/biz/admin_password.go、server/internal/biz/help_content.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
+    'policies.generated.mjs': moduleSource('server/internal/biz/business_pagination.go、server/internal/biz/work_center_pagination.go、server/internal/biz/admin_password.go、server/internal/biz/help_content.go、server/internal/biz/sales_order_export.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
     'rpcMethods.generated.mjs': moduleSource('server/api/jsonrpc/v1/jsonrpc.pb.go 消息描述、HTTP binding、Swagger 及 server/internal/service 的实际分发', { RpcTransport: catalog.rpcTransport, RpcDomain: domains, RpcMethod: catalog.rpc }),
     'rpcInspection.generated.mjs': moduleSource('server/internal/service 实际分支与参数读取点；仅供 DEV 工作台核对，不是完整 Schema 或授权结论', { RpcInspection: catalog.rpcInspection }),
   }
@@ -118,6 +118,8 @@ function completeManualRPCTables(catalog, source) {
   let part
   let fence = false
   const cell = rpcTableCell
+  const fieldHeader = (line) => /^\| (字段|返回字段|result\.data 字段) \|/u.test(line || '')
+  const groupHeading = (line) => /^\*\*(?:顶层字段|`[^`]+`)(?:（续）)?\*\*$/u.test(line || '')
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]
     if (!fence && line === '```json' && current && part === 'response' && typeof current.example.message === 'string') {
@@ -145,19 +147,27 @@ function completeManualRPCTables(catalog, source) {
       if (line === '##### 请求参数') part = 'parameters'
       if (line === '##### 返回结果') part = 'response'
       if (current && part && /^\| (字段|返回字段|result\.data 字段) \|/u.test(line) && /^\| ---/u.test(lines[index + 1] || '')) {
-        const header = line
-        const relativeResponse = part === 'response' && /^\| result\.data 字段 \|/u.test(line)
         const originals = new Map()
-        index += 2
-        while (lines[index]?.startsWith('|')) {
-          const cells = lines[index].split(/(?<!\\)\|/u).slice(1, -1).map((value) => value.trim().replaceAll('\\|', '|'))
-          const name = cells[0].replaceAll('`', '')
-          originals.set(relativeResponse ? `result.data.${name}` : name, cells)
-          index++
+        let cursor = index
+        while (fieldHeader(lines[cursor])) {
+          const relativeResponse = part === 'response' && /^\| result\.data 字段 \|/u.test(lines[cursor])
+          cursor += 2
+          while (lines[cursor]?.startsWith('|')) {
+            const cells = lines[cursor].split(/(?<!\\)\|/u).slice(1, -1).map((value) => value.trim().replaceAll('\\|', '|'))
+            const name = cells[0].replaceAll('`', '')
+            originals.set(relativeResponse ? `result.data.${name}` : name, cells)
+            cursor++
+          }
+          index = cursor - 1
+          while (lines[cursor] === '' || groupHeading(lines[cursor])) cursor++
+          if (!/^\| ---/u.test(lines[cursor + 1] || '')) break
         }
-        index--
-        out.push(part === 'parameters' ? header : '| 返回字段 | 类型 | 说明 |', part === 'parameters' ? '| --- | --- | --- | --- |' : '| --- | --- | --- |')
+        // Regeneration replaces its own first group label along with the tables.
+        let trailing = out.length - 1
+        while (out[trailing] === '') trailing--
+        if (groupHeading(out[trailing])) out.splice(trailing)
         if (part === 'response') {
+          out.push('| 返回字段 | 类型 | 说明 |', '| --- | --- | --- |')
           for (const [name, type, description] of [
             ['result.code', 'integer', '业务结果码；成功为 0，错误复用正式码表。'],
             ['result.message', 'string', '业务结果提示。'],
@@ -168,6 +178,7 @@ function completeManualRPCTables(catalog, source) {
             else out.push(`| \`${name}\` | ${cell(type)} | ${description} |`)
           }
         }
+        const fieldRows = new Map()
         for (const field of current[part] || []) {
           const old = originals.get(field.name)
           const description = old?.at(-1) || ''
@@ -178,18 +189,40 @@ function completeManualRPCTables(catalog, source) {
               const authored = old[1].replaceAll('&#124;', '|').replaceAll('\\|', '|').split(' | ')
               if (!authored.every((type) => accepted.has(type.replace(/^array<.*>$/u, 'array')))) throw new Error(`人工字段类型超出后端解析器：${field.name}`)
             }
-            out.push(part === 'parameters' ? `| \`${field.name}\` | ${cell(old[1])} | ${cell(old[2])} | ${cell(description)} |` : `| \`${field.name}\` | ${cell(field.type)} | ${cell(description)} |`)
+            fieldRows.set(field.name, part === 'parameters' ? `| \`${field.name}\` | ${cell(old[1])} | ${cell(old[2])} | ${cell(description)} |` : `| \`${field.name}\` | ${cell(field.type)} | ${cell(description)} |`)
           } else {
             const reference = field.source?.path ? ` 依据：\`${field.source.path}:${field.source.line}\`。` : ''
-            out.push(part === 'parameters' ? `| \`${field.name}\` | ${cell(requestFieldType(field))} | ${cell(field.required)} | ${cell(field.description)}${reference} |` : `| \`${field.name}\` | ${cell(field.type)} | 后端返回映射字段；按实际权限、状态及查询范围返回。${reference} |`)
+            fieldRows.set(field.name, part === 'parameters' ? `| \`${field.name}\` | ${cell(requestFieldType(field))} | ${cell(field.required)} | ${cell(field.description)}${reference} |` : `| \`${field.name}\` | ${cell(field.type)} | ${reference.trim() || '后端返回映射。'} |`)
           }
         }
+        if (part === 'response') out.push('')
+        const headers = part === 'parameters'
+          ? ['| 字段 | 类型 | 必填条件 | 说明 |', '| --- | --- | --- | --- |']
+          : ['| 返回字段 | 类型 | 说明 |', '| --- | --- | --- |']
+        appendRPCFieldTables(out, headers, current[part] || [], (field) => fieldRows.get(field.name))
         continue
       }
     }
     out.push(line)
   }
   return out.join('\n')
+}
+
+function appendRPCFieldTables(body, headers, fields, renderRow) {
+  let currentGroup
+  let count = 0
+  for (const field of fields) {
+    const name = field.name.replace(/^result\.data\./u, '')
+    const parent = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : '顶层字段'
+    if (parent !== currentGroup || count === 16) {
+      if (currentGroup !== undefined) body.push('')
+      body.push(`**${parent === '顶层字段' ? parent : `\`${parent}\``}${parent === currentGroup ? '（续）' : ''}**`, '', headers[0], headers[1])
+      currentGroup = parent
+      count = 0
+    }
+    body.push(renderRow(field))
+    count++
+  }
 }
 
 export function renderRPCDocumentation(catalog, source) {
@@ -210,16 +243,18 @@ export function renderRPCDocumentation(catalog, source) {
     const response = contract.response || []
     const request = { jsonrpc: '2.0', method, params: contract.example.params, id: `rpc-demo-${key}` }
     const result = { jsonrpc: '2.0', id: request.id, result: { code: 0, ...(typeof contract.example.message === 'string' ? { message: contract.example.message } : {}), data: contract.example.data } }
-    body.push(`#### ${names.get(key)} \`${key}\``, '', '##### 请求参数', '', '| 字段 | 类型 | 必填条件 | 说明 |', '| --- | --- | --- | --- |')
-    for (const field of fields) body.push(`| \`${cell(field.name)}\` | ${cell(requestFieldType(field))} | ${cell(field.required)} | ${cell(field.description)}${sourceRef(field)} |`)
-    body.push('', fields.length ? '必填、清空和条件分支以表内解析器及所属业务校验为准；对象引用、权限、状态和并发版本仍由后端执行。' : '此方法不读取业务参数；示例使用空对象。', '', '```json', JSON.stringify(request, null, 2), '```', '', '##### 返回结果', '', '| 返回字段 | 类型 | 说明 |', '| --- | --- | --- |', '| `result.code` | integer | 业务结果码；成功为 0，错误复用正式码表。 |', '| `result.message` | string | 业务结果提示。 |', `| \`result.data\` | ${cell(contract.dataType)}${contract.dataType === 'null' ? '' : ' / null'} | 当前方法的业务返回内容；统一封装允许空 data。 |`)
-    for (const field of response) body.push(`| \`${cell(field.name)}\` | ${cell(field.type)} | 后端返回映射字段；可见性与分支按实际权限、状态及查询范围确定。${sourceRef(field)} |`)
-    body.push('', '以下为模拟返回的主要字段投影；数组仅展示示例项，完整字段见上表。示例不是当前业务数据或第三方验收结果。', '', '```json', JSON.stringify(result, null, 2), '```', '')
+    body.push(`#### ${names.get(key)} \`${key}\``, '', '##### 请求参数', '')
+    appendRPCFieldTables(body, ['| 字段 | 类型 | 必填条件 | 说明 |', '| --- | --- | --- | --- |'], fields,
+      (field) => `| \`${cell(field.name)}\` | ${cell(requestFieldType(field))} | ${cell(field.required)} | ${cell(field.description)}${sourceRef(field)} |`)
+    body.push('', fields.length ? '对象引用、权限、状态和并发版本由后端校验。' : '此方法不读取业务参数；示例使用空对象。', '', '```json', JSON.stringify(request, null, 2), '```', '', '##### 返回结果', '', '| 返回字段 | 类型 | 说明 |', '| --- | --- | --- |', '| `result.code` | integer | 成功为 0；错误复用正式码表。 |', '| `result.message` | string | 业务结果提示。 |', `| \`result.data\` | ${cell(contract.dataType)}${contract.dataType === 'null' ? '' : ' / null'} | 当前方法的返回内容。 |`, '')
+    appendRPCFieldTables(body, ['| 返回字段 | 类型 | 说明 |', '| --- | --- | --- |'], response,
+      (field) => `| \`${cell(field.name)}\` | ${cell(field.type)} | ${sourceRef(field).trim() || '后端返回映射。'} |`)
+    body.push('', '```json', JSON.stringify(result, null, 2), '```', '')
     if (contract.example.source) body.push(`样例依据：[${contract.example.test}](../${contract.example.source.path.replace(/^server\//u, '')}) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。`, '')
     else body.push('样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。', '')
     if (contract.example.verification?.source) body.push(`执行核对入口：[${contract.example.verification.test}/${contract.example.verification.case}](../${contract.example.verification.source.path.replace(/^server\//u, '')})；实际执行状态读取对应源码身份的原始回执。`, '')
   }
-  const generated = `${rpcDocsStart}\n\n本节由 \`node scripts/gen-public-contracts.mjs\` 从当前后端解析器、DTO、返回映射和模拟样例生成。前文逐项维护的调用合同继续作为其方法真源；本节补齐其余方法，不维护第二份方法目录。\n\n${body.join('\n')}\n${rpcDocsEnd}`
+  const generated = `${rpcDocsStart}\n\n本节由 \`node scripts/gen-public-contracts.mjs\` 从后端解析器、DTO、返回映射和模拟样例生成；前文已维护的调用合同不在此重复。字段按所属对象分组，长表分段，完整路径保持可检索。\n\n所有方法共用以下阅读规则：必填、清空和条件分支按解析器及领域校验执行；返回字段的可见性由权限、状态和查询范围决定。JSON 只展示模拟值与数组示例项，完整字段见各组表格，不代表当前业务数据或第三方验收。\n\n${body.join('\n')}\n${rpcDocsEnd}`
   return begin >= 0 ? completeManualRPCTables(catalog, parts.before) + generated + completeManualRPCTables(catalog, parts.after) : `${completeManualRPCTables(catalog, source).trimEnd()}\n\n## 全量接口字段合同 / RPC Field Contracts\n\n${generated}\n`
 }
 

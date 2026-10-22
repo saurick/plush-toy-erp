@@ -14,6 +14,7 @@ import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
 import DevToolTable from '../components/DevToolTable.jsx'
+import DevProductEngineeringTools from '../components/DevProductEngineeringTools.jsx'
 import DevProjectRelationships from '../components/DevProjectRelationships.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
 import { DEV_PRODUCT_ENGINEERING_VIEWS } from '../config/devRelationshipPerspectives.mjs'
@@ -152,6 +153,8 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
         >
           {isDelivery ? (
             <DeliveryWorkspace items={items} scope={customerScope} />
+          ) : isProductEngineering ? (
+            <DevProductEngineeringTools items={items} />
           ) : (
             <section
               className="erp-dev-area-tools"

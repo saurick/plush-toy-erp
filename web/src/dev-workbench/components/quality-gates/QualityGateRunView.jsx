@@ -1,6 +1,7 @@
 import React from 'react'
-import { QuestionCircleOutlined, StopOutlined } from '@ant-design/icons'
-import { Alert, Button, Progress, Space, Tag, Tooltip, Typography } from 'antd'
+import { StopOutlined } from '@ant-design/icons'
+import { Alert, Button, Progress, Space, Tag, Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import DevTimestamp from '../DevTimestamp.jsx'
 import {
@@ -34,63 +35,43 @@ export function LocalDiagnosticsActions({
   initialLoading,
   canRun,
   actionProfile,
+  profile,
+  onProfileChange,
   onStart,
 }) {
   return (
     <section className="erp-dev-quality-actions" aria-label="本机质量诊断操作">
-      <div className="erp-dev-quality-actions__heading">
-        <div>
-          <Text strong>本机诊断（按需）</Text>
-          <Text type="secondary">
-            用于定位当前工作区问题；正式 main 门禁由推送后的 GitLab CI 执行。
-          </Text>
-        </div>
-        <Tag>不替代服务器 CI</Tag>
-      </div>
       <div className="erp-dev-quality-actions__buttons">
-        <div className="erp-dev-quality-actions__primary">
-          <Button
-            size="large"
-            disabled={!canRun}
-            loading={actionProfile === 'strict'}
-            onClick={() => onStart('strict')}
-          >
-            运行本机严格诊断
-          </Button>
-          <Tooltip
-            title="严格门禁比完整门禁多检查工具链、Shell 与 YAML，并生成绑定当前仓库身份的正式回执；若工作区有未提交改动，结果只证明当前工作区，不能作为干净 exact SHA 的发布证明。"
-            placement="bottom"
-            trigger={['hover', 'focus']}
-          >
-            <Button
-              type="text"
-              shape="circle"
-              size="small"
-              className="erp-dev-quality-actions__help"
-              icon={<QuestionCircleOutlined />}
-              aria-label="什么时候运行本机严格诊断"
-            />
-          </Tooltip>
-        </div>
+        <label htmlFor="quality-diagnostic-profile">诊断范围</label>
+        <Select
+          allowClear={false}
+          placeholder="诊断范围"
+          id="quality-diagnostic-profile"
+          aria-label="诊断范围"
+          value={profile}
+          disabled={initialLoading || Boolean(actionProfile) || summary?.busy?.active}
+          onChange={onProfileChange}
+          options={[
+            { value: 'strict', label: '严格诊断' },
+            { value: 'full', label: '完整诊断' },
+          ]}
+        />
         <Button
-          size="large"
+          type="primary"
           disabled={!canRun}
-          loading={actionProfile === 'full'}
-          onClick={() => onStart('full')}
+          loading={Boolean(actionProfile)}
+          onClick={() => onStart(profile)}
         >
-          运行本机完整诊断
+          {profile === 'strict' ? '运行本机严格诊断' : '运行本机完整诊断'}
         </Button>
-      </div>
-      <div className="erp-dev-quality-actions__durations">
-        <Text>
-          本机严格诊断：按需定位严格门禁问题 · 最近实际耗时{' '}
-          {formatQualityGateDuration(profileDuration(summary, 'strict'))}
-        </Text>
-        <Text>
-          本机完整诊断：按需定位完整门禁问题 · 最近实际耗时{' '}
-          {formatQualityGateDuration(profileDuration(summary, 'full'))}
+        <Text type="secondary">
+          最近耗时 {formatQualityGateDuration(profileDuration(summary, profile))}
         </Text>
       </div>
+      <Text type="secondary">
+        {profile === 'strict' ? '严格诊断额外检查工具链、Shell 和 YAML。' : ''}
+        结果仅证明当前工作区；固定提交门禁由 GitLab CI 执行。
+      </Text>
       {!initialLoading && summary?.environment ? (
         <div className="erp-dev-quality-actions__environment">
           <Tag

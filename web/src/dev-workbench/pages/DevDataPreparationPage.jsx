@@ -15,9 +15,7 @@ import {
   Empty,
   Input,
   List,
-  Modal,
   Radio,
-  Select,
   Skeleton,
   Space,
   Tag,
@@ -25,6 +23,7 @@ import {
   Typography,
 } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import Modal from '@/common/components/modal/AppModal'
 import { MermaidDiagram } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
@@ -206,23 +205,15 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
       </div>
       <div className="erp-dev-data-chain-toolbar">
         <div>
-          <Text strong>选择业务链查看</Text>
           <Text type="secondary">
             选择只影响计划下钻；完整回归始终执行全部已登记场景合同。
           </Text>
         </div>
-        <Select
-          value={selectedChainKey}
-          aria-label="选择业务链查看步骤"
-          onChange={onSelectChain}
-          options={[
-            { value: '', label: '全部业务链' },
-            ...plan.chains.map((chain) => ({
-              value: chain.key,
-              label: chain.label,
-            })),
-          ]}
-        />
+        {selectedChain ? (
+          <Button type="link" onClick={() => onSelectChain('')}>
+            返回全部业务链
+          </Button>
+        ) : null}
       </div>
       {selectedChain ? (
         <section className="erp-dev-data-selected-chain">
@@ -245,19 +236,13 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
           size="small"
           dataSource={plan.chains}
           renderItem={(chain) => (
-            <List.Item
-              actions={[
-                <Button
-                  key="inspect"
-                  type="link"
-                  onClick={() => onSelectChain(chain.key)}
-                >
-                  展开步骤
-                </Button>,
-              ]}
-            >
+            <List.Item>
               <List.Item.Meta
-                title={chain.label}
+                title={
+                  <Button type="link" onClick={() => onSelectChain(chain.key)}>
+                    {chain.label}
+                  </Button>
+                }
                 description={`${chain.summary}（${chain.stepCount} 步 / ${chain.scenarioCount} 类场景）`}
               />
             </List.Item>
@@ -486,7 +471,6 @@ function ProfileOption({ profile, selected, disabled, availability }) {
         </Radio>
       </th>
       <td>
-        <Text>{copy.purpose}</Text>
         <Text type="secondary">{copy.cleanupBoundary}</Text>
       </td>
       <td>
@@ -501,24 +485,7 @@ function ProfileOption({ profile, selected, disabled, availability }) {
         >
           {availability.label}
         </Tag>
-        <small>
-          {availability.blockers.map((blocker) => blocker.title).join('；') ||
-            (availability.status === 'not_proven'
-              ? '点击准备后读取目标，不会立即写入。'
-              : '可以准备计划，确认后才写入。')}
-        </small>
-      </td>
-      <td>
-        <details>
-          <summary>范围与退出方式</summary>
-          <p>{copy.scope}</p>
-          <p>{copy.cleanup}</p>
-          <div>
-            {profile.requiredEnvironment.map((requirement) => (
-              <Tag key={requirement}>{requirement}</Tag>
-            ))}
-          </div>
-        </details>
+        {availability.blockers.length ? <small>{availability.blockers.map((blocker) => blocker.title).join('；')}</small> : null}
       </td>
     </tr>
   )
@@ -990,8 +957,10 @@ export default function DevDataPreparationPage() {
   const [selectedChainKey, setSelectedChainKey] = useState('')
   const [currentOperation, setCurrentOperation] = useState(null)
   const dataView =
-    requestedDataView === 'confirm' && !currentOperation
-      ? 'scope'
+    requestedDataView === 'confirm'
+      ? !currentOperation
+        ? 'scope'
+        : currentOperation.terminal ? 'receipts' : 'confirm'
       : requestedDataView
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -1001,6 +970,18 @@ export default function DevDataPreparationPage() {
   const [executing, setExecuting] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmation, setConfirmation] = useState('')
+
+  useEffect(() => {
+    if (requestedDataView !== 'confirm' || !currentOperation?.terminal) return
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        next.set('view', 'receipts')
+        return next
+      },
+      { replace: true }
+    )
+  }, [requestedDataView, currentOperation?.terminal, setSearchParams])
 
   useEffect(() => {
     mountedRef.current = true
@@ -1316,32 +1297,43 @@ export default function DevDataPreparationPage() {
     }
   }
 
-  const historyItems = (summary?.currentOperations || []).map((operation) => ({
-    key: operation.id,
-    label: (
-      <div className="erp-dev-data-history-label">
-        <span>
-          {DEV_DATA_PREPARATION_PROFILE_COPY[operation.profileKey].title}
-        </span>
-        <Tag>{operationTargetLabel(operation.targetSummary.targetKey)}</Tag>
-        <StatusTag status={operation.status} />
-        <Text type="secondary" code>
-          {shortHash(operation.planHash)}
-        </Text>
-        <DevTimestamp
-          value={operation.updatedAt}
-          action={operationUpdateAction(operation)}
-          missing="更新时间未证明"
+  const latestReceipt = currentOperation?.terminal
+    ? currentOperation
+    : (summary?.currentOperations || [])
+        .filter((operation) =>
+          operation.terminal &&
+          operation.profileKey === selectedProfileKey &&
+          operation.targetSummary.targetKey === selectedOperationTargetKey
+        )
+        .toSorted((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0]
+  const historyItems = (summary?.currentOperations || [])
+    .filter((operation) => operation.id !== latestReceipt?.id)
+    .map((operation) => ({
+      key: operation.id,
+      label: (
+        <div className="erp-dev-data-history-label">
+          <span>
+            {DEV_DATA_PREPARATION_PROFILE_COPY[operation.profileKey].title}
+          </span>
+          <Tag>{operationTargetLabel(operation.targetSummary.targetKey)}</Tag>
+          <StatusTag status={operation.status} />
+          <Text type="secondary" code>
+            {shortHash(operation.planHash)}
+          </Text>
+          <DevTimestamp
+            value={operation.updatedAt}
+            action={operationUpdateAction(operation)}
+            missing="更新时间未证明"
+          />
+        </div>
+      ),
+      children: (
+        <OperationDetail
+          operation={operation}
+          acceptancePlan={summary?.acceptancePlan}
         />
-      </div>
-    ),
-    children: (
-      <OperationDetail
-        operation={operation}
-        acceptancePlan={summary?.acceptancePlan}
-      />
-    ),
-  }))
+      ),
+    }))
   const receiptIssues = (summary?.issues || []).filter((issue) =>
     [
       'unresolved_operation_contract_preserved',
@@ -1384,7 +1376,7 @@ export default function DevDataPreparationPage() {
             idPrefix="dev-data"
             ariaLabel="测试数据视图"
             items={DATA_VIEW_ITEMS.filter(
-              (item) => item.value !== 'confirm' || currentOperation
+              (item) => item.value !== 'confirm' || (currentOperation && !currentOperation.terminal)
             )}
             value={dataView}
             onChange={selectDataView}
@@ -1432,9 +1424,7 @@ export default function DevDataPreparationPage() {
               <Space direction="vertical" size={8}>
                 <Text>{loadError}</Text>
                 <Space>
-                  <Button onClick={() => refresh({ force: true })}>
-                    重新读取预检
-                  </Button>
+                  <Text>请使用页头“重新检查”重试。</Text>
                   <Link to="/__dev/database-migration">
                     查看数据库与运行状态
                   </Link>
@@ -1504,9 +1494,6 @@ export default function DevDataPreparationPage() {
                   }
                 </Text>
                 <StatusTag status={currentOperation.status} />
-                <Button onClick={() => selectDataView('confirm')}>
-                  查看当前批次
-                </Button>
               </div>
             ) : null}
             <section
@@ -1534,9 +1521,8 @@ export default function DevDataPreparationPage() {
                       <thead>
                         <tr>
                           <th scope="col">准备范围</th>
-                          <th scope="col">用途与保留</th>
+                          <th scope="col">保留方式</th>
                           <th scope="col">当前条件</th>
-                          <th scope="col">数据明细</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1588,7 +1574,7 @@ export default function DevDataPreparationPage() {
                       onChange={customerScope.selectCustomer}
                       disabled={preparing || executing}
                       label="客户"
-                      note="按登记的固定批次补齐模拟数据。"
+                      note=""
                       invalidDescription="当前甲方没有登记固定场景数据；其他数据准备方式不受影响。"
                     />
                   </div>
@@ -1596,11 +1582,8 @@ export default function DevDataPreparationPage() {
                 <div className="erp-dev-data-selection">
                   <div className="erp-dev-data-prepare-actions">
                     <div>
-                      <Text strong>{selectedProfileCopy.title}</Text>
-                      <Text type="secondary">
-                        {prepareBlockingReason ||
-                          selectedProfileCopy.prepareDescription}
-                      </Text>
+                      <Text>{selectedProfileCopy.purpose}</Text>
+                      {prepareBlockingReason && availability.blockers.length === 0 ? <Text type="secondary">{prepareBlockingReason}</Text> : null}
                     </div>
                     <Button
                       type="primary"
@@ -1633,7 +1616,10 @@ export default function DevDataPreparationPage() {
                     </section>
                   ) : null}
                   <details className="erp-dev-data-disclosure">
-                    <summary>目标与执行前置</summary>
+                    <summary>数据范围与执行前置</summary>
+                    <p>{selectedProfileCopy.scope}</p>
+                    <p>{selectedProfileCopy.prepareDescription}</p>
+                    <p>{selectedProfileCopy.cleanup}</p>
                     <Descriptions
                       size="small"
                       column={2}
@@ -1733,25 +1719,6 @@ export default function DevDataPreparationPage() {
                       }
                     />
                   ) : null}
-                  {currentOperation.terminal ? (
-                    <div className="erp-dev-data-result" role="status">
-                      <Text>
-                        {currentOperation.status === 'passed'
-                          ? DEV_DATA_PREPARATION_PROFILE_COPY[
-                              currentOperation.profileKey
-                            ].successDescription
-                          : '本次结果已保留。处理问题并重新检查后，可以准备新的计划。'}
-                      </Text>
-                      <Space>
-                        <Button onClick={() => selectDataView('receipts')}>
-                          查看执行记录
-                        </Button>
-                        <Button onClick={() => selectDataView('scope')}>
-                          返回准备数据
-                        </Button>
-                      </Space>
-                    </div>
-                  ) : null}
                 </DataSection>
               ) : null}
             </section>
@@ -1766,33 +1733,38 @@ export default function DevDataPreparationPage() {
                 title="执行记录"
                 extra={
                   <Tag>
-                    {historyItems.length} 条当前回执
+                    {summary.currentOperations.length} 条当前回执
                     {historicalOperationReferences.length > 0
                       ? ` · ${historicalOperationReferences.length} 条旧合同记录`
                       : ''}
                   </Tag>
                 }
               >
-                {currentOperation?.terminal ? (
+                {latestReceipt ? (
                   <section
                     className="erp-dev-data-latest-result"
                     aria-label="本次回执"
                   >
                     <Text strong>本次回执</Text>
+                    <Text>
+                      {latestReceipt.status === 'passed'
+                        ? DEV_DATA_PREPARATION_PROFILE_COPY[latestReceipt.profileKey].successDescription
+                        : '本次结果已保留。处理问题并重新检查后，可以准备新的计划。'}
+                    </Text>
                     <OperationDetail
-                      operation={currentOperation}
+                      operation={latestReceipt}
                       acceptancePlan={summary.acceptancePlan}
                     />
                   </section>
                 ) : null}
                 {historyItems.length > 0 ? (
                   <Collapse items={historyItems} />
-                ) : (
+                ) : !latestReceipt ? (
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                     description="尚无数据准备回执"
                   />
-                )}
+                ) : null}
                 {historicalOperationReferences.length > 0 ? (
                   <details className="erp-dev-data-history">
                     <summary>

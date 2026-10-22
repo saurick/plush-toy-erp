@@ -178,7 +178,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 		Materials: []CoreDemoMaterialSeed{
 			{
 				Code:            prefix + "-MAT-FABRIC",
-				Name:            "核心演示短毛绒面料",
+				Name:            "短毛绒面料",
 				Category:        "fabric",
 				StockCategory:   "MAIN",
 				Spec:            "150cm 幅宽",
@@ -187,7 +187,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			},
 			{
 				Code:            prefix + "-MAT-FILLING",
-				Name:            "核心演示 PP 棉",
+				Name:            "PP 棉",
 				Category:        "filling",
 				StockCategory:   "MAIN",
 				Spec:            "7D",
@@ -196,7 +196,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			},
 			{
 				Code:            prefix + "-MAT-EYE",
-				Name:            "核心演示安全眼",
+				Name:            "安全眼",
 				Category:        "accessory",
 				StockCategory:   "AUXILIARY",
 				Spec:            "12mm",
@@ -205,7 +205,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			},
 			{
 				Code:            prefix + "-MAT-THREAD",
-				Name:            "核心演示绣花线",
+				Name:            "绣花线",
 				Category:        "accessory",
 				StockCategory:   "AUXILIARY",
 				Spec:            "120D",
@@ -214,7 +214,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			},
 			{
 				Code:            prefix + "-MAT-PACKING",
-				Name:            "核心演示包装袋",
+				Name:            "包装袋",
 				Category:        "packing",
 				StockCategory:   "PACKAGING",
 				Spec:            "单只装",
@@ -222,7 +222,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			},
 			{
 				Code:            prefix + "-MAT-CARTON",
-				Name:            "核心演示外箱",
+				Name:            "外箱",
 				Category:        "packing",
 				StockCategory:   "PACKAGING",
 				Spec:            "60x40x50cm",
@@ -230,7 +230,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			},
 			{
 				Code:            prefix + "-MAT-LABEL",
-				Name:            "核心演示洗水标",
+				Name:            "洗水标",
 				Category:        "label",
 				StockCategory:   "AUXILIARY",
 				Spec:            "双语",
@@ -240,56 +240,56 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 		Products: []CoreDemoProductSeed{
 			{
 				Code:            productA,
-				Name:            "核心演示毛绒抱枕",
+				Name:            "毛绒抱枕",
 				StyleNo:         prefix + "-STYLE-A",
 				CustomerStyleNo: prefix + "-CUST-STYLE-A",
 				DefaultUnitCode: pcs,
 			},
 			{
 				Code:            productB,
-				Name:            "核心演示毛绒挂件",
+				Name:            "毛绒挂件",
 				StyleNo:         prefix + "-STYLE-B",
 				CustomerStyleNo: prefix + "-CUST-STYLE-B",
 				DefaultUnitCode: pcs,
 			},
 			{
 				Code:            productC,
-				Name:            "核心演示安抚熊",
+				Name:            "安抚熊",
 				StyleNo:         prefix + "-STYLE-C",
 				CustomerStyleNo: prefix + "-CUST-STYLE-C",
 				DefaultUnitCode: pcs,
 			},
 			{
 				Code:            productD,
-				Name:            "核心演示节日钥匙扣",
+				Name:            "节日钥匙扣",
 				StyleNo:         prefix + "-STYLE-D",
 				CustomerStyleNo: prefix + "-CUST-STYLE-D",
 				DefaultUnitCode: pcs,
 			},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
-			{Code: prefix + "-RM-WH", Name: "核心演示原料仓", Type: "MATERIAL"},
-			{Code: prefix + "-FG-WH", Name: "核心演示成品仓", Type: "FINISHED_GOODS"},
-			{Code: prefix + "-QC-HOLD", Name: "核心演示待检仓", Type: "MATERIAL"},
-			{Code: prefix + "-WIP-WH", Name: "核心演示在制仓", Type: "MATERIAL"},
+			{Code: prefix + "-RM-WH", Name: "原料仓", Type: "MATERIAL"},
+			{Code: prefix + "-FG-WH", Name: "成品仓", Type: "FINISHED_GOODS"},
+			{Code: prefix + "-QC-HOLD", Name: "待检仓", Type: "MATERIAL"},
+			{Code: prefix + "-WIP-WH", Name: "在制仓", Type: "MATERIAL"},
 		},
 		Processes: []CoreDemoProcessSeed{
 			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, QualityRequired: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
 			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", ProductionRouteOperationCode: biz.ProductionWIPOperationSewing, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 20, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
 			{Code: prefix + "-PROC-HANDWORK", Name: "手工", Category: "手工", ProductionRouteOperationCode: biz.ProductionWIPOperationHandwork, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 30, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
 			{Code: prefix + "-PROC-PACKAGING", Name: "包装", Category: "包装", ProductionRouteOperationCode: biz.ProductionWIPOperationPackaging, OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 40, Note: "毛绒玩具行业默认候选工序；可按工厂实际调整委外、内制与质检参考。"},
-			{Code: prefix + "-PROC-CUTTING-DIE", Name: "制作刀模", Category: "刀模", OutsourcingEnabled: true, SortOrder: 50, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, QualityRequired: true, SortOrder: 60, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-MACHINE-CUTTING", Name: "机裁", Category: "裁片", ProductionRouteOperationCode: biz.ProductionWIPOperationFabricProcessing, OutsourcingEnabled: true, SortOrder: 70, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-SILKSCREEN", Name: "丝印", Category: "印刷", OutsourcingEnabled: true, SortOrder: 80, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-LAMINATION", Name: "贴合", Category: "贴合", OutsourcingEnabled: true, SortOrder: 90, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-CUTTING-DIE", Name: "制作刀模", Category: "刀模", OutsourcingEnabled: true, SortOrder: 50, Note: "委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, QualityRequired: true, SortOrder: 60, Note: "委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-MACHINE-CUTTING", Name: "机裁", Category: "裁片", ProductionRouteOperationCode: biz.ProductionWIPOperationFabricProcessing, OutsourcingEnabled: true, SortOrder: 70, Note: "委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-SILKSCREEN", Name: "丝印", Category: "印刷", OutsourcingEnabled: true, SortOrder: 80, Note: "委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-LAMINATION", Name: "贴合", Category: "贴合", OutsourcingEnabled: true, SortOrder: 90, Note: "委外工序，可按实际工厂继续扩展。"},
 		},
 		BOMs: []CoreDemoBOMSeed{
 			{
 				ProductCode: productA,
 				Version:     prefix + "-BOM-V1",
 				Status:      "ACTIVE",
-				Note:        "核心演示 BOM，只用于本地试用和 QA，不代表真实客户资料。",
+				Note:        "BOM，按确认材料与用量生产。",
 				Items: []CoreDemoBOMItemSeed{
 					{
 						MaterialCode: prefix + "-MAT-FABRIC",
@@ -325,7 +325,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				ProductCode: productC,
 				Version:     prefix + "-BOM-C-V1",
 				Status:      "ACTIVE",
-				Note:        "核心演示 BOM，用于覆盖多材料、多单位和包装箱场景。",
+				Note:        "BOM，核对材料、单位和包装箱用量。",
 				Items: []CoreDemoBOMItemSeed{
 					{
 						MaterialCode: prefix + "-MAT-FABRIC",
@@ -715,7 +715,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		if !validStandardUnitSeed(unit) {
 			return fmt.Errorf("%w: unit %q", ErrCoreDemoSeedInvalidRecord, unit.Code)
 		}
-		if err := biz.ValidateNoNumberedImplementationStageLabels(unit.Code, unit.Name); err != nil {
+		if err := biz.ValidateSeedBusinessText(unit.Code, unit.Name); err != nil {
 			return fmt.Errorf("%w: unit %q naming: %v", ErrCoreDemoSeedInvalidRecord, unit.Code, err)
 		}
 		unitCodes[unit.Code] = struct{}{}
@@ -727,7 +727,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		if _, ok := unitCodes[material.DefaultUnitCode]; !ok {
 			return fmt.Errorf("%w: material %q references unknown unit %q", ErrCoreDemoSeedInvalidRecord, material.Code, material.DefaultUnitCode)
 		}
-		if err := biz.ValidateNoNumberedImplementationStageLabels(material.Code, material.Name, material.Category, material.Spec, material.Color); err != nil {
+		if err := biz.ValidateSeedBusinessText(material.Code, material.Name, material.Category, material.Spec, material.Color); err != nil {
 			return fmt.Errorf("%w: material %q naming: %v", ErrCoreDemoSeedInvalidRecord, material.Code, err)
 		}
 		materialCodes[material.Code] = struct{}{}
@@ -739,7 +739,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		if _, ok := unitCodes[product.DefaultUnitCode]; !ok {
 			return fmt.Errorf("%w: product %q references unknown unit %q", ErrCoreDemoSeedInvalidRecord, product.Code, product.DefaultUnitCode)
 		}
-		if err := biz.ValidateNoNumberedImplementationStageLabels(product.Code, product.Name, product.StyleNo, product.CustomerStyleNo); err != nil {
+		if err := biz.ValidateSeedBusinessText(product.Code, product.Name, product.StyleNo, product.CustomerStyleNo); err != nil {
 			return fmt.Errorf("%w: product %q naming: %v", ErrCoreDemoSeedInvalidRecord, product.Code, err)
 		}
 		productCodes[product.Code] = struct{}{}
@@ -748,7 +748,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		if !safeSeedCode(warehouse.Code, prefix) || strings.TrimSpace(warehouse.Name) == "" || !biz.ValidWarehouseType(warehouse.Type) {
 			return fmt.Errorf("%w: warehouse %q", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
 		}
-		if err := biz.ValidateNoNumberedImplementationStageLabels(warehouse.Code, warehouse.Name, warehouse.Type); err != nil {
+		if err := biz.ValidateSeedBusinessText(warehouse.Code, warehouse.Name, warehouse.Type); err != nil {
 			return fmt.Errorf("%w: warehouse %q naming: %v", ErrCoreDemoSeedInvalidRecord, warehouse.Code, err)
 		}
 	}
@@ -767,7 +767,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 			}
 			productionRouteOperationCodes[operationCode] = struct{}{}
 		}
-		if err := biz.ValidateNoNumberedImplementationStageLabels(process.Code, process.Name, process.Category, process.Note); err != nil {
+		if err := biz.ValidateSeedBusinessText(process.Code, process.Name, process.Category, process.Note); err != nil {
 			return fmt.Errorf("%w: process %q naming: %v", ErrCoreDemoSeedInvalidRecord, process.Code, err)
 		}
 	}
@@ -778,7 +778,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		if !safeSeedCode(bom.Version, prefix) || strings.TrimSpace(bom.Status) == "" {
 			return fmt.Errorf("%w: bom version %q", ErrCoreDemoSeedInvalidRecord, bom.Version)
 		}
-		if err := biz.ValidateNoNumberedImplementationStageLabels(bom.ProductCode, bom.Version, bom.Note); err != nil {
+		if err := biz.ValidateSeedBusinessText(bom.ProductCode, bom.Version, bom.Note); err != nil {
 			return fmt.Errorf("%w: bom %q naming: %v", ErrCoreDemoSeedInvalidRecord, bom.Version, err)
 		}
 		for _, item := range bom.Items {
@@ -795,7 +795,7 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 			if err != nil || !quantity.IsPositive() || biz.ValidateUnitQuantity(quantity, 6) != nil {
 				return fmt.Errorf("%w: bom item quantity must be positive with at most six decimal places", ErrCoreDemoSeedInvalidRecord)
 			}
-			if err := biz.ValidateNoNumberedImplementationStageLabels(item.MaterialCode, item.UnitCode, item.Position, item.Note); err != nil {
+			if err := biz.ValidateSeedBusinessText(item.MaterialCode, item.UnitCode, item.Position, item.Note); err != nil {
 				return fmt.Errorf("%w: bom item naming: %v", ErrCoreDemoSeedInvalidRecord, err)
 			}
 		}

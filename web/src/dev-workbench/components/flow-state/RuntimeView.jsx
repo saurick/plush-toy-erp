@@ -4,7 +4,8 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
-import { Alert, Empty, Select, Spin, Tag } from 'antd'
+import { Alert, Empty, Spin, Tag } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import {
   getProcessOwnerPoolLabel,
   BusinessChainProjectionContext,
@@ -30,7 +31,6 @@ import {
   getProcessNodeStatusLabel,
   getProcessStatusLabel,
   getWorkflowTaskDisplayName,
-  isDisplayOnlyWorkflowTask,
 } from '@/erp/utils/processRuntimePresentation.mjs'
 import {
   getWorkflowTaskOwnerRoleLabel,
@@ -216,26 +216,17 @@ function RuntimeResponsibilityEvidence({ model }) {
 }
 
 function RuntimeUnlinkedTaskBoundary({ task, taskId }) {
-  const displayOnly = isDisplayOnlyWorkflowTask(task)
   const status = task ? getWorkflowTaskStatusMeta(task) : null
   return (
     <section
       className="erp-dev-flow-unlinked-task"
-      data-task-runtime-boundary={displayOnly ? 'display-only' : 'unlinked'}
+      data-task-runtime-boundary="unlinked"
     >
       <Alert
         showIcon
-        type={displayOnly ? 'warning' : 'info'}
-        message={
-          displayOnly
-            ? '已找到任务，但它是模拟展示数据'
-            : '已找到任务，但它没有正式流程轨迹'
-        }
-        description={
-          displayOnly
-            ? '这个任务只用于演示任务列表，没有关联正式 ProcessRuntime。页面不会补造流程节点，也不能据此证明业务事实已经发生。'
-            : '任务记录真实存在，但未关联正式 ProcessRuntime。页面不会根据任务名称或 payload 补造流程节点。'
-        }
+        type="info"
+        message="已找到任务，但它没有正式流程轨迹"
+        description="任务记录真实存在，但未关联正式 ProcessRuntime。页面不会根据任务名称或 payload 补造流程节点。"
       />
       <div className="erp-dev-flow-section-heading">
         <div>
@@ -331,6 +322,8 @@ function RuntimeView({
         <label htmlFor="dev-flow-process-select">选择流程定义</label>
         {definition ? (
           <Select
+            allowClear={false}
+            placeholder="选择流程定义"
             id="dev-flow-process-select"
             aria-label="选择流程定义"
             showSearch

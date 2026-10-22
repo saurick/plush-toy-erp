@@ -22,7 +22,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存产品 BOM 的版本、有效期、状态及工程资料头信息。 |
 | 明确不负责 | BOM 是产品结构和用量真源，不是采购、库存、生产领料或成本事实。 |
@@ -31,53 +31,62 @@
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>version</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 并发控制版本；写动作通常使用 CAS 校验，不能由调用方任意跳号。 |
-| <code>status</code> | <code>varchar</code> | <code>string</code> | 非空 | <code>&#39;DRAFT&#39;</code> | — | 对象生命周期状态；允许值和组合约束见本表 CHECK 与生命周期说明。 |
-| <code>effective_from</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>effective_to</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>source_order_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>quantity_text</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>spare_text</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>print_date</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>designer</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>maker</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>auditor</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>hair_direction</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
-| <code>product_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `products`。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+#### 字段 1–16
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `version` | `varchar` | `string` | 非空 | — | 并发控制版本；写动作通常使用 CAS 校验，不能由调用方任意跳号。 |
+| `status` | `varchar` | `string` | 非空 | `'DRAFT'` | 对象生命周期状态；允许值和组合约束见本表 CHECK 与生命周期说明。 |
+| `effective_from` | `timestamp with time zone` | `time.Time` | 可空 | — | — |
+| `effective_to` | `timestamp with time zone` | `time.Time` | 可空 | — | — |
+| `source_order_no` | `varchar` | `string` | 可空 | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| `quantity_text` | `varchar` | `string` | 可空 | — | — |
+| `spare_text` | `varchar` | `string` | 可空 | — | — |
+| `print_date` | `timestamp with time zone` | `time.Time` | 可空 | — | — |
+| `designer` | `varchar` | `string` | 可空 | — | — |
+| `maker` | `varchar` | `string` | 可空 | — | — |
+| `auditor` | `varchar` | `string` | 可空 | — | — |
+| `hair_direction` | `varchar` | `string` | 可空 | — | — |
+| `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+
+#### 字段 17–17
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `product_id` | `bigint` | `int` | 非空 | — | 外键，关联 `products`。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
 | 约束 | 本表字段 | 引用 | ON UPDATE | ON DELETE |
 | --- | --- | --- | --- | --- |
-| <code>bom_headers_products_bom_headers</code> | <code>product_id</code> | [<code>public.products</code>](主数据与BOM.md#table-products) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
+| `bom_headers_products_bom_headers` | `product_id` | [`public.products`](主数据与BOM.md#table-products) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
 
 ### 索引
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>bomheader_product_id</code> | 是 | <code>product_id</code> | <code>status = &#39;ACTIVE&#39;</code> |
-| <code>bomheader_product_id_status</code> | 否 | <code>product_id</code>, <code>status</code> | — |
-| <code>bomheader_product_id_version</code> | 是 | <code>product_id</code>, <code>version</code> | — |
+| `bomheader_product_id` | 是 | `product_id` | `status = 'ACTIVE'` |
+| `bomheader_product_id_status` | 否 | `product_id`, `status` | — |
+| `bomheader_product_id_version` | 是 | `product_id`, `version` | — |
 
 ### CHECK 约束
 
-- <code>bom_headers_effective_dates_ordered</code>
+- `bom_headers_effective_dates_ordered`
 
 ```sql
 effective_from IS NULL OR effective_to IS NULL OR effective_to > effective_from
 ```
 
-- <code>bom_headers_status_allowed</code>
+- `bom_headers_status_allowed`
 
 ```sql
 status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
@@ -97,7 +106,7 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存材料在各部位的单位用量、损耗、片数和工艺资料；界面按材料分组复用主数据。 |
 | 明确不负责 | 不保存委外或车间执行归属。单位用量已包含该部位片数，汇总按生产数量乘单位用量乘一加损耗率；片数不再重复相乘。 |
@@ -106,50 +115,52 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>quantity</code> | <code>numeric(20,6)</code> | <code>other</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>loss_rate</code> | <code>numeric(20,6)</code> | <code>other</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>position</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>piece_count</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>total_usage_snapshot</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
-| <code>process_base</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>process_method</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
-| <code>bom_header_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `bom_headers`。 |
-| <code>material_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `materials`。 |
-| <code>unit_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `units`。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `quantity` | `numeric(20,6)` | `other` | 非空 | — | — |
+| `loss_rate` | `numeric(20,6)` | `other` | 非空 | — | — |
+| `position` | `varchar` | `string` | 可空 | — | — |
+| `piece_count` | `varchar` | `string` | 可空 | — | — |
+| `total_usage_snapshot` | `varchar` | `string` | 可空 | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
+| `process_base` | `varchar` | `string` | 可空 | — | — |
+| `process_method` | `varchar` | `string` | 可空 | — | — |
+| `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+| `bom_header_id` | `bigint` | `int` | 非空 | — | 外键，关联 `bom_headers`。 |
+| `material_id` | `bigint` | `int` | 非空 | — | 外键，关联 `materials`。 |
+| `unit_id` | `bigint` | `int` | 非空 | — | 外键，关联 `units`。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
 | 约束 | 本表字段 | 引用 | ON UPDATE | ON DELETE |
 | --- | --- | --- | --- | --- |
-| <code>bom_items_bom_headers_items</code> | <code>bom_header_id</code> | [<code>public.bom_headers</code>](主数据与BOM.md#table-bom-headers) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
-| <code>bom_items_materials_bom_items</code> | <code>material_id</code> | [<code>public.materials</code>](主数据与BOM.md#table-materials) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
-| <code>bom_items_units_bom_items</code> | <code>unit_id</code> | [<code>public.units</code>](主数据与BOM.md#table-units) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
+| `bom_items_bom_headers_items` | `bom_header_id` | [`public.bom_headers`](主数据与BOM.md#table-bom-headers) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
+| `bom_items_materials_bom_items` | `material_id` | [`public.materials`](主数据与BOM.md#table-materials) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
+| `bom_items_units_bom_items` | `unit_id` | [`public.units`](主数据与BOM.md#table-units) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
 
 ### 索引
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>bomitem_bom_header_id_material_id</code> | 否 | <code>bom_header_id</code>, <code>material_id</code> | — |
+| `bomitem_bom_header_id_material_id` | 否 | `bom_header_id`, `material_id` | — |
 
 ### CHECK 约束
 
-- <code>bom_items_loss_rate_non_negative</code>
+- `bom_items_loss_rate_non_negative`
 
 ```sql
 loss_rate >= 0
 ```
 
-- <code>bom_items_quantity_positive</code>
+- `bom_items_quantity_positive`
 
 ```sql
 quantity > 0
@@ -169,36 +180,38 @@ quantity > 0
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存客户或供应商联系人、联系方式、主联系人标记和启用状态。 |
 | 明确不负责 | 联系人通过 owner_type 和 owner_id 归属 CUSTOMER 或 SUPPLIER，不是交易单据参与方快照。 |
 | 生命周期 / 删除语义 | 启用或停用；主联系人切换按 owner 范围维护；不因主数据停用删除历史引用。 |
 | 写入边界 | MasterDataUsecase 校验 owner 类型、归属和主联系人唯一性后写入。 |
-| Catalog 敏感字段 | <code>phone</code>, <code>mobile</code>, <code>email</code> |
+| Catalog 敏感字段 | `phone`, `mobile`, `email` |
 | 审查备注 | owner 为多态引用，数据库没有跨两张 owner 表的普通外键，归属完整性主要由 usecase/repo 守住。 |
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>owner_type</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>owner_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>phone</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>mobile</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>email</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>title</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_primary</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>false</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `owner_type` | `varchar` | `string` | 非空 | — | — |
+| `owner_id` | `bigint` | `int` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `phone` | `varchar` | `string` | 可空 | 敏感 | — |
+| `mobile` | `varchar` | `string` | 可空 | 敏感 | — |
+| `email` | `varchar` | `string` | 可空 | 敏感 | — |
+| `title` | `varchar` | `string` | 可空 | — | — |
+| `is_primary` | `boolean` | `bool` | 非空 | `false` | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
@@ -208,15 +221,15 @@ quantity > 0
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>contact_is_active</code> | 否 | <code>is_active</code> | — |
-| <code>contact_mobile</code> | 否 | <code>mobile</code> | — |
-| <code>contact_owner_type_owner_id</code> | 否 | <code>owner_type</code>, <code>owner_id</code> | — |
-| <code>contact_owner_type_owner_id_is_primary</code> | 是 | <code>owner_type</code>, <code>owner_id</code>, <code>is_primary</code> | <code>is_primary = true</code> |
-| <code>contact_phone</code> | 否 | <code>phone</code> | — |
+| `contact_is_active` | 否 | `is_active` | — |
+| `contact_mobile` | 否 | `mobile` | — |
+| `contact_owner_type_owner_id` | 否 | `owner_type`, `owner_id` | — |
+| `contact_owner_type_owner_id_is_primary` | 是 | `owner_type`, `owner_id`, `is_primary` | `is_primary = true` |
+| `contact_phone` | 否 | `phone` | — |
 
 ### CHECK 约束
 
-- <code>contacts_owner_type_allowed</code>
+- `contacts_owner_type_allowed`
 
 ```sql
 owner_type IN ('CUSTOMER', 'SUPPLIER')
@@ -236,37 +249,39 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存销售、出货和应收等业务引用的客户主档。 |
 | 明确不负责 | 客户主档不记录销售承诺、出货发生或财务事实。 |
 | 生命周期 / 删除语义 | 启用或停用；停用只阻止新业务引用，不删除已有正式业务记录。 |
 | 写入边界 | MasterDataUsecase 创建、修改和启停。 |
-| Catalog 敏感字段 | <code>tax_no</code> |
+| Catalog 敏感字段 | `tax_no` |
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>short_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_payment_method</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_payment_term_days</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>tax_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>country_region</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_delivery_recipient</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_delivery_phone</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_delivery_address</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `code` | `varchar` | `string` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `short_name` | `varchar` | `string` | 可空 | — | — |
+| `default_payment_method` | `varchar` | `string` | 可空 | — | — |
+| `default_payment_term_days` | `bigint` | `int` | 可空 | — | — |
+| `tax_no` | `varchar` | `string` | 可空 | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| `country_region` | `varchar` | `string` | 可空 | — | — |
+| `default_delivery_recipient` | `varchar` | `string` | 可空 | — | — |
+| `default_delivery_phone` | `varchar` | `string` | 可空 | — | — |
+| `default_delivery_address` | `varchar` | `string` | 可空 | — | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
@@ -276,11 +291,11 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>customer_code</code> | 是 | <code>code</code> | — |
-| <code>customer_default_payment_method</code> | 否 | <code>default_payment_method</code> | — |
-| <code>customer_is_active</code> | 否 | <code>is_active</code> | — |
-| <code>customer_name</code> | 否 | <code>name</code> | — |
-| <code>customer_short_name</code> | 否 | <code>short_name</code> | — |
+| `customer_code` | 是 | `code` | — |
+| `customer_default_payment_method` | 否 | `default_payment_method` | — |
+| `customer_is_active` | 否 | `is_active` | — |
+| `customer_name` | 否 | `name` | — |
+| `customer_short_name` | 否 | `short_name` | — |
 
 ### CHECK 约束
 
@@ -300,7 +315,7 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存可复用材料名称、厂商、厂商料号、色号、规格、默认单位、库存类别和默认入库仓。 |
 | 明确不负责 | 厂商与料号色号组合决定材料身份；同料号色号的不同厂商保留独立档案。category 保存细分分类；stock_category 区分主料、辅料、包材、其他材料。默认仓只预填收货，不代替入库事实。 |
@@ -309,49 +324,51 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>supplier_item_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>category</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>stock_category</code> | <code>varchar</code> | <code>string</code> | 非空 | <code>&#39;UNCLASSIFIED&#39;</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>spec</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>color</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
-| <code>default_warehouse_id</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 外键，关联 `warehouses`。 |
-| <code>supplier_id</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 外键，关联 `suppliers`。 |
-| <code>default_unit_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `units`。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `code` | `varchar` | `string` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `supplier_item_no` | `varchar` | `string` | 可空 | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| `category` | `varchar` | `string` | 可空 | — | — |
+| `stock_category` | `varchar` | `string` | 非空 | `'UNCLASSIFIED'` | — |
+| `spec` | `varchar` | `string` | 可空 | — | — |
+| `color` | `varchar` | `string` | 可空 | — | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+| `default_warehouse_id` | `bigint` | `int` | 可空 | — | 外键，关联 `warehouses`。 |
+| `supplier_id` | `bigint` | `int` | 可空 | — | 外键，关联 `suppliers`。 |
+| `default_unit_id` | `bigint` | `int` | 非空 | — | 外键，关联 `units`。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
 | 约束 | 本表字段 | 引用 | ON UPDATE | ON DELETE |
 | --- | --- | --- | --- | --- |
-| <code>materials_suppliers_supplier</code> | <code>supplier_id</code> | [<code>public.suppliers</code>](主数据与BOM.md#table-suppliers) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
-| <code>materials_units_materials</code> | <code>default_unit_id</code> | [<code>public.units</code>](主数据与BOM.md#table-units) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
-| <code>materials_warehouses_default_warehouse</code> | <code>default_warehouse_id</code> | [<code>public.warehouses</code>](主数据与BOM.md#table-warehouses) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
+| `materials_suppliers_supplier` | `supplier_id` | [`public.suppliers`](主数据与BOM.md#table-suppliers) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
+| `materials_units_materials` | `default_unit_id` | [`public.units`](主数据与BOM.md#table-units) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
+| `materials_warehouses_default_warehouse` | `default_warehouse_id` | [`public.warehouses`](主数据与BOM.md#table-warehouses) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
 
 ### 索引
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>material_category</code> | 否 | <code>category</code> | — |
-| <code>material_code</code> | 是 | <code>code</code> | — |
-| <code>material_name</code> | 否 | <code>name</code> | — |
-| <code>material_stock_category</code> | 否 | <code>stock_category</code> | — |
-| <code>material_supplier_id_supplier_item_no</code> | 是 | <code>supplier_id</code>, <code>supplier_item_no</code> | <code>supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NULL</code> |
-| <code>material_supplier_id_supplier_item_no_color</code> | 是 | <code>supplier_id</code>, <code>supplier_item_no</code>, <code>color</code> | <code>supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NOT NULL</code> |
+| `material_category` | 否 | `category` | — |
+| `material_code` | 是 | `code` | — |
+| `material_name` | 否 | `name` | — |
+| `material_stock_category` | 否 | `stock_category` | — |
+| `material_supplier_id_supplier_item_no` | 是 | `supplier_id`, `supplier_item_no` | `supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NULL` |
+| `material_supplier_id_supplier_item_no_color` | 是 | `supplier_id`, `supplier_item_no`, `color` | `supplier_id IS NOT NULL AND supplier_item_no IS NOT NULL AND color IS NOT NULL` |
 
 ### CHECK 约束
 
-- <code>materials_stock_category_check</code>
+- `materials_stock_category_check`
 
 ```sql
 stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
@@ -371,7 +388,7 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存可复用生产工序、路线位置绑定、内制或委外能力和质检要求。 |
 | 明确不负责 | 它是生产工序主数据，不是 ProcessRuntime 流程定义、流程实例或 Workflow 任务。 |
@@ -381,25 +398,27 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>category</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>production_route_operation_code</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>outsourcing_enabled</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>false</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>inhouse_enabled</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>quality_required</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>false</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>sort_order</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `code` | `varchar` | `string` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `category` | `varchar` | `string` | 可空 | — | — |
+| `production_route_operation_code` | `varchar` | `string` | 可空 | — | — |
+| `outsourcing_enabled` | `boolean` | `bool` | 非空 | `false` | — |
+| `inhouse_enabled` | `boolean` | `bool` | 非空 | `true` | — |
+| `quality_required` | `boolean` | `bool` | 非空 | `false` | — |
+| `sort_order` | `bigint` | `int` | 非空 | `0` | — |
+| `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
@@ -409,23 +428,23 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>process_category</code> | 否 | <code>category</code> | — |
-| <code>process_code</code> | 是 | <code>code</code> | — |
-| <code>process_inhouse_enabled</code> | 否 | <code>inhouse_enabled</code> | — |
-| <code>process_is_active</code> | 否 | <code>is_active</code> | — |
-| <code>process_outsourcing_enabled</code> | 否 | <code>outsourcing_enabled</code> | — |
-| <code>process_production_route_operation_code</code> | 是 | <code>production_route_operation_code</code> | <code>production_route_operation_code IS NOT NULL</code> |
-| <code>process_sort_order_id</code> | 否 | <code>sort_order</code>, <code>id</code> | — |
+| `process_category` | 否 | `category` | — |
+| `process_code` | 是 | `code` | — |
+| `process_inhouse_enabled` | 否 | `inhouse_enabled` | — |
+| `process_is_active` | 否 | `is_active` | — |
+| `process_outsourcing_enabled` | 否 | `outsourcing_enabled` | — |
+| `process_production_route_operation_code` | 是 | `production_route_operation_code` | `production_route_operation_code IS NOT NULL` |
+| `process_sort_order_id` | 否 | `sort_order`, `id` | — |
 
 ### CHECK 约束
 
-- <code>processes_production_route_operation_allowed</code>
+- `processes_production_route_operation_allowed`
 
 ```sql
 production_route_operation_code IS NULL OR production_route_operation_code IN ('FABRIC_PROCESSING', 'SEWING', 'HANDWORK', 'PACKAGING')
 ```
 
-- <code>processes_sort_order_non_negative</code>
+- `processes_sort_order_non_negative`
 
 ```sql
 sort_order >= 0
@@ -445,7 +464,7 @@ sort_order >= 0
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存产品下的规格、颜色、尺码、条码和客户 SKU 等显式库存粒度。 |
 | 明确不负责 | SKU 是主数据，不自动创建库存、BOM、销售行或生产事实。 |
@@ -454,57 +473,59 @@ sort_order >= 0
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>sku_code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>sku_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>barcode</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>customer_sku</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>color</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>color_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>size</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>packaging_version</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>unit_net_weight_g</code> | <code>numeric(20,6)</code> | <code>other</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
-| <code>product_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `products`。 |
-| <code>default_unit_id</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 外键，关联 `units`。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `sku_code` | `varchar` | `string` | 非空 | — | — |
+| `sku_name` | `varchar` | `string` | 可空 | — | — |
+| `barcode` | `varchar` | `string` | 可空 | — | — |
+| `customer_sku` | `varchar` | `string` | 可空 | — | — |
+| `color` | `varchar` | `string` | 可空 | — | — |
+| `color_no` | `varchar` | `string` | 可空 | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| `size` | `varchar` | `string` | 可空 | — | — |
+| `packaging_version` | `varchar` | `string` | 可空 | — | — |
+| `unit_net_weight_g` | `numeric(20,6)` | `other` | 可空 | — | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+| `product_id` | `bigint` | `int` | 非空 | — | 外键，关联 `products`。 |
+| `default_unit_id` | `bigint` | `int` | 可空 | — | 外键，关联 `units`。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
 | 约束 | 本表字段 | 引用 | ON UPDATE | ON DELETE |
 | --- | --- | --- | --- | --- |
-| <code>product_skus_products_product_skus</code> | <code>product_id</code> | [<code>public.products</code>](主数据与BOM.md#table-products) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
-| <code>product_skus_units_product_skus</code> | <code>default_unit_id</code> | [<code>public.units</code>](主数据与BOM.md#table-units) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>SET NULL</code> |
+| `product_skus_products_product_skus` | `product_id` | [`public.products`](主数据与BOM.md#table-products) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
+| `product_skus_units_product_skus` | `default_unit_id` | [`public.units`](主数据与BOM.md#table-units) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `SET NULL` |
 
 ### 索引
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>productsku_barcode</code> | 是 | <code>barcode</code> | <code>barcode IS NOT NULL AND barcode &lt;&gt; &#39;&#39;</code> |
-| <code>productsku_color</code> | 否 | <code>color</code> | — |
-| <code>productsku_color_no</code> | 否 | <code>color_no</code> | — |
-| <code>productsku_customer_sku</code> | 否 | <code>customer_sku</code> | — |
-| <code>productsku_product_id_is_active</code> | 否 | <code>product_id</code>, <code>is_active</code> | — |
-| <code>productsku_product_id_sku_code</code> | 是 | <code>product_id</code>, <code>sku_code</code> | — |
-| <code>productsku_size</code> | 否 | <code>size</code> | — |
-| <code>productsku_sku_code</code> | 是 | <code>sku_code</code> | — |
+| `productsku_barcode` | 是 | `barcode` | `barcode IS NOT NULL AND barcode <> ''` |
+| `productsku_color` | 否 | `color` | — |
+| `productsku_color_no` | 否 | `color_no` | — |
+| `productsku_customer_sku` | 否 | `customer_sku` | — |
+| `productsku_product_id_is_active` | 否 | `product_id`, `is_active` | — |
+| `productsku_product_id_sku_code` | 是 | `product_id`, `sku_code` | — |
+| `productsku_size` | 否 | `size` | — |
+| `productsku_sku_code` | 是 | `sku_code` | — |
 
 ### CHECK 约束
 
-- <code>product_skus_unit_net_weight_g_positive</code>
+- `product_skus_unit_net_weight_g_positive`
 
 ```sql
 unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 ```
 
-- <code>product_skus_unit_net_weight_g_requires_default_unit</code>
+- `product_skus_unit_net_weight_g_requires_default_unit`
 
 ```sql
 unit_net_weight_g IS NULL OR default_unit_id IS NOT NULL
@@ -524,7 +545,7 @@ unit_net_weight_g IS NULL OR default_unit_id IS NOT NULL
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存产品或款号主档，供 SKU、BOM、订单、生产、库存和出货引用。 |
 | 明确不负责 | 产品主档不等于 SKU、BOM 版本、库存数量或订单事实。 |
@@ -533,43 +554,45 @@ unit_net_weight_g IS NULL OR default_unit_id IS NOT NULL
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>style_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>customer_style_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>english_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>hs_code</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>unit_net_weight_g</code> | <code>numeric(20,6)</code> | <code>other</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
-| <code>default_unit_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `units`。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `code` | `varchar` | `string` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `style_no` | `varchar` | `string` | 可空 | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| `customer_style_no` | `varchar` | `string` | 可空 | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| `english_name` | `varchar` | `string` | 可空 | — | — |
+| `hs_code` | `varchar` | `string` | 可空 | — | — |
+| `unit_net_weight_g` | `numeric(20,6)` | `other` | 可空 | — | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+| `default_unit_id` | `bigint` | `int` | 非空 | — | 外键，关联 `units`。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
 | 约束 | 本表字段 | 引用 | ON UPDATE | ON DELETE |
 | --- | --- | --- | --- | --- |
-| <code>products_units_products</code> | <code>default_unit_id</code> | [<code>public.units</code>](主数据与BOM.md#table-units) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>NO ACTION</code> |
+| `products_units_products` | `default_unit_id` | [`public.units`](主数据与BOM.md#table-units) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `NO ACTION` |
 
 ### 索引
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>product_code</code> | 是 | <code>code</code> | — |
-| <code>product_customer_style_no</code> | 否 | <code>customer_style_no</code> | — |
-| <code>product_name</code> | 否 | <code>name</code> | — |
-| <code>product_style_no</code> | 否 | <code>style_no</code> | — |
+| `product_code` | 是 | `code` | — |
+| `product_customer_style_no` | 否 | `customer_style_no` | — |
+| `product_name` | 否 | `name` | — |
+| `product_style_no` | 否 | `style_no` | — |
 
 ### CHECK 约束
 
-- <code>products_unit_net_weight_g_positive</code>
+- `products_unit_net_weight_g_positive`
 
 ```sql
 unit_net_weight_g IS NULL OR unit_net_weight_g > 0
@@ -589,7 +612,7 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存供应商或加工厂能够承接哪些生产工序的多对多关系。 |
 | 明确不负责 | 能力关联只用于委外来源校验，不等于已签合同、已分配 WIP 或已发生委外事实。 |
@@ -599,21 +622,23 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>supplier_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键 | 外键，关联 `suppliers`。 |
-| <code>process_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键 | 外键，关联 `processes`。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `supplier_id` | `bigint` | `int` | 非空 | 主键 | 外键，关联 `suppliers`。 |
+| `process_id` | `bigint` | `int` | 非空 | 主键 | 外键，关联 `processes`。 |
 
 ### 主键
 
-<code>supplier_id</code>, <code>process_id</code>
+`supplier_id`, `process_id`
 
 ### 外键
 
 | 约束 | 本表字段 | 引用 | ON UPDATE | ON DELETE |
 | --- | --- | --- | --- | --- |
-| <code>supplier_process_capabilities_process_id</code> | <code>process_id</code> | [<code>public.processes</code>](主数据与BOM.md#table-processes) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>CASCADE</code> |
-| <code>supplier_process_capabilities_supplier_id</code> | <code>supplier_id</code> | [<code>public.suppliers</code>](主数据与BOM.md#table-suppliers) <code>id</code> | 未显式指定（PostgreSQL 默认 NO ACTION） | <code>CASCADE</code> |
+| `supplier_process_capabilities_process_id` | `process_id` | [`public.processes`](主数据与BOM.md#table-processes) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `CASCADE` |
+| `supplier_process_capabilities_supplier_id` | `supplier_id` | [`public.suppliers`](主数据与BOM.md#table-suppliers) `id` | 未显式指定（PostgreSQL 默认 NO ACTION） | `CASCADE` |
 
 ### 索引
 
@@ -638,37 +663,39 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存采购、委外和应付引用的供应商或加工厂主档。 |
 | 明确不负责 | 供应商类型和工序能力不等于采购订单、委外合同或财务事实。 |
 | 生命周期 / 删除语义 | 启用或停用；停用阻止新引用但保留历史。 |
 | 写入边界 | MasterDataUsecase 创建、修改、启停并维护工序能力集合。 |
-| Catalog 敏感字段 | <code>tax_no</code> |
+| Catalog 敏感字段 | `tax_no` |
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>short_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>supplier_type</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>address</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>tax_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>default_payment_term_days</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_payment_method</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_invoice_required</code> | <code>boolean</code> | <code>bool</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_invoice_category</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `code` | `varchar` | `string` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `short_name` | `varchar` | `string` | 可空 | — | — |
+| `supplier_type` | `varchar` | `string` | 可空 | — | — |
+| `address` | `varchar` | `string` | 可空 | — | — |
+| `tax_no` | `varchar` | `string` | 可空 | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| `default_payment_term_days` | `bigint` | `int` | 非空 | `0` | — |
+| `default_payment_method` | `varchar` | `string` | 可空 | — | — |
+| `default_invoice_required` | `boolean` | `bool` | 可空 | — | — |
+| `default_invoice_category` | `varchar` | `string` | 可空 | — | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
@@ -678,27 +705,27 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>supplier_code</code> | 是 | <code>code</code> | — |
-| <code>supplier_is_active</code> | 否 | <code>is_active</code> | — |
-| <code>supplier_name</code> | 否 | <code>name</code> | — |
-| <code>supplier_short_name</code> | 否 | <code>short_name</code> | — |
-| <code>supplier_supplier_type</code> | 否 | <code>supplier_type</code> | — |
+| `supplier_code` | 是 | `code` | — |
+| `supplier_is_active` | 否 | `is_active` | — |
+| `supplier_name` | 否 | `name` | — |
+| `supplier_short_name` | 否 | `short_name` | — |
+| `supplier_supplier_type` | 否 | `supplier_type` | — |
 
 ### CHECK 约束
 
-- <code>suppliers_default_invoice_category_allowed</code>
+- `suppliers_default_invoice_category_allowed`
 
 ```sql
 default_invoice_category IS NULL OR default_invoice_category IN ('EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')
 ```
 
-- <code>suppliers_default_invoice_pair_valid</code>
+- `suppliers_default_invoice_pair_valid`
 
 ```sql
 ((default_invoice_required IS NULL AND default_invoice_category IS NULL) OR (default_invoice_required = false AND default_invoice_category IS NULL) OR (default_invoice_required = true AND default_invoice_category IS NOT NULL))
 ```
 
-- <code>suppliers_supplier_type_allowed</code>
+- `suppliers_supplier_type_allowed`
 
 ```sql
 supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')
@@ -718,7 +745,7 @@ supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service',
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存物料、产品、BOM、订单、库存和事实共用的计量单位。 |
 | 明确不负责 | 单位不负责换算或数量事实；当前引用必须使用明确单位。 |
@@ -727,19 +754,21 @@ supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service',
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>precision</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `code` | `varchar` | `string` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `precision` | `bigint` | `int` | 非空 | `0` | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
@@ -749,11 +778,11 @@ supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service',
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>unit_code</code> | 是 | <code>code</code> | — |
+| `unit_code` | 是 | `code` | — |
 
 ### CHECK 约束
 
-- <code>units_precision_allowed</code>
+- `units_precision_allowed`
 
 ```sql
 precision BETWEEN 0 AND 6
@@ -773,7 +802,7 @@ precision BETWEEN 0 AND 6
 
 | 项目 | 说明 |
 | --- | --- |
-| Schema | <code>public</code> |
+| Schema | `public` |
 | 分类 | MasterData / 主数据 |
 | 用途 | 保存库存、入库、调拨、出货和数据范围引用的仓库主档。 |
 | 明确不负责 | type 区分主料仓、辅料仓、包材仓、其他材料仓、原辅料综合仓和成品仓；未分类仓阻止新入库。仓库主档不保存库存数量，余额和流水仍在库存事实层。 |
@@ -782,19 +811,21 @@ precision BETWEEN 0 AND 6
 
 ### 字段
 
-| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>type</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
-| <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
+类型以当前结构为准。默认值与属性合列，未显示默认值表示未声明；说明为 `—` 时，业务含义回到上方表职责、约束及下方代码来源核对。
+
+| 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
+| `code` | `varchar` | `string` | 非空 | — | — |
+| `name` | `varchar` | `string` | 非空 | — | — |
+| `type` | `varchar` | `string` | 非空 | — | — |
+| `is_active` | `boolean` | `bool` | 非空 | `true` | — |
+| `created_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
+| `updated_at` | `timestamp with time zone` | `time.Time` | 非空 | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
 ### 主键
 
-<code>id</code>
+`id`
 
 ### 外键
 
@@ -804,12 +835,12 @@ precision BETWEEN 0 AND 6
 
 | 索引 | 唯一 | 字段 | Predicate |
 | --- | --- | --- | --- |
-| <code>warehouse_code</code> | 是 | <code>code</code> | — |
-| <code>warehouse_type</code> | 否 | <code>type</code> | — |
+| `warehouse_code` | 是 | `code` | — |
+| `warehouse_type` | 否 | `type` | — |
 
 ### CHECK 约束
 
-- <code>warehouses_type_check</code>
+- `warehouses_type_check`
 
 ```sql
 type IN ('MAIN_MATERIAL', 'AUXILIARY_MATERIAL', 'PACKAGING_MATERIAL', 'OTHER_MATERIAL', 'MATERIAL', 'FINISHED_GOODS', 'UNCLASSIFIED')

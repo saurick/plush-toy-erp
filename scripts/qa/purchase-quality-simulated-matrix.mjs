@@ -204,8 +204,8 @@ export function buildPlan(options) {
     prefix,
     ids,
     names: {
-      supplier: String(options.supplierName || "【试用】模拟采购供应商").trim(),
-      material: String(options.materialName || "【试用】模拟短毛绒材料").trim(),
+      supplier: String(options.supplierName || "材料供应商").trim(),
+      material: String(options.materialName || "短毛绒").trim(),
     },
     orderStatuses,
     receiptScenarios,
@@ -400,13 +400,12 @@ function orderParams(plan, status, index) {
     supplier_id: plan.ids.supplierId,
     supplier_snapshot: {
       name: plan.names.supplier,
-      simulated_only: true,
     },
     purchase_date: new Date().toISOString().slice(0, 10),
     expected_arrival_date: new Date(Date.now() + (index + 2) * 86400000)
       .toISOString()
       .slice(0, 10),
-    note: `【试用】采购订单-${labels[status]}；模拟试用数据，请勿用于正式业务。`,
+    note: `采购订单-${labels[status]}。`,
     items: [
       {
         line_no: 1,
@@ -568,10 +567,9 @@ function receiptSourceOrderParams(plan, scenario, index) {
     supplier_id: plan.ids.supplierId,
     supplier_snapshot: {
       name: plan.names.supplier,
-      simulated_only: true,
     },
     purchase_date: scenarioDate(index),
-    note: `【试用】采购入库-${labels[scenario.key]}来源订单；模拟试用数据，请勿用于正式业务。`,
+    note: `采购入库-${labels[scenario.key]}来源订单。`,
     items: [
       {
         line_no: 1,
@@ -582,7 +580,7 @@ function receiptSourceOrderParams(plan, scenario, index) {
         purchased_quantity: String(10 + index * 2),
         unit_price: "3.20",
         amount: ((10 + index * 2) * 3.2).toFixed(2),
-        note: `【试用】采购入库-${labels[scenario.key]}`,
+        note: `采购入库-${labels[scenario.key]}`,
       },
     ],
   };
@@ -750,12 +748,12 @@ async function createReceiptMatrix(
         params: {
           id: inspection.id,
           result: index % 2 === 0 ? "PASS" : "CONCESSION",
-          check_items: [{ name: "外观", requirement: "符合模拟确认样", observation: "按场景记录模拟结果", result: index % 2 === 0 ? "PASS" : "FAIL", scope: "FULL", note: "模拟验收" }],
+          check_items: [{ name: "外观", requirement: "符合确认样", observation: "已记录外观检验结果", result: index % 2 === 0 ? "PASS" : "FAIL", scope: "FULL", note: "已核对" }],
           inspected_at: scenarioDate(index),
           defect_rate_operator: "APPROX",
           defect_rate_percent: index % 2 === 0 ? "5" : "10",
           decision_note:
-            "【试用】检验通过或让步接收；模拟试用记录，请勿作为正式质检结论。",
+            "检验通过或让步接收。",
         },
         token: tokens.quality,
         fetchImpl,
@@ -774,12 +772,12 @@ async function createReceiptMatrix(
         params: {
           id: inspection.id,
           result: "REJECT",
-          check_items: [{ name: "尺寸", requirement: "符合模拟尺寸", observation: "模拟尺寸偏差", result: "FAIL", scope: "FULL", note: "模拟验收" }],
+          check_items: [{ name: "尺寸", requirement: "符合尺寸要求", observation: "尺寸偏差", result: "FAIL", scope: "FULL", note: "已核对" }],
           inspected_at: scenarioDate(index),
           defect_rate_operator: "GT",
           defect_rate_percent: "50",
           decision_note:
-            "【试用】尺寸偏差，执行拒收；模拟试用记录，请勿作为正式质检结论。",
+            "尺寸偏差，执行拒收。",
         },
         token: tokens.quality,
         fetchImpl,

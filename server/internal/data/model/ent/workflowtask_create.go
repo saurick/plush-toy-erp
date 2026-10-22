@@ -47,9 +47,25 @@ func (_c *WorkflowTaskCreate) SetSourceType(v string) *WorkflowTaskCreate {
 	return _c
 }
 
+// SetNillableSourceType sets the "source_type" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableSourceType(v *string) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetSourceType(*v)
+	}
+	return _c
+}
+
 // SetSourceID sets the "source_id" field.
 func (_c *WorkflowTaskCreate) SetSourceID(v int) *WorkflowTaskCreate {
 	_c.mutation.SetSourceID(v)
+	return _c
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableSourceID(v *int) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetSourceID(*v)
+	}
 	return _c
 }
 
@@ -547,16 +563,10 @@ func (_c *WorkflowTaskCreate) check() error {
 			return &ValidationError{Name: "task_name", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.task_name": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.SourceType(); !ok {
-		return &ValidationError{Name: "source_type", err: errors.New(`ent: missing required field "WorkflowTask.source_type"`)}
-	}
 	if v, ok := _c.mutation.SourceType(); ok {
 		if err := workflowtask.SourceTypeValidator(v); err != nil {
 			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.source_type": %w`, err)}
 		}
-	}
-	if _, ok := _c.mutation.SourceID(); !ok {
-		return &ValidationError{Name: "source_id", err: errors.New(`ent: missing required field "WorkflowTask.source_id"`)}
 	}
 	if v, ok := _c.mutation.SourceID(); ok {
 		if err := workflowtask.SourceIDValidator(v); err != nil {

@@ -40,7 +40,6 @@ import {
   formatDeliveryDuration,
   formatDeliveryPercent,
   formatDeliveryRate,
-  formatDeliveryTimestamp,
   isDevInitialCustomerConfigActivationReady,
   resolveDevOperationHistoryFilters,
   resolveDevOperationHistoryState,
@@ -826,14 +825,6 @@ test('delivery presentation helpers are deterministic and bounded', () => {
   assert.equal(formatDeliveryDuration(950), '950 ms')
   assert.equal(formatDeliveryDuration(5_400), '5.4 秒')
   assert.equal(formatDeliveryDuration(125_000), '2 分 5 秒')
-  assert.match(
-    formatDeliveryTimestamp('2026-07-29T01:02:03.000Z'),
-    /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
-  )
-  assert.equal(
-    formatDeliveryTimestamp('not-a-date', '发布时间未证明'),
-    '发布时间未证明'
-  )
   assert.equal(deliveryStatusPresentation('not_proven').label, '结果未证明')
   assert.equal(deliveryStatusPresentation('success').label, '成功')
   assert.equal(
@@ -1256,10 +1247,8 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /清空并重建测试数据/u)
   assert.match(source, /prepare-database-rebuild/u)
   assert.match(source, /execute-database-rebuild/u)
-  assert.match(source, /查看发布当前版本制品说明/u)
   assert.match(source, /先发布制品，不会直接部署到任一目标/u)
   assert.match(source, /“准备部署”和“确认部署”/u)
-  assert.match(source, /trigger=\{\['hover', 'click'\]\}/u)
   assert.match(source, /操作指引/u)
   assert.match(source, /手动与应急发布指引/u)
   assert.match(source, /四处操作各管什么/u)
@@ -1287,12 +1276,10 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /DEV_VERSION_GUIDE_ROUTE/u)
   assert.match(source, /href=\{[\s\S]*?DEV_VERSION_GUIDE_ROUTE/u)
   assert.doesNotMatch(source, /manualTakeoverTriggerRef|ManualGuideModal/u)
-  assert.match(
-    source,
-    /aria-label="查看发布当前版本制品说明"/u
-  )
+  assert.doesNotMatch(source, /查看发布当前版本制品说明/u)
+  assert.match(source, /title="发布当前版本制品"/u)
   assert.equal(source.match(/onClick=\{\(\) => setReleaseModalOpen\(true\)\}/gu)?.length, 1)
-  assert.match(source, /当前结论 \/ 下一步/u)
+  assert.match(source, /aria-label="当前发布结论与下一步"/u)
   assert.match(source, /summary[?][.]boundaries[?][.]releaseDispatchAllowed/u)
   assert.match(source, /deliveryReadOnlyReleasePresentation\(summary\)/u)
   assert.doesNotMatch(source, /当前只加载 GitLab 只读凭据/u)
@@ -1399,7 +1386,7 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.match(versionCenterPageSource, /发布于/u)
   assert.match(
     versionCenterPageSource,
-    /<DevDeliveryTimestamp[\s\S]*?value=\{record[.]publishedAt\}[\s\S]*?action="发布于"/u
+    /<DevTimestamp[\s\S]*?value=\{record[.]publishedAt\}[\s\S]*?action="发布于"/u
   )
   assert.match(
     versionCenterPageSource,
@@ -1430,7 +1417,7 @@ test('version center keeps critical state visible and uses stable tab pagination
   )
   assert.match(
     versionCenterPageSource,
-    /未结束操作始终保持可见[\s\S]*openOperations[.]map[\s\S]*<Tabs/u
+    /erp-dev-version-current-operation[\s\S]*openOperations[.]map[\s\S]*<Tabs/u
   )
 })
 

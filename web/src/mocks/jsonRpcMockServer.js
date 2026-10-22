@@ -1,3 +1,4 @@
+import { RpcErrorCode } from '../common/consts/errorCodes.js'
 import { WorkCenterPaginationPolicy } from '../common/consts/policies.generated.mjs'
 import {
   ADMIN_TOKEN_ISSUER,
@@ -901,7 +902,7 @@ function resolveMockWorkflowMutationReceipt(task, operation, params) {
   if (receipt.intent !== intent) {
     return {
       error: {
-        code: 40920,
+        code: RpcErrorCode.IDEMPOTENCY_CONFLICT,
         message: '重复请求内容与首次提交不一致，请刷新后重试',
       },
     }
@@ -919,7 +920,7 @@ function resolveMockWorkflowMutationRequest(method, params = {}) {
   } catch (error) {
     return {
       error: {
-        code: 40010,
+        code: RpcErrorCode.INVALID_PARAM,
         message: error?.message || '页面已更新，请刷新后重新操作',
       },
     }
@@ -928,11 +929,11 @@ function resolveMockWorkflowMutationRequest(method, params = {}) {
     (item) => item.id === mutationParams.task_id
   )
   if (!task) {
-    return { error: { code: 40010, message: '任务不存在' } }
+    return { error: { code: RpcErrorCode.RESOURCE_NOT_FOUND, message: '任务不存在' } }
   }
   if (!Number.isSafeInteger(task.version) || task.version <= 0) {
     return {
-      error: { code: 40010, message: '任务版本信息无效，请刷新后重试' },
+      error: { code: RpcErrorCode.INVALID_PARAM, message: '任务版本信息无效，请刷新后重试' },
     }
   }
   const receipt = resolveMockWorkflowMutationReceipt(
@@ -955,13 +956,13 @@ function resolveMockWorkflowReadRequest(
     })
   } catch (error) {
     return {
-      error: { code: 40010, message: error?.message || '任务查询参数无效' },
+      error: { code: RpcErrorCode.INVALID_PARAM, message: error?.message || '任务查询参数无效' },
     }
   }
   const task = mockWorkflowTasks.find(
     (item) => item.id === requestParams.taskID
   )
-  if (!task) return { error: { code: 40010, message: '任务不存在' } }
+  if (!task) return { error: { code: RpcErrorCode.RESOURCE_NOT_FOUND, message: '任务不存在' } }
   return { ...requestParams, task }
 }
 
@@ -1391,7 +1392,7 @@ export function setupJsonRpcMockServer() {
       if (!mockProductionOrderParamsValid(method, params)) {
         responseBody = makeJsonRpcBizError(
           id,
-          40010,
+          RpcErrorCode.INVALID_PARAM,
           '生产订单请求参数不符合当前合同'
         )
       } else if (method === 'list_production_orders') {
@@ -1439,7 +1440,7 @@ export function setupJsonRpcMockServer() {
           responseBody =
             previous.intent === intent
               ? { ...structuredClone(previous.response), id }
-              : makeJsonRpcBizError(id, 40920, '重复请求内容与首次提交不一致')
+              : makeJsonRpcBizError(id, RpcErrorCode.IDEMPOTENCY_CONFLICT, '重复请求内容与首次提交不一致')
         } else if (
           method !== 'create_production_order' &&
           (params.production_order_id !== mockProductionOrder.id ||
@@ -1447,7 +1448,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40922,
+            RpcErrorCode.RESOURCE_VERSION_CONFLICT,
             '记录已被其他操作更新，请刷新后重试'
           )
         } else {
@@ -1515,7 +1516,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号缺少查看协同任务权限'
           )
         } else {
@@ -1553,7 +1554,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号缺少查看协同任务权限'
           )
         } else {
@@ -1568,7 +1569,7 @@ export function setupJsonRpcMockServer() {
             !Number.isSafeInteger(offset) ||
             offset < 0
           ) {
-            responseBody = makeJsonRpcBizError(id, 40010, '工作台查询条件有误')
+            responseBody = makeJsonRpcBizError(id, RpcErrorCode.INVALID_PARAM, '工作台查询条件有误')
           } else {
             const snapshotAt = nowUnix()
             const visibleTasks = mockWorkflowTasks.filter((item) =>
@@ -1653,7 +1654,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号缺少查看协同任务权限'
           )
         } else {
@@ -1685,7 +1686,7 @@ export function setupJsonRpcMockServer() {
           } catch (error) {
             responseBody = makeJsonRpcBizError(
               id,
-              40010,
+              RpcErrorCode.INVALID_PARAM,
               error?.message || '岗位任务查询参数无效'
             )
           }
@@ -1700,7 +1701,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号缺少查看协同任务权限'
           )
         } else {
@@ -1743,7 +1744,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号无权查看该协同任务'
           )
         } else {
@@ -1788,7 +1789,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号无权查看该协同任务'
           )
         } else {
@@ -1873,7 +1874,7 @@ export function setupJsonRpcMockServer() {
         } catch (error) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             error?.message || 'create_task 参数无效'
           )
         }
@@ -1886,7 +1887,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号缺少创建协同任务权限'
           )
         }
@@ -1907,7 +1908,7 @@ export function setupJsonRpcMockServer() {
                 }
               : makeJsonRpcBizError(
                   id,
-                  40920,
+                  RpcErrorCode.IDEMPOTENCY_CONFLICT,
                   '重复请求内容与首次提交不一致，请刷新后重试'
                 )
         }
@@ -1975,7 +1976,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.PERMISSION_DENIED,
             '当前账号无权查看或执行该任务动作'
           )
         } else if (request.receipt.task) {
@@ -1986,11 +1987,11 @@ export function setupJsonRpcMockServer() {
             error: '',
           }
         } else if (!decision.allowed) {
-          responseBody = makeJsonRpcBizError(id, 40010, decision.reason)
+          responseBody = makeJsonRpcBizError(id, RpcErrorCode.BUSINESS_RULE_VIOLATION, decision.reason)
         } else if (isMockTerminalWorkflowTask(request.task)) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.BUSINESS_RULE_VIOLATION,
             '任务已结束，不能再次变更状态'
           )
         } else if (
@@ -1998,7 +1999,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.RESOURCE_VERSION_CONFLICT,
             '任务已被其他人更新，请刷新后重试'
           )
         } else {
@@ -2064,7 +2065,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.PERMISSION_DENIED,
             '当前账号无权查看或执行该任务动作'
           )
         } else if (request.receipt.task) {
@@ -2075,11 +2076,11 @@ export function setupJsonRpcMockServer() {
             error: '',
           }
         } else if (!decision.allowed) {
-          responseBody = makeJsonRpcBizError(id, 40010, decision.reason)
+          responseBody = makeJsonRpcBizError(id, RpcErrorCode.BUSINESS_RULE_VIOLATION, decision.reason)
         } else if (isMockTerminalWorkflowTask(request.task)) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.BUSINESS_RULE_VIOLATION,
             '任务已结束，不能再次变更状态'
           )
         } else if (
@@ -2087,7 +2088,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.RESOURCE_VERSION_CONFLICT,
             '任务已被其他人更新，请刷新后重试'
           )
         } else {
@@ -2152,7 +2153,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.PERMISSION_DENIED,
             '当前账号无权查看或执行该任务动作'
           )
         } else if (request.receipt.task) {
@@ -2163,15 +2164,15 @@ export function setupJsonRpcMockServer() {
             error: '',
           }
         } else if (!decision.allowed) {
-          responseBody = makeJsonRpcBizError(id, 40010, decision.reason)
+          responseBody = makeJsonRpcBizError(id, RpcErrorCode.BUSINESS_RULE_VIOLATION, decision.reason)
         } else if (isMockTerminalWorkflowTask(request.task)) {
-          responseBody = makeJsonRpcBizError(id, 40010, '任务已结束，不能催办')
+          responseBody = makeJsonRpcBizError(id, RpcErrorCode.BUSINESS_RULE_VIOLATION, '任务已结束，不能催办')
         } else if (
           request.mutationParams.expected_version !== request.task.version
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.RESOURCE_VERSION_CONFLICT,
             '任务已被其他人更新，请刷新后重试'
           )
         } else {
@@ -2234,7 +2235,7 @@ export function setupJsonRpcMockServer() {
         ) {
           responseBody = makeJsonRpcBizError(
             id,
-            40010,
+            RpcErrorCode.INVALID_PARAM,
             '当前账号缺少查看协同任务权限'
           )
         } else {

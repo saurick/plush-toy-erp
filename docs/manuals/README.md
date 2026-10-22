@@ -70,6 +70,10 @@ node scripts/docs/project-manuals.mjs --export
 
 纠错、补充当前状态及不可变修订分别由 `help_feedbacks`、`help_supplements`、`help_supplement_revisions` 保存，纳入数据库备份恢复；历史恢复是新增记录，不改写旧记录。企业补充支持文字、列表、表格和代码块；预览和离线 HTML 转义原始 HTML，不加载正文图片。修改记录可查看内容、与上一条对照以及恢复；未保存关闭、换页和离开页面会提示，保存期间阻止重复操作。
 
-业务使用手册是生成文件，复用业务页、工程用料、岗位说明与通用阅读章节；不直接编辑生成正文。简要步骤和词条在 `businessUsabilityCatalog.mjs`，逐页准备、填写、动作和问题处理在 `businessHandbookOperations.mjs`，由 `businessHandbook.mjs` 统一组装。具体办理说明保留实际代码来源供维护核对，字段或动作变化时先回查当前表单及 usecase。增加业务页面或字段规则后更新原目录，重新生成并检查，防止在线与离线口径漂移。管理和运维 Markdown 同步生成 `server/internal/projectmanuals/content.generated.json`，随后端发布，通过 `admin.project_manuals` 按当前有效账号角色和权限提供。生成器与检查见[手册脚本](../../scripts/docs/README.md)。
+业务使用手册是生成文件，复用业务页、工程用料、岗位说明与通用阅读章节；不直接编辑生成正文。简要步骤和词条在 `businessUsabilityCatalog.mjs`，逐页准备、填写、动作和问题处理在 `businessHandbookOperations.mjs`，由 `businessHandbook.mjs` 统一组装。
+
+具体办理说明保留实际代码来源供维护核对，字段或动作变化时先回查当前表单及 usecase。增加业务页面或字段规则后更新原目录，重新生成并检查，防止在线与离线口径漂移。
+
+管理和运维 Markdown 同步生成 `server/internal/projectmanuals/content.generated.json`，随后端发布，通过 `admin.project_manuals` 按当前有效账号角色和权限提供。生成器与检查见[手册脚本](../../scripts/docs/README.md)。
 
 管理员与技术手册保留连续操作路径，专题文档继续维护细则。改动行为、接口、配置或路径时，同轮更新受影响手册、目录、[文档清单](../文档清单.md)和验证；历史发布与验收证据继续保留原事实。

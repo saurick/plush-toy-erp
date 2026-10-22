@@ -5,7 +5,10 @@ import (
 	"strings"
 )
 
-var ErrSourceOrderNormalCloseIncomplete = errors.New("source order normal close requires complete fulfillment")
+var (
+	ErrSourceOrderNormalCloseIncomplete = errors.New("source order normal close requires complete fulfillment")
+	ErrSourceOrderStateInvalid          = errors.New("source order state does not allow this operation")
+)
 
 const (
 	SourceOrderActionSubmit  = "submit"

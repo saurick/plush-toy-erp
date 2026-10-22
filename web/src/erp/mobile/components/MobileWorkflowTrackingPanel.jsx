@@ -11,7 +11,7 @@ import { message } from '@/common/utils/antdApp'
 import { listWorkflowTracking } from '../../api/workflowApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
-import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
+import WorkflowTaskIdentity, { WorkflowTaskAssociation } from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import { WorkflowTaskSource } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowResponsibilities from '../../components/workflow/WorkflowResponsibilities.jsx'
 import WorkflowInitiator from '../../components/workflow/WorkflowInitiator.jsx'
@@ -500,6 +500,7 @@ function MobileTrackingContent({
             {current.items.map((entry) => (
               <WorkflowTaskCard
                 key={`${entry.kind}:${entry.id}`}
+                compact
                 className="mobile-workflow-tracking-card"
                 label={`流程跟踪：${trackingTitle(entry)}`}
                 data-mobile-tracking-entry={`${entry.kind}:${entry.id}`}
@@ -511,30 +512,32 @@ function MobileTrackingContent({
                     {trackingStatus(entry)}
                   </Tag>
                 </div>
-                <WorkflowTaskSource task={entry} copyable={false} />
-                {entry.display_context && (
+                {entry.display_context ? (
                   <WorkflowTaskIdentity
                     task={entry}
                     keyword={query.keyword}
                     compact
                     copyable={false}
                     showStyleNo
+                    source={<WorkflowTaskSource task={entry} copyable={false} showUnavailable={false} />}
                   />
-                )}
-                <div className="mobile-workflow-tracking-owner">
-                  {entry.current_tasks.length ? (
-                    <WorkflowResponsibilities
-                      items={entry.current_tasks.map(
-                        trackingResponsibilityParts
-                      )}
-                    />
-                  ) : (
-                    trackingHandoff(entry)
-                  )}
-                </div>
-                <div className="mobile-workflow-tracking-origin">
-                  <WorkflowInitiator summary={entry} />
-                  <span>{formatWorkflowTaskEventTime(entry.started_at)}</span>
+                ) : <span className="erp-task-identity erp-task-identity--compact"><WorkflowTaskAssociation task={entry} emptyLabel="关联内容未提供" /><WorkflowTaskSource task={entry} copyable={false} /></span>}
+                <div className="erp-task-card__footer mobile-workflow-tracking-footer">
+                  <div className="mobile-workflow-tracking-owner">
+                    {entry.current_tasks.length ? (
+                      <WorkflowResponsibilities
+                        items={entry.current_tasks.map(
+                          trackingResponsibilityParts
+                        )}
+                      />
+                    ) : (
+                      trackingHandoff(entry)
+                    )}
+                  </div>
+                  <div className="mobile-workflow-tracking-origin">
+                    <WorkflowInitiator summary={entry} />
+                    <span>{formatWorkflowTaskEventTime(entry.started_at)}</span>
+                  </div>
                 </div>
               </WorkflowTaskCard>
             ))}

@@ -28,6 +28,18 @@ export function createHistoryRecordScenarios(deps) {
       ...new Set([...customerRuntimeEffectiveSession.pages, 'history-records']),
     ],
   }
+  const assertUnselectedActions = async (page) => {
+    const actions = page.locator('.erp-business-selection-action-bar')
+    await actions.waitFor({ state: 'visible' })
+    for (const name of ['查看详情', '前往所属模块']) {
+      assert.equal(
+        await actions.getByRole('button', { name, exact: true }).isEnabled(),
+        false,
+        '有可选记录但未选择时，保留禁用的记录动作'
+      )
+    }
+    assert.equal(await page.locator('.ant-table-row-selected').count(), 0)
+  }
   const assertQueryLayout = async (page) => {
     const header = page.locator('.erp-business-page-header-card')
     const command = page.locator('.erp-business-operation-panel__command')
@@ -93,12 +105,7 @@ export function createHistoryRecordScenarios(deps) {
       await assertQueryLayout(page)
       const table = page.locator('.ant-table-tbody')
       await table.getByText('HISTORY-001', { exact: true }).waitFor()
-      assert.equal(
-        await page
-          .getByRole('button', { name: '查看详情', exact: true })
-          .isEnabled(),
-        false
-      )
+      await assertUnselectedActions(page)
       assert(
         page.historyRequests.every(
           (params) => params.lifecycle_scope === 'history'
@@ -128,6 +135,11 @@ export function createHistoryRecordScenarios(deps) {
       await page.locator('.ant-pagination-item-2').click()
       await table.getByText('HISTORY-051', { exact: true }).waitFor()
       await table.getByText('HISTORY-051', { exact: true }).click()
+      assert.equal(
+        await page.getByRole('button', { name: '清空已选', exact: true }).isEnabled(),
+        true,
+        '选中记录后可以清空选择'
+      )
       await page.getByRole('button', { name: '查看详情', exact: true }).click()
       await page
         .getByRole('dialog')
@@ -144,6 +156,11 @@ export function createHistoryRecordScenarios(deps) {
       await expectHeading(page, '历史记录中心')
       await table.getByText('HISTORY-051', { exact: true }).waitFor()
       assert.equal(new URL(page.url()).searchParams.get('page'), '2')
+      await table.getByText('HISTORY-051', { exact: true }).click()
+      assert.equal(
+        await page.getByRole('button', { name: '查看详情', exact: true }).isEnabled(),
+        true
+      )
       const search = page.getByPlaceholder('搜索历史记录', { exact: true })
       await search.fill('读取失败')
       await page.getByText('历史记录加载失败', { exact: true }).waitFor()
@@ -151,15 +168,38 @@ export function createHistoryRecordScenarios(deps) {
         await page.locator('.ant-table-tbody tr[data-row-key]').count(),
         0
       )
-      assert.equal(
-        await page
-          .getByRole('button', { name: '查看详情', exact: true })
-          .isEnabled(),
-        false
-      )
+      await page.locator('.erp-business-selection-action-bar').waitFor({ state: 'hidden' })
+      assert.equal(await page.getByRole('dialog').count(), 0, '读取失败后关闭旧记录详情')
+      const failedQuery = page.historyRequests.at(-1)
+      assert.equal(failedQuery.keyword, '读取失败')
       await page.getByRole('button', { name: '重新加载', exact: true }).click()
       await table.getByText('HISTORY-001', { exact: true }).waitFor()
+      assert.deepEqual(
+        page.historyRequests.at(-1),
+        failedQuery,
+        '重新加载应沿用失败查询的来源、关键词和分页'
+      )
+      await page.getByText('历史记录加载失败', { exact: true }).waitFor({ state: 'hidden' })
+      await assertUnselectedActions(page)
+      await table.getByText('HISTORY-001', { exact: true }).click()
+      await page.getByRole('button', { name: '查看详情', exact: true }).click()
+      const recoveredDetail = page.getByRole('dialog')
+      await recoveredDetail.getByText('HISTORY-001', { exact: true }).waitFor()
+      assert.equal(await recoveredDetail.getByText('HISTORY-051', { exact: true }).count(), 0)
+      await page.getByRole('button', { name: '关闭', exact: true }).click()
+      await page.getByRole('button', { name: '清空已选', exact: true }).click()
+      await assertUnselectedActions(page)
+      await search.fill('没有匹配的历史记录')
+      await page.getByText('当前筛选没有匹配的历史记录', { exact: true }).waitFor()
+      await page.locator('.erp-business-selection-action-bar').waitFor({ state: 'hidden' })
+      assert.equal(await table.locator('tr[data-row-key]').count(), 0)
+      const slowRequest = page.waitForRequest((request) =>
+        request.url().includes('/rpc/masterdata') &&
+        request.postDataJSON()?.method === 'list_customers' &&
+        request.postDataJSON()?.params?.keyword === '慢查询'
+      )
       await search.fill('慢查询')
+      await slowRequest
       await search.fill('HISTORY-201')
       await table.getByText('HISTORY-201', { exact: true }).waitFor()
       await delay(550)
@@ -167,8 +207,14 @@ export function createHistoryRecordScenarios(deps) {
         await page.locator('.ant-table-tbody tr[data-row-key]').count(),
         1
       )
+      await assertUnselectedActions(page)
+      await table.getByText('HISTORY-201', { exact: true }).click()
+      await page.getByRole('button', { name: '查看详情', exact: true }).click()
+      await page.getByRole('dialog').getByText('HISTORY-201', { exact: true }).waitFor()
+      await page.getByRole('button', { name: '关闭', exact: true }).click()
       await search.fill('')
       await table.getByText('HISTORY-001', { exact: true }).waitFor()
+      await assertUnselectedActions(page)
       await assertNoHorizontalOverflow(page, 'history-records-list-recovery')
     },
   }
@@ -240,7 +286,7 @@ export function createHistoryRecordScenarios(deps) {
         const source = page.getByRole('combobox', { name: '历史记录类型', exact: true })
         const sourceControl = page.locator('.ant-select').filter({ has: source }).locator('.ant-select-selector')
         const table = page.locator('.ant-table-tbody')
-        await table.getByText('HISTORY-051', { exact: true }).click()
+        await table.getByText('HISTORY-021', { exact: true }).click()
         await assertQueryLayout(page)
         await sourceControl.click()
         const options = page.locator('.ant-select-dropdown:visible')

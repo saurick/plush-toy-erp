@@ -7,7 +7,7 @@ import { installTestDOM, registerJSXTestLoader } from '../../../../scripts/test/
 test('date and time selections update the controlled value without confirmation or closing', async (t) => {
   const dom = installTestDOM()
   registerJSXTestLoader()
-  const [{ createRoot }, { DateInput, DateTimeInput }] = await Promise.all([import('react-dom/client'), import('./BusinessListLayout.jsx')])
+  const [{ createRoot }, { DateInput, DateTimeInput }] = await Promise.all([import('react-dom/client'), import('./BusinessDateInputs.jsx')])
   const node = document.createElement('div')
   document.body.appendChild(node)
   const root = createRoot(node)

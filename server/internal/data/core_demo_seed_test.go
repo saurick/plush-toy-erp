@@ -415,7 +415,7 @@ func TestSeedCoreDemoDataRejectsForeignRouteOwnerBeforeWrites(t *testing.T) {
 			{Code: "EA", Name: "个", Precision: 0},
 		},
 		Products: []CoreDemoProductSeed{
-			{Code: "SIM-TEST-PROD", Name: "演示产品", DefaultUnitCode: "EA"},
+			{Code: "SIM-TEST-PROD", Name: "毛绒小熊", DefaultUnitCode: "EA"},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
 			{Code: "SIM-TEST-FG", Name: "成品仓", Type: "FINISHED_GOODS"},
@@ -467,10 +467,10 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 			{Code: "EA", Name: "个", Precision: 0},
 		},
 		Materials: []CoreDemoMaterialSeed{
-			{Code: "SIM-TEST-MAT", Name: "演示材料", Category: "fabric", StockCategory: "MAIN", DefaultUnitCode: "EA"},
+			{Code: "SIM-TEST-MAT", Name: "短毛绒", Category: "fabric", StockCategory: "MAIN", DefaultUnitCode: "EA"},
 		},
 		Products: []CoreDemoProductSeed{
-			{Code: "SIM-TEST-PROD", Name: "演示产品", StyleNo: "SIM-TEST-STYLE", DefaultUnitCode: "EA"},
+			{Code: "SIM-TEST-PROD", Name: "毛绒小熊", StyleNo: "SIM-TEST-STYLE", DefaultUnitCode: "EA"},
 		},
 		Warehouses: []CoreDemoWarehouseSeed{
 			{Code: "SIM-TEST-FG", Name: "成品仓", Type: "FINISHED_GOODS"},
@@ -495,10 +495,10 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 		WithArgs("EA", "个", 0).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
 	mock.ExpectQuery("INSERT INTO materials").
-		WithArgs("SIM-TEST-MAT", "演示材料", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), 11, "MAIN").
+		WithArgs("SIM-TEST-MAT", "短毛绒", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), 11, "MAIN").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
 	mock.ExpectQuery("INSERT INTO products").
-		WithArgs("SIM-TEST-PROD", "演示产品", sqlmock.AnyArg(), sqlmock.AnyArg(), 11).
+		WithArgs("SIM-TEST-PROD", "毛绒小熊", sqlmock.AnyArg(), sqlmock.AnyArg(), 11).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(31))
 	mock.ExpectQuery("INSERT INTO warehouses").
 		WithArgs("SIM-TEST-FG", "成品仓", "FINISHED_GOODS").

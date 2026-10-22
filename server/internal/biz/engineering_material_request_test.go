@@ -44,3 +44,25 @@ func TestEngineeringMaterialNotesMatchStorageLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestEngineeringMaterialRejectionReasonAndStage(t *testing.T) {
+	uc := NewSalesOrderUsecase(&materialNoteTestRepo{})
+	for _, tc := range []struct {
+		name, note, stage string
+		want              error
+	}{
+		{"missing reason", "", "BOSS", ErrMaterialRequestReviewReasonRequired},
+		{"blank reason", "  ", "FINANCE", ErrMaterialRequestReviewReasonRequired},
+		{"unknown stage", "请重新核对用量", "UNKNOWN", ErrBadParam},
+		{"reason supplied", "请重新核对用量", "BOSS", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := uc.ReviewEngineeringMaterialRequest(t.Context(), &EngineeringMaterialReview{
+				ID: 1, ExpectedVersion: 1, ActorID: 2, Action: "REJECT", ReviewStage: tc.stage, Note: &tc.note,
+			})
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("error = %v, want %v", err, tc.want)
+			}
+		})
+	}
+}

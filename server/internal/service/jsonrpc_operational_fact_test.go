@@ -82,26 +82,27 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 		name    string
 		err     error
 		message string
+		code    int32
 	}{
-		{name: "shipment source", err: biz.ErrShipmentSourceMismatch, message: "出货来源与销售订单、客户或订单行不一致，请刷新来源后重试"},
-		{name: "order inactive", err: biz.ErrShipmentOrderNotActive, message: "销售订单尚未生效或已关闭，不能确认出货"},
-		{name: "shipment quantity", err: biz.ErrShipmentQuantityExceeded, message: "本次出货将超过销售订单行剩余可出货数量"},
-		{name: "reservation split", err: biz.ErrShipmentReservationSplit, message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"},
-		{name: "reservation source", err: biz.ErrStockReservationSourceMismatch, message: "库存预留与销售订单或订单行不一致，请刷新来源后重试"},
-		{name: "reservation quantity", err: biz.ErrStockReservationQuantityExceeded, message: "预留数量与已出货数量合计超过销售订单行数量"},
-		{name: "shipment quality pending", err: biz.ErrShipmentQualityPending, message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"},
-		{name: "shipment quality rejected", err: biz.ErrShipmentQualityRejected, message: "该出货单的出货前成品检验不合格，请先完成质量处置"},
-		{name: "shipment release rejected", err: biz.ErrShipmentReleaseRejected, message: "出货放行任务已退回，请取消当前出货单后重新登记"},
-		{name: "shipment cancellation process active", err: biz.ErrShipmentCancellationProcessActive, message: "该出货单仍有进行中的成品出货流程，请先完成流程后再取消"},
-		{name: "shipment cancellation task active", err: biz.ErrShipmentCancellationTaskActive, message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"},
-		{name: "outsourcing quality pending", err: biz.ErrOutsourcingReturnQualityPending, message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"},
-		{name: "outsourcing quality rejected", err: biz.ErrOutsourcingReturnQualityRejected, message: "该委外回货质检不合格，请先完成返工、退回等质量处置"},
-		{name: "production rework execution", err: biz.ErrProductionReworkExecutionDependency, message: "返工批次已经开始、拆分、流转、质检或补完工，不能再取消；请按当前返工进度继续办理"},
+		{name: "shipment source", err: biz.ErrShipmentSourceMismatch, code: errcode.InvalidParam.Code, message: "出货来源与销售订单、客户或订单行不一致，请刷新来源后重试"},
+		{name: "order inactive", err: biz.ErrShipmentOrderNotActive, code: errcode.BusinessRuleViolation.Code, message: "销售订单尚未生效或已关闭，不能确认出货"},
+		{name: "shipment quantity", err: biz.ErrShipmentQuantityExceeded, code: errcode.BusinessRuleViolation.Code, message: "本次出货将超过销售订单行剩余可出货数量"},
+		{name: "reservation split", err: biz.ErrShipmentReservationSplit, code: errcode.BusinessRuleViolation.Code, message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"},
+		{name: "reservation source", err: biz.ErrStockReservationSourceMismatch, code: errcode.InvalidParam.Code, message: "库存预留与销售订单或订单行不一致，请刷新来源后重试"},
+		{name: "reservation quantity", err: biz.ErrStockReservationQuantityExceeded, code: errcode.BusinessRuleViolation.Code, message: "预留数量与已出货数量合计超过销售订单行数量"},
+		{name: "shipment quality pending", err: biz.ErrShipmentQualityPending, code: errcode.BusinessRuleViolation.Code, message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"},
+		{name: "shipment quality rejected", err: biz.ErrShipmentQualityRejected, code: errcode.BusinessRuleViolation.Code, message: "该出货单的出货前成品检验不合格，请先完成质量处置"},
+		{name: "shipment release rejected", err: biz.ErrShipmentReleaseRejected, code: errcode.BusinessRuleViolation.Code, message: "出货放行任务已退回，请取消当前出货单后重新登记"},
+		{name: "shipment cancellation process active", err: biz.ErrShipmentCancellationProcessActive, code: errcode.BusinessRuleViolation.Code, message: "该出货单仍有进行中的成品出货流程，请先完成流程后再取消"},
+		{name: "shipment cancellation task active", err: biz.ErrShipmentCancellationTaskActive, code: errcode.BusinessRuleViolation.Code, message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"},
+		{name: "outsourcing quality pending", err: biz.ErrOutsourcingReturnQualityPending, code: errcode.BusinessRuleViolation.Code, message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"},
+		{name: "outsourcing quality rejected", err: biz.ErrOutsourcingReturnQualityRejected, code: errcode.BusinessRuleViolation.Code, message: "该委外回货质检不合格，请先完成返工、退回等质量处置"},
+		{name: "production rework execution", err: biz.ErrProductionReworkExecutionDependency, code: errcode.BusinessRuleViolation.Code, message: "返工批次已经开始、拆分、流转、质检或补完工，不能再取消；请按当前返工进度继续办理"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := dispatcher.mapOperationalFactError(context.Background(), tt.err)
-			if result.Code != errcode.InvalidParam.Code || result.Message != tt.message {
+			if result.Code != tt.code || result.Message != tt.message {
 				t.Fatalf("unexpected result: %#v", result)
 			}
 		})
@@ -361,7 +362,7 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions(t *te
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createWithItemsRes == nil || createWithItemsRes.Code != errcode.InvalidParam.Code {
+	if createWithItemsRes == nil || createWithItemsRes.Code != errcode.ResourceNotFound.Code {
 		t.Fatalf("expected usecase to run after shipment create-with-items permission, got %#v", createWithItemsRes)
 	}
 
@@ -435,7 +436,7 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only shipments create rejected, got %#v", createRes)
 	}
 	if repo.createShipmentWithItemsCalls != 0 {
@@ -503,14 +504,14 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if shipReadOnlyRes == nil || shipReadOnlyRes.Code != errcode.InvalidParam.Code {
+	if shipReadOnlyRes == nil || shipReadOnlyRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected inventory read_only ship rejected, got %#v", shipReadOnlyRes)
 	}
 	_, cancelReadOnlyRes, err := j.handleOperationalFact(ctx, "cancel_shipment", "inventory-read-only-cancel", mustJSONRPCStruct(t, map[string]any{"id": 100}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if cancelReadOnlyRes == nil || cancelReadOnlyRes.Code != errcode.InvalidParam.Code {
+	if cancelReadOnlyRes == nil || cancelReadOnlyRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected inventory read_only cancel rejected, got %#v", cancelReadOnlyRes)
 	}
 	if repo.shipShipmentCalls != 1 || repo.cancelShipmentCalls != 1 {
@@ -530,7 +531,7 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 		if err != nil {
 			t.Fatalf("workflow %s cancel transport error: %v", workflowState, err)
 		}
-		if result == nil || result.Code != errcode.InvalidParam.Code {
+		if result == nil || result.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("workflow %s must reject shipment cancel, got %#v", workflowState, result)
 		}
 		if repo.cancelShipmentCalls != 1 {
@@ -564,7 +565,7 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only finance create rejected, got %#v", createRes)
 	}
 	if repo.createFinanceFactCalls != 0 {
@@ -660,7 +661,7 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
-		if res == nil || res.Code != errcode.InvalidParam.Code {
+		if res == nil || res.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("%s expected disabled finance rejected, got %#v", tc.method, res)
 		}
 	}
@@ -948,7 +949,7 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if missingCreateRes == nil || missingCreateRes.Code != errcode.InvalidParam.Code {
+	if missingCreateRes == nil || missingCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected missing production module create rejected, got %#v", missingCreateRes)
 	}
 	if repo.createProductionFactCalls != 0 {
@@ -974,7 +975,7 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if readOnlyCreateRes == nil || readOnlyCreateRes.Code != errcode.InvalidParam.Code {
+	if readOnlyCreateRes == nil || readOnlyCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only production create rejected, got %#v", readOnlyCreateRes)
 	}
 
@@ -1035,7 +1036,7 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
-		if res == nil || res.Code != errcode.InvalidParam.Code {
+		if res == nil || res.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("%s expected disabled production rejected, got %#v", tc.method, res)
 		}
 	}
@@ -1208,7 +1209,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 	if err != nil {
 		t.Fatalf("read_only workflow gate transport error: %v", err)
 	}
-	if blocked == nil || blocked.Code != errcode.InvalidParam.Code || repo.postProductionFactCalls != 0 {
+	if blocked == nil || blocked.Code != errcode.BusinessRuleViolation.Code || repo.postProductionFactCalls != 0 {
 		t.Fatalf("rework post bypassed workflow module gate: result=%#v calls=%d", blocked, repo.postProductionFactCalls)
 	}
 	_, cancelBlocked, err := j.handleOperationalFact(
@@ -1220,7 +1221,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 	if err != nil {
 		t.Fatalf("read_only workflow cancel gate transport error: %v", err)
 	}
-	if cancelBlocked == nil || cancelBlocked.Code != errcode.InvalidParam.Code || repo.cancelProductionFactCalls != 0 {
+	if cancelBlocked == nil || cancelBlocked.Code != errcode.BusinessRuleViolation.Code || repo.cancelProductionFactCalls != 0 {
 		t.Fatalf("rework cancel bypassed workflow module gate: result=%#v calls=%d", cancelBlocked, repo.cancelProductionFactCalls)
 	}
 
@@ -1268,7 +1269,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 	if err != nil {
 		t.Fatalf("disabled workflow cancel gate transport error: %v", err)
 	}
-	if disabledCancel == nil || disabledCancel.Code != errcode.InvalidParam.Code || repo.cancelProductionFactCalls != 1 {
+	if disabledCancel == nil || disabledCancel.Code != errcode.BusinessRuleViolation.Code || repo.cancelProductionFactCalls != 1 {
 		t.Fatalf("disabled rework cancel bypassed workflow module gate: result=%#v calls=%d", disabledCancel, repo.cancelProductionFactCalls)
 	}
 }
@@ -1464,7 +1465,7 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if missingCreateRes == nil || missingCreateRes.Code != errcode.InvalidParam.Code {
+	if missingCreateRes == nil || missingCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected missing outsourcing module create rejected, got %#v", missingCreateRes)
 	}
 	if repo.createOutsourcingMaterialIssueCalls != 0 {
@@ -1490,7 +1491,7 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if readOnlyCreateRes == nil || readOnlyCreateRes.Code != errcode.InvalidParam.Code {
+	if readOnlyCreateRes == nil || readOnlyCreateRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only outsourcing create rejected, got %#v", readOnlyCreateRes)
 	}
 
@@ -1558,7 +1559,7 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
-		if res == nil || res.Code != errcode.InvalidParam.Code {
+		if res == nil || res.Code != errcode.BusinessRuleViolation.Code {
 			t.Fatalf("%s expected disabled outsourcing rejected, got %#v", tc.method, res)
 		}
 	}
@@ -1593,7 +1594,7 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only inventory create reservation rejected, got %#v", createRes)
 	}
 	if repo.createStockReservationCalls != 0 {
@@ -1671,7 +1672,7 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 	if err != nil {
 		t.Fatalf("release_stock_reservation expected nil err, got %v", err)
 	}
-	if disabledReleaseRes == nil || disabledReleaseRes.Code != errcode.InvalidParam.Code {
+	if disabledReleaseRes == nil || disabledReleaseRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("release_stock_reservation expected disabled inventory rejected, got %#v", disabledReleaseRes)
 	}
 	if repo.releaseStockReservationCalls != 1 {

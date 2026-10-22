@@ -1,5 +1,6 @@
-import { Alert, Button, Select, Typography } from 'antd'
+import { Alert, Button, Typography } from 'antd'
 import { CopyOutlined, ArrowRightOutlined } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import { ReleaseApplySummary } from './ReleaseApplySummary.jsx'
 import { CommandList, FormalGateItem, copyText } from './presentation.jsx'
@@ -29,33 +30,36 @@ export function ReleasePanel({
         <Text type="secondary">
           选择证据批次，检查正式配置是否就绪；通过后交接执行器。
         </Text>
-        <div className="erp-dev-customer-release-input">
-          <label htmlFor="customer-config-release-batch">发布证据批次</label>
-          <Select
-            id="customer-config-release-batch"
-            aria-label="选择发布证据批次"
-            disabled={disabled || batches.length === 0}
-            value={releaseBatch || undefined}
-            placeholder={batches.length ? '选择已登记批次' : '暂无可选批次'}
-            loading={releaseBatchesState.status === 'loading'}
-            options={batches.map((value) => ({ value, label: value }))}
-            onChange={onReleaseBatchChange}
-          />
-          <Button
-            type="primary"
-            loading={releaseState.status === 'checking'}
-            disabled={
-              disabled ||
-              !importSummary.canCheckReleaseReadiness ||
-              !releaseBatch
-            }
-            onClick={onCheckReleaseReadiness}
-          >
-            {releaseState.status === 'idle'
-              ? '检查发布条件'
-              : '重新检查发布条件'}
-          </Button>
-        </div>
+        {batches.length > 0 ? (
+          <div className="erp-dev-customer-release-input">
+            <label htmlFor="customer-config-release-batch">发布证据批次</label>
+            <Select
+              id="customer-config-release-batch"
+              aria-label="选择发布证据批次"
+              disabled={disabled || batches.length === 0}
+              value={releaseBatch || undefined}
+              placeholder={batches.length ? '选择已登记批次' : '暂无可选批次'}
+              loading={releaseBatchesState.status === 'loading'}
+              options={batches.map((value) => ({ value, label: value }))}
+              onChange={onReleaseBatchChange}
+            />
+            <Button
+              type="primary"
+              loading={releaseState.status === 'checking'}
+              disabled={
+                disabled ||
+                !importSummary.canCheckReleaseReadiness ||
+                !releaseBatch
+              }
+              onClick={onCheckReleaseReadiness}
+            >
+              {releaseState.status === 'idle'
+                ? '检查发布条件'
+                : '重新检查发布条件'}
+            </Button>
+          </div>
+        ) : null}
+        {releaseBatchesState.status === 'loading' ? <Text role="status">正在读取发布证据批次</Text> : null}
         {releaseBatchesState.status === 'error' ? (
           <Alert
             type="error"
@@ -83,14 +87,17 @@ export function ReleasePanel({
           <div>
             <strong>客户配置生效</strong>
             <p>由受控执行器确认目标环境、应用正式配置并读回结果。</p>
-            <Button
-              icon={<CopyOutlined aria-hidden="true" />}
-              disabled={!passed || disabled}
-              onClick={() => copyText(importSummary.releaseApply.command)}
-            >
-              复制配置执行器模板
-            </Button>
-            {!passed ? <small>本次发布检查通过后可复制</small> : null}
+            {passed ? (
+              <Button
+                icon={<CopyOutlined aria-hidden="true" />}
+                disabled={disabled}
+                onClick={() => copyText(importSummary.releaseApply.command)}
+              >
+                复制配置执行器模板
+              </Button>
+            ) : (
+              <small>本次发布检查通过后可复制执行器模板</small>
+            )}
           </div>
           <div>
             <strong>服务器版本部署</strong>

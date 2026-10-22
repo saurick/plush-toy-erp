@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,76 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent/enttest"
 )
+
+func TestWorkflowTaskDisplayContextProductionBatch(t *testing.T) {
+	f := openProductionWIPQualityTestFixture(t, "workflow_display_wip")
+	product := createSalesOrderTestProduct(t, f.ctx, f.client, f.unitID, "WIP-DISPLAY-P", true)
+	f.productID = product.ID
+	batch := f.createWaitingBatch(t, "DISPLAY", []string{biz.ProductionWIPQualityGateFinishedGoods})
+	product.Update().SetStyleNo("WIP-DISPLAY-STYLE").SaveX(f.ctx)
+	batch.item.Update().SetProductNameSnapshot("批次投产时的小熊").SetProductCodeSnapshot("WIP-SNAPSHOT-P").SaveX(f.ctx)
+	primary := f.client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(product.ID).SetAttachmentType("product_image").SetSlotKey("primary").SetFileName("wip-product.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(f.ctx)
+	in, err := biz.BuildFulfillmentTask("production_exception", batch.batch.ID, batch.batch.BatchNo, "/erp/production/orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.Payload["source_task_intent_hash"] = strings.Repeat("a", 64)
+	row := f.client.WorkflowTask.Create().SetTaskCode(in.TaskCode).SetTaskName(in.TaskName).SetTaskGroup(in.TaskGroup).SetSourceType(in.SourceType).SetSourceID(in.SourceID).SetSourceNo(*in.SourceNo).SetOwnerRoleKey(in.OwnerRoleKey).SetRequiredCapabilityKey(*in.RequiredCapabilityKey).SetTaskStatusKey("ready").SetPayload(in.Payload).SaveX(f.ctx)
+	repo := NewWorkflowRepo(f.data, log.NewStdLogger(io.Discard))
+	read := func() *biz.WorkflowTaskDisplayContext {
+		t.Helper()
+		task, readErr := repo.GetWorkflowTask(f.ctx, row.ID)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		return task.DisplayContext
+	}
+	context := read()
+	if context == nil || !context.Available || context.SourceNo != batch.batch.BatchNo || len(context.Items) != 1 {
+		t.Fatalf("batch identity=%#v", context)
+	}
+	item := context.Items[0]
+	if item.ProductID != product.ID || item.ProductID == batch.batch.ID || item.Name != "批次投产时的小熊" || item.Code != "WIP-SNAPSHOT-P" || item.StyleNo != "WIP-DISPLAY-STYLE" || item.ImageAttachmentID != primary.ID {
+		t.Fatalf("batch product identity=%#v", item)
+	}
+	for _, keyword := range []string{batch.batch.BatchNo, "批次投产时的小熊", "WIP-SNAPSHOT-P", "WIP-DISPLAY-STYLE"} {
+		items, total, searchErr := repo.ListWorkflowTasks(f.ctx, biz.WorkflowTaskFilter{Keyword: keyword, Limit: 10})
+		if searchErr != nil || total != 1 || len(items) != 1 || items[0].ID != row.ID {
+			t.Fatalf("batch search %q total=%d items=%d err=%v", keyword, total, len(items), searchErr)
+		}
+		page, searchErr := repo.ListWorkflowRoleTaskView(f.ctx, biz.WorkflowRoleTaskViewQuery{RoleKey: "sales", ViewKey: "todo", Keyword: keyword, Limit: 10, IncludeCounts: true, SnapshotAt: time.Now()})
+		if searchErr != nil || page.Counts == nil || page.Counts.Todo != 1 || len(page.Items) != 1 || page.Items[0].DisplayContext == nil {
+			t.Fatalf("mobile batch search %q page=%#v err=%v", keyword, page, searchErr)
+		}
+	}
+	f.client.BusinessAttachment.DeleteOne(primary).ExecX(f.ctx)
+	if read().Items[0].ImageAttachmentID != 0 {
+		t.Fatal("cleared batch product image retained")
+	}
+	other := createSalesOrderTestProduct(t, f.ctx, f.client, f.unitID, "WIP-REPLACED-P", true)
+	batch.item.Update().SetProductID(other.ID).ClearProductNameSnapshot().ClearProductCodeSnapshot().SaveX(f.ctx)
+	if got := read().Items[0]; got.ProductID != other.ID || got.Name != other.Name || got.Code != other.Code || got.ImageAttachmentID != 0 || got.StyleNo != "" {
+		t.Fatalf("batch product replacement retained stale values=%#v", got)
+	}
+	row.Update().SetPayload(map[string]any{"product_name": "不可信任务快照"}).SaveX(f.ctx)
+	if got := read(); got != nil {
+		t.Fatalf("unbound batch revealed identity=%#v", got)
+	}
+	_, total, err := repo.ListWorkflowTasks(f.ctx, biz.WorkflowTaskFilter{Keyword: other.Code, Limit: 10})
+	if err != nil || total != 0 {
+		t.Fatalf("unbound batch leaked through search: total=%d err=%v", total, err)
+	}
+	missingID := batch.batch.ID + 10000
+	in, err = biz.BuildFulfillmentTask("production_exception", missingID, "WIP-MISSING", "/erp/production/orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.Payload["source_task_intent_hash"] = strings.Repeat("b", 64)
+	row.Update().SetSourceID(missingID).SetTaskCode(in.TaskCode).SetPayload(in.Payload).SaveX(f.ctx)
+	if got := read(); got == nil || got.Available || len(got.Items) != 0 || got.SourceNo != "" {
+		t.Fatalf("missing batch retained stale identity=%#v", got)
+	}
+}
 
 func TestWorkflowTaskDisplayContextSourceIdentityAndSearch(t *testing.T) {
 	ctx := context.Background()

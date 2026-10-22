@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentSubflow, buildSubflowMermaid } from './devFulfillmentSubflow.mjs'
-import { buildFulfillmentExceptionDirectory, buildFulfillmentOverview, getFulfillmentStageContext, getFulfillmentSupplement, selectFulfillmentSubstep } from './devFulfillmentPresentation.mjs'
+import { buildFulfillmentExceptionDirectory, buildFulfillmentOverview, getFulfillmentStageContext, getFulfillmentSupplement, selectFulfillmentSubstep, selectFulfillmentException } from './devFulfillmentPresentation.mjs'
 
 const steps = catalog.fulfillment_flow
 const step = (key) => steps.find((item) => item.stage === key)
@@ -57,7 +57,7 @@ test('the exception directory exposes sources without a main-flow entry and neve
   assert(directory.some((item) => item.guide.key === 'over_issue' && item.roleMatch))
   assert(directory.some((item) => item.guide.key === 'outsourcing_rejection'))
   assert(directory.some((item) => item.guide.key === 'posted_purchase'))
-  assert(directory.every((item) => !item.related), 'unregistered stage associations stay unknown')
+  assert.deepEqual(directory.filter((item) => item.related).map((item) => item.guide.key), ['over_issue'], 'the handling catalog supplies the independent shortcut without inventing an entry stage')
   for (const item of directory) assert.equal(item.guide, catalog.exception_guides.find((guide) => guide.key === item.guide.key))
   const related = buildFulfillmentExceptionDirectory(catalog.exception_guides, 'engineering', 'incoming_quality')
   assert.equal(related[0].guide.key, 'purchase_rejection')
@@ -83,4 +83,27 @@ test('supplementary instructions retain uncovered source text without repeating 
   const selected = buildFulfillmentSubflow(issue).nodes.find((node) => node.key === 'issue')
   assert.deepEqual(selected.details.map((detail) => detail.reference), ['handoff:2', 'result'])
   assert.equal(selected.details.find((detail) => detail.reference === 'handoff:2').text, issue.handoffs[2])
+})
+
+test('all registered plans preserve current business continuations, with no default multi-plan or global origin', () => {
+  for (const guide of catalog.exception_guides) {
+    const empty = selectFulfillmentException({ guideKey: guide.key })
+    assert.equal(empty.plan?.key || null, guide.plans.length === 1 ? guide.plans[0].key : null)
+    assert.equal(empty.origin, null)
+    for (const plan of guide.plans) {
+      for (const originStage of [...guide.entry_stages, undefined]) {
+        const selection = selectFulfillmentException({ guideKey: guide.key, planKey: plan.key, originStage })
+        assert.equal(selection.plan, plan)
+        assert(selection.steps.length)
+        assert.equal(selection.origin?.stage, originStage)
+        assert.equal(selection.reentryStage?.stage, plan.continuation.reentry?.stage)
+        if (plan.continuation.kind === 'stop') assert.equal(selection.returnStage, null)
+        if (!originStage && ['origin', 'next'].includes(plan.continuation.target)) assert.equal(selection.returnStage, null)
+      }
+    }
+  }
+  assert.equal(selectFulfillmentException({ guideKey: 'production_quality', planKey: 'original_rework', originStage: 'shell_quality' }).returnStage.stage, 'shell_quality')
+  assert.equal(selectFulfillmentException({ guideKey: 'production_quality', planKey: 'concession', originStage: 'cutting_quality' }).returnStage.stage, 'sewing_execute')
+  assert(selectFulfillmentException({ guideKey: 'production_quality', originStage: 'sales_order' }).invalid)
+  assert(selectFulfillmentException({ guideKey: 'purchase_rejection', planKey: 'scrap' }).invalid)
 })

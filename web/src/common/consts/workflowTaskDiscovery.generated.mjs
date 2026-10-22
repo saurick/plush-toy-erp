@@ -2041,13 +2041,6 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     sources: Object.freeze(['inventory_operation']),
   }), Object.freeze({
     chain: 'collaboration',
-    group: '模拟任务',
-    key: 'simulation',
-    label: '模拟验收任务',
-    module: 'collaboration',
-    sources: Object.freeze(['simulated-manual-acceptance-task-batch']),
-  }), Object.freeze({
-    chain: 'collaboration',
     group: '业务跟进',
     groups: Object.freeze(['business_followup']),
     key: 'followup',

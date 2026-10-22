@@ -1,3 +1,5 @@
+import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { writeFile } from 'node:fs/promises'
 
 async function verifyOrderDirection({ assert, frame, exception, exceptionExpanded = true }) {
@@ -78,8 +80,8 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       assert(navigation.labels.every((label) => label.fits), `预览入口文字不应重叠：${JSON.stringify(navigation)}`)
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       if (mobile) {
-        await frame.locator('[data-action="open-mobile-tasks"]').click()
-        await frame.getByLabel('预览身份', { exact: true }).selectOption('admin')
+        await openUIDesignMobileTasks(frame)
+        await chooseSelectOption(frame.getByLabel('预览身份', { exact: true }), 'admin')
       }
       else await frame.locator('[data-action="board-status"][data-value="all"]').click()
       if (!mobile) {
@@ -161,7 +163,7 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       await open('H05', '手工成品正式入库')
       assert.equal(await field('counted').inputValue(), '', '实点数量不得默认代填')
       await field('counted').fill('239')
-      await field('warehouse').selectOption('finished')
+      await chooseSelectOption(field('warehouse'), 'finished')
       await submit()
       await frame.getByRole('alert').waitFor()
       await field('counted').fill('240')
@@ -169,12 +171,12 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       await frame.getByText(/成品仓库存增加 240/u).waitFor()
       await close()
       await open('H09', '办理成品质量关口')
-      await field('inspection').selectOption('passed')
+      await chooseSelectOption(field('inspection'), 'passed')
       await submit()
       await close()
       await open('H06', '查货与包装')
-      await field('checked').selectOption('passed')
-      await field('packing').selectOption('packed')
+      await chooseSelectOption(field('checked'), 'passed')
+      await chooseSelectOption(field('packing'), 'packed')
       await submit()
       await frame.getByText(/库存仍为 240/u).waitFor()
       await close()
@@ -183,12 +185,12 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       await frame.getByText(/业务已办理 240/u).waitFor()
       await close()
       await open('H07', '决定裁片异常处理方案')
-      await field('plan').selectOption('switch')
-      await field('supplier').selectOption('original')
+      await chooseSelectOption(field('plan'), 'switch')
+      await chooseSelectOption(field('supplier'), 'original')
       await field('note').fill('尺寸不符，由另一加工厂重新加工并复检。')
       await submit()
       await frame.getByRole('alert').filter({ hasText: '其他加工厂' }).waitFor()
-      await field('supplier').selectOption('replacement')
+      await chooseSelectOption(field('supplier'), 'replacement')
       await submit()
       await frame.getByText(/尚未执行库存处置/u).waitFor()
       const geometry = await frame.locator(mobile ? '.role-mobile-device' : '.drawer-body').evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth }))

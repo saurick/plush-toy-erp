@@ -20,6 +20,7 @@ func (WorkflowTask) Annotations() []schema.Annotation {
 		entsql.Annotation{Checks: map[string]string{
 			"workflow_tasks_status_allowed":          "task_status_key IN ('ready', 'blocked', 'done', 'rejected', 'withdrawn')",
 			"workflow_tasks_version_positive":        "version > 0",
+			"workflow_tasks_source_paired":           "((source_type IS NULL AND source_id IS NULL) OR (source_type IS NOT NULL AND length(trim(source_type)) > 0 AND source_id IS NOT NULL AND source_id > 0))",
 			"workflow_tasks_process_anchors_paired":  "((process_instance_id IS NULL AND process_node_instance_id IS NULL) OR (process_instance_id IS NOT NULL AND process_node_instance_id IS NOT NULL))",
 			"workflow_tasks_urge_count_non_negative": "urge_count >= 0",
 			"workflow_tasks_create_intent_bundle":    "((create_idempotency_key IS NULL AND create_intent_hash IS NULL) OR (create_idempotency_key IS NOT NULL AND create_intent_hash IS NOT NULL AND created_by IS NOT NULL AND length(trim(create_idempotency_key)) BETWEEN 1 AND 128 AND length(create_intent_hash) = 64))",
@@ -38,12 +39,14 @@ func (WorkflowTask) Fields() []ent.Field {
 		field.String("task_name").
 			NotEmpty().
 			MaxLen(128),
-		// source_* points to the workflow source object; it must not be treated as a fact ledger.
+		// Present source_* fields point to one workflow source object; independent tasks leave the pair empty.
 		field.String("source_type").
+			Optional().
 			NotEmpty().
 			MaxLen(64).
 			Comment("业务来源类型，如 project_order、material_bom、inbound"),
 		field.Int("source_id").
+			Optional().
 			Positive().
 			Comment("业务来源记录 ID"),
 		field.String("source_no").

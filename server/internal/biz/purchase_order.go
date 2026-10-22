@@ -265,7 +265,7 @@ func (uc *PurchaseOrderUsecase) UpdatePurchaseOrder(ctx context.Context, id int,
 		return nil, err
 	}
 	if !corestatus.IsPurchaseOrderEditable(current.LifecycleStatus) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	normalized, err := normalizePurchaseOrderMutation(*in, false)
 	if err != nil {
@@ -399,7 +399,7 @@ func (uc *PurchaseOrderUsecase) UpdatePurchaseOrderItem(ctx context.Context, id 
 		return nil, err
 	}
 	if current.LineStatus == PurchaseOrderItemStatusCanceled || current.LineStatus == PurchaseOrderItemStatusClosed {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	normalized, err := normalizePurchaseOrderItemMutation(*in)
 	if err != nil {
@@ -430,7 +430,7 @@ func (uc *PurchaseOrderUsecase) RemovePurchaseOrderItem(ctx context.Context, id 
 		return current, nil
 	}
 	if current.LineStatus == PurchaseOrderItemStatusClosed {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	if err := uc.validateOpenPurchaseOrder(ctx, current.PurchaseOrderID); err != nil {
 		return nil, err
@@ -451,7 +451,7 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 			return nil, err
 		}
 		if !corestatus.IsPurchaseOrderEditable(current.LifecycleStatus) {
-			return nil, ErrBadParam
+			return nil, ErrSourceOrderStateInvalid
 		}
 	}
 	if id == 0 {
@@ -492,8 +492,11 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 			if err != nil {
 				return nil, err
 			}
-			if current.PurchaseOrderID != id || current.LineStatus == PurchaseOrderItemStatusCanceled || current.LineStatus == PurchaseOrderItemStatusClosed {
+			if current.PurchaseOrderID != id {
 				return nil, ErrBadParam
+			}
+			if current.LineStatus == PurchaseOrderItemStatusCanceled || current.LineStatus == PurchaseOrderItemStatusClosed {
+				return nil, ErrSourceOrderStateInvalid
 			}
 		}
 		mutation := item.PurchaseOrderItemMutation
@@ -544,7 +547,7 @@ func (uc *PurchaseOrderUsecase) changePurchaseOrderLifecycle(ctx context.Context
 		return nil, err
 	}
 	if !IsPurchaseOrderLifecycleTransitionAllowed(current.LifecycleStatus, next) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	if current.LifecycleStatus == next {
 		return current, nil
@@ -574,7 +577,7 @@ func (uc *PurchaseOrderUsecase) openPurchaseOrder(ctx context.Context, id int) (
 		return nil, err
 	}
 	if !corestatus.IsPurchaseOrderEditable(order.LifecycleStatus) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	return order, nil
 }

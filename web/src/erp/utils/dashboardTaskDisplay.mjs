@@ -10,7 +10,6 @@ import {
 } from './workflowDocumentRefs.mjs'
 
 const TASK_SOURCE_TITLE_MAP = new Map([
-  ['simulated-manual-acceptance-task-batch', '模拟验收任务'],
   ['engineering_material_request', '工程用料审批'],
   ['purchase_receipt', '采购收货单'],
   ['quality_inspection', '质量检验'],
@@ -193,15 +192,8 @@ export function getWorkflowTaskSourceTypeLabel(
   return TASK_SOURCE_TITLE_MAP.get(normalizedSourceType) || fallback
 }
 
-export function formatWorkflowTaskListSource(task = {}) {
-  const source = formatWorkflowTaskSource(task)
-  return source === '任务记录' && (task.payload?.simulated_only === true || task.source_type === 'simulated-manual-acceptance-task-batch') ? '模拟任务' : source
-}
-
 export function getWorkflowTaskSourceNo(task = {}) {
   if (
-    task?.payload?.simulated_only === true ||
-    task.source_type === 'simulated-manual-acceptance-task-batch' ||
     (task.display_context && task.display_context.available !== true)
   ) {
     return ''
@@ -220,12 +212,6 @@ export function getWorkflowTaskSourceNo(task = {}) {
 export function formatWorkflowTaskSource(task = {}) {
   if (task.display_context && task.display_context.available !== true) {
     return '关联单据已不可用'
-  }
-  if (
-    task?.payload?.simulated_only === true ||
-    String(task.source_type || '') === 'simulated-manual-acceptance-task-batch'
-  ) {
-    return '任务记录'
   }
   const sourceType = String(task.source_type || '').trim()
   const sourceTitle = getWorkflowTaskSourceTypeLabel(sourceType, '')

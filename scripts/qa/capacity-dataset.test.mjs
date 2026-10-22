@@ -25,8 +25,7 @@ test("capacity SQL stays simulated, fixed-size, and leaves Fact rows draft", () 
   assert.match(sql, /'CUSTOMER'/u);
   assert.match(sql, /'DUE_ON_OCCURRENCE'/u);
   assert.match(sql, /due_at/u);
-  assert.match(sql, /'simulated_only', true/u);
-  assert.match(sql, /'real_customer_data', false/u);
+  assert.doesNotMatch(sql, /simulated_only|real_customer_data|trial_task/u);
   assert.match(sql, /'DRAFT'/u);
   assert.match(sql, /'production_ready'/u);
   assert.doesNotMatch(sql, /\bUPDATE\b|\bDELETE\b|INSERT INTO business_attachments/u);

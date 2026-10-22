@@ -174,7 +174,7 @@ export function createWorkflowModuleSelectionScenarios(deps) {
           try {
             await taskRow(page, readyID).waitFor({ state: 'visible' })
             const hint = page.locator(
-              '.erp-business-selection-action-bar--placeholder:visible'
+              '.erp-business-selection-action-bar--empty:visible'
             )
             await hint.waitFor({ state: 'visible' })
             const commandHeight = await page
@@ -461,7 +461,7 @@ export function createWorkflowModuleSelectionScenarios(deps) {
         .filter({ hasText: 'BOM-STYLE-L1' })
       await draft.waitFor({ state: 'visible' })
       await page
-        .locator('.erp-business-selection-action-bar--placeholder:visible')
+        .locator('.erp-business-selection-action-bar--empty:visible')
         .waitFor({ state: 'visible' })
       assert.equal(await actionBar(page).count(), 1)
       await draft.getByRole('checkbox').check()
@@ -582,7 +582,7 @@ export function createWorkflowModuleSelectionScenarios(deps) {
       },
       verify: async (page) => {
         const hint = page.locator(
-          '.erp-business-selection-action-bar--placeholder:visible'
+          '.erp-business-selection-action-bar--empty:visible'
         )
         try {
           await page
@@ -605,7 +605,7 @@ export function createWorkflowModuleSelectionScenarios(deps) {
             await hint.waitFor({ state: 'visible' })
             const geometry = await hint.evaluate((node) => {
               const text = node.querySelector(
-                '.erp-business-selection-action-bar__placeholder-text'
+                '.erp-business-selection-action-bar__tag'
               )
               const panel = node.closest('.erp-business-operation-panel')
               const table = panel
@@ -633,7 +633,9 @@ export function createWorkflowModuleSelectionScenarios(deps) {
               'query controls have no duplicate guidance'
             )
             assert.equal(await actionBar(page).count(), 1)
-            assert.equal(await hint.getByRole('button').count(), 0)
+            const commands = hint.locator('button:not(.erp-business-selection-action-bar__compact-more):visible')
+            assert(await commands.count() > 0, '未选择时保留已有动作')
+            assert.equal(await commands.evaluateAll((buttons) => buttons.every((button) => button.disabled)), true)
             assert.equal(geometry.clipped, false)
             assert.ok(
               getContrastRatio(

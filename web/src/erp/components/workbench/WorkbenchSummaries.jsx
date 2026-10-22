@@ -1,6 +1,6 @@
 import React from 'react'
-import { Select } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
 import SalesOrderSummaryPanel from './SalesOrderSummaryPanel.jsx'
 import EngineeringMaterialSummaryPanel from './EngineeringMaterialSummaryPanel.jsx'
@@ -11,6 +11,9 @@ function SummaryTypeControl({ options, selected, onChange }) {
     <div className="erp-workbench-summaries__heading">
       {options.length > 1 ? (
         <Select
+          allowClear={false}
+          label="汇总类型"
+          placeholder="汇总类型"
           aria-label="汇总类型"
           value={selected}
           options={options}

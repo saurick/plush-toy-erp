@@ -93,6 +93,7 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
     core: Object.freeze([
       "scripts/qa/manual-acceptance-core-contract.mjs",
       "scripts/qa/manual-acceptance-source-data.mjs",
+      "scripts/qa/seed-business-values.mjs",
       "scripts/qa/manual-acceptance-target-policy.mjs",
     ]),
     baseline: Object.freeze([
@@ -106,12 +107,14 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
     source: Object.freeze([
       "scripts/qa/manual-acceptance-core-contract.mjs",
       "scripts/qa/manual-acceptance-source-data.mjs",
+      "scripts/qa/seed-business-values.mjs",
       "scripts/qa/manual-acceptance-source-driven-facts.mjs",
     ]),
-    task: Object.freeze(["scripts/qa/manual-acceptance-task-data.mjs"]),
+    task: Object.freeze(["scripts/qa/manual-acceptance-task-data.mjs", "scripts/qa/seed-business-values.mjs"]),
     facts: Object.freeze([
       "web/src/erp/utils/numeric20Scale6.mjs",
       "scripts/qa/manual-acceptance-fact-data.mjs",
+      "scripts/qa/seed-business-values.mjs",
       "scripts/qa/manual-acceptance-exception-chain-data.mjs",
       "scripts/qa/manual-acceptance-engineering-data.mjs",
       "scripts/qa/manual-acceptance-attachment-data.mjs",
@@ -122,10 +125,13 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
       "scripts/qa/manual-acceptance-fact-report-contract.mjs",
     ]),
     attachments: Object.freeze([
+      "scripts/qa/manual-acceptance-task-data.mjs",
       "scripts/qa/manual-acceptance-account-identities.mjs",
       "scripts/qa/manual-acceptance-attachment-data.mjs",
+      "scripts/qa/seed-business-values.mjs",
     ]),
     readiness: Object.freeze([
+      "scripts/qa/manual-acceptance-task-data.mjs",
       "web/src/erp/utils/numeric20Scale6.mjs",
       "scripts/qa/manual-acceptance-exception-chain-data.mjs",
       "scripts/qa/manual-acceptance-catalog.mjs",

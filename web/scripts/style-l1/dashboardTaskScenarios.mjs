@@ -10,6 +10,19 @@ import { createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
 import { createTaskTrackingFilterScenarios } from './taskTrackingFilterScenarios.mjs'
 import { workflowExceptionScenario } from './workflowExceptionScenario.mjs'
 
+async function assertNarrowScreenAccountAccess(page) {
+  await page.getByRole('button', { name: '打开导航菜单', exact: true }).click()
+  const navigation = page.locator('.erp-admin-drawer')
+  const account = navigation.getByRole('button', { name: '账号菜单：系统管理员', exact: true })
+  await account.click()
+  const appearance = page.getByRole('menuitem', { name: '外观与密度', exact: true })
+  await appearance.waitFor({ state: 'visible' })
+  await account.click()
+  await appearance.waitFor({ state: 'hidden' })
+  await page.keyboard.press('Escape')
+  await navigation.waitFor({ state: 'hidden' })
+}
+
 export function createDashboardTaskScenarios({
   expectText,
   expectHeading,
@@ -287,7 +300,15 @@ export function createDashboardTaskScenarios({
         await moreFilters.click()
         const extraFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         const statusChoices = extraFilters.getByRole('group', { name: '任务状态', exact: true })
-        assert.deepEqual(await statusChoices.getByRole('button').allTextContents(), ['全部状态', '已驳回', '已撤回', '已完成'])
+        assert.deepEqual(await statusChoices.getByRole('button').allTextContents(), ['不限', '已驳回', '已撤回', '已完成'])
+        await statusChoices.getByRole('button', { name: '不限', exact: true, pressed: true }).waitFor()
+        await statusChoices.getByRole('button', { name: '已完成', exact: true }).click()
+        await page.waitForFunction(
+          () => new URLSearchParams(location.search).get('status') === 'done'
+        )
+        await statusChoices.getByRole('button', { name: '不限', exact: true }).click()
+        await page.waitForFunction(() => !new URLSearchParams(location.search).has('status'))
+        await statusChoices.getByRole('button', { name: '不限', exact: true, pressed: true }).waitFor()
         await statusChoices.getByRole('button', { name: '已完成', exact: true }).click()
         await page.waitForFunction(
           () => new URLSearchParams(location.search).get('status') === 'done'
@@ -481,16 +502,17 @@ export function createDashboardTaskScenarios({
             .click()
           await expectText(page, '审批详情')
           await expectText(page, '出货单 · SHIP-L1-501')
-          const approvalResponsibility = page.locator(
-            '.erp-task-action-drawer .workflow-task-current__responsibility'
-          )
+          const approvalResponsibility = page.getByRole('region', { name: '当前任务', exact: true })
           await expectText(approvalResponsibility, '财务')
           await expectText(approvalResponsibility, '由岗位人员处理')
+          const taskInformation = page.locator('.erp-task-action-drawer .workflow-task-info-card__details')
+          await taskInformation.locator('summary').click()
           const arrival = page.locator(
             '.erp-task-action-drawer [data-task-time="arrived"]'
           )
           assert.equal(await arrival.locator('dt').innerText(), '进入岗位')
           assert.match(await arrival.locator('dd').innerText(), /^财务 · /u)
+          await taskInformation.locator('summary').click()
           await assertTextAbsent(page, 'PROC-701-NODE-702-A1')
           await assertTextAbsent(page, '核对审批事项')
           await assertTextAbsent(page, '当前状态')
@@ -523,7 +545,7 @@ export function createDashboardTaskScenarios({
         }
         await expectText(page, '本任务处理记录')
         await expectText(page, '等待审批人核对来源单据与放行条件')
-        await page.getByRole('region', { name: '当前任务', exact: true }).getByRole('heading', { name: '当前办理', exact: true }).waitFor()
+        await page.getByRole('region', { name: '当前任务', exact: true }).getByText('负责岗位', { exact: true }).waitFor()
         await expectText(page, '出货财务放行')
         await expectText(page, '办理中')
         const taskEventTrail = page.getByTestId('workflow-task-event-trail')
@@ -558,7 +580,12 @@ export function createDashboardTaskScenarios({
             taskEventTrailMetrics
           )}`
         )
-        await expectText(taskEventTrail, '最近在前')
+        await taskEventTrail.getByRole('list', { name: '本任务处理记录，最近在前，按时间倒序', exact: true }).waitFor()
+        assert.deepEqual(
+          await taskEventTrail.locator('.workflow-task-event-trail__item-head > strong').allTextContents(),
+          ['任务信息已更新', '审批已发起'],
+          '处理记录按实际时间倒序展示'
+        )
         await taskEventTrail.screenshot({
           path: path.resolve(outputDir, 'erp-task-board-task-event-trail.png'),
         })
@@ -578,7 +605,7 @@ export function createDashboardTaskScenarios({
             const items = [
               ...element.querySelectorAll('.workflow-process-stage__item'),
             ]
-            const geometry = items.map((item, index) => {
+            const geometry = items.map((item) => {
               const marker = item.querySelector(
                 '.workflow-process-stage__marker'
               )
@@ -662,16 +689,16 @@ export function createDashboardTaskScenarios({
         await expectText(taskAttachmentAction, '附件（1）')
         const taskAttachmentActionMetrics = await taskAttachmentAction.evaluate(
           (button) => ({
-            insideResources: Boolean(
-              button.closest('.erp-task-action-drawer__resources')
+            insideFooter: Boolean(
+              button.closest('.erp-task-action-drawer__footer')
             ),
             height: button.getBoundingClientRect().height,
           })
         )
         assert(
-          taskAttachmentActionMetrics.insideResources &&
+          taskAttachmentActionMetrics.insideFooter &&
             taskAttachmentActionMetrics.height >= 32,
-          `电脑端任务附件应是任务摘要内的资料动作: ${JSON.stringify(
+          `电脑端任务附件应在固定底栏保持可操作: ${JSON.stringify(
             taskAttachmentActionMetrics
           )}`
         )
@@ -1249,8 +1276,8 @@ export function createDashboardTaskScenarios({
         )
         assert.equal(
           await page.locator('.ant-table-tbody > tr[data-task-code]').count(),
-          8,
-          '聚焦任务泳道每页应显示八条任务'
+          20,
+          '聚焦任务泳道默认每页应显示二十条任务'
         )
         const secondPageButton = page.locator(
           '.erp-task-pagination .ant-pagination-item-2'
@@ -1380,8 +1407,8 @@ export function createDashboardTaskScenarios({
             (request) => request,
             (error) => error
           )
-        await taskPager.getByText('20 条/页', { exact: true }).click()
-        await page.getByText('100 条/页', { exact: true }).click()
+        await taskPager.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible').getByText('100 条/页', { exact: true }).click()
         const changedPageSizeRequest = await pageSizeRead
         if (changedPageSizeRequest instanceof Error) {
           throw changedPageSizeRequest
@@ -1430,8 +1457,8 @@ export function createDashboardTaskScenarios({
           await route.fallback()
         }
         await page.route('**/rpc/workflow', failedPageSizeRoute)
-        await taskPager.getByText('100 条/页', { exact: true }).click()
-        await page.getByText('20 条/页', { exact: true }).click()
+        await taskPager.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible').getByText('20 条/页', { exact: true }).click()
         await page
           .locator('.ant-alert')
           .filter({ hasText: '任务管理加载失败' })
@@ -1464,6 +1491,7 @@ export function createDashboardTaskScenarios({
               .querySelector('.erp-admin-content')
               .getBoundingClientRect()
             return {
+              sharedCompact: Boolean(nav.querySelector('.app-pagination.ant-pagination-mini')),
               visible: rect.top >= content.top && rect.bottom <= content.bottom,
               overflow: nav.scrollWidth - nav.clientWidth,
               buttons: [
@@ -1480,13 +1508,12 @@ export function createDashboardTaskScenarios({
             pagerLayout.visible && pagerLayout.overflow <= 1,
             `${width}px 分页栏应在视口内且不溢出: ${JSON.stringify(pagerLayout)}`
           )
-          const targetSize = width < 768 ? 44 : 36
           assert(
-            pagerLayout.buttons.every(
+            pagerLayout.sharedCompact && pagerLayout.buttons.length === 2 && pagerLayout.buttons.every(
               (button) =>
-                button.width >= targetSize && button.height >= targetSize
+                button.width >= 24 && button.height >= 24
             ),
-            `${width}px 翻页按钮应有足够点击范围: ${JSON.stringify(pagerLayout)}`
+            `${width}px 翻页按钮应使用共享紧凑尺寸: ${JSON.stringify(pagerLayout)}`
           )
           await page.screenshot({
             path: path.resolve(outputDir, `erp-task-pagination-${width}.png`),
@@ -1610,11 +1637,15 @@ export function createDashboardTaskScenarios({
         const taskDrawer = page.locator('.erp-task-action-drawer')
         await taskDrawer.waitFor({ state: 'visible', timeout: 10_000 })
         await assertTaskMenuCopy(
-          page, taskDrawer, '产品信息',
+          page,
+          taskDrawer,
+          '产品信息',
           ['产品：长耳兔抱枕', '产品编号：PLUSH-RABBIT', '内部款号：RB-018']
         )
         await assertTaskMenuCopy(
-          page, taskDrawer, '任务信息',
+          page,
+          taskDrawer,
+          '任务信息',
           [
             '任务：看板跳转测试任务',
             '产品：长耳兔抱枕',
@@ -2267,9 +2298,7 @@ export function createDashboardTaskScenarios({
       auth: 'admin',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await page
-          .getByRole('button', { name: /^账号菜单：系统管理员/u })
-          .waitFor({ state: 'visible' })
+        await assertNarrowScreenAccountAccess(page)
         await page
           .getByRole('region', { name: '工作台', exact: true })
           .waitFor({ state: 'visible' })
@@ -2342,9 +2371,7 @@ export function createDashboardTaskScenarios({
         })
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '移动端任务处理回归')
-        await page
-          .getByRole('button', { name: /^账号菜单：系统管理员/u })
-          .waitFor({ state: 'visible' })
+        await assertNarrowScreenAccountAccess(page)
         await page
           .getByRole('region', { name: '任务管理', exact: true })
           .waitFor({ state: 'visible' })
@@ -2460,7 +2487,7 @@ export function createDashboardTaskScenarios({
         })
         await assertThemeReadable(page, {
           scenarioName: 'erp-dashboard-dark-desktop',
-          selector: '.erp-admin-header',
+          selector: '.erp-page-actions',
         })
         await assertThemeReadable(page, {
           scenarioName: 'erp-dashboard-dark-desktop',

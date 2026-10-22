@@ -19,7 +19,7 @@ const formalBusinessListCases = [
   {
     title: '销售订单',
     path: '../pages/SalesOrdersPage.jsx',
-    completeList: /listAllSalesOrders\(orderListParams,\s*\{ signal \}\)/u,
+    completeList: /return exportSalesOrders\([\s\S]*?routeSelectedID > 0 \? \{ id: routeSelectedID \} : orderListParams,[\s\S]*?\{ signal \}/u,
   },
   {
     title: '采购订单',

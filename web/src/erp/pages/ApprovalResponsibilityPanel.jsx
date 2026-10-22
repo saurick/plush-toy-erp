@@ -14,13 +14,14 @@ import {
   InputNumber,
   Radio,
   Popover,
-  Select,
   Space,
   Switch,
   Tag,
   Tooltip,
   Typography,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
+import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
@@ -269,6 +270,8 @@ export default function ApprovalResponsibilityPanel({
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [settings, setSettings] = useState(null)
+  const tableCardRef = useRef(null)
+  const sticky = useBusinessListStickyHeader(tableCardRef, active && Boolean(settings))
   const [draftItems, setDraftItems] = useState([])
   const [revision, setRevision] = useState('')
   const [preview, setPreview] = useState(null)
@@ -937,7 +940,9 @@ export default function ApprovalResponsibilityPanel({
 
   return (
     <Card
-      className="erp-permission-section erp-permission-section--approvals"
+      ref={tableCardRef}
+      data-page-table-region
+      className={`erp-permission-section erp-permission-section--approvals${sticky ? ' erp-business-data-table-card--sticky' : ''}`}
       variant="borderless"
       loading={loading}
       aria-busy={saving}
@@ -967,7 +972,7 @@ export default function ApprovalResponsibilityPanel({
 
       {settings ? (
         <>
-          <div className="erp-approval-responsibility__header">
+          <div className="erp-approval-responsibility__header" data-page-table-toolbar>
             <div>
               <Title level={5}>审批责任</Title>
               <Text type="secondary">
@@ -1030,6 +1035,7 @@ export default function ApprovalResponsibilityPanel({
           ) : null}
 
           <Table
+            sticky={sticky}
             className="erp-approval-responsibility__table"
             rowKey="approval_key"
             columns={columns}
@@ -1133,7 +1139,7 @@ export default function ApprovalResponsibilityPanel({
                     label="门槛币种"
                     rules={[{ required: true, message: '请选择币种' }]}
                   >
-                    <Select options={BUSINESS_CURRENCY_OPTIONS} />
+                    <Select placeholder="请选择门槛币种" options={BUSINESS_CURRENCY_OPTIONS} />
                   </Form.Item>
                   <Form.Item
                     name="approval_amount"
@@ -1275,6 +1281,7 @@ export default function ApprovalResponsibilityPanel({
                 initialValue="role"
               >
                 <Select
+                  placeholder="请选择由谁承接"
                   options={[
                     { value: 'role', label: '岗位内任一员工' },
                     { value: 'user', label: '指定一名员工' },

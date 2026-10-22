@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Select } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { renderProductOption } from '../master-data/ProductIdentity.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'

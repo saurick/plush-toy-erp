@@ -3,7 +3,7 @@
     "id": "handbook:start",
     "book": "business",
     "title": "开始使用",
-    "source_hash": "4517367f0ff6f78a45c53ff761a5851d8665ff5db6b5c065ed340671c09425d4",
+    "source_hash": "46df2d6136848432020e28f8105f178025a3fca88f0107c15ce891f72ad10a56",
     "path": "",
     "roles": [],
     "supplement": true
@@ -1742,7 +1742,7 @@
     "id": "manual:administration:master-data-and-trial",
     "book": "administration",
     "title": "基础资料与试用数据",
-    "source_hash": "9d88967d3a65b9cf092f086abee4947796ba3e5b3cf8619206ade36d5acf5c9c",
+    "source_hash": "7147bf87838179c5cce6a23139c96f94fa7375a6efc58b0f82ca19a43949841c",
     "supplement": true
   },
   {
@@ -1896,7 +1896,7 @@
     "id": "manual:operations:documentation",
     "book": "operations",
     "title": "手册、帮助与持续维护",
-    "source_hash": "68228efbfa38a1722438c1a40469cdbd8dce2a984cdb8b2cf4ca1bd95df15259",
+    "source_hash": "6bc34c4fb556ff13578392b6cf41fe704fc0bfcfd270975284beb5d9f4cb019f",
     "supplement": true
   },
   {

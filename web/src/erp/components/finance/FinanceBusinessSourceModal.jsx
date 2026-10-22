@@ -1,7 +1,7 @@
 import React from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,

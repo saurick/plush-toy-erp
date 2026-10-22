@@ -50,6 +50,7 @@ export default function AlertDialog({
 
   return (
     <AppModal
+      variant="panel"
       open={open}
       onClose={onClose}
       busy={confirming}

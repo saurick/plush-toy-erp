@@ -1,54 +1,21 @@
 import React from 'react'
 import { Button, Tag } from 'antd'
 import DevTimestamp from '../DevTimestamp.jsx'
-import {
-  VIEW_ITEMS,
-  formatQualityGateDuration,
-  getQualityGateStatusMeta,
-} from '../../config/devQualityGates.mjs'
-import {
-  shortCommit,
-  operationDuration,
-  SERVER_EVIDENCE_STATUS,
-} from '../../config/qualityGatePresentation.mjs'
+import { getQualityGateStatusMeta } from '../../config/devQualityGates.mjs'
+import { shortCommit } from '../../config/qualityGatePresentation.mjs'
 
 export function OperationStatusTag({ operation }) {
   const meta = getQualityGateStatusMeta(operation?.status || 'missing')
   return <Tag color={meta.tone}>{meta.label}</Tag>
 }
 
-export function ContextStrip({ summary, view, summaryError, onReturnLocal }) {
-  const serverEvidence = summary?.serverEvidence
-  const serverStatus = serverEvidence
-    ? SERVER_EVIDENCE_STATUS[serverEvidence.status] ||
-      SERVER_EVIDENCE_STATUS.unavailable
-    : summaryError
-      ? SERVER_EVIDENCE_STATUS.pageUnavailable
-      : SERVER_EVIDENCE_STATUS.loading
-  const serverLabel = serverEvidence?.pipeline?.id
-    ? `${serverStatus.label} · #${serverEvidence.pipeline.id}`
-    : serverStatus.label
-  const strictProof = summary?.proofs?.strict
-  const strictStatus =
-    summary?.currentOperation?.profile === 'strict'
-      ? `${getQualityGateStatusMeta(summary.currentOperation.status).label} ${formatQualityGateDuration(operationDuration(summary.currentOperation))}`
-      : strictProof?.current
-        ? `当前版本${getQualityGateStatusMeta(strictProof.status).label}`
-        : strictProof?.receipt
-          ? `旧版本${getQualityGateStatusMeta(strictProof.status).label}`
-          : '尚未运行'
-  const viewLabel = VIEW_ITEMS.find((item) => item.value === view)?.label
-
+export function ContextStrip({ summary, view, onReturnLocal }) {
   return (
     <section
       className="erp-dev-quality-context"
       aria-label="当前质量门禁上下文"
     >
       <dl>
-        <div>
-          <dt>当前视图</dt>
-          <dd>{viewLabel}</dd>
-        </div>
         <div>
           <dt>当前版本</dt>
           <dd>{shortCommit(summary?.repository?.commit)}</dd>
@@ -62,14 +29,6 @@ export function ContextStrip({ summary, view, summaryError, onReturnLocal }) {
                 ? '干净'
                 : '未核实'}
           </dd>
-        </div>
-        <div>
-          <dt>GitLab CI</dt>
-          <dd>{serverLabel}</dd>
-        </div>
-        <div>
-          <dt>本机诊断</dt>
-          <dd>{strictStatus || '尚未运行'}</dd>
         </div>
         <div>
           <dt>统计读取于</dt>

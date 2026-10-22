@@ -15,16 +15,18 @@ export const DEV_TESTING_FIXED_ACTIONS = Object.freeze([
     key: 'fast',
     priority: 'P0',
     label: '运行开发门禁',
+    shortLabel: '开发门禁',
     description:
-      '执行带回执的 fast 门禁，覆盖静态守卫、关键合同、Web 检查与服务端快速测试。',
+      '静态守卫、关键合同、Web 与服务端快速检查。',
     boundary: '不包含 PostgreSQL、真实业务浏览器、目标环境部署或客户 UAT。',
   }),
   Object.freeze({
     key: 'role-access',
     priority: 'P1',
     label: '岗位权限与任务可见性巡检',
+    shortLabel: '岗位权限',
     description:
-      '九岗位真实登录，验证允许读取、越权写入被拒绝、前后任务总量不串权。',
+      '九岗位登录、读取范围与越权拦截。',
     boundary:
       '需要本地后端与演示账号凭据；预期业务写入为零，不等于完整角色协同闭环。',
   }),
@@ -32,15 +34,17 @@ export const DEV_TESTING_FIXED_ACTIONS = Object.freeze([
     key: 'field-linkage',
     priority: 'P1',
     label: '字段联动专项',
+    shortLabel: '字段联动',
     description:
-      '验证字段来源、覆盖、清空、列表回显及打印合同，并原子更新专项报告。',
+      '字段来源、覆盖、清空、回显与打印。',
     boundary: '不连接数据库、不启动真实业务浏览器，也不代替端到端验收。',
   }),
   Object.freeze({
     key: 'rpc-examples',
     priority: 'P1',
     label: '接口文档样例执行核对',
-    description: '将登记的文档请求送入真实 Go handler 夹具，核对实际返回与主要字段投影。',
+    shortLabel: '接口样例',
+    description: '文档请求与真实 handler 返回对照。',
     boundary: '仅覆盖登记的隔离服务夹具，不连接业务数据库，不外推为全部接口或业务事务通过。',
   }),
 ])

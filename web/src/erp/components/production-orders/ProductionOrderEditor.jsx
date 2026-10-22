@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react'
-import { Alert, Button, Form, Input, Select, Space, Switch, Tag } from 'antd'
+import { Alert, Button, Form, Input, Space, Switch, Tag } from 'antd'
 import {
   DeleteOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -19,7 +20,7 @@ import BusinessLineItemsFooter, {
   BusinessLineItemsHeader,
 } from '../business-list/BusinessLineItemsFooter.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import ProductionOrderReferenceSelect from './ProductionOrderReferenceSelect.jsx'
 import { isProductionMaterialIssueEligible } from '../../utils/productionMaterialIssueAction.mjs'
 import {
@@ -171,7 +172,11 @@ function ProductionMaterialRequirementsPanel({
   return (
     <BusinessFormSection title="物料需求与领料" layout="content">
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Alert showIcon {...alert} />
+        {alert.type === 'warning' ? (
+          <Alert showIcon {...alert} />
+        ) : (
+          <div className="erp-business-inline-note" role="status">{alert.message}</div>
+        )}
         {requirements.length > 0 ? (
           <Table
             rowKey="id"
@@ -400,6 +405,7 @@ function RowReference({
             }}
           >
             <Select
+              placeholder="请选择生产路线"
               disabled={readOnly}
               options={[
                 {

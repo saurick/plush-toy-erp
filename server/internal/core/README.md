@@ -2,7 +2,9 @@
 
 `server/internal/core` 只承载稳定、纯粹、可复用、无 IO 的产品领域规则。它不是第二套 `biz`，不是第二套 `data`，也不是 JSON-RPC、HTTP 或部署入口。
 
-当前状态：已建立边界文档、import guard、第一批低风险值对象 / 领域错误、当前出货三态状态机、当前库存批次 `ACTIVE / HOLD / REJECTED / DISABLED` 状态机、采购入库 / 采购退货 / 采购入库调整单 `DRAFT / POSTED / CANCELLED` 过账单据状态机、来料质检 `DRAFT / SUBMITTED / PASSED / REJECTED / CANCELLED` 状态机、销售订单 `draft / submitted / active / closed / canceled` 生命周期状态机，以及当前库存可用量纯计算：`available = balance - active_reserved`。已替换 `biz/data` 中明确重复的纯校验、出货状态判断、库存批次状态迁移判断、采购过账单据重复动作判断、质检状态判断、销售订单生命周期判断和库存预留可用量公式；其他状态机、计算器或应用编排不迁入；不接 runtime，不改 schema / migration，不改变 JSON-RPC / 前端主路径。
+当前状态：已建立边界文档、import guard、第一批低风险值对象 / 领域错误、当前出货三态状态机、当前库存批次 `ACTIVE / HOLD / REJECTED / DISABLED` 状态机、采购入库 / 采购退货 / 采购入库调整单 `DRAFT / POSTED / CANCELLED` 过账单据状态机、来料质检 `DRAFT / SUBMITTED / PASSED / REJECTED / CANCELLED` 状态机、销售订单 `draft / submitted / active / closed / canceled` 生命周期状态机，以及当前库存可用量纯计算：`available = balance - active_reserved`。
+
+已替换 `biz/data` 中明确重复的纯校验、出货状态判断、库存批次状态迁移判断、采购过账单据重复动作判断、质检状态判断、销售订单生命周期判断和库存预留可用量公式；其他状态机、计算器或应用编排不迁入；不接 runtime，不改 schema / migration，不改变 JSON-RPC / 前端主路径。
 
 ## 允许放入
 

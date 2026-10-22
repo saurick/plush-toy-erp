@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { act, createElement } from 'react'
+import { installTestDOM, registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs'
 
 function readSource(relativePath) {
   return readFileSync(
@@ -9,6 +11,57 @@ function readSource(relativePath) {
     'utf8'
   )
 }
+
+test('standard AppModal preserves caller layout, accessible title, callbacks and footer', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { ConfigProvider }, { default: AppModal }] = await Promise.all([
+    import('react-dom/client'), import('antd'), import('./AppModal.jsx'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  let panel = null
+  let confirmed = 0
+  let cancelled = 0
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    dom.restore()
+  })
+  const props = {
+    open: true,
+    title: '共享标准弹窗',
+    width: 560,
+    panelRef: (node) => { panel = node },
+    className: 'contract-standard-modal',
+    centered: true,
+    okText: '执行检查',
+    onOk: () => { confirmed += 1 },
+    onCancel: () => { cancelled += 1 },
+    styles: { body: { padding: 17 } },
+  }
+  const render = async (extra = {}) => {
+    await act(async () => root.render(createElement(ConfigProvider,
+      { theme: { token: { motion: false } } },
+      createElement(AppModal, { ...props, ...extra }, '内容保持不变')
+    )))
+    await act(async () => new Promise(setImmediate))
+  }
+  await render()
+  const dialog = document.querySelector('.contract-standard-modal')
+  assert.equal(dialog.style.width, '560px')
+  assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent, '共享标准弹窗')
+  assert.equal(dialog.querySelector('.ant-modal-body').style.padding, '17px')
+  assert.equal(document.querySelectorAll('.app-modal-root').length, 0)
+  assert(panel)
+  await act(async () => dialog.querySelector('.ant-modal-footer .ant-btn-primary').click())
+  await act(async () => dialog.querySelector('.ant-modal-close').click())
+  assert.equal(confirmed, 1)
+  assert.equal(cancelled, 1)
+  await render({ footer: createElement('button', { type: 'button' }, '自定义关闭') })
+  assert.equal(dialog.querySelector('.ant-modal-footer').textContent, '自定义关闭')
+})
 
 test('AppModal: delegates overlay keyboard and focus containment to Ant Design Modal', () => {
   const source = readSource('./AppModal.jsx')

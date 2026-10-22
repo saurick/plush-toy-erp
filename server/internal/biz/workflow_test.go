@@ -178,6 +178,24 @@ func (s *stubWorkflowRepo) UpsertWorkflowBusinessState(_ context.Context, in *Wo
 	}, nil
 }
 
+func TestWorkflowUsecase_IndependentTaskSourcePair(t *testing.T) {
+	base := WorkflowTaskCreate{TaskCode: "TASK-INDEPENDENT", TaskGroup: "generic", TaskName: "核对包装要求", OwnerRoleKey: SalesRoleKey}
+	if _, err := normalizeWorkflowTaskCreate(base); err != nil {
+		t.Fatalf("independent task rejected: %v", err)
+	}
+	for _, input := range []WorkflowTaskCreate{
+		func() WorkflowTaskCreate { v := base; v.SourceType = "sales_order"; return v }(),
+		func() WorkflowTaskCreate { v := base; v.SourceID = 8; return v }(),
+		func() WorkflowTaskCreate { v := base; v.SourceID = -1; return v }(),
+		func() WorkflowTaskCreate { v := base; v.SourceNo = stringPtr("SO-001"); return v }(),
+		func() WorkflowTaskCreate { v := base; id := 1; v.ProcessInstanceID = &id; return v }(),
+	} {
+		if _, err := normalizeWorkflowTaskCreate(input); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("incomplete independent source was accepted: %#v err=%v", input, err)
+		}
+	}
+}
+
 func TestWorkflowUsecase_CreateTaskDefaultsReady(t *testing.T) {
 	repo := &stubWorkflowRepo{}
 	uc := NewWorkflowUsecase(repo)

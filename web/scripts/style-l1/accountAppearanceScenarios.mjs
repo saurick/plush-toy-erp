@@ -1,6 +1,7 @@
+import { openERPAppearance } from './themeAssertions.mjs'
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
-import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
+import { ERP_ACCENTS, WORKBENCH_APPEARANCE_STORAGE_KEY } from '../../src/common/theme/erpAppearance.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
@@ -129,6 +130,102 @@ export function createAccountAppearanceScenarios({
   const desktopSave = holdAppearanceSaves()
   const mobileSave = holdAppearanceSaves()
   return [
+    ...[false, true].map((standalone) => {
+      const saves = []
+      return {
+        auth: 'admin',
+        path: '/__dev/product-engineering',
+        name: standalone ? 'workbench-appearance-standalone-isolation' : 'workbench-appearance-account-isolation',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 2,
+        adminProfile: {
+          erp_preferences: {
+            appearance: { theme_mode: 'dark', accent: 'pink', density: 'standard', tableLines: 'simple' },
+          },
+        },
+        beforeNavigate: async (page) => {
+          page.on('request', (request) => {
+            if (request.url().endsWith('/rpc/admin') && request.method() === 'POST') {
+              const body = request.postDataJSON()
+              if (body.method === 'set_erp_appearance') saves.push(body.params)
+            }
+          })
+          if (standalone) {
+            await page.route('**/__dev/**', async (route) => {
+              if (route.request().resourceType() !== 'document') return route.fallback()
+              const response = await page.request.get(new URL('/workbench.html', route.request().url()).href)
+              assert.equal(response.status(), 200, '独立工作台 HTML 入口必须可用')
+              await route.fulfill({ response })
+            })
+          }
+        },
+        verify: async (page) => {
+          const expectAppearance = async (expected) => {
+            await page.waitForFunction((expected) => {
+              const root = document.documentElement.dataset
+              return root.erpThemeMode === expected.theme_mode &&
+                root.erpAccent === expected.accent && root.erpDensity === expected.density &&
+                root.erpTableLines === expected.tableLines
+            }, expected)
+          }
+          const initial = { theme_mode: 'system', accent: 'blue', density: 'compact', tableLines: 'grid' }
+          const chosen = { theme_mode: 'light', accent: 'teal', density: 'standard', tableLines: 'simple' }
+          await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
+          await expectAppearance(initial)
+          const accountBefore = await page.evaluate(() => localStorage.getItem('admin_erp_preferences'))
+          await openERPAppearance(page)
+          const dialog = page.getByRole('dialog', { name: '外观与密度' })
+          await dialog.getByRole('button', { name: '青绿', exact: true }).click()
+          await dialog.getByText('浅色', { exact: true }).click()
+          await dialog.getByText('标准', { exact: true }).click()
+          await dialog.getByText('简洁', { exact: true }).click()
+          await expectAppearance(chosen)
+          assert.deepEqual(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), WORKBENCH_APPEARANCE_STORAGE_KEY), chosen)
+          assert.equal(await page.evaluate(() => localStorage.getItem('admin_erp_preferences')), accountBefore)
+          assert.deepEqual(saves, [], '工作台操作不能写入 ERP 账号')
+          await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+          await page.reload()
+          await expectAppearance(chosen)
+          const nav = page.getByRole('navigation', { name: '开发页面导航' })
+          await nav.getByRole('link', { name: '质量验证', exact: true }).click()
+          await page.getByRole('heading', { name: '质量验证', exact: true }).waitFor()
+          await expectAppearance(chosen)
+          await page.goBack()
+          await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
+          await expectAppearance(chosen)
+
+          await page.goto(new URL('/erp/system/permissions', page.url()).href)
+          await expectAppearance({ theme_mode: 'dark', accent: 'pink', density: 'standard', tableLines: 'simple' })
+          await page.locator('.erp-admin-shell').waitFor({ state: 'visible' })
+          await openERPAppearance(page)
+          await dialog.getByRole('button', { name: '橙色', exact: true }).click()
+          await waitForSavedAppearance(page, { accent: 'orange' })
+          assert.deepEqual(saves, [{ accent: 'orange' }], 'ERP 自身仍按账号保存外观')
+          await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+          await page.goto(new URL('/__dev/product-engineering', page.url()).href)
+          await expectAppearance(chosen)
+          await openERPAppearance(page)
+          await dialog.getByText('跟系统', { exact: true }).click()
+          for (const colorScheme of ['dark', 'light']) {
+            await page.emulateMedia({ colorScheme })
+            await page.waitForFunction((scheme) => document.documentElement.dataset.erpTheme === scheme, colorScheme)
+          }
+          await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+          await expectAppearance({ ...chosen, theme_mode: 'system' })
+          await dialog.waitFor({ state: 'hidden' })
+          assert.deepEqual(saves, [{ accent: 'orange' }])
+          const geometry = await nav.evaluate((node) => ({
+            width: node.getBoundingClientRect().width,
+            overflow: document.documentElement.scrollWidth - innerWidth,
+            expandedGroups: node.querySelectorAll('.erp-dev-workspace-nav__secondary').length,
+          }))
+          assert.equal(geometry.width, 206)
+          assert(geometry.overflow <= 1, '独立偏好不得引入页面横向溢出')
+          assert.equal(geometry.expandedGroups, 3, '保持三个侧栏分组展开')
+        },
+      }
+    }),
     ...[
       {
         name: 'account-appearance-defaults',
@@ -196,9 +293,7 @@ export function createAccountAppearanceScenarios({
       },
       beforeNavigate: desktopSave.beforeNavigate,
       verify: async (page) => {
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
         for (const width of [3840, 1440]) {
           await page.setViewportSize({
@@ -273,9 +368,7 @@ export function createAccountAppearanceScenarios({
       ...desktop,
       name: 'account-appearance-desktop',
       verify: async (page) => {
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
         const primary = dialog.locator('.ant-modal-footer .ant-btn-primary')
         const primaryPaints = []
@@ -364,9 +457,7 @@ export function createAccountAppearanceScenarios({
           density: 'compact',
           tableLines: 'grid',
         })
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         await dialog.getByText('跟系统', { exact: true }).click()
         await waitForSavedAppearance(page, { theme_mode: 'system' })
         for (const colorScheme of ['light', 'dark']) {
@@ -407,9 +498,7 @@ export function createAccountAppearanceScenarios({
         })
       },
       verify: async (page) => {
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
         await dialog
           .getByRole('button', { name: ERP_ACCENTS.teal.label, exact: true })

@@ -1,5 +1,6 @@
 import React from 'react'
-import { Form, Input, Select } from 'antd'
+import { Form, Input } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 
 import { FinancePaymentKind } from '../../../common/consts/statuses.generated.mjs'
 import FinancePaymentSourceFields from './FinancePaymentSourceFields.jsx'
@@ -8,7 +9,7 @@ import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 
@@ -71,6 +72,7 @@ export function FinancePaymentEditor({
         ) : null}
         <Form.Item name="kind" label="款项用途" rules={[{ required: true }]}>
           <Select
+            placeholder="请选择款项用途"
             disabled={Boolean(refundSource || sourceContext)}
             options={
               refundSource
@@ -102,6 +104,7 @@ export function FinancePaymentEditor({
           rules={[{ required: true }]}
         >
           <Select
+            placeholder="请选择收付款方向"
             options={[
               { value: 'RECEIPT', label: '收款' },
               { value: 'DISBURSEMENT', label: '付款' },
@@ -123,6 +126,7 @@ export function FinancePaymentEditor({
           rules={[{ required: true, message: '请选择往来方' }]}
         >
           <Select
+            placeholder={partyIsCustomer ? '客户' : '供应商'}
             key={partyIsCustomer ? 'customer' : 'supplier'}
             showSearch
             optionFilterProp="label"
@@ -197,6 +201,7 @@ export function FinancePaymentEditor({
         </Form.Item>
         <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
           <Select
+            placeholder="请选择币种"
             disabled={paymentKind !== FinancePaymentKind.SETTLEMENT}
             options={BUSINESS_CURRENCY_OPTIONS}
           />

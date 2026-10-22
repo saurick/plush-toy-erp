@@ -50,6 +50,7 @@ export function createUnifiedInteractionScenarios({
     effectiveSession: customerRuntimeEffectiveSession,
     viewport: { width: 1440, height: 900 },
   }
+  let purchaseArrivalFail = false
   let recoveryMode
   let releaseRecovery
   let recoveryRequested
@@ -107,7 +108,8 @@ export function createUnifiedInteractionScenarios({
         await assertBusinessViewMotion(
           page,
           'inventory-distribution',
-          outputDir
+          outputDir,
+          { presentationSelector: '.erp-inventory-ledger-view-bar .ant-segmented-group' }
         )
         const panel = page.getByRole('region', {
           name: '仓库库存分布',
@@ -150,6 +152,11 @@ export function createUnifiedInteractionScenarios({
           )
         }
         await clickERPThemeOption(page, '暗色')
+        const navigationDrawer = page.locator('.erp-admin-drawer')
+        if (await navigationDrawer.isVisible()) {
+          await page.keyboard.press('Escape')
+          await navigationDrawer.waitFor({ state: 'hidden' })
+        }
         await captureBusinessView(
           page,
           panel,
@@ -448,15 +455,20 @@ export function createUnifiedInteractionScenarios({
       ...common,
       name: 'unified-purchase-interactions',
       path: '/erp/purchase/accessories',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
       beforeNavigate: async (page) => {
         await page.route('**/rpc/purchase_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           if (method !== 'list_purchase_orders') return route.fallback()
+          if (purchaseArrivalFail && !params.include_status_counts) {
+            return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id, error: { code: -32603, message: '计划读取失败' } }) })
+          }
           const orders = rows.map((row, index) => ({
             id: row.id,
             purchase_order_no: `PO-UI-${row.id}`,
             supplier_id: 1,
-            supplier_snapshot: { name: '交互验证供应商' },
+            supplier_snapshot: { name: index === 0 ? '交互验证供应商（加长名称与材料业务合作分公司）' : '交互验证供应商' },
             lifecycle_status: 'approved',
             version: 1,
             expected_arrival_date:
@@ -491,9 +503,50 @@ export function createUnifiedInteractionScenarios({
             .count(),
           1
         )
+        const geometry = await panel.locator('.erp-arrival-calendar__toolbar').evaluate((element) => {
+          const period = element.querySelector('.erp-arrival-calendar__period').getBoundingClientRect()
+          const filters = element.querySelector('.erp-arrival-calendar__filters').getBoundingClientRect()
+          return { height: element.getBoundingClientRect().height, delta: Math.abs(period.top - filters.top), dateWidth: element.querySelector('.erp-arrival-calendar__date-jump').getBoundingClientRect().width }
+        })
+        assert.ok(geometry.height < 70 && geometry.delta < 1 && geometry.dateWidth < 180, JSON.stringify(geometry))
+        assert.equal(await page.getByRole('button', { name: '表格工具', exact: true }).count(), 0)
+        assert.equal(await panel.getByRole('button', { name: /^全部\s*500/ }).getAttribute('aria-pressed'), 'true')
+        await page.screenshot({ path: `${outputDir}/purchase-arrival-default-4k.png`, fullPage: false })
+        await panel.getByText('全部确认状态', { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '供应商已确认' }).click()
+        await panel.getByRole('button', { name: /^全部\s*250/ }).waitFor()
+        assert.ok((await panel.locator('.erp-arrival-calendar__detail-head').innerText()).includes('250 张订单'))
+        const [download] = await Promise.all([
+          page.waitForEvent('download', { timeout: 12000 }),
+          panel.getByRole('button', { name: '导出当前结果', exact: true }).click({ timeout: 8000 }),
+        ])
+        const { readFile } = await import('node:fs/promises')
+        const csv = await readFile(await download.path(), 'utf8')
+        assert.equal(csv.trim().split('\n').length, 251, '导出应覆盖全部筛选结果，不受当前 25 行限制')
+        assert.ok(csv.includes('供应商已确认'))
+        assert.ok(!csv.includes('待供应商确认'))
+        await panel.getByRole('button', { name: '重置到货筛选', exact: true }).click()
+        await panel.locator('.ant-pagination-next button').click()
+        const selectedRow = panel.locator('.ant-table-tbody > tr[data-row-key]').first()
+        const selectedID = await selectedRow.getAttribute('data-row-key')
+        await selectedRow.click()
+        assert.equal(await page.locator('[data-business-action-key="print-contract"]').isEnabled(), true, '日历页第二页选单仍能打印')
+        await page.locator('[data-business-action-key="purchase-details"]').click()
+        const detail = page.getByRole('dialog').filter({ hasText: '采购订单详情' })
+        await detail.waitFor()
+        assert.ok((await detail.innerText()).includes(`PO-UI-${selectedID}`))
+        await detail.locator('.ant-modal-close').click()
+        await detail.waitFor({ state: 'hidden' })
+        await panel.locator('.ant-table-row-selected').waitFor()
+        await panel.getByRole('button', { name: '今天', exact: true }).click()
+        await panel.getByText('所选日期暂无到货安排', { exact: true }).waitFor()
+        assert.equal(await page.locator('[data-business-action-key="purchase-details"]').isEnabled(), false, '改变到货范围后不能继续操作旧选单')
+        assert.equal(await panel.getByRole('button', { name: '导出当前结果', exact: true }).isEnabled(), false)
+        assert.equal(await panel.locator('.ant-pagination').count(), 0)
+        await panel.getByRole('button', { name: '查看全部到货安排', exact: true }).click()
         await panel.getByRole('button', { name: /^全部\s*\d/ }).click()
         assert.equal(
-          await panel.locator('.erp-arrival-calendar__order').count(),
+          await panel.locator('.ant-table-tbody > tr[data-row-key]').count(),
           25
         )
         await panel
@@ -511,7 +564,7 @@ export function createUnifiedInteractionScenarios({
           .click()
         await panel.getByRole('button', { name: /^未填日期/ }).click()
         assert.equal(
-          await panel.locator('.erp-arrival-calendar__order').count(),
+          await panel.locator('.ant-table-tbody > tr[data-row-key]').count(),
           25
         )
         await page.getByText('订单列表', { exact: true }).click()
@@ -523,8 +576,18 @@ export function createUnifiedInteractionScenarios({
             .getAttribute('aria-pressed'),
           'true'
         )
-        for (const width of [1440, 768, 390]) {
-          await page.setViewportSize({ width, height: 900 })
+        await panel.locator('.ant-table-tbody > tr[data-row-key]').first().click()
+        assert.equal(await page.locator('[data-business-action-key="purchase-details"]').isEnabled(), true)
+        purchaseArrivalFail = true
+        await page.getByRole('button', { name: '刷新当前页', exact: true }).click()
+        await panel.getByRole('button', { name: '重新加载', exact: true }).waitFor()
+        assert.equal(await panel.locator('.ant-table-tbody > tr[data-row-key]').count(), 0, '加载失败不能展示旧清单')
+        assert.equal(await page.locator('[data-business-action-key="purchase-details"]').isEnabled(), false, '加载失败后不能操作旧记录')
+        purchaseArrivalFail = false
+        await panel.getByRole('button', { name: '重新加载', exact: true }).click()
+        await panel.locator('.ant-table-tbody > tr[data-row-key]').first().waitFor()
+        for (const width of [1920, 1440, 768, 390]) {
+          await page.setViewportSize({ width, height: width === 1920 ? 1080 : 900 })
           await assertNoHorizontalOverflow(page, `purchase-${width}`)
           await captureBusinessView(
             page,
@@ -535,6 +598,8 @@ export function createUnifiedInteractionScenarios({
           )
         }
         await clickERPThemeOption(page, '暗色')
+        await page.keyboard.press('Escape')
+        await page.locator('.erp-admin-drawer.ant-drawer-open').waitFor({ state: 'hidden' })
         await captureBusinessView(
           page,
           panel,
@@ -542,6 +607,34 @@ export function createUnifiedInteractionScenarios({
           390,
           outputDir
         )
+      },
+    },
+    {
+      name: 'purchase-arrival-design',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+        await page.getByRole('button', { name: /全屏预览/ }).click()
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item[data-page="purchase"]').click()
+        await frame.locator('[data-action="purchase-view"][data-value="arrival"]').click()
+        const plan = frame.locator('.arrival-plan-surface')
+        await plan.locator('.arrival-day').first().waitFor()
+        assert.equal(await plan.locator('.arrival-day').count(), 14)
+        assert.ok(await plan.locator('tbody tr').count() > 0)
+        assert.equal(await frame.locator('[data-action="arrival-select"][data-value="all"]').getAttribute('aria-pressed'), 'true')
+        const { chooseSelectOption } = await import('./selectControlActions.mjs')
+        await chooseSelectOption(plan.locator('#arrival-confirmation'), 'confirmed')
+        for (const text of await plan.locator('tbody tr td:nth-child(6)').allTextContents()) assert.equal(text, '供应商已确认')
+        await plan.locator('[data-action="arrival-reset"]').click()
+        await plan.locator('[data-action="arrival-choose"]').first().check()
+        assert.equal(await frame.locator('.business-record-actions [data-action="open-selected"]').isEnabled(), true)
+        await plan.locator('[data-action="arrival-period"][data-value="14"]').click()
+        assert.match(await plan.locator('.arrival-results-head').first().innerText(), /当前 14 天/)
+        await plan.locator('[data-action="arrival-reset"]').first().click()
+        await assertNoHorizontalOverflow(page, 'purchase-arrival-design')
       },
     },
     {

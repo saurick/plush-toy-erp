@@ -42,7 +42,7 @@ func (c *sourceDocumentListQueryCapture) selectCount() int {
 	count := 0
 	for _, line := range c.logs {
 		upper := strings.ToUpper(line)
-		if strings.Contains(upper, "DRIVER.QUERY") && strings.Contains(upper, "SELECT") {
+		if strings.Contains(upper, ".QUERY: QUERY=SELECT") || strings.Contains(upper, ".QUERYCONTEXT: QUERY=SELECT") {
 			count++
 		}
 	}

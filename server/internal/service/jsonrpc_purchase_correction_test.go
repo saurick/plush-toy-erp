@@ -432,11 +432,11 @@ func TestJsonrpcDispatcher_PurchaseCorrectionAPIRequiresPermissionsAndMapsErrors
 	}
 
 	_, missingReturn, err := j.handlePurchase(adminCtx, "get_purchase_return", "missing-return", mustJSONRPCStruct(t, map[string]any{"id": float64(999999)}))
-	if err != nil || missingReturn == nil || missingReturn.Code != errcode.InvalidParam.Code || missingReturn.Message != "采购退货单不存在" {
+	if err != nil || missingReturn == nil || missingReturn.Code != errcode.ResourceNotFound.Code || missingReturn.Message != "采购退货单不存在" {
 		t.Fatalf("missing return mapping = result=%#v err=%v", missingReturn, err)
 	}
 	_, missingAdjustment, err := j.handlePurchase(adminCtx, "get_purchase_receipt_adjustment", "missing-adjustment", mustJSONRPCStruct(t, map[string]any{"id": float64(999999)}))
-	if err != nil || missingAdjustment == nil || missingAdjustment.Code != errcode.InvalidParam.Code || missingAdjustment.Message != "采购入库调整单不存在" {
+	if err != nil || missingAdjustment == nil || missingAdjustment.Code != errcode.ResourceNotFound.Code || missingAdjustment.Message != "采购入库调整单不存在" {
 		t.Fatalf("missing adjustment mapping = result=%#v err=%v", missingAdjustment, err)
 	}
 }

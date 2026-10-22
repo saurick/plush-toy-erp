@@ -51,7 +51,7 @@ test('task copy uses the current product and document projection and includes ev
   }
   assert.doesNotMatch(
     result,
-    /SO-OLD|旧产品|TASK-INTERNAL|#42|未填写|未记录|undefined/
+    /SO-OLD|旧产品|TASK-INTERNAL|#42|undefined/
   )
 })
 
@@ -80,25 +80,15 @@ test('unavailable and cleared source projections never copy stale source or prod
   )
 })
 
-test('single-field source copy uses raw business references and excludes internal or simulated references', () => {
+test('source copy keeps linked business references and excludes internal or standalone batch references', () => {
   assert.equal(getWorkflowTaskSourceNo(task), 'SO-NEW')
   for (const source_no of ['', '8', '#8', 'ID-8', 'TASK-8']) {
     assert.equal(getWorkflowTaskSourceNo({ source_id: 8, source_no }), '')
   }
-  assert.equal(
-    getWorkflowTaskSourceNo({ ...task, payload: { simulated_only: true } }),
-    ''
-  )
-  assert.equal(
-    getWorkflowTaskSourceNo({
-      ...task,
-      source_type: 'simulated-manual-acceptance-task-batch',
-    }),
-    ''
-  )
+  assert.equal(getWorkflowTaskSourceNo({ source_type: null, source_no: null }), '')
 })
 
-test('product copy omits blank fields and redundant product identifiers', () => {
+test('product copy preserves missing core fields and omits redundant identifiers', () => {
   assert.equal(
     formatWorkflowProductCopy([
       {
@@ -112,7 +102,7 @@ test('product copy omits blank fields and redundant product identifiers', () => 
   )
   assert.equal(
     formatWorkflowProductCopy([{ kind: 'material', name: '', code: '' }]),
-    ''
+    '物料：名称未填写\n款号：未填写'
   )
   assert.equal(formatWorkflowProductCopy([]), '')
 })
@@ -130,7 +120,7 @@ test('supplier item copy preserves full text and separates the internal material
   )
   assert.equal(
     formatWorkflowProductCopy([{ ...material, supplierItemNo: '' }]),
-    '物料：短毛绒\n系统物料编号：MAT-1'
+    '物料：短毛绒\n款号：未填写\n系统物料编号：MAT-1'
   )
   assert.equal(
     formatWorkflowProductCopy([{ ...material, supplierItemNo: '客供' }]),
@@ -150,15 +140,23 @@ test('copied dates are complete local dates and do not change meaning when forwa
   assert.doesNotMatch(result, /今天|明天|昨天|18:00/)
 })
 
-test('completed tasks retain the recorded end time and missing dates do not become placeholders', () => {
+test('copied summaries retain recorded end times and explicit missing values without borrowing dates', () => {
   const result = formatWorkflowTaskCopy({
     ...task,
     task_status_key: 'done',
     completed_at: new Date(2026, 8, 8, 11, 0).getTime() / 1000,
   })
-  assert.match(result, /结束时间：2026年9月8日 11:00/)
-  assert.doesNotMatch(result, /进入岗位|任务生成|处理截止|未设置|未记录/)
+  assert.match(result, /完成时间：2026年9月8日 11:00/)
+  assert.match(result, /进入岗位：工程 · 未记录/)
+  assert.match(result, /处理截止：未设置截止/)
+  const missing = formatWorkflowTaskCopy({ task_name: '核对收款说明', task_status_key: 'done', updated_at: 1791500000 })
+  assert.match(missing, /关联内容：未关联产品／物料/)
+  assert.match(missing, /关联单据：未关联业务单据/)
+  assert.match(missing, /负责：负责岗位未提供 · 未指定办理人/)
+  assert.match(missing, /完成时间：未记录/)
+  assert.doesNotMatch(missing, /2026|已超时/)
   assert.equal(formatWorkflowTaskCopy({}), '')
+  assert.match(formatWorkflowTaskCopy({ task_name: ' ', task_status_key: 'ready' }), /^任务：未命名任务/u)
 })
 
 test('task summary follows the current reason and does not revive a previous blockage', () => {

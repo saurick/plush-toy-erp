@@ -54,66 +54,90 @@ function shortIdentity(value, length = 12) {
 }
 
 function EnvironmentRow({ card, loading }) {
-  const status = devEnvironmentEvidenceStatusPresentation(card.status)
+  const [expanded, setExpanded] = useState(false)
   return (
-    <tr data-environment={card.key}>
-      <th scope="row">
-        <strong>{card.label}</strong>
-        <small>{card.scope}</small>
-        <Tag color={loading ? 'processing' : status.color}>
-          {loading ? '读取中' : status.label}
-        </Tag>
-      </th>
-      {['runtime', 'candidate', 'dataset', 'acceptance'].map((key) => {
-        const dimension = card.evidenceDimensions.find(
-          (item) => item.key === key
-        )
-        const dimensionStatus = devEnvironmentEvidenceStatusPresentation(
-          dimension?.status || 'not_proven'
-        )
-        return (
-          <td key={key}>
-            <Tag color={loading ? 'processing' : dimensionStatus.color}>
-              {loading ? '读取中' : dimensionStatus.label}
-            </Tag>
-            <small>{dimension?.detail || '该维度尚无证据'}</small>
-          </td>
-        )
-      })}
-      <td>
-        <strong>当前下一步</strong>
-        <p>{card.nextAction}</p>
-        <details>
-          <summary>身份、读回与边界</summary>
-          <dl>
-            {[
-              ['Release / SHA', card.releaseSha],
-              ['数据库', card.databaseName],
-              ['Migration', card.migrationVersion],
-              ['客户配置 revision', card.customerConfigRevision],
-              [
-                '数据版本 / run',
-                `${card.datasetVersion} / ${card.datasetRunId}`,
-              ],
-              ['Semantic digest', card.semanticDigest],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd title={value}>{shortIdentity(value, 40)}</dd>
-              </div>
-            ))}
-          </dl>
-          <p>{card.datasetEvidence}</p>
-          <p>{card.health}</p>
-          <p>{card.rollbackBoundary}</p>
-          <DevTimestamp
-            value={card.readbackAt}
-            action="权威读回于"
-            missing="权威读回时间未证明"
-          />
-        </details>
-      </td>
-    </tr>
+    <>
+      <tr data-environment={card.key}>
+        <th scope="row">
+          <strong>{card.label}</strong>
+        </th>
+        {['runtime', 'candidate', 'dataset', 'acceptance'].map((key) => {
+          const dimension = card.evidenceDimensions.find(
+            (item) => item.key === key
+          )
+          const dimensionStatus = devEnvironmentEvidenceStatusPresentation(
+            dimension?.status || 'not_proven'
+          )
+          return (
+            <td key={key}>
+              <Tag color={loading ? 'processing' : dimensionStatus.color}>
+                {loading ? '读取中' : dimensionStatus.label}
+              </Tag>
+              {!loading && ['blocked', 'failed'].includes(dimension?.status) ? (
+                <small>{dimension.detail}</small>
+              ) : null}
+            </td>
+          )
+        })}
+        <td>
+          <p>{card.nextAction}</p>
+          <Button
+            type="link"
+            size="small"
+            aria-expanded={expanded}
+            aria-controls={`dev-environment-detail-${card.key}`}
+            aria-label={`${expanded ? '收起' : '查看'}${card.label}证据`}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? '收起证据' : '查看证据'}
+          </Button>
+        </td>
+      </tr>
+      <tr hidden={!expanded} id={`dev-environment-detail-${card.key}`}>
+        <td colSpan={6}>
+          <section className="erp-dev-environment-detail" aria-label={`${card.label}证据详情`}>
+            <Text>{card.scope}</Text>
+            <dl className="erp-dev-environment-detail__dimensions">
+              {[
+                ['runtime', '运行目标'], ['candidate', '代码候选'],
+                ['dataset', '数据合同'], ['acceptance', '人工验收'],
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <dt>{label}</dt>
+                  <dd>{card.evidenceDimensions.find((item) => item.key === key)?.detail || '该维度尚无证据'}</dd>
+                </div>
+              ))}
+            </dl>
+            <dl className="erp-dev-environment-detail__identity">
+              {[
+                ['Release / SHA', card.releaseSha],
+                ['数据库', card.databaseName],
+                ['Migration', card.migrationVersion],
+                ['客户配置 revision', card.customerConfigRevision],
+                [
+                  '数据版本 / run',
+                  `${card.datasetVersion} / ${card.datasetRunId}`,
+                ],
+                ['Semantic digest', card.semanticDigest],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd title={value}>{shortIdentity(value, 40)}</dd>
+                </div>
+              ))}
+            </dl>
+            <p>{card.datasetEvidence}</p>
+            <p>{card.health}</p>
+            <p>{card.rollbackBoundary}</p>
+            <DevTimestamp
+              value={card.readbackAt}
+              action="权威读回于"
+              missing="权威读回时间未证明"
+            />
+          </section>
+        </td>
+      </tr>
+    </>
   )
 }
 
@@ -144,9 +168,6 @@ function DeliveryOperationOverview({ summary, error, loading }) {
           <strong id="dev-delivery-operation-overview-title">
             最近工作台操作
           </strong>
-          <span className="erp-dev-delivery-operation-overview__scope">
-            仅记录由工作台发起的 release、promotion、rebuild 与 rollback。
-          </span>
         </div>
         <Tag color={presentation.color}>{presentation.label}</Tag>
       </header>
@@ -189,10 +210,14 @@ function DeliveryOperationOverview({ summary, error, loading }) {
           查看工作台操作记录
         </RouterLink>
       ) : null}
-      <Text type="secondary">
-        GitLab Pipeline、Package 与 Release
-        只在“远端流水线耗时”中展示，不会伪装成工作台操作记录。
-      </Text>
+      <details className="erp-dev-delivery-inline-details">
+        <summary>记录范围</summary>
+        <Text type="secondary">
+          仅记录工作台发起的制品发布、部署、数据重建与回滚。
+          GitLab Pipeline、Package 与 Release
+          在“流水线耗时”中查看。
+        </Text>
+      </details>
     </section>
   )
 }
@@ -309,17 +334,17 @@ export default function DevEnvironmentEvidencePanel() {
           权威读回
         </Button>
       </header>
-      <DeliveryOperationOverview
-        summary={state.deliverySummary}
-        error={state.deliveryError}
-        loading={state.deliveryLoading}
-      />
       <div className="erp-dev-environment-evidence__table-wrap">
         <table
           className="erp-dev-environment-evidence__table"
           data-table-lines="appearance"
           aria-label="环境证据对照表"
         >
+          <colgroup>
+            {[22, 11, 11, 11, 11, 34].map((width, index) => (
+              <col key={index} style={{ width: `${width}%` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {[
@@ -328,7 +353,7 @@ export default function DevEnvironmentEvidencePanel() {
                 '代码候选',
                 '数据合同',
                 '人工验收',
-                '下一步与详情',
+                '当前下一步',
               ].map((label) => (
                 <th scope="col" key={label}>
                   {label}
@@ -351,6 +376,11 @@ export default function DevEnvironmentEvidencePanel() {
           </tbody>
         </table>
       </div>
+      <DeliveryOperationOverview
+        summary={state.deliverySummary}
+        error={state.deliveryError}
+        loading={state.deliveryLoading}
+      />
     </section>
   )
 }

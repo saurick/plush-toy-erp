@@ -47,7 +47,9 @@
 
 2. 修改配置、命名或默认值后运行 `bash scripts/project-scan.sh --strict`。
 3. 开发验证先用 `bash scripts/qa/affected.sh --plan` 查看影响面，再运行所需验证；定向检查优先，完整门禁按任务需要执行。
-4. 需要迁移时进入 `server/`，交互使用 `make migrate`；非交互严格使用同一次 `make migrate_prepare` 输出执行 `make migrate_execute`。准备保持日常固定版本运行，先只读审计，再固定当前前后端、配置及迁移，完成成套备份与临时恢复库升级、登录和业务读取验证。确认后才进入短维护窗口、生成新的成套恢复点、执行一次迁移并切换固定版本。单位精度或单据引用冲突必须处理后重新准备，不能直接取整或删除已过账记录。准备成功不表示已升级，结果未知先只读核对。
+4. 需要迁移时进入 `server/`，交互使用 `make migrate`；非交互严格使用同一次 `make migrate_prepare` 输出执行 `make migrate_execute`。准备保持日常固定版本运行，先只读审计，再固定当前前后端、配置及迁移，完成成套备份与临时恢复库升级、登录和业务读取验证。确认后才进入短维护窗口、生成新的成套恢复点、执行一次迁移并切换固定版本。
+
+   单位精度或单据引用冲突必须处理后重新准备，不能直接取整或删除已过账记录。准备成功不表示已升级，结果未知先只读核对。
 5. 已获提交 / 推送授权并形成 clean HEAD 后，运行 `bash scripts/qa/prepare-push.sh`。默认单一 `origin/main` 只签发短门禁回执，高成本验证由 GitLab exact-SHA CI 完成；其他目标和显式 `--full` 按 [QA 回执合同](qa/README.md#推送准备与回执) 执行。
 6. 发布、部署和恢复分别使用 [部署脚本](deploy/README.md)，固定 SHA / digest 并读回目标结果；GitLab push 不自动部署。
 
@@ -84,7 +86,9 @@ sudo npm install --global "$(node -p 'require("./web/package.json").packageManag
 bash scripts/doctor.sh
 ```
 
-`n` 默认将 Node 安装到 `/usr/local/bin`，该目录需排在 PATH 的其他 Node 路径之前；使用可写的自定义 `N_PREFIX` 时，可去掉 `sudo` 并把 `$N_PREFIX/bin` 加入 PATH。切换后新开终端，核对 `command -v node` 和 `node --version`。Linux / WSL 同样使用 [n 官方安装方式](https://github.com/tj/n#installation)；原生 Windows 开发入口使用 WSL。
+`n` 默认将 Node 安装到 `/usr/local/bin`，该目录需排在 PATH 的其他 Node 路径之前；使用可写的自定义 `N_PREFIX` 时，可去掉 `sudo` 并把 `$N_PREFIX/bin` 加入 PATH。切换后新开终端，核对 `command -v node` 和 `node --version`。
+
+Linux / WSL 同样使用 [n 官方安装方式](https://github.com/tj/n#installation)；原生 Windows 开发入口使用 WSL。
 
 `doctor.sh` 核对 `n`、当前 Node、唯一版本锁与 `engines.node`，并阻断重复版本文件；同时检查 Bash（major ≥ 4）、`web/package.json#packageManager` 和 `server/go.mod`。开发工作台与覆盖率采集器校验当前进程版本，版本不符时先用 `n auto` 切换并重启前端。CI 继续校验精确版本，Docker 构建和运行镜像固定相同补丁版本。
 
@@ -98,4 +102,8 @@ bash scripts/doctor.sh
 
 ## 公共契约生成 / Public Contracts
 
-`node scripts/gen-public-contracts.mjs` 从后端正式声明生成 Web 权限、业务及流程状态、附件约束、RPC 标识、数值、密码和打印限制，并同步任务目录的 Web 模块与交互稿片段；同一入口从实际分发、参数解析和返回映射补齐 `server/docs/api.md` 的全部逐方法字段合同、请求与响应示例，校验模拟样例的覆盖、类型、必填条件、可空值和测试来源，并生成仅供 DEV 工作台追溯的方法源码索引。`--check` 只读检查全部生成物漂移，不改文档或样例。`node scripts/qa/public-contract-consumers.mjs` 检查 Web 引用和发布脚本的静态 RPC；契约源变化由 affected 自动选择同步及消费者检查。维护步骤与边界见[跨层公共契约与生成规范](../docs/engineering/跨层公共契约与生成规范.md)，错误码继续使用 `gen-error-codes.mjs`。
+`node scripts/gen-public-contracts.mjs` 从后端正式声明生成 Web 权限、业务及流程状态、附件约束、RPC 标识、数值、密码和打印限制，并同步任务目录的 Web 模块与交互稿片段；同一入口从实际分发、参数解析和返回映射补齐 `server/docs/api.md` 的全部逐方法字段合同、请求与响应示例，校验模拟样例的覆盖、类型、必填条件、可空值和测试来源，并生成仅供 DEV 工作台追溯的方法源码索引。
+
+`--check` 只读检查全部生成物漂移，不改文档或样例。`node scripts/qa/public-contract-consumers.mjs` 检查 Web 引用和发布脚本的静态 RPC；契约源变化由 affected 自动选择同步及消费者检查。
+
+维护步骤与边界见[跨层公共契约与生成规范](../docs/engineering/跨层公共契约与生成规范.md)，错误码继续使用 `gen-error-codes.mjs`。

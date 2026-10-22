@@ -4,6 +4,7 @@ export const BUSINESS_RULE_CATEGORIES = Object.freeze([
   { value: 'quantity', label: '数量与金额' },
   { value: 'concurrency', label: '并发与幂等' },
   { value: 'boundary', label: '权限与事实边界' },
+  { value: 'growth', label: '数据增长与资源边界' },
 ])
 
 const source = (file, name, gate = 'postgres') => Object.freeze({
@@ -17,6 +18,18 @@ const rule = (id, label, category, domain, standard, tests) => Object.freeze({
 })
 
 export const BUSINESS_RULES = Object.freeze([
+  rule('sales-export-snapshot', '销售导出快照与完整结果', 'growth', 'source-documents',
+    '订单集合、表头、明细数量和工程状态属于同一只读快照，稳定排序且不截断结果。', [
+      source('data/sales_order_export_postgres_test.go', 'TestSourceDocumentPostgresSalesOrderExportSnapshot'),
+    ]),
+  rule('sales-export-budget', '销售导出预算、准入与取消释放', 'growth', 'source-documents',
+    '行数和未压缩数据超限时整次拒绝；准备名额与期限有界，取消或失败后释放连接并允许重试。', [
+      source('biz/sales_order_export_test.go', 'TestSalesOrderExportAdmissionCancellationAndPreparation', 'server'),
+      source('biz/sales_order_export_test.go', 'TestSalesOrderExportFailureAndDeadline', 'server'),
+      source('service/jsonrpc_sales_order_export_test.go', 'TestSalesOrderExportServiceReleasesAdmissionAfterFailure', 'server'),
+      source('data/sales_order_export_postgres_test.go', 'TestSourceDocumentPostgresSalesOrderExportBudgets'),
+      source('data/sales_order_export_postgres_test.go', 'TestSourceDocumentPostgresSalesOrderExportCancelReleasesConnection'),
+    ]),
   rule('unit-quantity', '单位精度与应需取整', 'quantity', 'master-data',
     '录入数量不静默舍入；应需量按单位精度向上取整，越界拒绝。', [
       source('biz/unit_quantity_test.go', 'TestValidateUnitQuantity', 'server'),
@@ -62,9 +75,10 @@ export const BUSINESS_RULES = Object.freeze([
       source('data/source_document_postgres_concurrency_test.go', 'TestSourceDocumentPostgresSaveSubmitConcurrency'),
     ]),
   rule('engineering-approval', '用料审批与采购生成原子性', 'transaction', 'source-documents',
-    '审批、采购结果与审计共同提交；中途失败整批回滚，同一意图可安全重试。', [
+    '审批、采购结果与审计共同提交；查询保持同一快照，中途失败整批回滚，同一意图可安全重试。', [
       source('data/engineering_material_request_repo_test.go', 'TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval'),
       source('data/engineering_material_workflow_test.go', 'TestSourceDocumentPostgresEngineeringMaterialFinanceFailureAndRetry'),
+      source('data/engineering_material_snapshot_postgres_test.go', 'TestSourceDocumentPostgresEngineeringMaterialReadSnapshot'),
     ]),
   rule('production-capacity', '生产领料与获批超领上限', 'quantity', 'fact-production',
     '并发领料不得超过计划量与有效超领批准量，同一命令重放不重复扣料。', [
@@ -117,6 +131,17 @@ export function businessRuleTests(gate) {
 }
 
 export const BUSINESS_RULE_DIAGRAMS = Object.freeze({
+  growth: {
+    label: '有界读取与完整快照',
+    chart: `flowchart TD
+  request["筛选范围与稳定排序"] --> admission["有界准入与准备期限"]
+  admission --> snapshot["同一只读快照核对集合与预算"]
+  snapshot --> limit{"行数与数据体积在预算内"}
+  limit -->|是| complete["读取完整结果与派生数量"]
+  limit -->|否| reject["整次拒绝，不返回部分结果"]
+  complete --> release["关闭事务并释放名额"]
+  reject --> release`,
+  },
   boundary: {
     label: '协同办理与事实过账边界',
     chart: `flowchart TD

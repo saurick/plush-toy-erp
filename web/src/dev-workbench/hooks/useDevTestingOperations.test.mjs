@@ -8,8 +8,10 @@ const summary = (operations = {}, busy = { active: false, kind: '', profile: '' 
 })
 const operation = (status = 'running') => ({
   id: '4b6c68e0-e060-4d4e-adb8-3b31c48d0a04',
-  action: 'rpc-examples', revision: status === 'running' ? 1 : 2,
-  status, message: '隔离样例执行结果',
+  action: 'rpc-examples',
+  revision: status === 'running' ? 1 : 2,
+  status,
+  message: '隔离样例执行结果',
 })
 function deferred() {
   let resolve

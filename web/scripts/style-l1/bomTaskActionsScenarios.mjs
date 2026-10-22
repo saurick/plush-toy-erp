@@ -213,6 +213,18 @@ export function createBOMTaskActionsScenarios({
         })
       },
       verify: async (page) => {
+        if (mobile) {
+          await page.waitForURL('**/m/engineering/tasks')
+          await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
+          const detail = page.getByTestId('mobile-task-detail-screen')
+          await detail.waitFor({ state: 'visible' })
+          await detail.getByText(task.source_no, { exact: false }).first().waitFor()
+          assert.equal(await page.locator('.erp-business-data-table-card:visible').count(), 0, '手机任务入口不展开完整 BOM 列表')
+          assert.equal(requests.length, 0, '手机回到岗位任务时不读取桌面 BOM 的关联订单列表')
+          await page.screenshot({ path: path.join(outputDir, 'bom-task-mobile-entry.png'), animations: 'disabled' })
+          await assertNoHorizontalOverflow(page, 'bom-task-mobile-entry')
+          return
+        }
         const row = page.locator('tr[data-row-key="1"]').first()
         await row.waitFor({ state: 'visible' })
         const taskButton = page
@@ -254,7 +266,7 @@ export function createBOMTaskActionsScenarios({
         await page.getByRole('heading', { name: '销售订单', exact: true }).waitFor()
         assert.equal(taskReads, readsBeforeLeaving, '离开 BOM 时不能提前消费返回任务标记')
         await page
-          .getByRole('button', { name: '返回任务', exact: true })
+          .getByRole('button', { name: '返回原任务', exact: true })
           .click()
         await drawer
           .getByText(task.task_name, { exact: true })

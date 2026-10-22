@@ -168,23 +168,29 @@ func (d *jsonrpcDispatcher) mapBOMError(ctx context.Context, err error) *v1.Json
 		l.Warnf("[bom] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrBOMHeaderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "BOM 版本不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "BOM 版本不存在"}
 	case errors.Is(err, biz.ErrBOMItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "BOM 明细不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "BOM 明细不存在"}
 	case errors.Is(err, biz.ErrBOMActiveImmutable):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "已激活 BOM 不允许直接修改，请复制新版本"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "已激活 BOM 不允许直接修改，请复制新版本"}
 	case errors.Is(err, biz.ErrBOMActiveConflict):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "同一产品已有其他激活 BOM 版本，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "同一产品已有其他激活 BOM 版本，请刷新后重试"}
 	case errors.Is(err, biz.ErrBOMVersionConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
-	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该产品已停用，不能用于新 BOM 版本；历史 BOM 仍保留原引用"}
-	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该材料已停用，不能新增引用；历史 BOM 仍保留原引用"}
-	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单位已停用，不能新增引用；历史 BOM 仍保留原引用"}
+	case errors.Is(err, biz.ErrProductNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该产品已停用，不能用于新 BOM 版本；历史 BOM 仍保留原引用"}
+	case errors.Is(err, biz.ErrMaterialNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选材料不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该材料已停用，不能新增引用；历史 BOM 仍保留原引用"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该单位已停用，不能新增引用；历史 BOM 仍保留原引用"}
 	case errors.Is(err, biz.ErrBOMRecordConflict):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "同一产品的 BOM 版本不能重复，且最多只能有一个激活版本"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "同一产品的 BOM 版本不能重复，且最多只能有一个激活版本"}
 	default:
 		l.Errorf("[bom] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}

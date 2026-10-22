@@ -428,9 +428,19 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "due_at 必须是 Unix 秒时间戳"}, nil
 		}
-		sourceID, validSourceID := getRequiredJSONRPCPositiveInt(pm, "source_id")
-		if !validSourceID {
-			return id, invalidParamResult(), nil
+		sourceID := 0
+		if value := pm["source_id"]; value != nil {
+			var validSourceID bool
+			sourceID, validSourceID = getRequiredJSONRPCPositiveInt(pm, "source_id")
+			if !validSourceID {
+				return id, invalidParamResult(), nil
+			}
+		}
+		if value := pm["source_type"]; value != nil {
+			text, ok := value.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return id, invalidParamResult(), nil
+			}
 		}
 		task, err := d.workflowUC.CreateTask(ctx, &biz.WorkflowTaskCreate{
 			IdempotencyKey:        idempotencyKey,

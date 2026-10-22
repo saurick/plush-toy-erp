@@ -155,7 +155,7 @@ func TestSourceDocumentPostgresIntegrationPartnerReadIsolation(t *testing.T) {
 			requireIntegrationCode(t, noLogin, "auth", "admin_login", map[string]any{"username": a.username, "password": f.password}, errcode.AuthLoginRejected.Code)
 		})
 	}
-	requireIntegrationCode(t, actors[2].caller, "partner", "get_sales_order", map[string]any{"id": draft.ID}, errcode.InvalidParam.Code)
+	requireIntegrationCode(t, actors[2].caller, "partner", "get_sales_order", map[string]any{"id": draft.ID}, errcode.ResourceNotFound.Code)
 	t.Run("employee_boundary_and_binding", func(t *testing.T) {
 		requireIntegrationCode(t, admin, "partner", "list_sales_orders", map[string]any{}, errcode.PermissionDenied.Code)
 		listed := requireIntegrationCode(t, admin, "admin", "list", map[string]any{}, errcode.OK.Code).Result.Data.AsMap()["admins"].([]any)

@@ -6,7 +6,7 @@ import {
 
 import { manualAcceptanceBusinessNo } from "./manual-acceptance-source-driven-facts.mjs";
 
-const NOTE = "模拟业务链核验，不代表真实客户业务。";
+const NOTE = "按订单要求核对并处理。";
 
 function businessNo(plan, code, sequence) {
   return manualAcceptanceBusinessNo({
@@ -482,7 +482,7 @@ async function decideQuality(rpc, inspection, result, apply) {
           check_items: [
             {
               name: "外观",
-              requirement: "模拟确认样",
+              requirement: "确认样",
               observation: result === "PASS" ? "符合" : "不符合",
               result: result === "PASS" ? "PASS" : "FAIL",
               scope: "FULL",
@@ -1223,7 +1223,7 @@ export async function ensureOutsourcingDispositionChain({
               "outsourcing_quantity",
               "expected_return_date",
             ]),
-            processing_item: "模拟手工返修加工",
+            processing_item: "手工返修加工",
             unit_price: "1",
             amount: line.outsourcing_quantity,
           },

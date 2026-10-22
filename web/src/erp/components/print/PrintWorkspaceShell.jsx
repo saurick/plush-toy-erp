@@ -9,6 +9,7 @@ import React, {
 import '@fontsource-variable/noto-sans-sc'
 import '@fontsource-variable/noto-serif-sc'
 import { InfoCircleOutlined } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import { inspectPrintImageBudget } from '../../utils/printOutputPreflight.mjs'
 import {
   findBlankPrintFields,
@@ -87,7 +88,7 @@ function PrintWorkspaceFeedback({ feedback, local = false, returnFocusRef }) {
                   ? trigger
                   : feedbackRef.current
                       ?.closest('.erp-print-shell')
-                      ?.querySelector('.erp-print-shell__zoom-control select')
+                      ?.querySelector('.erp-print-shell__zoom-control [role="combobox"]')
               target?.focus({ preventScroll: true })
             }
             setDismissedFeedback(feedback)
@@ -221,6 +222,24 @@ export default function PrintWorkspaceShell({
   const [imageBudget, setImageBudget] = useState({ count: 0, problem: '' })
   const [blankCount, setBlankCount] = useState(0)
   const [hasLocatedBlank, setHasLocatedBlank] = useState(false)
+
+  useEffect(() => {
+    if (!selectionMode) return undefined
+    const shell = stageRef.current?.closest('.erp-print-shell')
+    const ownerDocument = shell?.ownerDocument
+    if (!ownerDocument) return undefined
+    const returnToEdit = (event) => {
+      const active = ownerDocument.activeElement
+      const ownsFocus = active === ownerDocument.body ||
+        active === ownerDocument.documentElement || shell.contains(active)
+      if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229 || event.defaultPrevented || !ownsFocus) return
+      event.preventDefault()
+      onReturnToEdit?.()
+    }
+    // WebKit 鼠标点击按钮后可能仍由 body 接收键盘事件。
+    ownerDocument.addEventListener('keydown', returnToEdit)
+    return () => ownerDocument.removeEventListener('keydown', returnToEdit)
+  }, [selectionMode, onReturnToEdit])
 
   useEffect(() => {
     const stage = stageRef.current
@@ -410,12 +429,6 @@ export default function PrintWorkspaceShell({
             setHasLocatedBlank(false)
           }
         }}
-        onKeyDownCapture={(event) => {
-          if (event.key === 'Escape' && selectionMode && !event.isComposing) {
-            event.preventDefault()
-            onReturnToEdit?.()
-          }
-        }}
       >
         <div className="erp-print-shell__header" data-print-editor-only>
           <header className="erp-print-shell__toolbar">
@@ -455,18 +468,27 @@ export default function PrintWorkspaceShell({
               <label className="erp-print-shell__zoom-control print-zoom-control">
                 显示比例
                 <span className="print-zoom-select">
-                  <select
-                    className="form-select"
+                  <Select
+                    allowClear={false}
+                    label="显示比例"
+                    placeholder="显示比例"
                     aria-label="显示比例"
+                    virtual={false}
+                    data-value={zoomMode}
                     value={zoomMode}
-                    onChange={(event) => setZoomMode(event.target.value)}
-                  >
-                    <option value="fit">适应宽度</option>
-                    <option value="0.75">75%</option>
-                    <option value="1">100%</option>
-                    <option value="1.25">125%</option>
-                    <option value="1.5">150%</option>
-                  </select>
+                    onChange={setZoomMode}
+                    options={[
+                      ['fit', '适应宽度'],
+                      ['0.75', '75%'],
+                      ['1', '100%'],
+                      ['1.25', '125%'],
+                      ['1.5', '150%'],
+                    ].map(([value, label]) => ({
+                      value,
+                      label,
+                      'data-select-value': value,
+                    }))}
+                  />
                 </span>
               </label>
               {toolbarActions}

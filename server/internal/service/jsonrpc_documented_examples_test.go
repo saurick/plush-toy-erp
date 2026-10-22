@@ -84,6 +84,10 @@ func (*documentedInventoryRepo) ListInventoryTxnsForAccess(context.Context, biz.
 
 func documentedRPCFixture(t *testing.T, key string) (*jsonrpcDispatcher, context.Context) {
 	t.Helper()
+	if key == "sales_order.export_sales_orders" {
+		d, _ := salesOrderExportRPCFixture(t, biz.PermissionSalesOrderRead)
+		return d, workflowJSONRPCAdminContext()
+	}
 	logger := log.NewStdLogger(io.Discard)
 	if strings.HasPrefix(key, "inventory.") {
 		return &jsonrpcDispatcher{log: log.NewHelper(logger), adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWarehouseInventoryRead)}, adminManageUC: newAllWarehouseScopeAdminUsecase(), inventoryUC: biz.NewInventoryUsecase(&documentedInventoryRepo{})}, workflowJSONRPCAdminContext()
@@ -119,6 +123,8 @@ func documentedRPCCall(t *testing.T, dispatcher *jsonrpcDispatcher, ctx context.
 	var result *v1.JsonrpcResult
 	if domain == "inventory" {
 		_, result, err = dispatcher.handleInventory(ctx, method, "documented-example", input)
+	} else if domain == "sales_order" {
+		_, result, err = dispatcher.Handle(ctx, domain, "2.0", method, "documented-example", input)
 	} else {
 		_, result, err = dispatcher.handleAdmin(ctx, method, "documented-example", input)
 	}
@@ -137,7 +143,7 @@ func TestRPCDocumentedExamples(t *testing.T) {
 	if err := json.Unmarshal(raw, &examples); err != nil {
 		t.Fatal(err)
 	}
-	registered := []string{"admin.audit_logs", "admin.me", "admin.set_role_settings", "inventory.list_inventory_balances", "inventory.list_inventory_lots", "inventory.list_inventory_txns"}
+	registered := []string{"admin.audit_logs", "admin.me", "admin.set_role_settings", "inventory.list_inventory_balances", "inventory.list_inventory_lots", "inventory.list_inventory_txns", "sales_order.export_sales_orders"}
 	for _, key := range registered {
 		t.Run(key, func(t *testing.T) {
 			example, present := examples[key]

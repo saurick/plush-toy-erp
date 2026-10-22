@@ -1,5 +1,6 @@
 import React from 'react'
-import { Modal, theme } from 'antd'
+import { theme } from 'antd'
+import Modal from '@/common/components/modal/AppModal'
 import { resolveBusinessModalWidth } from '../../utils/modalSizes.mjs'
 
 export default function BusinessModal({

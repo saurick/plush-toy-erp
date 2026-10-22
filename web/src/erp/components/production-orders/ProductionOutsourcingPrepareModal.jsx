@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Form, Select } from 'antd'
+import { Alert, Form } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import MaterialSupplierSelect from '../master-data/MaterialSupplierSelect.jsx'
 import { prepareProductionOutsourcingOrder } from '../../api/productionWipApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -94,6 +95,7 @@ export default function ProductionOutsourcingPrepareModal({
             rules={[{ required: true, message: '请选择交给加工厂的材料' }]}
           >
             <Select
+              placeholder="请选择本次外发的材料"
               mode="multiple"
               optionFilterProp="label"
               options={requirements.map((item) => ({

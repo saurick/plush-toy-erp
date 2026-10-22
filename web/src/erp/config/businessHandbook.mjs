@@ -59,6 +59,10 @@ const generalChapters = [
             '协同任务',
             '记录谁办理、何时交接和处理结论；任务完成不能替代对应业务结果。',
           ],
+          [
+            '章节中的关联资料',
+            '说明可衔接的业务范围；办理时仍须核对本次对象的真实关联和允许动作。',
+          ],
         ],
       }),
     ]
@@ -252,9 +256,7 @@ export function getBusinessPageHandbookSections(page) {
           section(
             'relations',
             '相关资料与后续业务',
-            [
-              '以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。',
-            ],
+            [],
             {
               rows: [
                 ...(page.upstreamLabels?.length
@@ -295,9 +297,20 @@ export function renderBusinessHandbookMarkdown({
     '',
     '## 阅读目录 / Contents',
     '',
-    ...chapters.map((c) => `- [${c.title}](#${c.id.replaceAll(':', '-')})`),
-    '',
   ]
+  const groups = new Map()
+  for (const c of chapters) {
+    if (!groups.has(c.sectionTitle)) groups.set(c.sectionTitle, [])
+    groups.get(c.sectionTitle).push(c)
+  }
+  for (const [title, entries] of groups) {
+    lines.push(
+      `### ${title}`,
+      '',
+      ...entries.map((c) => `- [${c.title}](#${c.id.replaceAll(':', '-')})`),
+      ''
+    )
+  }
   for (const c of chapters) {
     lines.push(
       `<a id="${c.id.replaceAll(':', '-')}"></a>`,

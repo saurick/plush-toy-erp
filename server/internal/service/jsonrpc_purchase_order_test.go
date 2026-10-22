@@ -634,7 +634,7 @@ func TestJsonrpcDispatcher_PurchaseOrderReceiptProgressFailsBeforeRepoOnInvalidI
 		"disabled-progress",
 		mustJSONRPCStruct(t, map[string]any{"id": float64(1)}),
 	)
-	if err != nil || disabled == nil || disabled.Code != errcode.InvalidParam.Code {
+	if err != nil || disabled == nil || disabled.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("disabled module result=%#v err=%v", disabled, err)
 	}
 	if repo.progressCalls != 0 {
@@ -769,7 +769,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+	if saveRes == nil || saveRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only purchase_orders save rejected, got %#v", saveRes)
 	}
 	if len(repo.items) != 0 {
@@ -822,7 +822,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+	if saveRes == nil || saveRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled purchase_orders aggregate save rejected, got %#v", saveRes)
 	}
 	if len(repo.orders) != beforeOrderCount || len(repo.items) != beforeItemCount {
@@ -839,7 +839,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
+	if cancelRes == nil || cancelRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected disabled purchase_orders cancel rejected, got %#v", cancelRes)
 	}
 	if repo.lifecycleCalls != beforeLifecycleCalls || repo.orders[orderID].LifecycleStatus != biz.PurchaseOrderStatusDraft {

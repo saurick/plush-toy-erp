@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Select, Typography } from 'antd'
+import { Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import {
   comparePressureScale,
   formatPressureNumber as format,
@@ -25,6 +26,7 @@ export default function DevPressureDataset({ report, reports }) {
     )
   }
   const main = pressureMainLevel(report)
+  const pagination = main?.pagination
   const maximum = Math.max(
     1,
     main?.operations.successfulRps || 0,
@@ -66,6 +68,38 @@ export default function DevPressureDataset({ report, reports }) {
           </tbody>
         </table>
       </div>
+      {pagination ? (
+        <>
+          <p className="erp-dev-pressure-note">
+            销售订单分页：每页 {format(pagination.pageSize)} 行，共 {format(pagination.totalRows)} 张订单；按订单日期、ID 稳定排序逐页核对集合、数量和明细数。
+            主段每页最少 {format(pagination.minPageSamples)} 次成功校验，{pagination.accepted ? '达到分页门限' : '未达到分页门限'}。
+            {pagination.fullPages === 0 ? '本次数据不足一整页，不能证明满页容量。' : ''}
+          </p>
+          <div className="erp-dev-tool-table-wrap">
+            <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="销售订单分页容量">
+              <thead><tr><th>页面范围</th><th>成功 / 失败</th><th>p95</th><th>p99</th></tr></thead>
+              <tbody>
+                {[
+                  [pagination.fullPages ? `整页（${format(pagination.pageSize)} 行）` : '整页（未覆盖）', pagination.full],
+                  [pagination.tailRows ? `末页（${format(pagination.tailRows)} 行）` : '末页（无余行）', pagination.tail],
+                ].map(([label, value]) => (
+                  <tr key={label}>
+                    <th scope="row">{label}</th>
+                    <td>{format(value.successes)} / {format(value.failures)}</td>
+                    <td>{value.successes ? `${format(value.p95Ms, 1)} ms` : '—'}</td>
+                    <td>{value.successes ? `${format(value.p99Ms, 1)} ms` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : <p className="erp-dev-pressure-note">该报告未记录分页样本，不能用于证明 500 行满页容量。</p>}
+      {main?.methods.some((method) => method.name === 'sales_order.export_sales_orders' && method.successes > 0) ? (
+        <p className="erp-dev-pressure-note">
+          本次完整订单导出每次核对 {format(data.totalOrders)} 张历史与当轮订单的集合、单号和明细数量，并验证日期排序；对应延迟见分方法报告。
+        </p>
+      ) : null}
       <p className="erp-dev-pressure-note">
         普通单 {format(data.complexity.ordinary.lines)} 行 ×{' '}
         {format(data.complexity.ordinary.bomParts)} 个 BOM 部位；复杂单{' '}

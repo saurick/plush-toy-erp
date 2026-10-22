@@ -11,6 +11,7 @@ import { AppAlertProvider } from '@/common/components/modal/AppAlertProvider'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
 import ScrollEdges from '@/common/components/scroll/ScrollEdges'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
+import { WORKBENCH_APPEARANCE_STORAGE_KEY } from '@/common/theme/erpAppearance.mjs'
 import { ERP_DARK_PALETTE, getERPAccentTokens, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
 import DevWorkbenchRoutes from './DevWorkbenchRoutes.jsx'
@@ -50,7 +51,7 @@ function StandaloneWorkbenchTheme() {
 
 function StandaloneWorkbench() {
   return (
-    <ERPThemeProvider>
+    <ERPThemeProvider browserStorageKey={WORKBENCH_APPEARANCE_STORAGE_KEY}>
       <StandaloneWorkbenchTheme />
     </ERPThemeProvider>
   )

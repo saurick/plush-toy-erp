@@ -108,19 +108,9 @@ test('urge, attachment refresh, same-role assignment and resume never reset arri
 })
 
 test('absent or invalid timestamps never borrow updated_at, payload dates or the current time', () => {
-  for (const missing of [
-    undefined,
-    null,
-    0,
-    -1,
-    '',
-    'unknown',
-    Infinity,
-    NaN,
-    true,
-    {},
-    9e99,
-  ]) {
+  const absent = [undefined, null, 0, '', '  ', '0']
+  const invalid = [-1, 'unknown', Infinity, NaN, true, {}, 9e99]
+  for (const missing of [...absent, ...invalid]) {
     const value = {
       ...task,
       created_at: missing,
@@ -128,15 +118,19 @@ test('absent or invalid timestamps never borrow updated_at, payload dates or the
       updated_at: nowMs / 1000,
       payload: { created_at: task.created_at, due_at: task.due_at },
     }
-    assert.deepEqual(timing(value), [])
-    assert.deepEqual(
-      timing(value, { detail: true }).map(({ value }) => value),
-      ['工程 · 未记录', '未设置截止']
-    )
+    const state = absent.includes(missing) ? 'missing' : 'invalid'
+    for (const detail of [false, true]) {
+      const rows = timing(value, { detail })
+      assert.deepEqual(rows.map(({ key }) => key), ['arrived', 'due'])
+      assert.deepEqual(rows.map(({ value }) => value), state === 'missing'
+        ? ['工程 · 未记录', '未设置截止']
+        : ['工程 · 时间待核对', '时间待核对'])
+      assert.ok(rows.every((row) => row.state === state && !row.dateTime && !row.title && row.tone === 'neutral'))
+    }
   }
   assert.deepEqual(
     timing({ ...task, due_at: null }).map(({ key }) => key),
-    ['arrived']
+    ['arrived', 'due']
   )
 })
 
@@ -165,7 +159,12 @@ test('terminal task lists show actual end time and never flag the previous deadl
     assert.equal(detail.at(-1).label, `${label}时间`)
     assert.equal(detail.at(-1).value, '2026年9月8日 09:30')
     assert(detail.every(({ tone }) => tone === 'neutral'))
-    assert.deepEqual(timing({ ...ended, completed_at: null }), [])
+    const missingEnd = timing({ ...ended, completed_at: null })
+    assert.equal(missingEnd.length, 1)
+    assert.equal(missingEnd[0].key, 'ended')
+    assert.equal(missingEnd[0].value, '结束时间未记录')
+    assert.equal(missingEnd[0].state, 'missing')
+    assert.equal(missingEnd[0].dateTime, '')
     assert.equal(
       timing({ ...ended, completed_at: null }, { detail: true }).at(-1).value,
       '未记录'

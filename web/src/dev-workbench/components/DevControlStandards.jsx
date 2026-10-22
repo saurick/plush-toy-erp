@@ -17,6 +17,9 @@ import SearchInput from '@/common/components/SearchInput'
 import { useERPTheme } from '@/common/theme/erpTheme'
 import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
+import DevSharedComponentGuide, { SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
+import DevUIPaginationExample from './DevUIPaginationExample.jsx'
+import { BasicInputExample, DateInputExample } from './DevUIInputExamples.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
   progressQueryFromURL,
@@ -31,6 +34,7 @@ const TOPICS = [
     guide: 'dialogs',
     description: '在同一份样例里体验输入校验、保存失败、结果未知和关闭保护。',
     rules: [
+      ['系统信息与外观设置', 'AppModal 标准模式', '通用弹窗使用共享入口，保留任务需要的尺寸、内容和页脚。'],
       [
         '局部编辑',
         '弹窗',
@@ -50,6 +54,62 @@ const TOPICS = [
       '切换保存结果：分别试重试、查询结果和连续点击。',
     ],
     source: 'BusinessFormModal · AppModal · message / notification',
+  },
+  {
+    key: 'components',
+    title: '组件选用',
+    summary: '按用途查正式入口与复用边界',
+    description: '从当前实现约定查找基础控件、共享交互、业务组合和打印组件，再进入对应样例。',
+    rules: [],
+    source: SHARED_COMPONENT_SEARCH_TEXT,
+  },
+  {
+    key: 'pagination',
+    title: '列表与分页',
+    summary: '翻页、条数与读取恢复',
+    guide: 'data',
+    description: '表格内分页与独立分页使用同一套控件；切换样例数据和读取状态，核对当前记录与分页结果。',
+    rules: [
+      ['表格内分页', 'AppTable', '表格统一接入公共分页配置，页面只提供当前页、总数和读取动作。'],
+      ['独立分页', 'AppPagination', '复用尺寸、翻页图标、范围文案和窄屏模式；固定批次可关闭条数选择。'],
+      ['条数与筛选', '回到第一页', '每页条数按接口支持的范围配置；改变范围时重新读取，避免保留失效页码。'],
+      ['加载与失败', '禁用分页，保留当前内容', '加载中不重复翻页；失败由调用方提示并重试，已读取内容和当前页保留。'],
+      ['手机任务', '连续加载', '手机任务列表沿用分批续取，不改为电脑页码导航。'],
+    ],
+    checks: [
+      '翻到第二页，再修改每页条数，核对首项与范围回到第一页。',
+      '切换表格内与独立分页，再试单页、空列表和恢复初始内容。',
+      '切换加载中与加载失败，核对禁用、内容保留和重试恢复。',
+    ],
+    source: 'common/components/pagination/AppPagination · common/components/table/AppTable · common/utils/pagination.mjs',
+  },
+  {
+    key: 'inputs',
+    title: '基础输入',
+    summary: '文本、选择与项目主题',
+    guide: 'forms',
+    description: 'Button、Input 继承项目主题；下拉统一使用 AppSelect / FilterSelect，选中后保留用途，清空后恢复提示。',
+    rules: [
+      ['普通文本与枚举', 'Input / AppSelect', '字段有明确提示和可见用途；可编辑值支持清空，必填仍由表单校验。'],
+      ['搜索与业务筛选', 'SearchInput / FilterSelect / SelectFilter', '清空取消条件，下拉菜单不添加“全部……”占位项；固定模式保留有效值。'],
+      ['领域选择', '已有来源或主数据选择器', '读取、搜索和来源快照合同由领域组件承接。'],
+    ],
+    checks: ['修改名称和类别，核对当前结果。', '清空内容，再恢复初始值。', '切换禁用与错误，核对值保留和状态外观。'],
+    source: 'antd: Button / Input · common/components/select · src/App.jsx: ConfigProvider · erp/styles/app/control-*.css',
+  },
+  {
+    key: 'dates',
+    title: '日期与时间',
+    summary: '日期、分钟与范围约束',
+    guide: 'forms',
+    description: '直接操作正式日期组件；正常、禁用与错误切换作用于上方两个输入，范围示例单独展示日期类型与起止约束。',
+    rules: [
+      ['单个日期', 'DateInput', '整框打开日历，选值立即回填，清空后保留空值。'],
+      ['日期时间', 'DateTimeInput', '分钟选择即时生效；快捷截止沿用跟进任务的同一构造函数。'],
+      ['起止筛选', 'DateRangeFilter', '组件组合日期类型与起止日期，限制倒置选择；已有倒置值保留错误提示并允许清空。'],
+    ],
+    checks: ['选择日期和分钟，核对下方值即时变化。', '使用截止快捷项，再切换禁用和错误。', '切换日期类型，查看倒置范围并清空、重置。'],
+    source: 'erp/components/business-list/BusinessDateInputs.jsx · erp/utils/dateRange.mjs · erp/utils/workflowTaskTiming.mjs',
   },
   {
     key: 'navigation',
@@ -349,7 +409,7 @@ function NavigationExample() {
           当前查看：{trackingView === 'progress' ? '流程进度' : '异常跟踪'}。
           内容导航保留下划线：选中字重 650、未选中 500，2px 主题线随当前位置连续移动。
           手机页面左右保留 12px，层间留白 4–8px，点击区域至少 44px；
-          完整布局与“我的”岗位切换见移动端任务样例。
+          完整布局与“我的”岗位切换见手机版任务样例。
         </p>
       </div>
     </div>
@@ -610,6 +670,7 @@ export default function DevControlStandards() {
     )
   )
   const contentRef = useRef(null)
+  const directoryRef = useRef(null)
   const update = (values) => {
     const next = new URLSearchParams(window.location.search)
     Object.entries(values).forEach(([key, value]) =>
@@ -631,7 +692,7 @@ export default function DevControlStandards() {
   }, [current.key])
   return (
     <section className="erp-control-library" aria-label="控件设计">
-      <aside className="erp-control-library-directory">
+      <aside className="erp-control-library-directory" ref={directoryRef}>
         <SearchInput
           aria-label="搜索控件设计"
           placeholder="控件或场景"
@@ -657,7 +718,14 @@ export default function DevControlStandards() {
           {!matches.length && (
             <div className="erp-control-library-no-results">
               <p>没有匹配的控件</p>
-              <Button onClick={() => update({ controlq: '' })}>清除搜索</Button>
+              <Button
+                onClick={() => {
+                  update({ controlq: '' })
+                  directoryRef.current?.querySelector('input')?.focus()
+                }}
+              >
+                清除搜索
+              </Button>
             </div>
           )}
         </nav>
@@ -672,99 +740,122 @@ export default function DevControlStandards() {
             <p>{current.description}</p>
           </div>
           <div className="erp-control-library-theme">
-            <span>样例外观</span>
-            <SlidingSegmented
-              aria-label="控件样例主题"
-              value={mode}
-              onChange={setMode}
-              options={[
-                { label: '浅色', value: 'light' },
-                { label: '深色', value: 'dark' },
-              ]}
-            />
+            {current.key !== 'components' && (
+              <>
+                <span>样例外观</span>
+                <SlidingSegmented
+                  aria-label="控件样例主题"
+                  value={mode}
+                  onChange={setMode}
+                  options={[
+                    { label: '浅色', value: 'light' },
+                    { label: '深色', value: 'dark' },
+                  ]}
+                />
+              </>
+            )}
           </div>
         </header>
-        <div className="erp-control-library-layout">
-          <section className="erp-control-library-demo" aria-label="交互样例">
-            <div className="erp-control-library-caption">
-              <strong>交互样例</strong>
-              <span>本地虚构数据 · 可反复操作</span>
+        {current.key === 'components' ? (
+          <DevSharedComponentGuide />
+        ) : (
+          <>
+            <div className="erp-control-library-layout">
+              <section
+                className="erp-control-library-demo"
+                aria-label="交互样例"
+              >
+                <div className="erp-control-library-caption">
+                  <strong>交互样例</strong>
+                  <span>本地虚构数据 · 可反复操作</span>
+                </div>
+                <ConfigProvider
+                  theme={{
+                    algorithm:
+                      mode === 'dark'
+                        ? theme.darkAlgorithm
+                        : theme.defaultAlgorithm,
+                    token: {
+                      colorPrimary:
+                        mode === 'dark' ? accent.dark : accent.primary,
+                      ...getERPSurfaceTokens(mode === 'dark'),
+                    },
+                  }}
+                >
+                  <div
+                    className="erp-control-library-stage"
+                    data-erp-theme={mode}
+                  >
+                    {current.key === 'counts' ? (
+                      <CountExample />
+                    ) : current.key === 'feedback' ? (
+                      <DevUIFeedbackExamples />
+                    ) : current.key === 'navigation' ? (
+                      <NavigationExample />
+                    ) : current.key === 'filters' ? (
+                      <FiltersExample />
+                    ) : current.key === 'actions' ? (
+                      <ActionsExample />
+                    ) : current.key === 'inputs' ? (
+                      <BasicInputExample />
+                    ) : current.key === 'dates' ? (
+                      <DateInputExample />
+                    ) : current.key === 'pagination' ? (
+                      <DevUIPaginationExample />
+                    ) : (
+                      <EmptyExample />
+                    )}
+                  </div>
+                </ConfigProvider>
+              </section>
+              <aside className="erp-control-library-checks">
+                <h3>按这 3 步核对</h3>
+                <ol>
+                  {current.checks.map((check) => (
+                    <li key={check}>{check}</li>
+                  ))}
+                </ol>
+                <Link to={guideLink('specification')}>
+                  查看图解说明 <ArrowRightOutlined aria-hidden="true" />
+                </Link>
+                <Link to={guideLink('rationale')}>
+                  查看设计依据 <ArrowRightOutlined aria-hidden="true" />
+                </Link>
+              </aside>
             </div>
-            <ConfigProvider
-              theme={{
-                algorithm:
-                  mode === 'dark'
-                    ? theme.darkAlgorithm
-                    : theme.defaultAlgorithm,
-                token: {
-                  colorPrimary: mode === 'dark' ? accent.dark : accent.primary,
-                  ...getERPSurfaceTokens(mode === 'dark'),
-                },
-              }}
-            >
-              <div className="erp-control-library-stage" data-erp-theme={mode}>
-                {current.key === 'counts' ? (
-                  <CountExample />
-                ) : current.key === 'feedback' ? (
-                  <DevUIFeedbackExamples />
-                ) : current.key === 'navigation' ? (
-                  <NavigationExample />
-                ) : current.key === 'filters' ? (
-                  <FiltersExample />
-                ) : current.key === 'actions' ? (
-                  <ActionsExample />
-                ) : (
-                  <EmptyExample />
-                )}
-              </div>
-            </ConfigProvider>
-          </section>
-          <aside className="erp-control-library-checks">
-            <h3>按这 3 步核对</h3>
-            <ol>
-              {current.checks.map((check) => (
-                <li key={check}>{check}</li>
-              ))}
-            </ol>
-            <Link to={guideLink('specification')}>
-              查看图解说明 <ArrowRightOutlined aria-hidden="true" />
-            </Link>
-            <Link to={guideLink('rationale')}>
-              查看设计依据 <ArrowRightOutlined aria-hidden="true" />
-            </Link>
-          </aside>
-        </div>
-        <section className="erp-control-library-rules">
-          <h3>什么时候用，为什么这样设计</h3>
-          <div className="erp-control-table-scroll">
-            <table className="erp-control-table" data-table-lines="fixed">
-              <thead>
-                <tr>
-                  <th>场景</th>
-                  <th>设计选择</th>
-                  <th>原因与边界</th>
-                </tr>
-              </thead>
-              <tbody>
-                {current.rules.map((row) => (
-                  <tr key={row[0]}>
-                    {row.map((cell) => (
-                      <td key={cell}>{cell}</td>
+            <section className="erp-control-library-rules">
+              <h3>什么时候用，为什么这样设计</h3>
+              <div className="erp-control-table-scroll">
+                <table className="erp-control-table" data-table-lines="fixed">
+                  <thead>
+                    <tr>
+                      <th>场景</th>
+                      <th>设计选择</th>
+                      <th>原因与边界</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {current.rules.map((row) => (
+                      <tr key={row[0]}>
+                        {row.map((cell) => (
+                          <td key={cell}>{cell}</td>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <details className="erp-control-library-source">
-          <summary>共享实现与尺寸</summary>
-          <p>{current.source}</p>
-          <p>
-            桌面常规控件 32–38px；手机可触区至少
-            44px。页面只安排位置，外观与动效沿用共享样式；样例不写业务数据或外观偏好。
-          </p>
-        </details>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <details className="erp-control-library-source">
+              <summary>共享实现与尺寸</summary>
+              <p>{current.source}</p>
+              <p>
+                桌面常规控件 32–38px；手机可触区至少
+                44px。页面只安排位置，外观与动效沿用共享样式；样例不写业务数据或外观偏好。
+              </p>
+            </details>
+          </>
+        )}
       </div>
     </section>
   )

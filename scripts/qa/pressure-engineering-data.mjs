@@ -71,7 +71,7 @@ export async function prepareEngineeringPressureData({
   const startedAt = new Date().toISOString();
   async function rpc({ actor, domain, method, params = {} }) {
     signal?.throwIfAborted();
-    const result = await pressureRPC({ signal, baseURL, domain, method, params: { customer_key: "yoyoosun", ...params }, token: tokens[actor] });
+    const result = await pressureRPC({ signal, baseURL, domain, method, params, token: tokens[actor] });
     if (!result.ok) throw new Error(result.error);
     return result.data;
   }
@@ -122,10 +122,11 @@ export async function prepareEngineeringPressureData({
     const ordinal = historical ? index : index - scale.historyOrders;
     const kind = ordinal % 3 === 0 ? "complex" : "ordinary", recipe = ENGINEERING_RECIPES[kind], product = products[kind];
     const orderNo = prefix + (historical ? "-H-" : "-W-") + String(ordinal + 1).padStart(4, "0");
+    const orderDate = Math.floor(Date.now() / 86400000) * 86400 - (historical ? (1 + ordinal % 20) * 36 * 86400 : 0);
     const item = (await rpc({ actor: "sales", domain: "sales_order", method: "save_sales_order_with_items", params: {
       order_no: orderNo, customer_id: customer.id, customer_snapshot: { name: customer.name },
       currency: "CNY", payment_method: "银行转账", payment_term_days: 0, tax_mode: "INCLUSIVE", tax_rate: "13",
-      freight_terms: "INCLUDED", price_condition_note: "模拟含税含运费", order_date: Math.floor(Date.now() / 86400000) * 86400 - (historical ? (1 + ordinal % 20) * 36 * 86400 : 0), note: "隔离压测模拟订单",
+      freight_terms: "INCLUDED", price_condition_note: "模拟含税含运费", order_date: orderDate, note: "隔离压测模拟订单",
       items: Array.from({ length: recipe.lines }, (_, line) => ({
         line_no: line + 1, product_id: product.id, product_sku_id: product.skuId, unit_id: productUnit.id,
         requested_product_name: product.name, customer_product_no: "SIM-STYLE-" + kind,
@@ -136,9 +137,9 @@ export async function prepareEngineeringPressureData({
     } })).sales_order;
     await advanceSalesOrderLifecycleThroughProcess({
       plan: { backendURL: baseURL, runId: runID }, record: { order_no: orderNo, targetStatus: "ACTIVE" },
-      item, token: tokens.sales, roleTokens: tokens, fetchImpl: (url, options) => fetch(url, { ...options, signal: signal ? AbortSignal.any([signal, ...(options?.signal ? [options.signal] : [])]) : options?.signal }), report: { steps: [] },
+      item, token: tokens.admin, roleTokens: tokens, fetchImpl: (url, options) => fetch(url, { ...options, signal: signal ? AbortSignal.any([signal, ...(options?.signal ? [options.signal] : [])]) : options?.signal }), report: { steps: [] },
     });
-    allOrders.push({ id: item.id, orderNo, kind, ...(historical ? { status: PRESSURE_HISTORY_STATES[ordinal % PRESSURE_HISTORY_STATES.length] } : {}) });
+    allOrders.push({ id: item.id, orderNo, orderDate, kind, ...(historical ? { status: PRESSURE_HISTORY_STATES[ordinal % PRESSURE_HISTORY_STATES.length] } : {}) });
     if ((index + 1) % 20 === 0) onProgress({ step: "orders", completed: index + 1, total: totalOrders });
   }
   let confirmed = 0;

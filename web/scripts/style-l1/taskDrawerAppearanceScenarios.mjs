@@ -1,3 +1,4 @@
+import { openERPAppearance } from './themeAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
@@ -105,9 +106,7 @@ export function createTaskDrawerAppearanceScenarios({
         ['橙色', 'orange'],
         ['紫色', 'purple'],
       ]) {
-        await page
-          .getByRole('button', { name: '外观与密度', exact: true })
-          .click()
+        await openERPAppearance(page)
         const appearance = page.getByRole('dialog', { name: '外观与密度' })
         await appearance
           .getByRole('button', { name: label, exact: true })

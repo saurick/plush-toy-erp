@@ -10,8 +10,9 @@ export default function WorkflowTaskTiming({
   events = [],
   includeKeys,
   showDueRisk = true,
+  nowMs,
 }) {
-  const rows = getWorkflowTaskTiming(task, { detail, events, showDueRisk }).filter((row) => !includeKeys || includeKeys.includes(row.key))
+  const rows = getWorkflowTaskTiming(task, { detail, events, showDueRisk, nowMs }).filter((row) => !includeKeys || includeKeys.includes(row.key))
   if (!rows.length) return null
   return (
     <div
@@ -27,8 +28,9 @@ export default function WorkflowTaskTiming({
             key={row.key}
             className={`erp-task-timing__row erp-task-timing__row--${row.tone}`}
             data-task-time={row.key}
+            data-time-state={row.state}
           >
-            <dt>{row.label}</dt>
+            <dt hidden={!detail && row.state === 'missing' && ['due', 'ended'].includes(row.key)}>{row.label}</dt>
             <dd>
               {row.dateTime ? (
                 <time dateTime={row.dateTime} title={row.title}>

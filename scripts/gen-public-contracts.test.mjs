@@ -62,6 +62,32 @@ test('public contracts: all generated files agree with current backend declarati
   assert(!outputs['rpcMethods.generated.mjs'].includes('old_password'))
 })
 
+test('public contracts: generated strings escape tabs without changing source excerpts', async () => {
+  const excerpts = [
+    'map[string]any{\n\t"scope": "inventory",\r\n}',
+    "single ' and double \" quotes, backslash \\, tab \t, 中文",
+    'literal \\t and literal \\n stay escaped',
+  ]
+  const inspection = { sample: { read: { expression: excerpts[0], 'guard\tname': excerpts } } }
+  const catalog = {
+    permissions: { SAMPLE_READ: 'sample.read' },
+    states: { SampleStatus: { READY: 'ready' } },
+    attachments: { maximum: 1 },
+    numeric: { Precision: 20, Scale: 6 },
+    policies: { minimum: 1 },
+    rpc: { sample: { READ: 'read' } },
+    rpcTransport: { method: 'POST', path: '/rpc/{url}' },
+    rpcInspection: inspection,
+    taskDiscovery: { groups: ['sample'] },
+  }
+  const outputs = renderCatalog(catalog)
+  for (const [name, source] of Object.entries(outputs)) {
+    assert.doesNotMatch(source, /\t/u, `${name}: source literals must escape tab characters`)
+  }
+  const { RpcInspection } = await import(`data:text/javascript,${encodeURIComponent(outputs['rpcInspection.generated.mjs'])}`)
+  assert.deepEqual(RpcInspection, inspection)
+})
+
 test('public contracts: RPC documentation preserves authored examples and descriptions, updates fields and stays idempotent', () => {
   const catalog = {
     rpc: { orders: { GET: 'get', LIST: 'list' } },

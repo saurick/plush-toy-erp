@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Select, Space, Tag } from 'antd'
+import { Alert, Button, Space, Tag } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import Pagination from '@/common/components/pagination/AppPagination'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
@@ -219,6 +220,8 @@ export default function DevRPCContractReview() {
         <label>
           比较范围{' '}
           <Select
+            allowClear={false}
+            placeholder="接口合同比较范围"
             aria-label="接口合同比较范围"
             value={query.range}
             options={[

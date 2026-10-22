@@ -15,6 +15,65 @@ export function createInventoryPresentationScenarios(deps) {
   } = deps
   return [
     {
+      name: 'inventory-toolbar-density-responsive',
+      path: '/erp/warehouse/inventory?view=balances',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        const command = page.locator('.erp-inventory-ledger-page .erp-business-operation-panel__command')
+        await command.getByRole('tab', { name: '库存余额' }).waitFor()
+        for (const width of [1920, 1366, 820, 390]) {
+          await page.setViewportSize({ width, height: 1080 })
+          const metrics = await command.evaluate((element) => {
+            const bounds = element.getBoundingClientRect()
+            const controls = [...element.children].filter((node) => node.getBoundingClientRect().width > 0)
+              .map((node) => ({ class: node.className, ...node.getBoundingClientRect().toJSON() }))
+            const search = element.querySelector('.erp-business-operation-panel__search').getBoundingClientRect()
+            return {
+              bounds: bounds.toJSON(),
+              controls,
+              searchWidth: search.width,
+              secondaryHeaders: document.querySelectorAll('.erp-inventory-ledger-page .erp-business-page-header-card--secondary').length,
+            }
+          })
+          assert.equal(metrics.secondaryHeaders, 0, '库存分类应与查询操作共用一行，不再另设二级页头')
+          assert.ok(metrics.controls.every((box) => box.left >= metrics.bounds.left && box.right <= metrics.bounds.right + 1), `库存工具栏控件须位于自身边界内: ${JSON.stringify(metrics)}`)
+          for (let i = 0; i < metrics.controls.length; i += 1) {
+            for (const peer of metrics.controls.slice(i + 1)) {
+              const current = metrics.controls[i]
+              const overlapX = Math.min(current.right, peer.right) - Math.max(current.left, peer.left)
+              const overlapY = Math.min(current.bottom, peer.bottom) - Math.max(current.top, peer.top)
+              assert.ok(overlapX <= 1 || overlapY <= 1, `库存工具栏换行后不能重叠: ${JSON.stringify(metrics)}`)
+            }
+          }
+          if (width === 1920) {
+            assert.ok(metrics.bounds.height <= 56, `宽屏库存工具栏应保持单行: ${JSON.stringify(metrics)}`)
+            assert.ok(metrics.searchWidth >= 240 && metrics.searchWidth <= 321, `库存搜索框应保留可用宽度且不铺满页面: ${JSON.stringify(metrics)}`)
+            const centers = metrics.controls.map((box) => box.top + box.height / 2)
+            assert.ok(Math.max(...centers) - Math.min(...centers) <= 1, '宽屏分类、视图与查询操作应垂直居中对齐')
+          }
+          await assertNoHorizontalOverflow(page, `inventory-toolbar-${width}`)
+          await page.screenshot({ path: path.join(outputDir, `inventory-toolbar-${width}.png`), fullPage: false })
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        const search = command.locator('.erp-business-operation-panel__search input')
+        await search.fill('SKU')
+        await command.getByRole('button', { name: /^筛选(?: · 已应用)?$/u }).click()
+        await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
+        await page.getByRole('dialog', { name: '筛选条件' }).getByRole('button', { name: '完成', exact: true }).click()
+        assert.equal(await search.inputValue(), 'SKU', '打开和关闭筛选应保留搜索词')
+        await search.fill('')
+        await verifySlidingMotion(page, assert, '.erp-inventory-ledger-view-bar .erp-sliding-segmented', 1)
+        await page.getByRole('region', { name: '仓库库存分布', exact: true }).waitFor()
+        await verifySlidingMotion(page, assert, '.erp-inventory-ledger-view-bar .erp-sliding-segmented', 0, true)
+        await command.getByRole('button', { name: '库存作业', exact: true }).click()
+        await page.getByRole('dialog', { name: /库存作业记录/u }).waitFor()
+      },
+    },
+    {
       name: 'inventory-visible-copy-desktop',
       path: '/erp/warehouse/inventory?view=balances',
       auth: 'admin',

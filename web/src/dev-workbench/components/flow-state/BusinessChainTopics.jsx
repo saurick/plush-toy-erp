@@ -15,7 +15,7 @@ function describeRoleDuties(roleName, steps) {
     : `${roleName}参与 ${steps.length} 个办理环节`
 }
 
-export default function BusinessChainTopics({ catalog, mermaid, currentChainKey, onSelectChain, onOpenExceptionDirectory }) {
+export default function BusinessChainTopics({ catalog, mermaid, currentChainKey, onSelectChain, selectedTopicKey }) {
   const [searchParams] = useSearchParams()
   const [mapOpen, setMapOpen] = useState(false)
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
@@ -29,7 +29,6 @@ export default function BusinessChainTopics({ catalog, mermaid, currentChainKey,
       <div className="erp-dev-chain-topics__toolbar">
         <p role="status">{role === 'all' ? `全部 ${count} 条业务流程` : `${roleName}参与 ${count} 条业务流程`}</p>
         <div className="erp-dev-chain-topics__actions">
-          <Button aria-label="异常目录" onClick={onOpenExceptionDirectory}>异常目录</Button>
           <Button onClick={() => setMapOpen(true)}>系统衔接图</Button>
         </div>
       </div>
@@ -40,10 +39,10 @@ export default function BusinessChainTopics({ catalog, mermaid, currentChainKey,
           <ul>
             {lane.topics.map(({ chain, matchingSteps }) => (
               <li key={chain.key}>
-                <button type="button" data-overview-chain={chain.key} aria-label={`查看业务链：${chain.label}`} onClick={() => onSelectChain(chain.key)}>
+                <button type="button" data-overview-chain={chain.key} aria-pressed={selectedTopicKey === chain.key} aria-label={`查看业务链：${chain.label}`} onClick={() => onSelectChain(chain.key)}>
                   <strong>{chain.label}</strong>
                   {role !== 'all' ? <span>{describeRoleDuties(roleName, matchingSteps)}</span> : null}
-                  <small>{chain.key === currentChainKey ? '当前任务所属流程 · ' : ''}查看分工与交接 →</small>
+                  {chain.key === currentChainKey ? <small>当前任务所属流程</small> : null}
                 </button>
               </li>
             ))}

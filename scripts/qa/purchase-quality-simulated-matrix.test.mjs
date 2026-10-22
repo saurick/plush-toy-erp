@@ -474,14 +474,14 @@ test("purchase and quality apply refuses an existing deterministic run before wr
   assert(!methods.includes("save_purchase_order_with_items"));
 });
 
-test("page-visible simulated records use trial wording instead of developer wording", () => {
+test("page-visible generated records use ordinary business values", () => {
   const source = readFileSync(
     new URL("./purchase-quality-simulated-matrix.mjs", import.meta.url),
     "utf8",
   );
 
-  assert.match(source, /【试用】模拟采购供应商/u);
-  assert.match(source, /模拟试用数据，请勿用于正式业务/u);
+  assert.match(source, /材料供应商/u);
+  assert.doesNotMatch(source, /simulated_only\s*:|【试用】模拟采购供应商/u);
   assert.doesNotMatch(source, /【手工测试】|甲方员工|测试人员/u);
 });
 

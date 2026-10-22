@@ -64,6 +64,15 @@ export function createDevWorkbenchDensityScenarios({
         await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
         const initial = await assertSidebarSelection(page, assert)
         assert.equal(initial.label, '产品工程')
+        assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 3, '三个工作区的子入口始终展开')
+        assert.equal(await nav.getByRole('group', { name: '产品工程工作入口' }).count(), 1)
+        const tools = nav.getByRole('button', { name: '页面工具', exact: true })
+        await tools.click()
+        const utilities = page.getByRole('group', { name: '页面工具', exact: true })
+        await utilities.getByRole('button', { name: '复制当前页面链接', exact: true }).waitFor()
+        await utilities.getByRole('button', { name: '复制当前页面链接', exact: true }).press('Escape')
+        await utilities.waitFor({ state: 'hidden' })
+        assert.equal(await tools.evaluate((button) => button === document.activeElement), true, '收起页面工具后恢复入口焦点')
         const originalBox = await secondary.boundingBox()
         await secondary.click()
         await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
@@ -86,6 +95,13 @@ export function createDevWorkbenchDensityScenarios({
         await page.reload()
         await page.getByRole('heading', { name: '产品内核', exact: true }).waitFor()
         await assertSidebarSelection(page, assert)
+        assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 3, '刷新后仍完整展开所有工作区')
+        for (const label of ['质量验证', '交付运行', '总览', '产品工程']) {
+          await nav.getByRole('link', { name: label, exact: true }).click()
+          await page.getByRole('heading', { name: label, exact: true }).waitFor()
+          assert.equal(await nav.getByRole('group', { name: /工作入口$/u }).count(), 3, '切换页面不折叠其他工作区')
+          assert.equal((await assertSidebarSelection(page, assert)).label, label)
+        }
         await assertNoHorizontalOverflow(page, '效能工作台侧栏选中样式')
       },
     },
@@ -135,7 +151,7 @@ export function createDevWorkbenchDensityScenarios({
               currentRouteDistinct: currentRoute
                 ? (() => {
                     const idle = element.querySelector(
-                      '.erp-dev-workspace-nav__secondary-route:not([aria-current])'
+                      '.erp-dev-workspace-nav a:not([aria-current])'
                     )
                     const idleStyle = getComputedStyle(idle)
                     return (
@@ -207,7 +223,6 @@ export function createDevWorkbenchDensityScenarios({
           }
           const headerControls = {
             '/__dev': '.erp-dev-overview-library__toolbar',
-            '/__dev/product-core': '.erp-dev-product-core-toolbar',
             '/__dev/project-skills': '.erp-dev-skills__health',
             '/__dev/customer-config': '.erp-dev-customer-stagebar',
             '/__dev/drill-recovery': '[aria-label="安全与恢复任务"]',
@@ -219,6 +234,9 @@ export function createDevWorkbenchDensityScenarios({
               `${label}的筛选、状态或主导航应直接并入页头`
             )
           }
+          if (route === '/__dev/product-core') {
+            assert.equal(await root.locator('main > .erp-dev-product-core-toolbar').count(), 1, '能力筛选集中在目录上方')
+          }
           if (route === '/__dev/project-skills') {
             const selection = await root
               .locator('.erp-dev-skills__item[aria-pressed="true"]')
@@ -227,13 +245,13 @@ export function createDevWorkbenchDensityScenarios({
                 return {
                   marker: style.boxShadow.includes('inset'),
                   size: Number.parseFloat(
-                    getComputedStyle(element.querySelector('span')).fontSize
+                    getComputedStyle(element.querySelector('strong')).fontSize
                   ),
                 }
               })
             assert(
               selection.marker && selection.size >= 14,
-              'Skill 目录保留当前标记和可读的说明文字'
+              'Skill 目录保留当前标记和可读的任务名称'
             )
           }
           if (route === '/__dev/testing') {
@@ -357,20 +375,24 @@ export function createDevWorkbenchDensityScenarios({
           cards: [...element.querySelectorAll('[data-stage-card]')].map(
             (card) => card.getBoundingClientRect().height
           ),
-          details: [...element.querySelectorAll('[data-stage-card]')].map((card) => ({
-            stage: card.closest('[data-chain-stage]').dataset.chainStage,
-            height: card.getBoundingClientRect().height,
-            mainHeight: card.querySelector('.erp-dev-chain__stage-main').getBoundingClientRect().height,
-            footHeight: card.querySelector('.erp-dev-chain__stage-foot').getBoundingClientRect().height,
-            footPaddingBottom: getComputedStyle(card.querySelector('.erp-dev-chain__stage-foot')).paddingBottom,
-          })),
+          details: [...element.querySelectorAll('[data-stage-card]')].map((card) => {
+            const stage = card.closest('[data-chain-stage]')
+            const entry = stage.querySelector('[data-stage-exception]')
+            return {
+              stage: stage.dataset.chainStage,
+              height: card.getBoundingClientRect().height,
+              exceptionHeight: entry?.getBoundingClientRect().height || null,
+              exceptionGap: entry ? entry.getBoundingClientRect().top - card.getBoundingClientRect().bottom : null,
+            }
+          }),
         }))
-        await fs.writeFile(path.join(outputDir, 'dev-density-chain-geometry.json'), JSON.stringify(chain, null, 2) + '\n')
+        await fs.writeFile(path.join(outputDir, 'dev-density-chain-geometry.json'), `${JSON.stringify(chain, null, 2)}\n`)
         assert(chain.height <= 760, '桌面总链应在一屏内保留主要结构')
         assert(
           chain.cards.every((height) => height >= 60 && height <= 88),
-          '节点压缩留白后仍应容纳标题与异常入口'
+          '正常入口保留标题与完整点击区域'
         )
+        assert(chain.details.every((item) => item.exceptionGap === null || item.exceptionGap >= 8), '异常入口在主按钮外保留间距')
         await assertNoHorizontalOverflow(page, '压缩后的业务链')
 
         for (const route of [
@@ -399,8 +421,9 @@ export function createDevWorkbenchDensityScenarios({
         ]) {
           await page.goto(new URL(route, page.url()).href)
           await page.locator('.erp-dev-workspace-page > header h1').waitFor()
-          if (name === 'skills')
+          if (name === 'skills') {
             await page.locator('.erp-dev-skills__health').waitFor()
+          }
           await page.screenshot({
             path: path.join(outputDir, `workbench-${name}-native.png`),
             fullPage: false,

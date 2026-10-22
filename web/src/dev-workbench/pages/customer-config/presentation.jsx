@@ -1,5 +1,6 @@
 import { CopyOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
-import { Alert, Button, Select, Space, Tag, Tooltip, Typography } from 'antd'
+import { Alert, Button, Space, Tag, Tooltip, Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { message } from '@/common/utils/antdApp'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 
@@ -257,6 +258,8 @@ export function CustomerPackageSelector({
         <Text strong>{options[0].label}</Text>
       ) : (
         <Select
+          allowClear={false}
+          label="客户包选择"
           aria-label="客户包选择"
           value={matched ? overview.customerKey : undefined}
           placeholder="选择已登记客户包"

@@ -1,3 +1,4 @@
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
 import { expandPrintToolSection } from './printToolHelpers.mjs'
 
 export function createPrintWorkspaceItemScenarios({
@@ -51,7 +52,7 @@ export function createPrintWorkspaceItemScenarios({
         const doc = new DOMParser().parseFromString(source, 'text/html')
         return {
           controls: doc.body.querySelectorAll(
-            '[data-print-tool], [data-print-editor-only], [data-print-blank-notice], .erp-print-shell__blank-actions, button, select'
+            "[data-print-tool], [data-print-editor-only], [data-print-blank-notice], .erp-print-shell__blank-actions, button, .ant-select"
           ).length,
           text: doc.body.textContent,
         }
@@ -98,9 +99,8 @@ export function createPrintWorkspaceItemScenarios({
     const values = async () =>
       (await editors('delivery').allTextContents()).map((text) => text.trim())
     await expandPrintToolSection(page, '条款编辑')
-    await tools
-      .getByRole('combobox', { name: '条款分组', exact: true })
-      .selectOption('delivery')
+    await chooseSelectOption(tools
+      .getByRole('combobox', { name: '条款分组', exact: true }), 'delivery')
     const source = ['条款甲', '条款乙', '条款丙']
     for (let index = 0; index < source.length; index += 1) {
       await editors('delivery').nth(index).fill(source[index])
@@ -155,9 +155,8 @@ export function createPrintWorkspaceItemScenarios({
     await page.locator('.erp-print-shell--ready').waitFor()
     assert.equal(await group('delivery').count(), 0, '刷新不补回已删组')
     await expandPrintToolSection(page, '条款编辑')
-    await tools
-      .getByRole('combobox', { name: '条款分组', exact: true })
-      .selectOption('delivery')
+    await chooseSelectOption(tools
+      .getByRole('combobox', { name: '条款分组', exact: true }), 'delivery')
     await tools.getByRole('button', { name: '新增条目', exact: true }).click()
     assert.deepEqual(await values(), [''])
     await expectBlanks(page, baseline + 1)
@@ -179,7 +178,7 @@ export function createPrintWorkspaceItemScenarios({
       name: '条款分组',
       exact: true,
     })
-    await groupSelect.selectOption('contract')
+    await chooseSelectOption(groupSelect, 'contract')
     await page.evaluate(
       () =>
         new Promise((resolve) =>
@@ -187,17 +186,16 @@ export function createPrintWorkspaceItemScenarios({
         )
     )
     assert.equal(
-      await groupSelect.inputValue(),
+      await readSelectValue(groupSelect),
       'contract',
       '旧定位不抢回已切换的分组'
     )
-    await groupSelect.selectOption('delivery')
+    await chooseSelectOption(groupSelect, 'delivery')
     await editors('delivery').first().fill('恢复条目')
     await expectBlanks(page, baseline)
     for (const key of ['delivery', 'contract', 'settlement']) {
-      await tools
-        .getByRole('combobox', { name: '条款分组', exact: true })
-        .selectOption(key)
+      await chooseSelectOption(tools
+        .getByRole('combobox', { name: '条款分组', exact: true }), key)
       const length = await editors(key).count()
       for (let index = 0; index < length; index += 1) {
         await tools

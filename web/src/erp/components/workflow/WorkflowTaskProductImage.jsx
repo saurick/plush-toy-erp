@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   InboxOutlined,
   PictureOutlined,
-  ZoomInOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
+import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { downloadBusinessAttachment } from '../../api/attachmentApi.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
@@ -27,7 +28,9 @@ function ImagePlaceholder({ item, state = 'empty' }) {
   const material = item.kind === 'material'
   const Icon = material ? InboxOutlined : PictureOutlined
   const label =
-    state === 'failed'
+    state === 'denied'
+      ? '无权限'
+      : state === 'failed'
       ? '加载失败'
       : state === 'loading'
         ? '加载中'
@@ -35,7 +38,9 @@ function ImagePlaceholder({ item, state = 'empty' }) {
           ? '物料'
           : '暂无图'
   const description = `${item.name || (material ? '物料' : '产品')}：${
-    state === 'failed'
+    state === 'denied'
+      ? '无图片读取权限'
+      : state === 'failed'
       ? '图片暂不可用'
       : state === 'loading'
         ? '图片加载中'
@@ -56,8 +61,11 @@ function ImagePlaceholder({ item, state = 'empty' }) {
 
 function ProductImage({ item, load, preview }) {
   const target = useRef(null)
+  const trigger = useRef(null)
   const [thumbnail, setThumbnail] = useState('')
   const [failed, setFailed] = useState(false)
+  const [denied, setDenied] = useState(false)
+  const [revision, setRevision] = useState(0)
   const [opened, setOpened] = useState(false)
 
   useEffect(() => {
@@ -67,8 +75,10 @@ function ProductImage({ item, load, preview }) {
         .then((src) => {
           if (active) setThumbnail(src)
         })
-        .catch(() => {
-          if (active) setFailed(true)
+        .catch((error) => {
+          if (!active) return
+          if (Number(error?.code) === RpcErrorCode.PERMISSION_DENIED) setDenied(true)
+          else setFailed(true)
         })
     const observer = new IntersectionObserver(
       (entries) => {
@@ -84,7 +94,7 @@ function ProductImage({ item, load, preview }) {
       active = false
       observer.disconnect()
     }
-  }, [item.productID, item.imageAttachmentID, load])
+  }, [item.productID, item.imageAttachmentID, load, revision])
 
   const picture = thumbnail ? (
     <img
@@ -100,7 +110,7 @@ function ProductImage({ item, load, preview }) {
   ) : (
     <ImagePlaceholder item={item} state="loading" />
   )
-  const imageState = failed ? 'failed' : thumbnail ? 'ready' : 'loading'
+  const imageState = denied ? 'denied' : failed ? 'failed' : thumbnail ? 'ready' : 'loading'
   return (
     <>
       <span
@@ -108,10 +118,30 @@ function ProductImage({ item, load, preview }) {
         className={`erp-task-product-image${imageState !== 'ready' ? ' erp-task-product-image--placeholder' : ''}`}
         data-image-state={imageState}
       >
-        {failed ? (
+        {denied ? (
+          <ImagePlaceholder item={item} state="denied" />
+        ) : failed && preview ? (
+          <button
+            type="button"
+            className="erp-task-product-image__retry"
+            aria-label={`重试${item.name || '产品'}图片`}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}
+            onClick={(event) => {
+              event.stopPropagation()
+              load.invalidate({ productID: item.productID, attachmentID: item.imageAttachmentID })
+              setFailed(false)
+              setThumbnail('')
+              setRevision((value) => value + 1)
+            }}
+          >
+            <ReloadOutlined aria-hidden="true" /><span>重试图片</span>
+          </button>
+        ) : failed ? (
           <ImagePlaceholder item={item} state="failed" />
         ) : thumbnail && preview ? (
           <button
+            ref={trigger}
             type="button"
             aria-label={`查看${item.name || '产品'}大图`}
             aria-haspopup="dialog"
@@ -121,7 +151,7 @@ function ProductImage({ item, load, preview }) {
             }}
             onTouchStart={(event) => event.stopPropagation()}
             onDoubleClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}
             onClick={(event) => {
               event.stopPropagation()
               if (!event.currentTarget.closest('[role="option"]')) {
@@ -131,10 +161,6 @@ function ProductImage({ item, load, preview }) {
             }}
           >
             {picture}
-            <ZoomInOutlined
-              className="erp-task-product-image__zoom"
-              aria-hidden="true"
-            />
           </button>
         ) : (
           picture
@@ -145,7 +171,10 @@ function ProductImage({ item, load, preview }) {
           item={item}
           thumbnail={thumbnail}
           load={load}
-          onClose={() => setOpened(false)}
+          onClose={() => {
+            setOpened(false)
+            trigger.current?.focus({ preventScroll: true })
+          }}
         />
       ) : null}
     </>
@@ -158,6 +187,7 @@ export default function WorkflowTaskProductImage({
   state = 'empty',
 }) {
   const { adminProfile } = useOutletContext() || {}
+  const denied = item.kind !== 'material' && item.productID > 0 && !hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   if (
     item.kind === 'material' ||
     !item.productID ||
@@ -167,9 +197,9 @@ export default function WorkflowTaskProductImage({
     return (
       <span
         className="erp-task-product-image erp-task-product-image--placeholder"
-        data-image-state={state}
+        data-image-state={denied ? 'denied' : state}
       >
-        <ImagePlaceholder item={item} state={state} />
+        <ImagePlaceholder item={item} state={denied ? 'denied' : state} />
       </span>
     )
   }

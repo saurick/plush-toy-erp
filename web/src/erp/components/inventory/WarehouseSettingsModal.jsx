@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Form, Input, Select, Switch } from 'antd'
+import { Alert, Button, Form, Input, Switch } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -166,6 +167,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
           ]}
         >
           <Select
+            placeholder="请选择仓库用途"
             options={
               rows.some(
                 (row) => row.id === editingID && row.type === 'UNCLASSIFIED'

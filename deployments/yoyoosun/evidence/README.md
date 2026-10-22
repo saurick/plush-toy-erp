@@ -62,11 +62,19 @@ node scripts/deploy/release-evidence-status.mjs \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
-status 不执行发布、不读取真实 `.env`、不恢复备份、不跑 migration、不调用后端、不做 smoke，也不执行 rollback / forward-fix；JSON 输出会带 `scope.evidenceOnly=true`、`readyMeaning` 和 `notProvenByThisHelper`，明确 `ready` 只表示该 evidence 目录通过 release evidence gate，不证明 status 脚本执行过真实目标环境发布、migration、smoke、恢复演练或回滚 / 前向修复演练。最终是否可进入客户试用或交付仍以 `release-evidence-gate.mjs` 通过为准。
+status 不执行发布、不读取真实 `.env`、不恢复备份、不跑 migration、不调用后端、不做 smoke，也不执行 rollback / forward-fix；JSON 输出会带 `scope.evidenceOnly=true`、`readyMeaning` 和 `notProvenByThisHelper`，明确 `ready` 只表示该 evidence 目录通过 release evidence gate，不证明 status 脚本执行过真实目标环境发布、migration、smoke、恢复演练或回滚 / 前向修复演练。
 
-门禁按所选 profile 校验。两档都要求真实运行时 preflight、完整 40 位 `productCommit`、镜像 digest、当前备份、migration before/after、基础 smoke 和回滚方案。普通发布无迁移且经复核 `recoveryProcedureChanged=false` 时，不要求重复恢复 / 回滚演练或客户签收；迁移、恢复流程变更及客户验收仍须完成演练。所有适用材料绑定同一 `releaseId`、environment 与 backup identity。详细条件由 [发布记录](releases/README.md) 与 `release-evidence-gate.mjs` 维护。
+最终是否可进入客户试用或交付仍以 `release-evidence-gate.mjs` 通过为准。
 
-恢复链跨越 `20260714055504` 时，还必须先在 restored DB 完成 populated upgrade read-only audit；`backup-evidence.md`、backup restore 的 restore / summary 和 `command-summary.txt` 必须同时记录 `populatedUpgradeAuditStatus=passed`，步骤必须包含 read-only audit。release gate 会交叉核对这些字段，不能只靠迁移最终版本或人工备注补证。
+门禁按所选 profile 校验。两档都要求真实运行时 preflight、完整 40 位 `productCommit`、镜像 digest、当前备份、migration before/after、基础 smoke 和回滚方案。
+
+普通发布无迁移且经复核 `recoveryProcedureChanged=false` 时，不要求重复恢复 / 回滚演练或客户签收；迁移、恢复流程变更及客户验收仍须完成演练。所有适用材料绑定同一 `releaseId`、environment 与 backup identity。
+
+详细条件由 [发布记录](releases/README.md) 与 `release-evidence-gate.mjs` 维护。
+
+恢复链跨越 `20260714055504` 时，还必须先在 restored DB 完成 populated upgrade read-only audit；`backup-evidence.md`、backup restore 的 restore / summary 和 `command-summary.txt` 必须同时记录 `populatedUpgradeAuditStatus=passed`，步骤必须包含 read-only audit。
+
+release gate 会交叉核对这些字段，不能只靠迁移最终版本或人工备注补证。
 
 恢复链跨越 `20260714055825` 时，还必须在 apply 前完成 customer config cutover read-only audit；上述四处必须同时记录 `customerConfigCutoverAuditStatus=passed`，步骤必须包含 customer config cutover read-only audit。发现遗留流程实例或任务配置 revision 锚点时必须停止并人工治理，恢复脚本不会自动清理生产数据。
 
@@ -107,7 +115,9 @@ node scripts/deploy/customer-config-activation-gate.mjs \
 
 该门禁只检查 manifest 与发布证据是否可进入激活，不会连接后端、不执行 `activate_customer_config`、不跑 migration、不恢复备份、不导入业务数据；目标发布及本轮适用的恢复演练仍必须独立完成。
 
-release evidence 目录还必须包含 `customer-config-manifest-evidence.json`，其中 `manifestSha256` 要等于当前 runtime manifest 的 `sha256:<64-hex>`，`manifestPath` / `releaseReport` 只保存仓库相对路径，并声明 `reviewStatus=approved`、`containsSecrets=false`、`containsRawCustomerRows=false`、`containsRawCustomerFiles=false`。这样激活门禁会证明“这份证据”绑定的是“这一份 manifest”，而不是复用一份泛化发布证据；草稿目录如果适用的 release evidence、smoke 或验收签收尚未通过，不应写成 `approved`。
+release evidence 目录还必须包含 `customer-config-manifest-evidence.json`，其中 `manifestSha256` 要等于当前 runtime manifest 的 `sha256:<64-hex>`，`manifestPath` / `releaseReport` 只保存仓库相对路径，并声明 `reviewStatus=approved`、`containsSecrets=false`、`containsRawCustomerRows=false`、`containsRawCustomerFiles=false`。
+
+这样激活门禁会证明“这份证据”绑定的是“这一份 manifest”，而不是复用一份泛化发布证据；草稿目录如果适用的 release evidence、smoke 或验收签收尚未通过，不应写成 `approved`。
 
 生成该文件时使用：
 
@@ -122,6 +132,8 @@ node scripts/deploy/customer-config-manifest-evidence.mjs \
 
 `--release-report` 可省略；提供时会额外校验 report 里的 `manifestSha256` 与当前 manifest 一致。未传 `--review-status approved` 时脚本默认生成 `draft`，不能通过 activation gate。
 
+## 客户配置发布就绪检查
+
 发布前或发布后声明“客户配置发布包 ready”时，必须再跑聚合 readiness gate。发布前不带执行报告即可证明 manifest、manifest evidence、release evidence 和 activation gate 同时通过：
 
 ```bash
@@ -131,7 +143,13 @@ node scripts/deploy/customer-config-release-readiness.mjs \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
-生成执行器报告后，追加 `--release-report`；如果要声明已经执行 publish，再追加 `--require-executed`；如果要声明 active revision 已生效，再追加 `--require-activated`。`--require-activated` 会要求执行器报告里的 `effectiveSessionVerification.status=verified`，也就是 activate 后已读回 `get_effective_session`，并确认 active revision、非空页面投影和字段策略 surface 与 manifest 对齐；同时还会要求本目录的 `smoke-test-report.json` 已包含目标环境 `customer-config-effective-session` 检查，且 revision 与当前 manifest 匹配；执行器报告的 `backendEndpointAlias` 必须与目标 smoke report 的 `backendEndpointAlias` 一致，避免用本地执行报告拼接目标环境 smoke 证据：
+生成执行器报告后，追加 `--release-report`；如果要声明已经执行 publish，再追加 `--require-executed`；如果要声明 active revision 已生效，再追加 `--require-activated`。
+
+`--require-activated` 同时核对以下证据：
+
+1. 执行器报告的 `effectiveSessionVerification.status=verified`：activate 后已读回 `get_effective_session`，active revision、非空页面投影和字段策略 surface 与 manifest 对齐。
+2. 本目录 `smoke-test-report.json` 包含目标环境 `customer-config-effective-session` 检查，revision 与当前 manifest 匹配。
+3. 执行器报告和目标 smoke report 的 `backendEndpointAlias` 一致，避免把本地执行报告拼接为目标环境证据。
 
 ```bash
 node scripts/deploy/customer-config-release-readiness.mjs \
@@ -142,7 +160,11 @@ node scripts/deploy/customer-config-release-readiness.mjs \
   --require-activated
 ```
 
-readiness gate 只聚合脱敏证据和 report，不访问后端、不执行 migration、不恢复备份、不导入业务数据；`--require-executed` 会要求执行器报告写有脱敏 `backendEndpointAlias`，`--require-activated / --require-rollback` 还要求该 endpoint 与目标 smoke report 一致。需要给自动化或交接脚本读取时可追加 `--json`，输出中的 `scope.evidenceOnly`、`readyMeaning` 和 `notProvenByThisGate` 会明确它没有执行目标发布、migration、恢复、smoke、回滚或 Workflow / Fact 写入。目标 smoke 证据已经存在也仍不能替代目标环境真实发布、恢复演练、smoke 或回滚 / forward-fix 判断。
+readiness gate 只聚合脱敏证据和 report，不访问后端、不执行 migration、不恢复备份、不导入业务数据；`--require-executed` 会要求执行器报告写有脱敏 `backendEndpointAlias`，`--require-activated / --require-rollback` 还要求该 endpoint 与目标 smoke report 一致。
+
+需要给自动化或交接脚本读取时可追加 `--json`，输出中的 `scope.evidenceOnly`、`readyMeaning` 和 `notProvenByThisGate` 会明确它没有执行目标发布、migration、恢复、smoke、回滚或 Workflow / Fact 写入。
+
+目标 smoke 证据已经存在也仍不能替代目标环境真实发布、恢复演练、smoke 或回滚 / forward-fix 判断。
 
 证据和计划确认后，可用客户配置发布执行器生成 report-only 计划或显式执行 JSON-RPC：
 
@@ -154,4 +176,8 @@ node scripts/deploy/customer-config-release-execute.mjs \
   --out output/customers/yoyoosun/customer-config-release
 ```
 
-真实执行必须额外提供 `--execute`、`--backend-url`、`CUSTOMER_CONFIG_ADMIN_TOKEN` 或管理员账号密码，并设置 `CUSTOMER_CONFIG_CONFIRM=PUBLISH_YOYOOSUN_CONFIG` 或 `CUSTOMER_CONFIG_CONFIRM=ACTIVATE_YOYOOSUN_CONFIG`。如果 publish 已成功，只补跑激活时使用 `--activate-only`，避免重复 publish。activate / rollback 执行成功后，执行器会用同一管理员身份调用 `get_effective_session` 并把投影验证写入 report。执行器只走 `customer_config` JSON-RPC，不上传 raw 文件、不直写数据库、不导入业务数据、不替代 migration / smoke / rollback。
+真实执行必须额外提供 `--execute`、`--backend-url`、`CUSTOMER_CONFIG_ADMIN_TOKEN` 或管理员账号密码，并设置 `CUSTOMER_CONFIG_CONFIRM=PUBLISH_YOYOOSUN_CONFIG` 或 `CUSTOMER_CONFIG_CONFIRM=ACTIVATE_YOYOOSUN_CONFIG`。
+
+如果 publish 已成功，只补跑激活时使用 `--activate-only`，避免重复 publish。activate / rollback 执行成功后，执行器会用同一管理员身份调用 `get_effective_session` 并把投影验证写入 report。
+
+执行器只走 `customer_config` JSON-RPC，不上传 raw 文件、不直写数据库、不导入业务数据、不替代 migration / smoke / rollback。

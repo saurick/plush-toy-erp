@@ -63,7 +63,7 @@ func (d *jsonrpcDispatcher) mapDebugError(ctx context.Context, err error) *v1.Js
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "必须提供 debugRunId，本接口禁止无范围清理"}
 	case errors.Is(err, biz.ErrDebugScenarioNotFound):
 		l.Warnf("[debug] scenario not found err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "调试场景不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "调试场景不存在"}
 	case errors.Is(err, biz.ErrDebugCleanupScopeInvalid):
 		l.Warnf("[debug] cleanup scope invalid err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "清理范围不受支持"}
@@ -72,7 +72,7 @@ func (d *jsonrpcDispatcher) mapDebugError(ctx context.Context, err error) *v1.Js
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "调试数据缺少安全标记"}
 	case errors.Is(err, biz.ErrWorkflowTaskExists):
 		l.Warnf("[debug] duplicated debug run err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "debugRunId 已存在，请重新生成"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "本次模拟记录已存在，请重新发起模拟"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[debug] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}

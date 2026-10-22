@@ -1,4 +1,4 @@
-h1:vmUn6jmHSLICUhHVltphqp7NBSlG2VdZ8kA/VpK2xy8=
+h1:YLh8MGwEBly57lOISAHi1GW9pBEWbhA/sLbIFkWHNlU=
 20260315161316_migrate.sql h1:aW9ynfMUR5IdFF5E6zkq5zQdgTv9YEtXjRiZTSF6f+I=
 20260421140457_migrate.sql h1:Znvhutjs+bPceNgWeN7W2TxKXHUQtyBH+Yr1b5kmXwE=
 20260423081607_migrate.sql h1:ZXYJO5Kvb2GkCOhWtMP/2nIV3stabZ5wFouUxOPbzhM=
@@ -155,3 +155,6 @@ h1:vmUn6jmHSLICUhHVltphqp7NBSlG2VdZ8kA/VpK2xy8=
 20261017085605_migrate.sql h1:+W8MK/ZBjf5w7awEZsdVcAkcXPI0y7Roxwf1TPoZPM8=
 20261017094049_migrate.sql h1:nZ3kRRCZVlY02fsUpslK5HRKaz1Z4uR4e8Fu8SsTNi8=
 20261019095827_migrate.sql h1:2cWj1wvajPjctzy3ls7uAu0/ehrYF4uR6qjnstHGRJg=
+20261021134134_migrate.sql h1:R3ZcPr3dtf7COC+fnKsIrtUqMOZJYvAwpAJ5cO5m3z8=
+20261021134135_remove_business_data_nature_markers.sql h1:Yl4mnp1gApfMjgfxfUEmfmR+4SEH4ZXrqpkyUHMTftA=
+20261021142304_normalize_task_business_copy.sql h1:VHye8X3PJBzSCSDnNbxIiY3MtxhL4DgEC1eWisnW1Vk=

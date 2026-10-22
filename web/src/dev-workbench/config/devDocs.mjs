@@ -1,6 +1,9 @@
 export { DEV_DOCS_ROUTE } from './devRoutes.mjs'
 
+export const DEV_DOCS_HOME_PATH = 'docs/README.md'
+
 export const PINNED_DEV_DOC_PATHS = Object.freeze([
+  DEV_DOCS_HOME_PATH,
   'README.md',
   'AGENTS.md',
   'web/README.md',
@@ -11,6 +14,42 @@ export const PINNED_DEV_DOC_PATHS = Object.freeze([
   'docs/product/产品能力进度台账.md',
   'docs/product/自动化测试策略.md',
 ])
+
+const DIRECTORY_LABELS = Object.freeze({
+  docs: '项目文档',
+  'docs/manuals': '使用与实施手册',
+  'docs/product': '产品与业务规则',
+  'docs/product/ui-design': '交互设计',
+  'docs/architecture': '架构与领域边界',
+  'docs/engineering': '开发与交付',
+  'docs/workflow': '工作流与协同',
+  'docs/roles': '角色与权限',
+  'docs/warehouse': '仓库与品质',
+  'docs/finance': '财务',
+  'docs/observability': '日志与审计',
+  'docs/security': '安全与隐私',
+  'docs/customers': '客户实施资料',
+  'docs/archive': '历史归档',
+  'docs/archive/architecture-history': '架构历史',
+  'docs/archive/customer-evidence': '客户历史证据',
+  server: '后端',
+  'server/docs': '后端专题',
+  'server/docs/database': '数据字典',
+  'server/deploy': '服务端部署',
+  web: '前端',
+  scripts: '脚本与检查',
+  deployments: '客户交付',
+  config: '配置',
+  'config/customers': '客户配置',
+  '.agents': '工程约定',
+  '.agents/skills': '项目 Skills',
+})
+
+export function getDevDocsDisplayTitle(title = '') {
+  const value = String(title || '')
+  // 中英对照标题保留完整检索值，导航只显示中文主标题。
+  return value.replace(/^(.*[\u3400-\u9fff].*?)\s+\/\s+[A-Za-z][\x20-\x7e]*$/u, '$1')
+}
 
 export const DEV_DOCS_PINNED_STORAGE_KEY = 'plush_erp_dev_docs_pinned_paths'
 export const DEV_DOCS_SELECTED_PATH_STORAGE_KEY =
@@ -312,6 +351,7 @@ export function buildDevDocsTree(items = []) {
           type: 'directory',
           key: `dir:${dirPath}`,
           name: segment,
+          label: DIRECTORY_LABELS[dirPath] || segment,
           path: dirPath,
           children: [],
           docCount: 0,
@@ -336,6 +376,9 @@ export function buildDevDocsTree(items = []) {
     }
 
     node.children.sort((left, right) => {
+      const leftIndex = left.type === 'document' && left.name === 'README.md'
+      const rightIndex = right.type === 'document' && right.name === 'README.md'
+      if (leftIndex !== rightIndex) return leftIndex ? -1 : 1
       if (left.type !== right.type) {
         return left.type === 'directory' ? -1 : 1
       }

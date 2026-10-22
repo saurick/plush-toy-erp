@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { Buffer } from 'node:buffer'
 import {
   buildMaterialPurchaseContractBatchDraft,
@@ -309,6 +310,8 @@ export function createPrintWorkspaceScenarios({
       const stage = document.querySelector('.erp-print-shell__stage')
       const paper = document.querySelector(selector)
       const toolbarRect = toolbar?.getBoundingClientRect()
+      const headerEnd = document.querySelector('.erp-print-shell__blank-notice') || toolbar
+      const headerEndRect = headerEnd?.getBoundingClientRect()
       const contentRect = content?.getBoundingClientRect()
       const stageRect = stage?.getBoundingClientRect()
       const paperRect = paper?.getBoundingClientRect()
@@ -324,6 +327,11 @@ export function createPrintWorkspaceScenarios({
             ? contentRect.top - toolbarRect.bottom
             : -1,
         controlsBottom: toolbarRect?.bottom || 0,
+        headerContentBottom: headerEndRect?.bottom || 0,
+        headerToContent:
+          headerEndRect && contentRect
+            ? contentRect.top - headerEndRect.bottom
+            : -1,
         stageTop: stageRect?.top || 0,
         contentToStage:
           contentRect && stageRect ? stageRect.top - contentRect.top : -1,
@@ -345,12 +353,12 @@ export function createPrintWorkspaceScenarios({
         metrics.foundContent &&
         metrics.foundStage &&
         metrics.foundPaper &&
-        Math.abs(metrics.toolbarToContent - 12) <= 1 &&
-        metrics.stageTop >= metrics.controlsBottom &&
-        metrics.stageTop <= metrics.controlsBottom + 20 &&
+        Math.abs(metrics.headerToContent - 12) <= 1 &&
+        metrics.stageTop >= metrics.headerContentBottom &&
+        metrics.stageTop <= metrics.headerContentBottom + 20 &&
         Math.abs(metrics.stagePaddingTop - 24) <= 1 &&
         Math.abs(metrics.stageToPaper - 25) <= 1 &&
-        Math.abs(metrics.toolbarToPaper - metrics.contentToStage - 37) <= 1 &&
+        Math.abs(metrics.paperTop - metrics.headerContentBottom - metrics.contentToStage - 37) <= 1 &&
         metrics.paperWidth > 700,
       `${scenarioLabel} 纸面编辑区到顶部工具栏的外层间距应和五套正式模板一致: ${JSON.stringify(metrics)}`
     )
@@ -1330,14 +1338,14 @@ export function createPrintWorkspaceScenarios({
             flexShrink: window.getComputedStyle(node).flexShrink,
             wrapperWidth: node.parentElement.getBoundingClientRect().width,
           }))
-        const zoom = page.getByLabel('显示比例')
-        await zoom.selectOption('1')
+        const zoom = page.getByRole('combobox', { name: "显示比例", exact: true })
+        await chooseSelectOption(zoom, '1')
         const original = await readPaperSize()
         assert(
           Math.abs(original.layoutWidth - (210 * 96) / 25.4) <= 1,
           '窄视口仍应使用 A4 的固定布局宽度'
         )
-        await zoom.selectOption('1.5')
+        await chooseSelectOption(zoom, '1.5')
         const enlarged = await readPaperSize()
         assert.equal(
           enlarged.layoutWidth,
@@ -1358,7 +1366,7 @@ export function createPrintWorkspaceScenarios({
         } finally {
           await page.emulateMedia({ media: 'screen' })
         }
-        await zoom.selectOption('fit')
+        await chooseSelectOption(zoom, 'fit')
         await assertNoHorizontalOverflow(page, '采购合同适应宽度')
         await assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints(page)
       },
@@ -1915,9 +1923,8 @@ export function createPrintWorkspaceScenarios({
           await page.evaluate(() => document.fonts.ready)
           const samples = await collectEmptyEditorSamples(editors)
           for (const scale of ['1', '1.25']) {
-            await page
-              .locator('.erp-print-shell__zoom-control select')
-              .selectOption(scale)
+            await chooseSelectOption(page
+              .locator('.erp-print-shell__zoom-control .ant-select'), scale)
             for (const sample of samples) {
               await assertEmptyEditorCaret(
                 page,
@@ -2675,13 +2682,11 @@ export function createPrintWorkspaceScenarios({
         await blankNotice
           .getByRole('button', { name: '下一处', exact: true })
           .waitFor()
-        await page
-          .getByRole('combobox', { name: '输出批次', exact: true })
-          .selectOption('0')
+        await chooseSelectOption(page
+          .getByRole('combobox', { name: '输出批次', exact: true }), '0')
         await blankNotice.getByText(/^当前有 300 处留白，/u).waitFor()
-        await page
-          .getByRole('combobox', { name: '输出批次', exact: true })
-          .selectOption('1')
+        await chooseSelectOption(page
+          .getByRole('combobox', { name: '输出批次', exact: true }), '1')
         await blankNotice.getByText(/^当前有 17 处留白，/u).waitFor()
         await blankNotice
           .getByRole('button', { name: '查看留白', exact: true })
@@ -2739,9 +2744,8 @@ export function createPrintWorkspaceScenarios({
           renderPayloads[0].html,
           /data-purchase-order-no="PO-MANY-1"/u
         )
-        await page
-          .getByRole('combobox', { name: '输出批次', exact: true })
-          .selectOption('0')
+        await chooseSelectOption(page
+          .getByRole('combobox', { name: '输出批次', exact: true }), '0')
         assert.equal(
           await page.locator('.erp-material-contract-batch__document').count(),
           20

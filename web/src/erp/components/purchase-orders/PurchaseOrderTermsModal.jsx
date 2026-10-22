@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Form, InputNumber, Spin } from 'antd'
 import Table from '@/common/components/table/AppTable.jsx'
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import {
   completePurchaseOrderTerms,

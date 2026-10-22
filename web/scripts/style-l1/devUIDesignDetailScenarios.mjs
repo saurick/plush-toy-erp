@@ -1,6 +1,10 @@
+import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
 import { writeFile } from 'node:fs/promises'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { getContrastRatio } from './colorAssertions.mjs'
+import { createDevWorkCenterDesignScenarios } from './devWorkCenterDesignScenarios.mjs'
+import { createDevSharedComponentScenarios } from './devSharedComponentScenarios.mjs'
+import { createDevUIDesignPreviewScenarios } from './devUIDesignPreviewScenarios.mjs'
 
 export function createDevUIDesignDetailScenarios({
   assert,
@@ -9,6 +13,9 @@ export function createDevUIDesignDetailScenarios({
   path,
 }) {
   return [
+    ...createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     {
       name: 'dev-ui-design-lazy-views',
       path: '/__dev/ui-design?view=specification',
@@ -103,7 +110,7 @@ export function createDevUIDesignDetailScenarios({
     },
     {
       name: 'dev-ui-design-details',
-      path: '/__dev/ui-design',
+      path: '/__dev/ui-design?topic=layout',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await page
@@ -135,14 +142,14 @@ export function createDevUIDesignDetailScenarios({
           0,
           '图解不同时堆叠完整规范'
         )
-        assert.equal(await directory.getByRole('button').count(), 11)
+        assert.equal(await directory.getByRole('button').count(), 19)
         const layout = page.locator('.erp-design-layout')
         const geometry = await layout.evaluate((node) => ({
           sidebar: node
             .querySelector('.erp-design-layout-sidebar')
             .getBoundingClientRect().width,
-          header: node
-            .querySelector('.erp-design-layout-topbar')
+          account: node
+            .querySelector('.erp-design-layout-account')
             .getBoundingClientRect().height,
           padding: getComputedStyle(
             node.querySelector('.erp-design-layout-content')
@@ -153,11 +160,11 @@ export function createDevUIDesignDetailScenarios({
         }))
         assert.deepEqual(geometry, {
           sidebar: 206,
-          header: 48,
+          account: 46,
           padding: '8px',
           gap: 6,
         })
-        await page.getByRole('button', { name: '图解 B：顶栏' }).click()
+        await page.getByRole('button', { name: '图解 B：账号与操作' }).click()
         assert.equal(await layout.getAttribute('data-highlight'), 'header')
         await page.getByRole('switch', { name: '收起示意侧栏' }).click()
         assert.equal(
@@ -454,6 +461,7 @@ export function createDevUIDesignDetailScenarios({
           .getByRole('group', { name: '销售订单视图', exact: true })
           .waitFor()
         await page.getByRole('tab', { name: '设计说明', exact: true }).click()
+        await page.getByRole('navigation', { name: '设计阅读目录' }).getByRole('button', { name: '页面骨架', exact: true }).click()
         await page
           .getByRole('heading', { name: '页面骨架：先分工，再分配空间' })
           .waitFor()
@@ -492,53 +500,37 @@ export function createDevUIDesignDetailScenarios({
             .evaluate((element) => element.inert),
           true
         )
-        const catalogTrigger = frame.getByRole('button', {
-          name: '全部模块',
-          exact: true,
-        })
-        await catalogTrigger.click()
-        const catalog = frame.getByRole('dialog', {
-          name: '全部桌面页面',
-          exact: true,
-        })
-        await catalog.waitFor()
-        assert.equal(
-          await frame.locator('.app').evaluate((element) => element.inert),
-          true
-        )
-        const first = catalog.getByRole('button', { name: '关闭', exact: true })
-        const last = catalog.getByRole('button', { name: '完成', exact: true })
-        await last.focus()
-        await last.press('Tab')
-        assert.equal(
-          await first.evaluate((element) => element === document.activeElement),
-          true
-        )
-        await first.press('Shift+Tab')
-        assert.equal(
-          await last.evaluate((element) => element === document.activeElement),
-          true
-        )
-        await last.press('Escape')
-        await catalog.waitFor({ state: 'hidden' })
-        assert.equal(
-          await catalogTrigger.evaluate(
-            (element) => element === document.activeElement
-          ),
-          true
-        )
-        assert.equal(
-          await frame.locator('.app').evaluate((element) => element.inert),
-          false
-        )
-        assert.equal(
-          await page
-            .getByRole('dialog', { name: 'UI 交互设计全屏预览' })
-            .isVisible(),
-          true
-        )
+        assert.equal(await frame.getByRole('button', { name: '全部模块', exact: true }).count(), 0)
+        await page.getByRole('button', { name: '状态模拟', exact: true }).click()
+        await page.getByRole('menuitem', { name: '空结果', exact: true }).click()
+        await frame.getByText('当前筛选没有记录', { exact: true }).waitFor()
+        await page.getByRole('button', { name: '状态模拟', exact: true }).click()
+        await page.getByRole('menuitem', { name: '正常', exact: true }).click()
+        await frame.locator('.data-surface').waitFor()
         await frame.locator('.preview-account-trigger').click()
         const account = frame.getByRole('menu', { name: '账号菜单' })
+        await account.waitFor()
+        const accountAnchor = await frame.locator('.preview-account-trigger').boundingBox()
+        const accountPopup = await account.boundingBox()
+        assert.ok(Math.abs(accountPopup.x - (accountAnchor.x + accountAnchor.width) - 8) <= 1, '设计稿账号菜单从按钮右侧展开')
+        assert.ok(Math.abs(accountPopup.y + accountPopup.height - (accountAnchor.y + accountAnchor.height)) <= 1, '设计稿账号菜单与按钮底边对齐')
+        await frame.locator('.preview-account-trigger').click()
+        await frame.getByRole('button', { name: '收起侧边菜单', exact: true }).click()
+        await frame.locator('.preview-account-trigger').click()
+        const collapsedAccountAnchor = await frame.locator('.preview-account-trigger').boundingBox()
+        const collapsedAccountPopup = await account.boundingBox()
+        assert.ok(Math.abs(collapsedAccountPopup.x - (collapsedAccountAnchor.x + collapsedAccountAnchor.width) - 8) <= 1, '设计稿收起侧栏后账号菜单仍向右展开')
+        await frame.locator('.preview-account-trigger').click()
+        const previousViewport = page.viewportSize()
+        await page.setViewportSize({ width: 390, height: 844 })
+        await frame.locator('[data-action="open-nav"]').filter({ visible: true }).first().click()
+        await frame.locator('.preview-account-trigger').click()
+        const narrowAccountPopup = await account.boundingBox()
+        assert.ok(narrowAccountPopup.x >= 0 && narrowAccountPopup.x + narrowAccountPopup.width <= 390 && narrowAccountPopup.y >= 0 && narrowAccountPopup.y + narrowAccountPopup.height <= 844, '设计稿窄屏账号菜单保留在视口内')
+        await frame.locator('.preview-account-trigger').click()
+        await page.setViewportSize(previousViewport)
+        await frame.getByRole('button', { name: '展开侧边菜单', exact: true }).click()
+        await frame.locator('.preview-account-trigger').click()
         await account
           .getByRole('button', { name: '切换工作入口' })
           .press('Escape')
@@ -774,8 +766,8 @@ export function createDevUIDesignDetailScenarios({
         }
         await page.emulateMedia({ colorScheme: 'light' })
 
-        await frame.locator('[data-action="open-mobile-tasks"]').click()
-        await frame.locator('.rm-task-card').first().click()
+        await openUIDesignMobileTasks(frame)
+        await frame.locator('.rm-task-card').first().locator('.rm-task-open').press('Enter')
         const detailTitle = await frame.locator('.rm-flow-title').textContent()
         await page.getByRole('button', { name: /全屏预览/ }).click()
         await page.setViewportSize({ width: 390, height: 900 })

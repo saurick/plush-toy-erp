@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
-import { Alert, Form, Input, Select } from 'antd'
+import { Form, Input } from 'antd'
+import Select from '@/common/components/select/AppSelect'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -119,11 +121,11 @@ export default function InventoryOperationModal({
   return (
     <BusinessFormModal
       className="erp-inventory-operation-modal"
-      title={isEdit ? meta.editTitle : meta.createTitle}
+      title={isEdit ? meta.editTitle : <BusinessHelpLabel label={meta.createTitle} description="从当前选中的库存余额生成可核对、可恢复的作业草稿。" />}
       description={
         isEdit
           ? '只可修改草稿中的业务内容，来源存货、仓库、批次和单位保持不变。'
-          : '从当前选中的库存余额生成可核对、可恢复的作业草稿。'
+          : undefined
       }
       open={open}
       size={sourceRows.length > 1 ? 'lineItems' : 'localAction'}
@@ -138,7 +140,7 @@ export default function InventoryOperationModal({
       onCancel={() => !loading && onCancel?.()}
       onOk={submit}
     >
-      <Alert type="info" showIcon message={meta.notice} />
+      <div className="erp-business-inline-note" role="note">{meta.notice}</div>
       {effectiveType === 'MANUAL_ADJUSTMENT' && !isEdit ? (
         <ProcessSubmissionRoute processKey="inventory_adjustment_approval" customerKey={customerKey} open={open} />
       ) : null}
@@ -294,6 +296,7 @@ export default function InventoryOperationModal({
                           ]}
                         >
                           <Select
+                            placeholder="请选择目标仓库"
                             showSearch
                             optionFilterProp="label"
                             options={targetWarehouseOptions}

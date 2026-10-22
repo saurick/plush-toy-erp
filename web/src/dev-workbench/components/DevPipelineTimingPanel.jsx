@@ -1,7 +1,8 @@
 import React from 'react'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
 
-import DevDeliveryTimestamp from './DevDeliveryTimestamp.jsx'
+import DevTimestamp from './DevTimestamp.jsx'
+import { formatDevTimestamp, isDevTimestamp } from '../config/devTimestamp.mjs'
 import {
   deliveryPipelinePresentation,
   deliveryPipelineRunModePresentation,
@@ -11,7 +12,6 @@ import {
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryPercent,
-  formatDeliveryTimestamp,
   shortGitSha,
   summarizePipelineTimings,
 } from '../config/devDelivery.mjs'
@@ -30,10 +30,7 @@ function formatClockTimestamp(value) {
 }
 
 function hasTimestampRange(startedAt, finishedAt) {
-  return (
-    Number.isFinite(Date.parse(startedAt || '')) &&
-    Number.isFinite(Date.parse(finishedAt || ''))
-  )
+  return isDevTimestamp(startedAt) && isDevTimestamp(finishedAt)
 }
 
 function formatTimestampRange(startedAt, finishedAt, { compact = false } = {}) {
@@ -41,7 +38,7 @@ function formatTimestampRange(startedAt, finishedAt, { compact = false } = {}) {
   if (compact) {
     return `${formatClockTimestamp(startedAt)}–${formatClockTimestamp(finishedAt)}`
   }
-  return `${formatDeliveryTimestamp(startedAt)}–${formatDeliveryTimestamp(finishedAt)}`
+  return `${formatDevTimestamp(startedAt)}–${formatDevTimestamp(finishedAt)}`
 }
 
 function formatJobDuration(job) {
@@ -190,7 +187,11 @@ export function DevPipelineStatusStrip({
                 ? deliveryPipelineRunModePresentation(summary.latestMode)
                 : '等待 CI 运行回执'}
             </Text>
-            <DevDeliveryTimestamp value={latestRun?.finishedAt} />
+            <DevTimestamp
+              value={latestRun?.finishedAt}
+              action="完成于"
+              missing="完成时间未证明"
+            />
           </div>
           <div>
             <Text type="secondary">最近一次制品发布</Text>
@@ -203,7 +204,11 @@ export function DevPipelineStatusStrip({
               严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
               {formatJobDuration(publishJob)}
             </Text>
-            <DevDeliveryTimestamp value={latestFullRelease?.finishedAt} />
+            <DevTimestamp
+              value={latestFullRelease?.finishedAt}
+              action="完成于"
+              missing="完成时间未证明"
+            />
           </div>
           <div>
             <Text type="secondary">构建缓存</Text>
@@ -216,7 +221,7 @@ export function DevPipelineStatusStrip({
               制品总计{' '}
               {formatDeliveryBytes(release?.artifactSummary?.totalBytes)}
             </Text>
-            <DevDeliveryTimestamp
+            <DevTimestamp
               value={release?.publishedAt}
               action="发布于"
               missing="发布时间未证明"
@@ -234,7 +239,11 @@ export function DevPipelineStatusStrip({
                 ? `${targetCache.status} · 实传 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)}`
                 : '等待目标部署读回'}
             </Text>
-            <DevDeliveryTimestamp value={deploymentOperation?.updatedAt} />
+            <DevTimestamp
+              value={deploymentOperation?.updatedAt}
+              action="完成于"
+              missing="完成时间未证明"
+            />
           </div>
         </div>
       </Card>
@@ -283,7 +292,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
           远端流水线耗时
         </Title>
         <Text type="secondary">
-          统计读取：{formatDeliveryTimestamp(timings?.generatedAt)}
+          统计读取：{formatDevTimestamp(timings?.generatedAt)}
         </Text>
       </div>
 
@@ -306,7 +315,11 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
                 同类型中位数 {formatDeliveryDuration(summary.medianDurationMs)}{' '}
                 · {summary.sampleCount} 次
               </Text>
-              <DevDeliveryTimestamp value={latestRun.finishedAt} />
+              <DevTimestamp
+                value={latestRun.finishedAt}
+                action="完成于"
+                missing="完成时间未证明"
+              />
             </div>
             <div>
               <Text type="secondary">最近一次制品发布</Text>
@@ -322,7 +335,9 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
                   ? 'CI strict 回执已可信复用；Release 未重复执行门禁'
                   : `完整发布中位数 ${formatDeliveryDuration(summary.fullReleaseMedianDurationMs)} · ${String(summary.fullReleaseSampleCount)} 次`}
               </Text>
-              <DevDeliveryTimestamp
+              <DevTimestamp
+                action="完成于"
+                missing="完成时间未证明"
                 value={summary.latestFullRelease?.finishedAt}
               />
             </div>
@@ -347,7 +362,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
                 · Web{' '}
                 {formatDeliveryBytes(release?.artifactSummary?.webImageBytes)}
               </Text>
-              <DevDeliveryTimestamp
+              <DevTimestamp
                 value={release?.publishedAt}
                 action="发布于"
                 missing="发布时间未证明"

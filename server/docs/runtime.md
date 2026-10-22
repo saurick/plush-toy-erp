@@ -55,7 +55,9 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
   - 路由复用统一管理员认证 middleware；每个请求以实时 session / RBAC 和同一次 active customer revision effective session 检查打印 action 与模板 module
   - HTML / CSS 只接受静态 allowlist、文档内锚点和受限内嵌位图；Chromium 禁用脚本与缓存、阻断 `data:` / `about:blank` 之外的请求，并为每次渲染创建独立 browser context
   - 最多 32 张内嵌图片，单图解码后最多 5 MiB、全部图片合计最多 16 MiB；HTML 最多 24 MiB、CSS 文本合计最多 4 MiB、DOM 节点最多 20,000 个、请求体最多 32 MiB、生成 PDF 最多 32 MiB，超限在继续分配或渲染前拒绝
-  - 使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`、以非 root 用户运行且不关闭 sandbox，并精确固定经目标宿主验证的 Debian 包版本。默认并发为 4、等待名额为 2；超过 6 个已接纳请求时立即返回忙碌，不继续读取大请求体。`ERP_PDF_RENDER_CONCURRENCY` 和 `ERP_PDF_QUEUE_CAPACITY` 分别控制执行与等待；正式发布使用 `ERP_PDF_WARMUP=async` 异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前或失败后保持未就绪。`off` 只用于临时故障隔离，发布 smoke 仍必须用受控管理员 token 真实生成非空 PDF
+  - 使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`、以非 root 用户运行且不关闭 sandbox，并精确固定经目标宿主验证的 Debian 包版本。默认并发为 4、等待名额为 2；超过 6 个已接纳请求时立即返回忙碌，不继续读取大请求体。
+
+    `ERP_PDF_RENDER_CONCURRENCY` 和 `ERP_PDF_QUEUE_CAPACITY` 分别控制执行与等待；正式发布使用 `ERP_PDF_WARMUP=async` 异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前或失败后保持未就绪。`off` 只用于临时故障隔离，发布 smoke 仍必须用受控管理员 token 真实生成非空 PDF
   - macOS 本地默认优先使用当前架构已安装的 Playwright `chrome-headless-shell`（选择最高下载修订号），避免 PDF 服务额外启动日常 Google Chrome 应用；没有该引擎时沿用系统 Chrome/Chromium。显式 `ERP_PDF_CHROME_PATH` 始终优先，配置无效则报错；生产 Linux 的内置引擎选择不变
   - macOS / Linux 的 PDF 浏览器通过独立 DevTools pipe 绑定后端进程，后端异常退出或被强制结束时管道关闭，浏览器随之退出；调试 HTTP 仍只监听 loopback。正常停止会在 HTTP 请求结束后关闭浏览器，最多等待 2 秒，再按本次创建的独立进程组强制回收；不操作日常浏览器或其他服务。停止后的管理器拒绝重新启动浏览器，正常回收后移除本次临时 profile；后端被强制结束时临时目录由系统临时目录策略处理
 
@@ -119,14 +121,20 @@ go run ./cmd/backfill-workflow-source-tasks \
   --confirm-database=<精确数据库名>
 ```
 
-该命令扫描当前 `RELEASED` 生产订单、`POSTED REWORK` 返工事实及 `DRAFT` 出货单，补齐缺失的 task / `created` event / business state 包；确定性编号被占用、已有包不完整或来源不合法时整批失败。新建任务保持 `ready`，由真实责任岗位处理，不推断历史 `done / rejected`。它重算已发布生产订单的来源待办，并扫描有明细的 `DRAFT` 出货单生成业务准备任务，不推断曾经提交或审批通过；出货放行仍必须从出货页显式提交。命令可执行不表示任何共享库、目标环境或客户数据库已经 dry-run / apply。
+该命令扫描当前 `RELEASED` 生产订单、`POSTED REWORK` 返工事实及 `DRAFT` 出货单，补齐缺失的 task / `created` event / business state 包；确定性编号被占用、已有包不完整或来源不合法时整批失败。新建任务保持 `ready`，由真实责任岗位处理，不推断历史 `done / rejected`。
 
-来源任务的时间参与幂等校验时统一按 UTC 计算。修复命令可以转换旧记录仅因时区表示不同产生的校验差异：逐项核对来源与原始创建事件，更新任务和业务状态的校验值，追加 `source_time_normalized` 事件，保留原始事件、办理结果和事实。报告中的 `source_time_intents_normalized` 单列转换数；同一时刻以外的日期或内容变化仍阻断。历史时区匹配仅用于这条显式修复路径，正常业务命令不保留宽松读取。重跑必须不再产生转换事件；已有出货放行任务会被核对，未提交的出货单不会因此生成放行审批。
+它重算已发布生产订单的来源待办，并扫描有明细的 `DRAFT` 出货单生成业务准备任务，不推断曾经提交或审批通过；出货放行仍必须从出货页显式提交。命令可执行不表示任何共享库、目标环境或客户数据库已经 dry-run / apply。
+
+来源任务的时间参与幂等校验时统一按 UTC 计算。修复命令可以转换旧记录仅因时区表示不同产生的校验差异：逐项核对来源与原始创建事件，更新任务和业务状态的校验值，追加 `source_time_normalized` 事件，保留原始事件、办理结果和事实。报告中的 `source_time_intents_normalized` 单列转换数；同一时刻以外的日期或内容变化仍阻断。
+
+历史时区匹配仅用于这条显式修复路径，正常业务命令不保留宽松读取。重跑必须不再产生转换事件；已有出货放行任务会被核对，未提交的出货单不会因此生成放行审批。
 
 
 ## 实现命名写入边界
 
-自动生成的 Workflow 任务名称 / payload、核心演示 seed 和试用 MasterData seed 复用 `internal/biz/implementation_naming.go`，避免自动化重新写入编号阶段标签。普通 MasterData 和客户业务数据不套用开发阶段命名规则；风险等级（内部优先级 P0/P1/P2）、p50/p95/p99 百分位、产品编码和部署技术步骤按原业务 / 技术语义保留。历史数据库残值按需使用只读 SQL 专项盘点，不建立常驻全表扫描流程。
+自动生成的 Workflow 任务名称 / payload、核心演示 seed 和试用 MasterData seed 复用 `internal/biz/implementation_naming.go`，避免自动化重新写入编号阶段标签。
+
+普通 MasterData 和客户业务数据不套用开发阶段命名规则；风险等级（内部优先级 P0/P1/P2）、p50/p95/p99 百分位、产品编码和部署技术步骤按原业务 / 技术语义保留。历史数据库残值按需使用只读 SQL 专项盘点，不建立常驻全表扫描流程。
 
 ### 任务治理升级边界 / Task Fulfillment Upgrade
 

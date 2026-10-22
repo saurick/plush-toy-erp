@@ -104,7 +104,9 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await open()
       const outcomeCounts = () => dialog.getByRole('group', { name: '处理结果筛选', exact: true }).locator('.erp-filter-chip__count').allTextContents()
       assert.deepEqual(await outcomeCounts(), ['66', '64', '1', '1'])
-      await dialog.getByText('今天', { exact: true }).click()
+      await close()
+      await page.getByRole('group', { name: '已办快捷筛选', exact: true }).getByRole('button', { name: /^今天/u }).click()
+      await open()
       await waitCount(1)
       await dialog.getByText('已完成', { exact: true }).click()
       await waitCount(0)
@@ -112,12 +114,14 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await close()
       await page.getByText('当前筛选下暂无已办任务', { exact: true }).waitFor()
       await open()
-      await dialog.getByText('近 7 天', { exact: true }).click()
+      await close()
+      await page.getByRole('group', { name: '已办快捷筛选', exact: true }).getByRole('button', { name: /^近 7 天/u }).click()
+      await open()
       await waitCount(64)
       await close()
       assert.equal(
         await trigger.getAttribute('aria-label'),
-        '筛选已办，已应用 2 项'
+        '筛选已办，已应用 1 项'
       )
       assert.match(
         await trigger.getAttribute('title'),
@@ -161,7 +165,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       })
       await clickTaskCardContent(
         rows.first(),
-        rows.first().locator('.mobile-task-list-row__head')
+        rows.first().locator('.erp-task-identity__card-heading')
       )
       await page.getByTestId('mobile-task-detail-screen').waitFor()
       await page.reload()
@@ -171,9 +175,10 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .click()
       await trigger.waitFor()
       await waitCount(64)
+      assert.equal(await sevenDays.getAttribute('aria-pressed'), 'true', '返回后保留已办时间快捷条件')
       assert.equal(
         await trigger.getAttribute('aria-label'),
-        '筛选已办，已应用 2 项'
+        '筛选已办，已应用 1 项'
       )
       await search.fill('历史筛选')
       await search.press('Enter')
@@ -183,7 +188,9 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .click()
       await waitCount(66)
       assert.equal(await search.inputValue(), '历史筛选', '重置保留搜索词')
-      await dialog.getByText('近 30 天', { exact: true }).click()
+      await close()
+      await page.getByRole('group', { name: '已办快捷筛选', exact: true }).getByRole('button', { name: /^近 30 天/u }).click()
+      await open()
       await dialog.getByText('已撤回', { exact: true }).click()
       await waitCount(1)
       await close()
@@ -211,13 +218,13 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .click()
       await waitCount(66)
       assert.equal(await search.inputValue(), '历史筛选')
+      await page.getByRole('group', { name: '已办快捷筛选', exact: true }).getByRole('button', { name: /^近 7 天/u }).click()
       await open()
-      await dialog.getByRole('button', { name: '近 7 天', exact: true }).click()
       await dialog.getByRole('button', { name: /^已完成/ }).click()
       await dialog.getByRole('button', { name: '销售订单', exact: true }).click()
       await close()
       await waitCount(64)
-      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 3 项')
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 2 项')
       const applied = page.getByRole('group', { name: '当前已办筛选', exact: true })
       for (const width of [320, 390, 430]) {
         await page.setViewportSize({ width, height: 844 })
@@ -228,7 +235,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await open()
       await dialog.getByRole('group', { name: '来源单据', exact: true }).getByRole('button', { name: '全部', exact: true }).click()
       await close()
-      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 2 项')
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 1 项')
       assert(await trigger.evaluate((node) => document.activeElement === node), '调整条件并收起后返回筛选入口')
       await clearFilters.tap()
       await waitCount(66)
@@ -240,10 +247,11 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await assertMobileFilterClearControl({ assert, trigger, active: false })
       await sevenDays.click()
       await waitCount(65)
-      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 1 项')
+      assert.equal(await sevenDays.getAttribute('aria-pressed'), 'true')
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办', '时间快捷条件不重复计入面板筛选数量')
       assert.equal(await applied.count(), 0, '单个时间条件直接使用快捷标签取消')
-      await assertMobileFilterClearControl({ assert, trigger })
-      await clearFilters.press('Enter')
+      await assertMobileFilterClearControl({ assert, trigger, active: false })
+      await sevenDays.press('Enter')
       await waitCount(66)
       assert(reads.some((query) => query.view_key === 'history' && query.keyword === '历史筛选' && !query.period && !query.status_key && !query.source_type), '清空后的请求保留搜索且不残留筛选')
       for (const width of [320, 390, 430]) {

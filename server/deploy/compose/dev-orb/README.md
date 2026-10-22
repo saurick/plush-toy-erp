@@ -34,6 +34,8 @@ node scripts/local-orb.mjs up
 
 这是一份可独立运行的开发快照，不是持续复制或自动故障转移。新写入 133 的数据不会自动进入 Orb，Orb 开发的新数据也不会自动回传。Jaeger 从本地新 Trace 开始记录，远端历史日志和 Trace 不属于业务恢复资产。
 
-初始化应先确认源为当前登记开发库、目标为独立空 Orb 库，生成独立凭据和数据卷。通过只读备份角色执行 `pg_dump -Fc --no-owner --no-privileges --lock-wait-timeout=5s`，恢复到本地后复用 `prod/database_roles.sh reconcile` 配置角色和权限。冻结恢复库中的附件元数据，再使用正式 `cmd/attachment-storage` 的 `backup` 从源 S3 读取不可覆盖对象，随后向本地桶 `restore`、逐对象 `verify`。源数据库与源存储保持只读；附件缺失或哈希不符时不得签发可接续开发的回执。
+初始化应先确认源为当前登记开发库、目标为独立空 Orb 库，生成独立凭据和数据卷。通过只读备份角色执行 `pg_dump -Fc --no-owner --no-privileges --lock-wait-timeout=5s`，恢复到本地后复用 `prod/database_roles.sh reconcile` 配置角色和权限。
+
+冻结恢复库中的附件元数据，再使用正式 `cmd/attachment-storage` 的 `backup` 从源 S3 读取不可覆盖对象，随后向本地桶 `restore`、逐对象 `verify`。源数据库与源存储保持只读；附件缺失或哈希不符时不得签发可接续开发的回执。
 
 只有 PG 恢复、附件全量校验、迁移状态、审计、隔离端口下的实际开发启动及业务读取均通过，才表示该快照可使用。后续刷新须保留旧快照和本地独有数据，在新隔离目标完成相同验证后再替换备用配置；本脚本不提供覆盖现有本地库或自动清理数据卷的入口。数据库重建产生新的集群身份时，重新核验并生成完整配置快照，不能只修改白名单绕过校验。

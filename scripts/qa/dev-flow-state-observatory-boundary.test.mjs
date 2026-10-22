@@ -116,11 +116,11 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
   assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
-  assert.match(page, /renderTopics=\{\(onOpenExceptionDirectory\) => <BusinessChainTopics/u);
+  assert.match(page, /renderTopics=\{\(\{ onSelectTopic, selectedTopicKey \}\) => <BusinessChainTopics/u);
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /按业务查阅/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
-  assert.match(guide, /onCloseException=\{closeException\}/u);
+  assert.match(guide, /aria-label="流程详情"/u);
   assert.match(guide, /<ExceptionFlowDirectory/u);
   assert.match(guide, /data-exception-entry=\{guide.key\}/u);
   assert.doesNotMatch(guide, /完整交接与审批说明|按文字选择子步骤/u);
@@ -128,7 +128,7 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(guide, /fulfillmentStepMatchesRole/u);
   assert.match(guide, /fulfillmentTaskLinks/u);
   assert.match(guide, /完整流程/u);
-  assert.match(chain, /aria-label="异常处理方案"/u);
+  assert.match(chain, /data-stage-exception=\{step.stage\}/u);
   assert.match(guide, /<FulfillmentChainCanvas/u, "the main chain remains present while an exception is open");
   assert.match(chainModel, /buildFulfillmentOverview\(flow\)/u, "the total flow groups the canonical source stages");
   assert.match(chain, /data-fulfillment-stage=\{step\.stage\}/u, "each main node retains its canonical identity");
@@ -280,6 +280,7 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "flow_substep",
     "flow_handling",
     "flow_tab",
+    "flow_topic",
     "flow_exception",
     "flow_decision",
     "flow_exception_step",
@@ -398,7 +399,6 @@ test("dev flow state observatory: task-name lookup and unlinked runtime boundary
     "订单 / 来源单号 / 任务名称或编号",
     "查询当前账号可见任务；数字任务 ID 可用于开发排障",
     "名称可能重复",
-    "已找到任务，但它是模拟展示数据",
     "已找到任务，但它没有正式流程轨迹",
     "未关联正式 ProcessRuntime",
   ]) {
@@ -426,7 +426,7 @@ test("dev flow state observatory: task-name lookup and unlinked runtime boundary
   assert.match(page, /function RuntimeUnlinkedTaskBoundary/u);
   assert.match(
     page,
-    /data-task-runtime-boundary=\{displayOnly \? 'display-only' : 'unlinked'\}/u,
+    /data-task-runtime-boundary="unlinked"/u,
   );
   assert.match(
     helper,

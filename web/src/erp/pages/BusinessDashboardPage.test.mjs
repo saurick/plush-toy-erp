@@ -53,6 +53,7 @@ const productIdentity = readFileSync(
   ),
   'utf8'
 )
+const progressContent = readFileSync(new URL('../components/business-visualizations/ProgressCompactContent.jsx', import.meta.url), 'utf8')
 const taskImage = readFileSync(
   fileURLToPath(
     new URL(
@@ -87,8 +88,8 @@ const mobileProgressStyles = readFileSync(
   fileURLToPath(new URL('../mobile/mobileProgress.css', import.meta.url)),
   'utf8'
 )
-const mobileTaskStyles = readFileSync(
-  fileURLToPath(new URL('../mobile/mobileRoleTasks.css', import.meta.url)),
+const designTokens = readFileSync(
+  fileURLToPath(new URL('../styles/app/design-tokens.css', import.meta.url)),
   'utf8'
 )
 const materialSummaryStyles = readFileSync(
@@ -108,7 +109,7 @@ test('business dashboard remains valid JSX', async () => {
   })
 })
 
-test('compact progress keeps detail images independently previewable without list image requests', () => {
+test('progress lists and details share independently previewable product identities', () => {
   assert.match(source, /<table\s+className="erp-progress-table"/u)
   assert.doesNotMatch(source, /className="erp-progress-summary"/u)
   assert.match(
@@ -134,6 +135,8 @@ test('compact progress keeps detail images independently previewable without lis
   assert.match(taskImage, /aria-haspopup="dialog"/u)
   assert.match(taskImage, /onMouseDown=\{\(event\) =>/u)
   assert.match(taskImage, /closest\('\[role="option"\]'\)/u)
+  assert.match(progressContent, /<ProductIdentity className="erp-progress-product"[\s\S]*?compact/u)
+  assert.doesNotMatch(progressContent, /return row\.product_match_count|preview=\{false\}/u)
   assert.match(source, /<ProgressIdentity row=\{row\}/u)
   assert.match(summary, /<ProductIdentity productId=\{row\.product_id\}/u)
   assert.match(mobileSummary, /<ProductIdentity productId=\{row\.product_id\}/u)
@@ -159,9 +162,10 @@ test('detail and business product images retain their existing sizes', () => {
     /\.erp-progress-overview-product \.erp-task-product-image \{[\s\S]*?width: 64px;/u
   )
   assert.match(
-    mobileTaskStyles,
-    /\.mobile-task-list-row__identity \.erp-task-product-image \{[\s\S]*?width: 48px;/u
+    taskImageStyles,
+    /\.erp-task-identity--compact \.erp-task-product-image \{[\s\S]*?width: var\(--erp-work-item-image-size\);/u
   )
+  assert.match(designTokens, /--erp-work-item-image-size: 48px;/u)
   assert.match(
     materialSummaryStyles,
     /\.erp-material-product \.erp-task-product-image \{[\s\S]*?width: 64px;/u

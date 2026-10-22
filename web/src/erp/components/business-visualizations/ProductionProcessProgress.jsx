@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
-import { Button, Select, Tag } from 'antd'
+import { Button, Tag } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import SearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'

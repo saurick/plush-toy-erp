@@ -33,7 +33,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -41,6 +40,7 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
@@ -53,7 +53,7 @@ import {
   listAllProductSKUs,
   listAllSalesOrderItems,
   listAllSalesOrderSummary,
-  listAllSalesOrders,
+  exportSalesOrders,
   listSalesOrders,
   listAllUnits,
   listAllWarehouses,
@@ -82,7 +82,12 @@ import {
 } from '../utils/salesOrderRequirements.mjs'
 import SalesOrderEditor from '../components/sales-orders/SalesOrderEditor.jsx'
 import SalesOrderExcelImport from '../components/sales-orders/SalesOrderExcelImport.jsx'
-import { buildSalesOrderColumns } from '../components/sales-orders/salesOrderColumns.jsx'
+import {
+  buildSalesOrderColumns,
+  buildSalesOrderListColumns,
+  buildSalesOrderExportColumns,
+  buildSalesOrderColumnProfile,
+} from '../components/sales-orders/salesOrderColumns.jsx'
 import {
   SALES_ORDER_DATE_FILTER_OPTIONS,
   SALES_ORDER_LIFECYCLE_ACTIONS,
@@ -1366,28 +1371,38 @@ export default function SalesOrdersPage() {
       ),
     [adminProfile]
   )
+  const orderListColumns = useMemo(
+    () => buildSalesOrderListColumns(orderDataColumns),
+    [orderDataColumns]
+  )
+  const columnOrderProfile = useMemo(
+    () => buildSalesOrderColumnProfile(adminProfile, orderListColumns),
+    [adminProfile, orderListColumns]
+  )
 
   const {
     tableColumns: orderColumns,
-    exportColumns: visibleOrderDataColumns,
+    exportColumns: orderedListColumns,
     openColumnOrder,
     columnOrderModal,
   } = useBusinessColumnOrder({
-    adminProfile,
+    adminProfile: columnOrderProfile,
     moduleKey: SALES_ORDERS_MODULE_KEY,
     moduleTitle: '销售订单列表',
-    columns: orderDataColumns,
+    columns: orderListColumns,
   })
+  const visibleOrderDataColumns = useMemo(
+    () => buildSalesOrderExportColumns(orderedListColumns, orderDataColumns),
+    [orderedListColumns, orderDataColumns]
+  )
 
   const loadExportOrders = useCallback(
     async ({ signal }) => {
       const routeSelectedID = Number(routeSalesOrderID || 0)
-      if (routeSelectedID > 0) {
-        const order = await getSalesOrder({ id: routeSelectedID }, { signal })
-        return order ? [order] : []
-      }
-      const result = await listAllSalesOrders(orderListParams, { signal })
-      return result?.sales_orders
+      return exportSalesOrders(
+        routeSelectedID > 0 ? { id: routeSelectedID } : orderListParams,
+        { signal }
+      )
     },
     [orderListParams, routeSalesOrderID]
   )
@@ -1606,7 +1621,7 @@ export default function SalesOrdersPage() {
               className="erp-business-filter-control--status"
               options={[{ label: '全部客户', value: '' }, ...customerOptions]}
               value={customerFilter}
-              placeholder="全部客户"
+              placeholder="客户"
               showSearch
               optionFilterProp="label"
               onChange={(nextCustomer) => {
@@ -1633,6 +1648,7 @@ export default function SalesOrdersPage() {
               }}
             />
             <SelectFilter
+              allowClear={false}
               aria-label="排序方式"
               className="erp-business-filter-control--sort"
               options={SALES_ORDER_SORT_FILTER_OPTIONS}

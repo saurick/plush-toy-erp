@@ -87,6 +87,12 @@ func (_u *WorkflowTaskUpdate) SetNillableSourceType(v *string) *WorkflowTaskUpda
 	return _u
 }
 
+// ClearSourceType clears the value of the "source_type" field.
+func (_u *WorkflowTaskUpdate) ClearSourceType() *WorkflowTaskUpdate {
+	_u.mutation.ClearSourceType()
+	return _u
+}
+
 // SetSourceID sets the "source_id" field.
 func (_u *WorkflowTaskUpdate) SetSourceID(v int) *WorkflowTaskUpdate {
 	_u.mutation.ResetSourceID()
@@ -105,6 +111,12 @@ func (_u *WorkflowTaskUpdate) SetNillableSourceID(v *int) *WorkflowTaskUpdate {
 // AddSourceID adds value to the "source_id" field.
 func (_u *WorkflowTaskUpdate) AddSourceID(v int) *WorkflowTaskUpdate {
 	_u.mutation.AddSourceID(v)
+	return _u
+}
+
+// ClearSourceID clears the value of the "source_id" field.
+func (_u *WorkflowTaskUpdate) ClearSourceID() *WorkflowTaskUpdate {
+	_u.mutation.ClearSourceID()
 	return _u
 }
 
@@ -862,11 +874,17 @@ func (_u *WorkflowTaskUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.SourceType(); ok {
 		_spec.SetField(workflowtask.FieldSourceType, field.TypeString, value)
 	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(workflowtask.FieldSourceType, field.TypeString)
+	}
 	if value, ok := _u.mutation.SourceID(); ok {
 		_spec.SetField(workflowtask.FieldSourceID, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.AddedSourceID(); ok {
 		_spec.AddField(workflowtask.FieldSourceID, field.TypeInt, value)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(workflowtask.FieldSourceID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.SourceNo(); ok {
 		_spec.SetField(workflowtask.FieldSourceNo, field.TypeString, value)
@@ -1197,6 +1215,12 @@ func (_u *WorkflowTaskUpdateOne) SetNillableSourceType(v *string) *WorkflowTaskU
 	return _u
 }
 
+// ClearSourceType clears the value of the "source_type" field.
+func (_u *WorkflowTaskUpdateOne) ClearSourceType() *WorkflowTaskUpdateOne {
+	_u.mutation.ClearSourceType()
+	return _u
+}
+
 // SetSourceID sets the "source_id" field.
 func (_u *WorkflowTaskUpdateOne) SetSourceID(v int) *WorkflowTaskUpdateOne {
 	_u.mutation.ResetSourceID()
@@ -1215,6 +1239,12 @@ func (_u *WorkflowTaskUpdateOne) SetNillableSourceID(v *int) *WorkflowTaskUpdate
 // AddSourceID adds value to the "source_id" field.
 func (_u *WorkflowTaskUpdateOne) AddSourceID(v int) *WorkflowTaskUpdateOne {
 	_u.mutation.AddSourceID(v)
+	return _u
+}
+
+// ClearSourceID clears the value of the "source_id" field.
+func (_u *WorkflowTaskUpdateOne) ClearSourceID() *WorkflowTaskUpdateOne {
+	_u.mutation.ClearSourceID()
 	return _u
 }
 
@@ -2002,11 +2032,17 @@ func (_u *WorkflowTaskUpdateOne) sqlSave(ctx context.Context) (_node *WorkflowTa
 	if value, ok := _u.mutation.SourceType(); ok {
 		_spec.SetField(workflowtask.FieldSourceType, field.TypeString, value)
 	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(workflowtask.FieldSourceType, field.TypeString)
+	}
 	if value, ok := _u.mutation.SourceID(); ok {
 		_spec.SetField(workflowtask.FieldSourceID, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.AddedSourceID(); ok {
 		_spec.AddField(workflowtask.FieldSourceID, field.TypeInt, value)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(workflowtask.FieldSourceID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.SourceNo(); ok {
 		_spec.SetField(workflowtask.FieldSourceNo, field.TypeString, value)

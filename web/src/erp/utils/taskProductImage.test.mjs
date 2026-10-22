@@ -81,3 +81,17 @@ test('only source-projected product references may request images; empty and mat
     undefined
   )
 })
+
+test('explicit thumbnail retry invalidates only the failed product reference', async () => {
+  const calls = []
+  const load = createTaskProductImageLoader(async ({ id }) => {
+    calls.push(id)
+    return { id, owner_type: 'product', owner_id: id === 8 ? 7 : 9, mime_type: 'image/png', content_base64: 'image' }
+  })
+  await load({ productID: 7, attachmentID: 8 })
+  await load({ productID: 9, attachmentID: 10 })
+  load.invalidate({ productID: 7, attachmentID: 8 })
+  await load({ productID: 7, attachmentID: 8 })
+  await load({ productID: 9, attachmentID: 10 })
+  assert.deepEqual(calls, [8, 10, 8])
+})

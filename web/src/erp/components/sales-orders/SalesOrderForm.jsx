@@ -9,9 +9,9 @@ import {
   Form,
   Input,
   InputNumber,
-  Select,
   Space,
 } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import {
   formatUnitQuantitySummary,
   calculateSalesOrderAmounts,
@@ -21,7 +21,7 @@ import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
 import SalesOrderSourceEvidence from './SalesOrderSourceEvidence.jsx'
 import SalesOrderSourcePaymentSection from './SalesOrderSourcePaymentSection.jsx'
-import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import DeliveryAddressFields from '../business-list/DeliveryAddressFields.jsx'
@@ -275,6 +275,7 @@ export function SalesOrderFormFields({
           rules={[{ required: true, message: '请选择客户' }]}
         >
           <Select
+            placeholder="请选择客户"
             allowClear
             showSearch
             optionFilterProp="label"
@@ -304,7 +305,7 @@ export function SalesOrderFormFields({
           name="currency"
           rules={[{ required: true, message: '请选择币种' }]}
         >
-          <Select options={BUSINESS_CURRENCY_OPTIONS} />
+          <Select placeholder="请选择币种" options={BUSINESS_CURRENCY_OPTIONS} />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
@@ -999,6 +1000,7 @@ export function SalesOrderItemsFormSection({
                         name={[field.name, 'order_category']}
                       >
                         <Select
+                          placeholder="请选择类别"
                           disabled={!canEditLine}
                           options={SALES_ORDER_CATEGORY_OPTIONS}
                         />

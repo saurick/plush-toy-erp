@@ -159,6 +159,32 @@ func TestWorkflowRepo_PublicCreateTaskReplaysFirstSnapshot(t *testing.T) {
 	}
 }
 
+func TestWorkflowRepo_IndependentTaskCreationReplaysWithoutSource(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_independent?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	uc := biz.NewWorkflowUsecase(repo)
+	input := &biz.WorkflowTaskCreate{IdempotencyKey: "independent-create", TaskCode: "TASK-INDEPENDENT", TaskGroup: "generic", TaskName: "核对包装要求", OwnerRoleKey: biz.SalesRoleKey}
+	first, err := uc.CreateTask(ctx, input, 7)
+	if err != nil {
+		t.Fatalf("create independent task: %v", err)
+	}
+	if first.SourceType != "" || first.SourceID != 0 || first.SourceNo != nil {
+		t.Fatalf("independent task fabricated a source: %#v", first)
+	}
+	if count := client.WorkflowTask.Query().Where(workflowtask.SourceTypeIsNil(), workflowtask.SourceIDIsNil()).CountX(ctx); count != 1 {
+		t.Fatalf("missing source pair was not stored as NULL: count=%d", count)
+	}
+	replayed, err := uc.CreateTask(ctx, input, 7)
+	if err != nil || replayed.ID != first.ID || replayed.Version != first.Version {
+		t.Fatalf("independent task replay failed: task=%#v err=%v", replayed, err)
+	}
+	if count := client.WorkflowBusinessState.Query().CountX(ctx); count != 0 {
+		t.Fatalf("independent task created %d source states", count)
+	}
+}
+
 func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo?mode=memory&cache=shared&_fk=1")

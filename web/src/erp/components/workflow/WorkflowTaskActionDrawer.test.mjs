@@ -117,7 +117,7 @@ test('task detail keeps current responsibility ahead of history and groups copy 
 test('switching tasks or sources closes linked-content details and clears stale products', async (t) => {
   const task = { id: 42, version: 1, task_name: '核对材料', task_status_key: 'ready', owner_role_key: 'purchase', display_context: { available: true, items: [{ kind: 'product', name: '海盐企鹅', code: '27007#' }, { kind: 'product', name: '挂件', code: '27007-GJ' }] } }
   const ui = await mountDrawer(t, { task })
-  await ui.click(ui.button('共 2 项产品'))
+  await ui.click(ui.button('共 2 款产品'))
   assert.ok(document.querySelector('.erp-task-linked-items'))
   const trigger = document.querySelector('button[aria-label="更多操作"]')
   await ui.update({ task: { ...task, id: 43, task_name: '核对规格' } })
@@ -126,12 +126,12 @@ test('switching tasks or sources closes linked-content details and clears stale 
   assert.equal(trigger.isConnected, false)
   assert.equal(nextTrigger.classList.contains('ant-dropdown-open'), false)
   assert.equal(document.querySelector('.erp-task-identity__count').getAttribute('aria-expanded'), 'false')
-  await ui.click(ui.button('共 2 项产品'))
+  await ui.click(ui.button('共 2 款产品'))
   const sourceTrigger = document.querySelector('button[aria-label="更多操作"]')
   await ui.update({ task: { ...task, id: 43, source_type: 'sales_order', source_id: 72, version: 2, display_context: { available: true, items: [{ kind: 'product', name: '新订单产品', code: 'P72' }, { kind: 'product', name: '新订单挂件', code: 'P73' }] } } })
   assert.equal(document.querySelector('.erp-task-identity__count').getAttribute('aria-expanded'), 'false')
   assert.equal(sourceTrigger.isConnected, false, 'changing the source binding also closes copy actions')
-  await ui.click(ui.button('共 2 项产品'))
+  await ui.click(ui.button('共 2 款产品'))
   assert.match(document.querySelector('.erp-task-linked-items').textContent, /新订单产品.*P72/u)
   assert.doesNotMatch(document.querySelector('.erp-task-linked-items').textContent, /海盐企鹅/u)
   await ui.update({ task: { ...ui.task, display_context: { available: false, items: [] } } })

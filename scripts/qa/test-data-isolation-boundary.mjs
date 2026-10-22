@@ -86,6 +86,22 @@ export function trialFixtureCoverageViolations(
 
 export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
   {
+    id: "seed-business-values-stay-ordinary",
+    bucket: "product-core-demo-seed",
+    description: "Generator provenance stays in tool receipts and out of business values.",
+    required: [
+      { path: "scripts/qa/manual-acceptance-task-data.mjs", pattern: /assertSeedBusinessValues\(params/u, message: "task construction validates ordinary business values" },
+      { path: "scripts/qa/manual-acceptance-source-driven-facts.mjs", pattern: /assertSeedBusinessValues\(params/u, message: "source construction validates ordinary business values" },
+      { path: "scripts/qa/manual-acceptance-fact-data.mjs", pattern: /assertSeedBusinessValues\(params/u, message: "fact construction validates ordinary business values" },
+      { path: "server/internal/data/core_demo_seed.go", pattern: /biz\.ValidateSeedBusinessText\(/u, message: "core seed validates ordinary business text" },
+    ],
+    forbidden: ["server/internal/biz/debug_seed.go", "scripts/qa/manual-acceptance-task-data.mjs", "scripts/qa/manual-acceptance-source-data.mjs", "scripts/qa/visualization-demo-data.mjs", "scripts/qa/purchase-quality-simulated-matrix.mjs", "scripts/qa/mobile-workflow-simulated-closure.mjs", "scripts/qa/transaction-real-backend-fixture.mjs", "web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs"].map((sourcePath) => ({
+      path: sourcePath,
+      pattern: /["']?(?:simulated_only|real_customer_data|trial_task|evidence_class|proves_process_runtime|acceptance_scenario_key)["']?\s*:/u,
+      message: "business writers must not add generator-nature fields",
+    })),
+  },
+  {
     id: "product-core-demo-seed-stays-neutral",
     bucket: "product-core-demo-seed",
     description:

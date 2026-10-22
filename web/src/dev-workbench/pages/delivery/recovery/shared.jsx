@@ -1,6 +1,6 @@
 import { ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { Button, Space, Tag, Typography } from 'antd'
-import DevDeliveryTimestamp from '../../../components/DevDeliveryTimestamp.jsx'
+import DevTimestamp from '../../../components/DevTimestamp.jsx'
 
 const { Paragraph, Text } = Typography
 
@@ -40,7 +40,7 @@ export function DrillAction({
       </Button>
     )
   }
-  return <Button disabled>{action.label}</Button>
+  return <Text type="secondary">{action.label}</Text>
 }
 
 export function DrillRow({ drill, recommended, onOpen }) {
@@ -50,9 +50,15 @@ export function DrillRow({ drill, recommended, onOpen }) {
         <Tag>{drill.priority}</Tag>
       </td>
       <th scope="row">
-        <strong>{drill.title}</strong>
+        <Button
+          type="link"
+          className="erp-dev-recovery-drill-link"
+          aria-label={`查看${drill.title}要点`}
+          onClick={(event) => onOpen(drill.key, event.currentTarget)}
+        >
+          {drill.title}
+        </Button>
         {recommended ? <Tag color="blue">当前建议</Tag> : null}
-        <small>{drill.objective}</small>
       </th>
       <td>
         <Tag color={drill.statusPresentation.color}>
@@ -61,15 +67,6 @@ export function DrillRow({ drill, recommended, onOpen }) {
         <Tag color={drill.riskPresentation.color}>
           {drill.riskPresentation.label}
         </Tag>
-      </td>
-      <td>{drill.cadence}</td>
-      <td>
-        <Button
-          aria-label={`查看${drill.title}要点`}
-          onClick={(event) => onOpen(drill.key, event.currentTarget)}
-        >
-          查看要点
-        </Button>
       </td>
     </tr>
   )
@@ -97,6 +94,8 @@ export function DrillDetail({
         <Text strong>目的</Text>
         <Paragraph>{drill.objective}</Paragraph>
       </div>
+      <Text strong>建议频率</Text>
+      <Paragraph>{drill.cadence}</Paragraph>
       <Text strong>变化时触发</Text>
       <Paragraph>{drill.trigger}</Paragraph>
       <Text strong>完成证据</Text>
@@ -108,8 +107,13 @@ export function DrillDetail({
       <Paragraph type="secondary">{drill.boundary}</Paragraph>
       <Text strong>最近证据</Text>
       <Paragraph>{drill.evidenceState.note}</Paragraph>
+      {drill.evidenceState.operationId ? (
+        <Paragraph type="secondary">
+          回执：{drill.evidenceState.operationId}
+        </Paragraph>
+      ) : null}
       {drill.evidenceState.at ? (
-        <DevDeliveryTimestamp
+        <DevTimestamp
           value={drill.evidenceState.at}
           action="核验于"
           missing="时间未证明"

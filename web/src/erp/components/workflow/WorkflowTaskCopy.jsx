@@ -6,6 +6,7 @@ import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import {
   formatWorkflowTaskSource,
   getWorkflowTaskSourceNo,
+  getWorkflowTaskSourceTypeLabel,
 } from '../../utils/dashboardTaskDisplay.mjs'
 import { formatWorkflowProductCopy, formatWorkflowTaskCopy } from '../../utils/workflowTaskCopy.mjs'
 import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
@@ -55,13 +56,15 @@ export function TaskCopyField({ value, label, children }) {
   )
 }
 
-export function WorkflowTaskSource({ task, label, copyable = true, onOpen }) {
+export function WorkflowTaskSource({ task, label, copyable = true, onOpen, showUnavailable = true }) {
+  const sourceNo = getWorkflowTaskSourceNo(task)
+  const source = label || (!showUnavailable && task.display_context?.available === false ? getWorkflowTaskSourceTypeLabel(task.source_type, '来源单据') : sourceNo ? <><span className="erp-task-source__type">{getWorkflowTaskSourceTypeLabel(task.source_type, '业务单据')}</span>{' · '}<span className="erp-task-source__number">{sourceNo}</span></> : formatWorkflowTaskSource(task))
   const content = onOpen
-    ? <Button type="link" className="erp-task-source-link" onClick={onOpen}>{label || formatWorkflowTaskSource(task)}<ExportOutlined aria-hidden="true" /></Button>
-    : label || formatWorkflowTaskSource(task)
+    ? <Button type="link" className="erp-task-source-link" onClick={onOpen}>{source}<ExportOutlined aria-hidden="true" /></Button>
+    : <span className="erp-task-source">{source}</span>
   if (!copyable) return content
   return (
-    <TaskCopyField value={getWorkflowTaskSourceNo(task)} label="单据编号">
+    <TaskCopyField value={sourceNo} label="单据编号">
       {content}
     </TaskCopyField>
   )

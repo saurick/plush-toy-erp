@@ -470,6 +470,16 @@ func SourceTypeHasSuffix(v string) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldSourceType, v))
 }
 
+// SourceTypeIsNil applies the IsNil predicate on the "source_type" field.
+func SourceTypeIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldSourceType))
+}
+
+// SourceTypeNotNil applies the NotNil predicate on the "source_type" field.
+func SourceTypeNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldSourceType))
+}
+
 // SourceTypeEqualFold applies the EqualFold predicate on the "source_type" field.
 func SourceTypeEqualFold(v string) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEqualFold(FieldSourceType, v))
@@ -518,6 +528,16 @@ func SourceIDLT(v int) predicate.WorkflowTask {
 // SourceIDLTE applies the LTE predicate on the "source_id" field.
 func SourceIDLTE(v int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldLTE(FieldSourceID, v))
+}
+
+// SourceIDIsNil applies the IsNil predicate on the "source_id" field.
+func SourceIDIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldSourceID))
+}
+
+// SourceIDNotNil applies the NotNil predicate on the "source_id" field.
+func SourceIDNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldSourceID))
 }
 
 // SourceNoEQ applies the EQ predicate on the "source_no" field.

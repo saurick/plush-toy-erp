@@ -31,12 +31,8 @@ const customerReadme = read("../../docs/customers/yoyoosun/README.md");
 const rbacSource = read("../../server/internal/biz/rbac.go");
 
 test("customer confirmation separates enforced finance gate, published baseline and pending acceptance", () => {
-  const financeGateRow = customerConfirmation
-    .split("\n")
-    .find((line) => /^\| X10 \|/u.test(line));
-  const financeApprovalRow = customerConfirmation
-    .split("\n")
-    .find((line) => /^\| A05 \|/u.test(line));
+  const financeGateRow = headingSection(customerConfirmation, /^X10(?: ·|$)/u);
+  const financeApprovalRow = headingSection(customerConfirmation, /^A05(?: ·|$)/u);
   assert.match(financeGateRow, /当前为强制门禁，未批准不能出货/u);
   assert.doesNotMatch(financeGateRow, /不是强制门禁/u);
   assert.match(financeApprovalRow, /真实岗位办理和 C05 业务选择仍待确认/u);
@@ -46,12 +42,9 @@ test("customer confirmation separates enforced finance gate, published baseline 
   const statusAppendix = customerConfirmation.split("### 6.2 乙方状态附表")[1];
   assert.ok(statusAppendix);
   for (const id of ["P03", "P07", "P08", "P09"]) {
-    const row = statusAppendix
-      .split("\n")
-      .find((line) => line.startsWith(`| ${id} |`));
-    const cells = row.split("|").map((cell) => cell.trim());
-    assert.equal(cells[4], "固定版本已发布；岗位待核验", id);
-    assert.equal(cells[5], "待验收", id);
+    const record = headingSection(statusAppendix, new RegExp(`^${id}(?: ·|$)`, "u"));
+    assert.match(record, /^\*\*目标环境\*\*：固定版本已发布；岗位待核验$/mu, id);
+    assert.match(record, /^\*\*用户验收\*\*：待验收$/mu, id);
   }
 });
 
@@ -61,9 +54,18 @@ const registeredPermissionKeys = new Set(
   ),
 );
 
-function tableIDs(source, prefix) {
-  const pattern = new RegExp(`^\\|\\s*(${prefix}\\d{2})\\s*\\|`, "gmu");
+function recordIDs(source, prefix) {
+  const pattern = new RegExp(`^(?:\\|\\s*|### )(${prefix}\\d{2})(?:\\s*\\|| ·|$)`, "gmu");
   return [...source.matchAll(pattern)].map((match) => match[1]);
+}
+
+function headingSection(source, titlePattern) {
+  const headings = [...source.matchAll(/^(#{1,6}) (.+)$/gmu)];
+  const index = headings.findIndex((heading) => titlePattern.test(heading[2]));
+  assert.notEqual(index, -1, `missing section: ${titlePattern}`);
+  const heading = headings[index];
+  const next = headings.slice(index + 1).find((item) => item[1].length <= heading[1].length);
+  return source.slice(heading.index, next?.index ?? source.length);
 }
 
 function tableRows(source) {
@@ -98,7 +100,7 @@ function sectionBetween(source, startMarker, endMarker) {
 }
 
 function assertRecordedDeploymentIdentity(source) {
-  const baseline = sectionBetween(source, "## 当前环境基线", "## 状态口径");
+  const baseline = headingSection(source, /^当前环境基线$/u);
   const rows = tableRows(baseline);
   for (const [label, pattern] of [
     ["固定版本", /^`[^`\s]+`$/u],
@@ -346,18 +348,18 @@ test("customer confirmation separates decisions from system evidence", () => {
     "## 10. 待甲方决策清单",
     "## 11. 当面对接方法",
   );
-  assert.deepEqual(tableIDs(roleSection, "R"), expectedIDs("R", 9));
-  assert.deepEqual(tableIDs(nodeSection, "A"), expectedIDs("A", 6));
-  assert.deepEqual(tableIDs(handoffSection, "H"), [
+  assert.deepEqual(recordIDs(roleSection, "R"), expectedIDs("R", 9));
+  assert.deepEqual(recordIDs(nodeSection, "A"), expectedIDs("A", 6));
+  assert.deepEqual(recordIDs(handoffSection, "H"), [
     ...expectedIDs("H", 19),
     "H21",
     "H22",
   ]);
-  assert.deepEqual(tableIDs(exceptionSection, "X"), [
+  assert.deepEqual(recordIDs(exceptionSection, "X"), [
     ...expectedIDs("X", 10),
     "X12",
   ]);
-  assert.deepEqual(tableIDs(decisionSection, "C"), expectedIDs("C", 9));
+  assert.deepEqual(recordIDs(decisionSection, "C"), expectedIDs("C", 9));
 
   for (const forbiddenTechnicalToken of [
     "workflow.task.approve",

@@ -211,7 +211,7 @@ func TestProductionWIPJSONRPCAuthPermissionAndOutsourcingModule(t *testing.T) {
 		"outsourcing_allocations": []any{map[string]any{"outsourcing_order_item_id": float64(501)}},
 	})
 	_, moduleDenied, _ := dispatcher.handleProductionWIP(workflowJSONRPCAdminContext(), "execute_production_wip_action", "module-denied", assignParams)
-	if moduleDenied.Code != errcode.InvalidParam.Code || repo.actionCall != nil {
+	if moduleDenied.Code != errcode.BusinessRuleViolation.Code || repo.actionCall != nil {
 		t.Fatalf("module denied=%#v call=%#v", moduleDenied, repo.actionCall)
 	}
 
@@ -274,7 +274,7 @@ func TestProductionWIPJSONRPCDistinguishesAllocationAndMaterialIssueErrors(t *te
 	dispatcher := newProductionWIPJSONRPCTestDispatcher(t, &productionWIPJSONRPCRepo{}, workflowJSONRPCAdmin([]string{biz.ProductionRoleKey}))
 	allocation := dispatcher.mapProductionWIPError(context.Background(), biz.ErrProductionWIPOutsourcingAllocationInvalid)
 	issue := dispatcher.mapProductionWIPError(context.Background(), biz.ErrProductionWIPOutsourcingMaterialIssuePending)
-	if allocation.Code != errcode.InvalidParam.Code || issue.Code != errcode.InvalidParam.Code || allocation.Message == issue.Message ||
+	if allocation.Code != errcode.InvalidParam.Code || issue.Code != errcode.BusinessRuleViolation.Code || allocation.Message == issue.Message ||
 		issue.Message != "布料加工材料尚未完成外发发料，不能开工" {
 		t.Fatalf("allocation=%#v issue=%#v", allocation, issue)
 	}

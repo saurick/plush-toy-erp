@@ -152,12 +152,16 @@ export default function useWorkflowDashboardData({
             error: errorMessage,
           })
         } else {
-          setWorkbenchResponseState({
+          setWorkbenchResponseState((current) => ({
             scopeKey: requestWorkbenchScopeKey,
             requestKey: workbenchRequestKey,
-            response: null,
+            response:
+              current?.scopeKey === requestWorkbenchScopeKey &&
+              current?.response?.queue_key === workbenchRequest.queue_key
+                ? current.response
+                : null,
             error: errorMessage,
-          })
+          }))
         }
       }
       return false

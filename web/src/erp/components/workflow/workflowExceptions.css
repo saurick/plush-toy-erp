@@ -1,6 +1,6 @@
 .workflow-exceptions {
   display: grid;
-  gap: 12px;
+  gap: var(--erp-work-item-gap);
   min-width: 0;
 }
 .workflow-exceptions__query {
@@ -94,8 +94,8 @@
 }
 .workflow-exceptions__item {
   border: 1px solid var(--erp-border);
-  border-radius: 8px;
-  padding: 14px;
+  border-radius: var(--erp-work-item-radius);
+  padding: var(--erp-work-item-padding);
   background: var(--erp-surface-bg);
 }
 .workflow-exceptions__loading {

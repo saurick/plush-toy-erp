@@ -474,7 +474,7 @@ func TestJsonrpcDispatcher_AttachmentWriteAPIRequiresOwnerModuleEnabled(t *testi
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if uploadRes == nil || uploadRes.Code != errcode.InvalidParam.Code {
+	if uploadRes == nil || uploadRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only owner module to reject upload, got %#v", uploadRes)
 	}
 	if repo.createCalls != 0 {
@@ -545,7 +545,7 @@ func TestJsonrpcDispatcher_AttachmentWriteAPIRequiresOwnerModuleEnabled(t *testi
 		"id":     101,
 		"reason": "上传错误",
 	}))
-	if err != nil || withdrawRes == nil || withdrawRes.Code != errcode.InvalidParam.Code {
+	if err != nil || withdrawRes == nil || withdrawRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("disabled owner module must reject attachment withdrawal: res=%#v err=%v", withdrawRes, err)
 	}
 	if repo.withdrawCalls != 0 {
@@ -619,7 +619,7 @@ func TestJsonrpcDispatcher_WithdrawAttachmentUsesSessionActorAndReturnsAuditRece
 	_, changedRes, _ := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "withdraw-changed", mustJSONRPCStruct(t, map[string]any{
 		"id": 101, "reason": "另一个原因",
 	}))
-	if changedRes.Code != errcode.ResourceVersionConflict.Code || repo.withdrawCalls != 1 {
+	if changedRes.Code != errcode.BusinessRuleViolation.Code || repo.withdrawCalls != 1 {
 		t.Fatalf("changed retry must conflict without writing: res=%#v calls=%d", changedRes, repo.withdrawCalls)
 	}
 }
@@ -687,7 +687,7 @@ func TestJsonrpcDispatcher_WithdrawAttachmentFailsClosedAtBusinessBoundaries(t *
 		_, res, _ := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "product-image", mustJSONRPCStruct(t, map[string]any{
 			"id": 201, "reason": "不再使用",
 		}))
-		if res.Code != errcode.InvalidParam.Code || res.Message != "产品图片请使用替换或清空，不支持撤销" || repo.withdrawCalls != 0 {
+		if res.Code != errcode.BusinessRuleViolation.Code || res.Message != "产品图片请使用替换或清空，不支持撤销" || repo.withdrawCalls != 0 {
 			t.Fatalf("product image withdrawal must fail closed: res=%#v calls=%d", res, repo.withdrawCalls)
 		}
 	})
@@ -1123,7 +1123,7 @@ func TestJsonrpcDispatcher_DownloadRejectsWithdrawnAttachmentBeforeLoadingConten
 		"withdrawn-download",
 		mustJSONRPCStruct(t, map[string]any{"id": 71}),
 	)
-	if err != nil || res.Code != errcode.InvalidParam.Code ||
+	if err != nil || res.Code != errcode.BusinessRuleViolation.Code ||
 		res.Message != "附件已撤销，不能预览或下载" {
 		t.Fatalf("withdrawn attachment download must fail clearly: res=%#v err=%v", res, err)
 	}

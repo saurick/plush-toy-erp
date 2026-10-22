@@ -9,12 +9,12 @@
 | `$plush-capability-evidence-audit`        | 只读审计“做到哪、还缺什么、能否发布/交付”，分开代码、本地 QA、运行态、目标发布、恢复和客户验收                                         |
 | `$plush-code-review-governance`           | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查                                                                  |
 | `$plush-docs-governance`                  | 当前真源、文档清单、中文文件名、读者路径和 `progress.md`                                                                               |
-| `$plush-domain-boundary-governance`       | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC 和字段真源                                      |
-| `$plush-page-design-governance`           | 普通 ERP 页面业务语义、字段/动作/状态、原型和浏览器回归                                                                                |
+| `$plush-domain-boundary-governance`       | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC、字段真源和数据增长与容量设计                      |
+| `$plush-page-design-governance`           | 普通 ERP 页面业务语义、字段/动作/状态、功能与数据增长、原型和浏览器回归                                                                  |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真                                                                     |
 | `$plush-seed-import-governance`           | 模块化 seed / fixture / 模拟数据、甲方资料到脱敏场景映射、增量复用、import dry-run、批次与数据 cleanup 边界                           |
 | `$plush-manual-acceptance-governance`     | 人工验收目录/批次、岗位账号/任务、浏览器/PDF 与人工证据、签收和退出清理                                                                |
-| `$plush-test-governance`                  | 验证范围需要判断，或涉及浏览器、数据库、migration、CI 编排/缓存变更及证据；T0-T8 只作工作台追踪键                                  |
+| `$plush-test-governance`                  | 验证范围判断、增长与容量验证，或涉及浏览器、数据库、migration、CI 编排/缓存变更及证据；T0-T8 只作工作台追踪键                          |
 | `$plush-operations-governance`            | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚                                                                                 |
 
 ## 选择规则
@@ -61,3 +61,6 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --check -- .agents/
 | “继续已授权的共享组件修改，完成必要浏览器验证。” | Page / Test | 沿用同一目标授权，按真实影响选择验证；只在显著超出范围或预算时询问。 |
 | “根据已有发布回执判断缺口，不连接目标。” | Capability Evidence Audit | 读取已有证据，保留目标未核验结论；不访问生产或取得运行凭据。 |
 | “实现 schema 调整并生成 migration，暂不 apply。” | Domain / Test | 完成设计、生成、守卫及适用的隔离升级检查；不执行目标库 apply。 |
+| “订单按钮以后增多时仍要清楚好用。” | Page | 评估业务分组、优先级、宽度与交互恢复，选择受影响的增长场景；不自动新增功能区或后台压测。 |
+| “评估历史数据增长后的查询和导出，先别改。” | Domain / Test | 区分总量、处理范围、负载和环境，核对现有主路径并提出有依据的验证方案；不改库、不启动压测、不承诺未实测容量。 |
+| “只改一个按钮文案。” | Page | 沿用现有布局与容量边界，完成相关核对；不额外引入规模分析、造数或压测。 |

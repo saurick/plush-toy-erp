@@ -176,6 +176,14 @@ export function normalizeDevPressureReports(value) {
         metrics(level.operations)
         metrics(level.rpc)
         metrics(level.flows)
+        if (level.pagination) {
+          const page = level.pagination
+          if (!['pageSize', 'totalRows', 'fullPages', 'tailRows', 'minPageSamples'].every((key) => Number.isSafeInteger(page[key]) && page[key] >= 0) ||
+              page.pageSize < 1 || page.totalRows < 1 || page.fullPages !== Math.floor(page.totalRows / page.pageSize) ||
+              page.tailRows !== page.totalRows % page.pageSize || typeof page.accepted !== 'boolean') invalid()
+          metrics(page.full)
+          metrics(page.tail)
+        }
         level.methods.forEach((method) => {
           if (!/^[a-z_]+\.[a-z_]+$/u.test(method.name)) invalid()
           metrics(method)

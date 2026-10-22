@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { expandPrintToolSection } from './printToolHelpers.mjs'
 import { Buffer } from 'node:buffer'
 import { writeFile } from 'node:fs/promises'
@@ -1284,9 +1285,8 @@ export function createPrintWorkspaceFeedbackScenarios({
             '表头留白提示不进入浏览器打印'
           )
           await page.emulateMedia({ media: 'screen' })
-          await page
-            .getByRole('combobox', { name: '显示比例', exact: true })
-            .selectOption('0.75')
+          await chooseSelectOption(page
+            .getByRole('combobox', { name: '显示比例', exact: true }), '0.75')
           await notice
             .getByRole('button', { name: '下一处', exact: true })
             .click()

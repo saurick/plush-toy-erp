@@ -1,32 +1,40 @@
 import React from 'react'
 import { Tag } from 'antd'
+import { FileTextOutlined } from '@ant-design/icons'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import {
   progressAttention,
   progressDelivery,
   progressDue,
-  progressProductLabel,
+  progressIdentityPresentation,
   progressStatusLabel,
 } from '../../utils/businessProgress.mjs'
 
+export function ProgressProductIdentity({ row, compact = false, children }) {
+  const identity = progressIdentityPresentation(row)
+  const content = children ?? identity.product
+  return identity.hasProduct ? (
+    <ProductIdentity className="erp-progress-product" productId={row.product_id} name={row.product} compact={compact}>
+      {content}
+    </ProductIdentity>
+  ) : <span className="erp-progress-product erp-progress-product--empty"><span className="erp-task-product-image erp-task-product-image--placeholder" aria-label="未关联产品／物料"><FileTextOutlined aria-hidden="true" /></span>{content}</span>
+}
+
 export function ProgressIdentity({ row }) {
+  const identity = progressIdentityPresentation(row)
   const content = (
     <span className="erp-progress-identity">
       <strong>
-        {progressProductLabel(row)}
+        {identity.product}
       </strong>
-      <span className="erp-progress-reference">{row.order_no}</span>
+      <span className="erp-progress-reference">{identity.reference}</span>
       <span className="erp-progress-customer">
-        {row.customer || (row.unlinked ? '含未关联销售明细' : '客户待补齐')}
+        {identity.customer}
         <Tag>{progressStatusLabel(row.status)}</Tag>
       </span>
     </span>
   )
-  return row.product_match_count > 0 ? (
-    <ProductIdentity productId={row.product_id} name={row.product} preview={false}>
-      {content}
-    </ProductIdentity>
-  ) : content
+  return <ProgressProductIdentity row={row} compact>{content}</ProgressProductIdentity>
 }
 
 export function ProgressDue({ row, snapshotAt }) {

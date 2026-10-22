@@ -222,7 +222,7 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 			return nil, err
 		}
 		if !isOutsourcingOrderEditable(current.LifecycleStatus) {
-			return nil, ErrBadParam
+			return nil, ErrSourceOrderStateInvalid
 		}
 	}
 	if id == 0 {
@@ -260,8 +260,11 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 			if err != nil {
 				return nil, err
 			}
-			if current.OutsourcingOrderID != id || current.LineStatus != OutsourcingOrderItemStatusOpen {
+			if current.OutsourcingOrderID != id {
 				return nil, ErrBadParam
+			}
+			if current.LineStatus != OutsourcingOrderItemStatusOpen {
+				return nil, ErrSourceOrderStateInvalid
 			}
 		}
 		mutation := item.OutsourcingOrderItemMutation
@@ -368,7 +371,7 @@ func (uc *OutsourcingOrderUsecase) changeOutsourcingOrderLifecycle(ctx context.C
 		return nil, err
 	}
 	if !IsOutsourcingOrderLifecycleTransitionAllowed(current.LifecycleStatus, next) {
-		return nil, ErrBadParam
+		return nil, ErrSourceOrderStateInvalid
 	}
 	if current.LifecycleStatus == next {
 		return current, nil

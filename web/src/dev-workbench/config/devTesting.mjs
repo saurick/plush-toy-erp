@@ -552,7 +552,11 @@ function parseMarkdownTable(source = '', heading = '') {
   const rows = tableRows.slice(2).filter((cells) => {
     return cells.length === headers.length && !isSeparatorRow(cells)
   })
-  return { headers, rows }
+  const complete =
+    tableRows[1].length === headers.length &&
+    isSeparatorRow(tableRows[1]) &&
+    rows.length === tableRows.length - 2
+  return { headers, rows, complete }
 }
 
 function parseFirstMarkdownTable(source = '', headings = []) {
@@ -575,6 +579,41 @@ function getMarkdownTableCell(cells = [], headerIndex = {}, headerNames = []) {
     if (Number.isInteger(index)) return cells[index] || ''
   }
   return ''
+}
+
+export function parseDevTestingStrategyGuide(source = '') {
+  const tables = {
+    methods: {
+      heading: '## 测试方式 / Test Methods',
+      headers: ['测试方式', '适用场景', '当前入口', '结果边界'],
+    },
+    evidence: {
+      heading: '## 证据分类 / Evidence Categories',
+      headers: ['证据类别', '必要上下文', '能证明的范围', '不能替代'],
+    },
+    devices: {
+      heading: '## 真机回归 / Real Device Regression',
+      headers: ['场景', '操作范围', '判定与读回'],
+    },
+    growth: {
+      heading: '## 增长、并发与事务验证 / Growth and Correctness',
+      headers: ['能力', '检查与触发条件', '验证入口', '结论边界'],
+    },
+  }
+  return Object.fromEntries(
+    Object.entries(tables).map(([key, { heading, headers }]) => {
+      const table = parseMarkdownTable(source, heading)
+      const rows = table.rows.map((cells) => cells.map(stripMarkdownInline))
+      const labels = rows.map((cells) => cells[0])
+      const valid =
+        table.complete &&
+        table.headers.length === headers.length &&
+        headers.every((header, index) => table.headers[index] === header) &&
+        rows.every((cells) => cells.every(Boolean)) &&
+        new Set(labels).size === labels.length
+      return [key, { headers, rows: valid ? rows : [] }]
+    })
+  )
 }
 
 export function parseDevTestingStrategyTiers(source = '') {

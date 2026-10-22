@@ -8,6 +8,7 @@ import React, {
 } from 'react'
 import { Checkbox, Input } from 'antd'
 import { DeleteOutlined, DragOutlined } from '@ant-design/icons'
+import Select from '@/common/components/select/AppSelect'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
@@ -1123,20 +1124,29 @@ export default function WorkInstructionImageAnnotationEditor({
 
               <label>
                 线条颜色
-                <select
-                  className="form-select"
+                <Select
+                  allowClear={false}
+                  placeholder="线条颜色"
+                  aria-label="线条颜色"
+                  virtual={false}
+                  data-value={selectedAnnotation.color}
                   value={selectedAnnotation.color}
-                  onChange={(event) =>
+                  onChange={(color) =>
                     updateSelectedAnnotation((annotation) => ({
                       ...annotation,
-                      color: event.target.value,
+                      color,
                     }))
                   }
-                >
-                  <option value="#2563eb">蓝色</option>
-                  <option value="#ef4444">红色</option>
-                  <option value="#111827">黑色</option>
-                </select>
+                  options={[
+                    ['#2563eb', '蓝色'],
+                    ['#ef4444', '红色'],
+                    ['#111827', '黑色'],
+                  ].map(([value, label]) => ({
+                    value,
+                    label,
+                    'data-select-value': value,
+                  }))}
+                />
               </label>
 
               {selectedAnnotation.type ===
@@ -1144,19 +1154,28 @@ export default function WorkInstructionImageAnnotationEditor({
                 <>
                   <label>
                     说明框样式
-                    <select
-                      className="form-select"
+                    <Select
+                      allowClear={false}
+                      placeholder="说明框样式"
+                      aria-label="说明框样式"
+                      virtual={false}
+                      data-value={selectedAnnotation.tone}
                       value={selectedAnnotation.tone}
-                      onChange={(event) =>
+                      onChange={(tone) =>
                         updateSelectedAnnotation((annotation) => ({
                           ...annotation,
-                          tone: event.target.value,
+                          tone,
                         }))
                       }
-                    >
-                      <option value="white">白底</option>
-                      <option value="blue-fill">蓝底白字</option>
-                    </select>
+                      options={[
+                        ['white', '白底'],
+                        ['blue-fill', '蓝底白字'],
+                      ].map(([value, label]) => ({
+                        value,
+                        label,
+                        'data-select-value': value,
+                      }))}
+                    />
                   </label>
                   <label>
                     说明框宽度

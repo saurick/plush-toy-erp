@@ -90,6 +90,9 @@ export async function installOrderRpcMocks(page, context) {
       case 'list_sales_orders':
         data = stylePaginatedRpcData([salesOrder], 'sales_orders', params)
         break
+      case 'export_sales_orders':
+        data = { sales_orders: [salesOrder], total: 1 }
+        break
       case 'list_sales_order_items':
         data = mockSalesOrderItemsList(params, salesOrderItem)
         break

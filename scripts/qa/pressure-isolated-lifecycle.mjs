@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { createDatabaseRunID, databaseNameForRun, assertDisposableDatabaseTarget } from "./database-target.mjs";
 import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
+import { BusinessPaginationPolicy } from "../../web/src/common/consts/policies.generated.mjs";
 import { capacityDatasetConfirmation, runCapacityDataset, capacityDatasetTargets } from "./capacity-dataset.mjs";
 import { applyCapacityCustomerConfig, capacityConfigConfirmation } from "./capacity-customer-config.mjs";
 import { runIsolatedPressure, CONFIRM_PHRASE } from "./manual-acceptance-capacity-pressure.mjs";
@@ -21,7 +22,9 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_S3_IMAGE = "chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882";
 export function pressureLifecyclePlan(profile = "capacity", dataScale = "baseline") {
   const scale = pressureDataScale(dataScale);
+  const totalOrders = scale.historyOrders + engineeringPressurePoolSize(profile);
   return { profile, dataScale, historyOrders: scale.historyOrders, readTargets: capacityDatasetTargets(dataScale), poolSize: engineeringPressurePoolSize(profile), simulatedOnly: true,
+    pagination: { pageSize: BusinessPaginationPolicy.maxPageSize, totalOrders, fullPages: Math.floor(totalOrders / BusinessPaginationPolicy.maxPageSize), tailRows: totalOrders % BusinessPaginationPolicy.maxPageSize },
     databaseProfile: "capacity", environment: "owned loopback PostgreSQL + S3 + backend",
     steps: ["source snapshot and build", "owned PostgreSQL/S3", "Atlas migrate/readback", "backend identity",
       "role/core seed", "read dataset/config activation", "read pressure", "engineering preparation",
@@ -39,7 +42,8 @@ export function pressureNetworkConfig(subnet = "") {
 function includesPressureBuildSource(directory, file) {
   const relative = path.relative(directory, file);
   return !/(^|\/)(\.git|\.env[^/]*|node_modules|bin|output|tmp)(\/|$)/u.test(relative) &&
-    !/config\.local\.ya?ml$/u.test(relative);
+    !/config\.local\.ya?ml$/u.test(relative) &&
+    relative !== path.join("configs", "dev", "database-roles.local.json");
 }
 export function copyPressureBuildSource(directory, destination) {
   cpSync(directory, destination, { recursive: true,
@@ -225,8 +229,8 @@ export async function runPressureLifecycle({ profile = "capacity", dataScale = "
       report.runtimeIdentity = await verifyPressureRuntime({ baseURL, databaseName, commit, migration: report.migration, signal: activeSignal });
     });
     await step("seed", async () => {
-      await command("go", ["run", "-mod=readonly", "./cmd/seed-role-demo-admins", "--include-debug"], { cwd: source, env: runtimeEnv, timeout: 120000 });
-      await command("go", ["run", "-mod=readonly", "./cmd/seed-core-demo-data", "--prefix", "SIM-PRESSURE"], { cwd: source, env: runtimeEnv, timeout: 120000 });
+      await command("go", ["run", "-mod=readonly", "./cmd/seed-role-demo-admins", "--conf", path.join(directory, "config.yaml"), "--include-debug"], { cwd: source, env: runtimeEnv, timeout: 120000 });
+      await command("go", ["run", "-mod=readonly", "./cmd/seed-core-demo-data", "--conf", path.join(directory, "config.yaml"), "--prefix", "SIM-PRESSURE"], { cwd: source, env: runtimeEnv, timeout: 120000 });
     });
     let dataset;
     await step("read-dataset-config", async () => {

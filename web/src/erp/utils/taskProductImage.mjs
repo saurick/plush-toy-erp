@@ -1,6 +1,6 @@
 export function createTaskProductImageLoader(download) {
   const cache = new Map()
-  return function load({ attachmentID, productID, variant = 'thumbnail' }) {
+  function load({ attachmentID, productID, variant = 'thumbnail' }) {
     const key = `${productID}:${attachmentID}:${variant}`
     if (variant === 'thumbnail' && cache.has(key)) return cache.get(key)
     const request = download({
@@ -29,4 +29,8 @@ export function createTaskProductImageLoader(download) {
     }
     return request
   }
+  load.invalidate = ({ attachmentID, productID }) => {
+    cache.delete(`${productID}:${attachmentID}:thumbnail`)
+  }
+  return load
 }

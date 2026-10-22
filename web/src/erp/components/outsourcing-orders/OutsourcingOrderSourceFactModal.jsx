@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react'
-import { Alert, Descriptions, Form, Input, Radio, Select } from 'antd'
+import { Alert, Descriptions, Form, Input, Radio } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import BusinessFormSectionTitle from '../business-list/BusinessFormSectionTitle.jsx'
 import {

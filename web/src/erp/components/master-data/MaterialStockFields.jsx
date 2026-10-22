@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Form, Select } from 'antd'
+import { Button, Form } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { listAllMaterialWarehouses } from '../../api/masterDataOrderApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {

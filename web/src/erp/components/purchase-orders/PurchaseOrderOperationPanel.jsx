@@ -19,13 +19,13 @@ import {
   BusinessLifecycleSecondaryAction,
   BusinessLifecyclePrimaryAction,
   BusinessOperationPanel,
-  DateRangeFilter,
   SearchInput,
   SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
   ToolbarButton,
 } from '../business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import LifecycleScopeFilter from '../business-list/LifecycleScopeFilter.jsx'
 import {
   PURCHASE_ORDER_DATE_FILTER_OPTIONS,
@@ -53,6 +53,7 @@ export default function PurchaseOrderOperationPanel({
   exportDisabled = false,
   exporting = false,
   exportOrders,
+  showListTools = true,
   generatingInboundDraft = false,
   hasActiveFilters = false,
   itemsLoading = false,
@@ -177,7 +178,7 @@ export default function PurchaseOrderOperationPanel({
             className="erp-business-filter-control--status"
             value={supplierFilter}
             options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
-            placeholder="全部供应商"
+            placeholder="供应商"
             showSearch
             optionFilterProp="label"
             onChange={(value) => {
@@ -204,6 +205,7 @@ export default function PurchaseOrderOperationPanel({
             }}
           />
           <SelectFilter
+            allowClear={false}
             aria-label="排序方式"
             className="erp-business-filter-control--sort"
             value={sortValue}
@@ -215,14 +217,14 @@ export default function PurchaseOrderOperationPanel({
           />
         </>
       }
-      actions={
+      actions={showListTools ? (
         <BusinessListToolbarActions
           onExport={exportOrders}
           exportDisabled={exportDisabled || exporting || orders.length === 0}
           exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
           onOpenColumnOrder={() => setColumnOrderOpen(true)}
         />
-      }
+      ) : null}
       primaryAction={
         canCreate ? (
           <BusinessActionTooltip
@@ -420,7 +422,7 @@ export default function PurchaseOrderOperationPanel({
         >
           <Button
             data-business-action-key="print-contract"
-            data-business-action-role="secondary"
+            data-business-action-role="output"
             size="small"
             icon={<FileTextOutlined />}
             disabled={!printSelectionReady || recordActionBusy}

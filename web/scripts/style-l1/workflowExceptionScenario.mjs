@@ -59,6 +59,7 @@ export function workflowExceptionScenario(deps) {
     },
     verify: async (page) => {
       const panel = page.getByRole('region', { name: '异常跟踪', exact: true })
+      const toolbar = page.locator('.erp-task-tracking-toolbar')
       await panel.getByText('EX-DESKTOP-001', { exact: true }).waitFor()
       assert.equal(await page.getByLabel('任务范围', { exact: true }).getByText('异常跟踪', { exact: true }).count(), 0)
       assert.equal(await page.getByLabel('跟踪内容', { exact: true }).getByText('异常跟踪', { exact: true }).count(), 1)
@@ -66,19 +67,19 @@ export function workflowExceptionScenario(deps) {
       assert.equal(await panel.locator('.erp-sliding-segmented').count(), 0, '统计和状态不再增加导航层')
       assert.equal(await panel.getByLabel('异常关联入口', { exact: true }).count(), 1)
       assert.equal(await page.getByLabel('跟踪内容', { exact: true }).evaluate((node) => getComputedStyle(node).borderTopWidth), '0px')
-      const counts = () => panel.locator('.workflow-exceptions__states .erp-filter-chip__count').allTextContents()
+      const counts = () => toolbar.locator('.workflow-exceptions__states .erp-filter-chip__count').allTextContents()
       assert.deepEqual(await counts(), ['45', '40', '5'])
       assert.equal(await panel.getByText(/共 \d+ 项异常/).count(), 0)
-      await panel.getByRole('button', { name: /^已处理完/ }).click()
+      await toolbar.getByRole('button', { name: /^已处理完/ }).click()
       await panel.getByText('EX-DESKTOP-041', { exact: true }).waitFor()
       assert.deepEqual(await counts(), ['45', '40', '5'])
       assert.equal(await panel.locator('.workflow-exceptions__item').count(), 5)
-      await panel.getByRole('button', { name: /^未处理完/ }).click()
+      await toolbar.getByRole('button', { name: /^未处理完/ }).click()
       await panel.getByText('EX-DESKTOP-001', { exact: true }).waitFor()
       assert.deepEqual(await counts(), ['45', '40', '5'])
-      await panel.getByRole('button', { name: /^全部异常/ }).click()
+      await toolbar.getByRole('button', { name: /^全部异常/ }).click()
       await panel.getByText('EX-DESKTOP-001', { exact: true }).waitFor()
-      const search = panel.getByLabel('搜索异常单号、订单、批次或原因')
+      const search = toolbar.getByLabel('搜索异常单号、订单、批次或原因')
       await search.fill('无匹配')
       await search.press('Enter')
       await panel.getByText('当前条件下没有可跟踪的异常', { exact: true }).waitFor()
@@ -87,8 +88,8 @@ export function workflowExceptionScenario(deps) {
       await panel.getByText('EX-DESKTOP-001', { exact: true }).waitFor()
       assert.equal(await panel.getByRole('heading', { name: '异常跟踪', exact: true }).count(), 0)
       assert.equal(await panel.getByText('查看明细', { exact: true }).count(), 0)
-      assert.equal(await panel.locator('.workflow-exceptions__query button').filter({ hasText: '刷新' }).count(), 0)
-      const geometry = await panel.evaluate((root) => ({
+      assert.equal(await toolbar.locator('.workflow-exceptions__query button').filter({ hasText: '刷新' }).count(), 0)
+      const geometry = await page.locator('.erp-dashboard-task-board-card').evaluate((root) => ({
         controlsToRecord: root.querySelector('.workflow-exceptions__item').getBoundingClientRect().top - root.querySelector('.workflow-exceptions__query').getBoundingClientRect().top,
         overflow: root.scrollWidth - root.clientWidth,
       }))
@@ -98,7 +99,7 @@ export function workflowExceptionScenario(deps) {
       await panel.getByText('EX-DESKTOP-021', { exact: true }).waitFor()
       assert.equal(reads.at(-1).offset, 20)
       await verifyMobileNavigationMotion(page, assert, '.erp-task-tracking-views', 0)
-      await page.locator('.erp-workflow-tracking-panel').getByPlaceholder('单号 / 任务 / 产品 / 款号').waitFor()
+      await toolbar.getByPlaceholder('单号 / 任务 / 产品 / 款号').waitFor()
       await verifyMobileNavigationMotion(page, assert, '.erp-task-tracking-views', 1, true)
       await panel.getByText('EX-DESKTOP-021', { exact: true }).waitFor()
       assert.equal(reads.at(-1).offset, 20, '切换追踪视图保留异常页码')

@@ -65,17 +65,22 @@ function callSection(section, validate) {
   const fences = section.tokens.filter(
     (token) => token.type === 'fence' && token.params.trim() === 'json'
   )
-  const table = section.tokens.find((token) => token.type === 'table_open')
+  const tables = section.tokens.filter((token) => token.type === 'table_open')
   // Remarkable's table tokenizer splits escaped pipes as column boundaries.
   // Keep source cell boundaries so unions and parser expressions retain meaning.
-  const rows = table ? section.bodyLines.slice(
+  const fieldTables = tables.flatMap((table) => {
+    const rows = section.bodyLines.slice(
     table.lines[0] - section.bodyStart, table.lines[1] - section.bodyStart
   ).filter((_, index) => index !== 1).map((line) => line.trim()
     .replace(/^\||\|$/gu, '').split(/(?<!\\)\|/u)
-    .map((cell) => cell.trim().replaceAll('\\|', '|').replaceAll('&#124;', '|'))) : []
-  const header = rows[0] || []
-  const hasFields = /字段$/u.test(header[0] || '') && header[1] === '类型' &&
+    .map((cell) => cell.trim().replaceAll('\\|', '|').replaceAll('&#124;', '|')))
+    const header = rows[0] || []
+    return /字段$/u.test(header[0] || '') && header[1] === '类型' &&
     (header.length === 3 || (header[2] === '必填条件' && header.length === 4))
+      ? [{ table, header, rows: rows.slice(1) }]
+      : []
+  })
+  const hasFields = fieldTables.length > 0
   let example
   try {
     example = fences.length === 1 ? JSON.parse(fences[0].content) : null
@@ -90,16 +95,16 @@ function callSection(section, validate) {
   ).join('\n').trim()
   return {
     source,
-    fields: hasFields ? rows.slice(1).map((cells) => ({
+    fields: hasFields ? fieldTables.flatMap(({ header, rows }) => rows.map((cells) => ({
       name: cells[0].replace(/^`([^`]+)`$/u, '$1'),
       type: cells[1],
       required: header.length === 4 ? cells[2] : '',
       description: cells[header.length - 1],
-    })) : null,
-    fieldHeader: hasFields ? header[0] : '',
+    }))) : null,
+    fieldHeader: hasFields ? fieldTables[0].header[0] : '',
     notesSource: hasFields ? section.bodyLines.filter((line, index) => {
       const position = section.bodyStart + index
-      return (position < table.lines[0] || position >= table.lines[1]) &&
+      return fieldTables.every(({ table }) => position < table.lines[0] || position >= table.lines[1]) &&
         fences.every((token) => position < token.lines[0] || position >= token.lines[1])
     }).join('\n').trim() : source,
     example: validate(example) ? example : null,

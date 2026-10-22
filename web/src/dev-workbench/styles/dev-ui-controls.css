@@ -237,6 +237,60 @@
   padding-block: 6px;
 }
 
+.erp-control-library-catalog {
+  max-width: 100%;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.erp-control-library-catalog table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: 16px;
+  font-size: var(--erp-font-small);
+}
+
+.erp-control-library-catalog :is(th, td) {
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.erp-control-library-catalog th {
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-control-library-catalog :is(p, .erp-control-example-row) {
+  margin-block: 16px;
+}
+
+.erp-control-library-catalog a {
+  color: var(--erp-primary);
+}
+
+.erp-control-input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+}
+
+.erp-control-input-field {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.erp-control-input-field > :is(.ant-picker, .ant-select) {
+  width: 100%;
+}
+
+.erp-control-input-field output {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
 .erp-control-example-stack {
   display: grid;
   gap: 16px;

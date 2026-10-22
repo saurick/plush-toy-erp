@@ -156,30 +156,38 @@ func (d *jsonrpcDispatcher) purchaseOrderErrorResult(ctx context.Context, err er
 	case errors.Is(err, biz.ErrPurchaseOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrPurchaseOrderPriceFrozen):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "此处只补缺失单价，已确认的采购价格不能覆盖"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "此处只补缺失单价，已确认的采购价格不能覆盖"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderStateInvalid):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单当前状态不允许此操作，请刷新后核对可办理的操作"}
 	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单尚未全部入库；若确定不再收货，请改用短关闭并填写原因"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单尚未全部入库；若确定不再收货，请改用短关闭并填写原因"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[purchase_order] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购订单不存在"}
 	case errors.Is(err, biz.ErrPurchaseOrderItemNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单行不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购订单行不存在"}
 	case errors.Is(err, biz.ErrPurchaseOrderCloseDraftReceiptDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单存在待入账的入库草稿，不能关闭"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单存在待入账的入库草稿，不能关闭"}
 	case errors.Is(err, biz.ErrPurchaseOrderCancelReceiptDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单已生成未取消的入库单，不能取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单已生成未取消的入库单，不能取消"}
 	case errors.Is(err, biz.ErrPurchaseOrderLifecycleProcessDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单仍有进行中的备料流程，不能关闭或取消"}
-	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "供应商不存在或已停用"}
-	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "材料不存在或已停用"}
-	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "单位不存在或已停用"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单仍有进行中的备料流程，不能关闭或取消"}
+	case errors.Is(err, biz.ErrSupplierNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选供应商不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrSupplierInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "供应商已停用"}
+	case errors.Is(err, biz.ErrMaterialNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选材料不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "材料已停用"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "单位已停用"}
 	default:
 		return nil
 	}

@@ -26,13 +26,6 @@ test('ERP dialogs enter the shared sizing and scroll shell', () => {
     }
     const relative = path.relative(root, filename)
     if (relative === 'components/business-list/BusinessModal.jsx') continue
-    if (
-      relative === 'components/workflow/ExceptionProcessRecoveryButton.jsx' &&
-      source.includes('Modal.useModal()') &&
-      !/<Modal\b/u.test(source)
-    ) {
-      continue
-    }
     bypasses.push(relative)
   }
   assert.deepEqual(bypasses, [], 'Business dialogs must use BusinessModal')

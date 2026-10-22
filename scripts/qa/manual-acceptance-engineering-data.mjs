@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { ATTACHMENT_NOTE, buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 
-const SAMPLE_NOTE = "模拟样品已核对，仅用于试用流程演示。";
+const SAMPLE_NOTE = "样品已核对，请按确认资料办理。";
 
 function requireValue(condition, message) {
   if (!condition) throw new Error(`engineering preparation: ${message}`);

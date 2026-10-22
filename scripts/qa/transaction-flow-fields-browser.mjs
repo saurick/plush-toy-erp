@@ -176,10 +176,10 @@ export function readExpectedPostgresColumns() {
         inFields = false;
       }
       if (line.startsWith("### ")) inFields = line === "### 字段";
-      if (!inFields || !line.startsWith("| <code>")) continue;
+      if (!inFields || !line.startsWith("| `")) continue;
       const parts = line
         .split("|")
-        .map((part) => part.replace(/<[^>]+>/gu, "").trim());
+        .map((part) => part.trim().replace(/^`([^`]+)`$/u, "$1"));
       columns.push({
         table,
         column: parts[1],

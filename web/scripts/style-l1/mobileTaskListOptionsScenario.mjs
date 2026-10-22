@@ -8,6 +8,12 @@ import {
 } from './mobileFilterPopoverAssertions.mjs'
 import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 
+export async function chooseMobileFilterOption(control, label) {
+  const select = control.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+  await select.locator('.ant-select-selector').click()
+  await control.page().locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
+}
+
 export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
   const baseTime = 1_788_840_000
   const tasks = Array.from({ length: 64 }, (_, index) => ({
@@ -189,7 +195,9 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         )
       }
       const chooseFilter = async (dropdown, label) => {
-        await dropdown.getByText(label, { exact: true }).click()
+        const sort = { 最近进入: 'newest', 截止最早: 'due', 等待最久: 'oldest' }[label]
+        if (sort) await chooseMobileFilterOption(dropdown.getByRole('combobox', { name: '任务排序', exact: true }), label)
+        else await dropdown.getByText(label, { exact: true }).click()
         assert(await dropdown.isVisible(), '即时筛选保持浮层打开，允许连续切换')
         await dropdown
           .getByRole('button', { name: '关闭筛选', exact: true })
@@ -288,7 +296,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
 
       for (const fromField of [false, true]) {
         const escapeDropdown = await openFilters()
-        if (fromField) await escapeDropdown.getByRole('button', { name: '截止最早', exact: true }).focus()
+        if (fromField) await escapeDropdown.getByRole('combobox', { name: '任务排序', exact: true }).focus()
         await page.keyboard.press('Escape')
         await escapeDropdown.waitFor({ state: 'hidden' })
         await page.waitForFunction(
@@ -304,13 +312,15 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       }
 
       const immediateDropdown = await openFilters()
-      assert.equal(await immediateDropdown.locator('details, .ant-select').count(), 0, '手机主筛选不嵌套折叠或下拉')
+      assert.equal(await immediateDropdown.locator('details').count(), 0, '手机常用条件保持直接可见')
+      assert.equal(await immediateDropdown.locator('.ant-select').count(), 1, '少量来源直接点选，仅次要排序使用单行选择')
       const controls = await immediateDropdown.locator('.mobile-filter-options .erp-filter-chip').evaluateAll((nodes) => nodes.map((node) => ({ height: node.getBoundingClientRect().height, overflow: node.scrollWidth - node.clientWidth })))
-      for (const label of ['任务排序', '任务状态筛选', '截止时间']) await immediateDropdown.getByRole('group', { name: label, exact: true }).waitFor()
+      for (const label of ['任务状态筛选', '截止时间']) await immediateDropdown.getByRole('group', { name: label, exact: true }).waitFor()
+      await immediateDropdown.getByRole('combobox', { name: '任务排序', exact: true }).waitFor()
       assert(controls.length > 0 && controls.every(({ height, overflow }) => height >= 44 && overflow <= 1), JSON.stringify(controls))
-      await immediateDropdown.getByRole('button', { name: '截止最早', exact: true }).click()
+      await chooseMobileFilterOption(immediateDropdown.getByRole('combobox', { name: '任务排序', exact: true }), '截止最早')
       assert(await immediateDropdown.isVisible(), '点选立即生效且保留筛选面板')
-      await immediateDropdown.getByRole('button', { name: '最近进入', exact: true }).click()
+      await chooseMobileFilterOption(immediateDropdown.getByRole('combobox', { name: '任务排序', exact: true }), '最近进入')
       await chooseFilter(immediateDropdown, '等待最久')
       await waitFirst(97001)
       assert.equal(
@@ -387,10 +397,11 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
 
       await page.getByTestId('mobile-role-filter-approval').click()
       await waitCount(12)
+      assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选任务，已应用 2 项', '审批快捷条件在原胶囊表达，不重复计数')
       const selectedID = (await ids())[0]
       await clickTaskCardContent(
         rows.first(),
-        rows.first().locator('.mobile-task-list-row__head')
+        rows.first().locator('.erp-task-identity__card-heading')
       )
       await page
         .getByTestId('mobile-task-detail-screen')
@@ -405,9 +416,10 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await waitFirst(selectedID)
       assert.equal(
         await filterTrigger.getAttribute('aria-label'),
-        '筛选任务，已应用 3 项',
+        '筛选任务，已应用 2 项',
         '进入详情并返回后保留筛选条件'
       )
+      assert.equal(await page.getByTestId('mobile-role-filter-approval').getAttribute('aria-pressed'), 'true', '返回后保留审批快捷范围')
 
       const search = page.getByRole('searchbox')
       await search.fill('不存在的模拟订单')
@@ -420,9 +432,10 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await waitFirst(97063)
       assert.equal(
         await filterTrigger.getAttribute('aria-label'),
-        '筛选任务，已应用 3 项',
+        '筛选任务，已应用 2 项',
         '清除搜索不连带清除任务筛选'
       )
+      assert.equal(await page.getByTestId('mobile-role-filter-approval').getAttribute('aria-pressed'), 'true', '清除搜索保留审批快捷范围')
 
       const appliedResetDropdown = await openFilters()
       await appliedResetDropdown
@@ -569,7 +582,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       )
       await overdueRisk.tap()
       await applyFilters({ sort: '截止最早', contextLabel: '风险' })
-      assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选风险，已应用 2 项', '超时快捷条件计入总数')
+      assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选风险，已应用 1 项', '超时快捷条件在原胶囊表达，不重复计数')
       await page.getByRole('button', { name: '清空风险筛选', exact: true }).tap()
       assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选风险')
       assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '清空全部包含超时快捷条件')

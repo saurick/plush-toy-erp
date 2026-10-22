@@ -1,3 +1,4 @@
+import { findVisibleBusinessPage } from '../businessNavigation.mjs'
 import { verifyBOMMaterialGroups } from './bomMaterialGroupsScenarios.mjs'
 
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
@@ -342,19 +343,11 @@ export async function verifyBusinessCoreMasterData(page, deps) {
     scenarioName: 'business-standard-product-skus-header-reference-refresh',
   })
 
-  const openModuleFromCatalog = async (label) => {
-    await page.locator('.erp-module-catalog-trigger:visible').click()
-    const catalog = page.getByRole('dialog', {
-      name: '全部模块',
-      exact: true,
-    })
-    await catalog.waitFor({ state: 'visible' })
-    await catalog.getByRole('button', { name: label, exact: true }).click()
-  }
+  const openModule = async (label) => (await findVisibleBusinessPage(page, label)).click()
 
   const beforeMaterialsMenuRequests = masterDataMethods.length
 
-  await openModuleFromCatalog('材料档案')
+  await openModule('材料档案')
 
   await expectHeading(page, '材料档案')
 
@@ -372,7 +365,7 @@ export async function verifyBusinessCoreMasterData(page, deps) {
 
   const beforeRepeatedMaterialsMenuRequests = masterDataMethods.length
 
-  await openModuleFromCatalog('材料档案')
+  await openModule('材料档案')
 
   await assertNoMasterDataRequest(page, masterDataMethods, {
     methods: ['list_materials', 'list_units'],

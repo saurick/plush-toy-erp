@@ -19,7 +19,7 @@ import {
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
-import DevDeliveryTimestamp from '../components/DevDeliveryTimestamp.jsx'
+import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import { buildDevCustomerScopedRoute } from '../config/devCustomerScope.mjs'
@@ -132,16 +132,18 @@ export default function DevVersionCenterPage() {
         </section>
         <div className="erp-dev-version-header-actions">
           <Space wrap>
-            <Tooltip title={canDispatch ? '' : dispatchExplanation}>
-              <Button
-                type={activeView === 'overview' ? 'primary' : 'default'}
-                icon={<CloudUploadOutlined aria-hidden="true" />}
-                disabled={!canDispatch}
-                onClick={() => setReleaseModalOpen(true)}
-              >
-                生成发布制品
-              </Button>
-            </Tooltip>
+            {['versions', 'overview'].includes(activeView) ? (
+              <Tooltip title={canDispatch ? '' : dispatchExplanation}>
+                <Button
+                  type={activeView === 'overview' ? 'primary' : 'default'}
+                  icon={<CloudUploadOutlined aria-hidden="true" />}
+                  disabled={!canDispatch}
+                  onClick={() => setReleaseModalOpen(true)}
+                >
+                  生成发布制品
+                </Button>
+              </Tooltip>
+            ) : null}
             <Button
               icon={<ReloadOutlined aria-hidden="true" />}
               loading={refreshBusy}
@@ -206,7 +208,6 @@ export default function DevVersionCenterPage() {
           <Card
             title="当前操作"
             className="erp-dev-version-table-card erp-dev-version-current-operation"
-            extra={<Text type="secondary">未结束操作始终保持可见</Text>}
           >
             <div className="erp-dev-version-current-operation__list">
               {openOperations.map((operation) => {
@@ -227,10 +228,7 @@ export default function DevVersionCenterPage() {
                           operation.target
                         )}
                       </Text>
-                      <Text type="secondary" code>
-                        {operation.id.slice(0, 8)}
-                      </Text>
-                      <DevDeliveryTimestamp
+                      <DevTimestamp
                         value={operation.createdAt}
                         action="开始于"
                         missing="开始时间未证明"
@@ -253,7 +251,7 @@ export default function DevVersionCenterPage() {
                       <Text type="secondary" title={statusMessage.title}>
                         {statusMessage.label}
                       </Text>
-                      <DevDeliveryTimestamp
+                      <DevTimestamp
                         value={operation.updatedAt}
                         action={operationUpdateAction(operation)}
                         missing="更新时间未证明"

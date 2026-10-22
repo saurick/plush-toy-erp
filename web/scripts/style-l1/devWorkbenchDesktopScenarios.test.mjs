@@ -157,6 +157,16 @@ test('product and quality area smokes enforce their complete landing contracts',
         return { count: async () => route === DEV_PRODUCT_ENGINEERING_ROUTE ? 1 : 0 }
       },
       locator: (selector) => ({
+        evaluateAll: async (read) => {
+          assert.equal(selector, '.erp-dev-product-tools a')
+          const links = DEV_SECONDARY_NAV_ITEMS
+            .filter((entry) => entry.areaKey === 'product-engineering' && entry.showInNavigation !== false)
+            .map((entry) => ({ getAttribute: (name) => {
+              assert.equal(name, 'href')
+              return entry.route
+            } }))
+          return read(links)
+        },
         count: async () =>
           selector === '.erp-dev-tool-table tbody tr' &&
           route === DEV_PRODUCT_ENGINEERING_ROUTE

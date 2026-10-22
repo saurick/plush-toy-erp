@@ -33,6 +33,66 @@ function WorkflowEventAuditDetails({ item }) {
   )
 }
 
+export function WorkflowTaskEventEntries({ items, variant = 'desktop' }) {
+  return (
+    <ol
+      className={`workflow-task-event-trail__list workflow-task-event-trail__list--${variant}`}
+      aria-label="本任务处理记录，最近在前，按时间倒序"
+    >
+      {items.map((item) => (
+        <li
+          key={item.key}
+          className={`workflow-task-event-trail__item workflow-task-event-trail__item--${item.tone}`}
+        >
+          <span
+            className="workflow-task-event-trail__marker"
+            aria-hidden="true"
+          />
+          <div className="workflow-task-event-trail__content">
+            <div className="workflow-task-event-trail__item-head">
+              <strong>{item.label}</strong>
+              <WorkflowEventAuditDetails item={item} />
+            </div>
+            <p className="workflow-task-event-trail__meta">
+              {item.actorName ? (
+                <>
+                  <span className="workflow-task-event-trail__actor-name">
+                    {item.actorName}
+                  </span>
+                  {item.actorRoleLabel ? (
+                    <span className="workflow-task-event-trail__actor-role">
+                      （{item.actorRoleLabel}）
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <span className="workflow-task-event-trail__actor-name">
+                  {item.actorLabel}
+                </span>
+              )}{' '}
+              ·{' '}
+              <span className="workflow-task-event-trail__meta-time">
+                {item.timeLabel.replace(/:\d{2}$/u, '')}
+              </span>
+
+            </p>
+            {item.transitionLabel ? (
+              <p className="workflow-task-event-trail__transition">
+                {item.transitionLabel}
+              </p>
+            ) : null}
+            {item.reason ? (
+              <p className="workflow-task-event-trail__reason">
+                意见：{item.reason}
+              </p>
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 export default function WorkflowTaskEventTrail({
   approvalTask = false,
   className = '',
@@ -111,61 +171,7 @@ export default function WorkflowTaskEventTrail({
         </p>
       ) : model.items.length > 0 ? (
         <>
-          <ol
-            className="workflow-task-event-trail__list"
-            aria-label="本任务处理记录，最近在前，按时间倒序"
-          >
-            {model.items.map((item) => (
-              <li
-                key={item.key}
-                className={`workflow-task-event-trail__item workflow-task-event-trail__item--${item.tone}`}
-              >
-                <span
-                  className="workflow-task-event-trail__marker"
-                  aria-hidden="true"
-                />
-                <div className="workflow-task-event-trail__content">
-                  <div className="workflow-task-event-trail__item-head">
-                    <strong>{item.label}</strong>
-                    <WorkflowEventAuditDetails item={item} />
-                  </div>
-                  <p className="workflow-task-event-trail__meta">
-                    {item.actorName ? (
-                      <>
-                        <span className="workflow-task-event-trail__actor-name">
-                          {item.actorName}
-                        </span>
-                        {item.actorRoleLabel ? (
-                          <span className="workflow-task-event-trail__actor-role">
-                            （{item.actorRoleLabel}）
-                          </span>
-                        ) : null}
-                      </>
-                    ) : (
-                      <span className="workflow-task-event-trail__actor-name">
-                        {item.actorLabel}
-                      </span>
-                    )}{' '}
-                    ·{' '}
-                    <span className="workflow-task-event-trail__meta-time">
-                      {item.timeLabel.replace(/:\d{2}$/u, '')}
-                    </span>
-
-                  </p>
-                  {item.transitionLabel ? (
-                    <p className="workflow-task-event-trail__transition">
-                      {item.transitionLabel}
-                    </p>
-                  ) : null}
-                  {item.reason ? (
-                    <p className="workflow-task-event-trail__reason">
-                      意见：{item.reason}
-                    </p>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ol>
+          <WorkflowTaskEventEntries items={model.items} variant={variant} />
           {truncated ? (
             <p
               className="workflow-task-event-trail__state"

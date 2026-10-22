@@ -1,12 +1,11 @@
 import React, { useEffect, useId, useLayoutEffect, useRef } from 'react'
-import { usePrintEditableDraftSync } from './usePrintEditableDraftSync.js'
+import PrintEditableText from './PrintEditableText.jsx'
 import { WorkInstructionImageAnnotationLayer } from './WorkInstructionImageAnnotationEditor.jsx'
 import BusinessImage from '../business-list/BusinessImage.jsx'
 import {
   createEmptyEngineeringImageSlot,
   engineeringImageSlots,
 } from '../../data/engineeringPrintTemplates.mjs'
-import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
 import { resolveWorkInstructionAnnotationLayout } from '../../utils/workInstructionImageAnnotations.mjs'
 
 const ATTACHMENT_ACCEPT = 'image/*,.svg'
@@ -288,27 +287,6 @@ function EditableText({
   }
 
   useLayoutEffect(() => {
-    const element = editableRef.current
-    if (!element) {
-      return
-    }
-    if (element.ownerDocument?.activeElement === element) {
-      return
-    }
-    if (rich) {
-      const nextHTML = htmlValue || '&nbsp;'
-      if (element.innerHTML !== nextHTML) {
-        element.innerHTML = nextHTML
-      }
-      return
-    }
-    const nextText = String(value ?? '').trim() ? String(value ?? '') : '\u00A0'
-    if (element.textContent !== nextText) {
-      element.textContent = nextText
-    }
-  }, [htmlValue, rich, value])
-
-  useLayoutEffect(() => {
     restoreFocusIfNeeded()
   })
 
@@ -324,82 +302,37 @@ function EditableText({
     }
   }, [])
 
-  usePrintEditableDraftSync({
-    editableRef,
-    commitElementValue: (element) => rich ? commitRichValue(element) : commitPlainValue(element),
-    elementType: Component,
-  })
-
-  if (rich) {
-    return (
-      <Component
-        ref={editableRef}
-        className={`${EDITABLE_CLASS} ${className}`}
-        data-print-blank-field={blankField ? '' : undefined}
-        data-print-empty={
-          !String(value ?? '')
-            .replace(/<[^>]*>/g, '')
-            .replace(/&nbsp;/g, '')
-            .trim()
-        }
-        contentEditable
-        data-engineering-editable-id={editableID}
-        suppressContentEditableWarning
-        spellCheck={false}
-        onMouseDown={handleMouseDown}
-        onFocus={handleFocus}
-        onInput={(event) => {
-          normalizeRichEditableElement(event.currentTarget)
-          runSilentPrintWorkspaceDraftUpdate(() => {
-            commitRichValue(event.currentTarget)
-          })
-        }}
-        onBlur={(event) => {
-          commitRichValue(event.currentTarget, { normalizeElement: true })
-        }}
-        dangerouslySetInnerHTML={{
-          __html: htmlValue || '&nbsp;',
-        }}
-      />
-    )
-  }
-
   return (
-    <Component
-      ref={editableRef}
+    <PrintEditableText
+      as={Component}
+      editableRef={editableRef}
+      value={value}
+      html={
+        rich
+          ? htmlValue || '&nbsp;'
+          : String(value ?? '').trim()
+            ? escapeEditablePlainText(value)
+            : '&nbsp;'
+      }
+      commitElementValue={rich ? commitRichValue : commitPlainValue}
       className={`${EDITABLE_CLASS} ${className}`}
       data-print-blank-field={blankField ? '' : undefined}
-      data-print-empty={
-        !String(value ?? '')
-          .replace(/<[^>]*>/g, '')
-          .replace(/&nbsp;/g, '')
-          .trim()
-      }
-      contentEditable
       data-engineering-editable-id={editableID}
-      suppressContentEditableWarning
-      spellCheck={false}
       onMouseDown={handleMouseDown}
       onFocus={handleFocus}
       onKeyDown={(event) => {
-        if (!multiline && event.key === 'Enter') {
+        if (
+          !rich && !multiline && event.key === 'Enter' &&
+          !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229
+        ) {
           event.preventDefault()
+          clearRequestedEditableFocus()
           event.currentTarget.blur()
         }
       }}
-      onInput={(event) => {
-        runSilentPrintWorkspaceDraftUpdate(() => {
-          commitPlainValue(event.currentTarget)
-        })
-      }}
-      onBlur={(event) => {
-        commitPlainValue(event.currentTarget, { normalizeElement: true })
-      }}
-      dangerouslySetInnerHTML={{
-        __html: String(value ?? '').trim()
-          ? escapeEditablePlainText(value)
-          : '&nbsp;',
-      }}
+      onInput={rich
+        ? (event) => normalizeRichEditableElement(event.currentTarget)
+        : undefined}
     />
   )
 }

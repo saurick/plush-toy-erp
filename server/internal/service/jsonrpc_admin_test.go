@@ -1244,7 +1244,7 @@ func TestJsonrpcDispatcher_AdminEffectiveRoleAccessPreviewsPermissionDraftWithou
 		"permission_keys": []any{"finance.receivable.unsupported"},
 	})
 	_, unknown, err := dispatcher.handleAdmin(ctx, "effective_role_access", "4", unknownParams)
-	if err != nil || unknown.Code != errcode.InvalidParam.Code {
+	if err != nil || unknown.Code != errcode.ResourceNotFound.Code {
 		t.Fatalf("unknown preview permission = %#v err=%v", unknown, err)
 	}
 
@@ -1290,8 +1290,8 @@ func TestJsonrpcDispatcher_AdminManageErrorsMapToExplicitContracts(t *testing.T)
 		{name: "privileged role", err: biz.ErrPrivilegedRoleAssignmentForbidden, code: errcode.PermissionDenied.Code},
 		{name: "privileged target", err: biz.ErrPrivilegedAdminTargetForbidden, code: errcode.PermissionDenied.Code},
 		{name: "system role", err: biz.ErrSystemRoleImmutable, code: errcode.PermissionDenied.Code},
-		{name: "permission not delegable", err: biz.ErrPermissionNotDelegable, code: errcode.InvalidParam.Code},
-		{name: "debug role environment", err: biz.ErrDebugRoleProductionForbidden, code: errcode.InvalidParam.Code},
+		{name: "permission not delegable", err: biz.ErrPermissionNotDelegable, code: errcode.PermissionDenied.Code},
+		{name: "debug role environment", err: biz.ErrDebugRoleProductionForbidden, code: errcode.PermissionDenied.Code},
 		{name: "role version", err: biz.ErrRoleVersionConflict, code: errcode.ResourceVersionConflict.Code},
 	}
 	for _, tt := range tests {

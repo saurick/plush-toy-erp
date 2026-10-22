@@ -57,13 +57,8 @@ test('任务分类用正式环节名称或路径末级，完整路径原样可�
   assert.deepEqual(taskClassificationPresentation(null), { label: '', path: '' })
 })
 
-test('分类中的模拟短标签只认正式标记，不按任务名、办理人或文字猜测', async () => {
+test('分类不从任务名或办理人推断数据性质', async () => {
   const { taskClassificationPresentation } = await import('./workflowTaskDiscovery.mjs')
-  const task = { task_name: '模拟资料复核', source_type: 'sales_order', discovery: { assignee_name: '演示业务', path: '协同跟进 / 业务跟进 / 资料复核' } }
-  assert.equal(taskClassificationPresentation(task).label, '资料复核')
-  assert.equal(taskClassificationPresentation({ ...task, payload: { simulated_only: 'true' } }).label, '资料复核')
-  assert.equal(taskClassificationPresentation({ ...task, payload: { simulated_only: true } }).label, '模拟任务')
-  assert.equal(taskClassificationPresentation({ ...task, source_type: 'simulated-manual-acceptance-task-batch' }).label, '模拟任务')
-  assert.equal(taskClassificationPresentation(task).path, task.discovery.path)
-  assert.equal(task.discovery.assignee_name, '演示业务')
+  const task = { task_name: '资料复核', discovery: { assignee_name: '业务员', path: '协同跟进 / 业务跟进 / 资料复核' } }
+  assert.deepEqual(taskClassificationPresentation(task), { label: '资料复核', path: task.discovery.path })
 })

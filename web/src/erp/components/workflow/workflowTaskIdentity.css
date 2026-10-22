@@ -41,6 +41,7 @@
 }
 
 .erp-task-identity__code,
+.erp-task-identity__source,
 .erp-task-identity__unavailable {
   color: var(--erp-text-muted, #64748b);
   font-size: var(--erp-font-caption);
@@ -110,6 +111,148 @@
   flex: 1;
 }
 
+.erp-task-identity__count-label {
+  display: inline-block;
+  max-width: 100%;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-weight: 400;
+  margin-inline-start: 6px;
+}
+
+.erp-task-identity__count-label--link {
+  color: var(--erp-primary);
+}
+
+.erp-task-identity__count-label > .anticon {
+  margin-inline-start: 3px;
+  font-size: 10px;
+}
+
+.erp-task-identity--card {
+  gap: 4px;
+}
+
+.erp-task-identity__card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 24px;
+}
+
+.erp-task-identity__card-heading > .erp-task-identity__heading {
+  flex: 1;
+}
+
+.erp-task-identity__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-width: 45%;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-task-identity__card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: max(var(--erp-work-item-association-height), calc(var(--erp-font-small) * 4.5 + 4px), calc(var(--erp-font-caption) * 4.5 + 4px));
+}
+
+.erp-task-identity__card-body > .erp-task-identity__item {
+  position: relative;
+  flex: 1;
+  gap: 2px;
+  align-content: start;
+}
+
+.erp-task-identity--card .erp-task-identity__card-body {
+  align-items: center;
+}
+
+.erp-task-identity--table .erp-task-identity__card-body {
+  min-height: var(--erp-work-item-association-height);
+}
+
+.erp-task-identity__content {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.erp-task-identity__content > .erp-task-identity__item {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.erp-task-identity__card-body--empty > .erp-task-identity__item {
+  min-height: var(--erp-work-item-image-size);
+  align-content: center;
+}
+
+.erp-task-identity__content > .erp-task-identity__item:has(> .erp-task-identity__association-open) {
+  min-height: 44px;
+}
+
+
+.erp-task-identity__association-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.erp-task-identity__association-open:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-task-identity__item .erp-task-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.erp-task-identity--card > .erp-task-identity__source {
+  min-height: 20px;
+}
+
+.erp-task-identity__product {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+  font-weight: 500;
+}
+
+.erp-task-identity__content .erp-task-identity__product {
+  flex-basis: 100%;
+}
+
+.erp-task-identity__field-label {
+  color: var(--erp-text-muted);
+  font-weight: 400;
+}
+
+.erp-task-identity__field-value {
+  color: var(--erp-text);
+  font-weight: 400;
+}
+
 .erp-task-identity__name {
   display: flex;
   flex-wrap: wrap;
@@ -139,6 +282,38 @@
 .erp-task-product-image--placeholder {
   background: var(--erp-surface-bg-muted, #f1f5f9);
   color: var(--erp-text-muted, #64748b);
+}
+
+.erp-task-identity__card-body--empty > .erp-task-product-image {
+  flex-basis: var(--erp-work-item-image-size);
+  width: var(--erp-work-item-image-size);
+  height: var(--erp-work-item-image-size);
+  font-size: 22px;
+}
+
+.erp-task-product-image > button.erp-task-product-image__retry {
+  flex-direction: column;
+  gap: 3px;
+  color: var(--erp-primary);
+  font-size: var(--erp-font-micro);
+  cursor: pointer;
+}
+
+@media (min-width: 768px) and (pointer: fine) {
+  .erp-task-identity--compact .erp-task-copy-field {
+    position: relative;
+    min-height: 18px;
+    padding-inline-end: 26px;
+  }
+
+  .erp-task-identity--compact .erp-task-copy-field > .erp-task-copy {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translateY(-50%);
+  }
 }
 
 .erp-task-product-image__placeholder {
@@ -184,33 +359,6 @@
   object-fit: contain;
 }
 
-.erp-task-product-image__zoom {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  background: rgb(15 23 42 / 75%);
-  color: #fff;
-  font-size: var(--erp-font-small);
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-
-.erp-task-product-image > button:hover .erp-task-product-image__zoom,
-.erp-task-product-image > button:focus-visible .erp-task-product-image__zoom {
-  opacity: 1;
-}
-
-@media (pointer: coarse) {
-  .erp-task-product-image__zoom {
-    opacity: 1;
-  }
-}
-
 @media (max-width: 767px) {
   .mobile-role-tasks-page .erp-task-identity {
     font-size: 16px;
@@ -225,4 +373,10 @@
     width: 56px;
     height: 56px;
   }
+}
+
+.erp-task-identity--compact .erp-task-product-image {
+  flex-basis: var(--erp-work-item-image-size);
+  width: var(--erp-work-item-image-size);
+  height: var(--erp-work-item-image-size);
 }

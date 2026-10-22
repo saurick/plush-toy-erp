@@ -1,25 +1,20 @@
 # 可观测性 / Observability
 
-本目录回答“日志、审计、Trace 和健康检查怎么理解”的问题。部署和运行状态仍以部署文档、server 文档、当前代码和目标环境 evidence 为准。
+查日志、审计、Trace、健康检查与集中日志接入。
 
 ## 先读哪几份 / Reader Paths
 
-| 任务 | 先读 | 再核对 |
-| --- | --- | --- |
-| 看日志 / 审计 / Trace 口径 | `日志链路追踪与审计.md` | `server/README.md`、server docs 和当前代码 |
-| 接入本地与部署环境集中日志 | `集中日志接入与运维.md` | `scripts/observability.mjs`、`server/deploy/compose/prod/compose.observability.yml` |
-| 改系统审计页或审计 API | `server/README.md` | `docs/当前真源与交接顺序.md`、RBAC、service / biz / data tests |
-| 改部署健康检查或 tracing | `docs/部署约定.md` | `server/deploy/README.md`、`docs/observability/日志链路追踪与审计.md` |
+| 任务 | 入口 |
+| --- | --- |
+| 查日志、审计与链路追踪口径 | [日志、Trace 与审计](日志链路追踪与审计.md) |
+| 接入本地或部署环境集中日志 | [集中日志接入与运维](集中日志接入与运维.md) |
+| 调整审计 API 或后台行为 | [后端入口](../../server/README.md) |
+| 调整部署健康检查 | [部署说明](../../server/deploy/README.md)、[部署约定](../部署约定.md) |
 
 ## 真源边界 / Source Boundary
 
-本目录是可观测性设计和说明入口，不是部署主路径、客户部署包或事故记录归档。系统控制面审计和业务事实审计也要分开判断，不能因为有 audit 文档就扩成通用业务流水。
+观测日志、系统控制面审计与业务事实审计各有职责。文档说明设计；运行状态需核对当前代码、部署配置和目标证据。
 
 ## 更新规则 / Maintenance
 
-新增、删除、重命名可观测性文档，或改变日志、审计、Trace、健康检查口径时，必须同步检查：
-
-- 本 README。
-- `docs/文档清单.md`。
-- `docs/当前真源与交接顺序.md`。
-- 相关部署 / server 文档。
+口径变化时同步日志消费者、相关 server / 部署文档和测试；文档索引遵循[统一同步规则](../README.md#索引同步--index-sync)。

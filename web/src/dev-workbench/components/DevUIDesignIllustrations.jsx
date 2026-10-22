@@ -1,8 +1,11 @@
 import React, { useState } from 'react'
 import { Button, Slider, Switch } from 'antd'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import BusinessCellStack from '@/erp/components/business-list/BusinessCellStack.jsx'
 import DevUIDesignMechanisms from './DevUIDesignMechanisms.jsx'
 import DevUIFeedbackGuide from './DevUIFeedbackGuide.jsx'
+import DevWorkCenterDesign from './DevWorkCenterDesign.jsx'
+import { WORK_CENTER_DESIGN_TOPICS } from '../config/devWorkCenterDesign.mjs'
 
 const LAYOUT_PARTS = [
   {
@@ -13,9 +16,9 @@ const LAYOUT_PARTS = [
   },
   {
     value: 'header',
-    label: '顶栏',
-    title: '全局操作与当前工作分开',
-    text: '顶栏放刷新、外观与账号。当前对象和主要动作留在内容区，主标题只出现一次，把垂直空间留给记录。',
+    label: '账号与操作',
+    title: '账号固定底部，刷新跟随当前页面',
+    text: '账号固定在侧栏底部，外观设置收进账号菜单；刷新放在页面标题或工具栏。移除单独占高的全局顶栏，窄屏从页面操作打开导航。',
   },
   {
     value: 'spacing',
@@ -134,13 +137,12 @@ function LayoutGuide() {
                   {collapsed ? name.slice(0, 1) : name}
                 </span>
               ))}
+              <div className="erp-design-layout-account">
+                {point('header', 'B', '账号与操作')}
+                <span>{collapsed ? '账号' : '账号 · 外观'}</span>
+              </div>
             </div>
             <div className="erp-design-layout-body">
-              <div className="erp-design-layout-topbar">
-                {point('header', 'B', '顶栏')}
-                <span>全局操作</span>
-                <span className="erp-design-dimension">48 px</span>
-              </div>
               <div className="erp-design-layout-content">
                 {point('spacing', 'C', '留白')}
                 <span className="erp-design-layout-ruler">
@@ -148,7 +150,7 @@ function LayoutGuide() {
                 </span>
                 <div className="erp-design-layout-toolbar">
                   <strong>订单列表</strong>
-                  <span>搜索 · 筛选 · 新建</span>
+                  <span>搜索 · 筛选 · 新建 · 刷新</span>
                   <small>内部上下 10 / 左右 12 px</small>
                 </div>
                 <div
@@ -215,16 +217,39 @@ function TypographyGuide() {
             <span>分区标题 · 组织相邻字段</span>
           </div>
           <div className="erp-design-type-line">
-            <span>样例订单 A / 待处理</span>
-            <span>表格正文 · 13 px</span>
+            <span>样例订单 A</span>
+            <span>表格正文 · 沿用正文字号</span>
           </div>
           <div className="erp-design-type-line">
             <small>按当前筛选条件统计</small>
             <span>辅助说明 · 就近解释口径</span>
           </div>
           <SampleTable />
+          <h3 className="erp-design-cell-samples-title">联系人：同一格内区分主次</h3>
+          <table className="erp-design-cell-samples" data-table-lines="fixed" aria-label="虚构联系人上下布局样例">
+            <thead>
+              <tr>
+                <th scope="col">场景</th>
+                <th scope="col">联系人</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">信息齐全</th>
+                <td><BusinessCellStack primary="张小林" secondary="13800000000" /></td>
+              </tr>
+              <tr>
+                <th scope="row">缺少电话</th>
+                <td><BusinessCellStack primary="王小雨" /></td>
+              </tr>
+              <tr>
+                <th scope="row">长内容</th>
+                <td><BusinessCellStack primary="欧阳晴川（华南仓储服务中心夜班收货联系人）" secondary="13800000000" /></td>
+              </tr>
+            </tbody>
+          </table>
           <figcaption>
-            文字靠左形成起点，数量靠右方便按位比较。状态保留文字，颜色只做辅助。
+            联系人为虚构示例。缺项不留空行，长内容自然换行；文字靠左，数量靠右，状态保留文字。
           </figcaption>
         </figure>
         <aside className="erp-design-explanation">
@@ -236,8 +261,15 @@ function TypographyGuide() {
           <p>
             标题靠字重与适度字号建立层级，主动作才使用强调色。正文保持可读，较低优先级通过位置与色阶处理。
           </p>
+          <h3>相关信息成组，上行先识别</h3>
+          <p>
+            姓名与电话、收货人与地址、承运信息与运单号、产品与规格、仓库与批次可上下排列，减少横向占宽和拼接后的随意换行。
+          </p>
           <p className="erp-design-guide-note">
-            长名称允许换行或查看完整值；长文档控制行宽，宽数据表保留比较所需的空间。
+            两行沿用正文大小，下行用次要文字色。金额、数量、单独日期和短状态保留各自的比较方式；单位、比例和原值中有含义的斜杠仍保留。
+          </p>
+          <p className="erp-design-guide-note">
+            长文档控制行宽，宽数据表保留比较所需的空间。
           </p>
         </aside>
       </div>
@@ -407,6 +439,7 @@ function SurfaceGuide() {
 }
 
 export default function DevUIDesignIllustrations({ topic, chapters, view }) {
+  if (WORK_CENTER_DESIGN_TOPICS.some((item) => item.key === topic.key)) return <DevWorkCenterDesign topic={topic} />
   if (['forms', 'dialogs', 'feedback', 'submission', 'closing'].includes(topic.key)) {
     return <DevUIFeedbackGuide topic={topic} chapters={chapters} view={view} />
   }

@@ -1,4 +1,5 @@
-import { Alert, Input, Modal, Space, Typography } from 'antd'
+import { Alert, Input, Space, Typography } from 'antd'
+import Modal from '@/common/components/modal/AppModal'
 import { deliveryTargetLabel } from './shared.jsx'
 
 const { Text } = Typography

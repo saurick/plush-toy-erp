@@ -592,18 +592,18 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 100MB，请压缩后再上传"}
 	case errors.Is(err, biz.ErrBusinessAttachmentReferenced):
-		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "图片已用于订单样品记录，不能替换或清空；请保留原图"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "图片已用于订单样品记录，不能替换或清空；请保留原图"}
 	case errors.Is(err, biz.ErrBusinessAttachmentIntegrity):
 		d.log.WithContext(ctx).Errorf("business attachment integrity verification failed: %v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "附件内容校验失败，请联系管理员"}
 	case errors.Is(err, biz.ErrBusinessAttachmentWithdrawnContentUnavailable):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "附件已撤销，不能预览或下载"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "附件已撤销，不能预览或下载"}
 	case errors.Is(err, biz.ErrBusinessAttachmentWithdrawn):
-		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "附件已撤销，请刷新后查看撤销记录"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "附件已撤销，请刷新后查看撤销记录"}
 	case errors.Is(err, biz.ErrBusinessAttachmentWithdrawalReasonInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请填写撤销原因，最多 255 个字"}
 	case errors.Is(err, biz.ErrBusinessAttachmentProductImageWithdrawalUnsupported):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品图片请使用替换或清空，不支持撤销"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品图片请使用替换或清空，不支持撤销"}
 	case errors.Is(err, biz.ErrBusinessAttachmentProductImageMimeNotAllowed):
 		return &v1.JsonrpcResult{
 			Code:    errcode.InvalidParam.Code,
@@ -630,7 +630,7 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	case errors.Is(err, biz.ErrBusinessAttachmentNotFound),
 		errors.Is(err, biz.ErrBusinessAttachmentOwnerNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "附件或所属业务记录不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "附件或所属业务记录不存在"}
 	case errors.Is(err, biz.ErrWorkflowTaskConflict), errors.Is(err, biz.ErrWorkflowTaskSettled):
 		return d.mapWorkflowError(ctx, err)
 	case errors.Is(err, biz.ErrForbidden):

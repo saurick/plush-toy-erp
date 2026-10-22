@@ -76,7 +76,10 @@ func ensureCustomerConfigModuleKeysInStates(moduleKeys []string, modules []Deplo
 	}
 	for _, moduleKey := range customerConfigModuleDependencyClosure(moduleKeys) {
 		if !stringSliceContains(allowedStates, moduleStates[moduleKey]) {
-			return ErrBadParam
+			if moduleStates[moduleKey] == "read_only" {
+				return fmt.Errorf("%w: %s", ErrCustomerConfigModuleReadOnly, moduleKey)
+			}
+			return fmt.Errorf("%w: %s", ErrCustomerConfigModuleDisabled, moduleKey)
 		}
 	}
 	return nil

@@ -1,14 +1,15 @@
 import {
   progressDelivery,
+  progressIdentityPresentation,
   progressStages,
 } from '../../utils/businessProgress.mjs'
-import { ProgressAttention } from '../../components/business-visualizations/ProgressCompactContent.jsx'
-import ProductIdentity from '../../components/master-data/ProductIdentity.jsx'
+import { ProgressAttention, ProgressProductIdentity } from '../../components/business-visualizations/ProgressCompactContent.jsx'
 import MobileProgressRecentRecords from './MobileProgressRecentRecords.jsx'
 
 export default function MobileProgressSummary({ data }) {
   const { row, access, sections } = data
   const delivery = progressDelivery(row)
+  const identity = progressIdentityPresentation(row)
   const stages = progressStages(row, access)
   const task = access.tasks
     ? sections.tasks?.find((item) => item.label === row.attention_task) ||
@@ -21,15 +22,10 @@ export default function MobileProgressSummary({ data }) {
         className="mobile-detail-section mobile-progress-overview"
         aria-label="单据摘要"
       >
-        <h2>{row.order_no}</h2>
+        <h2>{identity.reference}</h2>
         <div className="mobile-progress-overview-product">
-          <ProductIdentity productId={row.product_id} name={row.product}>
-            {row.product}
-            {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
-          </ProductIdentity>
-          {row.customer ? (
-            <p className="mobile-detail-identity">{row.customer}</p>
-          ) : null}
+          <ProgressProductIdentity row={row} />
+          <p className="mobile-detail-identity">{identity.customer}</p>
         </div>
         <dl className="mobile-detail-facts">
           <div className="mobile-detail-fact">

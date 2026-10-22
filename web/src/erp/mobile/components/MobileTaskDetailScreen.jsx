@@ -6,7 +6,7 @@ import {
 } from '@ant-design/icons'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
-import WorkflowFollowupDetails from '../../components/workflow/WorkflowFollowupDetails.jsx'
+import WorkflowFollowupDetails, { hasWorkflowFollowupDetails } from '../../components/workflow/WorkflowFollowupDetails.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowTaskInfoCard from '../../components/workflow/WorkflowTaskInfoCard.jsx'
 import WorkflowTaskCurrentSummary from '../../components/workflow/WorkflowTaskCurrentSummary.jsx'
@@ -279,7 +279,7 @@ export default function MobileTaskDetailScreen({
           assigneeLabel={assigneeLabel}
           events={taskEventsState === 'ready' ? taskEvents : []}
           summary={<WorkflowTaskCurrentSummary appearance="facts" task={selectedTask} roleLabel={ownerRoleLabel} assigneeLabel={assigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={isTaskRisk(selectedTask) ? taskReason : ''} reasonLabel={taskReasonLabel} contact={exceptionContact} guidance={actionGuidance} />}
-          businessInfo={factRows.length > 0 || completeCondition || selectedTask.task_group === 'business_followup' ? (
+          businessInfo={factRows.length > 0 || completeCondition || hasWorkflowFollowupDetails(selectedTask) ? (
             <>
               <dl className="mobile-detail-facts">
                 {factRows.map(([label, value]) => <div key={label} className="mobile-detail-fact"><dt>{label}</dt><dd>{mobileFactValueText(value)}</dd></div>)}

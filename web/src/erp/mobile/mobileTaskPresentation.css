@@ -79,16 +79,10 @@
   margin: 0;
 }
 
-.mobile-task-screen .workflow-task-event-trail__item-head {
-  display: flex;
-  align-items: center;
-}
-
 .mobile-task-screen .workflow-task-event-trail__audit-trigger {
   flex: 0 0 auto;
   min-width: 44px;
   min-height: 44px;
-  padding: 8px;
 }
 
 .mobile-task-screen .workflow-task-event-trail__meta {

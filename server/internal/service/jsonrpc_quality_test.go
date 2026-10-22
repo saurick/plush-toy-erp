@@ -341,7 +341,7 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 		"inspection_no": "QI-RPC-OUT-INSPECTION-OTHER",
 	}
 	_, conflictRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "create_quality_inspection_from_outsourcing_return", "out-conflict", mustJSONRPCStruct(t, conflictParams))
-	if err != nil || conflictRes == nil || conflictRes.Code != errcode.IdempotencyConflict.Code {
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.ResourceConflict.Code {
 		t.Fatalf("outsourcing quality source conflict result=%#v err=%v", conflictRes, err)
 	}
 	_, submitRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "submit_quality_inspection", "out-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(inspectionID)}))
@@ -501,15 +501,15 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t 
 	conflictParams := cloneQualityParams(createParams)
 	conflictParams["inspection_no"] = "QI-JSONRPC-FG-CONFLICT"
 	_, conflictRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-conflict", mustJSONRPCStruct(t, conflictParams))
-	if err != nil || conflictRes == nil || conflictRes.Code != errcode.IdempotencyConflict.Code || conflictRes.Message != "该业务来源已存在未取消的质检单" {
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.ResourceConflict.Code || conflictRes.Message != "该业务来源已存在未取消的质检单" {
 		t.Fatalf("same active finished goods quality grain must conflict, res=%#v err=%v", conflictRes, err)
 	}
 	missingShipmentParams := cloneQualityParams(createParams)
 	missingShipmentParams["inspection_no"] = "QI-JSONRPC-FG-MISSING-SHIPMENT"
 	missingShipmentParams["shipment_id"] = float64(shipment.ID + 100000)
 	_, missingShipmentRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-missing-shipment", mustJSONRPCStruct(t, missingShipmentParams))
-	if err != nil || missingShipmentRes == nil || missingShipmentRes.Code != errcode.InvalidParam.Code || missingShipmentRes.Message != "出货单不存在" {
-		t.Fatalf("missing shipment must map to readable invalid param, res=%#v err=%v", missingShipmentRes, err)
+	if err != nil || missingShipmentRes == nil || missingShipmentRes.Code != errcode.ResourceNotFound.Code || missingShipmentRes.Message != "出货单不存在" {
+		t.Fatalf("missing shipment must map to readable not found, res=%#v err=%v", missingShipmentRes, err)
 	}
 
 	_, submitRes, err := j.handleQuality(adminCtx, "submit_quality_inspection", "fg-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(inspectionID)}))
@@ -603,7 +603,7 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresEnabledModules(t *testing
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only quality_inspections to reject create, got %#v", createRes)
 	}
 	if count := client.QualityInspection.Query().
@@ -630,7 +630,7 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresEnabledModules(t *testing
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if submitRes == nil || submitRes.Code != errcode.InvalidParam.Code {
+	if submitRes == nil || submitRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("expected read_only quality_inspections to reject submit, got %#v", submitRes)
 	}
 	stored := client.QualityInspection.GetX(ctx, createdID)
@@ -699,7 +699,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionRequiresShipmentModuleE
 		"product_id":            float64(fixtures.productID),
 		"warehouse_id":          float64(fixtures.productWarehouseID),
 	}))
-	if err != nil || createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+	if err != nil || createRes == nil || createRes.Code != errcode.BusinessRuleViolation.Code {
 		t.Fatalf("read_only shipments must reject finished goods quality creation, res=%#v err=%v", createRes, err)
 	}
 	if count := client.QualityInspection.Query().Where(qualityinspection.InspectionNo("QI-MODULE-FG-READONLY")).CountX(ctx); count != 0 {

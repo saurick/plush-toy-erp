@@ -164,7 +164,7 @@ BEGIN
   SELECT
     'SIM-CAP-V1-' || lpad(series.value::text, 6, '0'),
     'trial_pmc_work',
-    '模拟容量任务 ' || series.value,
+    '核对生产进度 ' || series.value,
     '${taskSourceType}',
     ${sourceID},
     'SIM-CAPACITY-${sourceID}',
@@ -177,9 +177,6 @@ BEGIN
     false,
     0,
     jsonb_build_object(
-      'simulated_only', true,
-      'real_customer_data', false,
-      'trial_task', true,
       'capacity_fixture', '${CAPACITY_DATASET_VERSION}',
       'sequence', series.value
     ),

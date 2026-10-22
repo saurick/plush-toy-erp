@@ -4,12 +4,11 @@ import { ArrowRightOutlined } from '@ant-design/icons'
 import {
   progressAttention,
   progressDelivery,
-  progressProductLabel,
+  progressIdentityPresentation,
   progressStages,
   progressStatusLabel,
 } from '../../utils/businessProgress.mjs'
-import { ProgressAttention } from './ProgressCompactContent.jsx'
-import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { ProgressAttention, ProgressProductIdentity } from './ProgressCompactContent.jsx'
 import './businessProgressSummary.css'
 
 export function ProgressBadges({ row }) {
@@ -32,17 +31,16 @@ export default function BusinessProgressSummary({
 }) {
   const delivery = progressDelivery(row)
   const attention = progressAttention(row, access)
+  const identity = progressIdentityPresentation(row)
   return (
     <div className="erp-progress-overview">
       <header className="erp-progress-overview-identity">
         <h2 ref={headingRef} tabIndex={-1}>
-          {row.order_no}
+          {identity.reference}
         </h2>
         <div className="erp-progress-overview-product">
-          <ProductIdentity productId={row.product_id} name={row.product}>
-            {progressProductLabel(row)}
-          </ProductIdentity>
-          {row.customer ? <p>{row.customer}</p> : null}
+          <ProgressProductIdentity row={row} />
+          <p>{identity.customer}</p>
         </div>
         <ProgressBadges row={row} />
         <p className={row.overdue ? 'erp-progress-danger' : ''}>

@@ -1,7 +1,7 @@
 import { ReloadOutlined } from '@ant-design/icons'
-import React, { useCallback, useState } from 'react'
-import { Button, Modal } from 'antd'
-import { message } from '@/common/utils/antdApp'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Button } from 'antd'
+import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 import {
@@ -21,8 +21,18 @@ export default function ExceptionProcessRecoveryButton({
   onRecovered,
   size = 'small',
 }) {
-  const [modal, contextHolder] = Modal.useModal()
   const [loading, setLoading] = useState(false)
+  const inspectionVersion = useRef(0)
+  const confirmation = useRef(null)
+
+  useEffect(() => {
+    setLoading(false)
+    return () => {
+      inspectionVersion.current += 1
+      confirmation.current?.destroy()
+      confirmation.current = null
+    }
+  }, [canRecover])
 
   const finishRecovery = useCallback(async () => {
     if (typeof onRecovered === 'function') {
@@ -69,16 +79,19 @@ export default function ExceptionProcessRecoveryButton({
   )
 
   const inspect = useCallback(async () => {
-    if (typeof loadProcess !== 'function') return
+    if (typeof loadProcess !== 'function' || confirmation.current) return
+    const version = ++inspectionVersion.current
     setLoading(true)
     try {
       const processData = await loadProcess()
+      if (version !== inspectionVersion.current) return
       const processInstanceID = Number(
         processData?.process_context?.process_instance?.id || 0
       )
       const recoveryData = await getProcessRecoveryContext({
         process_instance_id: processInstanceID,
       })
+      if (version !== inspectionVersion.current) return
       const candidate = findExceptionProcessRecoveryCandidate(recoveryData)
       if (!candidate) {
         const alreadyRecovered =
@@ -94,7 +107,7 @@ export default function ExceptionProcessRecoveryButton({
         )
         return
       }
-      modal.confirm({
+      const handle = modal.confirm({
         maskClosable: true,
         title: '确认终止异常流程并撤回下游待办？',
         content:
@@ -103,13 +116,19 @@ export default function ExceptionProcessRecoveryButton({
         cancelText: '返回核对',
         okButtonProps: { danger: true },
         onOk: () => recover(candidate, recoveryData),
+        afterClose: () => {
+          if (confirmation.current === handle) confirmation.current = null
+        },
       })
+      confirmation.current = handle
     } catch (error) {
-      message.error(getActionErrorMessage(error, '核对异常流程恢复条件'))
+      if (version === inspectionVersion.current) {
+        message.error(getActionErrorMessage(error, '核对异常流程恢复条件'))
+      }
     } finally {
-      setLoading(false)
+      if (version === inspectionVersion.current) setLoading(false)
     }
-  }, [loadProcess, modal, recover])
+  }, [loadProcess, recover])
 
   if (!canRecover) return null
   const actionDisabled = disabled || loading
@@ -118,26 +137,23 @@ export default function ExceptionProcessRecoveryButton({
     : disabledReason
 
   return (
-    <>
-      {contextHolder}
-      <BusinessActionTooltip
+    <BusinessActionTooltip
+      disabled={actionDisabled}
+      disabledReason={actionDisabledReason}
+    >
+      <Button
+        icon={<ReloadOutlined aria-hidden="true" />}
+        className="erp-action-button"
+        danger
+        size={size}
+        data-business-action-key="exception-process-recovery"
         disabled={actionDisabled}
-        disabledReason={actionDisabledReason}
+        loading={loading}
+        onClick={inspect}
       >
-        <Button
-          icon={<ReloadOutlined aria-hidden="true" />}
-          className="erp-action-button"
-          danger
-          size={size}
-          data-business-action-key="exception-process-recovery"
-          disabled={actionDisabled}
-          loading={loading}
-          onClick={inspect}
-        >
-          恢复异常流程
-        </Button>
-      </BusinessActionTooltip>
-    </>
+        恢复异常流程
+      </Button>
+    </BusinessActionTooltip>
   )
 }
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -328,6 +329,7 @@ func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.
 	tests := []struct {
 		name        string
 		membership  biz.WorkPoolMembershipInput
+		wantCode    int32
 		wantMessage string
 	}{
 		{
@@ -343,6 +345,7 @@ func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.
 				PoolKey: "approval.sales_order", RoleKey: biz.SalesRoleKey,
 				UserID: 13, Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
 			},
+			wantCode:    errcode.BusinessRuleViolation.Code,
 			wantMessage: "指定员工当前未启用",
 		},
 		{
@@ -351,7 +354,8 @@ func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.
 				PoolKey: "approval.sales_order", RoleKey: biz.SalesRoleKey,
 				UserID: 14, Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
 			},
-			wantMessage: "指定员工不存在或已离职",
+			wantCode:    errcode.BusinessRuleViolation.Code,
+			wantMessage: "指定员工已离职",
 		},
 		{
 			name: "employee missing selected role",
@@ -359,6 +363,7 @@ func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.
 				PoolKey: "approval.sales_order", RoleKey: biz.SalesRoleKey,
 				UserID: 15, Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
 			},
+			wantCode:    errcode.BusinessRuleViolation.Code,
 			wantMessage: "指定员工不属于所选岗位",
 		},
 		{
@@ -367,7 +372,8 @@ func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.
 				PoolKey: "approval.sales_order", RoleKey: biz.SalesRoleKey,
 				UserID: 99, Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
 			},
-			wantMessage: "指定员工不存在或已离职",
+			wantCode:    errcode.ResourceNotFound.Code,
+			wantMessage: "指定员工不存在",
 		},
 		{
 			name: "role pool with active employee",
@@ -382,6 +388,7 @@ func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.
 				PoolKey: "approval.purchase_order", RoleKey: biz.PurchaseRoleKey,
 				Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
 			},
+			wantCode:    errcode.BusinessRuleViolation.Code,
 			wantMessage: "所选岗位当前没有可办理员工",
 		},
 	}
@@ -397,8 +404,8 @@ func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.
 				}
 				return
 			}
-			if result == nil || result.Message != test.wantMessage {
-				t.Fatalf("validation result = %#v, want %q", result, test.wantMessage)
+			if result == nil || result.Code != test.wantCode || result.Message != test.wantMessage {
+				t.Fatalf("validation result = %#v, want code=%d message=%q", result, test.wantCode, test.wantMessage)
 			}
 		})
 	}
@@ -435,7 +442,7 @@ func TestApprovalSettingsMembersRequirePersistedApprovalPermission(t *testing.T)
 			Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
 		}},
 	)
-	if result == nil || result.Message != "所选岗位当前未开启审批功能" {
+	if result == nil || result.Code != errcode.BusinessRuleViolation.Code || result.Message != "所选岗位当前未开启审批功能" {
 		t.Fatalf("validation result = %#v", result)
 	}
 }

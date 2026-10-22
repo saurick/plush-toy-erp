@@ -123,6 +123,7 @@ for (const pageCase of [
     start: 'const saveOrder = async () => {',
     end: 'const runLifecycleAction',
     resetPattern: /resetBusinessPaginationCurrent\(setPagination\)/u,
+    refreshPattern: /loadOrders\b/u,
   },
   {
     title: '采购订单',
@@ -131,6 +132,7 @@ for (const pageCase of [
     end: 'const runLifecycleAction',
     resetPattern:
       /setPagination\(\(current\) => \(\{ \.\.\.current, current: 1 \}\)\)/u,
+    refreshPattern: /settleSourceDocumentPostSaveEffect\(refreshPageData\)/u,
   },
 ]) {
   test(`${pageCase.title} create resets page one and edit refreshes the current page`, () => {
@@ -140,10 +142,22 @@ for (const pageCase of [
     const branches = conditionalBranches(mutation, 'isCreatingOrder')
     assert.match(branches.truthy, pageCase.resetPattern)
     assert.doesNotMatch(branches.truthy, /loadOrders\b/u)
-    assert.match(branches.falsy, /loadOrders\b/u)
+    assert.doesNotMatch(branches.truthy, pageCase.refreshPattern)
+    assert.match(branches.falsy, pageCase.refreshPattern)
     assert.doesNotMatch(branches.falsy, pageCase.resetPattern)
   })
 }
+
+test('purchase edit refresh preserves pagination while refreshing the arrival view', () => {
+  const refresh = sourceSlice(
+    purchaseOrderSource,
+    'const refreshPageData = useCallback',
+    'registerPageRefresh?.(refreshPageData)'
+  )
+  assert.match(refresh, /loadOrders\(\)/u)
+  assert.match(refresh, /if \(contentView === 'arrival'\) reloadArrivalData\(\)/u)
+  assert.doesNotMatch(refresh, /setPagination|resetBusinessPaginationCurrent/u)
+})
 
 test('outsourcing create resets only the order page while edit refreshes the current page and workflow tasks', () => {
   const mutation = sourceSlice(

@@ -1,8 +1,4 @@
 .workflow-task-event-trail {
-  --workflow-event-marker-size: 12px;
-  --workflow-event-title-height: calc(var(--erp-font-body) * 1.45);
-  --workflow-event-marker-offset: calc((var(--workflow-event-title-height) - var(--workflow-event-marker-size)) / 2);
-  --workflow-event-marker-color: var(--erp-text-subtle);
   display: grid;
   min-width: 0;
   gap: 12px;
@@ -86,6 +82,10 @@
 }
 
 .workflow-task-event-trail__list {
+  --workflow-event-marker-size: 12px;
+  --workflow-event-title-height: calc(var(--erp-font-body) * 1.45);
+  --workflow-event-marker-offset: calc((var(--workflow-event-title-height) - var(--workflow-event-marker-size)) / 2);
+  --workflow-event-marker-color: var(--erp-text-subtle);
   display: grid;
   min-width: 0;
   gap: 0;
@@ -134,6 +134,7 @@
 }
 
 .workflow-task-event-trail__content {
+  position: relative;
   min-width: 0;
 }
 
@@ -143,6 +144,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  padding-right: 54px;
 }
 
 .workflow-task-event-trail__item-head strong {
@@ -168,6 +170,10 @@
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
   line-height: 1.5;
+}
+
+.workflow-task-event-trail__meta {
+  padding-right: 54px;
 }
 
 .workflow-task-event-trail__actor-name {
@@ -245,12 +251,6 @@
 
   .workflow-task-event-trail__responsibility {
     grid-template-columns: 1fr;
-  }
-
-  .workflow-task-event-trail__item-head {
-    display: grid;
-    justify-content: stretch;
-    gap: 4px;
   }
 
   .workflow-task-event-trail__item-head > span {
@@ -368,7 +368,6 @@
 .workflow-task-event-trail__audit { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; max-width: min(360px, calc(100vw - 64px)); margin: 0; }
 .workflow-task-event-trail__audit dt { color: var(--erp-text-muted); }
 .workflow-task-event-trail__audit dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.workflow-task-event-trail__audit-trigger.ant-btn { min-height: 32px; padding: 4px 8px; color: var(--erp-text-muted); }
-.workflow-task-event-trail--mobile .workflow-task-event-trail__audit-trigger.ant-btn { min-width: 44px; min-height: 44px; }
-@media (max-width: 640px) { .workflow-task-event-trail__item-head { display: flex; align-items: center; } }
+.workflow-task-event-trail__audit-trigger.ant-btn { position: absolute; top: 0; right: 0; min-height: 32px; align-items: flex-start; padding: 0 8px; color: var(--erp-text-muted); line-height: var(--workflow-event-title-height); }
+.workflow-task-event-trail__list--mobile .workflow-task-event-trail__audit-trigger.ant-btn { min-width: 44px; min-height: 44px; }
 @media (pointer: coarse) { .workflow-task-event-trail__audit-trigger.ant-btn { min-width: 44px; min-height: 44px; } }

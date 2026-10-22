@@ -282,7 +282,7 @@ func TestSalesOrderUsecaseLifecycleGuards(t *testing.T) {
 	if _, err := uc.CloseSalesOrder(ctx, 3); err != nil || repo.nextStatus != SalesOrderStatusClosed {
 		t.Fatalf("expected active -> closed allowed, status=%s err=%v", repo.nextStatus, err)
 	}
-	if _, err := uc.ActivateSalesOrder(ctx, 1); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.ActivateSalesOrder(ctx, 1); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected draft -> active rejected, got %v", err)
 	}
 	if _, err := uc.CancelSalesOrder(ctx, 1); err != nil || repo.nextStatus != SalesOrderStatusCanceled {
@@ -291,7 +291,7 @@ func TestSalesOrderUsecaseLifecycleGuards(t *testing.T) {
 	if IsValidSalesOrderStatus("shipped") || IsSalesOrderLifecycleTransitionAllowed(SalesOrderStatusActive, "shipped") {
 		t.Fatalf("shipped must not be a sales order lifecycle status")
 	}
-	if _, err := uc.CancelSalesOrder(ctx, 4); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CancelSalesOrder(ctx, 4); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
 	}
 }
@@ -591,7 +591,7 @@ func TestSalesOrderUsecaseItemGuards(t *testing.T) {
 		t.Fatalf("expected ordered quantity retained, got %s", repo.createdItem.OrderedQuantity)
 	}
 
-	if _, err := uc.AddSalesOrderItem(ctx, &SalesOrderItemMutation{SalesOrderID: 2, LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.AddSalesOrderItem(ctx, &SalesOrderItemMutation{SalesOrderID: 2, LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected closed order item add rejected, got %v", err)
 	}
 	if _, err := uc.AddSalesOrderItem(ctx, &SalesOrderItemMutation{SalesOrderID: 1, LineNo: 1, ProductID: 999, UnitID: 200, OrderedQuantity: qty}); !errors.Is(err, ErrProductNotFound) {
@@ -666,10 +666,10 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-NO-VERSION", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing version rejected, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected closed order save rejected, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 3, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-SUBMITTED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 3, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-SUBMITTED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrSourceOrderStateInvalid) {
 		t.Fatalf("expected submitted sales order to be frozen, got %v", err)
 	}
 	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-WRONG-ITEM", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, []*SalesOrderItemSaveMutation{

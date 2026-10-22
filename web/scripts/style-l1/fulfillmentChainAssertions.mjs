@@ -2,13 +2,9 @@ import assert from 'node:assert/strict'
 import { expect } from 'playwright/test'
 
 export async function openFulfillmentExceptionDirectory(guide) {
-  const entry = guide.getByRole('button', { name: '异常目录', exact: true })
-  if (!await entry.count()) {
-    const topics = guide.getByRole('button', { name: '按业务查阅', exact: true })
-    if (await topics.count()) await topics.click()
-    else await guide.getByRole('button', { name: '返回业务目录', exact: true }).click()
-  }
-  await entry.click()
+  const topics = guide.getByRole('button', { name: '按业务查阅', exact: true })
+  if (await topics.count()) await topics.click()
+  await guide.getByRole('radiogroup', { name: '查阅目录', exact: true }).getByText('异常目录', { exact: true }).click()
 }
 
 export async function assertFulfillmentDetailGeometry(detail) {
@@ -78,7 +74,7 @@ export async function assertFulfillmentChainClickTargets(canvas) {
     await card.click({ position: { x: box.width - 6, y: box.height - 6 } })
     await stage.locator('.erp-dev-chain__stage-main[aria-expanded="true"]').waitFor()
   }
-  await canvas.getByRole('button', { name: '收起环节', exact: true }).click()
+  await canvas.locator('xpath=ancestor::*[@id="task-fulfillment-guide"]').getByRole('button', { name: '收起详情', exact: true }).click()
   await expect(canvas.locator('[data-stage-card][data-selected]')).toHaveCount(0)
   assert.equal(await canvas.locator('[data-stage-card][data-selected]').count(), 0)
 }
@@ -100,7 +96,7 @@ export function fulfillmentWireCollisions({ boxes, paths, source, target }) {
       const nx = command === 'H' ? Number(tokens[index++]) : x
       const ny = command === 'V' ? Number(tokens[index++]) : y
       for (const box of boxes) {
-        if ([source, target].includes(box.key)) continue
+        if ([path.from || source, path.to || target].includes(box.key)) continue
         const hit = command === 'H'
           ? y > box.y + 2 && y < box.y + box.height - 2 && Math.max(Math.min(x, nx), box.x + 2) < Math.min(Math.max(x, nx), box.x + box.width - 2)
           : x > box.x + 2 && x < box.x + box.width - 2 && Math.max(Math.min(y, ny), box.y + 2) < Math.min(Math.max(y, ny), box.y + box.height - 2)
@@ -131,7 +127,7 @@ export async function assertFulfillmentChainGeometry(canvas) {
         const box = node.getBoundingClientRect()
         return { key: `${node.dataset.stageException}:exception`, x: box.x - base.x, y: box.y - base.y, width: box.width, height: box.height }
       })],
-      paths: [...root.querySelectorAll('path[data-chain-wire^="exception-"]')].map((node) => ({ key: node.getAttribute('data-chain-wire'), d: node.getAttribute('d') })),
+      paths: [...root.querySelectorAll('path[data-chain-wire]')].map((node) => ({ key: node.getAttribute('data-chain-wire'), d: node.getAttribute('d'), from: node.getAttribute('data-wire-from'), to: node.getAttribute('data-wire-to') })),
       clippedLabels: [...root.querySelectorAll('[data-cable-label]')].filter((node) => {
         const box = node.getBoundingClientRect()
         return box.left < base.left - 1 || box.right > base.right + 1 || node.scrollHeight > node.parentElement.getBoundingClientRect().height + 1
@@ -141,5 +137,5 @@ export async function assertFulfillmentChainGeometry(canvas) {
   assert.equal(geometry.count, 17)
   assert(geometry.scrollWidth <= geometry.width + 1, '总链不横向挤出页面')
   assert.deepEqual(geometry.clippedLabels, [], '异常条件标签应完整显示')
-  assert.deepEqual(fulfillmentWireCollisions(geometry), [], '异常连线不能穿过其他环节')
+  assert.deepEqual(fulfillmentWireCollisions(geometry), [], '阅读连线不能穿过环节或异常入口')
 }

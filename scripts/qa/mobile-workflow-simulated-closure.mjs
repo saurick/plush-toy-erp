@@ -261,12 +261,11 @@ function buildTask(prefix, task) {
       : {}),
     priority: task.priority ?? 2,
     payload: {
-      simulated_only: true,
       simulation_prefix: SIMULATION_PREFIX,
       mobile_workflow_task: true,
-      customer_name: "Mobile workflow 模拟客户",
+      customer_name: "客户",
       style_no: "MOBILE-WORKFLOW",
-      product_name: "Mobile workflow 模拟产品",
+      product_name: "产品",
       quantity: "24",
       unit: "pcs",
       critical_path: true,
@@ -294,7 +293,7 @@ function buildPlan(options) {
       approval: buildTask(prefix, {
         code: "APPROVAL",
         group: "trial_boss_work",
-        name: "Mobile workflow 模拟老板审批",
+        name: "老板审批",
         sourceType: "project-orders",
         sourceId: 910001,
         sourceNo: "SO-APPROVAL",
@@ -310,7 +309,7 @@ function buildPlan(options) {
       approvalRejected: buildTask(prefix, {
         code: "APPROVAL-REJECT",
         group: "trial_boss_work",
-        name: "Mobile workflow 模拟老板退回",
+        name: "老板退回",
         sourceType: "project-orders",
         sourceId: 910005,
         sourceNo: "SO-REJECT",
@@ -326,7 +325,7 @@ function buildPlan(options) {
       quality: buildTask(prefix, {
         code: "QC",
         group: "trial_quality_work",
-        name: "Mobile workflow 模拟成品抽检",
+        name: "成品抽检",
         sourceType: "production-progress",
         sourceId: 910002,
         sourceNo: "QC",
@@ -341,7 +340,7 @@ function buildPlan(options) {
       warehouseInbound: buildTask(prefix, {
         code: "WH-IN",
         group: "trial_warehouse_work",
-        name: "Mobile workflow 模拟仓库入库确认",
+        name: "仓库入库确认",
         sourceType: "accessories-purchase",
         sourceId: 910003,
         sourceNo: "WH-IN",
@@ -349,13 +348,13 @@ function buildPlan(options) {
         ownerRole: "warehouse",
         completeCondition: "仓库在岗位任务端确认入库数量、库位和经手人。",
         payload: {
-          material_name: "Mobile workflow 模拟辅料",
+          material_name: "辅料",
         },
       }),
       warehouseUrge: buildTask(prefix, {
         code: "WH-URGE",
         group: "trial_warehouse_work",
-        name: "Mobile workflow 模拟仓库任务催办",
+        name: "仓库任务催办",
         sourceType: "shipping-release",
         sourceId: 910006,
         sourceNo: "WH-URGE",
@@ -372,7 +371,7 @@ function buildPlan(options) {
       shipmentRelease: buildTask(prefix, {
         code: "SHIP-REL",
         group: "trial_warehouse_work",
-        name: "Mobile workflow 模拟仓库异常",
+        name: "仓库异常",
         sourceType: "trial-workflow",
         sourceId: 910004,
         sourceNo: "SHIP-REL",
@@ -392,46 +391,46 @@ function buildPlan(options) {
         role: "boss",
         nextStatus: "done",
         reason: "",
-        feedback: "Mobile workflow 模拟审批已确认。",
+        feedback: "审批已确认。",
         payload: mobileActionPayload({
-          feedback: "Mobile workflow 模拟审批已确认。",
+          feedback: "审批已确认。",
         }),
       },
       approvalRejected: {
         role: "boss",
         nextStatus: "rejected",
-        reason: "Mobile workflow 模拟资料不完整，退回销售补齐。",
+        reason: "资料不完整，退回销售补齐。",
         payload: mobileActionPayload(),
       },
       qualityDone: {
         role: "quality",
         nextStatus: "done",
         reason: "",
-        feedback: "Mobile workflow 模拟抽检办理完成。",
+        feedback: "抽检办理完成。",
         payload: mobileActionPayload({
-          feedback: "Mobile workflow 模拟抽检办理完成。",
+          feedback: "抽检办理完成。",
         }),
       },
       warehouseInboundDone: {
         role: "warehouse",
         nextStatus: "done",
         reason: "",
-        feedback: "Mobile workflow 模拟入库任务办理完成。",
+        feedback: "入库任务办理完成。",
         payload: mobileActionPayload({
-          feedback: "Mobile workflow 模拟入库任务办理完成。",
+          feedback: "入库任务办理完成。",
         }),
       },
       shipmentReleaseBlocked: {
         role: "warehouse",
         nextStatus: "blocked",
         reason:
-          "Mobile workflow 模拟出货唛头未确认，等待业务负责人补齐后恢复。",
+          "出货唛头未确认，等待业务负责人补齐后恢复。",
         payload: mobileActionPayload(),
       },
       warehouseUrged: {
         role: "pmc",
         action: "urge_task",
-        reason: "Mobile workflow 模拟 PMC 催办仓库出货放行。",
+        reason: " PMC 催办仓库出货放行。",
         payload: {
           surface_key: "mobile_role_tasks",
         },

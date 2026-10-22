@@ -15,9 +15,11 @@ const (
 )
 
 var (
-	ErrMaterialRequestNotReady      = errors.New("engineering material request sources not ready")
-	ErrMaterialRequestConflict      = errors.New("engineering material request changed")
-	ErrMaterialRequestReviewInvalid = errors.New("engineering material request review invalid")
+	ErrMaterialRequestNotReady             = errors.New("engineering material request sources not ready")
+	ErrMaterialRequestConflict             = errors.New("engineering material request changed")
+	ErrMaterialRequestNotFound             = errors.New("engineering material request not found")
+	ErrMaterialRequestReviewReasonRequired = errors.New("engineering material review reason required")
+	ErrMaterialRequestReviewInvalid        = errors.New("engineering material request review invalid")
 )
 
 type EngineeringMaterialRequest struct {
@@ -129,8 +131,13 @@ func (uc *SalesOrderUsecase) ReviewEngineeringMaterialRequest(ctx context.Contex
 	if copy.Note != nil && len(*copy.Note) > 255 {
 		return nil, ErrBadParam
 	}
-	if copy.Action == "REJECT" && (copy.Note == nil || (copy.ReviewStage != "BOSS" && copy.ReviewStage != "FINANCE")) {
-		return nil, ErrMaterialRequestReviewInvalid
+	if copy.Action == "REJECT" {
+		if copy.Note == nil {
+			return nil, ErrMaterialRequestReviewReasonRequired
+		}
+		if copy.ReviewStage != "BOSS" && copy.ReviewStage != "FINANCE" {
+			return nil, ErrBadParam
+		}
 	}
 	switch copy.Action {
 	case "BOSS_APPROVE", "FINANCE_APPROVE", "REJECT":

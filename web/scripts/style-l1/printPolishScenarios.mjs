@@ -1,6 +1,8 @@
 import { writeFile } from 'node:fs/promises'
 import { Buffer } from 'node:buffer'
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { createWorkInstructionMeasurementScenario } from './workInstructionMeasurementScenario.mjs'
+import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
 
 export function createPrintPolishScenarios({
   assert,
@@ -32,6 +34,82 @@ export function createPrintPolishScenarios({
       captureSnapshot,
     }),
     {
+      name: 'print-workspace-editor-input-lifecycle',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 3840, height: 2160 },
+      verify: async (page) => {
+        for (const template of printTemplateCatalog.filter((item) => item.runtime?.workspace)) {
+          await gotoScenarioPath(page, `/erp/print-workspace/${template.key}?draft=fresh&state=editor-input-lifecycle`)
+          await page.locator('.erp-print-shell--ready').waitFor()
+          const editor = page.locator('.erp-print-shell__stage [contenteditable="true"]').first()
+          await editor.fill('输入中  ')
+          const state = await editor.evaluate(async (node) => {
+            const originalValue = node.textContent
+            const text = node.firstChild
+            document.getSelection().collapse(text, 2)
+            const ime = [{ isComposing: true }, { keyCode: 229 }].map((options) => {
+              const event = new KeyboardEvent('keydown', {
+                key: 'Enter', bubbles: true, cancelable: true, ...options,
+              })
+              node.dispatchEvent(event)
+              return { prevented: event.defaultPrevented, focused: document.activeElement === node }
+            })
+            const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+            try {
+              Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+              document.dispatchEvent(new Event('visibilitychange'))
+            } finally {
+              if (visibility) Object.defineProperty(document, 'visibilityState', visibility)
+              else delete document.visibilityState
+            }
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+            return {
+              ime,
+              originalValue,
+              value: node.textContent,
+              sameTextNode: node.firstChild === text,
+              caretNode: document.getSelection().anchorNode === text,
+              caretOffset: document.getSelection().anchorOffset,
+              focused: document.activeElement === node,
+            }
+          })
+          assert(state.ime.every((event) => !event.prevented && event.focused), `${template.key} 输入法确认保持编辑`)
+          assert.equal(state.originalValue.replace(/\u00a0/gu, ' '), '输入中  ', `${template.key} 输入保留尾部空格`)
+          assert.equal(state.value, state.originalValue, `${template.key} 草稿刷新不覆盖输入中的文字`)
+          assert(state.sameTextNode && state.caretNode && state.caretOffset === 2 && state.focused, `${template.key} 草稿刷新保留光标: ${JSON.stringify(state)}`)
+          await page.screenshot({ path: path.join(outputDir, `print-editor-lifecycle-${template.key}.png`) })
+          // 加工字段与色卡富文本保留 Enter 的原有行为，使用 Tab 主动离开。
+          if (['processing-contract', 'engineering-color-card'].includes(template.key)) {
+            await editor.press('Tab')
+          } else {
+            await editor.press('Enter')
+          }
+          if (template.key.startsWith('engineering-')) {
+            // 工程字段的最晚恢复定时器为 900ms，主动结束后不能再进入该字段。
+            await page.waitForTimeout(1100)
+          }
+          assert.equal(await editor.evaluate((node) => document.activeElement === node), false, `${template.key} 主动结束编辑后不抢回焦点`)
+          assert.equal(await editor.textContent(), '输入中', `${template.key} 失焦后正文与规范化草稿一致`)
+          const html = await captureSnapshot(page, template.key)
+          const output = await page.evaluate((source) => {
+            const doc = new DOMParser().parseFromString(source, 'text/html')
+            return {
+              text: doc.body.textContent,
+              editors: doc.body.querySelectorAll('[contenteditable], [data-print-editor-only]').length,
+            }
+          }, html)
+          assert(output.text.includes('输入中'), `${template.key} 输出使用当前编辑值`)
+          assert.equal(output.editors, 0, `${template.key} 编辑控件不进入输出`)
+          const restoredURL = new URL(page.url())
+          restoredURL.searchParams.delete('draft')
+          await page.goto(restoredURL.href, { waitUntil: 'networkidle' })
+          await page.locator('.erp-print-shell--ready').waitFor()
+          assert.equal(await editor.textContent(), '输入中', `${template.key} 刷新恢复最后提交值`)
+        }
+      },
+    },
+    {
       name: 'print-workspace-contract-edit-continuity',
       path: '/erp/print-workspace/material-purchase-contract?state=edit-start',
       auth: 'admin',
@@ -50,9 +128,8 @@ export function createPrintPolishScenarios({
           )
           await meta.first().waitFor()
           for (const scale of ['1', '1.25']) {
-            await page
-              .locator('.erp-print-shell__zoom-control select')
-              .selectOption(scale)
+            await chooseSelectOption(page
+              .locator('.erp-print-shell__zoom-control .ant-select'), scale)
             const entries = [
               meta.first(),
               meta.nth(1),
@@ -332,7 +409,7 @@ export function createPrintPolishScenarios({
         )
         assert.equal(await firstCallout.inputValue(), '接缝平整，针距均匀')
         await callouts.last().click()
-        await modal.locator('select').nth(1).selectOption('blue-fill')
+        await chooseSelectOption(modal.locator('.ant-select').nth(1), 'blue-fill')
         assert.equal(
           await callouts
             .last()

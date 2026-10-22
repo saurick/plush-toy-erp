@@ -6,9 +6,10 @@ import {
   ExportOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
+import { Alert, Button, Drawer, Input, Tag, Typography } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
-import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
+import WorkflowFollowupDetails, { hasWorkflowFollowupDetails } from './WorkflowFollowupDetails.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import WorkflowTaskInfoCard from './WorkflowTaskInfoCard.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
@@ -805,7 +806,7 @@ export default function WorkflowTaskActionDrawer({
               source={<div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} onOpen={canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>}
               assigneeLabel={currentAssigneeLabel}
               events={taskEventsState === 'ready' ? taskEvents : []}
-              businessInfo={<WorkflowFollowupDetails task={task} />}
+              businessInfo={hasWorkflowFollowupDetails(task) ? <WorkflowFollowupDetails task={task} /> : null}
               summary={<WorkflowTaskCurrentSummary appearance="facts" task={task} roleLabel={ownerRoleLabel} assigneeLabel={currentAssigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={taskReason} contact={exceptionContact} guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''} />}
             />
           ) : (

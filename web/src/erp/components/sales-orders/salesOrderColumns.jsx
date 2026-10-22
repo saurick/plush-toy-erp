@@ -1,6 +1,11 @@
 import React from 'react'
 import { Tag } from 'antd'
 import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
+import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
+import {
+  resolveBusinessTableCopyLabel,
+  resolveBusinessTableCopyText,
+} from '../../utils/businessTableCopy.mjs'
 import DeliveryInfoCell from '../business-list/DeliveryInfoCell.jsx'
 
 import {
@@ -329,6 +334,102 @@ export function buildSalesOrderColumns() {
         statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
     },
   ])
+}
+
+const SALES_ORDER_COLUMN_GROUPS = [
+  { keys: ['order_no', 'customer_order_no'], title: '订单编号', width: 220, labels: ['', '客户单号'] },
+  { keys: ['customer_snapshot', 'sales_owner'], title: '客户与跟单', width: 200, labels: ['', '跟单'] },
+  { keys: ['lifecycle_status', 'engineering_material_status'], title: '订单与用料', width: 190, labels: ['订单', '用料'] },
+  { keys: ['order_total', 'currency'], title: '订单总额', width: 150, inline: true },
+]
+
+function renderSalesOrderGroupedField(column, record, label) {
+  const value = record?.[column.dataIndex]
+  const text = String(column.exportValue?.(record) ?? value ?? '').trim()
+  if (!text || text === '-' || text === '—') return null
+  const content = <>{label ? `${label}：` : ''}{column.render ? column.render(value, record) : value}</>
+  const copyText = column.copyable ? resolveBusinessTableCopyText(column, value, record) : ''
+  if (!copyText) return content
+  return (
+    <span className="erp-business-table-copyable-cell" data-copyable-column={column.dataIndex} data-align="left">
+      <span className="erp-business-table-copyable-cell__content" title={copyText}>{content}</span>
+      <BusinessCopyButton
+        className="erp-business-table-copyable-cell__button"
+        label={resolveBusinessTableCopyLabel(column)}
+        value={copyText}
+      />
+    </span>
+  )
+}
+
+// Compose only fields that survived the effective-field policy. The original
+// columns remain the source for details, export and per-field copy values.
+export function buildSalesOrderListColumns(columns) {
+  const groups = SALES_ORDER_COLUMN_GROUPS.map((group) => ({
+    ...group,
+    members: group.keys.map((key) => columns.find((column) => column.dataIndex === key)).filter(Boolean),
+  }))
+  return columns.flatMap((column) => {
+    const group = groups.find(({ members }) => members.includes(column))
+    if (!group || group.members.length < 2) return [column]
+    if (column !== group.members[0]) return []
+    const [primary, secondary] = group.members
+    return [{
+      ...primary,
+      title: group.title,
+      exportTitle: group.title,
+      width: group.width,
+      sourceColumnKeys: group.members.map((member) => member.dataIndex),
+      ...(group.inline ? {} : {
+        align: 'left',
+        copyable: false,
+        render: (_value, record) => (
+          <BusinessCellStack
+            primary={renderSalesOrderGroupedField(primary, record, group.labels[0])}
+            secondary={renderSalesOrderGroupedField(secondary, record, group.labels[1])}
+          />
+        ),
+      }),
+      sorter: (left, right, order) => {
+        for (const member of group.members) {
+          const result = member.sorter?.(left, right, order) || 0
+          if (result) return result
+        }
+        return 0
+      },
+    }]
+  })
+}
+
+export function buildSalesOrderExportColumns(listColumns, sourceColumns) {
+  return listColumns.flatMap((column) => (column.sourceColumnKeys || [column.dataIndex || column.key])
+    .map((key) => sourceColumns.find((source) => (source.dataIndex || source.key) === key))
+    .filter(Boolean))
+}
+
+export function buildSalesOrderColumnProfile(adminProfile, listColumns) {
+  const preferences = adminProfile?.erp_preferences
+  const savedOrder = preferences?.column_orders?.['sales-orders']
+  if (!Array.isArray(savedOrder) || !savedOrder.length) return adminProfile
+  const savedHidden = preferences?.hidden_columns?.['sales-orders'] || []
+  const keys = new Map()
+  const hidden = []
+  for (const column of listColumns) {
+    const key = column.dataIndex || column.key
+    const members = column.sourceColumnKeys || [key]
+    for (const member of members) keys.set(member, key)
+    const savedMembers = members.filter((member) => savedOrder.includes(member))
+    if (savedMembers.length && savedMembers.every((member) => savedHidden.includes(member))) hidden.push(key)
+  }
+  const order = [...new Set(savedOrder.map((key) => keys.get(key)).filter(Boolean))]
+  return {
+    ...adminProfile,
+    erp_preferences: {
+      ...preferences,
+      column_orders: { ...preferences.column_orders, 'sales-orders': order },
+      hidden_columns: { ...preferences.hidden_columns, 'sales-orders': hidden },
+    },
+  }
 }
 
 export function buildSalesOrderItemColumns() {

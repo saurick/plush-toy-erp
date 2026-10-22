@@ -21,35 +21,81 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 ### Storage retention
 
-备份保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、异机精确挂载、独立文件系统、固定 marker 与唯一 `age` recipient；任一缺失即阻断，不回退到 SSD 或同机 RAID。只有本地归档和四个加密文件全部完成后才原子登记异机目录并写成功状态。Compose 不自动创建缺失的冷数据目录。已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
+备份保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、异机精确挂载、独立文件系统、固定 marker 与唯一 `age` recipient；任一缺失即阻断，不回退到 SSD 或同机 RAID。只有本地归档和四个加密文件全部完成后才原子登记异机目录并写成功状态。Compose 不自动创建缺失的冷数据目录。
 
-正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回，最后通过 `gitlab-runner-images.mjs` 移除本次构建在专属 Runner 中的六个镜像别名。清理入口只接受可重建默认主机名 `plush-gitlab-runner` 与当前 ESXi 实例主机名 `plush-gitlab-runner-esxi`，并继续同时校验 CI、项目和 exact SHA。每个别名都核对完整 commit，任何现存容器引用或 tag 身份变化都阻止删除；不使用 force，构建层仍受 Docker GC 管理。缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。
+已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
 
-CI 的 Package 删除使用当前 `CI_JOB_TOKEN`，发布发起者须具有本项目 Package 删除权限（Maintainer / Owner）；验证和 Release 读写继续使用原有 Developer 发布账号，不提升其常驻权限。缺失 Job Token 或 API 拒绝删除时停止退役，不降级凭据。历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理；非 CI 运维必须提供本来就有删除权限的 `GITLAB_RELEASE_TOKEN`。
+正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回，最后通过 `gitlab-runner-images.mjs` 移除本次构建在专属 Runner 中的六个镜像别名。
 
-Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。每台 Runner 的 Docker 默认 builder 启用 `40GB` GC 保留目标，为重复构建保留余量；该目标仅作用于 Docker 构建缓存，Go/pnpm 缓存和发布镜像另行保留。VM disk 显式使用 `discard=unmap`，guest 启用每周 `fstrim.timer`。在线应用配置须先证明 Runner 空闲，在维护窗口重启并读回；不删除业务 volume，不把镜像大小与共享 build cache 相加。目标部署的旧镜像/中转包先按 live 容器、当前版本、回滚和 operation 引用盘点，必要历史归档放 RAID5，精确清理仍走项目发布边界。
+清理入口只接受可重建默认主机名 `plush-gitlab-runner` 与当前 ESXi 实例主机名 `plush-gitlab-runner-esxi`，并继续同时校验 CI、项目和 exact SHA。每个别名都核对完整 commit，任何现存容器引用或 tag 身份变化都阻止删除；不使用 force，构建层仍受 Docker GC 管理。
 
-质量 CI 的下载缓存保留、Fastzip 并发和数据库优先顺序由 `.gitlab-ci.yml` 管理，边界见 [QA 执行合同](../../../scripts/qa/README.md#门禁完整性与-ci-边界)。 发布和 PDF monitor 额外复用 policy 绑定的 Trivy 工具 / 漏洞库下载缓存，只有串行 `publish_release` 写回归档；每次仍执行漏洞库更新和镜像扫描，不复用扫描报告。这些设置不修改 Runner 的槽位、宿主服务或 Docker 配置；效果分别核对 `get_sources`、`restore_cache`、`archive_cache` 与完整流水线关键路径，不能用单个缓存基准代替远端 CI。
+缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。
 
-升级前的 VM 内部快照会继续引用旧磁盘块，guest TRIM 成功不等于宿主机已经回收空间。快照归档使用 `/srv/raid5/runner-vm/upgrade-backups/<日期>/`：先停止空闲 VM，保存含快照的 qcow2、backing image、domain/snapshot XML；压缩档解压流的 SHA-256 必须与停机原盘一致，backing image 单独校验。只删除已归档的指定内部快照，再运行 `qemu-img check`、启动 guest、TRIM 和 Runner 验证，并以宿主机 `du` / `df` 读回实际回收量。恢复时先在独立目录解压并核对 backing image 与指定快照，不能直接覆盖运行盘。后续升级复用同一归档路径；正常升级确认后保留最近两次恢复点，额外历史按明确保留需求处理。
+CI 的 Package 删除使用当前 `CI_JOB_TOKEN`，发布发起者须具有本项目 Package 删除权限（Maintainer / Owner）；验证和 Release 读写继续使用原有 Developer 发布账号，不提升其常驻权限。缺失 Job Token 或 API 拒绝删除时停止退役，不降级凭据。
+
+历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理；非 CI 运维必须提供本来就有删除权限的 `GITLAB_RELEASE_TOKEN`。
+
+Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。每台 Runner 的 Docker 默认 builder 启用 `40GB` GC 保留目标，为重复构建保留余量；该目标仅作用于 Docker 构建缓存，Go/pnpm 缓存和发布镜像另行保留。VM disk 显式使用 `discard=unmap`，guest 启用每周 `fstrim.timer`。
+
+在线应用配置须先证明 Runner 空闲，在维护窗口重启并读回；不删除业务 volume，不把镜像大小与共享 build cache 相加。目标部署的旧镜像/中转包先按 live 容器、当前版本、回滚和 operation 引用盘点，必要历史归档放 RAID5，精确清理仍走项目发布边界。
+
+质量 CI 的下载缓存保留、Fastzip 并发和数据库优先顺序由 `.gitlab-ci.yml` 管理，边界见 [QA 执行合同](../../../scripts/qa/README.md#门禁完整性与-ci-边界)。
+
+ 发布和 PDF monitor 额外复用 policy 绑定的 Trivy 工具 / 漏洞库下载缓存，只有串行 `publish_release` 写回归档；每次仍执行漏洞库更新和镜像扫描，不复用扫描报告。
+
+这些设置不修改 Runner 的槽位、宿主服务或 Docker 配置；效果分别核对 `get_sources`、`restore_cache`、`archive_cache` 与完整流水线关键路径，不能用单个缓存基准代替远端 CI。
+
+升级前的 VM 内部快照会继续引用旧磁盘块，guest TRIM 成功不等于宿主机已经回收空间。
+
+快照归档使用 `/srv/raid5/runner-vm/upgrade-backups/<日期>/`：先停止空闲 VM，保存含快照的 qcow2、backing image、domain/snapshot XML；压缩档解压流的 SHA-256 必须与停机原盘一致，backing image 单独校验。
+
+只删除已归档的指定内部快照，再运行 `qemu-img check`、启动 guest、TRIM 和 Runner 验证，并以宿主机 `du` / `df` 读回实际回收量。恢复时先在独立目录解压并核对 backing image 与指定快照，不能直接覆盖运行盘。后续升级复用同一归档路径；正常升级确认后保留最近两次恢复点，额外历史按明确保留需求处理。
 
 旧部署的冷归档使用 `/srv/raid5/cicd-archives/<项目>/`。已完成且超过七天的中转操作可逐文件校验后仅迁走镜像和源码大文件，原 operation 回执与控制文件继续保留；状态不明、活动操作和容器挂载引用的文件不迁走。镜像清理保护所有现存容器引用的版本及其 Server/Web 配对，并额外保留各镜像最近三个版本；每次按精确 tag 列表执行，不扩到其他项目。
 
-Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；脚本不设置与工作负载脱节的固定内存下限。`runner-capacity.sh --evidence` 只读回在线 vCPU、MemTotal、swap、根文件系统和槽位配置，证明当前配置身份一致，不把开机快照冒充负载容量结论。Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `nproc` 自动派生；注册、重建与后续 live 调整都复用 `runner-capacity.sh`，它只在 Runner 空闲、配置身份和旧值精确匹配时原子更新全局 `concurrent` 与唯一 project runner `limit`，失败恢复旧配置并读回。
+Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；脚本不设置与工作负载脱节的固定内存下限。`runner-capacity.sh --evidence` 只读回在线 vCPU、MemTotal、swap、根文件系统和槽位配置，证明当前配置身份一致，不把开机快照冒充负载容量结论。
 
-当前 canonical 质量 Pipeline 的全局稳定安全并发上限只在 `runner-capacity.env` 保存，DAG 只调度已经就绪的 Job，空槽不预留 CPU 或内存。`concurrent=limit` 把多 Pipeline 即使短暂重叠时的总资源使用也限制在同一个全局上限内；普通完整质量只接受 protected main 的自然 push，新的 commit 自动取消可中断的旧 Pipeline。Job 内 Node 并发仍为 1；`.gitlab-ci.yml` 统一设置 `GOMAXPROCS=4` 与 `GOFLAGS=-p=4`，限制每个 Go 进程的运行并发和包编译并发，避免每个并行 Job 都按 VM 全部 vCPU 展开。govulncheck 继续完整扫描符号调用路径，并保留 `GOGC=25` 的堆预算。语言并发参数不是宿主 CPU 硬配额，实际 CPU 峰值与整条关键路径仍须分别实测。PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
+Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `nproc` 自动派生；注册、重建与后续 live 调整都复用 `runner-capacity.sh`，它只在 Runner 空闲、配置身份和旧值精确匹配时原子更新全局 `concurrent` 与唯一 project runner `limit`，失败恢复旧配置并读回。
 
-GitLab quality 中的 `server-upgrade` 与 `server-postgres` 各自把 PostgreSQL 官方 volume 根目录挂载为独立、上限 1 GiB 的 tmpfs，使临时表数据和 WAL 不再与 Git checkout、编译缓存及 Docker 写层争用 Runner 系统盘。容器启动后必须从 Docker inspect 读回精确 tmpfs 参数，并确认镜像 `PGDATA` 位于该挂载内；缺失、漂移或越界一律在测试前失败。tmpfs 上限不是预留内存，两座数据库仍保持独立容器和完整清理读回，不能以此放宽 Runner 的内存、swap、OOM 或 PSI 观察。
+当前 canonical 质量 Pipeline 的全局稳定安全并发上限只在 `runner-capacity.env` 保存，DAG 只调度已经就绪的 Job，空槽不预留 CPU 或内存。
 
-性能调优必须分别观测 GitLab 宿主机和 Runner guest：在候选内存下运行 protected main 的完整自然 push Pipeline，记录冷/热缓存的 job 时长、DAG 关键路径、峰值工作集、最低 MemAvailable、swap、memory PSI、OOM、IO 峰值、p50、波动和近似 p95，再决定 Runner 内存、slot、分片和语言测试并行度。内存候选以完整 Pipeline 的实测峰值加明确余量为依据；一次绿色只证明该次候选可运行，不直接证明长期稳定，缩容后至少保留可立即恢复的上一档规格。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
+`concurrent=limit` 把多 Pipeline 即使短暂重叠时的总资源使用也限制在同一个全局上限内；普通完整质量只接受 protected main 的自然 push，新的 commit 自动取消可中断的旧 Pipeline。
+
+Job 内 Node 并发仍为 1；`.gitlab-ci.yml` 统一设置 `GOMAXPROCS=4` 与 `GOFLAGS=-p=4`，限制每个 Go 进程的运行并发和包编译并发，避免每个并行 Job 都按 VM 全部 vCPU 展开。govulncheck 继续完整扫描符号调用路径，并保留 `GOGC=25` 的堆预算。
+
+语言并发参数不是宿主 CPU 硬配额，实际 CPU 峰值与整条关键路径仍须分别实测。PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
+
+GitLab quality 中的 `server-upgrade` 与 `server-postgres` 各自把 PostgreSQL 官方 volume 根目录挂载为独立、上限 1 GiB 的 tmpfs，使临时表数据和 WAL 不再与 Git checkout、编译缓存及 Docker 写层争用 Runner 系统盘。
+
+容器启动后必须从 Docker inspect 读回精确 tmpfs 参数，并确认镜像 `PGDATA` 位于该挂载内；缺失、漂移或越界一律在测试前失败。tmpfs 上限不是预留内存，两座数据库仍保持独立容器和完整清理读回，不能以此放宽 Runner 的内存、swap、OOM 或 PSI 观察。
+
+性能调优必须分别观测 GitLab 宿主机和 Runner guest：在候选内存下运行 protected main 的完整自然 push Pipeline，记录冷/热缓存的 job 时长、DAG 关键路径、峰值工作集、最低 MemAvailable、swap、memory PSI、OOM、IO 峰值、p50、波动和近似 p95，再决定 Runner 内存、slot、分片和语言测试并行度。
+
+内存候选以完整 Pipeline 的实测峰值加明确余量为依据；一次绿色只证明该次候选可运行，不直接证明长期稳定，缩容后至少保留可立即恢复的上一档规格。普通 CI 7–9 分钟、热缓存提交到部署 10–15 分钟只是稳健阶段目标；资源仍有余量且未出现排队、IO 争用、OOM、flaky 或波动扩大时，继续冲刺 6–8 分钟和 8–12 分钟，稳定更快也接受。
+
+只有资源饱和或进一步提速需要明显不成比例的复杂度时才停止；不得减少测试、放宽 fail-closed / exact-SHA、隔离或清理门禁，也不得用伪缓存命中换取数字。
 
 ## Playwright 冷启动与本地运行包
 
-exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7` 是失败证据，不是优化完成证明：`plan` 约 `115s` 通过，`prepare` 约 `3900s` 后以 `job_token_expired` 失败，后续七个分片均未执行。唯一有界失败 trace 显示 pnpm 的 765 个包约 `65s` 完成，随后 Playwright Chromium 公网下载停滞约 `58m51s`。后续 pipeline `11` 已把冷下载改为串行，但第一个 `chrome-linux64.zip` 仍在 12 分钟后超时；pipeline `13` 再次证明 Google Storage 单连接无法满足该边界。exact SHA `7f4120cae6f6de3eeb81d9699b62eff995a37c8f` 的自然 push pipeline `14` 把两个 CFT 大包固定到 Google 官方 edge，并把每个请求延长到 20 分钟；765 个 pnpm 包约 `75s` 完成，但第一个 `chrome-linux64.zip` 仍精确超时，后续分片未运行。该证据否定了“只换 CDN 或继续加长 CI 超时”的方向：局部吞吐采样不能替代完整传输，根因仍是 Runner 公网链路对 175 MB 固定包不具备可接受的有界吞吐。
+exact SHA `cddd39ff87e3e2ae9cd8c0282431309bb7cb043f` 的自然 push pipeline `7` 是失败证据，不是优化完成证明：`plan` 约 `115s` 通过，`prepare` 约 `3900s` 后以 `job_token_expired` 失败，后续七个分片均未执行。
 
-exact SHA `13d392524fdd414296503dbcf05bb4064bd18fea` 的自然 push pipeline `15` 已证明冷种子闭环本身有效：`prepare` 在约 `2m15s` 内完成 765 个 pnpm 包、一次 Runner 本地种子消费、Generic Package 上传与读回，精确种子目录随后不存在。该流水线仍是失败证据：Node 分片因未离线安装 Web 依赖而找不到 `playwright`，Web 分片因 DEV 版本中心 fixture 缺少当前 `releaseVersionPolicy` 合同而失败，Server 逐测试 Go JSON trace 超过 GitLab 4 MiB 日志上限，浏览器、聚合与 `CI Gate` 按 DAG 跳过。后续修复必须产生新 SHA；不得重试 pipeline `15`，也不得把其局部绿色写成完整 CI 或发布证明。
+唯一有界失败 trace 显示 pnpm 的 765 个包约 `65s` 完成，随后 Playwright Chromium 公网下载停滞约 `58m51s`。后续 pipeline `11` 已把冷下载改为串行，但第一个 `chrome-linux64.zip` 仍在 12 分钟后超时；pipeline `13` 再次证明 Google Storage 单连接无法满足该边界。
 
-exact SHA `3aba488752b04e3b930ea181aa04e11d5f143cb8` 的自然 push pipeline `16` 进一步证明缓存与主要质量阶段绿色：Static、Web、Resource、Security 通过；Server 的 3634 项 Go 测试和关键 PostgreSQL、Browser 的真实 Chromium smoke 均通过。该流水线仍是失败证据：Node 的后置 source archive 校验错误地把合法 `sha256:<64hex>` 当成裸 digest；当前 Runner 又漂移为缺失 cloud-init 已声明的 sandbox 清理 helper 与精确 sudo 入口，使 Server / Browser 在测试后清理阶段失败并留下 job 113 / 115 两个 sandbox。运维闭环已按仓库声明恢复精确 root-owned helper 和单命令 sudo drop-in、经全局 `visudo` 与 CI 用户调用验证后删除这两个残留；后续 `prepare` 会在任何 cache 写入前先校验该清理入口。不得重试 pipeline `16`，修复仍须新 SHA 的自然流水线证明。
+exact SHA `7f4120cae6f6de3eeb81d9699b62eff995a37c8f` 的自然 push pipeline `14` 把两个 CFT 大包固定到 Google 官方 edge，并把每个请求延长到 20 分钟；765 个 pnpm 包约 `75s` 完成，但第一个 `chrome-linux64.zip` 仍精确超时，后续分片未运行。
+
+该证据否定了“只换 CDN 或继续加长 CI 超时”的方向：局部吞吐采样不能替代完整传输，根因仍是 Runner 公网链路对 175 MB 固定包不具备可接受的有界吞吐。
+
+exact SHA `13d392524fdd414296503dbcf05bb4064bd18fea` 的自然 push pipeline `15` 已证明冷种子闭环本身有效：`prepare` 在约 `2m15s` 内完成 765 个 pnpm 包、一次 Runner 本地种子消费、Generic Package 上传与读回，精确种子目录随后不存在。
+
+该流水线仍是失败证据：Node 分片因未离线安装 Web 依赖而找不到 `playwright`，Web 分片因 DEV 版本中心 fixture 缺少当前 `releaseVersionPolicy` 合同而失败，Server 逐测试 Go JSON trace 超过 GitLab 4 MiB 日志上限，浏览器、聚合与 `CI Gate` 按 DAG 跳过。
+
+后续修复必须产生新 SHA；不得重试 pipeline `15`，也不得把其局部绿色写成完整 CI 或发布证明。
+
+exact SHA `3aba488752b04e3b930ea181aa04e11d5f143cb8` 的自然 push pipeline `16` 进一步证明缓存与主要质量阶段绿色：Static、Web、Resource、Security 通过；Server 的 3634 项 Go 测试和关键 PostgreSQL、Browser 的真实 Chromium smoke 均通过。
+
+该流水线仍是失败证据：Node 的后置 source archive 校验错误地把合法 `sha256:<64hex>` 当成裸 digest；当前 Runner 又漂移为缺失 cloud-init 已声明的 sandbox 清理 helper 与精确 sudo 入口，使 Server / Browser 在测试后清理阶段失败并留下 job 113 / 115 两个 sandbox。
+
+运维闭环已按仓库声明恢复精确 root-owned helper 和单命令 sudo drop-in、经全局 `visudo` 与 CI 用户调用验证后删除这两个残留；后续 `prepare` 会在任何 cache 写入前先校验该清理入口。不得重试 pipeline `16`，修复仍须新 SHA 的自然流水线证明。
 
 CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1.63.0 / Chromium 153.0.8010.12 / revision 1243 / FFmpeg 1011`，并绑定下列原始 ZIP：
 
@@ -59,9 +105,17 @@ CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1
 | `chrome-headless-shell-linux64.zip` | `119809080` | `a9da028861a0cf789ff25c2fed45f5f1aaf969ed9247835b6a7821a4f7af9d1d` |
 | `ffmpeg-linux.zip` | `2376500` | `ebc74fc5b94830176a3c2914ae96bd8bc7f6a91f4f33890230f84a172ee61ccc` |
 
-只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许消费一次 Runner 本地冷种子。运维 owner 在 CI 外下载上述三个公开固定文件，逐项核对长度和 SHA-256，再通过受信 SSH 写入 `/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.63.0-linux-x64-r1243-v1`：目录必须为当前 `gitlab-runner` uid、真实目录、`0700`，且只含三个当前 uid、真实普通文件、`0600` 的精确 basename。`prepare` 会在任何 package 写入前再次检查身份、mode、inventory、长度和 SHA-256，只把校验后的副本打为 `runtime.tar`，用内存中的 job token 上传 GitLab Generic Package，再下载、解包并复核同一内层集合；成功或失败后仅删除已经完整接受的精确本地种子目录。种子缺失或任何身份/内容歧义立即失败，不回退到 Runner 公网下载。
+只有 protected main 的自然 push `prepare` job 在同项目 Generic Package 精确返回 404 时，才允许消费一次 Runner 本地冷种子。
 
-后续 job 只能消费 GitLab 本地 package 或其已校验 ZIP cache；含 job token 的 package GET/PUT 继续使用 Node fetch，token 只作为内存 header，不进入参数、输出或 cache。已解压目录不进 cache，每个 job 在独立目录 materialize，核对 Chrome、headless shell、FFmpeg 和安装标记后使用，并在成功或失败时清理。GitLab 普通 CI 全绿前，不得把 pipeline `7`、`11`、`13`、`14`、`15`、`16` 或局部路由采样写成完整 CI 或发布证据。
+运维 owner 在 CI 外下载上述三个公开固定文件，逐项核对长度和 SHA-256，再通过受信 SSH 写入 `/home/gitlab-runner/.plush-ci-playwright-runtime-seed-playwright-1.63.0-linux-x64-r1243-v1`：目录必须为当前 `gitlab-runner` uid、真实目录、`0700`，且只含三个当前 uid、真实普通文件、`0600` 的精确 basename。
+
+`prepare` 会在任何 package 写入前再次检查身份、mode、inventory、长度和 SHA-256，只把校验后的副本打为 `runtime.tar`，用内存中的 job token 上传 GitLab Generic Package，再下载、解包并复核同一内层集合；成功或失败后仅删除已经完整接受的精确本地种子目录。
+
+种子缺失或任何身份/内容歧义立即失败，不回退到 Runner 公网下载。
+
+后续 job 只能消费 GitLab 本地 package 或其已校验 ZIP cache；含 job token 的 package GET/PUT 继续使用 Node fetch，token 只作为内存 header，不进入参数、输出或 cache。
+
+已解压目录不进 cache，每个 job 在独立目录 materialize，核对 Chrome、headless shell、FFmpeg 和安装标记后使用，并在成功或失败时清理。GitLab 普通 CI 全绿前，不得把 pipeline `7`、`11`、`13`、`14`、`15`、`16` 或局部路由采样写成完整 CI 或发布证据。
 
 ## 文件职责
 
@@ -85,7 +139,9 @@ Runner VM 的 Go 模块下载统一由 `/etc/profile.d/plush-go-module-network.s
 
 Node 公共依赖安装固定优先使用 pnpm store，并直连 `https://registry.npmmirror.com`；CI 安装命令清除通用代理环境，避免大包流量被低速代理接管。`pnpm audit` 仍固定请求 npm 官方审计接口，第一次强制直连；只有连接、DNS、429 或 5xx 瞬时失败且 Runner 环境已配置代理时，最后一次重试才使用该代理。合法漏洞报告和非瞬时错误继续立即失败关闭。
 
-`govulncheck` 固定安装 `v1.6.0`，`shfmt` 固定安装 `v3.13.1`；两者的安装命令都使用上述代理和 checksum database，并保留有界重试与超时。Runner bootstrap 不依赖 GitHub Release CDN，避免可达性间歇变化绕过统一模块校验路径。最终门禁必须分别用 `ubuntu`、`root`、`gitlab-runner` 的登录 shell 读回相同的 `GOPROXY` 与 `GOSUMDB`，防止 bootstrap 成功但 CI job 回到不可达或未校验的下载路径。
+`govulncheck` 固定安装 `v1.6.0`，`shfmt` 固定安装 `v3.13.1`；两者的安装命令都使用上述代理和 checksum database，并保留有界重试与超时。Runner bootstrap 不依赖 GitHub Release CDN，避免可达性间歇变化绕过统一模块校验路径。
+
+最终门禁必须分别用 `ubuntu`、`root`、`gitlab-runner` 的登录 shell 读回相同的 `GOPROXY` 与 `GOSUMDB`，防止 bootstrap 成功但 CI job 回到不可达或未校验的下载路径。
 
 Runner 的 Node 统一由固定版本 `n` 管理，目标版本与根目录 `.n-node-version` 一致。bootstrap 先校验并安装 `n`，再把通过固定 SHA-256 校验的 Node 归档解压到 `n` 缓存，使用 `n --offline` 安装到 `/usr/local`。安装读回通过后清理原独立前缀；CI job 只核对版本，不切换共享工具链。pnpm 仍按 `web/package.json#packageManager` 固定安装。
 
@@ -93,7 +149,9 @@ Runner 的 Node 统一由固定版本 `n` 管理，目标版本与根目录 `.n-
 
 `govulncheck`、`shfmt`、Atlas、gitleaks 与 GitLab Runner 同样只在固定路径、精确版本及 `root:root 0755` 同时匹配时复用，否则重新进入各自的校验安装路径。gitleaks 先解压到私有临时目录，再显式安装为 `root:root 0755`，不继承发布归档内的 uid/gid。
 
-GitLab Runner 使用官方版本化 `gitlab-runner_amd64.deb` 作为压缩传输载体，只在本轮私有临时目录内有界续传。脚本先校验包的精确长度与 SHA-256，再通过 `dpkg-deb --fsys-tarfile` 只提取 `/usr/bin/gitlab-runner`，并再次校验二进制 SHA-256 后原子安装；不会执行 `dpkg -i`、maintainer script 或包自带的服务动作。普通小文件仍使用失败即删除的下载路径，避免把不完整内容误作可复用制品。
+GitLab Runner 使用官方版本化 `gitlab-runner_amd64.deb` 作为压缩传输载体，只在本轮私有临时目录内有界续传。
+
+脚本先校验包的精确长度与 SHA-256，再通过 `dpkg-deb --fsys-tarfile` 只提取 `/usr/bin/gitlab-runner`，并再次校验二进制 SHA-256 后原子安装；不会执行 `dpkg -i`、maintainer script 或包自带的服务动作。普通小文件仍使用失败即删除的下载路径，避免把不完整内容误作可复用制品。
 
 ## Runner canonical 内网路由
 
@@ -105,7 +163,11 @@ Runner 和 shell job 始终使用 canonical 身份 `https://gitlab.saurick.me`�
 - `qemu-guest-agent` 随 VM 安装并启动，QEMU channel、服务存活和持久化状态进入 bootstrap 门禁；它只提供宿主机管理和只读身份证明，不成为 CI 凭据通道。
 - 注册前必须以系统信任链分别通过 curl 与 Node 的无认证 canonical GET；注册后还要读回 Runner service 配置环境和实际主进程环境。任一环节不绿，不消费注册 token，也不启动 Runner。
 
-GitLab 宿主侧必须先有只监听 bridge/LAN 443 的 canonical TLS proxy。Tailscale 节点域名只表示主机身份，不作为 GitLab 服务地址，也不得把 GitLab 挂到节点 `tailscale serve` 根路径。Runner 的 UFW 规则只允许 `192.168.124.0/24` 经 KVM bridge 接口访问目标 `192.168.124.1/tcp/443`；Mac、Windows 等 LAN 客户端若需 canonical 内网直连，只按实际客户端 `/32` 向 `192.168.0.133/tcp/443` 添加精确规则。不得改成 wildcard 443、LAN 整段放行或公网 FRP 绕行。主机防火墙、proxy listener、客户端自然解析、系统信任链 curl 和 Node fetch 必须一起读回，单独的 `/etc/hosts` 或端口监听不算可达性证明。
+GitLab 宿主侧必须先有只监听 bridge/LAN 443 的 canonical TLS proxy。Tailscale 节点域名只表示主机身份，不作为 GitLab 服务地址，也不得把 GitLab 挂到节点 `tailscale serve` 根路径。
+
+Runner 的 UFW 规则只允许 `192.168.124.0/24` 经 KVM bridge 接口访问目标 `192.168.124.1/tcp/443`；Mac、Windows 等 LAN 客户端若需 canonical 内网直连，只按实际客户端 `/32` 向 `192.168.0.133/tcp/443` 添加精确规则。
+
+不得改成 wildcard 443、LAN 整段放行或公网 FRP 绕行。主机防火墙、proxy listener、客户端自然解析、系统信任链 curl 和 Node fetch 必须一起读回，单独的 `/etc/hosts` 或端口监听不算可达性证明。
 
 ## 公网入口（独立可选）
 
@@ -119,7 +181,11 @@ gitlab.saurick.me
   -> plush-gitlab:8929
 ```
 
-阿里云现有同名站点若仍指向旧端口，发布前必须先备份配置，再把 upstream 精确切到 `127.0.0.1:18226` 并完成 `nginx -t`、外网 `/users/sign_in` 与容器内 `/-/health`、`/-/readiness?all=1` 读回。监控探针遵循既有 IP allowlist，默认从容器内 localhost 检查；公网可用性按 [GitLab 官方健康检查说明](https://docs.gitlab.com/administration/monitoring/health_check/)使用登录页判断。不要开放 GitLab 容器的 8929 到公网。Git over SSH 默认只供 LAN 使用；确需公网 SSH 时另行评审端口、防火墙和审计。
+阿里云现有同名站点若仍指向旧端口，发布前必须先备份配置，再把 upstream 精确切到 `127.0.0.1:18226` 并完成 `nginx -t`、外网 `/users/sign_in` 与容器内 `/-/health`、`/-/readiness?all=1` 读回。
+
+监控探针遵循既有 IP allowlist，默认从容器内 localhost 检查；公网可用性按 [GitLab 官方健康检查说明](https://docs.gitlab.com/administration/monitoring/health_check/)使用登录页判断。不要开放 GitLab 容器的 8929 到公网。
+
+Git over SSH 默认只供 LAN 使用；确需公网 SSH 时另行评审端口、防火墙和审计。
 
 ## 首次安装顺序
 
@@ -148,7 +214,13 @@ gitlab.saurick.me
    | `GITHUB_PACKAGES_TOKEN` | GitHub Packages write/read，不授 repo 管理   |
    | `GITLAB_RELEASE_TOKEN`  | 当前项目 API 与 Release 管理，不授管理员权限 |
 
-6. 用 `runner-vm.sh` 显式传入 Ubuntu 24.04 base volume、vCPU、内存、磁盘和受信 SSH 公钥；槽位与安全上限只从 `runner-capacity.env` 读取。preview 给出绑定全部参数和源文件身份的精确确认值，execute 才渲染并应用 `runner-vm-cloud-init.yml`。cloud-init 固定安装 GNU Make、GCC、用于 PDF 验证的 `poppler-utils`、QEMU Guest Agent、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.63.0 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。先在 GitLab 宿主上完成上一节的 proxy listener 与精确 UFW bridge 规则并读回，再在 GitLab 创建 project runner，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，运行 `/usr/local/sbin/plush-register-gitlab-runner`。注册脚本只把同一个显式参数交给共享 capacity helper 初始化槽位，不再维护第二份 TOML 改写；成功后销毁 token 文件并验证 Runner 进程环境。
+6. 用 `runner-vm.sh` 显式传入 Ubuntu 24.04 base volume、vCPU、内存、磁盘和受信 SSH 公钥；槽位与安全上限只从 `runner-capacity.env` 读取。preview 给出绑定全部参数和源文件身份的精确确认值，execute 才渲染并应用 `runner-vm-cloud-init.yml`。
+
+   cloud-init 固定安装 GNU Make、GCC、用于 PDF 验证的 `poppler-utils`、QEMU Guest Agent、Docker Buildx v0.30.1、Docker Compose v2.40.3 与当前 Playwright 1.63.0 Chromium 所需系统包，并要求 `ubuntu`、`root`、`gitlab-runner` 的 Go 环境都读回 `CGO_ENABLED=1`，job 不能自行取得 apt 权限。
+
+   先在 GitLab 宿主上完成上一节的 proxy listener 与精确 UFW bridge 规则并读回，再在 GitLab 创建 project runner，把 token 只写入 VM 的 `/etc/plush-runner/registration.env`，权限 `0600`，运行 `/usr/local/sbin/plush-register-gitlab-runner`。
+
+   注册脚本只把同一个显式参数交给共享 capacity helper 初始化槽位，不再维护第二份 TOML 改写；成功后销毁 token 文件并验证 Runner 进程环境。
 7. Runner 必须显示 tags `plush,isolated,amd64`、locked、run untagged=false；运行一次非发布 pipeline，核对 VM 内临时 PostgreSQL 被清理且 GitLab 宿主容器列表未变化。
 
 ## GitHub 单向镜像与 GPT Review
@@ -230,7 +302,11 @@ sudo /usr/local/libexec/plush-gitlab-backup-health.sh \
   --env-file /etc/plush-gitlab/gitlab.env
 ```
 
-把对应异机目录提供给独立恢复主机后，使用私钥运行 `gitlab-offsite-backup-verify.sh --backup-dir <精确挂载点> --age-identity-file <私钥文件> --report <回执路径>`；报告的边界只是“加密副本和归档完整”。随后仍需每季度把同一 GitLab backup、config archive 和 checksum 放入一次性同版本 VM，按 GitLab 官方恢复流程演练。只有登录、项目 clone、pipeline artifact 和 Release package 都读回后，恢复证据才算完整。在线 health、归档校验或异机解密都不能替代恢复演练。首次手工闭环通过后再执行 `systemctl enable plush-gitlab-backup.timer` 和 `systemctl start plush-gitlab-backup.timer`；`Persistent=true` 可能立即补跑错过的日程，因此启动 timer 也必须位于同一备份窗口。
+把对应异机目录提供给独立恢复主机后，使用私钥运行 `gitlab-offsite-backup-verify.sh --backup-dir <精确挂载点> --age-identity-file <私钥文件> --report <回执路径>`；报告的边界只是“加密副本和归档完整”。
+
+随后仍需每季度把同一 GitLab backup、config archive 和 checksum 放入一次性同版本 VM，按 GitLab 官方恢复流程演练。只有登录、项目 clone、pipeline artifact 和 Release package 都读回后，恢复证据才算完整。在线 health、归档校验或异机解密都不能替代恢复演练。
+
+首次手工闭环通过后再执行 `systemctl enable plush-gitlab-backup.timer` 和 `systemctl start plush-gitlab-backup.timer`；`Persistent=true` 可能立即补跑错过的日程，因此启动 timer 也必须位于同一备份窗口。
 
 升级前先固定当前 compose digest、GitLab 版本、最新已验证备份和回滚窗口；按 GitLab 支持的逐版本升级路径修改 digest。不得使用浮动 `latest`，不得在失败时删除 `/srv/gitlab` 或 RAID5 备份。
 
@@ -240,9 +316,19 @@ sudo /usr/local/libexec/plush-gitlab-backup-health.sh \
 
 GitLab、独立 KVM Runner、公网入口、protected main、GitHub 单向 mirror 和 main pipeline 已进入实际运行主链。本文档只固定重建和安全合同，不把某次历史绿灯写成当前运行证明；当前 SHA、Runner 配置、pipeline/job 终态、Package/Release、backup/restore 仍必须从 GitLab API、Runner VM 和对应脱敏回执实时读回。
 
-`runner-vm.sh` 与其消费的 `runner-vm-cloud-init.yml` 共同构成新建或重建 Runner VM 的唯一正式入口，不会被普通 CI job 自动应用。VM 资源不保存一次性的固定数字；每次 preview/execute 都必须显式提供并读回。当前槽位由 VM 内 root-owned capacity policy、live config 和 configuration receipt 共同绑定；普通 Pipeline 的 prepare job 只能通过精确的只读 `sudo ... --evidence` 投影验证 live `concurrent=limit`、service 与 safety ceiling，并记录本次候选资源。七类 aggregate 全绿只证明该 exact SHA 在该候选资源下完成一次；内存是否适合作为稳定规格仍以完整 Pipeline 窗口内的峰值、余量、PSI、swap、OOM 和多次波动证据判断，不能从 prepare 的空载快照推导。线上参数漂移时，只在无活动 job 的有界窗口内用共享 capacity helper 修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。GitLab 宿主的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。
+`runner-vm.sh` 与其消费的 `runner-vm-cloud-init.yml` 共同构成新建或重建 Runner VM 的唯一正式入口，不会被普通 CI job 自动应用。VM 资源不保存一次性的固定数字；每次 preview/execute 都必须显式提供并读回。
 
-`quality_security` 只在自身 Job 内限制 `govulncheck` 可用的 Go 调度并行度并收紧 GC 目标；仍执行默认 symbol 级 `./...` 源码扫描，不改成 package/module 级，也不以资源优化跳过安全门禁。具体参数以 `.gitlab-ci.yml` 为唯一真源；Runner vCPU、Go / govulncheck 版本或服务端包图明显变化时，必须在同一 SHA、同一 Runner 的空闲窗口重新比较峰值 RSS、墙钟、CPU 与扫描结果，再决定是否调整。单独扫描的改进不能证明更小 VM 容量可用，容量仍需完整自然 Pipeline 的 OOM、swap、PSI 与最低余量证据。
+当前槽位由 VM 内 root-owned capacity policy、live config 和 configuration receipt 共同绑定；普通 Pipeline 的 prepare job 只能通过精确的只读 `sudo ... --evidence` 投影验证 live `concurrent=limit`、service 与 safety ceiling，并记录本次候选资源。
+
+七类 aggregate 全绿只证明该 exact SHA 在该候选资源下完成一次；内存是否适合作为稳定规格仍以完整 Pipeline 窗口内的峰值、余量、PSI、swap、OOM 和多次波动证据判断，不能从 prepare 的空载快照推导。
+
+线上参数漂移时，只在无活动 job 的有界窗口内用共享 capacity helper 修正、重启 Runner 并读回；不回显 token，不把 live 手工改动作为唯一真源。
+
+GitLab 宿主的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置状态，Runner VM 重建不会替它们补写；每次重建都必须重新完成宿主 listener/firewall 与 guest curl/Node 的双边读回。
+
+`quality_security` 只在自身 Job 内限制 `govulncheck` 可用的 Go 调度并行度并收紧 GC 目标；仍执行默认 symbol 级 `./...` 源码扫描，不改成 package/module 级，也不以资源优化跳过安全门禁。
+
+具体参数以 `.gitlab-ci.yml` 为唯一真源；Runner vCPU、Go / govulncheck 版本或服务端包图明显变化时，必须在同一 SHA、同一 Runner 的空闲窗口重新比较峰值 RSS、墙钟、CPU 与扫描结果，再决定是否调整。单独扫描的改进不能证明更小 VM 容量可用，容量仍需完整自然 Pipeline 的 OOM、swap、PSI 与最低余量证据。
 
 ## 打印引擎 CI
 

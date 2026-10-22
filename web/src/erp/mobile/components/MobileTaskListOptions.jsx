@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useId, useState } from 'react'
+import Select from '@/common/components/select/AppSelect'
 import MobileTaskExtraFilters from './MobileTaskExtraFilters.jsx'
 import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
 import MobileFilterChoices from './MobileFilterChoices.jsx'
@@ -26,6 +27,7 @@ export default function MobileTaskListOptions({
   triggerRef,
 }) {
   const [open, setOpen] = useState(false)
+  const sortID = useId()
   return (
     <MobileFilterPopover
       contextLabel={contextLabel}
@@ -49,17 +51,6 @@ export default function MobileTaskListOptions({
         />
       </fieldset>
       )}
-      {showSort && (
-        <fieldset role="presentation">
-          <legend>任务排序</legend>
-          <MobileFilterChoices
-            label="任务排序"
-            value={sortKey}
-            options={MOBILE_TASK_SORT_OPTIONS}
-            onChange={(value) => onChange({ sortKey: value, statusKey })}
-          />
-        </fieldset>
-      )}
       <fieldset role="presentation">
         <legend>任务状态</legend>
         {calendarState ? <MobileFilterChoices label="任务状态筛选" value={statusKey} options={MOBILE_TASK_STATUS_OPTIONS} onChange={(value) => onChange({ statusKey: value })} /> : <BusinessStatusFilter
@@ -73,6 +64,20 @@ export default function MobileTaskListOptions({
         />}
       </fieldset>
       <MobileTaskExtraFilters options={options} sourceTypes={sourceTypes} showDue={!calendarState} onChange={onChange} />
+      {showSort && (
+        <div className="mobile-filter-select-field mobile-filter-sort-field">
+          <label htmlFor={sortID}>任务排序</label>
+          <Select
+            allowClear={false}
+            placeholder="任务排序"
+            id={sortID}
+            aria-label="任务排序"
+            value={sortKey}
+            options={MOBILE_TASK_SORT_OPTIONS}
+            onChange={(value) => onChange({ sortKey: value, statusKey })}
+          />
+        </div>
+      )}
     </MobileFilterPopover>
   )
 }

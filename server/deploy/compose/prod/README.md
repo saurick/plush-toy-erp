@@ -33,7 +33,9 @@ Jaeger 只发布 `jaeger-v2.yml` 实际启用的 OTLP、Jaeger、Zipkin 与查�
 
 ## Trace 保留与资源 / Trace Retention
 
-业务请求默认使用 `TRACE_RATIO=0.1`；`ParentBased` 保留已有父链路的采样决定。后台 ProcessRuntime 对账根 Trace 至多采样 10%，无父上下文的 health / ready / runtime identity 探针不导出，SQL 仅跟随有效操作上下文。比例采样不保证所有失败都有 Trace，完成日志、错误指标与数据库审计保持各自合同。开发业务请求默认全采样，配置真源和接入范围见[服务端观测说明](../../../../docs/observability/日志链路追踪与审计.md)。
+业务请求默认使用 `TRACE_RATIO=0.1`；`ParentBased` 保留已有父链路的采样决定。后台 ProcessRuntime 对账根 Trace 至多采样 10%，无父上下文的 health / ready / runtime identity 探针不导出，SQL 仅跟随有效操作上下文。比例采样不保证所有失败都有 Trace，完成日志、错误指标与数据库审计保持各自合同。
+
+开发业务请求默认全采样，配置真源和接入范围见[服务端观测说明](../../../../docs/observability/日志链路追踪与审计.md)。
 
 Jaeger 使用每个 Compose project 独立的 `jaeger-data` named volume，挂载到镜像的可写 `/tmp`，Badger key / value 数据位于 `/tmp/badger/`，以镜像非 root 用户运行。Trace TTL 为 `168h`，重建容器和普通停止保留历史；不得在停用、升级或回滚时删除 volume。TTL 限制可查询跨度，实际磁盘回收由存储清理完成，磁盘容量仍需主机监控。
 
@@ -105,11 +107,15 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 
 模拟数据可以通过受控 rebuild operation 重建，但执行器必须先创建并恢复校验备份、保存旧物理数据代和精确回滚身份。禁止裸清表、volume 删除、临时 SQL 或跨环境复制。
 
-该重建的恢复检查只证明 PostgreSQL，不自动切换附件 bucket，也不证明附件已恢复。需要成套恢复保证时，按[备份恢复手册](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)对同批 PG 与全部登记附件完成隔离恢复、对象校验和临时资源清理，单独保留回执。fresh demo 须按[全页面试用验收数据](../../../../scripts/qa/README.md#全页面试用验收数据)先用临时管理员准备完整 formal 岗位账号，再激活客户配置、bootstrap core、轮换凭据，并按显式来源规模执行 runner；这些步骤不属于普通 promotion 的隐含阶段。
+该重建的恢复检查只证明 PostgreSQL，不自动切换附件 bucket，也不证明附件已恢复。需要成套恢复保证时，按[备份恢复手册](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)对同批 PG 与全部登记附件完成隔离恢复、对象校验和临时资源清理，单独保留回执。
+
+fresh demo 须按[全页面试用验收数据](../../../../scripts/qa/README.md#全页面试用验收数据)先用临时管理员准备完整 formal 岗位账号，再激活客户配置、bootstrap core、轮换凭据，并按显式来源规模执行 runner；这些步骤不属于普通 promotion 的隐含阶段。
 
 ## customer-test 干净基线
 
-`customer-test-133` 用于甲方自行录入测试数据。它不执行 demo 的 fixture、整批模拟业务造数或 Fact 写入。普通 promotion 不清空、不重建、也不重放基础资料；只有当前 Codex 任务明确授权目标写入时，才允许在 fresh backup 与实时 preflight 后运行一次性 core bootstrap。该入口只幂等创建当前 allowlist 中的 8 个标准单位和 4 个仓库，不创建材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact，也不停用旧批次或人工维护的资料。
+`customer-test-133` 用于甲方自行录入测试数据。它不执行 demo 的 fixture、整批模拟业务造数或 Fact 写入。普通 promotion 不清空、不重建、也不重放基础资料；只有当前 Codex 任务明确授权目标写入时，才允许在 fresh backup 与实时 preflight 后运行一次性 core bootstrap。
+
+该入口只幂等创建当前 allowlist 中的 8 个标准单位和 4 个仓库，不创建材料、产品、工艺、BOM、客户、订单、Workflow 或 Fact，也不停用旧批次或人工维护的资料。
 
 ```bash
 cd /root/deploy/plush-toy-erp-test-v1/current/server/deploy/compose/prod
@@ -173,7 +179,9 @@ DEPLOYMENT_TARGET_KEY='<demo-133|customer-test-133>' \
 
 ## 发布与回滚
 
-目标机不构建源码，只 load / pull 已发布的不可变制品。promotion 必须绑定同一 Git SHA、image digest、migration 序列、客户配置源指纹和 release rehearsal；同一原子 env 备份还绑定 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本。`ATTACHMENT_STORAGE_MODE=external` 时不新增或修改 `ATTACHMENT_STORE_IMAGE`，共享外部存储必须走自己的维护窗口。成功后分别读回 Compose、容器 image/content identity、`GIT_SHA`、health、ready、公网入口和 rollback point。
+目标机不构建源码，只 load / pull 已发布的不可变制品。promotion 必须绑定同一 Git SHA、image digest、migration 序列、客户配置源指纹和 release rehearsal；同一原子 env 备份还绑定 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本。
+
+`ATTACHMENT_STORAGE_MODE=external` 时不新增或修改 `ATTACHMENT_STORE_IMAGE`，共享外部存储必须走自己的维护窗口。成功后分别读回 Compose、容器 image/content identity、`GIT_SHA`、health、ready、公网入口和 rollback point。
 
 代码回滚只允许 migration 序列与客户配置源指纹兼容的旧 manifest；不自动 down migration，也不把数据库恢复隐藏在代码回滚中。兼容的 PostgreSQL 小版本、Jaeger v2 和 S3 服务版本不会随代码回滚降级；若基础服务本身需要回退，必须使用 promotion 前 env 备份、对应旧镜像和数据库/附件恢复点单独执行。任何结果为 `not_proven` 时先只读核对目标，禁止重试。
 
@@ -201,7 +209,11 @@ git diff --check
 
 外部模式不启动 `attachment-store`，无需在 ERP env 中保存存储管理员密码或数据目录。S3 origin 允许 HTTPS 或局域网 HTTP IP 地址，不接受带凭据、文件路径、query 的 URL。Compose profile 只允许表中值，宿主环境仍不得覆盖受控 env。业务服务会在存储不可用时拒绝文件操作，不能用数据库内容回退。
 
-本机模式使用 SeaweedFS `4.47` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
+本机模式使用 SeaweedFS `4.47` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。
+
+`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。
+
+新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
 
 目标主机先确认 `/srv/raid5` 已挂载到预期块设备，再创建专用目录并限制权限。启动前执行：
 
@@ -212,7 +224,9 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
 
 本机模式的 Compose 不自动创建缺失的附件目录，也不发布 S3 / filer / master / 管理界面端口；业务容器通过附件私有网络访问存储。`production-preflight --runtime` 会核对实际挂载、服务健康、S3 bucket 访问及管理界面的登录保护和凭据。目标机预装 `.env.example` 中固定的 SeaweedFS 镜像；低配目标不构建镜像。初始化或恢复失败时保留附件目录供核对，不沿用数据库清理脚本删除文件。
 
-已有库外置按正式 promotion 的停写窗口进行。发布前保留旧版本、完整 PG 备份及其恢复验证；候选镜像包含 `/app/attachment-storage`。`migrate_online.sh --reconcile-permissions` 和 `--apply` 在同一 Atlas 串行锁范围中导出、逐个读回校验并提供迁移摘要，回执保存在 migration receipt 旁。纯只读预检遇到待外置数据时会明确阻断，不会自行复制文件。迁移后继续走权限对账、health / ready 和附件上传下载 smoke。若尚未移除旧列，可回到旧版本和旧库；旧列移除后回滚旧代码必须同时恢复配套旧 PG dump，不能只切镜像。
+已有库外置按正式 promotion 的停写窗口进行。发布前保留旧版本、完整 PG 备份及其恢复验证；候选镜像包含 `/app/attachment-storage`。`migrate_online.sh --reconcile-permissions` 和 `--apply` 在同一 Atlas 串行锁范围中导出、逐个读回校验并提供迁移摘要，回执保存在 migration receipt 旁。
+
+纯只读预检遇到待外置数据时会明确阻断，不会自行复制文件。迁移后继续走权限对账、health / ready 和附件上传下载 smoke。若尚未移除旧列，可回到旧版本和旧库；旧列移除后回滚旧代码必须同时恢复配套旧 PG dump，不能只切镜像。
 
 `cmd/attachment-storage` 提供以下维护入口，默认写操作均为 dry-run；实际操作要求 `-execute` 和精确 `-confirm`。连接只从 `POSTGRES_DSN` 与 `ATTACHMENT_S3_*` 环境变量读取，凭据放受控 `0600` 文件或临时进程环境，不进入命令参数、Git 或日志。
 
@@ -225,9 +239,17 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
 | `backup` | 导出可迁移的普通文件和 manifest，完成后才写 manifest | `-dir <new-directory> -execute -confirm ATTACHMENT_BACKUP:<db>` |
 | `restore` | 验证配套数据库元数据与备份，再恢复同一 key | `-dir <backup-directory> -execute -confirm ATTACHMENT_RESTORE:<db>` |
 
-本地开发也必须配置同一组 `ATTACHMENT_S3_*` 变量；使用 RAID5 上独立的开发 bucket，可通过受控局域网端点或 SSH tunnel 连接已有服务，或在隔离本地验证中使用一次性 SeaweedFS。开发配置保存在忽略 Git 的 `server/.env`（`0600`），`make run / dev_restart` 会读取同一组变量。不要让开发和 demo/test 复用 bucket。共享开发库迁移前，停写后执行 `export`，再用 `verify -receipt <file> -pg-options` 的输出设置本次进程的 `PGOPTIONS`，然后按 `make migrate_prepare → make migrate_execute` 的同一 ready 输出执行，完成后 `unset PGOPTIONS`。运行 API 没有 PG 内容回退。
+本地开发也必须配置同一组 `ATTACHMENT_S3_*` 变量；使用 RAID5 上独立的开发 bucket，可通过受控局域网端点或 SSH tunnel 连接已有服务，或在隔离本地验证中使用一次性 SeaweedFS。开发配置保存在忽略 Git 的 `server/.env`（`0600`），`make run / dev_restart` 会读取同一组变量。
 
-成套入口为 `node scripts/deploy/backup-set/cli.mjs`，参数与恢复步骤见[备份恢复](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)。`create` 核对唯一运行 app-server / postgres、精确 project / database、固定 PG 18.6 和只读 `erp_backup`；停止原 app-server 后拒绝其它数据库连接，在同一窗口生成 PG custom-format dump 与全部登记附件（包含撤回记录）。前后核对附件整行摘要、有效客户配置和迁移版本，再恢复原容器并等健康；随后将 manifest、dump 和附件封为单个 `*.tar.age`，原子发布本地与异地校验副本。不要直接打包运行中的 SeaweedFS 原始数据目录。
+不要让开发和 demo/test 复用 bucket。
+
+共享开发库迁移前，停写后执行 `export`，再用 `verify -receipt <file> -pg-options` 的输出设置本次进程的 `PGOPTIONS`，然后按 `make migrate_prepare → make migrate_execute` 的同一 ready 输出执行，完成后 `unset PGOPTIONS`。运行 API 没有 PG 内容回退。
+
+成套入口为 `node scripts/deploy/backup-set/cli.mjs`，参数与恢复步骤见[备份恢复](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)。
+
+`create` 核对唯一运行 app-server / postgres、精确 project / database、固定 PG 18.6 和只读 `erp_backup`；停止原 app-server 后拒绝其它数据库连接，在同一窗口生成 PG custom-format dump 与全部登记附件（包含撤回记录）。
+
+前后核对附件整行摘要、有效客户配置和迁移版本，再恢复原容器并等健康；随后将 manifest、dump 和附件封为单个 `*.tar.age`，原子发布本地与异地校验副本。不要直接打包运行中的 SeaweedFS 原始数据目录。
 
 备份确认串同时表示已安排独占停写窗口：发布、迁移、导入、其它应用实例和对象清理不能并发。工具只管理这一 Compose project 的原 app-server，不能代替外部写入方的维护安排。`scheduled-postgres-backup.sh` 保留为 PG 专用入口，其结果不表示完整系统备份。
 
@@ -239,7 +261,9 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
 
 ### 只读查看存储
 
-本机模式的管理界面复用同一 SeaweedFS 容器，查看存储状态、bucket 和底层文件。外部模式使用存储服务的管理入口；在 File Browser 中打开 `/buckets/<ATTACHMENT_S3_BUCKET>/attachments`。已识别的 PNG、JPEG、GIF、WebP 对象写入图片类型，便于只读预览；其他格式保留下载类型。它供项目管理员排查存储使用，文件对应的产品、单据和撤销状态仍以 ERP 为准。界面显示的是存储服务信息，不证明 RAID 控制器或磁盘健康，也不证明备份完成。
+本机模式的管理界面复用同一 SeaweedFS 容器，查看存储状态、bucket 和底层文件。外部模式使用存储服务的管理入口；在 File Browser 中打开 `/buckets/<ATTACHMENT_S3_BUCKET>/attachments`。已识别的 PNG、JPEG、GIF、WebP 对象写入图片类型，便于只读预览；其他格式保留下载类型。
+
+它供项目管理员排查存储使用，文件对应的产品、单据和撤销状态仍以 ERP 为准。界面显示的是存储服务信息，不证明 RAID 控制器或磁盘健康，也不证明备份完成。
 
 | 账号 | 配置 | 用途 |
 | --- | --- | --- |

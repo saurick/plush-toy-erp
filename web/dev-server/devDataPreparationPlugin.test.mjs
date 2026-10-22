@@ -23,7 +23,10 @@ import {
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
 import { validateDevDataPreparationSummary } from '../src/dev-workbench/config/devDataPreparation.mjs'
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../scripts/qa/manual-acceptance-core-contract.mjs'
+import { buildManualAcceptanceBusinessChainReviewPlan } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
+import { buildManualAcceptancePageDataContract } from '../../scripts/qa/manual-acceptance-page-data-contract.mjs'
 import {
+  MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   buildManualAcceptanceSemanticPlan,
   digestManualAcceptanceSemanticPlan,
 } from '../../scripts/qa/manual-acceptance-dataset.mjs'
@@ -1352,16 +1355,13 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
   assert.equal(lifecycleCalls.length, 1)
   assert.equal(lifecycleCalls[0].args.includes('--execute'), false)
   const summary = await service.summary()
-  assert.deepEqual(
-    {
-      chains: summary.acceptancePlan.chainCount,
-      steps: summary.acceptancePlan.stepCount,
-      scenarios: summary.acceptancePlan.scenarioCount,
-      stages: summary.acceptancePlan.dataStageCount,
-      targets: summary.acceptancePlan.catalogTargetCount,
-    },
-    { chains: 11, steps: 77, scenarios: 66, stages: 9, targets: 51 }
-  )
+  const reviewPlan = buildManualAcceptanceBusinessChainReviewPlan({
+    catalogTargetCount: buildManualAcceptancePageDataContract().targetCount,
+    datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  })
+  const publicReviewPlan = { ...reviewPlan }
+  delete publicReviewPlan.definitionSnapshot
+  assert.deepEqual(summary.acceptancePlan, publicReviewPlan)
   assert.doesNotThrow(() => validateDevDataPreparationSummary(summary))
   assert.equal(Object.hasOwn(summary.acceptancePlan, 'definitionSnapshot'), false)
   assert.equal(summary.acceptancePlan.selectorAffectsExecution, false)

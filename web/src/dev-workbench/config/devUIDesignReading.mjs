@@ -1,7 +1,11 @@
 import { Remarkable } from 'remarkable'
 import { extractMarkdownHeadings } from '../../common/components/markdown/anchors.mjs'
+import { WORK_CENTER_DESIGN_TOPICS } from './devWorkCenterDesign.mjs'
 
 export const UI_DESIGN_TOPICS = [
+  ...WORK_CENTER_DESIGN_TOPICS.map(({ key, title, description }) => ({
+    key, title, description, group: '工作中心', views: ['specification'], chapters: ['工作中心的信息与布局'],
+  })),
   {
     key: 'layout',
     title: '页面骨架',
@@ -30,7 +34,7 @@ export const UI_DESIGN_TOPICS = [
     key: 'type',
     title: '文字与对齐',
     group: '布局与视觉',
-    description: '标题、正文、金额与辅助说明的阅读顺序',
+    description: '标题、复合信息、金额与辅助说明的阅读顺序',
     chapters: ['高保真视觉合同', '排版与阅读路径'],
   },
   {

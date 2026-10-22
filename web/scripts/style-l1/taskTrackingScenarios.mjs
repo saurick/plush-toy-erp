@@ -195,7 +195,7 @@ approval_form: null,
         assert.match(await panel.locator('.ant-table-row').nth(1).innerText(), /发起岗位：管理员/)
         assert.match(await pager.innerText(), /第 1-20 条 \/ 共 161 条/)
         assert.equal(await panel.getByRole('button', { name: '加载更多', exact: true }).count(), 0)
-        await pager.getByRole('button', { name: '下一页', exact: true }).click()
+        await pager.locator('.ant-pagination-next button').click()
         await panel.getByText('任务进度加载失败', { exact: true }).waitFor()
         assert.equal(await panel.getByText('任务分页记录 1', { exact: true }).count(), 0, 'failed page must not be presented as earlier rows')
         await panel.getByRole('button', { name: '重新读取', exact: true }).click()
@@ -219,7 +219,7 @@ approval_form: null,
         await panel.getByText('任务分页记录 161', { exact: true }).waitFor()
         assert.equal(await panel.locator('.ant-table-row').count(), 1)
         assert.match(await pager.innerText(), /第 161-161 条 \/ 共 161 条/)
-        await pager.getByRole('button', { name: '上一页', exact: true }).click()
+        await pager.locator('.ant-pagination-prev button').click()
         await panel.getByText('任务分页记录 141', { exact: true }).waitFor()
         await pager.locator('.ant-select-selector').click()
         const pageSizeOptions = await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').evaluateAll((options) => options.map((option) => ({
@@ -240,7 +240,7 @@ approval_form: null,
         await panel.getByText('SO-TRACK-001', { exact: true }).waitFor()
         const row = page.locator('.erp-workflow-tracking-panel .ant-table-row').filter({ hasText: 'SO-TRACK-001' })
         assert.equal(await row.locator('.erp-workflow-tracking-title a, .erp-workflow-tracking-title .ant-btn-link').count(), 0)
-        assert.match(await row.innerText(), /共 2 项关联内容/)
+        assert.match(await row.innerText(), /共 2 款产品/)
         assert.match(await row.innerText(), /内部款号 RABBIT-STYLE/)
         const initiator = row.locator('.erp-workflow-initiator')
         assert.match(await initiator.innerText(), /业务小李.*发起岗位：业务/s)
@@ -338,18 +338,20 @@ approval_form: null,
         await drawer.locator('.ant-drawer-header').getByRole('button', { name: '返回列表', exact: true }).click()
         await drawer.waitFor({ state: 'hidden' })
         const title = row.getByRole('button', { name: /销售订单受理/ })
+        await page.waitForFunction((element) => element === document.activeElement, await title.elementHandle(), { timeout: 1000 })
         assert.equal(await title.evaluate((element) => element === document.activeElement), true, 'returning from handling and closing progress restores the original row entry')
         await page.keyboard.press('Enter')
         await drawer.getByText('审批已通过', { exact: true }).waitFor()
         await page.keyboard.press('Escape')
         await drawer.waitFor({ state: 'hidden' })
+        await page.waitForFunction((element) => element === document.activeElement, await title.elementHandle(), { timeout: 1000 })
         assert.equal(await title.evaluate((element) => element === document.activeElement), true)
         const chooseScope = async (label) => {
           const scope = label === '我参与的' ? 'participated' : label === '相关流程' ? 'visible' : 'started'
           await Promise.all([
             page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.method() === 'POST' && request.postDataJSON().method === 'list_tracking' && request.postDataJSON().params.scope === scope),
             (async () => {
-              await panel.getByRole('button', { name: /^筛选/u }).click()
+              await page.locator('.erp-task-tracking-toolbar').getByRole('button', { name: /^筛选/u }).click()
               await page.getByRole('dialog', { name: '筛选条件', exact: true })
                 .getByRole('group', { name: '跟踪范围', exact: true })
                 .getByRole('button', { name: label, exact: true }).click()

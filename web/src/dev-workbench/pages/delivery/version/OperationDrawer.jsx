@@ -7,7 +7,7 @@ import {
   deliveryTargetLabel,
   operationUpdateAction,
 } from './shared.jsx'
-import DevDeliveryTimestamp from '../../../components/DevDeliveryTimestamp.jsx'
+import DevTimestamp from '../../../components/DevTimestamp.jsx'
 import { DevTimingBars } from '../../../components/DevPipelineTimingPanel.jsx'
 import {
   deliveryOperationMessagePresentation,
@@ -67,13 +67,13 @@ export function OperationDrawer({
             <Text code>{shortGitSha(operationDetail.gitSha)}</Text>
           </Space>
           <Space wrap size={[12, 4]}>
-            <DevDeliveryTimestamp
+            <DevTimestamp
               value={operationDetail.createdAt}
               action="开始于"
               missing="开始时间未证明"
               className="erp-dev-operation-detail-time"
             />
-            <DevDeliveryTimestamp
+            <DevTimestamp
               value={operationDetail.updatedAt}
               action={operationUpdateAction(operationDetail)}
               missing="更新时间未证明"
@@ -211,7 +211,7 @@ export function OperationDrawer({
                     <Space direction="vertical" size={4}>
                       <Space wrap>
                         <StatusTag status={event.status} />
-                        <DevDeliveryTimestamp
+                        <DevTimestamp
                           value={event.at}
                           action=""
                           missing="事件时间未证明"

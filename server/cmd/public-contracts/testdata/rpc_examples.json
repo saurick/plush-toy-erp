@@ -20616,6 +20616,20 @@
     "params": {},
     "test": "TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction"
   },
+  "sales_order.export_sales_orders": {
+    "basis": "handler-fixture",
+    "data": {
+      "sales_orders": [{"id": 1, "order_no": "SO-EXPORT-001", "customer_id": 1, "lifecycle_status": "draft"}],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "test": "TestRPCDocumentedExamples",
+      "case": "sales_order.export_sales_orders"
+    }
+  },
   "sales_order.list_sales_orders": {
     "basis": "handler-fixture",
     "data": {

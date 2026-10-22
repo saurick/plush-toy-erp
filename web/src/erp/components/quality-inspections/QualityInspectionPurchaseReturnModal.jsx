@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
-import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
 
 import {
   sourceBusinessActionNo,

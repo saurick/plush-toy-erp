@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { assertSeedBusinessValues } from "./seed-business-values.mjs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -660,7 +661,7 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     (status, offset) => ({
       receiptIndex: RECEIPT_COUNT + offset,
       inspectionNo: shortBusinessNo(report, "ZJ", 2001 + offset),
-      reason: "模拟确认资料补齐后重新检验",
+      reason: "确认资料补齐后重新检验",
       status,
     }),
   );
@@ -726,6 +727,9 @@ export async function manualAcceptanceFactRPCCall({
   sleep = (milliseconds) =>
     new Promise((resolve) => setTimeout(resolve, milliseconds)),
 }) {
+  if (domain !== "auth" && !/^(?:get_|list_|check_|explain_)/u.test(method)) {
+    assertSeedBusinessValues(params, `${domain}.${method}`);
+  }
   const request = {
     method: "POST",
     redirect: "error",
@@ -1184,11 +1188,11 @@ async function advanceQuality(rpc, inspection, target, plan) {
         check_items: [
           {
             name: "外观",
-            requirement: "符合模拟确认样",
-            observation: "已核对模拟确认样",
+            requirement: "符合确认样",
+            observation: "已核对确认样",
             result: "PASS",
             scope: "FULL",
-            note: "模拟验收记录",
+            note: "已记录检验结果",
           },
         ],
         defect_rate_operator: "APPROX",
@@ -1204,11 +1208,11 @@ async function advanceQuality(rpc, inspection, target, plan) {
         check_items: [
           {
             name: "颜色",
-            requirement: "符合模拟确认样",
-            observation: "模拟颜色偏差",
+            requirement: "符合确认样",
+            observation: "颜色偏差",
             result: "FAIL",
             scope: "FULL",
-            note: "模拟验收记录",
+            note: "已记录检验结果",
           },
         ],
         defect_rate_operator: "GT",
@@ -3237,7 +3241,7 @@ async function ensureProductionFactSpecimen(
         params: {
           id: fact.id,
           expected_version: positiveID(fact.version, "production fact version"),
-          reason: "本批返工样例取消",
+          reason: "本批返工取消",
         },
       }),
       "production_fact",
@@ -3537,7 +3541,7 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
           production_order_item_id: productionOrderItemID,
           production_material_requirement_id: requirement.id,
           requested_quantity: "1",
-          reason: "本地验收：模拟生产损耗需追加领料一件。",
+          reason: "生产损耗需追加领料一件。",
           idempotency_key: `manual-acceptance:${plan.dataVersion}:production-exception:${decisionNo}:submit`,
         },
       }),
@@ -3601,7 +3605,7 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     processInstanceID: Number(instance.id),
     processNodeID: Number(approvalNode.id),
   });
-  const approvalReason = "本地验收：批准本批模拟超领额度。";
+  const approvalReason = "批准本批超领额度。";
   if (
     String(approvalTask.task_status_key || "").toLowerCase() === "ready" &&
     apply
@@ -4053,7 +4057,7 @@ async function completeFinancePaymentHumanNode({
   ) {
     throw new CliError(`${nodeKey} active task is missing or not ready`);
   }
-  const reason = "本地验收：已核对模拟收付款来源与核销金额。";
+  const reason = "已核对收付款来源与核销金额。";
   const completed = await rpc({
     actor,
     domain: "workflow",
@@ -4155,8 +4159,8 @@ async function ensureFinancePaymentSpecimen({
           `${specimenKey}.currency`,
           8,
         ),
-        account_ref: "本地验收模拟账户",
-        evidence_ref: "本地验收模拟凭据，不代表真实收付款",
+        account_ref: "银行账户",
+        evidence_ref: "银行回单",
         idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-payment:${specimenKey.toLowerCase()}`,
       },
     }),
@@ -4271,7 +4275,7 @@ async function ensureFinancePaymentSpecimen({
             currentReadback.version,
             `${paymentNo}.version`,
           ),
-          reason: "本地验收：冲销模拟收款并恢复原核销金额。",
+          reason: "冲销收款并恢复原核销金额。",
         },
       }),
       "payment",
@@ -4777,7 +4781,7 @@ async function ensureFinanceCreditNoteSpecimens({
               `${creditNoteNo}.finance_fact_id`,
             ),
             amount: "1",
-            reason: "本地验收：模拟财务红冲。",
+            reason: "原单金额有误，申请红冲。",
             idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-credit-note:${key.toLowerCase()}`,
           },
         }),
@@ -4816,7 +4820,7 @@ async function ensureFinanceCreditNoteSpecimens({
         params: {
           credit_note_id: original.id,
           credit_note_no: reversalNo,
-          reason: "本地验收：反向红冲错误的模拟红冲单。",
+          reason: "原红冲单有误，反向红冲。",
           idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-credit-note:reversal`,
         },
       }),

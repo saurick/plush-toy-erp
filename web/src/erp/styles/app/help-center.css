@@ -49,7 +49,13 @@
 }
 
 .erp-help-heading-actions {
-  display: contents;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  grid-column: 5;
+  grid-row: 1;
+  gap: 8px;
 }
 
 .erp-help-mobile-directory-button {
@@ -253,6 +259,12 @@
   .erp-help-download-button {
     grid-column: 2;
     grid-row: 1;
+  }
+
+  .erp-help-heading-actions {
+    grid-column: 2;
+    grid-row: 1;
+    flex-wrap: wrap;
   }
 
   .erp-help-heading-actions > .ant-btn {

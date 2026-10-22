@@ -1,12 +1,12 @@
-import React, { useCallback, useLayoutEffect, useRef } from 'react'
-import { usePrintEditableDraftSync } from './usePrintEditableDraftSync.js'
+import React, { useCallback } from 'react'
+import PrintEditableText from './PrintEditableText.jsx'
+import MaterialContractMetaPair from './MaterialContractMetaPair.jsx'
 import {
   MATERIAL_PURCHASE_DETAIL_COLUMNS,
   findMergeAtCell,
   isCellInsideSelection,
   isMergeTopLeftCell,
 } from '../../utils/materialPurchaseContractEditor.mjs'
-import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
 import { PrintAppendixImages } from './PrintAppendixImages.jsx'
 import { visibleContractClauseGroups } from '../../utils/contractClauseEditor.mjs'
 
@@ -18,12 +18,8 @@ function EditableText({
   disabled = false,
 }) {
   const Tag = multiline ? 'div' : 'span'
-  const editableRef = useRef(null)
-  const displayText = String(value ?? '').trim()
-    ? String(value ?? '')
-    : '\u00A0'
   const commitElementValue = useCallback(
-    (element) => {
+    (element, { normalizeElement = false } = {}) => {
       const elementText = multiline ? element.innerText : element.textContent
       const nextValue = multiline
         ? elementText
@@ -33,6 +29,9 @@ function EditableText({
         : String(elementText ?? '')
             .replaceAll('\r', '')
             .trim()
+      if (normalizeElement && element.textContent !== (nextValue || '\u00A0')) {
+        element.textContent = nextValue || '\u00A0'
+      }
       if (nextValue !== String(value ?? '')) {
         onCommit(nextValue)
       }
@@ -40,58 +39,25 @@ function EditableText({
     [multiline, onCommit, value]
   )
 
-  useLayoutEffect(() => {
-    const element = editableRef.current
-    if (!element) {
-      return
-    }
-    if (element.ownerDocument?.activeElement === element) {
-      return
-    }
-    if (element.textContent !== displayText) {
-      element.textContent = displayText
-    }
-  }, [displayText])
-
-  usePrintEditableDraftSync({
-    editableRef,
-    commitElementValue,
-    elementType: Tag,
-    disabled,
-  })
-
   return (
-    <Tag
-      ref={editableRef}
+    <PrintEditableText
+      as={Tag}
+      value={value}
+      commitElementValue={commitElementValue}
+      disabled={disabled}
       className={`erp-material-contract-editable ${className} ${
         disabled ? 'erp-material-contract-editable-disabled' : ''
       }`}
-      data-print-empty={
-        !String(value ?? '')
-          .replace(/<[^>]*>/g, '')
-          .replace(/&nbsp;/g, '')
-          .trim()
-      }
-      contentEditable={!disabled}
-      suppressContentEditableWarning
-      spellCheck={false}
       onKeyDown={(event) => {
-        if (!multiline && event.key === 'Enter') {
+        if (
+          !multiline && event.key === 'Enter' &&
+          !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229
+        ) {
           event.preventDefault()
           event.currentTarget.blur()
         }
       }}
-      onInput={(event) => {
-        runSilentPrintWorkspaceDraftUpdate(() => {
-          commitElementValue(event.currentTarget)
-        })
-      }}
-      onBlur={(event) => {
-        commitElementValue(event.currentTarget)
-      }}
-    >
-      {displayText}
-    </Tag>
+    />
   )
 }
 
@@ -114,19 +80,6 @@ function MetaField({
         disabled={disabled}
         className="erp-material-contract-meta__value"
       />
-    </div>
-  )
-}
-
-function MetaPair({ left, right }) {
-  return (
-    <div className="erp-material-contract-meta__pair">
-      <div className="erp-material-contract-meta__cell erp-material-contract-meta__cell--left">
-        {left}
-      </div>
-      <div className="erp-material-contract-meta__cell erp-material-contract-meta__cell--right">
-        {right}
-      </div>
     </div>
   )
 }
@@ -215,7 +168,7 @@ export default function MaterialPurchaseContractPaper({
         className="erp-material-contract-meta"
         data-print-blank-region=""
       >
-        <MetaPair
+        <MaterialContractMetaPair
           left={
             <MetaField
               label="采购订单号："
@@ -249,7 +202,7 @@ export default function MaterialPurchaseContractPaper({
             </div>
           }
         />
-        <MetaPair
+        <MaterialContractMetaPair
           left={
             <MetaField
               label="供应商名称："
@@ -271,7 +224,7 @@ export default function MaterialPurchaseContractPaper({
             />
           }
         />
-        <MetaPair
+        <MaterialContractMetaPair
           left={
             <MetaField
               label="联系人："
@@ -293,7 +246,7 @@ export default function MaterialPurchaseContractPaper({
             />
           }
         />
-        <MetaPair
+        <MaterialContractMetaPair
           left={
             <MetaField
               label="联系电话："
@@ -315,7 +268,7 @@ export default function MaterialPurchaseContractPaper({
             />
           }
         />
-        <MetaPair
+        <MaterialContractMetaPair
           left={
             <MetaField
               label="供应商地址："

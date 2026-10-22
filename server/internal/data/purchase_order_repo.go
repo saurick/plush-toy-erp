@@ -290,7 +290,7 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 		return nil, err
 	}
 	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := syncPurchaseOrderHandoffs(ctx, tx.Client(), id, 0); err != nil {
 		return nil, err
@@ -372,7 +372,7 @@ func (r *purchaseOrderRepo) RejectPurchaseOrderForProcessCommand(
 		return nil, err
 	}
 	if current.LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, purchaseOrderID, biz.PurchaseOrderStatusCanceled, true); err != nil {
 		return nil, err
@@ -454,7 +454,7 @@ func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
 		return nil, err
 	}
 	if current.LifecycleStatus != expectedStatus {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	row, err := tx.PurchaseOrder.UpdateOneID(purchaseOrderID).
 		Where(purchaseorder.Version(current.Version), purchaseorder.LifecycleStatus(expectedStatus)).
@@ -531,7 +531,7 @@ func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id
 		return entPurchaseOrderToBiz(row), nil
 	}
 	if !containsString(allowedCurrent, row.LifecycleStatus) {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, id, lifecycleStatus, false); err != nil {
 		return nil, err
@@ -604,7 +604,7 @@ func (r *purchaseOrderRepo) ApplyPurchaseOrderLifecycleAction(
 		return nil, biz.ErrPurchaseOrderConflict
 	}
 	if !biz.IsPurchaseOrderLifecycleTransitionAllowed(current.LifecycleStatus, lifecycleStatus) || current.LifecycleStatus == lifecycleStatus {
-		return nil, biz.ErrBadParam
+		return nil, biz.ErrSourceOrderStateInvalid
 	}
 	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, in.ID, lifecycleStatus, lifecycleStatus == biz.PurchaseOrderStatusCanceled); err != nil {
 		return nil, err
@@ -1012,7 +1012,7 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 				return nil, err
 			}
 			if current.LifecycleStatus != biz.PurchaseOrderStatusDraft {
-				return nil, biz.ErrBadParam
+				return nil, biz.ErrSourceOrderStateInvalid
 			}
 			if current.Version != in.ExpectedVersion {
 				return nil, biz.ErrPurchaseOrderConflict
@@ -1076,7 +1076,7 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 				return nil, biz.ErrPurchaseOrderItemNotFound
 			}
 			if current.LineStatus == biz.PurchaseOrderItemStatusCanceled || current.LineStatus == biz.PurchaseOrderItemStatusClosed {
-				return nil, biz.ErrBadParam
+				return nil, biz.ErrSourceOrderStateInvalid
 			}
 			mutation.LineNo = current.LineNo
 			if _, err := savePurchaseOrderItemUpdate(ctx, tx, item.ID, displayOrder, &mutation); err != nil {

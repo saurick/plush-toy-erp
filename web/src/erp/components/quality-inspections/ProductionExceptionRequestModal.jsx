@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Select, Spin } from 'antd'
+import { Alert, Button, Form, Input, Spin } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 import { ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
 import MaterialSupplierSelect from '../master-data/MaterialSupplierSelect.jsx'
 import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'

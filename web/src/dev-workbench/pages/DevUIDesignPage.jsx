@@ -1,11 +1,13 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
-import { Button, Select, Typography } from 'antd'
+import { Button, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import Select from '@/common/components/select/AppSelect'
 import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import DevPageNav from '../components/DevPageNav.jsx'
+import { resolveUIDesignPreviewPage, UI_DESIGN_PREVIEW_PAGES } from '../config/devUIDesign.mjs'
 
 const DevUIDesignPreview = lazyWithDynamicImportRetry(
   () => import('./DevUIDesignPreview.jsx')
@@ -25,20 +27,28 @@ const VIEWS = [
 
 export default function DevUIDesignPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const requestedPage = searchParams.get('page')
+  const previewPage = requestedPage === 'controls'
+    ? requestedPage
+    : resolveUIDesignPreviewPage(requestedPage)
   const requestedView = searchParams.get('view') || 'preview'
   const view = VIEWS.some((item) => item.key === requestedView)
     ? requestedView
     : 'preview'
-  const requestedPage = searchParams.get('page')
-  const previewPage = ['login', 'help', 'workbench', 'controls', 'mobile-tasks', 'task-handling'].includes(requestedPage)
-    ? requestedPage
-    : 'workspace'
   const controlsVisible = previewPage === 'controls'
   const showHTMLPreview = view === 'preview' && !controlsVisible
   const [previewOpened, setPreviewOpened] = useState(showHTMLPreview)
   const [controlRevision, setControlRevision] = useState(0)
   const lastHTMLPage = useRef(controlsVisible ? 'workspace' : previewPage)
-  const htmlPage = controlsVisible ? lastHTMLPage.current : previewPage
+  const htmlPage = showHTMLPreview ? previewPage : lastHTMLPage.current
+
+  useEffect(() => {
+    if (VIEWS.some((item) => item.key === requestedView) && !['screen', 'field', 'annotations'].some((key) => searchParams.has(key))) return
+    const next = new URLSearchParams(searchParams)
+    if (!VIEWS.some((item) => item.key === requestedView)) next.delete('view')
+    for (const key of ['screen', 'field', 'annotations']) next.delete(key)
+    setSearchParams(next, { replace: true })
+  }, [requestedView, searchParams, setSearchParams])
 
   useEffect(() => {
     if (showHTMLPreview) {
@@ -51,21 +61,22 @@ export default function DevUIDesignPage() {
     const next = new URLSearchParams(window.location.search)
     if (value) next.set(key, value)
     else next.delete(key)
+    if (key === 'page') {
+      next.delete('point')
+    }
     setSearchParams(next)
   }
 
   const pageSelector = (
     <Select
+      allowClear={false}
+      label="设计预览入口"
+      placeholder="设计预览入口"
       className="erp-dev-ui-design-page-select"
       aria-label="设计预览入口"
       value={previewPage}
       options={[
-        { value: 'workspace', label: '业务界面' },
-        { value: 'task-handling', label: '任务处理' },
-        { value: 'mobile-tasks', label: '移动端任务' },
-        { value: 'workbench', label: '效能工作台' },
-        { value: 'login', label: '登录页' },
-        { value: 'help', label: '岗位帮助' },
+        ...UI_DESIGN_PREVIEW_PAGES,
         { value: 'controls', label: '控件设计' },
       ]}
       onChange={(value) => updateQuery('page', value === 'workspace' ? '' : value)}
@@ -92,9 +103,11 @@ export default function DevUIDesignPage() {
         <section className="erp-dev-ui-design-reader" aria-label="最新可交互设计">
           <div className="erp-dev-ui-design-toolbar">
             {pageSelector}
-            <Button icon={<ReloadOutlined />} onClick={() => setControlRevision((value) => value + 1)}>
-              重置演示
-            </Button>
+            {searchParams.get('control') !== 'components' && (
+              <Button icon={<ReloadOutlined />} onClick={() => setControlRevision((value) => value + 1)}>
+                重置演示
+              </Button>
+            )}
           </div>
           <Suspense fallback={<Loading title="正在加载控件设计" />}>
             <DevControlStandards key={`controls-${controlRevision}`} />

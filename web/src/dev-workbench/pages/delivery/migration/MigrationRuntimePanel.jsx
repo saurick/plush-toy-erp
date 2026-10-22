@@ -90,20 +90,22 @@ export function MigrationRuntimePanel({
                     (!recoveryActive || isLatest) ? (
                       <Button href="/erp">进入业务系统</Button>
                     ) : null}
-                    <Button
-                      icon={<SyncOutlined aria-hidden="true" />}
-                      disabled={!canRestart}
-                      loading={actionKey === 'restart'}
-                      onClick={() =>
-                        performAction('restart', {
-                          action: 'restart',
-                          idempotencyKey:
-                            createDatabaseMigrationIdempotencyKey('restart'),
-                        })
-                      }
-                    >
-                      恢复已验证后端
-                    </Button>
+                    {!runtime?.available ? (
+                      <Button
+                        icon={<SyncOutlined aria-hidden="true" />}
+                        disabled={!canRestart}
+                        loading={actionKey === 'restart'}
+                        onClick={() =>
+                          performAction('restart', {
+                            action: 'restart',
+                            idempotencyKey:
+                              createDatabaseMigrationIdempotencyKey('restart'),
+                          })
+                        }
+                      >
+                        恢复已验证后端
+                      </Button>
+                    ) : null}
                   </Space>
                 </td>
               </tr>

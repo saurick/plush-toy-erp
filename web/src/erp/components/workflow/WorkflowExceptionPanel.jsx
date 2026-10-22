@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import {
   Alert,
   Button,
@@ -66,6 +67,7 @@ export default function WorkflowExceptionPanel({
   scrollContainerRef,
   renderRefreshControl,
   trackingRef,
+  toolbarContainer = null,
 }) {
   const [filters, setFilters] = React.useState(() => compact ? {} : normalizeTaskDiscoveryFilters(initialQuery.filters))
   const searchRoot = React.useRef(null)
@@ -259,6 +261,56 @@ export default function WorkflowExceptionPanel({
     />
   )
   const StateFilters = compact ? HorizontalScroll : 'div'
+  const stateFilters = (
+    <StateFilters className="workflow-exceptions__states" role="group" aria-label="异常处理状态">
+      {[
+        { label: '全部异常', value: '', count: current?.data ? current.data.open + current.data.closed : '—' },
+        { label: '未处理完', value: 'open', count: current?.data?.open ?? '—' },
+        { label: '已处理完', value: 'closed', count: current?.data?.closed ?? '—' },
+      ].map((option) => <FilterChip key={option.value} count={option.count} selected={state === option.value} removable={compact && Boolean(option.value)} onClick={() => selectState(compact && state === option.value ? '' : option.value)}>{option.label}</FilterChip>)}
+    </StateFilters>
+  )
+  const controls = (
+    <div className="workflow-exceptions__controls">
+      {!compact && stateFilters}
+      {!compact && filterControls}
+      <div className="workflow-exceptions__query" ref={searchRoot}>
+        {compact ? <MobileSearchInput
+          aria-label="搜索异常单号、订单、批次或原因"
+          placeholder="单号/原因"
+          title="搜索异常单号、订单、批次或原因"
+          value={search.value}
+          onChange={search.onChange}
+          onCompositionStart={search.onCompositionStart}
+          onCompositionEnd={search.onCompositionEnd}
+          onPressEnter={search.onPressEnter}
+          onClear={() => search.onChange({ currentTarget: { value: '' } })}
+        /> : <SearchInput
+          value={search.value}
+          aria-label="搜索异常单号、订单、批次或原因"
+          placeholder="异常单号 / 订单 / 批次 / 原因"
+          maxLength={100}
+          allowClear
+          onChange={search.onChange}
+          onCompositionStart={search.onCompositionStart}
+          onCompositionEnd={search.onCompositionEnd}
+          onPressEnter={search.onPressEnter}
+        />}
+        {compact && state && (
+          <MobileFilterClearButton
+            standalone
+            contextLabel="异常"
+            onClear={() => {
+              selectState('')
+              searchRoot.current?.querySelector('input')?.focus({ preventScroll: true })
+            }}
+          />
+        )}
+      </div>
+      {compact && stateFilters}
+      {compact && <MobileScrollEdge scrollContainerRef={scrollContainerRef} />}
+    </div>
+  )
   return (
     <section ref={panelRef} className={`workflow-exceptions${compact ? ' workflow-exceptions--mobile erp-mobile-controls' : ''}`} aria-label="异常跟踪" aria-busy={loading}>
       {view ? (
@@ -272,50 +324,7 @@ export default function WorkflowExceptionPanel({
         ) : null}
       {!trackingRef && !view ? (
         <>
-          <div className="workflow-exceptions__controls">
-            {!compact && filterControls}
-            <div className="workflow-exceptions__query" ref={searchRoot}>
-              {compact ? <MobileSearchInput
-                aria-label="搜索异常单号、订单、批次或原因"
-                placeholder="单号/原因"
-                title="搜索异常单号、订单、批次或原因"
-                value={search.value}
-                onChange={search.onChange}
-                onCompositionStart={search.onCompositionStart}
-                onCompositionEnd={search.onCompositionEnd}
-                onPressEnter={search.onPressEnter}
-                onClear={() => search.onChange({ currentTarget: { value: '' } })}
-              /> : <SearchInput
-                value={search.value}
-                aria-label="搜索异常单号、订单、批次或原因"
-                placeholder="异常单号 / 订单 / 批次 / 原因"
-                maxLength={100}
-                allowClear
-                onChange={search.onChange}
-                onCompositionStart={search.onCompositionStart}
-                onCompositionEnd={search.onCompositionEnd}
-                onPressEnter={search.onPressEnter}
-              />}
-              {compact && state && (
-                <MobileFilterClearButton
-                  standalone
-                  contextLabel="异常"
-                  onClear={() => {
-                    selectState('')
-                    searchRoot.current?.querySelector('input')?.focus({ preventScroll: true })
-                  }}
-                />
-              )}
-            </div>
-            <StateFilters className="workflow-exceptions__states" role="group" aria-label="异常处理状态">
-              {[
-                { label: '全部异常', value: '', count: current?.data ? current.data.open + current.data.closed : '—' },
-                { label: '未处理完', value: 'open', count: current?.data?.open ?? '—' },
-                { label: '已处理完', value: 'closed', count: current?.data?.closed ?? '—' },
-              ].map((option) => <FilterChip key={option.value} count={option.count} selected={state === option.value} removable={compact && Boolean(option.value)} onClick={() => selectState(compact && state === option.value ? '' : option.value)}>{option.label}</FilterChip>)}
-            </StateFilters>
-            {compact && <MobileScrollEdge scrollContainerRef={scrollContainerRef} />}
-          </div>
+          {toolbarContainer ? createPortal(controls, toolbarContainer) : controls}
           <div className="workflow-exceptions__summary" aria-label="异常关联入口">
             <div className="workflow-exceptions__related-links">
               {[

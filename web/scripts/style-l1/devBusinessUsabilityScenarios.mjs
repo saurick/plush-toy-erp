@@ -119,6 +119,8 @@ export function createDevBusinessUsabilityScenarios({
           '清空筛选恢复第一页'
         )
         await assertNoHorizontalOverflow(page, '工作台分页翻页、筛选与空结果恢复')
+        await page.getByRole('link', { name: '工作中心设计说明', exact: true }).click()
+        await page.getByRole('region', { name: '工作中心界面说明', exact: true }).waitFor()
       },
     },
   ]

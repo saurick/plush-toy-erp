@@ -157,7 +157,9 @@ CHECK/UNIQUE/FK 约束。
 *   **Checksum Mismatch (校验和不匹配)**: 先用 Git 恢复被改写的已有 migration SQL；禁止重新 hash 掩盖历史漂移。`make migrate_hash` 只允许在新增、尚未跟踪的 custom migration 后更新 `atlas.sum`，并会拒绝任何已跟踪 SQL diff。
 *   **Atlas 版本不一致**: 本地、CI 和发布统一使用 `v1.3.0`。`make data` / `make migrate_hash` 只检查版本，不再联网自动安装或静默替换 Atlas。
 *   **开发库只是落后于仓库已有 migration**: 登记共享开发库执行 `make migrate`，非交互环境执行同一次 operation 的 `migrate_prepare → migrate_execute`；不要因为“缺字段”就重新 `make data`，也不要跳版本。
-*   **Drift Detected / Duplicate Column (字段已存在)**: 这通常表示数据库曾被手动改过，或当前库状态已经偏离迁移历史；不要把它和“开发库单纯还没 apply 最新 migration”混为一谈。先做结构和 revision 对账。通用 `make migrate_set` 已封闭；极少数“SQL 已完整执行但 revision 回执缺失”的异常只能另建一次性专项修复，绑定备份、schema 指纹、checksum、停写确认和修复后读回，不能用于跳过失败的数据门禁。
+*   **Drift Detected / Duplicate Column (字段已存在)**: 这通常表示数据库曾被手动改过，或当前库状态已经偏离迁移历史；不要把它和“开发库单纯还没 apply 最新 migration”混为一谈。先做结构和 revision 对账。
+
+  通用 `make migrate_set` 已封闭；极少数“SQL 已完整执行但 revision 回执缺失”的异常只能另建一次性专项修复，绑定备份、schema 指纹、checksum、停写确认和修复后读回，不能用于跳过失败的数据门禁。
 
 ## 数据库表数据字典
 
@@ -191,9 +193,15 @@ go run ./cmd/schema-doc --check
 | `runtime` | health / ready 状态；未检查或读不到时为 `unknown`。 |
 | `error_code / next_action` | 稳定错误分类和下一动作 token；成功时 `error_code=none`。 |
 
-`auto_retry=false` 是固定安全边界。尤其看到 `result=not_proven`、`writes=unknown` 或 `next_action=run_status_no_auto_retry` 时，只能重新运行只读 `make migrate_status` 并核对 operation，不得自动重试 apply 或执行 `migrate_set`。`make` 自身可能把子进程的 exit 1 / 2 都表现为 recipe 失败，自动化应同时读取 `result`，不能只看最外层 exit code。
+`auto_retry=false` 是固定安全边界。尤其看到 `result=not_proven`、`writes=unknown` 或 `next_action=run_status_no_auto_retry` 时，只能重新运行只读 `make migrate_status` 并核对 operation，不得自动重试 apply 或执行 `migrate_set`。
 
-回执不会包含用户名、密码、完整 DSN、原始错误或确认值；原始人类可读错误另行脱敏输出到 stderr。为了让显式 `migrate_prepare → migrate_execute` 仍可操作，prepare 的受控 continuation 会在回执前单独给出本次 operation 的确认变量；低层 `migrate_status / plan` 为现有服务端 parser 保留的旧机器行也可能在回执前给出内部确认。它们都不是通用回执字段，不应复制进日志、工单或聊天。终端回执也不替代备份、隔离恢复、停写、目标 identity、一次 apply 和同目标读回证据。
+`make` 自身可能把子进程的 exit 1 / 2 都表现为 recipe 失败，自动化应同时读取 `result`，不能只看最外层 exit code。
+
+回执不会包含用户名、密码、完整 DSN、原始错误或确认值；原始人类可读错误另行脱敏输出到 stderr。
+
+为了让显式 `migrate_prepare → migrate_execute` 仍可操作，prepare 的受控 continuation 会在回执前单独给出本次 operation 的确认变量；低层 `migrate_status / plan` 为现有服务端 parser 保留的旧机器行也可能在回执前给出内部确认。它们都不是通用回执字段，不应复制进日志、工单或聊天。
+
+终端回执也不替代备份、隔离恢复、停写、目标 identity、一次 apply 和同目标读回证据。
 
 ## 数据库连接与执行超时
 

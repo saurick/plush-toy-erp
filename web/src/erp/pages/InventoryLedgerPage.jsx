@@ -21,6 +21,7 @@ import {
   Tag,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import {
@@ -56,6 +57,7 @@ import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
 import Tabs from '@/common/components/navigation/SlidingTabs'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
 import WarehouseSettingsModal from '../components/inventory/WarehouseSettingsModal.jsx'
@@ -83,7 +85,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -92,13 +93,13 @@ import {
   normalizeBusinessTableColumns,
   useBusinessTableRecordOpen,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import InventoryDistributionOverview from '../components/business-visualizations/InventoryDistributionOverview.jsx'
-import { BusinessViewSwitch } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
 import { executeInventoryOperationTransition } from '../utils/inventoryOperationTransition.mjs'
@@ -161,6 +162,8 @@ export default function InventoryLedgerPage() {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const outletContext = useOutletContext()
   const InventoryTable = outletContext?.mobileTaskBusiness ? BusinessDataTable : Table
+  const tableCardRef = useRef(null)
+  const sticky = useBusinessListStickyHeader(tableCardRef, !outletContext?.mobileTaskBusiness)
   const taskStock = outletContext?.mobileTaskCommand?.kind === 'inventory' ? outletContext.mobileTaskCommand.selected : null
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useBusinessSearchParams()
@@ -532,14 +535,17 @@ export default function InventoryLedgerPage() {
 
   const activeLabel = VIEW_LABELS[activeView]
   const inventoryBalanceSwitch = (
-    <BusinessViewSwitch
-      value={balanceDisplay}
-      options={[
-        { value: 'list', label: '余额明细' },
-        { value: 'distribution', label: '仓库分布' },
-      ]}
-      onChange={setBalanceDisplay}
-    />
+    <div className="erp-business-visual-switch">
+      <Segmented
+        aria-label="库存余额展示方式"
+        value={balanceDisplay}
+        options={[
+          { value: 'list', label: '余额明细' },
+          { value: 'distribution', label: '仓库分布' },
+        ]}
+        onChange={setBalanceDisplay}
+      />
+    </div>
   )
   const openInventoryDetails = useCallback((record) => {
     if (!record?.id) return
@@ -1199,16 +1205,6 @@ export default function InventoryLedgerPage() {
         compact
         helpKey="inventory"
         title="库存台账"
-        viewSwitch={
-          <div className="erp-inventory-ledger-view-bar">
-            <Tabs
-              activeKey={activeView}
-              items={VIEW_ITEMS}
-              onChange={handleViewChange}
-            />
-            {activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
-          </div>
-        }
       />
 
       {currentOperation || operationRecoveryError ? (
@@ -1370,6 +1366,16 @@ export default function InventoryLedgerPage() {
 
       <BusinessOperationPanel
         compact
+        viewSwitch={
+          <div className="erp-inventory-ledger-view-bar">
+            <Tabs
+              activeKey={activeView}
+              items={VIEW_ITEMS}
+              onChange={handleViewChange}
+            />
+            {activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
+          </div>
+        }
         onClearFilters={clearFilters}
         clearFiltersDisabled={!hasActiveFilters}
         filters={
@@ -1428,7 +1434,7 @@ export default function InventoryLedgerPage() {
                 { label: '全部材料或产品', value: '' },
                 ...subjectOptions,
               ]}
-              placeholder={subjectType ? '全部材料或产品' : '先选存货类型'}
+              placeholder={subjectType ? '选择材料或产品' : '先选存货类型'}
               disabled={!subjectType}
               showSearch
               optionFilterProp="label"
@@ -1447,7 +1453,7 @@ export default function InventoryLedgerPage() {
                 ...productSKUOptions,
               ]}
               placeholder={
-                subjectType === 'PRODUCT' ? '全部产品规格' : '仅成品可选规格'
+                subjectType === 'PRODUCT' ? '选择产品规格' : '仅成品可选规格'
               }
               disabled={subjectType !== 'PRODUCT' || !canReadProductSKUs}
               showSearch
@@ -1466,7 +1472,7 @@ export default function InventoryLedgerPage() {
                 ...warehouseFilterOptions,
               ]}
               placeholder={
-                activeView === VIEW_LOTS ? '当前有余额仓库' : '全部仓库'
+                activeView === VIEW_LOTS ? '选择有余额的仓库' : '选择仓库'
               }
               showSearch
               optionFilterProp="label"
@@ -1483,7 +1489,7 @@ export default function InventoryLedgerPage() {
                 { label: '全部批次', value: '' },
                 ...inventoryLotOptions,
               ]}
-              placeholder="全部批次"
+              placeholder="批次"
               showSearch
               optionFilterProp="label"
               onChange={(nextID) => {
@@ -1695,7 +1701,7 @@ export default function InventoryLedgerPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <Card className="erp-business-data-table-card erp-business-module-table-card" onClickCapture={inventoryRecordOpen.onClickCapture} onDoubleClickCapture={inventoryRecordOpen.onDoubleClickCapture}>
+      <Card ref={tableCardRef} className={`erp-business-data-table-card erp-business-module-table-card${sticky ? ' erp-business-data-table-card--sticky' : ''}`} onClickCapture={inventoryRecordOpen.onClickCapture} onDoubleClickCapture={inventoryRecordOpen.onDoubleClickCapture}>
         {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
           <InventoryDistributionOverview
             balances={distributionData.rows}
@@ -1713,6 +1719,7 @@ export default function InventoryLedgerPage() {
         ) : (
           <InventoryTable
             scrollToolbar
+            sticky={sticky}
             rowKey={(record) => `${activeView}-${record.id}`}
             loading={loading}
             dataSource={rows}

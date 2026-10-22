@@ -1,3 +1,4 @@
+import { chooseSelectOption } from './selectControlActions.mjs'
 import { Buffer } from 'node:buffer'
 import { writeFile } from 'node:fs/promises'
 
@@ -213,9 +214,8 @@ export function createWorkInstructionMeasurementScenario({
         )
         .first()
       for (const scale of ['1', '1.25']) {
-        await page
-          .locator('.erp-print-shell__zoom-control select')
-          .selectOption(scale)
+        await chooseSelectOption(page
+          .locator('.erp-print-shell__zoom-control .ant-select'), scale)
         await checkGeometry(output, `restored-paper/${scale}`)
       }
       await openEditor()

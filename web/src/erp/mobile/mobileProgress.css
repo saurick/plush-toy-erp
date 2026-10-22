@@ -55,8 +55,10 @@
 }
 .mobile-progress-risks {
   display: flex;
+  min-width: 0;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   padding: 4px 0;
   scrollbar-width: none;
 }
@@ -66,7 +68,8 @@
   font-size: var(--erp-font-small);
 }
 .mobile-progress-risks .erp-progress-due-options {
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 6px;
 }
 .mobile-progress-range {
@@ -90,7 +93,7 @@
 }
 .mobile-progress-list {
   display: grid;
-  gap: 10px;
+  gap: var(--erp-work-item-gap);
   padding: 8px 12px 12px;
   min-height: 60px;
 }
@@ -100,20 +103,20 @@
   min-width: 0;
   flex-direction: column;
   border: 1px solid var(--mobile-progress-line);
-  border-radius: 10px;
+  border-radius: var(--erp-work-item-radius);
   background: var(--mobile-progress-card);
   color: var(--mobile-progress-text);
   text-align: left;
   overflow-wrap: anywhere;
 }
 .mobile-progress-card-selection {
-  border-radius: 10px;
+  border-radius: var(--erp-work-item-radius);
 }
 .mobile-progress-card-main {
   display: grid;
   min-width: 0;
-  gap: 10px;
-  padding: 12px;
+  gap: 4px;
+  padding: var(--erp-work-item-padding) var(--erp-work-item-padding) 4px;
   color: inherit;
   text-align: left;
 }
@@ -121,7 +124,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: 10px;
+  gap: var(--erp-work-item-gap);
+  min-height: var(--erp-work-item-association-height);
 }
 .mobile-progress-card .erp-progress-due {
   text-align: right;
@@ -131,13 +135,13 @@
   display: flex;
   min-width: 0;
   min-height: 44px;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   border: 0;
   border-top: 1px solid var(--mobile-progress-line);
-  margin: 0 12px;
-  padding: 9px 0;
+  margin: 0 var(--erp-work-item-padding);
+  padding: 6px 0;
   background: transparent;
   color: var(--erp-primary-strong);
   text-align: left;
@@ -149,10 +153,19 @@
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 4px 8px;
+}
+.mobile-progress-card .erp-progress-delivery {
+  min-height: 36px;
+  align-content: center;
+}
+.mobile-progress-card .erp-progress-delivery-copy {
+  align-items: center;
 }
 .mobile-progress-card .erp-progress-quantity-detail {
   min-height: 44px;
+  /* 触区使用数量行上下各 4px 的间距，不额外撑高卡片。 */
+  margin-block: -4px;
 }
 .mobile-progress-error {
   margin: 8px 12px;
@@ -261,62 +274,10 @@
   line-height: 1.5;
 }
 
-.mobile-detail-timeline {
-  display: grid;
-  margin: 0;
+.mobile-progress-recent .workflow-task-event-trail__reason {
   padding: 0;
-  list-style: none;
-}
-
-.mobile-detail-timeline > li {
-  position: relative;
-  padding: 0 0 14px 21px;
-  font-size: var(--erp-font-small);
-  line-height: 1.4;
-}
-
-.mobile-detail-timeline > li:last-child {
-  padding-bottom: 0;
-}
-
-.mobile-detail-timeline > li::before {
-  position: absolute;
-  top: 7px;
-  bottom: -3px;
-  left: 5px;
-  width: 1px;
-  background: var(--erp-border);
-  content: '';
-}
-
-.mobile-detail-timeline > li:last-child::before {
-  display: none;
-}
-
-.mobile-detail-timeline > li::after {
-  position: absolute;
-  top: 5px;
-  left: 1px;
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--erp-surface-bg);
-  border-radius: 50%;
-  background: var(--erp-primary);
-  box-shadow: 0 0 0 1px var(--erp-primary);
-  content: '';
-}
-
-.mobile-detail-timeline strong {
-  font-weight: 600;
-}
-
-.mobile-detail-timeline small,
-.mobile-detail-timeline p {
-  display: block;
-  margin: 3px 0 0;
-  color: var(--erp-text-subtle);
-  font-size: var(--erp-font-micro);
-  overflow-wrap: anywhere;
+  border: 0;
+  background: transparent;
 }
 
 .mobile-progress-detail-toggle,

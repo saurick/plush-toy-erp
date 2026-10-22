@@ -156,9 +156,8 @@ test('visual steps preserve actual completion, blocked responsibility and routin
   assert.doesNotMatch(incompleteHistory.items[0].detail, /审批负责人|实际审批人/)
 })
 
-
 test('tracking accepts a complete hundred-row page and rejects overflow or truncated responses', () => {
-  const summary = trackingFixture().summary
+  const { summary } = trackingFixture()
   const page = {
     items: Array.from({ length: 100 }, (_, index) => ({ ...summary, id: index + 1 })),
     total: 105,

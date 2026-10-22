@@ -127,7 +127,7 @@ test("mobile workflow simulated mobile closure action payload keeps only current
   }
   assert.match(
     plan.actions.shipmentReleaseBlocked.reason,
-    /模拟出货唛头未确认/u,
+    /出货唛头未确认/u,
   );
   assert.match(plan.actions.approvalRejected.reason, /资料不完整/u);
   assert.deepEqual(plan.actions.warehouseUrged.payload, {

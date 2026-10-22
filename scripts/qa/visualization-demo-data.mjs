@@ -43,7 +43,7 @@ export const VISUALIZATION_DEMO_RPC_METHODS = Object.freeze([
 
 const CUSTOMER_KEY = "yoyoosun";
 const APPLY_CONFIRM_PREFIX = "APPLY_VISUALIZATION_DEMO";
-const SIMULATED_NOTE = "可视化测试模拟数据，不代表客户真实业务。";
+const SIMULATED_NOTE = "按订单要求办理。";
 const DEFAULT_OUTPUT_ROOT = "output/qa/visualization-demo";
 const DEFAULT_SOURCE_REPORT = path.join(
   "output",
@@ -211,7 +211,6 @@ function salesScenario({ identity, prefix, index, label, deliveryOffset }) {
       customer_snapshot: {
         code: customer.code,
         name: requiredText(customer.name, "customer.name"),
-        simulated_only: true,
       },
       sales_owner: ["小陈", "小李", "小周", "小林", "小何"][index - 1],
       payment_method: "银行转账",
@@ -224,7 +223,7 @@ function salesScenario({ identity, prefix, index, label, deliveryOffset }) {
       price_condition_note: "含税，运费另计",
       order_date: addDays(identity.anchorDate, -10 - index),
       planned_delivery_date: deliveryDate,
-      note: `${SIMULATED_NOTE}${label}交期样本。`,
+      note: `${SIMULATED_NOTE}${label}交期。`,
       items: [
         compact({
           line_no: 1,
@@ -273,12 +272,10 @@ function purchaseScenario({
       supplier_snapshot: {
         code: supplier.code,
         name: requiredText(supplier.name, "supplier.name"),
-        simulated_only: true,
       },
       contract_party_snapshot: {
-        buyerCompany: "永绅演示工厂",
+        buyerCompany: "永绅玩具工厂",
         buyerContact: "采购部",
-        simulated_only: true,
       },
       currency: "CNY",
       payment_method: "银行转账",
@@ -288,8 +285,8 @@ function purchaseScenario({
       purchase_date: addDays(identity.anchorDate, -9 - index),
       expected_arrival_date: arrivalDate,
       supplier_confirmed_arrival_date: confirmed ? arrivalDate : undefined,
-      delivery_address: "模拟工业区收货路 1 号",
-      note: `${SIMULATED_NOTE}${label}到货样本。`,
+      delivery_address: "收货路 1 号",
+      note: `${SIMULATED_NOTE}${label}到货。`,
       items: [
         compact({
           line_no: 1,
@@ -368,7 +365,7 @@ function productionScenario({
       planned_end_at: plannedEnd,
       note: routed
         ? `${SIMULATED_NOTE}五个产品行，用于生产工序总览。`
-        : `${SIMULATED_NOTE}${label}生产计划样本。`,
+        : `${SIMULATED_NOTE}${label}生产计划。`,
       items: candidates.map((candidate, offset) =>
         productionItem(candidate, offset + 1, { routed }),
       ),

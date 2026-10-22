@@ -25,7 +25,7 @@ import {
   DEV_VERSION_CENTER_ROUTE,
   DEV_VERSION_GUIDE_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
-  resolveDevPageFavicon,
+  DEV_WORKBENCH_FAVICON_HREF,
   resolveDevPageTitle,
 } from './config/devRoutes.mjs'
 import { createDevLazyRoute } from './config/devRouteModules.mjs'
@@ -148,11 +148,10 @@ export default function DevWorkbenchRoutes() {
   const recoveryOnly = isDevDatabaseMigrationRecoveryActive()
   const appTitle = import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
   const documentTitle = resolveDevPageTitle(location.pathname, appTitle)
-  const faviconHref = resolveDevPageFavicon(location.pathname)
 
   useEffect(() => {
-    applyDevWorkbenchFavicon(document, faviconHref)
-  }, [faviconHref])
+    applyDevWorkbenchFavicon(document, DEV_WORKBENCH_FAVICON_HREF)
+  }, [])
 
   if (recoveryOnly) {
     return (

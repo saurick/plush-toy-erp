@@ -1,5 +1,6 @@
 import React from 'react'
-import { Form, Input, Select } from 'antd'
+import { Form, Input } from 'antd'
+import Select from '@/common/components/select/AppSelect'
 
 import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 
@@ -55,6 +56,7 @@ export function FinanceCreditEditor({
             rules={[{ required: true, message: '请选择来源财务记录' }]}
           >
             <Select
+              placeholder="请选择来源应收 / 应付"
               showSearch
               optionFilterProp="label"
               loading={referenceLoading}

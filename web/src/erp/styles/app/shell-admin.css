@@ -385,47 +385,16 @@
   display: none;
 }
 
-.erp-admin-sider__footer {
-  padding: 14px 16px 18px;
-  border-top: 1px solid #dce8dd;
-  background: rgb(255 255 255 / 0.45);
-}
-
-.erp-admin-sider__footer-label {
-  color: #7b8c7e;
-  font-size: var(--erp-font-micro);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.erp-admin-sider__footer-value {
-  margin-top: 6px;
-  color: #1f2937;
-  font-size: var(--erp-font-body);
-  font-weight: 600;
-}
-
-.erp-admin-header {
-  height: var(--erp-topbar-height);
-  flex: 0 0 var(--erp-topbar-height);
-  border-bottom: 1px solid var(--erp-border);
-  background: var(--erp-shell-bg);
-  line-height: normal;
-  padding: 0 14px;
-}
-
-.erp-admin-header__row {
+.erp-page-actions {
   display: flex;
-  height: 100%;
+  flex: none;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: nowrap;
+  gap: 8px;
+  margin-inline-start: auto;
 }
 
-.erp-admin-header__menu-button {
+.erp-page-actions__navigation.ant-btn {
   display: none;
-  margin-top: 2px;
 }
 
 .erp-admin-content {
@@ -439,58 +408,53 @@
   gap: var(--erp-page-gap);
 }
 
-.erp-admin-header__right,
-.erp-admin-header__left {
-  min-width: 0;
+.erp-admin-sider__footer {
+  flex: none;
+  padding: 8px 9px;
+  border-top: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg-muted);
 }
 
-.erp-admin-header__left {
-  flex: 1 1 auto;
+.erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-sider__footer {
+  padding-inline: 8px;
 }
 
-.erp-admin-header__left > .ant-space-item:last-child {
-  min-width: 0;
-}
-
-.erp-admin-header__right {
-  flex: 0 0 auto;
-}
-
-.erp-admin-header__account.ant-btn {
-  height: 40px;
-  min-height: var(--erp-touch-target, 40px);
-  padding: 3px 9px;
-}
-
-.erp-admin-header__meta {
-  min-width: 0;
+.erp-admin-account.ant-btn {
   display: flex;
-  flex-wrap: wrap;
+  width: 100%;
+  height: auto;
+  min-height: 46px;
+  min-width: 0;
+  padding: 6px;
+  gap: 6px;
+}
+
+.erp-admin-account .erp-account-identity {
+  flex: 1;
+}
+
+.erp-admin-account__chevron {
+  flex: none;
+}
+
+.erp-admin-drawer .erp-admin-account .erp-account-identity__copy {
+  display: grid;
+}
+
+.erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-account .erp-account-identity {
+  justify-content: center;
+}
+
+.erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-account .erp-account-identity__copy,
+.erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-account__chevron {
+  display: none;
+}
+
+.erp-print-center-heading-actions {
+  display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.erp-admin-header__theme-toggle {
-  flex: 0 0 auto;
-}
-
-.erp-admin-header__role-tag.ant-tag {
-  margin-inline-end: 0;
-  border-radius: 14px;
-  padding-inline: 10px;
-  font-size: var(--erp-font-small);
-  line-height: 26px;
-  font-weight: 600;
-}
-
-.erp-admin-header__user {
-  color: #6b7280;
-}
-
-.erp-admin-breadcrumb {
-  margin: 0;
-  white-space: nowrap;
-  color: var(--erp-text-subtle);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .erp-admin-page-head {
@@ -554,6 +518,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: var(--erp-page-gap);
 }
 
 .erp-product-core-capability-review {

@@ -2,8 +2,8 @@ import React from 'react'
 import './businessCellStack.css'
 
 export default function BusinessCellStack({ primary, secondary }) {
-  const first = String(primary ?? '').trim()
-  const second = String(secondary ?? '').trim()
+  const first = React.isValidElement(primary) ? primary : String(primary ?? '').trim()
+  const second = React.isValidElement(secondary) ? secondary : String(secondary ?? '').trim()
   return (
     <span className="erp-business-cell-stack">
       <span>{first || second || '-'}</span>

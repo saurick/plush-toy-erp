@@ -361,8 +361,6 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 		SetTaskCode(in.TaskCode).
 		SetTaskGroup(in.TaskGroup).
 		SetTaskName(in.TaskName).
-		SetSourceType(in.SourceType).
-		SetSourceID(in.SourceID).
 		SetNillableSourceNo(in.SourceNo).
 		SetNillableBusinessStatusKey(in.BusinessStatusKey).
 		SetTaskStatusKey(in.TaskStatusKey).
@@ -378,6 +376,9 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 		SetCriticalPath(in.CriticalPath).
 		SetNillableDueAt(in.DueAt).
 		SetPayload(in.Payload)
+	if in.SourceType != "" {
+		builder.SetSourceType(in.SourceType).SetSourceID(in.SourceID)
+	}
 	if actorID > 0 {
 		builder.SetCreatedBy(actorID).SetUpdatedBy(actorID)
 	}
@@ -1319,9 +1320,11 @@ func workflowTaskMutationResultTaskV1FromBiz(task *biz.WorkflowTask) *workflowTa
 
 func (task workflowTaskMutationResultTaskV1) toBiz() (*biz.WorkflowTask, error) {
 	taskStatusKey := strings.TrimSpace(task.TaskStatusKey)
-	if task.ID <= 0 || task.Version <= 0 || task.SourceID <= 0 ||
+	if task.ID <= 0 || task.Version <= 0 || task.SourceID < 0 ||
+		((strings.TrimSpace(task.SourceType) == "") != (task.SourceID == 0)) ||
+		(task.SourceID == 0 && (task.SourceNo != nil || task.ProcessInstanceID != nil || task.ProcessNodeInstanceID != nil)) ||
 		strings.TrimSpace(task.TaskCode) == "" || strings.TrimSpace(task.TaskGroup) == "" ||
-		strings.TrimSpace(task.TaskName) == "" || strings.TrimSpace(task.SourceType) == "" ||
+		strings.TrimSpace(task.TaskName) == "" ||
 		task.TaskStatusKey != taskStatusKey || !biz.IsKnownWorkflowTaskState(taskStatusKey) || strings.TrimSpace(task.OwnerRoleKey) == "" ||
 		task.CreatedAt.IsZero() || task.UpdatedAt.IsZero() {
 		return nil, fmt.Errorf("workflow task mutation result is invalid")
@@ -1648,8 +1651,6 @@ func ensureActiveWorkflowTaskInTx(
 		SetTaskCode(in.TaskCode).
 		SetTaskGroup(in.TaskGroup).
 		SetTaskName(in.TaskName).
-		SetSourceType(in.SourceType).
-		SetSourceID(in.SourceID).
 		SetNillableSourceNo(in.SourceNo).
 		SetNillableBusinessStatusKey(in.BusinessStatusKey).
 		SetTaskStatusKey(in.TaskStatusKey).
@@ -1665,6 +1666,9 @@ func ensureActiveWorkflowTaskInTx(
 		SetCriticalPath(in.CriticalPath).
 		SetNillableDueAt(in.DueAt).
 		SetPayload(in.Payload)
+	if in.SourceType != "" {
+		builder.SetSourceType(in.SourceType).SetSourceID(in.SourceID)
+	}
 	if actorID > 0 {
 		builder.SetCreatedBy(actorID).SetUpdatedBy(actorID)
 	}

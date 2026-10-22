@@ -5,6 +5,7 @@ import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import { buildWorkflowProcessStageModel } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
 import { getWorkflowTaskTiming } from '../../utils/workflowTaskTiming.mjs'
+import { getWorkflowTaskAssigneeLabel } from '../../utils/workflowTaskEventPresentation.mjs'
 import './workflowTaskCurrentSummary.css'
 
 export default function WorkflowTaskCurrentSummary({
@@ -23,7 +24,9 @@ export default function WorkflowTaskCurrentSummary({
   const stage = !ended && processContext && processContext.linked_node?.id === task.process_node_instance_id
     ? buildWorkflowProcessStageModel(processContext) : null
   const stepNumber = stage ? stage.items.findIndex((item) => item.linked && item.current) + 1 : 0
-  const handler = ended && !task.assignee_id ? '' : assigneeLabel
+  const handler = ended && !task.assignee_id
+    ? getWorkflowTaskAssigneeLabel(task)
+    : assigneeLabel || getWorkflowTaskAssigneeLabel(task)
   const Icon = ended ? CheckCircleOutlined : task.task_status_key === WorkflowTaskStatus.BLOCKED ? ExclamationCircleOutlined : RightCircleOutlined
   if (appearance === 'facts') {
     const deadline = getWorkflowTaskTiming(task, { detail: true, events }).find((row) => row.key === 'due')

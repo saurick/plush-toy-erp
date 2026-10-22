@@ -1,5 +1,5 @@
-import React, { useCallback, useLayoutEffect, useRef } from 'react'
-import { usePrintEditableDraftSync } from './usePrintEditableDraftSync.js'
+import React, { useCallback } from 'react'
+import PrintEditableText from './PrintEditableText.jsx'
 import {
   calculateProcessingContractTotals,
   PROCESSING_CONTRACT_TABLE_COLUMNS,
@@ -10,7 +10,6 @@ import {
   isCellInsideSelection,
   isMergeTopLeftCell,
 } from '../../utils/detailCellMerge.mjs'
-import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
 import { PrintAppendixImages } from './PrintAppendixImages.jsx'
 import { visibleContractClauseGroups } from '../../utils/contractClauseEditor.mjs'
 import { renderPrintValue } from './printValue.mjs'
@@ -33,69 +32,35 @@ function EditableText({
   onCommit,
   disabled = false,
 }) {
-  const editableRef = useRef(null)
   const displayText = String(renderPrintValue(value))
   const commitElementValue = useCallback(
-    (element) => {
+    (element, { normalizeElement = false } = {}) => {
       if (disabled) {
         return
       }
       if (typeof onCommit === 'function') {
-        onCommit(
-          normalizeEditableText(
-            multiline ? element.innerText : element.textContent,
-            multiline
-          )
+        const nextValue = normalizeEditableText(
+          multiline ? element.innerText : element.textContent,
+          multiline
         )
+        if (normalizeElement && element.textContent !== (nextValue || '\u00A0')) {
+          element.textContent = nextValue || '\u00A0'
+        }
+        onCommit(nextValue)
       }
     },
     [disabled, multiline, onCommit]
   )
 
-  useLayoutEffect(() => {
-    const element = editableRef.current
-    if (!element) {
-      return
-    }
-    if (element.ownerDocument?.activeElement === element) {
-      return
-    }
-    if (element.textContent !== displayText) {
-      element.textContent = displayText
-    }
-  }, [displayText])
-
-  usePrintEditableDraftSync({
-    editableRef,
-    commitElementValue,
-    elementType: Component,
-    disabled,
-  })
-
   return (
-    <Component
-      ref={editableRef}
+    <PrintEditableText
+      as={Component}
+      value={value}
+      text={displayText}
+      commitElementValue={commitElementValue}
+      disabled={disabled}
       className={`${className}${disabled ? ' erp-processing-contract-editable--disabled' : ''}`}
-      data-print-empty={
-        !String(value ?? '')
-          .replace(/<[^>]*>/g, '')
-          .replace(/&nbsp;/g, '')
-          .trim()
-      }
-      contentEditable={!disabled}
-      suppressContentEditableWarning
-      spellCheck={false}
-      onInput={(event) => {
-        runSilentPrintWorkspaceDraftUpdate(() => {
-          commitElementValue(event.currentTarget)
-        })
-      }}
-      onBlur={(event) => {
-        commitElementValue(event.currentTarget)
-      }}
-    >
-      {displayText}
-    </Component>
+    />
   )
 }
 

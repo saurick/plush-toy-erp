@@ -230,8 +230,8 @@ async function assertBusinessMainTableInitialSelectionEmpty(
       checkedWrapperCount: checkedWrappers.length,
       selectedRowCount: selectedRows.length,
       actionBarCount: actionBars.length,
-      actionButtonCount: actionBars.reduce(
-        (count, node) => count + node.querySelectorAll('button').length,
+      enabledActionButtonCount: actionBars.reduce(
+        (count, node) => count + [...node.querySelectorAll('button')].filter((button) => button.checkVisibility() && !button.disabled && !button.classList.contains('erp-business-selection-action-bar__compact-more')).length,
         0
       ),
       actionText: actionBar?.textContent?.replace(/\s+/g, ' ').trim() || '',
@@ -275,9 +275,9 @@ async function assertBusinessMainTableInitialSelectionEmpty(
     `${scenarioName} 初始操作栏不应处于选中态: ${JSON.stringify(metrics)}`
   )
   assert.equal(
-    metrics.actionButtonCount,
+    metrics.enabledActionButtonCount,
     0,
-    `${scenarioName} 初始不应展示记录操作按钮: ${JSON.stringify(metrics)}`
+    `${scenarioName} 初始记录操作按钮不可执行: ${JSON.stringify(metrics)}`
   )
   if (metrics.actionBarCount > 0) {
     assert(
@@ -286,7 +286,7 @@ async function assertBusinessMainTableInitialSelectionEmpty(
     )
     assert.match(
       metrics.actionText,
-      /选中记录后显示可用操作/u,
+      /请选择一条记录/u,
       `${scenarioName} 初始操作栏应说明先选记录再操作`
     )
   }

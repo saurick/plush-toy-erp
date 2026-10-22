@@ -606,33 +606,33 @@ func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err err
 	logger := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrSalesOrderEngineeringNotReady):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先确认当前样品，并选用与样品一致的量产 BOM，再下达生产"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请先确认当前样品，并选用与样品一致的量产 BOM，再下达生产"}
 	case errors.Is(err, biz.ErrMaterialRequestNotReady):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单用料尚未完成老板和财务审批，暂不能下达生产"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "订单用料尚未完成老板和财务审批，暂不能下达生产"}
 	case errors.Is(err, biz.ErrProductionOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrProductionOrderNotFound):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单不存在"}
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "生产订单不存在"}
 	case errors.Is(err, biz.ErrProductionOrderReferenceInvalid), errors.Is(err, biz.ErrProductionOrderFactSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单引用的产品、规格、单位、销售明细或 BOM 已失效，请刷新后检查"}
 	case errors.Is(err, biz.ErrProductionOrderPlannedQuantityExceeded):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该销售订单行的累计生产计划数量超过生产需求数量（订单数量＋船头样），请刷新可排产数量后调整"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该销售订单行的累计生产计划数量超过生产需求数量（订单数量＋船头样），请刷新可排产数量后调整"}
 	case errors.Is(err, biz.ErrProductionOrderHasPostedFacts):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该生产订单已有生效的生产入库记录，不能取消；请先按业务规则冲正或关闭"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该生产订单已有生效的生产入库记录，不能取消；请先按业务规则冲正或关闭"}
 	case errors.Is(err, biz.ErrProductionOrderFactDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单仍有未过账或未取消的领料、完工或返工记录，请先处理后再关闭或取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "生产订单仍有未过账或未取消的领料、完工或返工记录，请先处理后再关闭或取消"}
 	case errors.Is(err, biz.ErrProductionOrderCloseReasonRequired):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产数量尚未全部完成，请填写短关闭原因"}
 	case errors.Is(err, biz.ErrProductionOrderSchedulingTaskRequired):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该生产订单缺少来源生成的排产任务，不能继续；请检查订单发布链路"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该生产订单缺少来源生成的排产任务，不能继续；请检查订单发布链路"}
 	case errors.Is(err, biz.ErrProductionOrderSchedulingTaskActive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "排产任务尚未结束，请先到生产订单或任务中心完成处理"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "排产任务尚未结束，请先到生产订单或任务中心完成处理"}
 	case errors.Is(err, biz.ErrProductionOrderWIPActive):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仍有未结束的在制批次，请先完成对应工序、外发回仓或质量处理后再关闭生产订单"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "仍有未结束的在制批次，请先完成对应工序、外发回仓或质量处理后再关闭生产订单"}
 	case errors.Is(err, biz.ErrProductionOrderExceptionDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单仍有未结的异常审批、超领额度或委外返工处置，请先处理后再关闭或取消"}
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "生产订单仍有未结的异常审批、超领额度或委外返工处置，请先处理后再关闭或取消"}
 	case errors.Is(err, biz.ErrProductionOrderQuantityExceeded), errors.Is(err, biz.ErrProductionOrderInvalidState), errors.Is(err, biz.ErrBadParam):
 		return invalidParamResult()
 	default:
