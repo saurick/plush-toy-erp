@@ -14,16 +14,3 @@
 .erp-business-status-filters .erp-filter-chip__count {
   font-variant-numeric: tabular-nums;
 }
-
-.erp-business-status-filter-compact-wrap {
-  display: inline-flex;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.erp-business-status-filter--compact.ant-select {
-  width: max-content;
-  min-width: 156px;
-  max-width: min(280px, 100%);
-  font-variant-numeric: tabular-nums;
-}

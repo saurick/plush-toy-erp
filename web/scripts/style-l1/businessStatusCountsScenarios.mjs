@@ -89,43 +89,22 @@ async function installRoute(page) {
 
 export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEffectiveSession, gotoScenarioPath, assertNoHorizontalOverflow, outputDir, path }) {
   const group = (page, label = '销售订单状态') => page.getByRole('group', { name: label, exact: true })
-  const countText = (text, count) => `${text} ${count.toLocaleString('zh-CN')}`
   const ready = async (page, total, label = '销售订单状态') => {
     const filter = group(page, label)
     await filter.waitFor()
     await page.waitForFunction((name) => [...document.querySelectorAll('[role="group"]')].some((el) => el.getAttribute('aria-label') === name && el.getAttribute('aria-busy') === 'false'), label)
-    const combo = filter.getByRole('combobox')
-    if (await combo.count()) {
-      const summary = filter.locator('.ant-select-selection-item')
-      if ((await summary.textContent()) !== countText('不限状态', total)) {
-        await filter.locator('.ant-select-selector').click()
-        await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: new RegExp(`^${countText('不限状态', total)}$`, 'u') }).waitFor()
-        await combo.press('Escape')
-      }
-      return combo
-    }
+    assert.equal(await filter.getByRole('combobox').count(), 0, '状态与数量应直接展示为快捷按钮')
     const all = filter.getByRole('button', { name: `不限状态，共 ${total} 条`, exact: true })
     await all.waitFor()
     return all
   }
   const assertCounts = async (page, label, entries) => {
     const filter = group(page, label)
-    const combo = filter.getByRole('combobox')
-    if (await combo.count()) {
-      await filter.locator('.ant-select-selector').click()
-      for (const [text, count] of entries) await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: new RegExp(`^${countText(text, count)}$`, 'u') }).waitFor()
-      await combo.press('Escape')
-    } else {
-      for (const [text, count] of entries) await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).waitFor()
-    }
+    for (const [text, count] of entries) await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).waitFor()
   }
   const choose = async (page, label, text, count) => {
     const filter = group(page, label)
-    const combo = filter.getByRole('combobox')
-    if (await combo.count()) {
-      await filter.locator('.ant-select-selector').click()
-      await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').filter({ hasText: new RegExp(`^${countText(text, count)}$`, 'u') }).click()
-    } else await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).click()
+    await filter.getByRole('button', { name: `${text}，共 ${count} 条`, exact: true }).click()
   }
   const shared = { path: salesPath, auth: 'admin', effectiveSession: customerRuntimeEffectiveSession, beforeNavigate: installRoute }
   return [
@@ -136,20 +115,20 @@ viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
-        const filter = frame.getByRole('combobox', { name: '状态筛选', exact: true })
+        const filter = frame.getByRole('group', { name: '状态筛选', exact: true })
         await filter.waitFor()
-        const labels = () => filter.locator('option').allTextContents()
+        const labels = () => filter.getByRole('button').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))
         const before = await labels()
-        assert(before.some((text) => text.startsWith('已生效 ')))
+        assert(before.some((text) => text.startsWith('已生效，')))
         assert(!before.some((text) => /工程中|生产中|已阻塞/u.test(text)))
-        const counts = before.map((text) => Number(text.match(/(\d+)$/u)?.[1]))
+        const counts = before.map((text) => Number(text.match(/共 (\d+) 条$/u)?.[1]))
         assert.equal(counts[0], counts.slice(1).reduce((sum, value) => sum + value, 0))
-        await filter.selectOption('draft')
+        await filter.getByRole('button', { name: /^草稿，/u }).click()
         assert.deepEqual(await labels(), before)
         await frame.locator('#list-search').fill('SO-20260925-001')
-        await filter.locator('option').filter({ hasText: /^不限状态 1$/u }).waitFor({ state: 'attached' })
-        assert((await labels()).includes('已生效 1'))
-        assert((await labels()).includes('草稿 0'))
+        await filter.getByRole('button', { name: '不限状态，共 1 条', exact: true }).waitFor()
+        assert((await labels()).includes('已生效，共 1 条'))
+        assert((await labels()).includes('草稿，共 0 条'))
         await assertNoHorizontalOverflow(page, 'business-status-counts-design')
       },
     },
@@ -169,11 +148,10 @@ viewport: { width: 1440, height: 900 },
         await ready(page, 45)
         assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), 3)
         assert.equal(page.statusCountRequests.at(-1).params.offset, 0, '切换状态返回第一页')
-        assert.equal(await group(page).locator('.ant-select-selection-item').textContent(), '已提交 3')
-        const combo = group(page).getByRole('combobox')
-        await combo.press('ArrowDown')
-        await combo.press('ArrowUp')
-        await combo.press('Enter')
+        assert.equal(await group(page).getByRole('button', { name: '已提交，共 3 条', exact: true }).getAttribute('aria-pressed'), 'true')
+        const all = group(page).getByRole('button', { name: '不限状态，共 45 条', exact: true })
+        await all.focus()
+        await all.press('Enter')
         await page.locator('.ant-table-tbody').getByText('SO-COUNT-001', { exact: true }).waitFor()
         await ready(page, 45)
         const search = page.locator('.erp-business-operation-panel__search input').first()
@@ -181,14 +159,14 @@ viewport: { width: 1440, height: 900 },
         await ready(page, 2)
         await assertCounts(page, '销售订单状态', [['草稿', 1], ['已提交', 1]])
         await search.fill('慢查询')
-        await group(page).locator('.ant-select-selection-item').filter({ hasText: /—/u }).waitFor()
+        await group(page).getByRole('button', { name: '不限状态，数量暂不可用', exact: true }).waitFor()
         await search.fill('指定')
         await ready(page, 2)
         await delay(750)
         await ready(page, 2)
         await search.fill('读取失败')
         await page.locator('.ant-message-error').waitFor()
-        await group(page).locator('.ant-select-selection-item').filter({ hasText: /—/u }).waitFor()
+        await group(page).getByRole('button', { name: '不限状态，数量暂不可用', exact: true }).waitFor()
         await search.fill('')
         await ready(page, 45)
         await search.blur()
@@ -231,12 +209,7 @@ viewport: { width: 1440, height: 900 },
           assert(await filter.locator('..').evaluate((el) => el.classList.contains('erp-business-operation-panel__quick')), `${url} 状态应直接可见`)
           assert(page.statusCountRequests.some((request) => request.method === method), `${url} 必须请求后端统计`)
           if (label === '单据状态') {
-            const combo = filter.getByRole('combobox')
-            if (await combo.count()) {
-              await filter.locator('.ant-select-selector').click()
-              assert.equal(await page.locator('.ant-select-dropdown:visible').getByText(/^已发货|^生效中|^已释放|^已消耗/u).count(), 0, '财务只能使用财务状态')
-              await combo.press('Escape')
-            }
+            assert.equal(await filter.getByRole('button', { name: /^(已发货|生效中|已释放|已消耗)/u }).count(), 0, '财务只能使用财务状态')
           }
           if (label === '质检状态') {
             await page.locator('.erp-business-operation-panel').getByRole('button', { name: '筛选', exact: true }).click()
@@ -281,7 +254,7 @@ viewport: { width: 760, height: 900 },
         await choose(page, '收付款状态', '已批准待核销', 1234567890)
         await ready(page, 1234567890, '收付款状态')
         assert(!(await group(page, '收付款状态').evaluate((el) => el.scrollWidth > el.clientWidth)))
-        const summary = group(page, '收付款状态').locator('.ant-select-selection-item')
+        const summary = group(page, '收付款状态').getByRole('button', { name: '已批准待核销，共 1234567890 条', exact: true })
         assert(await summary.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), '长状态和完整数量不应被省略')
         await assertNoHorizontalOverflow(page, 'business-status-counts-wide-numbers')
         await page.screenshot({ path: path.join(outputDir, 'business-status-counts-finance-narrow.png') })

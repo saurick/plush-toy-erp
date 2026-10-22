@@ -274,7 +274,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
-        await frame.locator('[data-action="status"][data-value="closed"]').click()
+        await frame.getByRole('group', { name: '状态筛选', exact: true }).getByRole('button', { name: /^已关闭，/u }).click()
         await frame.locator('[data-action="select-row"]').first().check()
         assert.equal(await frame.locator('[data-action="open-task-create"]').count(), 0)
         await frame.locator('[data-action="open-related-tasks"]').click()
@@ -283,7 +283,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         assert.equal(await relatedTasks.locator('[data-action="open-task-create"]').isDisabled(), true)
         await clickDialogBackdrop(relatedTasks)
         await relatedTasks.waitFor({ state: 'hidden' })
-        await frame.locator('[data-action="status"][data-value="active"]').click()
+        await frame.getByRole('group', { name: '状态筛选', exact: true }).getByRole('button', { name: /^已生效，/u }).click()
         await frame.locator('[data-action="select-row"]').first().check()
         await frame.locator('[data-action="open-related-tasks"]').click()
         await frame.locator('[data-action="open-task-create"]').click()

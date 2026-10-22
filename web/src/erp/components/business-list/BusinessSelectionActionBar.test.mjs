@@ -392,7 +392,7 @@ test('表格工具保留导出和列设置各自回调，禁用导出不能执�
   assert.equal(exported, 1)
 })
 
-test('长状态组使用紧凑控件并保留当前状态、数量与筛选回调', async (t) => {
+test('长状态组保留快捷按钮、数量和单击筛选，加载与指定记录时不可切换', async (t) => {
   const { default: BusinessStatusFilter } = await import('./BusinessStatusFilter.jsx')
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -400,22 +400,45 @@ test('长状态组使用紧凑控件并保留当前状态、数量与筛选回�
   t.after(async () => { await act(async () => root.unmount()); container.remove() })
   let value = 'SUBMITTED'
   let inline = true
+  let loading = false
+  let exact = false
   const render = () => act(async () => root.render(createElement(BusinessStatusFilter, {
     inline,
-value,
-'aria-label': '质检状态',
-counts: { DRAFT: 2, SUBMITTED: 3 },
+    value,
+    loading,
+    exact,
+    'aria-label': '质检状态',
+    counts: { DRAFT: 2, SUBMITTED: 3 },
     options: [{ value: 'DRAFT', label: '草稿' }, { value: 'SUBMITTED', label: '已提交' }, { value: 'PASSED', label: '合格' }, { value: 'REJECTED', label: '不合格' }, { value: 'CANCELLED', label: '已取消' }],
     onChange: (next) => { value = next },
   })))
+  const button = (label) => [...container.querySelectorAll('button')].find(
+    (node) => node.getAttribute('aria-label').startsWith(`${label}，`)
+  )
   await render()
-  assert(container.querySelector('[role="combobox"][aria-label="质检状态"]'))
-  assert.match(container.textContent, /已提交 3/u)
+  assert.equal(container.querySelectorAll('button').length, 6)
+  assert.equal(container.querySelectorAll('[role="combobox"]').length, 0)
+  assert.equal(button('不限状态').getAttribute('aria-label'), '不限状态，共 5 条')
+  assert.equal(button('已提交').getAttribute('aria-pressed'), 'true')
+  assert.equal(button('不合格').getAttribute('aria-label'), '不合格，共 0 条')
+  await act(async () => button('草稿').click())
+  assert.equal(value, 'DRAFT')
+  await render()
+  assert.equal(button('草稿').getAttribute('aria-pressed'), 'true')
+  loading = true
+  await render()
+  assert.equal(button('草稿').getAttribute('aria-label'), '草稿，数量暂不可用')
+  assert([...container.querySelectorAll('button')].every((node) => node.disabled))
+  loading = false
+  exact = true
+  await render()
+  assert([...container.querySelectorAll('button')].every((node) => node.disabled))
+  exact = false
   inline = false
   await render()
   assert.equal(container.querySelectorAll('button').length, 6)
-  await act(async () => [...container.querySelectorAll('button')].find((button) => button.textContent.includes('草稿')).click())
-  assert.equal(value, 'DRAFT')
+  await act(async () => button('不限状态').click())
+  assert.equal(value, '')
 })
 
 test('更多操作中的单据菜单按 Escape 后同时关闭，焦点恢复且可再次执行', async (t) => {

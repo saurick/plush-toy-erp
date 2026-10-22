@@ -3224,7 +3224,10 @@
     .task-copy-options .btn { display:flex; align-items:center; justify-content:flex-start; min-height:40px; gap:8px; padding:10px 9px; border:0; border-radius:4px; background:transparent; box-shadow:none; white-space:nowrap; }
     .business-action-menu > summary { display:flex; width:auto; min-height:34px; padding:6px 10px; border:1px solid var(--line); font-size:14px; gap:6px; }
     .business-action-menu .task-copy-options { max-height:min(420px,60vh); overflow:auto; width:max-content; min-width:180px; }
-    .business-status-choice select { min-width:156px; min-height:34px; }
+    .command-row:has(.business-status-filters) { flex-wrap:wrap; }
+    .business-status-filters.segment { min-width:0; max-width:100%; min-height:34px; height:auto; flex:0 1 auto; flex-wrap:wrap; gap:4px; border:0; overflow:visible; }
+    .business-status-filters.segment button { min-height:34px; padding:5px 10px; flex:0 0 auto; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:none; }
+    .business-status-filters.segment button.active { color:var(--brand-strong); background:var(--brand-softer); box-shadow:none; }
     .task-focus-content .detail-section { padding:16px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
     .task-fused-meta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 18px; border:1px solid var(--line); border-radius:8px; padding:12px; }
     .task-fused-meta > div { display:flex; justify-content:space-between; gap:12px; }
@@ -5899,7 +5902,7 @@ active = new Set()
       const operation = `${renderHubTabsRow(hub,config)}${renderBusinessViewRow(config)}<section class="surface operation-surface">
         <div class="command-row">
           ${config.key === 'history' ? `<label class="control"><span>记录类型</span><select id="history-source" aria-label="历史记录类型">${[['基础资料', ['客户档案']], ['业务单据与版本', ['销售订单', '采购订单', '委外订单']]].map(([label, sources]) => `<optgroup label="${label}">${sources.map(source => `<option value="${source}" ${state.historySource === source ? 'selected' : ''}>${source}</option>`).join('')}</optgroup>`).join('')}</select></label>` : ''}
-          ${countedStatuses.length>3?`<label class="business-status-choice"><select id="business-list-status" aria-label="状态筛选">${countedStatuses.map(([key,label,count])=>`<option value="${key}" ${state.status===key?'selected':''}>${label} ${count===null?'—':count}</option>`).join('')}</select></label>`:`<div class="segment" role="group" aria-label="状态筛选">${countedStatuses.map(([key,label,count])=>`<button type="button" aria-pressed="${state.status===key}" class="${state.status===key?'active':''}" data-action="status" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div>`}
+          <div class="segment business-status-filters" role="group" aria-label="状态筛选">${countedStatuses.map(([key,label,count])=>`<button type="button" aria-pressed="${state.status===key}" aria-label="${label}，${count===null?'数量暂不可用':`共 ${count} 条`}" class="${state.status===key?'active':''}" data-action="status" data-value="${key}">${label}<b>${count===null?'—':count}</b></button>`).join('')}</div>
           <label class="search">${icon('search')}<input id="list-search" value="${escapeHTML(state.search)}" placeholder="搜索${config.entity}、${config.party}、${config.item}" aria-label="搜索" /></label>
           <div class="command-actions">
             ${renderFilterTrigger(activeFilterCount()>0,'open-filter','clear-filter')}
@@ -16899,7 +16902,6 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function bindInputs() {
-      document.querySelector('#business-list-status')?.addEventListener('change',event=>{state.status=event.target.value;state.pageNo=1;state.selected.clear();renderView();});
       document.querySelectorAll('#view [data-fulfillment-role]').forEach(input=>input.onchange=event=>{state.fulfillmentRole=event.target.value;state.fulfillmentStage='';renderAll();});
       document.querySelectorAll('[data-form-field]').forEach(el=>el.addEventListener('input',()=>{
         const previousType=state.formValues.party;captureFormDraft();
