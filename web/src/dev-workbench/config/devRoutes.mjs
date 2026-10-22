@@ -1,4 +1,4 @@
-export const DEV_WORKBENCH_FAVICON_HREF = '/favicon-dev.svg'
+export const DEV_WORKBENCH_FAVICON_HREF = new URL('../assets/favicon-dev.svg?no-inline', import.meta.url).href
 
 export const DEV_HUB_ROUTE = '/__dev'
 export const DEV_PRODUCT_ENGINEERING_ROUTE = '/__dev/product-engineering'

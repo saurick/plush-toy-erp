@@ -886,7 +886,7 @@ async function verifyWorkInstructionRowImages({
     .setInputFiles([
       path.resolve(webDir, 'public', 'favicon.svg'),
       path.resolve(webDir, 'public', 'favicon-admin.svg'),
-      path.resolve(webDir, 'public', 'favicon-dev.svg'),
+      path.resolve(webDir, 'src/dev-workbench/assets/favicon-dev.svg'),
       path.resolve(webDir, 'public', 'favicon-tasks.svg'),
     ])
 

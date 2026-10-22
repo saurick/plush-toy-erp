@@ -46,7 +46,7 @@ test("GitLab full-path patterns match the conservative documentation classifier"
   }
 });
 
-test("CI plan keeps a documentation pull request lightweight", () => {
+test("CI plan keeps documentation with workbench consumers on focused checks", () => {
   const plan = buildCIPlan({
     files: ["docs/product/自动化测试策略.md"],
     mode: "affected",
@@ -54,8 +54,8 @@ test("CI plan keeps a documentation pull request lightweight", () => {
   });
   assert.equal(plan.schemaVersion, "plush.ci-plan/v2");
   assert.equal(plan.effectiveMode, "affected");
-  assert.deepEqual(plan.affectedScopes, ["T0", "T1"]);
-  assert.equal(plan.maxAffectedScope, "T1");
+  assert.deepEqual(plan.affectedScopes, ["T0", "T1", "T5"]);
+  assert.equal(plan.maxAffectedScope, "T5");
   assert.equal(plan.localGate, "focused");
   assert.deepEqual(plan.flags, {
     full: false,

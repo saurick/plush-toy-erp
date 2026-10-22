@@ -93,6 +93,7 @@ function installRealReceiptFiles(root) {
     "scripts/qa/run-test-gate.mjs",
     "scripts/qa/verify-go-test-json.mjs",
     "scripts/qa/verify-node-test-summary.mjs",
+    "scripts/qa/lib/business-rule-catalog.mjs",
     "scripts/qa/lib/git-range.mjs",
     "scripts/qa/lib/repository-identity.mjs",
     "scripts/git-hooks/pre-push.sh",

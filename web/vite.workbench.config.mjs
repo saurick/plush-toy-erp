@@ -13,6 +13,14 @@ export default defineConfig({
     outDir: 'build-workbench',
     sourcemap: false,
     reportCompressedSize: false,
-    rollupOptions: { input: path.join(root, 'workbench.html') },
+    rollupOptions: {
+      input: path.join(root, 'workbench.html'),
+      output: {
+        // The authenticated server exposes this one icon before login.
+        assetFileNames: (asset) => asset.names.includes('favicon-dev.svg')
+          ? 'favicon-dev.svg'
+          : 'assets/[name]-[hash][extname]',
+      },
+    },
   },
 })

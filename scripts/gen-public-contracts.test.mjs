@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { loadCatalog, renderCatalog, renderRPCDocumentation, syncOutputs, syncRPCDocumentation, syncTaskDesignCatalog } from './gen-public-contracts.mjs'
 import { checkConsumerSource, checkConsumers, checkScriptConsumerSource, checkScriptConsumers } from './qa/public-contract-consumers.mjs'
 import { RpcMethod } from '../web/src/common/consts/rpcMethods.generated.mjs'
@@ -62,7 +62,7 @@ test('public contracts: all generated files agree with current backend declarati
   assert(!outputs['rpcMethods.generated.mjs'].includes('old_password'))
 })
 
-test('public contracts: generated strings escape tabs without changing source excerpts', async () => {
+test('public contracts: generated strings escape tabs without changing source excerpts', async (t) => {
   const excerpts = [
     'map[string]any{\n\t"scope": "inventory",\r\n}',
     "single ' and double \" quotes, backslash \\, tab \t, 中文",
@@ -84,7 +84,11 @@ test('public contracts: generated strings escape tabs without changing source ex
   for (const [name, source] of Object.entries(outputs)) {
     assert.doesNotMatch(source, /\t/u, `${name}: source literals must escape tab characters`)
   }
-  const { RpcInspection } = await import(`data:text/javascript,${encodeURIComponent(outputs['rpcInspection.generated.mjs'])}`)
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'public-contract-module-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  syncOutputs(outputs, { repositoryRoot: directory })
+  const generatedModule = path.join(directory, 'web/src/dev-workbench/config/rpcInspection.generated.mjs')
+  const { RpcInspection } = await import(pathToFileURL(generatedModule).href)
   assert.deepEqual(RpcInspection, inspection)
 })
 
