@@ -1152,27 +1152,22 @@ export default function BOMVersionsPage() {
     recordLabel: '物料清单',
   })
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    productID ||
-    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-    status
-  )
+  const activeFilterCount = [
+    productID,
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT,
+    status,
+  ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setProductID(undefined)
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
     setStatus('')
-    setSearchParams(new URLSearchParams(), { replace: true })
+    setSearchParams((current) => {
+      const next = withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT)
+      next.delete('product_id')
+      return next
+    }, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [
-    setKeyword,
-    setLifecycleScope,
-    setPagination,
-    setProductID,
-    setSearchParams,
-    setStatus,
-  ])
+  }, [setProductID, setLifecycleScope, setStatus, setSearchParams, setPagination])
 
   const preparationLoadError =
     preparationError ||
@@ -1216,7 +1211,7 @@ export default function BOMVersionsPage() {
       <BusinessOperationPanel
         compact
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

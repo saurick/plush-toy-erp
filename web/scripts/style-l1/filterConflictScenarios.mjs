@@ -98,7 +98,13 @@ export function createFilterConflictScenarios(deps) {
     await waitQuery({ due_status: 'overdue', blocked_only: true })
     assert.equal(await due(quick, '已逾期').getAttribute('aria-pressed'), 'true')
     assert.equal(await quick.getByRole('button', { name: /^仅看任务受阻/ }).getAttribute('aria-pressed'), 'true')
-    assert.equal(await trigger.getAttribute('aria-label'), '筛选进度，已应用 2 项')
+    assert.equal(await trigger.getAttribute('aria-label'), '筛选进度', '已显示的快捷条件不重复计入额外筛选')
+    await filters.getByLabel('记录范围', { exact: true }).getByText('全部记录', { exact: true }).click()
+    await waitQuery({ scope: 'all', due_status: 'overdue', blocked_only: true })
+    await panel.getByRole('button', { name: '筛选进度，已应用 1 项', exact: true }).waitFor()
+    assert.equal(await trigger.getAttribute('aria-label'), '筛选进度，已应用 1 项')
+    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    await waitQuery({ scope: 'active', due_status: 'overdue', blocked_only: true })
     assert.match(await due(filters, '已逾期').innerText(), /1/u)
     assert.match(await due(filters, '7天内到期').innerText(), /0/u)
     await due(filters, '7天内到期').click()
@@ -124,7 +130,8 @@ export function createFilterConflictScenarios(deps) {
     await search.press('Enter')
     await trigger.click()
     await waitForFilters(page, filters)
-    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    if (phone) assert.equal(await filters.getByRole('button', { name: '重置筛选', exact: true }).isDisabled(), true)
+    else await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
     assert.equal(await search.inputValue(), '云朵')
     assert.equal(await trigger.getAttribute('aria-label'), '筛选进度')
     if (phone) {
@@ -207,6 +214,7 @@ export function createFilterConflictScenarios(deps) {
       const scope = page.locator(phone ? '.mobile-workspace-task-views' : '.erp-task-management-scope')
       await scope.getByText('流程跟踪', { exact: true }).click()
       const panel = page.locator(phone ? '.mobile-workflow-tracking' : '.erp-workflow-tracking-panel')
+      const toolbar = phone ? panel : page.locator('.erp-workflow-tracking-controls')
       await panel.getByRole('button', { name: '重新读取', exact: true }).click()
       await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
       const requests = []
@@ -216,8 +224,8 @@ export function createFilterConflictScenarios(deps) {
         if (body?.method === 'list_tracking') requests.push(body.params)
       })
       const filters = page.getByRole('dialog', { name: phone ? '筛选流程' : '筛选条件', exact: true })
-      if (phone) await panel.getByRole('button', { name: /筛选流程/ }).click()
-      else await panel.getByRole('button', { name: /^筛选/ }).click()
+      if (phone) await toolbar.getByRole('button', { name: /筛选流程/ }).click()
+      else await toolbar.getByRole('button', { name: /^筛选/ }).click()
       await waitForFilters(page, filters)
       await choose(page, filters, '当前岗位', '工程')
       await Promise.all([
@@ -235,8 +243,8 @@ export function createFilterConflictScenarios(deps) {
           } else {
             await choose(page, filters, '关注事项', '只看逾期')
             await filters.getByRole('button', { name: '完成', exact: true }).click()
-            await panel.getByRole('button', { name: /^已结束，/ }).click()
-            await panel.getByRole('button', { name: /^筛选/ }).click()
+            await toolbar.getByRole('button', { name: /^已结束，/ }).click()
+            await toolbar.getByRole('button', { name: /^筛选/ }).click()
           }
         })(),
       ])
@@ -255,7 +263,7 @@ export function createFilterConflictScenarios(deps) {
       await page.reload()
       await Promise.all([
         page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.status === 'active'),
-        panel.getByRole('button', { name: /^进行中，/ }).click(),
+        toolbar.getByRole('button', { name: /^进行中，/ }).click(),
       ])
       assert(requests.filter((query) => query.status === 'active').every((query) => !query.attention && !query.owner_role_key))
       await waitForFiniteAnimations(page)
@@ -336,7 +344,7 @@ export function createFilterConflictScenarios(deps) {
       const operation = page.locator('.erp-business-operation-panel')
       const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
       const openFilters = async () => {
-        await operation.getByRole('button', { name: /^(filter )?筛选( · 已应用)?$/ }).click()
+        await operation.getByRole('button', { name: /^筛选(?:，已应用 \d+ 项)?$/u }).click()
         await waitForFilters(page, filters)
       }
       const response = () => page.waitForResponse((res) => res.url().includes('/rpc/') && res.request().postDataJSON()?.method === config.method)
@@ -371,6 +379,10 @@ export function createFilterConflictScenarios(deps) {
         await Promise.all([response(), selectStatus('草稿')])
         await reopen()
         assert.equal(page.filterQueries.at(-1)[config.field], 'draft', '合法缓存状态仍需保留')
+        assert.equal(await operation.getByRole('button', { name: '清空筛选', exact: true }).count(), 0, '仅快捷状态不显示额外条件清空入口')
+        await openFilters()
+        await Promise.all([response(), choose(page, filters, '记录范围', '全部记录')])
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
       } else {
         await openFilters()
         assert(page.filterQueries.length > 0)
@@ -389,8 +401,8 @@ export function createFilterConflictScenarios(deps) {
       await waitForFiniteAnimations(page)
       assert.equal(await filters.isVisible(), false)
       assert.equal(await directClear.count(), 0, `${config.key} 清空后恢复默认筛选状态`)
-      assert.equal(page.filterQueries.at(-1)[config.field] || '', '')
-      assert.equal(await operation.locator('button[aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
+      assert.equal(page.filterQueries.at(-1)[config.field] || '', config.group ? 'draft' : '', '清空额外条件保留有效的快捷状态')
+      assert.equal(await operation.getByRole('button', { name: /^筛选(?:，已应用 \d+ 项)?$/u }).evaluate((node) => node === document.activeElement), true)
       await assertNoHorizontalOverflow(page, `${config.key} 记录范围恢复`)
     },
   }))

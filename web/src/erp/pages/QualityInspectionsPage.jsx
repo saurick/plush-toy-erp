@@ -1246,27 +1246,20 @@ export default function QualityInspectionsPage() {
       recordLabel: '质检单',
     })
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    statusFilter ||
-    resultFilter ||
-    inspectionTypeFilter ||
-    purchaseReceiptFilter ||
-    materialFilter ||
-    warehouseFilter ||
-    lotFilter ||
-    dateFilterStart ||
-    dateFilterEnd ||
-    routePurchaseOrderID ||
-    routePurchaseReceiptID ||
-    routeQualityInspectionID ||
-    routeSourceType ||
-    routeSourceID ||
-    linkedKeyword
-  )
+  const activeFilterCount = [
+    resultFilter,
+    inspectionTypeFilter,
+    purchaseReceiptFilter,
+    materialFilter,
+    warehouseFilter,
+    lotFilter,
+    dateFilterStart || dateFilterEnd,
+    routePurchaseOrderID,
+    routePurchaseReceiptID,
+    routeQualityInspectionID,
+    routeSourceType && routeSourceID,
+  ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setKeyword('')
-    setStatusFilter('')
     setResultFilter('')
     setInspectionTypeFilter('')
     setPurchaseReceiptFilter('')
@@ -1276,8 +1269,9 @@ export default function QualityInspectionsPage() {
     setDateFilterField('inspected_at')
     setDateFilterStart('')
     setDateFilterEnd('')
+    setKeyword(resolvedRouteKeyword || linkedKeyword || keyword)
     clearRouteContext()
-  }, [clearRouteContext])
+  }, [clearRouteContext, setKeyword, keyword, linkedKeyword, resolvedRouteKeyword])
 
   return (
     <BusinessPageLayout className="erp-quality-inspections-page">
@@ -1286,7 +1280,7 @@ export default function QualityInspectionsPage() {
       <BusinessOperationPanel
         compact
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

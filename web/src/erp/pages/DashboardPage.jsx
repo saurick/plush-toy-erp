@@ -102,7 +102,7 @@ import {
   getWorkflowTaskReasonMeta,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskStatusRiskTags,
-  hasActiveWorkflowTaskBoardFilters,
+  workflowTaskBoardExtraFilterCount,
   normalizeWorkflowTaskPageSize,
   readWorkflowTaskBoardFiltersFromSearch,
   resolveWorkflowTaskBoardResponseState,
@@ -411,8 +411,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setSearchParams,
   ])
 
-  const hasActiveFilters = useMemo(
-    () => hasActiveWorkflowTaskBoardFilters({ ...filters, due: calendarView ? 'all' : filters.due, keyword: '', mode: 'all' }),
+  const activeFilterCount = useMemo(
+    () => workflowTaskBoardExtraFilterCount(filters, { calendar: calendarView }),
     [calendarView, filters]
   )
   const taskBoardResponse = useMemo(
@@ -767,7 +767,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       keyword: filters.keyword,
       lane: filters.lane,
       mode: filters.mode,
-      sort: 'smart',
+      sort: filters.sort,
       pageSize: filters.pageSize,
     }
     preserveTaskBoardTransitionHeight(
@@ -1520,7 +1520,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       filtersOpen={taskFiltersOpen}
                       onFiltersOpenChange={setTaskFiltersOpen}
                       onClearFilters={clearFilters}
-                      clearFiltersDisabled={!hasActiveFilters}
+                      activeFilterCount={activeFilterCount}
                       filters={
                         <>
                           {!calendarView && (

@@ -55,7 +55,7 @@ export function writeTrackingFilters(params, scope, changes) {
 }
 
 export function clearTrackingFilters(params, scope) {
-  return writeTrackingFilters(params, scope, Object.fromEntries([...FILTER_FIELDS, 'search'].map((key) => [key, ''])))
+  return writeTrackingFilters(params, scope, Object.fromEntries(FILTER_FIELDS.filter((key) => key !== 'status').map((key) => [key, ''])))
 }
 
 export function readTrackingPagination(params, scope) {

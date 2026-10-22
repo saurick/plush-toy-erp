@@ -280,16 +280,12 @@ export default forwardRef((
     <section aria-label="委外加工明细汇总" data-page-table-region>
       <BusinessOperationPanel
         compact
-        clearFiltersDisabled={
-          !(
-            filters.keyword ||
-            filters.supplier_id ||
-            filters.process_id ||
-            filters.lifecycle_status ||
-            filters.date_from ||
-            filters.date_to
-          )
-        }
+        activeFilterCount={[
+          filters.supplier_id,
+          filters.process_id,
+          filters.lifecycle_status,
+          filters.date_from || filters.date_to,
+        ].filter(Boolean).length}
         filters={
           <>
             <SearchInput
@@ -346,7 +342,6 @@ export default forwardRef((
         }
         onClearFilters={() =>
           update({
-            q: '',
             supplier: '',
             process: '',
             status: '',

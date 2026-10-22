@@ -201,10 +201,9 @@ export default function MobileTaskListScreen({
     onTaskListOptionsChange({
       statusKey: '',
       sourceType: '',
-      ...(history ? { period: '' } : { sortKey: activeCalendar ? taskSortKey : 'newest', due: '' }),
+      ...(!history ? { sortKey: activeCalendar ? taskSortKey : 'newest' } : {}),
+      ...(taskHistoryOptions.due ? { due: '' } : {}),
     })
-    if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO && !activeCalendar) setActiveFilterKey(MOBILE_TASK_FILTER_KEYS.ALL)
-    if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES) setActiveMessageTabKey(MOBILE_MESSAGE_TAB_KEYS.WARNING)
     if (activeCalendar) activeCalendar.change({ selection: defaultTaskCalendarDate(activeCalendar.month) })
   }
   const lastTaskTab = useRef(MOBILE_MAIN_TAB_KEYS.TODO)

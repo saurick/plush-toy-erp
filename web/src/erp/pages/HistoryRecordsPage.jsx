@@ -302,17 +302,11 @@ export default function HistoryRecordsPage() {
     setDetailRecord(record)
   }
 
-  const hasActiveFilters = Boolean(keyword.trim() || status)
-
   return (
     <BusinessPageLayout className="erp-history-records-page">
       <PageHeaderCard compact title="历史记录中心" />
       <BusinessOperationPanel
         compact
-        onClearFilters={() =>
-          updateQuery({ keyword: '', status: '', page: '' })
-        }
-        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <HistoryQueryFilters inline>

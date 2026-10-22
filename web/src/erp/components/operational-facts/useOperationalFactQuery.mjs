@@ -460,9 +460,8 @@ export function useOperationalFactQuery({
     [resetPaginationForKey, searchParams, setSearchParams]
   )
 
-  const clearFilters = useCallback(() => {
-    setKeyword('')
-    setStatusFilter('')
+  const clearFilters = useCallback((searchKeyword = linkedKeyword || keyword) => {
+    if (currentActiveKey !== 'finance') setStatusFilter('')
     setDateFieldByKey((prev) => ({
       ...prev,
       [currentActiveKey]: activeConfig.defaultDateField || 'occurred_at',
@@ -471,12 +470,20 @@ export function useOperationalFactQuery({
       ...prev,
       [currentActiveKey]: ['', ''],
     }))
-    clearRouteContext()
+    if (routeSalesOrderID || routeFactID) {
+      setKeyword(searchKeyword)
+      clearRouteContext()
+    } else resetPaginationForKey()
   }, [
     activeConfig.defaultDateField,
+    resetPaginationForKey,
+    routeSalesOrderID,
+    routeFactID,
+    linkedKeyword,
+    keyword,
+    setKeyword,
     clearRouteContext,
     currentActiveKey,
-    setKeyword,
     setStatusFilter,
     setDateFieldByKey,
     setDateRangeByKey,

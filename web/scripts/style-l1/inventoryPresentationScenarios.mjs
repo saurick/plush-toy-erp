@@ -61,7 +61,7 @@ export function createInventoryPresentationScenarios(deps) {
         await page.setViewportSize({ width: 1920, height: 1080 })
         const search = command.locator('.erp-business-operation-panel__search input')
         await search.fill('SKU')
-        await command.getByRole('button', { name: /^筛选(?: · 已应用)?$/u }).click()
+        await command.getByRole('button', { name: /^筛选(?:，已应用 \d+ 项)?$/u }).click()
         await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
         await page.getByRole('dialog', { name: '筛选条件' }).getByRole('button', { name: '完成', exact: true }).click()
         assert.equal(await search.inputValue(), 'SKU', '打开和关闭筛选应保留搜索词')

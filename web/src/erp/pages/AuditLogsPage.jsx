@@ -674,14 +674,11 @@ export default function AuditLogsPage() {
     columns: exportColumns,
     recordLabel: '操作记录',
   })
-  const hasActiveFilters = Boolean(
-    source ||
-    eventKey ||
-    keyword.trim() ||
-    createdFrom ||
-    createdTo ||
-    riskFilter !== 'all'
-  )
+  const activeFilterCount = [
+    eventKey,
+    createdFrom || createdTo,
+    riskFilter !== 'all',
+  ].filter(Boolean).length
   const resetPage = () =>
     setPagination((previous) => ({ ...previous, current: 1 }))
 
@@ -690,11 +687,9 @@ export default function AuditLogsPage() {
       <PageHeaderCard compact title="系统操作记录" />
       <BusinessOperationPanel
         compact
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         onClearFilters={() => {
-          setSource('')
           setEventKey('')
-          setKeyword('')
           setCreatedFrom('')
           setCreatedTo('')
           setRiskFilter('all')

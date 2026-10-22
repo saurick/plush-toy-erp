@@ -1026,24 +1026,18 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       moduleTitle: moduleItem?.title || '页面暂不可用',
       columns,
     })
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-      status ||
-      ownerRoleKey ||
-      dueFrom ||
-      dueTo ||
-      hasRouteSourceContext
-  )
+  const activeFilterCount = [
+    status,
+    ownerRoleKey,
+    dueFrom || dueTo,
+    hasRouteSourceContext,
+  ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setStatus('')
     setOwnerRoleKey('')
     setDueFrom('')
     setDueTo('')
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('link_keyword')
-    nextParams.delete('link_source')
-    nextParams.delete('link_fields')
     nextParams.delete('source_type')
     nextParams.delete('source_id')
     setSearchParams(nextParams, { replace: true })
@@ -1051,7 +1045,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   }, [
     searchParams,
     setSearchParams,
-    setKeyword,
     setStatus,
     setOwnerRoleKey,
     setDueFrom,
@@ -1081,7 +1074,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       <BusinessOperationPanel
         compact
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

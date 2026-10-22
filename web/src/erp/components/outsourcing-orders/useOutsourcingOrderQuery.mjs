@@ -30,6 +30,7 @@ import {
   LIFECYCLE_SCOPE,
   filterLifecycleStatusOptions,
   lifecycleScopeFromSearchParams,
+  lifecycleScopeIncludesStatus,
   withLifecycleScopeSearchParam,
 } from '../../utils/lifecycleScope.mjs'
 
@@ -262,17 +263,12 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
     ]
   )
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-      linkedKeyword ||
-      routeOutsourcingOrderID ||
-      routeOutsourcingFactID ||
-      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-      statusFilter ||
-      supplierFilter ||
-      dateRange?.[0] ||
-      dateRange?.[1]
-  )
+  const activeFilterCount = [
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT,
+    supplierFilter,
+    dateRange?.[0] || dateRange?.[1],
+    sortValue !== 'updated_at:desc',
+  ].filter(Boolean).length
 
   const clearRouteContext = useCallback(
     (resetScope = false) => {
@@ -292,15 +288,15 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
   )
 
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
-    setStatusFilter('')
+    setStatusFilter((current) => lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, current, ['closed', 'canceled']) ? current : '')
     setSupplierFilter('')
     setDateField('order_date')
     setDateRange([null, null])
+    setSortValue('updated_at:desc')
     setPagination((current) => ({ ...current, current: 1 }))
-    clearRouteContext(true)
-  }, [clearRouteContext])
+    setSearchParams((current) => withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT), { replace: true })
+  }, [setSearchParams])
   return {
     searchParams,
     setSearchParams,
@@ -337,7 +333,7 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
     beginLatestRequest,
     loadOrders,
     loadExportOrders,
-    hasActiveFilters,
+    activeFilterCount,
     clearRouteContext,
     clearFilters,
   }

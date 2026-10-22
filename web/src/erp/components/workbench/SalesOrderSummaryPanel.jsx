@@ -279,16 +279,12 @@ export default function SalesOrderSummaryPanel({
     <>
       <BusinessOperationPanel
         compact
-        clearFiltersDisabled={
-          !(
-            filters.keyword ||
-            filters.customer ||
-            filters.sales_owner ||
-            filters.lifecycle_status ||
-            filters.date_from ||
-            filters.date_to
-          )
-        }
+        activeFilterCount={[
+          filters.customer,
+          filters.sales_owner,
+          filters.lifecycle_status,
+          filters.date_from || filters.date_to,
+        ].filter(Boolean).length}
         filters={
           <>
             {summaryTypeControl}
@@ -331,7 +327,6 @@ export default function SalesOrderSummaryPanel({
         }
         onClearFilters={() =>
           update({
-            q: '',
             customer: '',
             owner: '',
             status: '',

@@ -25,6 +25,7 @@ import {
   getWorkflowTaskStatusMeta,
   getWorkflowTaskStatusRiskTags,
   hasActiveWorkflowTaskBoardFilters,
+  workflowTaskBoardExtraFilterCount,
   readWorkflowTaskBoardFiltersFromSearch,
   resolveWorkflowTaskBoardResponseState,
   TASK_BOARD_ROLE_OPTIONS,
@@ -32,6 +33,13 @@ import {
 } from './workflowTaskBoard.mjs'
 
 const now = Math.floor(Date.now() / 1000)
+
+test('task filter count excludes search, visible category and sorting, counting a date range once', () => {
+  assert.equal(workflowTaskBoardExtraFilterCount({ keyword: '小熊', mode: 'approval', lane: 'actionable', sort: 'newest' }), 0)
+  assert.equal(workflowTaskBoardExtraFilterCount({ lane: 'finished', period: 'custom', dateFrom: '2026-10-01', dateTo: '2026-10-22', status: 'done', role: 'warehouse', sourceType: 'sales_order' }), 4)
+  assert.equal(workflowTaskBoardExtraFilterCount({ due: 'overdue' }), 1)
+  assert.equal(workflowTaskBoardExtraFilterCount({ due: 'overdue' }, { calendar: true }), 0)
+})
 
 test('task overview prioritizes exceptions and due work, deduplicates overlapping previews and leaves finished work in its category', () => {
   const blocked = { id: 1, task_status_key: 'blocked' }

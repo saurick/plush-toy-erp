@@ -18,7 +18,8 @@ import {
   progressIdentityPresentation,
   progressDueOptions,
   progressFilterCount,
-  PROGRESS_FILTER_RESET,
+  progressFilterReset,
+  progressExtraFilters,
   withProgressFilters,
 } from './businessProgress.mjs'
 
@@ -193,7 +194,7 @@ test('source links identify the source record and keep task codes encoded', () =
 test('交期与受阻组合，结束范围清理冲突且恢复时不复现', () => {
   for (const due_status of ['overdue', 'due_soon']) {
     const active = new URLSearchParams({ view: 'orders', scope: 'active', due_status, blocked_only: 'true', q: '小熊' })
-    assert.equal(progressFilterCount(progressQueryFromURL(active)), 2)
+    assert.equal(progressFilterCount(progressQueryFromURL(active)), 0)
     const ended = withProgressFilters(active, { scope: 'ended' })
     assert.equal(ended.get('due_status'), 'all')
     assert.equal(ended.has('blocked_only'), false)
@@ -212,13 +213,21 @@ test('交期与受阻组合，结束范围清理冲突且恢复时不复现', ()
   assert.equal(progressQueryFromURL(new URLSearchParams('blocked_only=false')).blocked_only, false)
 })
 
-test('两端数量提示计算全部生效条件，搜索不计数，重置保留搜索', () => {
+test('两端仅计算额外条件，重置保留搜索与快捷交期和受阻', () => {
   const params = new URLSearchParams('view=production&scope=all&due_status=overdue&blocked_only=true&unlinked_only=true&owner=小陈&from=2026-10-01&q=小熊')
-  assert.equal(progressFilterCount(progressQueryFromURL(params)), 6)
-  const reset = withProgressFilters(params, PROGRESS_FILTER_RESET)
+  assert.equal(progressFilterCount(progressQueryFromURL(params)), 4)
+  const reset = withProgressFilters(params, progressFilterReset(progressQueryFromURL(params)))
   assert.equal(progressFilterCount(progressQueryFromURL(reset)), 0)
   assert.equal(reset.get('q'), '小熊')
   assert.equal(reset.get('view'), 'production')
+  assert.equal(reset.get('due_status'), 'overdue')
+  assert.equal(reset.get('blocked_only'), 'true')
+  assert.equal(progressExtraFilters(progressQueryFromURL(reset)).length, 0)
+  const undated = new URLSearchParams('scope=all&due_status=undated&q=小熊')
+  assert.equal(progressFilterCount(progressQueryFromURL(undated)), 2)
+  const cleared = withProgressFilters(undated, progressFilterReset(progressQueryFromURL(undated)))
+  assert.equal(cleared.get('due_status'), 'all')
+  assert.equal(cleared.get('q'), '小熊')
 })
 
 test('未定交期与具体日期互斥，最后选择生效且搜索不受影响', () => {

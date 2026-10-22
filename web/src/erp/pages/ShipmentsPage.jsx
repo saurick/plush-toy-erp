@@ -1512,32 +1512,29 @@ export default function ShipmentsPage() {
     columns: exportColumns,
     recordLabel: '出货单',
   })
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    statusFilter ||
-    customerFilter ||
-    productFilter ||
-    warehouseFilter ||
-    dateFilterStart ||
-    dateFilterEnd ||
-    routeSalesOrderID ||
-    routeShipmentID ||
-    linkedKeyword
-  )
+  const activeFilterCount = [
+    customerFilter,
+    productFilter,
+    warehouseFilter,
+    dateFilterStart || dateFilterEnd,
+    routeSalesOrderID,
+    routeShipmentID,
+  ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setKeyword('')
-    setStatusFilter('')
     setCustomerFilter('')
     setProductFilter('')
     setWarehouseFilter('')
     setDateFilterField('planned_ship_at')
     setDateFilterStart('')
     setDateFilterEnd('')
+    setKeyword(resolvedRouteKeyword || linkedKeyword || keyword)
     clearRouteContext()
   }, [
     clearRouteContext,
     setKeyword,
-    setStatusFilter,
+    keyword,
+    linkedKeyword,
+    resolvedRouteKeyword,
     setCustomerFilter,
     setProductFilter,
     setWarehouseFilter,
@@ -1602,7 +1599,7 @@ export default function ShipmentsPage() {
       <BusinessOperationPanel
         compact
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

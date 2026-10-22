@@ -660,34 +660,22 @@ export default function MasterDataPage({ type }) {
     setStockCategory('')
   }, [effectiveType, setKeyword, setPagination, setStockCategory])
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-    (effectiveType === 'suppliers' && supplierTypeFilter) ||
-    (effectiveType === 'materials' && stockCategory)
-  )
+  const activeFilterCount = [
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT,
+    effectiveType === 'suppliers' && supplierTypeFilter,
+    effectiveType === 'materials' && stockCategory,
+  ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
-    setSupplierTypeFilter('')
-    setStockCategory('')
-    const nextParams = withLifecycleScopeSearchParam(
-      searchParams,
-      LIFECYCLE_SCOPE.CURRENT
-    )
-    nextParams.delete('keyword')
-    nextParams.delete('supplier_type')
-    setSearchParams(nextParams, { replace: true })
+    if (effectiveType === 'suppliers') setSupplierTypeFilter('')
+    if (effectiveType === 'materials') setStockCategory('')
+    setSearchParams((current) => {
+      const next = withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT)
+      if (effectiveType === 'suppliers') next.delete('supplier_type')
+      return next
+    }, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [
-    searchParams,
-    setKeyword,
-    setLifecycleScope,
-    setPagination,
-    setSearchParams,
-    setStockCategory,
-    setSupplierTypeFilter,
-  ])
+  }, [effectiveType, setLifecycleScope, setSupplierTypeFilter, setStockCategory, setSearchParams, setPagination])
 
   const handleProductCatalogTabChange = useCallback(
     (nextType) => {
@@ -1004,7 +992,7 @@ export default function MasterDataPage({ type }) {
       <BusinessOperationPanel
         compact
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

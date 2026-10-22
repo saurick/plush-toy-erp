@@ -315,7 +315,8 @@ export function createDashboardTaskScenarios({
         )
         await moreFilters.click()
         await extraFilters.waitFor({ state: 'hidden' })
-        assert.match(await moreFilters.innerText(), /已应用/)
+        assert.match(await moreFilters.innerText(), /筛选 · \d+/u)
+        assert.match(await moreFilters.getAttribute('aria-label'), /^筛选，已应用 \d+ 项$/u)
         await page.getByRole('button', { name: /异常处理/ }).click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(location.search)

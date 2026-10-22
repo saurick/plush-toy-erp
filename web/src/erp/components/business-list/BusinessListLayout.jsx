@@ -1034,7 +1034,7 @@ export function BusinessOperationPanel({
   actions = null,
   primaryAction = null,
   onClearFilters = null,
-  clearFiltersDisabled,
+  activeFilterCount = 0,
   children,
   showSelection = true,
   compact = false,
@@ -1045,7 +1045,7 @@ export function BusinessOperationPanel({
   const selectionAvailability = React.useContext(BusinessSelectionAvailabilityContext)
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
-  const hasActiveFilters = hasClearFilters && clearFiltersDisabled === false
+  const hasActiveFilters = activeFilterCount > 0
   const childActions = React.Children.toArray(flattenSelectionActions(children))
   const hasSelectedRecord = childActions.some((child) => child.type === SelectionActionBar && Number(child.props.selectedCount) > 0)
   const hasRecordActions = childActions.some((child) =>
@@ -1175,7 +1175,7 @@ export function BusinessOperationPanel({
                         aria-label="清空筛选"
                         size="small"
                         type="text"
-                        disabled={clearFiltersDisabled}
+                        disabled={!hasActiveFilters}
                         icon={<RollbackOutlined />}
                         onClick={() => {
                           onClearFilters()
@@ -1202,6 +1202,7 @@ export function BusinessOperationPanel({
               <Button
                 ref={filterTriggerRef}
                 icon={<FilterOutlined aria-hidden />}
+                aria-label={hasActiveFilters ? `筛选，已应用 ${activeFilterCount} 项` : '筛选'}
                 aria-haspopup="dialog"
                 aria-controls={filtersOpen ? filterPanelId : undefined}
                 aria-expanded={filtersOpen}
@@ -1209,11 +1210,11 @@ export function BusinessOperationPanel({
                   hasActiveFilters ? 'erp-business-filter-trigger--active' : ''
                 }
               >
-                筛选{hasActiveFilters ? ' · 已应用' : ''}
+                筛选{hasActiveFilters ? ` · ${activeFilterCount}` : ''}
               </Button>
             </Popover>
-            {hasActiveFilters ? (
-              <Tooltip title="清空筛选">
+            {hasActiveFilters && hasClearFilters ? (
+              <Tooltip title="清空额外条件，保留搜索与快捷筛选">
                 <Button
                   className="erp-business-filter-clear"
                   aria-label="清空筛选"

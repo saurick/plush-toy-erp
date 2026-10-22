@@ -180,9 +180,13 @@ export default function ProductionExceptionDecisionPanel({
       Number.isSafeInteger(linkedProductionExceptionID) &&
       linkedProductionExceptionID > 0
   )
-  const hasActiveFilters = Boolean(
-    hasListFilters || hasRouteProductionOrder || hasExactContext
-  )
+  const activeFilterCount = [
+    decisionTypeFilter,
+    statusFilter,
+    executionStatusFilter,
+    hasRouteProductionOrder,
+    hasExactContext,
+  ].filter(Boolean).length
 
   useEffect(() => {
     if (!Number.isSafeInteger(linkedProductionExceptionID) || linkedProductionExceptionID <= 0) {
@@ -646,7 +650,7 @@ export default function ProductionExceptionDecisionPanel({
           </>
         }
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         actions={
           <BusinessListToolbarActions
             showExport={false}

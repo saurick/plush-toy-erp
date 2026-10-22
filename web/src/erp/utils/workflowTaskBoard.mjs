@@ -430,6 +430,18 @@ export function hasActiveWorkflowTaskBoardFilters(filters = {}) {
   )
 }
 
+export function workflowTaskBoardExtraFilterCount(filters = {}, { calendar = false } = {}) {
+  const normalized = normalizeWorkflowTaskBoardFilters(filters)
+  return [
+    normalized.period,
+    ...DISCOVERY_FILTER_KEYS.map((key) => normalized[key]),
+    normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status,
+    normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role,
+    !calendar && normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due,
+    normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType,
+  ].filter(Boolean).length
+}
+
 export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
   const params =
     typeof searchParams.get === 'function'

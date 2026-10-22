@@ -1099,26 +1099,21 @@ export default function InventoryLedgerPage() {
     recordLabel: `${activeLabel}记录`,
   })
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    subjectType ||
-    stockCategory ||
-    subjectID ||
-    productSkuID ||
-    warehouseID ||
-    lotID ||
-    lotStatus ||
-    txnType ||
-    sourceType ||
-    dateFilterStart ||
-    dateFilterEnd ||
-    routeSourceID ||
-    routeSourceType ||
-    routeLotID ||
-    linkedKeyword
-  )
+  const activeFilterCount = [
+    subjectType,
+    stockCategory,
+    subjectID,
+    productSkuID,
+    warehouseID,
+    lotID,
+    activeView === VIEW_LOTS && lotStatus,
+    activeView === VIEW_TXNS && txnType,
+    activeView === VIEW_TXNS && sourceType,
+    activeView !== VIEW_BALANCES && (dateFilterStart || dateFilterEnd),
+    Boolean(routeSourceType && routeSourceID),
+    Boolean(routeLotID),
+  ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setSubjectType('')
     setStockCategory('')
     setSubjectID('')
@@ -1130,12 +1125,15 @@ export default function InventoryLedgerPage() {
     setSourceType('')
     setDateFilterStart('')
     setDateFilterEnd('')
+    setKeyword(linkedKeyword || keyword)
     clearRouteContext()
   }, [
     clearRouteContext,
+    setKeyword,
+    keyword,
+    linkedKeyword,
     setDateFilterEnd,
     setDateFilterStart,
-    setKeyword,
     setLotID,
     setLotStatus,
     setProductSkuID,
@@ -1377,7 +1375,7 @@ export default function InventoryLedgerPage() {
           </div>
         }
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

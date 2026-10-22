@@ -5153,7 +5153,7 @@
     }
 
     function activeFilterCount() {
-      return [state.filterParty.trim(), state.filterOwner !== 'all', state.filterRisk !== 'all', !state.filterIncludeEnded, state.filterDateFrom, state.filterDateTo].filter(Boolean).length;
+      return [state.filterParty.trim(), state.filterOwner !== 'all', state.filterRisk !== 'all', !state.filterIncludeEnded, state.filterDateFrom || state.filterDateTo].filter(Boolean).length;
     }
 
     function resetListFilters() {
@@ -6387,10 +6387,10 @@ active = new Set()
           ${config.key === 'inventory' ? `<div class="inventory-navigation"><div class="segment" role="tablist" aria-label="库存台账内容">${[['balances','库存余额'],['lots','库存批次'],['txns','库存变动记录']].map(([key,label])=>`<button type="button" role="tab" aria-selected="${state.inventoryView===key}" class="${state.inventoryView===key?'active':''}" data-action="inventory-view" data-value="${key}">${label}</button>`).join('')}</div>${state.inventoryView==='balances'?`<div class="inventory-display" role="group" aria-label="库存余额展示方式">${[['list','余额明细'],['distribution','仓库分布']].map(([key,label])=>`<button type="button" aria-pressed="${state.inventoryDisplay===key}" class="${state.inventoryDisplay===key?'active':''}" data-action="inventory-display" data-value="${key}">${label}</button>`).join('')}</div>`:''}</div>` : ''}
           ${inlineView?viewSwitch:''}
           ${config.key === 'history' ? `<label class="control"><span>记录类型</span><ui-select id="history-source" aria-label="历史记录类型" data-required-selection>${[['基础资料', ['客户档案']], ['业务单据与版本', ['销售订单', '采购订单', '委外订单']]].map(([label, sources]) => `<optgroup label="${label}">${sources.map(source => `<option value="${source}" ${state.historySource === source ? 'selected' : ''}>${source}</option>`).join('')}</optgroup>`).join('')}</ui-select></label>` : ''}
-          ${config.key === 'inventory' ? '' : `<div class="segment business-status-filters" role="group" aria-label="状态筛选">${countedStatuses.map(([key,label,count])=>`<button type="button" aria-pressed="${state.status===key}" aria-label="${label}，${count===null?'数量暂不可用':`共 ${count} 条`}" class="${state.status===key?'active':''}" data-action="status" data-value="${key}">${label}<b>${count===null?'—':count}</b></button>`).join('')}</div>`}
+          ${config.key === 'inventory' ? '' : `<div class="segment business-status-filters" role="group" aria-label="状态筛选">${countedStatuses.map(([key,label,count])=>`<button type="button" aria-pressed="${state.status===key}" aria-label="${label}，${count===null?'数量暂不可用':`共 ${count} 条`}" class="${state.status===key?'active':''}" data-action="status" data-value="${key}">${label}<b>${count===null?'—':count}</b>${key!=='all'&&state.status===key?icon('close'):''}</button>`).join('')}</div>`}
           <label class="search">${icon('search')}<input id="list-search" value="${escapeHTML(state.search)}" placeholder="搜索${config.entity}、${config.party}、${config.item}" aria-label="搜索" /></label>
           <div class="command-actions">
-            ${renderFilterTrigger(activeFilterCount()>0,'open-filter','clear-filter')}
+            ${renderFilterTrigger(activeFilterCount(),'open-filter','clear-filter')}
             ${renderBusinessActionMenu(`<button class="btn" data-action="export">${icon('export')}导出筛选结果</button><button class="btn" data-action="open-columns">${icon('columns')}列设置</button>`,'表格工具')}
             ${config.primary ? `<button class="btn ${selectedRows.length?'':'primary'}" data-action="new-record">${icon('plus')}<span>${config.primary}</span></button>` : ''}
           </div>
@@ -15700,9 +15700,10 @@ return {orders,financeCustomers};})();
     function renderDirectFilterChoices(label, value, options, action, field, disabled=false) {
       return `<div class="filter-choice-field"><span>${label}</span><div class="filter-choice-options" role="group" aria-label="${label}">${options.map(([key,text])=>`<button class="filter-chip" data-action="${action}" data-field="${field}" data-value="${key}" aria-pressed="${String(value||'')===String(key)}" ${disabled?'disabled':''}>${text}</button>`).join('')}</div></div>`;
     }
-    function renderFilterTrigger(active, openAction='open-task-filter', clearAction='task-filter-clear-direct') {
+    function renderFilterTrigger(count, openAction='open-task-filter', clearAction='task-filter-clear-direct') {
+      const active=count>0;
       const expanded=state.overlay===(openAction==='open-filter'?'filter':'task-filter');
-      return `<span class="filter-trigger-group" role="group" aria-label="筛选操作"><button class="control ${active?'filter-active':''}" data-action="${openAction}" aria-haspopup="dialog" aria-expanded="${expanded}">${icon('filter')}筛选${active?' · 已应用':''}</button>${active?`<button class="control filter-active filter-trigger-clear" data-action="${clearAction}" aria-label="清空筛选" title="清空筛选">${icon('close')}</button>`:''}</span>`;
+      return `<span class="filter-trigger-group" role="group" aria-label="筛选操作"><button class="control ${active?'filter-active':''}" data-action="${openAction}" aria-label="筛选${active?`，已应用 ${count} 项`:''}" aria-haspopup="dialog" aria-expanded="${expanded}">${icon('filter')}筛选${active?` · ${count}`:''}</button>${active?`<button class="control filter-active filter-trigger-clear" data-action="${clearAction}" aria-label="清空筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</span>`;
     }
     function renderTaskFilterPopover() {
       const tracking = ['visible','started','participated'].includes(state.boardMode);
@@ -15717,7 +15718,7 @@ return {orders,financeCustomers};})();
       const trigger = document.querySelector('[data-action="open-task-filter"]')?.getBoundingClientRect();
       const top = Math.min((trigger?.bottom || 130) + 8, Math.max(12, innerHeight - 360));
       const right = Math.max(12, innerWidth - (trigger?.right || innerWidth - 12));
-      const active = tracking ? Object.values(f).some(Boolean) : Boolean(state.boardSearch || state.boardRole !== 'all' || Object.values(taskDiscoveryDemo).some(Boolean));
+      const active = tracking ? [f.role,f.source,f.attention,f.from||f.to].some(Boolean) : Boolean(state.boardRole !== 'all' || Object.values(taskDiscoveryDemo).some(Boolean));
       return `<section class="popover" id="task-filter-popover" role="dialog" aria-label="筛选条件" style="top:${top}px;right:${right}px;width:min(560px,calc(100vw - 24px))"><div class="popover-head"><strong>筛选条件</strong><button class="btn" data-action="task-filter-clear" ${active?'':'disabled'}>清空筛选</button></div>${tracking?'':renderTaskDiscoveryControls()}<div class="filter-grid">${fields}</div><div class="popover-foot"><button class="btn primary" data-action="close-overlay">完成</button></div></section>`;
     }
 
@@ -15997,7 +15998,7 @@ return {orders,financeCustomers};})();
       const active=(mobile?state.mobileExceptionState:state.exceptionState)||'';
       // The H07 incident remains open when its associated task is completed.
       const options=[['','全部异常',matches?1:0],['open','未处理完',matches?1:0],['closed','已处理完',0]];
-      return `<div class="${mobile?'rm-quick-filters':'task-handling-toolbar'} exception-states" role="group" aria-label="异常处理状态">${options.map(([key,label,count])=>`<button class="rm-chip ${active===key?'active':''}" aria-pressed="${active===key}" data-action="${mobile?'mobile-exception-state':'exception-state'}" data-value="${key}">${label} <b>${count}</b>${mobile&&key&&active===key?icon('close'):''}</button>`).join('')}</div>`;
+      return `<div class="${mobile?'rm-quick-filters':'task-handling-toolbar'} exception-states" role="group" aria-label="异常处理状态">${options.map(([key,label,count])=>`<button class="rm-chip ${active===key?'active':''}" aria-pressed="${active===key}" data-action="${mobile?'mobile-exception-state':'exception-state'}" data-value="${key}">${label} <b>${count}</b>${key&&active===key?icon('close'):''}</button>`).join('')}</div>`;
     }
     function renderExceptionSummary(mobile, visible, pending) {
       const active=(mobile?state.mobileExceptionView:state.exceptionView)||'';
@@ -16021,7 +16022,7 @@ return {orders,financeCustomers};})();
     }
     function renderTrackingStates(f, mobile=false) {
       const active=Number(trackingDemoMatches(f));
-      return `<div class="${mobile?'rm-tracking-status':'task-handling-toolbar exception-states'}" role="group" aria-label="流转状态">${[['','全部状态',active],['active','进行中',active],['completed','已结束',0]].map(([key,label,count])=>`<button class="rm-chip ${(!f.status&&!key)||f.status===key?'active':''}" aria-pressed="${(!f.status&&!key)||f.status===key}" data-action="${mobile?'mobile-tracking-status':'tracking-status'}" data-value="${key}">${label}<span class="filter-chip-count">${count}</span>${mobile&&key&&f.status===key?icon('close'):''}</button>`).join('')}</div>`;
+      return `<div class="${mobile?'rm-tracking-status':'task-handling-toolbar exception-states'}" role="group" aria-label="流转状态">${[['','全部状态',active],['active','进行中',active],['completed','已结束',0]].map(([key,label,count])=>`<button class="rm-chip ${(!f.status&&!key)||f.status===key?'active':''}" aria-pressed="${(!f.status&&!key)||f.status===key}" data-action="${mobile?'mobile-tracking-status':'tracking-status'}" data-value="${key}">${label}<span class="filter-chip-count">${count}</span>${key&&f.status===key?icon('close'):''}</button>`).join('')}</div>`;
     }
 
     const taskCalendarDemo = {
@@ -16057,7 +16058,7 @@ return {orders,financeCustomers};})();
       if (tracking) {
         const f = state.trackingFilters[state.boardMode] || {};
         const filters = `<label class="search">${icon('search')}<input data-tracking-filter="keyword" aria-label="搜索流转记录" value="${escapeHTML(f.keyword || '')}" placeholder="单号 / 任务 / 产品 / 款号" /></label>
-          ${renderFilterTrigger(Object.values(f).some(Boolean))}`;
+          ${renderFilterTrigger([f.role,f.source,f.attention,f.from||f.to].filter(Boolean).length)}`;
         const matches = (!f.status || f.status==='active') && trackingDemoMatches(f);
         const pageSize = state.trackingPageSizes[state.boardMode] || 20;
         const pager = `<nav class="statistics-pagination erp-task-pagination" aria-label="流转记录分页"><div class="erp-task-pagination__summary"><span role="status">第 ${matches?'1–1':'0–0'} 条，共 ${matches?1:0} 条</span><ui-select data-tracking-page-size aria-label="每页流转记录数" data-required-selection>${[20,50,100].map(value=>`<option value="${value}" ${value===pageSize?'selected':''}>${value} 条 / 页</option>`).join('')}</ui-select></div><div class="statistics-pager"><button class="btn" aria-label="上一页" disabled>← 上一页</button><button class="btn is-current" aria-current="page" disabled>1</button><button class="btn" aria-label="下一页" disabled>下一页 →</button></div></nav>`;
@@ -16069,12 +16070,12 @@ return {orders,financeCustomers};})();
       const displayedTasks = state.boardStatus === 'all' ? ['blocked','due','normal'].flatMap(key=>filtered.filter(task=>task.lane===key).slice(0,2)) : filtered;
       if(state.boardMode==='todo'&&taskCalendarDemo.desktop.layout==='calendar') {
         const rows=tasks.filter(task=>matchTaskDiscovery(task)&&task.lane!=='done'&&(state.boardRole==='all'||task.role===state.boardRole)&&(!q||Object.values(task).join(' ').toLowerCase().includes(q)));
-        return `${header}<section class="surface operation-surface"><div class="command-row">${calendarSwitch}<label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="搜索订单、产品、任务" /></label>${renderFilterTrigger(Boolean(state.boardRole!=='all'||state.boardSearch||Object.values(taskDiscoveryDemo).some(Boolean)))}</div></section><section class="surface board-surface">${renderTaskCalendarDemo(rows)}</section>`;
+        return `${header}<section class="surface operation-surface"><div class="command-row">${calendarSwitch}<label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="搜索订单、产品、任务" /></label>${renderFilterTrigger(Number(state.boardRole!=='all')+Object.values(taskDiscoveryDemo).filter(Boolean).length)}</div></section><section class="surface board-surface">${renderTaskCalendarDemo(rows)}</section>`;
       }
       if(taskHandlingPreview) {
         const categories=[['all','全部'],['normal','常规待办'],['blocked','阻塞'],['due','到期提醒'],...(state.boardMode==='all'?[['done','已结束']]:[])];
         const rows=displayedTasks.map(task=>`<tr data-lane="${task.lane}" data-action="open-task" data-id="${task.id}"><td><div class="product-cell">${renderProductThumb(0,getTaskListSubject(task))}<div><button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task)}</button><small>${escapeHTML(task.object)}</small><small>${escapeHTML(demoTaskPath(task))}</small></div></div></td><td>${escapeHTML(listConfig[task.sourcePage]?.title||'业务单据')} · ${copyValue(getTaskListSource(task)?.no||task.object)}<small>${escapeHTML(demoTaskTime(task))}</small></td><td><span class="badge ${task.badge}">${escapeHTML(taskListStatusLabel(task))}</span><div class="task-reason">${escapeHTML(task.reason||'打开任务查看办理依据与处理记录。')}</div></td><td>${escapeHTML(task.role)}<small>${escapeHTML(demoAssignee(task))}</small></td></tr>`).join('');
-        return `${header}<section class="surface board-surface task-handling-board"><div class="task-handling-toolbar">${calendarSwitch}<div class="segment" aria-label="任务分类">${categories.map(([key,label])=>`<button class="${state.boardStatus===key?'active':''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus===key}">${label}<b>${inScope.filter(task=>key==='all'||task.lane===key).length}</b></button>`).join('')}</div><label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="订单 / 产品 / 物料 / 款号" aria-label="搜索任务" /></label>${renderFilterTrigger(state.boardRole!=='all'||Object.values(taskDiscoveryDemo).some(Boolean))}</div><div class="task-handling-table"><table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 处理人</th></tr></thead><tbody>${rows||'<tr><td colspan="4"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table></div><nav class="statistics-pagination erp-task-pagination" aria-label="任务分页"><span role="status">第 ${filtered.length?'1–'+filtered.length:'0–0'} 项，共 ${filtered.length} 项</span><div class="statistics-pager"><button class="btn" disabled>← 上一页</button><button class="btn is-current" disabled>1</button><button class="btn" disabled>下一页 →</button></div></nav></section>`;
+        return `${header}<section class="surface board-surface task-handling-board"><div class="task-handling-toolbar">${calendarSwitch}<div class="segment" aria-label="任务分类">${categories.map(([key,label])=>`<button class="${state.boardStatus===key?'active':''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus===key}">${label}<b>${inScope.filter(task=>key==='all'||task.lane===key).length}</b></button>`).join('')}</div><label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="订单 / 产品 / 物料 / 款号" aria-label="搜索任务" /></label>${renderFilterTrigger(Number(state.boardRole!=='all')+Object.values(taskDiscoveryDemo).filter(Boolean).length)}</div><div class="task-handling-table"><table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 处理人</th></tr></thead><tbody>${rows||'<tr><td colspan="4"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table></div><nav class="statistics-pagination erp-task-pagination" aria-label="任务分页"><span role="status">第 ${filtered.length?'1–'+filtered.length:'0–0'} 项，共 ${filtered.length} 项</span><div class="statistics-pager"><button class="btn" disabled>← 上一页</button><button class="btn is-current" disabled>1</button><button class="btn" disabled>下一页 →</button></div></nav></section>`;
       }
       const lanes = [
         ['normal','常规待办',''], ['blocked','阻塞','blocked'], ['due','到期提醒','due'], ['done','已结束','']
@@ -16088,7 +16089,7 @@ return {orders,financeCustomers};})();
             ${calendarSwitch}
             <div class="segment" aria-label="任务分类">${[['all','概览'],...lanes].map(([key,label]) => { const count=inScope.filter(t=>key==='all'||t.lane===key).length; return `<button class="${state.boardStatus === key ? 'active' : ''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus === key}">${label}<b>${count}</b></button>`; }).join('')}</div>
             <label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="搜索订单、产品、任务" /></label>
-            ${renderFilterTrigger(Boolean(state.boardRole!=='all'||state.boardSearch||Object.values(taskDiscoveryDemo).some(Boolean)))}
+            ${renderFilterTrigger(Number(state.boardRole!=='all')+Object.values(taskDiscoveryDemo).filter(Boolean).length)}
           </div>
         </section>
         <section class="surface board-surface">${content}</section>`;
@@ -16485,13 +16486,13 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover rm-tracking-filters" role="dialog" aria-label="流转筛选"><div class="rm-sheet-head"><strong>流转筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭筛选">${icon('close')}</button></div><div class="rm-filter-fields">
         <div class="rm-sheet-group"><span>跟踪范围</span><div class="rm-sheet-options">${[['visible','相关流程'],['started','我发起的'],['participated','我参与的']].map(([key,label])=>`<button class="${state.mobileTrackingScope===key?'active':''}" data-action="mobile-tracking-scope" data-value="${key}">${label}</button>`).join('')}</div></div>
         ${select('role','当前岗位',[['','全部当前岗位'],['业务','业务'],['老板','老板'],['工程','工程'],['PMC','PMC'],['采购','采购'],['仓库','仓库'],['质量','质量'],['财务','财务']])}
-        <div class="rm-sheet-group"><span>关注事项</span><div class="rm-sheet-options">${[['','全部情况'],['overdue','只看逾期'],['blocked','只看受阻']].map(([key,label])=>`<button class="${(f.attention||'')===key?'active':''}" data-action="mobile-tracking-attention" data-value="${key}" ${f.status==='completed'?'disabled':''}>${label}</button>`).join('')}</div></div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-tracking-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
+        <div class="rm-sheet-group"><span>关注事项</span><div class="rm-sheet-options">${[['','全部情况'],['overdue','只看逾期'],['blocked','只看受阻']].map(([key,label])=>`<button class="${(f.attention||'')===key?'active':''}" data-action="mobile-tracking-attention" data-value="${key}" ${f.status==='completed'?'disabled':''}>${label}</button>`).join('')}</div></div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-tracking-reset" ${f.role||f.attention?'':'disabled'}>重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
     }
 
     function renderMobileFilterControl(count, label, summary=[]) {
       const first=summary[0]||'筛选', text=first.includes('：')?first.slice(first.indexOf('：')+1):first;
       const active=count>0||state.mobileOptionsOpen;
-      return `<div class="rm-filter-control ${active?'active':''}" role="group" aria-label="${label}筛选操作"><button class="rm-filter-button" data-action="mobile-options" aria-label="筛选${label}${count?`，已应用 ${count} 项`:''}" aria-expanded="${state.mobileOptionsOpen}">${icon('filter')}<span class="rm-filter-label" title="${escapeHTML(summary.join('；'))}">${escapeHTML(count?text:'筛选')}</span>${count&&(!summary.length||count>1)?`<span class="rm-filter-count">${summary.length?'+'+(count-1):count}</span>`:''}</button>${count?`<button class="rm-filter-clear" data-action="mobile-filter-clear-all" aria-label="清空${label}筛选" title="清空全部筛选">${icon('close')}</button>`:''}</div>`;
+      return `<div class="rm-filter-control ${active?'active':''}" role="group" aria-label="${label}筛选操作"><button class="rm-filter-button" data-action="mobile-options" aria-label="筛选${label}${count?`，已应用 ${count} 项`:''}" aria-expanded="${state.mobileOptionsOpen}">${icon('filter')}<span class="rm-filter-label" title="${escapeHTML(summary.join('；'))}">${escapeHTML(count?text:'筛选')}</span>${count&&(!summary.length||count>1)?`<span class="rm-filter-count">${summary.length?'+'+(count-1):count}</span>`:''}</button>${count?`<button class="rm-filter-clear" data-action="mobile-filter-clear-all" aria-label="清空${label}筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</div>`;
     }
     function renderMobileApplied(items, action) {
       const selected=items.filter(item=>item[1]);
@@ -16505,14 +16506,13 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         +Number(calendar&&['overdue','undated'].includes(taskCalendarDemo.mobile.selection));
     }
     function resetMobileFilters() {
-      if(state.mobileMain==='progress') {state.mobileProgressScope='active';state.mobileProgressDue='all';state.mobileProgressBlockedOnly=false;}
-      else if(state.mobileMain==='tasks'&&state.mobileTab==='tracking') Object.assign(mobileTrackingQuery(),{status:'',role:'',attention:'',scrollTop:0});
+      if(state.mobileMain==='progress') {state.mobileProgressScope='active';if(state.mobileProgressDue==='undated')state.mobileProgressDue='all';}
+      else if(state.mobileMain==='tasks'&&state.mobileTab==='tracking') Object.assign(mobileTrackingQuery(),{role:'',attention:'',scrollTop:0});
       else {
         Object.keys(mobileTaskDiscoveryDemo()).forEach(key=>delete mobileTaskDiscoveryDemo()[key]);
-        if(state.mobileMain==='tasks'&&state.mobileTab==='done') Object.assign(state.mobileHistory,{period:'',result:'',from:'',to:'',calendar:false,start:''});
+        if(state.mobileMain==='tasks'&&state.mobileTab==='done') Object.assign(state.mobileHistory,{result:'',calendar:false,start:''});
         else {
           state.mobileSort='newest';state.mobileStatus='';
-          state.mobileQuick=state.mobileMain==='risk'?'risk':'all';
           if(state.mobileMain==='tasks'&&state.mobileTab==='todo'&&taskCalendarDemo.mobile.layout==='calendar'){const view=taskCalendarDemo.mobile;view.selection=view.month==='2026-10'?'2026-10-14':`${view.month}-01`;}
         }
       }
@@ -16582,7 +16582,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const selected=matches&&state.mobileExceptionState!=='closed';
       const visible=selected&&(view!=='tasks'||task.lane!=='done');
       const content=view==='orders'?`<strong>${escapeHTML(task.source)}</strong>`:view==='tasks'?`<strong>${escapeHTML(task.title)}</strong><p>${escapeHTML(demoTaskPath(task))} · ${demoAssignee(task)}</p><button class="btn primary" data-action="mobile-open-task" data-id="H07">查看异常关联任务</button>`:`<strong>裁片颜色与尺寸异常 · ${task.decisionPlan?'方案待审批':'待定方案'}</strong><p>${escapeHTML(demoTaskPath(task))}</p><p>${escapeHTML(task.reason)}</p><p>当前待办 · ${escapeHTML(task.role)} · ${demoAssignee(task)}</p><button class="btn primary" data-action="mobile-open-task" data-id="H07">查看异常关联任务</button>`;
-      return `<section class="rm-tracking" aria-label="异常跟踪">${view?'':`<div class="rm-list-controls"><div class="rm-query"><label class="rm-search">${icon('search')}<input id="mobile-exception-search" aria-label="搜索异常单号、订单、批次或原因" placeholder="单号/原因" title="搜索异常单号、订单、批次或原因" value="${escapeHTML(query)}" /></label>${state.mobileExceptionState?`<button class="rm-filter-clear rm-filter-clear--standalone" data-action="mobile-exception-clear" aria-label="清空异常筛选" title="清空筛选，保留搜索词">${icon('close')}</button>`:''}</div>${renderExceptionStates(true,matches)}</div>`}${renderExceptionSummary(true,selected,task.lane!=='done')}${visible?`<div class="rm-section">${content}</div>`:'<div class="rm-empty">当前条件下没有匹配记录</div>'}</section>`;
+      return `<section class="rm-tracking" aria-label="异常跟踪">${view?'':`<div class="rm-list-controls"><div class="rm-query"><label class="rm-search">${icon('search')}<input id="mobile-exception-search" aria-label="搜索异常单号、订单、批次或原因" placeholder="单号/原因" title="搜索异常单号、订单、批次或原因" value="${escapeHTML(query)}" /></label></div>${renderExceptionStates(true,matches)}</div>`}${renderExceptionSummary(true,selected,task.lane!=='done')}${visible?`<div class="rm-section">${content}</div>`:'<div class="rm-empty">当前条件下没有匹配记录</div>'}</section>`;
     }
 
     function renderMobileProfile() {
@@ -16722,7 +16722,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover" role="dialog" aria-label="已办筛选">
         <div class="rm-sheet-head"><strong>已办筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭筛选">${icon('close')}</button></div><div class="rm-filter-fields">
         <div class="rm-sheet-group rm-history-results"><span>处理结果</span><div class="rm-sheet-options">${[['','全部结果'],['done','已完成'],['rejected','已驳回'],['withdrawn','已撤回']].map(([key,label])=>`<button class="${f.result===key?'active':''}" data-action="mobile-history-result" data-value="${key}" aria-pressed="${f.result===key}">${label}<span class="filter-chip-count">${getMobileFilteredTasks({ignoreStatus:true}).filter(task=>!key||task.result===key).length}</span></button>`).join('')}</div></div>
-        </div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-history-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
+        </div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-history-reset" ${mobileTaskFilterCount()?'':'disabled'}>重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
     }
     function renderMobileOptionsSheet() {
       if(state.mobileMain==='tasks'&&state.mobileTab==='done') return renderMobileHistoryOptions();
@@ -16734,7 +16734,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
         <div class="rm-sheet-group"><span>任务状态</span><div class="rm-sheet-options">${statusOptions.map(([key,label]) => `<button class="${state.mobileStatus === key ? 'active' : ''}" data-action="mobile-status" data-value="${key}" aria-pressed="${state.mobileStatus===key}">${label}${calendar?'':`<span class="filter-chip-count">${getMobileFilteredTasks({ignoreStatus:true}).filter(task=>!key||(key==='blocked'?task.state==='阻塞':task.access==='actionable')).length}</span>`}</button>`).join('')}</div></div>
         ${calendar?'':`<div class="rm-filter-select-field rm-filter-sort-field"><span>任务排序</span><ui-select aria-label="任务排序" data-mobile-sort data-required-selection>${[['newest','最近进入'],['due','截止最早'],['oldest','等待最久']].map(([value,label])=>`<option value="${value}" ${state.mobileSort===value?'selected':''}>${label}</option>`).join('')}</ui-select></div>`}
-        </div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-options-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div>
+        </div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-options-reset" ${mobileTaskFilterCount()?'':'disabled'}>重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div>
       </section></div>`;
     }
 
@@ -16761,7 +16761,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         +(scope==='ended'?'':`<button class="${mobile?'rm-chip ':''}${blocked?'active':''}" data-action="${prefix}-blocked" aria-pressed="${blocked}">仅看任务受阻<b>${getProgressDesignRows({mobile,blockedOnly:true}).length}</b>${blocked?icon('close'):''}</button>`);
     }
     function renderMobileProgressOptions() {
-      return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover" role="dialog" aria-modal="false" aria-label="进度筛选"><div class="rm-sheet-head"><strong>进度筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭">${icon('close')}</button></div><div class="rm-filter-fields"><div class="rm-sheet-group"><span>记录范围</span><div class="rm-sheet-options">${[['active','未结束'],['all','全部记录'],['ended','已结束']].map(([key,label])=>`<button class="${state.mobileProgressScope===key?'active':''}" data-action="mobile-progress-scope" data-value="${key}">${label}</button>`).join('')}</div></div><div class="rm-sheet-group"><span>交期单选，任务受阻可叠加</span><div class="rm-sheet-options">${renderProgressDesignFilters(true)}</div></div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-progress-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
+      return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover" role="dialog" aria-modal="false" aria-label="进度筛选"><div class="rm-sheet-head"><strong>进度筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭">${icon('close')}</button></div><div class="rm-filter-fields"><div class="rm-sheet-group"><span>记录范围</span><div class="rm-sheet-options">${[['active','未结束'],['all','全部记录'],['ended','已结束']].map(([key,label])=>`<button class="${state.mobileProgressScope===key?'active':''}" data-action="mobile-progress-scope" data-value="${key}">${label}</button>`).join('')}</div></div><div class="rm-sheet-group"><span>交期单选，任务受阻可叠加</span><div class="rm-sheet-options">${renderProgressDesignFilters(true)}</div></div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-progress-reset" ${state.mobileProgressScope!=='active'||state.mobileProgressDue==='undated'?'':'disabled'}>重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
     }
 
     function getMobileProgressTasks(row) {
@@ -16787,8 +16787,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderMobileProgress() {
       const rows=getMobileProgressRows();
       const scopeLabel={active:'未结束',all:'全部记录',ended:'已结束'}[state.mobileProgressScope];
-      const optionCount=Number(state.mobileProgressScope!=='active')+Number(state.mobileProgressDue!=='all')+Number(state.mobileProgressBlockedOnly);
-      return `<div class="role-mobile-screen"><div class="rm-scroll" id="mobile-task-scroll"><div class="rm-progress-controls"><div class="rm-view-tabs rm-primary-tabs" role="tablist" aria-label="进度视图"><button class="${state.mobileProgressView==='orders'?'active':''}" role="tab" aria-selected="${state.mobileProgressView==='orders'}" data-action="mobile-progress-view" data-value="orders">订单交付</button><button class="${state.mobileProgressView==='production'?'active':''}" role="tab" aria-selected="${state.mobileProgressView==='production'}" data-action="mobile-progress-view" data-value="production">生产执行</button></div><div class="rm-query" style="padding:0"><label class="rm-search">${icon('search')}<input id="mobile-progress-search" value="${escapeHTML(state.mobileProgressSearch)}" placeholder="单号/名称" title="搜索单号、名称或负责人" /></label>${renderMobileFilterControl(optionCount,'进度',[state.mobileProgressScope!=='active'&&`记录范围：${scopeLabel}`,state.mobileProgressDue!=='all'&&({overdue:'已逾期',due_soon:'7天内到期',undated:'未定交期'}[state.mobileProgressDue]),state.mobileProgressBlockedOnly&&'任务受阻'].filter(Boolean))}</div><div class="rm-quick-filters" role="group" aria-label="进度快捷筛选">${renderProgressDesignFilters(true)}</div></div><section class="rm-progress-list">${rows.map(renderMobileProgressCard).join('')}${rows.length?'':'<div class="rm-empty">没有符合条件的进度记录</div>'}</section></div>${renderMobileBottomNav()}${state.mobileOptionsOpen?renderMobileProgressOptions():''}</div>`;
+      const optionCount=Number(state.mobileProgressScope!=='active')+Number(state.mobileProgressDue==='undated');
+      return `<div class="role-mobile-screen"><div class="rm-scroll" id="mobile-task-scroll"><div class="rm-progress-controls"><div class="rm-view-tabs rm-primary-tabs" role="tablist" aria-label="进度视图"><button class="${state.mobileProgressView==='orders'?'active':''}" role="tab" aria-selected="${state.mobileProgressView==='orders'}" data-action="mobile-progress-view" data-value="orders">订单交付</button><button class="${state.mobileProgressView==='production'?'active':''}" role="tab" aria-selected="${state.mobileProgressView==='production'}" data-action="mobile-progress-view" data-value="production">生产执行</button></div><div class="rm-query" style="padding:0"><label class="rm-search">${icon('search')}<input id="mobile-progress-search" value="${escapeHTML(state.mobileProgressSearch)}" placeholder="单号/名称" title="搜索单号、名称或负责人" /></label>${renderMobileFilterControl(optionCount,'进度',[state.mobileProgressScope!=='active'&&`记录范围：${scopeLabel}`,state.mobileProgressDue==='undated'&&({overdue:'已逾期',due_soon:'7天内到期',undated:'未定交期'}[state.mobileProgressDue])].filter(Boolean))}</div><div class="rm-quick-filters" role="group" aria-label="进度快捷筛选">${renderProgressDesignFilters(true)}</div></div><section class="rm-progress-list">${rows.map(renderMobileProgressCard).join('')}${rows.length?'':'<div class="rm-empty">没有符合条件的进度记录</div>'}</section></div>${renderMobileBottomNav()}${state.mobileOptionsOpen?renderMobileProgressOptions():''}</div>`;
     }
     function renderMobileProgressDetail() {
       const row = mobileProgressRows.find(item => item.id === state.mobileProgressId) || mobileProgressRows[0];
@@ -18131,7 +18131,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'mobile-tab') { if(state.mobileTab==='tracking')saveMobileTrackingScroll();if(['tracking','exceptions'].includes(state.mobileTab))state.mobileLastTrackingView=state.mobileTab;state.mobileTab = target.dataset.value==='tracking'?(state.mobileLastTrackingView||'tracking'):target.dataset.value; state.mobileOptionsOpen=false;state.mobileQuick = 'all'; state.mobileVisibleCount = 4; renderView(); }
       else if (action === 'mobile-tracking-view') {if(state.mobileTab==='tracking')saveMobileTrackingScroll();state.mobileTab=target.dataset.value;state.mobileLastTrackingView=state.mobileTab;state.mobileOptionsOpen=false;renderView();}
-      else if (action === 'tracking-status') {state.trackingFilters[state.boardMode]=normalizeTrackingDemoFilters({...state.trackingFilters[state.boardMode],status:target.dataset.value});renderView();}
+      else if (action === 'tracking-status') {state.trackingFilters[state.boardMode]=normalizeTrackingDemoFilters({...state.trackingFilters[state.boardMode],status:state.trackingFilters[state.boardMode]?.status===target.dataset.value?'':target.dataset.value});renderView();}
       else if (action === 'mobile-tracking-status') changeMobileTrackingQuery({status:mobileTrackingQuery().status===target.dataset.value?'':target.dataset.value});
       else if (action === 'mobile-tracking-attention') changeMobileTrackingQuery({attention:target.dataset.value});
       else if (action === 'mobile-tracking-reset') {resetMobileFilters();renderView();}
@@ -18158,9 +18158,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'mobile-history-result') {state.mobileHistory.result=target.dataset.value;state.mobileVisibleCount=4;renderView();}
       else if (action === 'mobile-exception-view') {const next=target.dataset.value;if(next)state.mobileExceptionReturnScroll=document.querySelector('#mobile-task-scroll')?.scrollTop||0;state.mobileExceptionView=next;renderView();requestAnimationFrame(()=>{const scroll=document.querySelector('#mobile-task-scroll');if(scroll)scroll.scrollTop=next?0:state.mobileExceptionReturnScroll||0;});}
       else if (action === 'exception-view') {state.exceptionView=target.dataset.value;renderView();}
-      else if (action === 'mobile-exception-clear') {state.mobileExceptionState='';renderView();requestAnimationFrame(()=>document.querySelector('#mobile-exception-search')?.focus());}
       else if (action === 'mobile-exception-state') {state.mobileExceptionState=state.mobileExceptionState===target.dataset.value?'':target.dataset.value;renderView();}
-      else if (action === 'exception-state') {state.exceptionState=target.dataset.value;renderView();}
+      else if (action === 'exception-state') {state.exceptionState=state.exceptionState===target.dataset.value?'':target.dataset.value;renderView();}
       else if (action === 'mobile-history-reset') {resetMobileFilters();renderView();}
       else if (action === 'mobile-history-calendar') {state.mobileFilterDateKind='history';Object.assign(state.mobileHistory,{calendar:true,start:state.mobileHistory.period==='custom'?state.mobileHistory.from:'',end:state.mobileHistory.period==='custom'?state.mobileHistory.to:''});renderView();}
       else if (action === 'mobile-history-date-cancel') {state.mobileHistory.calendar=false;state.mobileFilterDateKind='';renderView();}
@@ -18178,7 +18177,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'mobile-progress-view') { switchProgressDesignView(target.dataset.value,true); state.mobileOptionsOpen = false; renderView(); }
       else if (action === 'mobile-progress-due') { state.mobileProgressDue=state.mobileProgressDue===target.dataset.value?'all':target.dataset.value;renderView(); }
       else if (action === 'mobile-progress-blocked') {state.mobileProgressBlockedOnly=!state.mobileProgressBlockedOnly;renderView();}
-      else if (action === 'mobile-progress-scope') { state.mobileProgressScope = target.dataset.value; if(state.mobileProgressScope==='ended'){if(['overdue','due'].includes(state.mobileProgressDue))state.mobileProgressDue='all';state.mobileProgressBlockedOnly=false;} renderView(); }
+      else if (action === 'mobile-progress-scope') { state.mobileProgressScope = target.dataset.value; if(state.mobileProgressScope==='ended'){if(['overdue','due_soon'].includes(state.mobileProgressDue))state.mobileProgressDue='all';state.mobileProgressBlockedOnly=false;} renderView(); }
       else if (action === 'mobile-progress-reset') {resetMobileFilters();renderView();}
       else if (action === 'mobile-progress-open') { state.mobileProgressId = target.dataset.id; state.mobileProgressDetailsOpen = false; state.mobileProgressDetailGroup = 'products'; state.mobileScreen = 'progress-detail'; renderView(); }
       else if (action === 'mobile-progress-back') { state.mobileProgressId = null; state.mobileProgressDetailsOpen = false; returnToMobileList(); }
@@ -18256,12 +18255,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'arrival-select') { state.arrivalSelected=state.arrivalSelected===target.dataset.value&&/^\d{4}-/.test(target.dataset.value)?'period':target.dataset.value;refreshVisual(); }
       else if (action === 'finance-due-view') switchBusinessView('financeDueView',target.dataset.value);
       else if (action === 'finance-due-filter') { state.financeDueFilter=target.dataset.value;refreshVisual(); }
-      else if (action === 'status') { state.status = target.dataset.value; state.pageNo = 1; state.selected.clear(); renderView(); }
+      else if (action === 'status') { state.status = state.status===target.dataset.value?'all':target.dataset.value; state.pageNo = 1; state.selected.clear(); renderView(); }
       else if (action === 'task-discovery-clear') {const filters=target.dataset.device==='mobile'?mobileTaskDiscoveryDemo():taskDiscoveryDemo;Object.keys(filters).forEach(key=>delete filters[key]);renderView();renderFloating();}
       else if (action === 'board-mode') { state.boardMode=target.dataset.value==='tracking'?(state.trackingLastView==='exceptions'?'exceptions':state.trackingLastScope||'visible'):target.dataset.value; state.boardStatus='all'; state.overlay=null; renderView(); renderFloating(); }
       else if (action === 'tracking-view') { state.trackingLastView=target.dataset.value;state.boardMode=target.dataset.value==='tracking'?(state.trackingLastScope||'visible'):'exceptions';state.overlay=null;renderView();renderFloating(); }
       else if (action === 'open-task-filter') { state.overlay='task-filter'; renderFloating(); }
-      else if (action === 'task-filter-clear' || action === 'task-filter-clear-direct') { const direct=action==='task-filter-clear-direct'; if(['visible','started','participated'].includes(state.boardMode)) state.trackingFilters[state.boardMode]={}; else {state.boardRole='all';state.boardSearch='';Object.keys(taskDiscoveryDemo).forEach(key=>delete taskDiscoveryDemo[key]);} if(direct) state.overlay=null; renderView(); renderFloating(); if(direct) document.querySelector('[data-action="open-task-filter"]')?.focus(); }
+      else if (action === 'task-filter-clear' || action === 'task-filter-clear-direct') { const direct=action==='task-filter-clear-direct'; if(['visible','started','participated'].includes(state.boardMode)) state.trackingFilters[state.boardMode]={keyword:state.trackingFilters[state.boardMode]?.keyword||'',status:state.trackingFilters[state.boardMode]?.status||''}; else {state.boardRole='all';Object.keys(taskDiscoveryDemo).forEach(key=>delete taskDiscoveryDemo[key]);} if(direct) state.overlay=null; renderView(); renderFloating(); if(direct) document.querySelector('[data-action="open-task-filter"]')?.focus(); }
       else if (action === 'board-status') { state.boardStatus = target.dataset.value; renderView(); }
       else if (action === 'progress-view') { switchProgressDesignView(target.dataset.value); state.progressSelected=''; renderView(); }
       else if (action === 'statistics-filter') { statisticsDesignState.status=target.dataset.value; statisticsDesignState.selected=''; statisticsDesignState.page=1; statisticsDesignState.sourcePage=1; statisticsDesignState.scroll=0; renderView(); }

@@ -1414,16 +1414,12 @@ export default function SalesOrdersPage() {
     recordLabel: '销售订单',
   })
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    linkedKeyword ||
-    routeSalesOrderID ||
-    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-    statusFilter ||
-    customerFilter ||
-    dateFilterStart ||
-    dateFilterEnd
-  )
+  const activeFilterCount = [
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT,
+    customerFilter,
+    dateFilterStart || dateFilterEnd,
+    sortFilter !== 'updated_at:desc',
+  ].filter(Boolean).length
   const clearRouteContext = useCallback(
     (resetScope = false) => {
       const nextParams = clearLinkedDocumentParams(searchParams)
@@ -1439,25 +1435,16 @@ export default function SalesOrdersPage() {
     [searchParams, setSearchParams, setPagination]
   )
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
-    setStatusFilter('')
+    setStatusFilter((current) => lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, current, ['closed', 'canceled']) ? current : '')
     setCustomerFilter('')
     setDateFilterField('order_date')
     setDateFilterStart('')
     setDateFilterEnd('')
+    setSortFilter('updated_at:desc')
+    setSearchParams((current) => withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT), { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-    clearRouteContext(true)
-  }, [
-    clearRouteContext,
-    setKeyword,
-    setPagination,
-    setStatusFilter,
-    setCustomerFilter,
-    setDateFilterField,
-    setDateFilterStart,
-    setDateFilterEnd,
-  ])
+  }, [setLifecycleScope, setStatusFilter, setCustomerFilter, setDateFilterField, setDateFilterStart, setDateFilterEnd, setSortFilter, setSearchParams, setPagination])
 
   const selectedOrderDisplayText = useMemo(() => {
     if (!selectedOrder) return '请先选择销售订单'
@@ -1566,7 +1553,7 @@ export default function SalesOrdersPage() {
         showSelection={contentView === 'list'}
         compact
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

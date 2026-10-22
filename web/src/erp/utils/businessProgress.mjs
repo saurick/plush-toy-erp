@@ -176,25 +176,43 @@ export function progressDueOptions(scope) {
   )
 }
 
-export function progressFilterCount(query) {
+export function progressExtraFilters(query) {
   return [
-    query.scope !== 'active',
-    query.due_status !== 'all',
-    query.blocked_only,
-    query.unlinked_only,
-    Boolean(query.owner),
-    Boolean(query.date_from || query.date_to),
-  ].filter(Boolean).length
+    query.scope !== 'active' && {
+      key: 'scope',
+      label: PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label,
+      clear: { scope: 'active' },
+    },
+    query.due_status === 'undated' && {
+      key: 'due_status', label: '未定交期', clear: { due_status: 'all' },
+    },
+    query.unlinked_only && {
+      key: 'unlinked_only', label: '仅看未关联销售', clear: { unlinked_only: false },
+    },
+    query.owner && {
+      key: 'owner', label: `负责人：${query.owner}`, clear: { owner: '' },
+    },
+    (query.date_from || query.date_to) && {
+      key: 'date',
+      label: `交期：${query.date_from || '不限'} 至 ${query.date_to || '不限'}`,
+      clear: { from: '', to: '' },
+    },
+  ].filter(Boolean)
 }
 
-export const PROGRESS_FILTER_RESET = {
-  scope: 'active',
-  due_status: 'all',
-  blocked_only: false,
-  unlinked_only: false,
-  owner: '',
-  from: '',
-  to: '',
+export function progressFilterCount(query) {
+  return progressExtraFilters(query).length
+}
+
+export function progressFilterReset(query) {
+  return {
+    scope: 'active',
+    due_status: query.due_status === 'undated' ? 'all' : query.due_status,
+    unlinked_only: false,
+    owner: '',
+    from: '',
+    to: '',
+  }
 }
 
 export function progressQueryFromURL(params) {

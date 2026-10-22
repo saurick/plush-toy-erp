@@ -55,7 +55,6 @@ export default function PurchaseOrderOperationPanel({
   exportOrders,
   showListTools = true,
   generatingInboundDraft = false,
-  hasActiveFilters = false,
   itemsLoading = false,
   keyword = '',
   lifecycleScope = 'current',
@@ -139,7 +138,12 @@ export default function PurchaseOrderOperationPanel({
     <BusinessOperationPanel
       compact
       onClearFilters={clearFilters}
-      clearFiltersDisabled={!hasActiveFilters}
+      activeFilterCount={[
+        lifecycleScope !== 'current',
+        supplierFilter,
+        dateFilterStart || dateFilterEnd,
+        sortValue !== 'updated_at:desc',
+      ].filter(Boolean).length}
       filters={
         <>
           <SearchInput

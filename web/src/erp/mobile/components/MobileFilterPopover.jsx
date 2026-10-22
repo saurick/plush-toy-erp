@@ -4,14 +4,13 @@ import { Button, Popover, theme } from 'antd'
 import { CloseOutlined, FilterOutlined, UpOutlined, ReloadOutlined } from '@ant-design/icons'
 import './mobileFilterPopover.css'
 
-export function MobileFilterClearButton({ contextLabel, onClear, standalone = false }) {
+function MobileFilterClearButton({ contextLabel, onClear }) {
   return (
     <button
       type="button"
-      className={`mobile-filter-clear${standalone ? ' mobile-filter-clear--standalone erp-control-button' : ''}`}
+      className="mobile-filter-clear"
       aria-label={`清空${contextLabel}筛选`}
-      title="清空筛选，保留搜索词"
-      data-active={standalone || undefined}
+      title="清空额外条件，保留搜索与快捷筛选"
       onClick={onClear}
     >
       <CloseOutlined aria-hidden="true" />
@@ -101,7 +100,7 @@ export default function MobileFilterPopover({
         >
           <div className="mobile-filter-fields" aria-label={title}>{children}</div>
           <footer>
-            <Button type="text" icon={<ReloadOutlined aria-hidden />} onClick={onReset}>重置筛选</Button>
+            <Button type="text" icon={<ReloadOutlined aria-hidden />} disabled={!count} onClick={onReset}>重置筛选</Button>
             <Button type="text" icon={<UpOutlined aria-hidden />} aria-label="关闭筛选" onClick={close}>收起</Button>
           </footer>
         </section>

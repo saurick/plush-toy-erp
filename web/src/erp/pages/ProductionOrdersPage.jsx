@@ -126,6 +126,7 @@ import {
   filterLifecycleStatusOptions,
   lifecycleScopeFromSearchParams,
   lifecycleScopeIncludesStatus,
+  withLifecycleScopeSearchParam,
   normalizeLifecycleStatus,
 } from '../utils/lifecycleScope.mjs'
 
@@ -1702,21 +1703,21 @@ export default function ProductionOrdersPage() {
           ) : null
         }
         onClearFilters={() => {
-          setQuery(DEFAULT_QUERY)
-          setSearchParams(new URLSearchParams(), { replace: true })
+          const { scope } = DEFAULT_QUERY
+          const status = lifecycleScopeIncludesStatus(scope, query.status, [PRODUCTION_ORDER_STATUS.CLOSED, PRODUCTION_ORDER_STATUS.CANCELLED]) ? query.status : ''
+          setQuery((current) => ({ ...current, scope, status, date_field: DEFAULT_QUERY.date_field, date_from: '', date_to: '', page: 1 }))
+          setSearchParams((current) => {
+            const next = withLifecycleScopeSearchParam(current, scope)
+            for (const key of ['date_field', 'date_from', 'date_to', 'page']) next.delete(key)
+            if (status) next.set('status', status)
+            else next.delete('status')
+            return next
+          }, { replace: true })
         }}
-        clearFiltersDisabled={
-          !(
-            resolvedRouteKeyword ||
-            linkedKeyword ||
-            routeProductionOrderID ||
-            query.keyword.trim() ||
-            query.scope !== DEFAULT_QUERY.scope ||
-            query.status ||
-            query.date_from ||
-            query.date_to
-          )
-        }
+        activeFilterCount={[
+          query.scope !== DEFAULT_QUERY.scope,
+          query.date_from || query.date_to,
+        ].filter(Boolean).length}
       >
         <SelectionActionBar
           embedded

@@ -9,7 +9,7 @@ export default function BusinessStatusFilter({
   counts = null,
   loading = false,
   exact = false,
-  removable = false,
+  removable = true,
   allLabel = '不限状态',
   onChange,
   'aria-label': label = '业务状态',
@@ -38,7 +38,7 @@ export default function BusinessStatusFilter({
             aria-label={`${text}，${count === null ? '数量暂不可用' : `共 ${count} 条`}`}
             title={
               exact
-                ? '当前查看指定记录，清空筛选后可按状态查找'
+                ? '当前查看指定记录，清除单据范围后可按状态查找'
                 : `${text}：当前查询范围内${count === null ? '数量暂不可用' : `共 ${count} 条记录`}`
             }
             onClick={() => {

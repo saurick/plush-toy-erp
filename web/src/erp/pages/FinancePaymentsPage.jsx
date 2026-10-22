@@ -357,6 +357,11 @@ export default function FinancePaymentsPage() {
         <>
           <BusinessOperationPanel
             compact
+            activeFilterCount={Number(Boolean(paymentDirectionFilter))}
+            onClearFilters={() => {
+              setPaymentDirectionFilter('')
+              setPaymentPagination((current) => ({ ...current, current: 1 }))
+            }}
             filters={
               <>
                 <SearchInput

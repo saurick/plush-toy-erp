@@ -22,9 +22,9 @@ import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
 import {
   progressQueryFromURL,
   progressAttention,
-  PROGRESS_SCOPE_OPTIONS,
+  progressExtraFilters,
   progressFilterCount,
-  PROGRESS_FILTER_RESET,
+  progressFilterReset,
   withProgressFilters,
 } from '../utils/businessProgress.mjs'
 import useBusinessStatistics from '../components/business-visualizations/useBusinessStatistics.jsx'
@@ -219,35 +219,8 @@ export default function BusinessDashboardPage() {
   const filterCount = progressFilterCount(query)
   const filterCounts = loading ? undefined : data?.counts
   const filterQuery = { ...query, view }
-  const extraFilters = [
-    query.scope !== 'active' && {
-      key: 'scope',
-      label: PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)
-        ?.label,
-      clear: { scope: 'active' },
-    },
-    query.due_status === 'undated' && {
-      key: 'due_status',
-      label: '未定交期',
-      clear: { due_status: 'all' },
-    },
-    query.owner && {
-      key: 'owner',
-      label: `负责人：${query.owner}`,
-      clear: { owner: '' },
-    },
-    (query.date_from || query.date_to) && {
-      key: 'date',
-      label: `交期：${query.date_from || '不限'} 至 ${query.date_to || '不限'}`,
-      clear: { from: '', to: '' },
-    },
-    query.unlinked_only && {
-      key: 'unlinked_only',
-      label: '仅看未关联销售',
-      clear: { unlinked_only: false },
-    },
-  ].filter(Boolean)
-  const hasFilters = query.keyword || filterCount > 0
+  const extraFilters = progressExtraFilters(query)
+  const hasFilters = query.keyword || filterCount > 0 || query.due_status !== 'all' || query.blocked_only
   const selectedRow =
     data?.rows.find(
       (row) => `${row.view}:${row.id}` === params.get('selected')
@@ -376,7 +349,7 @@ export default function BusinessDashboardPage() {
                       <Button
                         onClick={() => {
                           setFilterResetKey((value) => value + 1)
-                          update(PROGRESS_FILTER_RESET)
+                          update(progressFilterReset(query))
                         }}
                       >
                         重置筛选
@@ -420,7 +393,7 @@ export default function BusinessDashboardPage() {
                       领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
                     </p>
                     <p>
-                      选项数量表示保留其他条件时，选择该项可查到的记录数；交期与任务受阻可以组合。筛选数量统计非默认范围、交期情况、任务受阻、销售关联、负责人和日期范围，不含搜索词。关联任务仅包含当前账号可见内容。
+                      选项数量表示保留其他条件时，选择该项可查到的记录数；交期与任务受阻可以组合。筛选数量只统计额外条件；搜索词、已逾期、7天内和受阻快捷项不重复计数，重置时保留。关联任务仅包含当前账号可见内容。
                     </p>
                   </div>
                 }

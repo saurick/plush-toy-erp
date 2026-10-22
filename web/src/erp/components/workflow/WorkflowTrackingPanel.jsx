@@ -148,7 +148,7 @@ render: (_, entry) => (
     <div className="erp-workflow-tracking-controls" data-page-table-toolbar={toolbarContainer ? undefined : true}>
       <BusinessOperationPanel
         compact
-        clearFiltersDisabled={!hasFilters}
+        activeFilterCount={[filters.owner_role_key, !source.source_id && filters.source_type, filters.attention, filters.date_from || filters.date_to].filter(Boolean).length}
         onClearFilters={() => setSearchParams((current) => clearTrackingFilters(current, scope), { replace: true })}
         filters={(
           <>

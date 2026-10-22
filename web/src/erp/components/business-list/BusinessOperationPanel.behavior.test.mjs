@@ -8,19 +8,19 @@ test('共享筛选只在存在可清空的条件时显示直接清空入口', as
   const { BusinessOperationPanel, SearchInput, SelectFilter } = await import('./BusinessListLayout.jsx')
   const filters = createElement(SelectFilter, { value: '', options: [{ value: '', label: '全部' }] })
   const clear = () => document.querySelector('button[aria-label="清空筛选"]')
-  for (const clearFiltersDisabled of [true, undefined]) {
-    await harness.render(createElement(BusinessOperationPanel, { filters, onClearFilters() {}, clearFiltersDisabled }))
+  for (const activeFilterCount of [0, undefined]) {
+    await harness.render(createElement(BusinessOperationPanel, { filters, onClearFilters() {}, activeFilterCount }))
     assert.equal(clear(), null)
   }
-  await harness.render(createElement(BusinessOperationPanel, { filters, clearFiltersDisabled: false }))
+  await harness.render(createElement(BusinessOperationPanel, { filters, activeFilterCount: 1 }))
   assert.equal(clear(), null, '没有清空回调时不展示动作')
-  await harness.render(createElement(BusinessOperationPanel, { filters, onClearFilters() {}, clearFiltersDisabled: false }))
+  await harness.render(createElement(BusinessOperationPanel, { filters, onClearFilters() {}, activeFilterCount: 1 }))
   assert.ok(clear())
   assert.equal(document.querySelector('button button'), null, '打开和清空使用两个独立按钮')
   await harness.render(createElement(BusinessOperationPanel, {
     filters: createElement(SearchInput, { value: '', onChange() {} }),
     onClearFilters() {},
-    clearFiltersDisabled: false,
+    activeFilterCount: 1,
   }))
   assert.equal(clear(), null, '只有搜索时不额外生成筛选入口')
 })
@@ -34,7 +34,7 @@ test('直接清空只调用一次原回调、恢复结果与焦点，重新筛�
     const [status, setStatus] = React.useState('ready')
     return createElement(BusinessOperationPanel, {
       onClearFilters() { cleared += 1; setStatus('') },
-      clearFiltersDisabled: !status,
+      activeFilterCount: Number(Boolean(status)),
       onFiltersOpenChange(open) { opens.push(open) },
       filters: createElement(React.Fragment, null, createElement(SearchInput, { value: '小熊', onChange() {} }), createElement(SelectFilter, {
           'aria-label': '任务状态',
@@ -60,7 +60,8 @@ onChange: setStatus,
   await harness.click(harness.button('完成'))
   assert.ok(document.querySelector('button[aria-label="清空筛选"]'))
   assert.equal(document.querySelector('output').textContent, '共 1 条')
-  assert.match(trigger().textContent, /已应用/u)
+  assert.equal(trigger().textContent.trim(), '筛选 · 1')
+  assert.equal(trigger().getAttribute('aria-label'), '筛选，已应用 1 项')
   assert.equal(trigger().getAttribute('aria-expanded'), 'false')
 })
 
@@ -74,7 +75,7 @@ test('受控面板直接清空会关闭并恢复焦点，面板内清空保留�
     return createElement(BusinessOperationPanel, {
       filtersOpen: open,
       onFiltersOpenChange: setOpen,
-      clearFiltersDisabled: !value,
+      activeFilterCount: Number(Boolean(value)),
       onClearFilters() { cleared += 1; setValue('') },
       filters: createElement(SelectFilter, {
         'aria-label': '任务状态',

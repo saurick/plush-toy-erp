@@ -822,17 +822,12 @@ export function OperationalFactWorkspace({
     }
   }
 
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    statusFilter ||
-    activeDateRange[0] ||
-    activeDateRange[1] ||
-    routeSalesOrderID ||
-    routeSourceType ||
-    routeSourceID ||
-    routeFactID ||
-    linkedKeyword
-  )
+  const activeFilterCount = [
+    currentActiveKey !== 'finance' && statusFilter,
+    routeSalesOrderID,
+    routeFactID,
+    activeDateRange[0] || activeDateRange[1],
+  ].filter(Boolean).length
 
   const tabItems = Object.entries(configs).map(([key, config]) => ({
     key,
@@ -904,8 +899,8 @@ export function OperationalFactWorkspace({
         hidden={contentView === 'process'}
         compact
         viewSwitch={contentViewSwitch}
-        onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        onClearFilters={() => clearFilters(resolvedRouteKeyword || linkedKeyword || keyword)}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

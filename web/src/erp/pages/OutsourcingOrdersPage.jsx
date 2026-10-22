@@ -165,7 +165,7 @@ export default function OutsourcingOrdersPage() {
     beginLatestRequest,
     loadOrders,
     loadExportOrders,
-    hasActiveFilters,
+    activeFilterCount,
     clearRouteContext,
     clearFilters,
   } = useOutsourcingOrderQuery({ adminProfile })
@@ -688,7 +688,7 @@ export default function OutsourcingOrdersPage() {
           <BusinessOperationPanel
             compact
             onClearFilters={clearFilters}
-            clearFiltersDisabled={!hasActiveFilters}
+            activeFilterCount={activeFilterCount}
             filters={
               <>
                 <SearchInput

@@ -213,7 +213,7 @@ export function createOutsourcingSummaryScenarios({
         await search.fill('耳*2')
         await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         assert.equal(calls.at(-1).offset, 0)
-        await region.getByText('共 1 条加工明细', { exact: true }).waitFor()
+        await region.locator('.ant-pagination-total-text').filter({ hasText: /共 1 条/u }).waitFor()
         await region.getByText('已取消', { exact: true }).waitFor()
         const [filteredDownload] = await Promise.all([
           page.waitForEvent('download'),
@@ -230,15 +230,20 @@ export function createOutsourcingSummaryScenarios({
             !filteredCSV.includes('模拟产品 1')
         )
         const directClear = region.getByRole('button', { name: '清空筛选', exact: true })
+        assert.equal(await directClear.count(), 0, '仅搜索不显示额外条件清空入口')
+        await region.getByRole('button', { name: '筛选', exact: true }).click()
+        const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+        await filters.getByRole('group', { name: '明细合同状态', exact: true }).getByRole('button', { name: '已取消', exact: true }).click()
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        assert.equal(await region.getByRole('button', { name: '筛选，已应用 1 项', exact: true }).count(), 1)
         await directClear.click()
-        await region.getByText('模拟产品 1', { exact: true }).waitFor()
+        await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         await page.getByRole('dialog', { name: '筛选条件', exact: true }).waitFor({ state: 'hidden' })
-        assert.equal(await search.inputValue(), '')
+        await directClear.waitFor({ state: 'hidden' })
+        assert.equal(await search.inputValue(), '耳*2', '清空额外条件保留搜索')
         assert.equal(await directClear.count(), 0)
         assert.equal(await page.getByRole('dialog', { name: '筛选条件', exact: true }).isVisible(), false)
         assert.equal(await region.locator('button[aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
-        await search.fill('耳*2')
-        await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         await region
           .getByRole('button', {
             name: 'SIM-OUTSOURCE-CONTRACT-L1',

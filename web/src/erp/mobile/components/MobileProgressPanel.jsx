@@ -23,10 +23,9 @@ import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
 import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention } from '../../components/business-visualizations/ProgressCompactContent.jsx'
 import {
   progressQueryFromURL,
-  PROGRESS_SCOPE_OPTIONS,
-  PROGRESS_DUE_OPTIONS,
+  progressExtraFilters,
   progressFilterCount,
-  PROGRESS_FILTER_RESET,
+  progressFilterReset,
   withProgressFilters,
 } from '../../utils/businessProgress.mjs'
 import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
@@ -363,15 +362,12 @@ export default function MobileProgressPanel({
       : []),
   ]
   const filterCount = progressFilterCount(query)
-  const filterSummary = [
-    query.scope !== 'active' && `记录范围：${PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label}`,
-    query.due_status !== 'all' && `交期：${PROGRESS_DUE_OPTIONS.find(({ value }) => value === query.due_status)?.label}`,
-    query.blocked_only && '任务受阻',
-    query.unlinked_only && '仅看未关联销售',
-    query.owner && `负责人：${query.owner}`,
-    (query.date_from || query.date_to) && '自定义交期',
-  ].filter(Boolean)
-  const filtered = values.q || filterCount > 0
+  const filterSummary = progressExtraFilters(query).map(({ key, label }) => {
+    if (key === 'scope') return `记录范围：${label}`
+    if (key === 'due_status') return `交期：${label}`
+    return label
+  })
+  const filtered = values.q || filterCount > 0 || query.due_status !== 'all' || query.blocked_only
   const filterCounts = loading ? undefined : counts
   return (
     <section
@@ -451,7 +447,7 @@ export default function MobileProgressPanel({
               count={filterCount}
               summary={filterSummary}
               triggerRef={filterTriggerRef}
-              onReset={() => update(PROGRESS_FILTER_RESET)}
+              onReset={() => update(progressFilterReset(query))}
             >
               <BusinessProgressFilterFields
                 compact

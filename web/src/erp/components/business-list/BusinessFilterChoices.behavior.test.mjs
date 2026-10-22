@@ -3,6 +3,27 @@ import test from 'node:test'
 import React, { createElement } from 'react'
 import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 
+test('快捷状态显示独立选中反馈，再次选择仅取消该项；加载与指定记录范围保持禁用', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: BusinessStatusFilter } = await import('./BusinessStatusFilter.jsx')
+  const selected = []
+  const props = { options: [{ value: '', label: '全部' }, { value: 'draft', label: '草稿' }], counts: { draft: 3 }, onChange: (next) => selected.push(next) }
+  await harness.render(createElement(BusinessStatusFilter, { ...props, value: 'draft' }))
+  const draft = () => document.querySelector('button[aria-label="草稿，共 3 条"]')
+  assert.equal(draft().getAttribute('aria-pressed'), 'true')
+  assert.ok(draft().querySelector('.erp-filter-chip__clear'))
+  await harness.click(draft())
+  assert.deepEqual(selected, [''])
+  await harness.render(createElement(BusinessStatusFilter, { ...props, value: '' }))
+  assert.equal(draft().querySelector('.erp-filter-chip__clear'), null)
+  await harness.click(draft())
+  assert.deepEqual(selected, ['', 'draft'])
+  for (const state of [{ loading: true }, { exact: true }]) {
+    await harness.render(createElement(BusinessStatusFilter, { ...props, value: 'draft', ...state }))
+    assert.ok([...document.querySelectorAll('button')].every((button) => button.disabled))
+  }
+})
+
 test('固定单选按选项直接选择、清空和禁用，显式搜索与排序保留下拉能力', async (t) => {
   const harness = await businessFormHarness(t)
   const { BusinessOperationPanel, SelectFilter } = await import('./BusinessListLayout.jsx')

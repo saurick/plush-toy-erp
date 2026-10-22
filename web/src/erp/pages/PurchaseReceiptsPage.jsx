@@ -1036,21 +1036,17 @@ export default function PurchaseReceiptsPage() {
     columns: exportColumns,
     recordLabel: '采购入库单',
   })
-  const hasActiveFilters = Boolean(
-    keyword.trim() ||
-    statusFilter ||
-    supplierFilter ||
-    materialFilter ||
-    warehouseFilter ||
-    lotFilter ||
-    dateFilterStart ||
-    dateFilterEnd ||
-    routePurchaseOrderID ||
-    routeReceiptID ||
-    linkedKeyword
-  )
+  const activeFilterCount = [
+    statusFilter,
+    supplierFilter,
+    materialFilter,
+    warehouseFilter,
+    lotFilter,
+    dateFilterStart || dateFilterEnd,
+    routePurchaseOrderID,
+    routeReceiptID,
+  ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setStatusFilter('')
     setSupplierFilter('')
     setMaterialFilter('')
@@ -1059,13 +1055,17 @@ export default function PurchaseReceiptsPage() {
     setDateFilterField('received_at')
     setDateFilterStart('')
     setDateFilterEnd('')
+    setKeyword(resolvedRouteKeyword || linkedKeyword || keyword)
     clearRouteContext()
   }, [
     clearRouteContext,
+    setKeyword,
+    keyword,
+    linkedKeyword,
+    resolvedRouteKeyword,
     setDateFilterEnd,
     setDateFilterField,
     setDateFilterStart,
-    setKeyword,
     setLotFilter,
     setMaterialFilter,
     setStatusFilter,
@@ -1080,7 +1080,7 @@ export default function PurchaseReceiptsPage() {
       <BusinessOperationPanel
         compact
         onClearFilters={clearFilters}
-        clearFiltersDisabled={!hasActiveFilters}
+        activeFilterCount={activeFilterCount}
         filters={
           <>
             <SearchInput

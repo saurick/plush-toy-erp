@@ -1132,25 +1132,22 @@ export default function PurchaseOrdersPage() {
     [searchParams, setSearchParams, setPagination]
   )
   const clearFilters = useCallback(() => {
-    setKeyword('')
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
-    setStatus('')
+    setStatus((current) => lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, current, ['closed', 'canceled']) ? current : '')
     setSupplierFilter('')
     setDateFilterField('purchase_date')
     setDateFilterStart('')
     setDateFilterEnd('')
+    setSortValue('updated_at:desc')
     setPagination((current) => ({ ...current, current: 1 }))
+    setSearchParams((current) => withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT), { replace: true })
+  }, [setLifecycleScope, setStatus, setSupplierFilter, setDateFilterField, setDateFilterStart, setDateFilterEnd, setSortValue, setPagination, setSearchParams])
+  const clearQuery = () => {
+    clearFilters()
+    setKeyword('')
+    setStatus('')
     clearRouteContext(true)
-  }, [
-    clearRouteContext,
-    setKeyword,
-    setPagination,
-    setStatus,
-    setSupplierFilter,
-    setDateFilterField,
-    setDateFilterStart,
-    setDateFilterEnd,
-  ])
+  }
 
   const selectedOrders = useMemo(
     () => (contentView === 'arrival'
@@ -1412,7 +1409,6 @@ export default function PurchaseOrdersPage() {
         exporting={exporting}
         exportOrders={exportOrders}
         generatingInboundDraft={generatingInboundDraft}
-        hasActiveFilters={hasActiveFilters}
         itemsLoading={itemsLoading}
         keyword={resolvedRouteKeyword || linkedKeyword || keyword}
         lifecycleScope={lifecycleScope}
@@ -1498,7 +1494,7 @@ export default function PurchaseOrdersPage() {
             selectedRowKeys={selectedRowKeys}
             selectionDisabled={recordActionBusy}
             hasQueryFilters={hasActiveFilters}
-            onClearQuery={clearFilters}
+            onClearQuery={clearQuery}
             onSelect={(row) => {
               if (recordActionBusy || !row) return
               const order = arrivalData.rows.find((item) => Number(item.id) === Number(row.id))

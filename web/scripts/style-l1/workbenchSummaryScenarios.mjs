@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { exerciseTableScrollControls, exerciseTableScrollPagination } from './tableScrollControlAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertTableSemanticAlignment } from './businessTableAssertions.mjs'
 import { createMaterialSummaryScenarios } from './materialSummaryScenarios.mjs'
@@ -234,6 +235,19 @@ export function createWorkbenchSummaryScenarios({
             calls.some(({ method }) => method === 'list_sales_order_summary'),
             false
           )
+          const search = region.locator('.erp-business-operation-panel__search input').first()
+          await search.fill('SO-MATERIAL-SUM')
+          await search.press('Enter')
+          await region.getByRole('button', { name: '筛选', exact: true }).click()
+          const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+          await filters.getByRole('group', { name: '审批状态', exact: true }).getByRole('button').nth(1).click()
+          await region.getByRole('button', { name: '筛选，已应用 1 项', exact: true }).waitFor()
+          await filters.getByRole('button', { name: '完成', exact: true }).click()
+          await region.getByRole('button', { name: '清空筛选', exact: true }).click()
+          await region.getByRole('button', { name: '清空筛选', exact: true }).waitFor({ state: 'hidden' })
+          assert.equal(await search.inputValue(), 'SO-MATERIAL-SUM')
+          assert.equal(new URL(page.url()).searchParams.has('materials.status'), false)
+          assert.equal(await region.getByRole('button', { name: '清空筛选', exact: true }).count(), 0)
           return
         }
         await region.getByText('模拟产品 1', { exact: true }).waitFor()
@@ -418,6 +432,9 @@ export function createWorkbenchSummaryScenarios({
         assert.equal(await filterDialog.isVisible(), false)
         assert.equal(await filterTrigger.evaluate((node) => node === document.activeElement), true)
         await filterTrigger.click()
+        await filterDialog.waitFor({ state: 'visible' })
+        await waitForFiniteAnimations(page)
+        assert.equal(await customer.inputValue(), '', '重开面板不能恢复已清空的客户条件')
         await customer.fill('模拟筛选客户')
         await customer.press('Enter')
         await filterDialog.getByRole('button', { name: '完成', exact: true }).click()

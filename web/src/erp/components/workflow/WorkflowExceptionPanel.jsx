@@ -34,7 +34,6 @@ import WorkflowTaskDiscoveryFilters from './WorkflowTaskDiscoveryFilters.jsx'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import useWorkflowTaskAssignees from '../../hooks/useWorkflowTaskAssignees'
 import MobileScrollEdge from '../../mobile/components/MobileScrollEdge.jsx'
-import { MobileFilterClearButton } from '../../mobile/components/MobileFilterPopover.jsx'
 import { usePageLoadFeedback } from '../PageLoadFeedback.jsx'
 import './workflowExceptions.css'
 
@@ -70,7 +69,6 @@ export default function WorkflowExceptionPanel({
   toolbarContainer = null,
 }) {
   const [filters, setFilters] = React.useState(() => compact ? {} : normalizeTaskDiscoveryFilters(initialQuery.filters))
-  const searchRoot = React.useRef(null)
   const assignees = useWorkflowTaskAssignees(profile, roleKey, !compact)
   const [keyword, setKeyword] = React.useState(initialQuery.keyword || '')
   const [state, setState] = React.useState(initialQuery.state || '')
@@ -267,14 +265,14 @@ export default function WorkflowExceptionPanel({
         { label: '全部异常', value: '', count: current?.data ? current.data.open + current.data.closed : '—' },
         { label: '未处理完', value: 'open', count: current?.data?.open ?? '—' },
         { label: '已处理完', value: 'closed', count: current?.data?.closed ?? '—' },
-      ].map((option) => <FilterChip key={option.value} count={option.count} selected={state === option.value} removable={compact && Boolean(option.value)} onClick={() => selectState(compact && state === option.value ? '' : option.value)}>{option.label}</FilterChip>)}
+      ].map((option) => <FilterChip key={option.value} count={option.count} selected={state === option.value} removable={Boolean(option.value)} onClick={() => selectState(state === option.value ? '' : option.value)}>{option.label}</FilterChip>)}
     </StateFilters>
   )
   const controls = (
     <div className="workflow-exceptions__controls">
       {!compact && stateFilters}
       {!compact && filterControls}
-      <div className="workflow-exceptions__query" ref={searchRoot}>
+      <div className="workflow-exceptions__query">
         {compact ? <MobileSearchInput
           aria-label="搜索异常单号、订单、批次或原因"
           placeholder="单号/原因"
@@ -296,16 +294,7 @@ export default function WorkflowExceptionPanel({
           onCompositionEnd={search.onCompositionEnd}
           onPressEnter={search.onPressEnter}
         />}
-        {compact && state && (
-          <MobileFilterClearButton
-            standalone
-            contextLabel="异常"
-            onClear={() => {
-              selectState('')
-              searchRoot.current?.querySelector('input')?.focus({ preventScroll: true })
-            }}
-          />
-        )}
+
       </div>
       {compact && stateFilters}
       {compact && <MobileScrollEdge scrollContainerRef={scrollContainerRef} />}

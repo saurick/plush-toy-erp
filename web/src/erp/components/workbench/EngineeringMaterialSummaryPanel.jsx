@@ -190,6 +190,8 @@ export default function EngineeringMaterialSummaryPanel({
     <>
       <BusinessOperationPanel
         compact
+        activeFilterCount={Number(Boolean(status))}
+        onClearFilters={() => updateFilter('status', '')}
         filters={filters}
         actions={
           <BusinessListToolbarActions

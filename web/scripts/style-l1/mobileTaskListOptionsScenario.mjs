@@ -102,6 +102,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         await page.evaluate(() => document.fonts.ready)
         assert.equal(await filters.getAttribute('role'), 'group')
         assert.equal(await filters.getByRole('tab').count(), 0)
+        if (await overdue.getAttribute('aria-pressed') === 'true') await warning.click()
         const keyword = await page.getByRole('searchbox').inputValue()
         const filterLabel = await filterTrigger.getAttribute('aria-label')
         const counts = await filters.locator('.mobile-role-task-filter__count').allTextContents()
@@ -448,6 +449,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await appliedResetDropdown.waitFor({ state: 'hidden' })
       await waitFirst(97063)
       assert.match(await range.innerText(), /共 64 项/u)
+      assert.equal(await page.getByTestId('mobile-role-filter-approval').getAttribute('aria-pressed'), 'true', '重置额外条件保留审批快捷范围')
       assert.equal(
         await filterTrigger.getAttribute('aria-label'),
         '筛选任务',
@@ -585,11 +587,11 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选风险，已应用 1 项', '超时快捷条件在原胶囊表达，不重复计数')
       await page.getByRole('button', { name: '清空风险筛选', exact: true }).tap()
       assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选风险')
-      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '清空全部包含超时快捷条件')
+      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'true', '清空额外条件保留超时快捷条件')
       assert.equal(await search.inputValue(), 'SORT-6', '直接清空风险条件保留当前搜索')
       await page.reload()
       await page.getByRole('button', { name: '筛选风险', exact: true }).waitFor()
-      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '刷新后不恢复已清空的超时条件')
+      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'true', '刷新后保留超时快捷条件')
       assert.equal(await search.inputValue(), 'SORT-6')
       await page.getByTestId('mobile-role-nav-tasks').click()
       await page.waitForFunction(

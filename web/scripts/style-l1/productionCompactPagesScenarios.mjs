@@ -195,7 +195,7 @@ export function createProductionCompactPagesScenarios({
         await page.waitForURL('**/erp/production/exceptions')
         await row.waitFor()
         await page
-          .getByRole('button', { name: '筛选 · 已应用', exact: true })
+          .getByRole('button', { name: '筛选，已应用 1 项', exact: true })
           .click()
         await filters
           .getByRole('group', { name: '审批状态', exact: true })
