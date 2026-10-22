@@ -60,15 +60,25 @@
 | `verify-backup-restore.sh` | 检查备份恢复 evidence 的必要字段和脱敏边界 | 不读取、复制或恢复真实备份文件，不证明恢复成功 |
 | `backup-replica/cli.mjs` | 将既有加密备份拉取到按 UUID 核对的 Mac 外盘，独立保留历史并在一次性 PostgreSQL 验证恢复 | 私有 JSON 配置选择来源与介质；不写生产库、不传播来源删除；定时安装只接受已提交模块 |
 
-参数以各脚本 `--help` 为准，目标与证据要求见[备份恢复](../../deployments/yoyoosun/runbooks/04-backup-restore.md)和[发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。`run-smoke.sh --print-input-template` 只输出输入模板，不触网、不读 token、不写报告；正式 smoke 的 URL 禁止携带账号密码，报告不保存密码、token、手机号、HTML、PDF 正文或完整响应。
+参数以各脚本 `--help` 为准，目标与证据要求见[备份恢复](../../deployments/yoyoosun/runbooks/04-backup-restore.md)和[发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。
+
+`run-smoke.sh --print-input-template` 只输出输入模板，不触网、不读 token、不写报告；正式 smoke 的 URL 禁止携带账号密码，报告不保存密码、token、手机号、HTML、PDF 正文或完整响应。
+
+`backup-set/cli.mjs restore-check --business-smoke` 在同一隔离恢复环境追加原应用镜像的登录、配置、业务与附件读取，凭据仅从受控环境传入；完成并精确清理后才产生绑定备份与版本的业务回执。账号、覆盖范围及恢复页报告入口见[恢复步骤](../../deployments/yoyoosun/runbooks/04-backup-restore.md#恢复步骤)。
 
 恢复演练的 `command-summary.txt` 绑定同一 `backupId / releaseId / sourceAlias / restoreTarget`；dump 留在受控本地输出。`image-digests-evidence.mjs` 只写脱敏镜像证据，不构建镜像、不访问 registry、不读取 `.env`。
 
-额外副本的接入、目标迁移、Mac 定时任务和恢复范围见[备份恢复中的 Mac 外接盘副本](../../deployments/yoyoosun/runbooks/04-backup-restore.md#mac-外接盘副本--mac-backup-replica)。配置样例为 `deployments/yoyoosun/env/backup-replica.example.json`；SSH 来源、介质校验、同步保留、恢复与安装各由独立 Node 标准库模块负责，来源地址和本机 UUID 不写入代码。该工具复用项目 Node 版本及 macOS 内置 `lockf / plutil`；恢复另需 `age`、Docker 和本机已有的 `postgres:18.6` 镜像。
+额外副本的接入、目标迁移、Mac 定时任务和恢复范围见[备份恢复中的 Mac 外接盘副本](../../deployments/yoyoosun/runbooks/04-backup-restore.md#mac-外接盘副本--mac-backup-replica)。
+
+配置样例为 `deployments/yoyoosun/env/backup-replica.example.json`；SSH 来源、介质校验、同步保留、恢复与安装各由独立 Node 标准库模块负责，来源地址和本机 UUID 不写入代码。
+
+该工具复用项目 Node 版本及 macOS 内置 `lockf / plutil`；恢复另需 `age`、Docker 和本机已有的 `postgres:18.6` 镜像。
 
 ## GitLab 主链与不可变发布
 
-`.gitlab-ci.yml` 是 canonical CI/CD：main 的 prepare cache writer 后，通过隔离 GitLab Job/DAG 并行执行七个固定质量分片；每个 Node job 内保持 `--test-concurrency=1`，`resource_sensitive` 串行。aggregate 与 `CI Gate` 绑定 exact SHA、strict/full、零 skip、security、receipt 和 evidence。
+`.gitlab-ci.yml` 是 canonical CI/CD：main 的 prepare cache writer 后，通过隔离 GitLab Job/DAG 并行执行七个固定质量分片；每个 Node job 内保持 `--test-concurrency=1`，`resource_sensitive` 串行。
+
+aggregate 与 `CI Gate` 绑定 exact SHA、strict/full、零 skip、security、receipt 和 evidence。
 
 release pipeline 只复用同一 protected main push pipeline 的完整终态，不重跑 strict；随后：
 
@@ -81,7 +91,11 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 旧 v1 六资产只读、展示和既有回滚兼容，`promotionEligible=false`。同版本异 SHA、digest、rehearsal 或资产内容一律失败关闭。
 
-历史运行 SHA 只有在已有完整 v2 七资产时，才可通过 protected main 的 `backfill_release_source` job 补齐唯一 `source.tar`。该 job 在 Runner 内证明目标 SHA 是当前 main 的 ancestor，下载并校验四个小控制文件与服务端七资产目录，再由 `git archive` 生成并核对 source digest；它只写 `plush-release-source`，不改写七资产、GitLab Release、镜像或 public asset。旧 v1 不允许借 backfill 升格为 promotion 输入。
+历史运行 SHA 只有在已有完整 v2 七资产时，才可通过 protected main 的 `backfill_release_source` job 补齐唯一 `source.tar`。
+
+该 job 在 Runner 内证明目标 SHA 是当前 main 的 ancestor，下载并校验四个小控制文件与服务端七资产目录，再由 `git archive` 生成并核对 source digest；它只写 `plush-release-source`，不改写七资产、GitLab Release、镜像或 public asset。
+
+旧 v1 不允许借 backfill 升格为 promotion 输入。
 
 ## 命令行发起 GitLab 发布
 
@@ -96,7 +110,9 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 `publish` 不带 `--execute` 时仍只输出计划。可用 `--sha` 绑定已审阅提交，用 `--version` 核对已审阅版本；指定值必须与当前源码和正式版本目录一致。已有流水线运行时只返回状态，已有失败发布或请求结果不确定时停止，不自动重试、不切换到浏览器。
 
-发布凭据与只读凭据分开。Mac 从当前用户的 Keychain 项 `plush-toy-erp.gitlab-release-api` 读取；Linux 默认读取 `~/.config/plush-toy-erp/gitlab-release-token`，也可显式设置 `PLUSH_GITLAB_TOKEN_FILE`。文件必须为当前用户所有的普通文件、权限 `0400 / 0600`，拒绝符号链接。显式 `PLUSH_GITLAB_TOKEN` 仍沿用既有服务端输入合同；命令参数不接受 token，凭据不进入公开输出或仓库。
+发布凭据与只读凭据分开。Mac 从当前用户的 Keychain 项 `plush-toy-erp.gitlab-release-api` 读取；Linux 默认读取 `~/.config/plush-toy-erp/gitlab-release-token`，也可显式设置 `PLUSH_GITLAB_TOKEN_FILE`。
+
+文件必须为当前用户所有的普通文件、权限 `0400 / 0600`，拒绝符号链接。显式 `PLUSH_GITLAB_TOKEN` 仍沿用既有服务端输入合同；命令参数不接受 token，凭据不进入公开输出或仓库。
 
 专用身份使用本项目带到期日的 Maintainer API token，并受当前 protected-main 与流水线变量规则约束；不复用或提升 CI 发布机器人的权限。到期前通过正式 GitLab 凭据维护轮换此专用身份，并重新运行 `check-credentials`。只读查询继续沿用 `PLUSH_GITLAB_READ_TOKEN`、Mac 的 `plush-toy-erp.gitlab-read-api` 或既有受控只读文件。
 
@@ -106,7 +122,11 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，由 GitLab Provider 单独读取；它们不会被伪造成 operation。Codex 聊天、普通 SSH、手工排障和没有正式回执的动作也不会进入 operation store。
 
-同一动作、target、Exact-SHA、版本和发布输入通常只认领一个 operation；不同窗口对未因回滚改变的同一意图会合并。成功回滚后，同版前向部署以该回滚 operation ID 区分新意图，不复用回滚前的部署成功回执；复用已通过的部署回执前还须只读核对目标服务与公网入口确为该 SHA，否则失败关闭。`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。执行器子进程启动或过早退出时只把 4 KiB 以内的 stderr 转成 240 字符以内的脱敏诊断写入 operation，命令、参数、PID、凭据和真实路径仍不入库。数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
+同一动作、target、Exact-SHA、版本和发布输入通常只认领一个 operation；不同窗口对未因回滚改变的同一意图会合并。成功回滚后，同版前向部署以该回滚 operation ID 区分新意图，不复用回滚前的部署成功回执；复用已通过的部署回执前还须只读核对目标服务与公网入口确为该 SHA，否则失败关闭。
+
+`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。执行器子进程启动或过早退出时只把 4 KiB 以内的 stderr 转成 240 字符以内的脱敏诊断写入 operation，命令、参数、PID、凭据和真实路径仍不入库。
+
+数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 
@@ -120,11 +140,25 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 ## Promotion 与传输
 
-三个登记 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表；legacy v1 代码回滚额外传输小型 `checksums.sha256` 作为既有目标缓存的校验目录。Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。专用 `read_package_registry` deploy token 只保存在工作台进程内存，并且只注入确实可能冷取件的唯一 executor 子进程；子进程在任何预检前立即从环境移除，再仅通过唯一 SSH 标准输入进入已加锁的远端执行器。它不进入其他子进程、参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。不存在静默回退到 Mac 大文件中转的路径。
+三个登记 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表；legacy v1 代码回滚额外传输小型 `checksums.sha256` 作为既有目标缓存的校验目录。
 
-正式 target cache v2 精确包含七资产与 `source.tar` 八项；legacy cache 只允许既有 v1 代码回滚按目标精确命中，缺失即阻断，禁止用于 promotion、远端补取、迁入 v2 或新建 legacy cache。operation 私有 incoming 可以包含控制文件，但只有逐项复核过的 payload 才能被物化或提升为对应正式 cache。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。工作台首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 或同目标 legacy 回滚输入可用；这一核对完成前 operation 保持 `running`，只能从 `running` 直接进入最终 `ready / blocked`，避免新版本成功后才发现旧版本不可回取，也不暴露可误确认的中间 ready。
+Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。
 
-即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。promotion 在已创建权限为 `0600` 的 env 备份后，同时推进 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本；外部附件存储不在该动作中变更。固定的基础服务镜像须在执行前预置到目标，执行器使用 `--pull never`，并在创建新备份和进入维护窗口前核对所需镜像与 `linux/amd64` 平台，缺失时失败关闭。operation 分别记录 Mac 控制包字节/耗时、目标宿主内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
+专用 `read_package_registry` deploy token 只保存在工作台进程内存，并且只注入确实可能冷取件的唯一 executor 子进程；子进程在任何预检前立即从环境移除，再仅通过唯一 SSH 标准输入进入已加锁的远端执行器。它不进入其他子进程、参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。
+
+不存在静默回退到 Mac 大文件中转的路径。
+
+正式 target cache v2 精确包含七资产与 `source.tar` 八项；legacy cache 只允许既有 v1 代码回滚按目标精确命中，缺失即阻断，禁止用于 promotion、远端补取、迁入 v2 或新建 legacy cache。operation 私有 incoming 可以包含控制文件，但只有逐项复核过的 payload 才能被物化或提升为对应正式 cache。
+
+允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。
+
+工作台首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 或同目标 legacy 回滚输入可用；这一核对完成前 operation 保持 `running`，只能从 `running` 直接进入最终 `ready / blocked`，避免新版本成功后才发现旧版本不可回取，也不暴露可误确认的中间 ready。
+
+即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。promotion 在已创建权限为 `0600` 的 env 备份后，同时推进 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本；外部附件存储不在该动作中变更。
+
+固定的基础服务镜像须在执行前预置到目标，执行器使用 `--pull never`，并在创建新备份和进入维护窗口前核对所需镜像与 `linux/amd64` 平台，缺失时失败关闭。operation 分别记录 Mac 控制包字节/耗时、目标宿主内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。
+
+传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。
 
 目标 source 在 `umask 077` 下解包，默认保持 owner 私有；只有容器必须读取的 `server/deploy/compose/prod/jaeger-v2.yml` 在校验为当前用户拥有的普通文件后改为 `0444`，`database_roles.sh` 则恢复为 `0755`。promotion、rollback 与首次初始化必须执行同一归一化合同，禁止通过 root 容器绕过文件权限。
 
@@ -197,7 +231,9 @@ steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PAS
 
 客户配置激活、发布就绪和证据状态入口共用 `deployment-targets.mjs` 的目标合同，包含显式选择的 `production-133`。正式配置仍须完成 manifest 评审、发布证据、validate / publish、transition check、activate 和 effective-session 读回；生产只接受 `base-release`，不使用固定测试凭据验收档。
 
-普通发布和客户验收使用两个 profile；无迁移且确认恢复流程未变的普通发布不重复要求恢复 / 回滚演练或客户签收，但保留当前备份和固定回滚路径。详细条件见 [发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。目标机预检、能力核验和 JSON 回执复用已有 Shell、jq 与 SHA-256 工具，不需要宿主 Node.js、Go 或 Python；回执继续使用 `release-evidence-contract.json`，由本地 Node.js 合同测试核对结构、脱敏和原子写入。
+普通发布和客户验收使用两个 profile；无迁移且确认恢复流程未变的普通发布不重复要求恢复 / 回滚演练或客户签收，但保留当前备份和固定回滚路径。详细条件见 [发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。
+
+目标机预检、能力核验和 JSON 回执复用已有 Shell、jq 与 SHA-256 工具，不需要宿主 Node.js、Go 或 Python；回执继续使用 `release-evidence-contract.json`，由本地 Node.js 合同测试核对结构、脱敏和原子写入。
 
 ## 安全边界
 
@@ -260,9 +296,15 @@ bash scripts/deploy/production-preflight.sh \
   --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.json
 ```
 
-不写 evidence 的 env-only 预检可以不带 `--runtime`。正式 evidence 必须在部署后带 `--runtime`；`--out` 写入稳定 JSON 检查 ID，中文日志只供操作人阅读，不参与 release gate 解析。`base-release` 只执行配置、隔离、镜像、迁移、运行身份和 health / ready 底线；`customer-trial-acceptance` 才追加 SMS provider、PDF warmup 与 Chromium exact pin，并把 profile 写入回执供 release gate 交叉验证。
+不写 evidence 的 env-only 预检可以不带 `--runtime`。正式 evidence 必须在部署后带 `--runtime`；`--out` 写入稳定 JSON 检查 ID，中文日志只供操作人阅读，不参与 release gate 解析。
 
-产品级 production preflight 只核配置与部署边界，不读取业务行。现存数据库升级链在 apply 前必须依次完成两项独立只读审计：`populated-upgrade` 同时覆盖 `20260714055504_migrate.sql` 的存量边界和 WIP `20260717035245 -> 20260717043625` 委外关联切换，`customer-config-cutover` 覆盖 `20260714055825_customer_config_append_only_and_role_backfill.sql` 的切换边界。`migrate_online.sh` 的非 `--status-only` 路径会在 Atlas status 后按此顺序调用；任一失败都不会进入 dry-run 或 apply。需要单独复核时，使用固定 `--audit` 值，并通过容器模式或环境变量名传入 DSN，不能把连接串直接写进命令或报告：
+`base-release` 只执行配置、隔离、镜像、迁移、运行身份和 health / ready 底线；`customer-trial-acceptance` 才追加 SMS provider、PDF warmup 与 Chromium exact pin，并把 profile 写入回执供 release gate 交叉验证。
+
+产品级 production preflight 只核配置与部署边界，不读取业务行。
+
+现存数据库升级链在 apply 前必须依次完成两项独立只读审计：`populated-upgrade` 同时覆盖 `20260714055504_migrate.sql` 的存量边界和 WIP `20260717035245 -> 20260717043625` 委外关联切换，`customer-config-cutover` 覆盖 `20260714055825_customer_config_append_only_and_role_backfill.sql` 的切换边界。
+
+`migrate_online.sh` 的非 `--status-only` 路径会在 Atlas status 后按此顺序调用；任一失败都不会进入 dry-run 或 apply。需要单独复核时，使用固定 `--audit` 值，并通过容器模式或环境变量名传入 DSN，不能把连接串直接写进命令或报告：
 
 ```bash
 sh scripts/qa/populated-upgrade-preflight.sh \
@@ -287,7 +329,9 @@ sh scripts/qa/populated-upgrade-preflight.sh \
   --database-url-env POPULATED_UPGRADE_DATABASE_URL
 ```
 
-两项审计都以 `BEGIN TRANSACTION READ ONLY` 执行，只报告 blocker。发现不兼容存量行、WIP 旧委外链接、切换后缺失 allocation、遗留流程实例或任务配置 revision 锚点后应停止 apply，由人工治理任务明确数据映射、审计、备份与回滚点；不得向审计、migration 或发布脚本补自动 `INSERT / UPDATE / DELETE`。fresh schema、静态 DDL、Ent 零漂移、Atlas validate 或空库迁移不能替代存量升级证明。备份恢复演练同样先恢复 dump、记录 pre-apply status、依次运行两项审计，再允许 Atlas apply。
+两项审计都以 `BEGIN TRANSACTION READ ONLY` 执行，只报告 blocker。发现不兼容存量行、WIP 旧委外链接、切换后缺失 allocation、遗留流程实例或任务配置 revision 锚点后应停止 apply，由人工治理任务明确数据映射、审计、备份与回滚点；不得向审计、migration 或发布脚本补自动 `INSERT / UPDATE / DELETE`。
+
+fresh schema、静态 DDL、Ent 零漂移、Atlas validate 或空库迁移不能替代存量升级证明。备份恢复演练同样先恢复 dump、记录 pre-apply status、依次运行两项审计，再允许 Atlas apply。
 
 ## 回滚演练报告
 
@@ -308,4 +352,12 @@ node scripts/deploy/rollback-rehearsal-report.mjs \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
-该生成器要求步骤非空且全部 `pass / passed / ok`，post-smoke report 的 checks 非空且全部通过，并声明不含 secret / raw customer rows；提供 `--evidence-dir` 时默认写入同目录 `rollback-rehearsal-report.json`。生成的 `postCheck` 会记录 `smokeReport` 和 `smokeCheckCount`，release gate 会要求 `smokeReport` 指向同一 release evidence 目录内的 `smoke-test-report.json`，且 `smokeCheckCount` 与该文件 checks 数量一致，避免只手写 `smokeStatus=passed` 或引用其他批次 smoke。生成器本身也会拒绝绝对路径、非 `smoke-test-report.json` 文件名，或无法解析到输出目录同层 `smoke-test-report.json` 的路径；使用仓库相对路径或 `smoke-test-report.json`。如果提供 `--customer-config-revision`，还会要求 post-smoke report 包含 `customer-config-effective-session`，且 `target=jsonrpc:customer_config.get_effective_session`、`expectedRevision` 匹配传入 revision、记录 token 来源 env 名并声明 `responseBodyStored=false`，生成的 `postCheck.customerConfigEffectiveSession` 才能作为回滚 / 前向修复后读回 active revision 的脱敏证据。它不执行回滚、不恢复备份、不跑 migration、不调用后端。
+该生成器要求步骤非空且全部 `pass / passed / ok`，post-smoke report 的 checks 非空且全部通过，并声明不含 secret / raw customer rows；提供 `--evidence-dir` 时默认写入同目录 `rollback-rehearsal-report.json`。
+
+生成的 `postCheck` 会记录 `smokeReport` 和 `smokeCheckCount`，release gate 会要求 `smokeReport` 指向同一 release evidence 目录内的 `smoke-test-report.json`，且 `smokeCheckCount` 与该文件 checks 数量一致，避免只手写 `smokeStatus=passed` 或引用其他批次 smoke。
+
+生成器本身也会拒绝绝对路径、非 `smoke-test-report.json` 文件名，或无法解析到输出目录同层 `smoke-test-report.json` 的路径；使用仓库相对路径或 `smoke-test-report.json`。
+
+如果提供 `--customer-config-revision`，还会要求 post-smoke report 包含 `customer-config-effective-session`，且 `target=jsonrpc:customer_config.get_effective_session`、`expectedRevision` 匹配传入 revision、记录 token 来源 env 名并声明 `responseBodyStored=false`，生成的 `postCheck.customerConfigEffectiveSession` 才能作为回滚 / 前向修复后读回 active revision 的脱敏证据。
+
+它不执行回滚、不恢复备份、不跑 migration、不调用后端。

@@ -2276,3 +2276,133 @@ test('workbench startup freezes an interrupted launch as not_proven', (t) => {
   })
   assert.equal(readDeliveryOperation(store, OPERATION_ID).status, 'not_proven')
 })
+
+test('delivery middleware reacquires a registered read credential once after reload and only on allowed requests', async () => {
+  let loads = 0
+  let configured
+  const middleware = createDevDeliveryMiddleware({
+    projectRoot: '/unused',
+    resolveReadCredential: async () => {
+      loads += 1
+      return { token: 'reloaded-read-token', source: 'keychain' }
+    },
+    createService: (options) => {
+      configured = options
+      return { summary: async () => ({ status: 'success' }) }
+    },
+  })
+  await requestMiddleware(middleware, { url: '/unrelated' })
+  await requestMiddleware(middleware, {
+    host: 'external.invalid',
+    remoteAddress: '203.0.113.10',
+  })
+  assert.equal(loads, 0)
+  const results = await Promise.all([
+    requestMiddleware(middleware),
+    requestMiddleware(middleware),
+  ])
+  assert.equal(loads, 1)
+  assert.equal(configured.env.PLUSH_GITLAB_READ_TOKEN, 'reloaded-read-token')
+  assert(
+    results.every(
+      (result) =>
+        result.statusCode === 200 &&
+        !result.body.includes('reloaded-read-token')
+    )
+  )
+})
+
+test('formal rollback lineage survives the public operation and client contracts into recovery status', async (t) => {
+  const { createDevDeliveryClient } =
+    await import('../src/dev-workbench/config/devDelivery.mjs')
+  const { buildDevRecoveryOverview } =
+    await import('../src/dev-workbench/config/devRecovery.mjs')
+  const { root, store } = createProject(t)
+  const drillId = '33333333-3333-4333-8333-333333333333'
+  const oldSha = 'b'.repeat(40)
+  const at = (minute) =>
+    `2026-10-22T08:${String(minute).padStart(2, '0')}:00.000Z`
+  for (const [id, action, sha, minute, metadata] of [
+    [
+      ROLLBACK_OPERATION_ID,
+      'rollback',
+      oldSha,
+      0,
+      { currentGitSha: SHA, recoveryDrillId: drillId },
+    ],
+    [
+      OPERATION_ID,
+      'promote',
+      SHA,
+      3,
+      {
+        currentGitSha: oldSha,
+        recoveryDrillId: drillId,
+        recoveryRollbackOperationId: ROLLBACK_OPERATION_ID,
+        recoveryRollbackGitSha: oldSha,
+      },
+    ],
+  ]) {
+    createOrReuseDeliveryOperation(store, {
+      operationId: id,
+      action,
+      target: 'demo-133',
+      gitSha: sha,
+      version: '2026.10.18-1',
+      idempotencyKey: `recovery-proof:${id}`,
+      metadata: { ...metadata, source: 'version-center' },
+      now: at(minute),
+    })
+    transitionDeliveryOperation(store, id, {
+      status: 'running',
+      message: 'execution started',
+      now: at(minute + 1),
+    })
+    transitionDeliveryOperation(store, id, {
+      status: 'passed',
+      message: 'runtime verification passed',
+      now: at(minute + 2),
+    })
+  }
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: { provider: 'gitlab' },
+    now: () => at(6),
+  })
+  const client = createDevDeliveryClient({
+    fetchImpl: async (url) => ({
+      ok: true,
+      json: async () => ({
+        kind: 'plush.dev-delivery-operation-result',
+        operation: service.readOperation(url.split('/').at(-1)),
+      }),
+    }),
+  })
+  const operations = await Promise.all(
+    [ROLLBACK_OPERATION_ID, OPERATION_ID].map((id) => client.operation(id))
+  )
+  assert.equal(operations[0].metadata.source, undefined)
+  assert.deepEqual(Object.keys(operations[1].metadata).sort(), [
+    'currentGitSha',
+    'recoveryDrillId',
+    'recoveryRollbackGitSha',
+    'recoveryRollbackOperationId',
+  ])
+  const overview = buildDevRecoveryOverview(
+    {
+      target: {
+        target: 'demo-133',
+        status: 'passed',
+        remote: { runtime: { serverSha: SHA, webSha: SHA } },
+      },
+      operations,
+      versions: [],
+    },
+    { nowMs: Date.parse(at(6)) }
+  )
+  assert.equal(
+    overview.drills.find((drill) => drill.key === 'rollback-forward').status,
+    'current'
+  )
+})

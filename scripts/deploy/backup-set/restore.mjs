@@ -17,8 +17,17 @@ import {
 } from "./common.mjs";
 import { latestSet, unpackSet, verifyCipher } from "./archive.mjs";
 import { CONFIG_SQL, MIGRATION_SQL, ROWS_SQL } from "./source.mjs";
+import { verifyRestoredBusiness } from "./business-smoke.mjs";
 
 export async function restoreSet(options, { run = command, signal } = {}) {
+  if (options.businessSmoke)
+    requireValue(
+      Boolean(
+        options.businessCredentials?.username &&
+        options.businessCredentials?.password,
+      ),
+      "restore_business_credentials_missing",
+    );
   plainPath(options.identityFile, { privateOwner: true });
   privateDirectory(options.workDir);
   privateDirectory(path.dirname(options.report));
@@ -34,7 +43,8 @@ export async function restoreSet(options, { run = command, signal } = {}) {
   const pg = `${id}-pg`,
     s3 = `${id}-s3`,
     tool = `${id}-tool`;
-  const names = [tool, s3, pg];
+  const app = `${id}-app`;
+  const names = [app, tool, s3, pg];
   let network = false,
     passed = false,
     cleanupDone = false;
@@ -89,6 +99,9 @@ export async function restoreSet(options, { run = command, signal } = {}) {
       directory,
       run,
     );
+    // Keep the source database name inside a new, disconnected cluster so
+    // published runtime identity guards remain valid during business checks.
+    const database = manifest.database;
     const backupAgeSeconds = Math.floor(
       (Date.now() - Date.parse(manifest.snapshotAt)) / 1000,
     );
@@ -119,17 +132,14 @@ export async function restoreSet(options, { run = command, signal } = {}) {
         flag: "wx",
         mode: 0o600,
       });
-    write(
-      "pg.env",
-      `POSTGRES_PASSWORD=${password}\nPOSTGRES_DB=plush_set_restore`,
-    );
+    write("pg.env", `POSTGRES_PASSWORD=${password}\nPOSTGRES_DB=${database}`);
     write(
       "s3.env",
       `AWS_ACCESS_KEY_ID=${access}\nAWS_SECRET_ACCESS_KEY=${secret}\nS3_BUCKET=plush-set-restore`,
     );
     write(
       "tool.env",
-      `POSTGRES_DSN=postgres://postgres:${password}@${pg}:5432/plush_set_restore?sslmode=disable\nATTACHMENT_S3_ENDPOINT=http://${s3}:8333\nATTACHMENT_S3_BUCKET=plush-set-restore\nATTACHMENT_S3_REGION=us-east-1\nATTACHMENT_S3_ACCESS_KEY_ID=${access}\nATTACHMENT_S3_SECRET_ACCESS_KEY=${secret}`,
+      `POSTGRES_DSN=postgres://postgres:${password}@${pg}:5432/${database}?sslmode=disable\nATTACHMENT_S3_ENDPOINT=http://${s3}:8333\nATTACHMENT_S3_BUCKET=plush-set-restore\nATTACHMENT_S3_REGION=us-east-1\nATTACHMENT_S3_ACCESS_KEY_ID=${access}\nATTACHMENT_S3_SECRET_ACCESS_KEY=${secret}`,
     );
     network = true;
     await run(
@@ -162,6 +172,8 @@ export async function restoreSet(options, { run = command, signal } = {}) {
         "--name",
         pg,
         ...limits,
+        "--network-alias",
+        "postgres",
         "--memory",
         "1g",
         "--env-file",
@@ -257,7 +269,7 @@ export async function restoreSet(options, { run = command, signal } = {}) {
           "/app/attachment-storage",
           appImage,
           "-database",
-          "plush_set_restore",
+          database,
           ...args,
         ],
         { signal, timeout: 900_000 },
@@ -271,7 +283,7 @@ export async function restoreSet(options, { run = command, signal } = {}) {
         "-U",
         "postgres",
         "-d",
-        "plush_set_restore",
+        database,
         "--no-owner",
         "--no-acl",
         "--exit-on-error",
@@ -296,7 +308,7 @@ export async function restoreSet(options, { run = command, signal } = {}) {
           "/app/attachment-storage",
           appImage,
           "-database",
-          "plush_set_restore",
+          database,
           "-mode",
           "check",
         ]),
@@ -313,7 +325,7 @@ export async function restoreSet(options, { run = command, signal } = {}) {
           "-U",
           "postgres",
           "-d",
-          "plush_set_restore",
+          database,
           "-X",
           "-A",
           "-t",
@@ -349,7 +361,7 @@ export async function restoreSet(options, { run = command, signal } = {}) {
         "/backup/objects",
         "-execute",
         "-confirm",
-        "ATTACHMENT_RESTORE:plush_set_restore",
+        `ATTACHMENT_RESTORE:${database}`,
       ]),
     );
     const verified = JSON.parse(await toolRun(["-mode", "verify"]));
@@ -369,6 +381,23 @@ export async function restoreSet(options, { run = command, signal } = {}) {
         manifest.files.find((f) => f.path === "database.dump").sha256,
       "dump_changed_during_restore",
     );
+    const businessSmoke = options.businessSmoke
+      ? await verifyRestoredBusiness({
+          manifest,
+          work,
+          appImage,
+          app,
+          pg,
+          s3,
+          network: id,
+          access,
+          secret,
+          credentials: options.businessCredentials,
+          scalar,
+          run,
+          signal,
+        })
+      : "not-run";
     if (!options.keep) await cleanup();
     const result = {
       schemaVersion: "plush.backup-set-restore/v1",
@@ -391,7 +420,7 @@ export async function restoreSet(options, { run = command, signal } = {}) {
       restoreTarget: options.keep
         ? "new-isolated-resources-retained"
         : "temporary-postgres-and-s3-removed",
-      businessSmoke: "not-run",
+      businessSmoke,
     };
     if (options.keep)
       result.retainedResources = {

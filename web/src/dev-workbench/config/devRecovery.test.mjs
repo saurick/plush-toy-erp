@@ -463,3 +463,50 @@ test('devRecovery: 页面只读消费版本摘要，不创建第二套写动作'
   assert.match(source, /drill\.evidenceState\.note/u)
   assert.match(source, /禁止对当前试用或正式环境临时注入故障/u)
 })
+
+test('paired restore keeps business verification separate and becomes current only after bound smoke passes', () => {
+  const receipt = backupRestoreReceipt({
+    coverage: 'database-and-attachments',
+    businessSmoke: 'not-run',
+    attachmentCount: 45,
+    attachmentBytes: 10197864,
+    publicTableCount: 79,
+    backupSizeBytes: undefined,
+  })
+  const options = { nowMs: Date.parse('2026-08-15T00:00:00Z') }
+  const partial = buildDevRecoveryOverview(
+    summary({ recoveryReceipt: receipt }),
+    options
+  )
+  assert.equal(
+    partial.drills.find((item) => item.key === 'backup-restore-isolated')
+      .status,
+    'guarded'
+  )
+  assert.equal(
+    partial.securityChecks.find((item) => item.key === 'backup').statusLabel,
+    '数据库与附件恢复已核验'
+  )
+  const complete = buildDevRecoveryOverview(
+    summary({ recoveryReceipt: { ...receipt, businessSmoke: 'passed' } }),
+    options
+  )
+  assert.equal(
+    complete.drills.find((item) => item.key === 'backup-restore-isolated')
+      .status,
+    'current'
+  )
+  assert.match(
+    complete.drills.find((item) => item.key === 'backup-restore-isolated')
+      .evidenceState.note,
+    /79 张表、45 份附件/
+  )
+  const stale = buildDevRecoveryOverview(
+    summary({ recoveryReceipt: receipt }),
+    { nowMs: Date.parse('2026-10-22T00:00:00Z') }
+  )
+  assert.equal(
+    stale.securityChecks.find((item) => item.key === 'backup').statusLabel,
+    '未核验'
+  )
+})

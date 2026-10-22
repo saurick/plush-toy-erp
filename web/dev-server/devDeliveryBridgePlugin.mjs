@@ -511,6 +511,18 @@ function publicOperation(
     revision: operation.revision,
     createdAt: operation.createdAt,
     updatedAt: operation.updatedAt,
+    // Recovery consumes only these validated linkage fields from the formal
+    // operation store; other executor metadata stays server-side.
+    metadata: Object.fromEntries(
+      [
+        ['currentGitSha', SHA_PATTERN],
+        ['recoveryDrillId', UUID_V4_PATTERN],
+        ['recoveryRollbackOperationId', UUID_V4_PATTERN],
+        ['recoveryRollbackGitSha', SHA_PATTERN],
+      ]
+        .filter(([key, pattern]) => pattern.test(String(metadata[key] || '')))
+        .map(([key]) => [key, metadata[key]])
+    ),
     durationMs,
     stages: measuredStages.length > 0 ? measuredStages : lifecycleStages,
     metrics: {
@@ -2050,8 +2062,31 @@ export function createDevDeliveryMiddleware({
   projectRoot,
   service,
   csrfToken = randomBytes(32).toString('base64url'),
+  createService = createDevDeliveryService,
+  resolveReadCredential = async (options) => {
+    const { resolveDevGitlabCredential } =
+      await import('../scripts/startWebDev.mjs')
+    return resolveDevGitlabCredential(options)
+  },
 } = {}) {
-  const deliveryService = service || createDevDeliveryService({ projectRoot })
+  // Vite reloads this middleware after the previous service consumed its env.
+  // Reacquire the registered read credential; never grant release write access.
+  const environment = { ...process.env }
+  let deliveryService = service
+  let servicePromise
+  const getService = () => {
+    if (deliveryService) return Promise.resolve(deliveryService)
+    servicePromise ||= resolveReadCredential({ env: environment }).then(
+      (credential) => {
+        deliveryService = createService({
+          projectRoot,
+          env: { ...environment, PLUSH_GITLAB_READ_TOKEN: credential.token },
+        })
+        return deliveryService
+      }
+    )
+    return servicePromise
+  }
 
   return async (request, response, next) => {
     let requestPath
@@ -2074,6 +2109,7 @@ export function createDevDeliveryMiddleware({
     }
 
     try {
+      const deliveryService = await getService()
       if (
         request.method === 'GET' &&
         requestPath === DEV_DELIVERY_SESSION_API_PATH

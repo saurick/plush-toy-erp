@@ -8,6 +8,7 @@ const SECURITY_CHECKS = Object.freeze([
     key: 'application',
     title: '应用与依赖安全',
     evidence: '本页尚未接入与当前运行版本绑定的安全审计回执。',
+    actionLabel: '核对审计与依赖',
     next: '核对应用审计、秘密检查和依赖检查的范围及未完成项。',
     guidePath: 'docs/security/应用安全与验证边界.md',
     guideAnchor: '',
@@ -16,6 +17,7 @@ const SECURITY_CHECKS = Object.freeze([
     key: 'access',
     title: '入口与运维身份',
     evidence: '本页尚未接入端口暴露、访问限制及运维多因素认证的核验回执。',
+    actionLabel: '核对入口与身份',
     next: '核对数据库、附件存储、远程管理入口和特权身份隔离。',
     guidePath: DEV_DRILL_RECOVERY_SOURCE_PATH,
     guideAnchor: 'access-boundary',
@@ -24,6 +26,7 @@ const SECURITY_CHECKS = Object.freeze([
     key: 'monitoring',
     title: '账号与异常监测',
     evidence: '尚未接入登录、权限变更及异常下载的告警证据。',
+    actionLabel: '核对日志与告警',
     next: '核对账号与会话控制、主机外日志及告警是否能通知到人。',
     guidePath: DEV_DRILL_RECOVERY_SOURCE_PATH,
     guideAnchor: 'security-monitoring',
@@ -32,6 +35,7 @@ const SECURITY_CHECKS = Object.freeze([
     key: 'backup',
     title: '备份隔离与完整恢复',
     evidence: '数据库与附件的共同恢复点、备份隔离及删除权限尚未核验。',
+    actionLabel: '核对隔离备份与恢复',
     next: '核对配套附件、离线或不可变副本，并在隔离目标恢复验证。',
     guidePath: DEV_DRILL_RECOVERY_SOURCE_PATH,
     guideAnchor: 'ransomware-backup',
@@ -102,8 +106,9 @@ export const DEV_DRILL_RECOVERY_CATALOG = Object.freeze([
   Object.freeze({
     key: 'backup-restore-isolated',
     priority: DEV_DRILL_PRIORITIES.p1,
-    title: '备份恢复到隔离数据库',
-    objective: '证明备份可读取、可恢复，且不会触碰当前、共享或生产数据库。',
+    title: '备份恢复到隔离环境',
+    objective:
+      '证明数据库与附件可恢复，恢复后能登录和读取业务，且不会触碰当前、共享或生产数据。',
     cadence: '数据库或备份工具升级后；稳定期每月一次',
     trigger: 'PostgreSQL、备份格式、存储路径或恢复脚本变化',
     risk: 'isolated_write',
@@ -112,6 +117,7 @@ export const DEV_DRILL_RECOVERY_CATALOG = Object.freeze([
       '备份 SHA-256 与大小',
       '带 operation 标识和 TTL 的隔离库',
       'migration / schema 读回',
+      '附件完整性、恢复后登录与业务读取',
       '演练后 inventory 为零',
     ]),
     boundary:
@@ -299,8 +305,14 @@ function backupRestoreEvidenceState(summary, nowMs) {
     Number.isFinite(verifiedAtMs) &&
     /^[0-9a-f]{64}$/u.test(String(receipt.reportSha256 || '')) &&
     /^[0-9a-f]{64}$/u.test(String(receipt.backupSha256 || '')) &&
-    Number.isSafeInteger(receipt.backupSizeBytes) &&
-    receipt.backupSizeBytes > 0 &&
+    ((Number.isSafeInteger(receipt.backupSizeBytes) &&
+      receipt.backupSizeBytes > 0) ||
+      (receipt.coverage === 'database-and-attachments' &&
+        Number.isSafeInteger(receipt.attachmentCount) &&
+        receipt.attachmentCount >= 0 &&
+        Number.isSafeInteger(receipt.attachmentBytes) &&
+        receipt.attachmentBytes >= 0 &&
+        ['passed', 'not-run'].includes(receipt.businessSmoke))) &&
     receipt.pendingFiles === 0 &&
     receipt.disposableCleanup === 'passed'
   if (!validContract) {
@@ -355,6 +367,17 @@ function backupRestoreEvidenceState(summary, nowMs) {
       at: verifiedAt,
       operationId: receipt.backupId,
       note: '演练回执有效，但当前目标预检未通过',
+    }
+  }
+  if (receipt.coverage === 'database-and-attachments') {
+    const businessPassed = receipt.businessSmoke === 'passed'
+    return {
+      status: businessPassed ? 'current' : 'guarded',
+      at: verifiedAt,
+      operationId: receipt.backupId,
+      coverage: receipt.coverage,
+      businessSmoke: receipt.businessSmoke,
+      note: `已恢复 ${receipt.publicTableCount} 张表、${receipt.attachmentCount} 份附件；${businessPassed ? '恢复后登录、配置、业务与附件读取通过，临时资源已清理' : '尚未验证恢复后的登录与业务读取，临时资源已清理'}。`,
     }
   }
   return {
@@ -495,9 +518,7 @@ function drillEvidence(drill, summary, status, nowMs) {
   if (drill.key === 'backup-restore-isolated') {
     const evidence = backupRestoreEvidenceState(summary, nowMs)
     return {
-      at: evidence.at,
-      operationId: evidence.operationId,
-      note: evidence.note,
+      ...evidence,
     }
   }
   return { at: '', operationId: '', note: '当前没有可冒充演练结果的正式回执' }
@@ -546,15 +567,25 @@ export function buildDevRecoveryOverview(
     (drill) => drill.key === 'backup-restore-isolated'
   )
   const securityChecks = SECURITY_CHECKS.map((check) => {
+    const pairedVerified =
+      check.key === 'backup' &&
+      databaseRestore.evidenceState.coverage === 'database-and-attachments'
     const databaseVerified =
-      check.key === 'backup' && databaseRestore.status === 'current'
+      check.key === 'backup' &&
+      (databaseRestore.status === 'current' || pairedVerified)
     return Object.freeze({
       ...check,
       status: databaseVerified ? 'partial' : 'not_checked',
-      statusLabel: databaseVerified ? '仅数据库恢复已核验' : '未核验',
-      evidence: databaseVerified
-        ? '数据库隔离恢复回执有效；附件、离线或不可变副本及删除权限仍未核验。'
-        : check.evidence,
+      statusLabel: pairedVerified
+        ? '数据库与附件恢复已核验'
+        : databaseVerified
+          ? '仅数据库恢复已核验'
+          : '未核验',
+      evidence: pairedVerified
+        ? `${databaseRestore.evidenceState.note} 离线或不可变副本及删除权限仍需独立核验。`
+        : databaseVerified
+          ? '数据库隔离恢复回执有效；附件、离线或不可变副本及删除权限仍未核验。'
+          : check.evidence,
       verifiedAt: databaseVerified ? databaseRestore.evidenceState.at : '',
       evidenceId: databaseVerified
         ? databaseRestore.evidenceState.operationId

@@ -15,7 +15,7 @@ const HELP = `用法（只在执行主机操作，不使用 SSH）：
     [--retention-days 35]
   node scripts/deploy/backup-set/cli.mjs restore-check --offsite-dir <mounted-offsite>
     --identity-file <private-age-identity> --work-dir <private-local> --report <private-json>
-    [--max-age-hours 36]
+    [--max-age-hours 36] [--business-smoke]
   node scripts/deploy/backup-set/cli.mjs restore --file <exact-set.tar.age>
     --identity-file <private-age-identity> --work-dir <private-local> --report <private-json>
     --keep
@@ -25,7 +25,9 @@ restore 只创建无宿主端口的隔离 PG/S3；--keep 保留新资源等待�
 隔离开发可显式 --allow-local-only，仅本地加密，不产生异地备份证据。
 restore-check 也可 --file 选择明确备份集，此时不产生异地来源证明。
 恢复需要本机已有配套应用镜像、postgres:18.6 和固定 SeaweedFS 镜像。
-不修改已有数据库或 bucket，不迁移，不切业务入口；不把此结果作为业务 smoke。
+不修改已有数据库或 bucket，不迁移，不切业务入口。
+--business-smoke 在清理前启动同一备份绑定的应用镜像，验证登录、配置、业务与附件读取。
+账号通过 RESTORE_SMOKE_USERNAME / RESTORE_SMOKE_PASSWORD 提供，不重设恢复库中的账号。
 `;
 
 async function main() {
@@ -52,6 +54,7 @@ async function main() {
         .concat([
           ["help", { type: "boolean" }],
           ["keep", { type: "boolean" }],
+          ["business-smoke", { type: "boolean" }],
           ["allow-local-only", { type: "boolean" }],
           ["locked", { type: "boolean" }],
         ]),
@@ -110,6 +113,16 @@ async function main() {
       child.once("close", (code) => resolve(code ?? 1));
     });
     return;
+  }
+  if (values["business-smoke"]) {
+    if (action !== "restore-check")
+      throw new Error("business_smoke_requires_restore_check");
+    options.businessCredentials = {
+      username: process.env.RESTORE_SMOKE_USERNAME,
+      password: process.env.RESTORE_SMOKE_PASSWORD,
+    };
+    delete process.env.RESTORE_SMOKE_USERNAME;
+    delete process.env.RESTORE_SMOKE_PASSWORD;
   }
   const controller = new AbortController();
   process.once("SIGINT", () => controller.abort());

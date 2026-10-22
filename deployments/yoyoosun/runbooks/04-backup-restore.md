@@ -10,7 +10,9 @@
 | release evidence        | 发布审计资料                                                                  | 可入库，必须脱敏        |
 | import / dry-run report | 导入报告摘要                                                                  | 可入库，不能含 raw rows |
 
-成套入口是 `node scripts/deploy/backup-set/cli.mjs`。一个 `plush-set-<UTC>-<UUID>.tar.age` 包含 PG custom-format dump、附件 manifest、全部登记文件，以及绑定它们的 SHA-256、镜像内容身份、release、migration、有效客户配置和运行 env 指纹。包含已撤回附件，保留原 ID、key 与审计。运行存储边界见[附件合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5)；不直接打包运行中的 SeaweedFS 数据目录。
+成套入口是 `node scripts/deploy/backup-set/cli.mjs`。一个 `plush-set-<UTC>-<UUID>.tar.age` 包含 PG custom-format dump、附件 manifest、全部登记文件，以及绑定它们的 SHA-256、镜像内容身份、release、migration、有效客户配置和运行 env 指纹。
+
+包含已撤回附件，保留原 ID、key 与审计。运行存储边界见[附件合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5)；不直接打包运行中的 SeaweedFS 数据目录。
 
 包内不包含 env 明文、密码、age identity 或镜像本身。受控加密运行配置、解密身份和对应固定镜像必须另行保存；恢复端先加载该架构下的原应用镜像与固定 PG / SeaweedFS 镜像，工具不会临时拉取或构建制品。
 
@@ -21,7 +23,9 @@
 - 真实导入 apply 前：必须备份；当前 yoyoosun 真实导入未开放。
 - 日常目标：每日在维护窗口生成一个 PG＋附件成套备份，本地和异地均只保留加密包及 checksum，保留 35 天且至少保护最近两套；每周从异地副本恢复到新建临时 PG / S3，验证后精确删除临时资源。
 
-[`systemd` 模板](../systemd/README.md) 已指向成套入口；模板变化不修改已安装任务。升级时须同时核对固定工具版本、Node 路径、独占维护窗口、工作盘空间、异地挂载和恢复端镜像。只有首跑成功、异地同名包 / checksum 读回、恢复报告为 `passed` 且绑定同一 backupId，才可宣称该目标已启用成套日常备份。旧 `scheduled-postgres-backup.sh` 和 `verify-scheduled-postgres-backup.sh` 仍为 PG 专用工具，旧报告不能升级为成套证明。
+[`systemd` 模板](../systemd/README.md) 已指向成套入口；模板变化不修改已安装任务。升级时须同时核对固定工具版本、Node 路径、独占维护窗口、工作盘空间、异地挂载和恢复端镜像。只有首跑成功、异地同名包 / checksum 读回、恢复报告为 `passed` 且绑定同一 backupId，才可宣称该目标已启用成套日常备份。
+
+旧 `scheduled-postgres-backup.sh` 和 `verify-scheduled-postgres-backup.sh` 仍为 PG 专用工具，旧报告不能升级为成套证明。
 
 ## 备份步骤
 
@@ -42,7 +46,11 @@ node scripts/deploy/backup-set/cli.mjs create \
   --confirm BACKUP_SET:plush-toy-erp-production:plush_erp_production
 ```
 
-停写耗时取决于数据库与附件体积，须以演练实测安排窗口。辅助容器按宿主备份目录属主的数值 UID / GID 运行，配合只读根文件系统及去除 capabilities，以访问 0700 / 0600 私有文件；不依赖应用镜像的默认用户。正常隔离验证运行 `node scripts/qa/backup-set-integration.mjs`：使用默认非 root 工具镜像、合成非空附件、真实 migration 和一次性 PG / SeaweedFS；显式本地加密模式 `--allow-local-only` 不提供异地证明。工具链使用项目 Node、Docker、age，宿主锁在 Linux 使用 flock、Mac 使用 lockf。
+停写耗时取决于数据库与附件体积，须以演练实测安排窗口。辅助容器按宿主备份目录属主的数值 UID / GID 运行，配合只读根文件系统及去除 capabilities，以访问 0700 / 0600 私有文件；不依赖应用镜像的默认用户。
+
+正常隔离验证运行 `node scripts/qa/backup-set-integration.mjs`：使用默认非 root 工具镜像、合成非空附件、真实 migration 和一次性 PG / SeaweedFS；显式本地加密模式 `--allow-local-only` 不提供异地证明。
+
+工具链使用项目 Node、Docker、age，宿主锁在 Linux 使用 flock、Mac 使用 lockf。
 
 仅做 PostgreSQL 升级审计时可使用旧的专项演练入口，不能代替成套恢复：
 
@@ -73,9 +81,19 @@ node scripts/deploy/backup-set/cli.mjs restore-check \
   --max-age-hours 36
 ```
 
-恢复检查不连接现有 PG / bucket：在无宿主端口的 Docker internal 网络创建独立 PG 与 S3，先验密文 checksum、解密、拒绝 tar 链接 / 特殊文件 / 路径穿越，再逐文件校验。恢复 PG 后核对迁移、有效客户配置、附件整行摘要，向新 bucket 恢复文件并逐对象验大小与 SHA-256。临时容器、该次匿名卷、网络及明文均清理成功才写 `plush.backup-set-restore/v1` passed。报告必须为 `sourceKind=offsite-backup-set`、同一 backupId、数量和字节相符、`restoreTarget=temporary-postgres-and-s3-removed`。失败会覆盖本次报告为 failed，不能沿用旧 passed。
+恢复检查不连接现有 PG / bucket：在无宿主端口的 Docker internal 网络创建独立 PG 与 S3，先验密文 checksum、解密、拒绝 tar 链接 / 特殊文件 / 路径穿越，再逐文件校验。恢复 PG 后核对迁移、有效客户配置、附件整行摘要，向新 bucket 恢复文件并逐对象验大小与 SHA-256。
 
-灾难恢复可选择一套精确文件，以 `restore --file <absolute-set.tar.age> --identity-file <private-key> --work-dir <private-dir> --report <private-json> --keep` 保留新建隔离 PG / S3。资源名与私有配置目录只写入 0600 报告，仍无宿主端口。该入口不接受已有数据库或 bucket，也不切生产入口；先核对资源和文件再按以下步骤完成业务恢复。`restore-check --file` 可用于指定副本演练，其报告明确为 `explicit-backup-set`，不证明异地来源。旧 PG-only 文件不被成套入口接受。
+临时容器、该次匿名卷、网络及明文均清理成功才写 `plush.backup-set-restore/v1` passed。报告必须为 `sourceKind=offsite-backup-set`、同一 backupId、数量和字节相符、`restoreTarget=temporary-postgres-and-s3-removed`。失败会覆盖本次报告为 failed，不能沿用旧 passed。
+
+需要验证恢复后的业务时，在 `restore-check` 增加 `--business-smoke`，由受控进程环境提供 `RESTORE_SMOKE_USERNAME`、`RESTORE_SMOKE_PASSWORD`。该选项在同一个无宿主端口、无外网出口的隔离网络中，按正式角色脚本重建并验证数据库最小权限，保留备份中的数据库名和网络内 `postgres` 别名，再启动备份绑定的原应用镜像。试用配置按备份中的有效产品标识恢复运行开关，仍由原应用执行完整边界检查；Chromium 使用正式 Compose 的 seccomp 策略并保留 sandbox。验证不更改原账号密码，不 bootstrap 或通过业务 API 写入业务事实；应用自身启动及登录审计只作用于临时副本。
+
+业务检查包括 health / ready、真实登录、有效客户配置版本、单位和销售订单读取，以及最多三份未撤回附件的 API 下载与哈希核对；全部附件仍由前面的存储恢复逐对象校验。会话退出、应用容器及其余临时资源清理成功后，`businessSmoke.status=passed` 才能随同一 backupId / releaseSha 输出。未选择该选项仍为 `businessSmoke=not-run`，不能用数据库与附件成功代替业务验证。它不是完整岗位矩阵、业务写入或客户验收。
+
+恢复页从固定的 `output/customers/<customer>/backup-restore-rehearsal/` 读取脱敏回执。成套报告保存为 `backup-set-restore-report.json`；旧专项数据库回执仍使用 `backup-restore-report.json`，两者保留各自证据范围。跨主机取回报告时保留原内容和 SHA-256，不复制 dump、私有资源清单或凭据。
+
+灾难恢复可选择一套精确文件，以 `restore --file <absolute-set.tar.age> --identity-file <private-key> --work-dir <private-dir> --report <private-json> --keep` 保留新建隔离 PG / S3。资源名与私有配置目录只写入 0600 报告，仍无宿主端口。
+
+该入口不接受已有数据库或 bucket，也不切生产入口；先核对资源和文件再按以下步骤完成业务恢复。`restore-check --file` 可用于指定副本演练，其报告明确为 `explicit-backup-set`，不证明异地来源。旧 PG-only 文件不被成套入口接受。
 
 1. 选择 backup id，并确认 hash。
 2. 准备隔离恢复环境或明确恢复窗口。
@@ -130,7 +148,11 @@ Mac 复用项目 Node 版本与内置 `lockf / plutil`，SSH 来源使用 POSIX 
 4. 运行 `verify --config <private-config.json>`。它从外盘实际副本解密，恢复到无网络、无宿主端口的一次性 PostgreSQL，核对业务表与 Atlas migration；精确清理临时容器、其新建匿名卷及临时明文成功后才保存 passed 回执。首次镜像启动须等待 PID 1 已进入最终 PostgreSQL 进程，避免误用 initdb 的临时服务。
 5. 相关模块提交并验证后运行 `install --config <private-config.json>`。安装器核对每个模块与提交内容一致，生成固定内容 hash 的独立运行目录及当前用户 launchd 任务；共享工作区后续变化不影响已安装版本。安装后读回 launchd 最后退出码和 `status --config <private-config.json>`，不能只凭安装成功宣称定时首跑通过。
 
-`run` 执行同步及到期的恢复检查。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。外盘读取先在独立进程执行 15 秒限时预检；无法读取时记录 `destination_access_unavailable`，不开始传输或解密。首次后台访问外盘可能需要在 macOS 提示中允许 Node 访问可移动宗卷；前台运行继承终端 / App 权限，不能证明后台已获准。遇到预检失败须核对介质与系统授权，不能改为内盘目录或关闭系统保护。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；副本索引在外盘专属目录。SIGTERM / SIGINT 进入同一清理路径；安装器拒绝中断仍在运行的旧备份任务。Mac 休眠 / 离线期间不会保证取得最新副本，服务器原有自动备份继续独立运行。
+`run` 执行同步及到期的恢复检查。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。外盘读取先在独立进程执行 15 秒限时预检；无法读取时记录 `destination_access_unavailable`，不开始传输或解密。
+
+首次后台访问外盘可能需要在 macOS 提示中允许 Node 访问可移动宗卷；前台运行继承终端 / App 权限，不能证明后台已获准。遇到预检失败须核对介质与系统授权，不能改为内盘目录或关闭系统保护。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；副本索引在外盘专属目录。SIGTERM / SIGINT 进入同一清理路径；安装器拒绝中断仍在运行的旧备份任务。
+
+Mac 休眠 / 离线期间不会保证取得最新副本，服务器原有自动备份继续独立运行。
 
 切换同一数据来源到另一台 SSH 主机时，先复制历史加密文件、checksum 和来源身份标记，修改私有配置的 host / directory，再依次执行 sync、verify 和定时首跑读回。更换外盘时填写新 UUID 并初始化 / 核验专属目录；恢复回执绑定卷 UUID，新介质会重新验证。新链路通过且保留窗口结束后再处理旧目标；不同业务来源使用新的 id 与目录。对象存储等新协议应扩展传输模块，不混入同步及恢复逻辑。
 

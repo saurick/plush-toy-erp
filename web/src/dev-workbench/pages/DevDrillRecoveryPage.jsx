@@ -160,24 +160,17 @@ export default function DevDrillRecoveryPage() {
                 </dd>
               </div>
             </dl>
-            <Text type="secondary">
-              {recoveryReady
-                ? '目标身份一致，可以按正式门禁安排演练'
-                : '先补齐目标、版本或公网入口证据'}
-            </Text>
+            {!recoveryReady ? (
+              <Text type="secondary">先补齐目标、版本或公网入口证据</Text>
+            ) : null}
           </section>
         ) : null}
 
         <SecurityPanel activeView={activeView} overview={overview} />
         <DrillsPanel
           activeView={activeView}
-          customerReady={customerReady}
           drillTriggerRef={drillTriggerRef}
-          loading={loading}
-          navigateWithinCustomerScope={navigateWithinCustomerScope}
           overview={overview}
-          refresh={refresh}
-          refreshing={refreshing}
           setSelectedDrillKey={setSelectedDrillKey}
         />
         <EmergencyPanel
@@ -185,9 +178,6 @@ export default function DevDrillRecoveryPage() {
           customerReady={customerReady}
           navigateWithinCustomerScope={navigateWithinCustomerScope}
         />
-        <Text type="secondary" className="erp-dev-delivery-boundary">
-          本页只读，不接受主机、路径、凭据、命令或故障脚本输入。
-        </Text>
       </main>
       <DrillDrawer
         customerReady={customerReady}

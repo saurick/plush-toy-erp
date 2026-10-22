@@ -27,7 +27,9 @@
 - [ ] 恢复后 smoke query 通过。
 - [ ] 恢复后 web / server 健康检查通过。
 - [ ] `command-summary.txt` 已生成，只记录脱敏命令摘要，不包含完整 DSN、secret、dump 内容或客户 raw rows。
-- [ ] `backup-restore-report.json` 已生成，并声明 `backupCreated=true`、`restoreCompleted=true`、`migrationStatus=ok`、`smokeQueryStatus=passed`；跨越 `20260714055504` 时四处 `populatedUpgradeAuditStatus` 均为 `passed`，跨越 `20260714055825` 时四处 `customerConfigCutoverAuditStatus` 均为 `passed`，步骤含对应 read-only audit；且 `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus`、`artifacts.commandSummary` 指向当前 evidence 目录内真实存在的相对路径。
+- [ ] `backup-restore-report.json` 已生成，包含 `backupCreated=true`、`restoreCompleted=true`、`migrationStatus=ok`、`smokeQueryStatus=passed`。
+- [ ] 跨越 `20260714055504` 时四处 `populatedUpgradeAuditStatus` 均为 `passed`；跨越 `20260714055825` 时四处 `customerConfigCutoverAuditStatus` 均为 `passed`，步骤含对应 read-only audit。
+- [ ] `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus`、`artifacts.commandSummary` 均指向当前 evidence 目录内真实存在的相对路径。
 
 ## 收口
 
