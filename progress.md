@@ -4,7 +4,9 @@
 
 ## GitLab 部署记录整合（2026-10-23）
 
-三环境部署 / 回滚接入 GitLab 原生环境，项目回执归档 Generic Package；工作台保留项目检查、原始时间、操作入口和离线历史。183 条历史操作、22 份已有回执完成归档及逐条回读，789 个原始文件摘要不变；退役目标独立保留，缺失证据不补造。协议与补录恢复入口见 [部署脚本](scripts/deploy/README.md#gitlab-部署登记与回执归档)。本轮源码仅纳入精确任务差异；其他工作区改动排除。后续推送与三个目标发布已获用户授权，最终 SHA 与运行回执留在 ignored `output/qa/gitlab-deployment-integration/`，不能以本地验证代替发布结果。
+三环境部署 / 回滚接入 GitLab 原生环境，项目回执归档 Generic Package；工作台保留项目检查、原始时间、操作入口和离线历史。183 条历史操作、22 份已有回执逐条归档读回，789 个原始文件摘要不变；退役目标独立保留。协议见[部署脚本](scripts/deploy/README.md#gitlab-部署登记与回执归档)。
+
+`2026.10.23-1` / `013a540846fa12afcc027928e3d9d3fb2d742b38` 已通过 CI #397（28/28），完成发布 #407 和三个普通 promotion；备份恢复、运行预检、GitLab 回读及生产账号只读 smoke 通过，数据库与配置不变。两次网络失败记录保留；同制品重试未修改共享 Docker、代理或 DNS。证据在 ignored `output/qa/gitlab-deployment-integration/`，发布身份见[客户交付矩阵](docs/customers/yoyoosun/客户交付矩阵.md#当前环境基线)。共享工作区其他改动未带入；本结果不代表客户 UAT。
 
 ## 全部代码推送与三目标发布（2026-10-22）
 
