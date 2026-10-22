@@ -1202,6 +1202,8 @@ only; it never builds, performs a database down migration, restores a database
 or automatically retries a terminal or unknown operation.`);
       process.exit(0);
     }
+    const fetchToken = process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+    delete process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
     const { runRecordedDeployment } = await import("./gitlab-deployment-records.mjs");
     const operationStore = consumeDeliveryOperationStore(process.cwd());
     const report = await runRecordedDeployment({
@@ -1216,7 +1218,7 @@ or automatically retries a terminal or unknown operation.`);
         targetBundleDir: options.targetBundleDir,
         targetReleaseManifestPath: options.targetManifest,
         confirmation: options.confirmation,
-      }),
+      }, { fetchToken }),
     });
     console.log(
       options.json

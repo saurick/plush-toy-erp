@@ -1724,6 +1724,8 @@ The operation must already be ready. A terminal or unknown operation is never
 automatically retried. The browser-facing Bridge chooses all local paths.`);
       process.exit(0);
     }
+    const fetchToken = process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
+    delete process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN;
     const { runRecordedDeployment } = await import("./gitlab-deployment-records.mjs");
     const operationStore = consumeDeliveryOperationStore(process.cwd());
     const report = await runRecordedDeployment({
@@ -1737,7 +1739,7 @@ automatically retried. The browser-facing Bridge chooses all local paths.`);
         bundleDir: options.bundleDir,
         releaseManifestPath: options.releaseManifest,
         confirmation: options.confirmation,
-      }),
+      }, { fetchToken }),
     });
     console.log(
       options.json
