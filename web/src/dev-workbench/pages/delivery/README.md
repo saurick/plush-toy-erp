@@ -9,6 +9,8 @@
 | `migration/`                                     | 状态读取与动作生命周期、升级路径、运行检查、记录、确认与详情 |
 | `version/useVersionCenterRoute.jsx`              | URL 视图、历史筛选与前进后退                                 |
 | `version/useVersionCenterState.jsx`              | 客户范围、只读快照、发布会话、请求保护和写动作               |
+| `version/useOperationHistory.jsx`               | 全部留存操作的服务端分页、筛选、统计及过期请求保护           |
+| `version/OperationEvidence.jsx`                 | 目标检查回执、迁移与恢复范围、源码和 CI/CD 追溯链接          |
 | `version/buildVersionCenterModel.mjs`            | 复用正式合同计算制品、目标、发布资格与操作详情               |
 | `version/` 其他模块                              | 版本与记录列表、当前任务、制品发布、部署确认和操作详情       |
 | `recovery/`                                      | 核验数据生命周期、安全清单、计划演练、应急步骤和只读详情     |

@@ -21,6 +21,7 @@ import {
   consumeDeliveryOperationStore,
   listDeliveryOperations,
   readDeliveryOperation,
+  persistDeliveryOperationReceipt,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
@@ -481,21 +482,6 @@ function persistTargetBootstrapAccess(store, targetKey, operationId, password) {
   return file;
 }
 
-function persistTargetInitializationReceipt(store, receipt) {
-  const directory = path.join(store, "receipts");
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const file = path.join(
-    directory,
-    `${receipt.operationId}${TARGET_INITIALIZATION_RECEIPT_FILE_SUFFIX}`,
-  );
-  writeFileSync(file, `${JSON.stringify(receipt, null, 2)}\n`, {
-    encoding: "utf8",
-    flag: "wx",
-    mode: 0o600,
-  });
-  return file;
-}
-
 const PREPARE_TARGET_INITIALIZATION_ROOT = String.raw`set -Eeuo pipefail
 umask 077
 operation_id="$1"
@@ -564,11 +550,12 @@ export function validateRemoteTargetInitializationReceipt(receipt, expected) {
     SHA256_PATTERN.test(backupSha256) &&
     Number.isSafeInteger(backupSizeBytes) &&
     backupSizeBytes > 0 &&
-      receipt?.rollbackPoint?.restoreChecked === true;
+    receipt?.rollbackPoint?.restoreChecked === true;
   const acquisitionCompleted =
     receipt?.acquisition?.mode === "gitlab_internal" &&
     receipt?.acquisition?.expectedBytes === expected.acquisitionExpectedBytes &&
-    receipt?.acquisition?.downloadedBytes === expected.acquisitionExpectedBytes &&
+    receipt?.acquisition?.downloadedBytes ===
+      expected.acquisitionExpectedBytes &&
     Number.isSafeInteger(receipt?.acquisition?.durationMs) &&
     receipt.acquisition.durationMs > 0 &&
     receipt?.acquisition?.catalogAndChecksumsVerified === true;
@@ -948,7 +935,7 @@ function executeTargetInitialization(
         "remote target initialization exit status contradicts its receipt",
       );
     }
-    const receiptFile = persistTargetInitializationReceipt(
+    const receiptFile = persistDeliveryOperationReceipt(
       store,
       validatedReceipt,
     );
@@ -976,8 +963,7 @@ function executeTargetInitialization(
         backupSizeBytes: validatedReceipt.rollbackPoint.backupSizeBytes,
         migrationReadback: validatedReceipt.migration.readback,
         targetAcquisitionMode: validatedReceipt.acquisition.mode,
-        targetAcquisitionBytes:
-          validatedReceipt.acquisition.downloadedBytes,
+        targetAcquisitionBytes: validatedReceipt.acquisition.downloadedBytes,
         targetAcquisitionExpectedBytes:
           validatedReceipt.acquisition.expectedBytes,
         targetAcquisitionVerified:
@@ -1567,6 +1553,7 @@ export function executePromotion(
     ) {
       throw new Error("remote promotion exit status contradicts its receipt");
     }
+    persistDeliveryOperationReceipt(store, receipt);
     operation = transitionDeliveryOperation(store, operation.id, {
       status: receipt.status,
       message:
@@ -1637,7 +1624,7 @@ export function executePromotion(
           ? "remote promotion result could not be proven; automatic retry is disabled"
           : !targetCleanupProven
             ? "promotion control transfer cleanup could not be proven; automatic retry is disabled"
-          : "promotion package preparation or control transfer failed before remote execution",
+            : "promotion package preparation or control transfer failed before remote execution",
         issues: terminalIssue(outcomeUnknown ? "not_proven" : "failed"),
         metadata: {
           ...current.metadata,

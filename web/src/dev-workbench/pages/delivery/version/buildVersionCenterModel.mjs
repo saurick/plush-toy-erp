@@ -1,7 +1,6 @@
 import {
   POLLING_OPERATION_STATUSES,
   OPEN_OPERATION_STATUSES,
-  operationHistoryStatePresentation,
 } from './shared.jsx'
 import {
   DEV_DELIVERY_TARGETS,
@@ -11,19 +10,16 @@ import {
   deliveryReadOnlyReleasePresentation,
   deliveryTargetCachePresentation,
   deliveryVersionForTarget,
-  filterDevOperationHistory,
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryPercent,
   formatDeliveryRate,
-  resolveDevOperationHistoryState,
 } from '../../../config/devDelivery.mjs'
 
 export function buildVersionCenterModel({
   actionKey,
   customerReady,
   initialLoading,
-  loadError,
   operationDetail,
   operationHistoryFilters,
   qualityGateError,
@@ -51,28 +47,11 @@ export function buildVersionCenterModel({
   const openOperations = operations.filter((operation) =>
     OPEN_OPERATION_STATUSES.has(operation.status)
   )
-  const historyOperations = operations.filter(
-    (operation) => !OPEN_OPERATION_STATUSES.has(operation.status)
-  )
-  const filteredHistoryOperations = filterDevOperationHistory(
-    historyOperations,
-    operationHistoryFilters
-  )
   const hasOperationHistoryFilters = Boolean(
     operationHistoryFilters.action !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
     operationHistoryFilters.result !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
     operationHistoryFilters.target !== DEV_VERSION_CENTER_HISTORY_FILTER_ALL ||
     operationHistoryFilters.keyword
-  )
-  const operationHistoryState = resolveDevOperationHistoryState({
-    initialLoading,
-    loadError,
-    hasSummary: Boolean(summary),
-    summaryFresh,
-    operationCount: historyOperations.length,
-  })
-  const operationHistoryPresentation = operationHistoryStatePresentation(
-    operationHistoryState
   )
   const pollingOperation = operations.find((operation) =>
     POLLING_OPERATION_STATUSES.has(operation.status)
@@ -439,10 +418,8 @@ export function buildVersionCenterModel({
     customerTestRebuildEligible,
     customerTestRebuildExplanation,
     dispatchExplanation,
-    filteredHistoryOperations,
     hasOpenOperation,
     hasOperationHistoryFilters,
-    historyOperations,
     initializationPreflight,
     initializationReady,
     isMutationRunning,
@@ -451,8 +428,6 @@ export function buildVersionCenterModel({
     operationDetailIdempotency,
     operationDetailNeedsRetryCard,
     operationDetailView,
-    operationHistoryPresentation,
-    operationHistoryState,
     operationReleaseMetricItems,
     operationServerDigest,
     operationTargetMetricItems,

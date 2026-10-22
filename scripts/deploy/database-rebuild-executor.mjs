@@ -24,6 +24,7 @@ import {
 } from "./database-rebuild-manifest.mjs";
 import {
   readDeliveryOperation,
+  persistDeliveryOperationReceipt,
   reconcileDeliveryOperationFromTerminalReceipt,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
@@ -353,25 +354,6 @@ export function validateRemoteDatabaseRebuildReceipt(receipt, expected) {
   return receipt;
 }
 
-function persistDatabaseRebuildReceipt(store, receipt) {
-  const operationId = String(receipt?.operationId || "");
-  if (!UUID_V4_PATTERN.test(operationId)) {
-    throw new Error("database rebuild receipt operation id is invalid");
-  }
-  const directory = path.join(store, "receipts");
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const file = path.join(
-    directory,
-    `${operationId}${DATABASE_REBUILD_RECEIPT_FILE_SUFFIX}`,
-  );
-  writeFileSync(file, `${JSON.stringify(receipt, null, 2)}\n`, {
-    encoding: "utf8",
-    flag: "wx",
-    mode: 0o600,
-  });
-  return file;
-}
-
 function fixedSshArgs(target) {
   return [
     "-o",
@@ -633,7 +615,7 @@ export function executeDatabaseRebuild(
         "remote database rebuild exit status contradicts its receipt",
       );
     }
-    const receiptFile = persistDatabaseRebuildReceipt(store, receipt);
+    const receiptFile = persistDeliveryOperationReceipt(store, receipt);
     const receiptSha256 = sha256File(receiptFile);
     if (receipt.status !== "passed" && existsSync(transfer.secretFile)) {
       rmSync(transfer.secretFile);

@@ -1,4 +1,4 @@
-import { DEV_DELIVERY_TARGETS, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
+import { DEV_DELIVERY_TARGETS, filterDevOperationHistory, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
 import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
@@ -388,6 +388,50 @@ export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
       body: JSON.stringify(summary),
     })
   })
+  await page.route('**/__dev/api/delivery/operations?*', async (route) => {
+    const query = Object.fromEntries(
+      new URL(route.request().url()).searchParams
+    )
+    const all = summary.operations.filter((operation) =>
+      ['passed', 'failed', 'blocked', 'not_proven'].includes(operation.status)
+    )
+    const matches = filterDevOperationHistory(all, query)
+    const pageSize = Number(query.pageSize || 10)
+    const current = Math.min(
+      Number(query.page || 1),
+      Math.max(1, Math.ceil(matches.length / pageSize))
+    )
+    const counts = Object.fromEntries(
+      ['passed', 'failed', 'blocked', 'not_proven'].map((status) => [
+        status,
+        matches.filter((operation) => operation.status === status).length,
+      ])
+    )
+    const durations = matches
+      .filter((operation) => operation.status === 'passed')
+      .map((operation) => operation.durationMs)
+      .sort((a, b) => a - b)
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        kind: 'plush.dev-delivery-history',
+        generatedAt: summary.generatedAt,
+        total: all.length,
+        matched: matches.length,
+        page: current,
+        pageSize,
+        statistics: {
+          counts,
+          passedDurationSamples: durations.length,
+          passedDurationMedianMs: durations.length
+            ? durations[Math.floor(durations.length / 2)]
+            : null,
+        },
+        operations: matches.slice((current - 1) * pageSize, current * pageSize),
+      }),
+    })
+  })
   return summary
 }
 
@@ -530,6 +574,9 @@ export function createDevVersionCenterScenarios({
       path: '/__dev/version-center?view=history&view=pipeline&history_action=promote&history_action=release',
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 2,
+      expectedConsoleErrorPatterns: [
+        /console error \[path=\/__dev\/version-center\]: Failed to load resource: the server responded with a status of 503 .*\/__dev\/api\/delivery\/operations\?/u,
+      ],
       beforeNavigate: async (page) => {
         summaryRequests = 0
         await installSummaryRoute(page, () => {
@@ -610,6 +657,34 @@ export function createDevVersionCenterScenarios({
           .locator('.erp-dev-version-tab--history')
           .waitFor({ state: 'visible' })
         assert.equal(await page.locator('.erp-dev-version-current-operation').isVisible(), true)
+
+        const historyView = page.locator('.erp-dev-version-tab--history')
+        await historyView.getByText('共 12 条记录', { exact: true }).waitFor()
+        await historyView.locator('.ant-pagination-item-2').click()
+        await historyView.getByText('2026.08.08-2', { exact: true }).waitFor()
+        assert.equal(await historyView.getByRole('row').count(), 3)
+        const historySearch = page.getByRole('textbox', { name: '搜索版本、SHA 或操作 ID' })
+        await historySearch.fill('2026.08.08-1')
+        await historyView.getByText('匹配 4 / 共 12 条记录', { exact: true }).waitFor()
+        await historySearch.fill('does-not-exist')
+        await historyView.getByText('没有符合筛选条件的记录，请调整或清空上方条件', { exact: true }).waitFor()
+        await page.getByRole('button', { name: '清空筛选', exact: true }).click()
+        await historyView.getByText('共 12 条记录', { exact: true }).waitFor()
+        let historyUnavailable = true
+        await page.route('**/__dev/api/delivery/operations?*', async (route) => {
+          if (!historyUnavailable) return route.fallback()
+          return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: '暂时不可读' }) })
+        })
+        await historySearch.fill('2026.08.08-9')
+        await historyView.getByText('工作台操作记录当前不可读', { exact: true }).waitFor()
+        assert.equal(await historySearch.inputValue(), '2026.08.08-9')
+        assert.equal(await historyView.getByRole('table').count(), 0)
+        assert.equal(await historyView.getByText('共 0 条记录', { exact: true }).count(), 0)
+        historyUnavailable = false
+        await historyView.getByRole('button', { name: '重试读取', exact: true }).click()
+        await historyView.getByText('匹配 1 / 共 12 条记录', { exact: true }).waitFor()
+        await page.getByRole('button', { name: '清空筛选', exact: true }).click()
+        await historyView.getByText('共 12 条记录', { exact: true }).waitFor()
 
         await page.getByRole('tab', { name: '流水线耗时' }).click()
         await waitForView(page, 'pipeline')

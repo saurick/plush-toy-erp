@@ -1,12 +1,4 @@
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Input,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Card, Empty, Input, Space, Tag, Typography } from 'antd'
 import {
   OPEN_OPERATION_STATUSES,
   OPERATION_HISTORY_RESULT_OPTIONS,
@@ -30,6 +22,7 @@ import {
   DEV_VERSION_CENTER_VIEW_PIPELINE,
   DEV_VERSION_CENTER_VIEW_VERSIONS,
   deliveryReadOnlyReleasePresentation,
+  formatDeliveryDuration,
 } from '../../../config/devDelivery.mjs'
 import FilterSelect from '@/common/components/select/FilterSelect'
 
@@ -42,7 +35,9 @@ export function buildVersionWorkspace({
   deliveryProviderName,
   filteredHistoryOperations,
   hasOperationHistoryFilters,
-  historyOperations,
+  historyResult,
+  historyLoading,
+  retryHistory,
   historyPage,
   historyTableRef,
   initialLoading,
@@ -76,7 +71,7 @@ export function buildVersionWorkspace({
           <Card
             title="可部署版本"
             className="erp-dev-version-table-card"
-            extra={<Text type="secondary">最近 20 个版本</Text>}
+            extra={<Text type="secondary">最近 {versions.length} 个版本</Text>}
           >
             <Table
               rowKey="gitSha"
@@ -107,7 +102,9 @@ export function buildVersionWorkspace({
               scroll={{ x: 980 }}
             />
           </Card>
-          {!operations.some((operation) => OPEN_OPERATION_STATUSES.has(operation.status)) ? (
+          {!operations.some((operation) =>
+            OPEN_OPERATION_STATUSES.has(operation.status)
+          ) ? (
             <DevStaticGuidance title="部署步骤">
               <DeliveryTaskPath
                 items={[
@@ -178,7 +175,7 @@ export function buildVersionWorkspace({
                 type="warning"
                 showIcon
                 message="当前显示上次成功读回的操作记录"
-                description="最新操作记录不可读或仍在重新核对；记录可查看，但所有写操作保持停用。"
+                description="最新操作记录不可读或仍在重新核对；当前统计对应上次读回结果。"
               />
             ) : null}
             {operationHistoryState === 'failure' ? (
@@ -189,108 +186,142 @@ export function buildVersionWorkspace({
                 description="未使用 GitLab Pipeline、Package、Release、Codex 对话或普通 SSH 动作补造操作记录。"
               />
             ) : null}
+            <div
+              className="erp-dev-operation-history-filters"
+              role="search"
+              aria-label="筛选发布与部署记录"
+            >
+              <div className="erp-dev-operation-history-filters__controls">
+                <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--result">
+                  <Text type="secondary">结果</Text>
+                  <Segmented
+                    aria-label="筛选结果"
+                    value={operationHistoryFilters.result}
+                    options={OPERATION_HISTORY_RESULT_OPTIONS}
+                    onChange={(value) =>
+                      updateOperationHistoryFilter(
+                        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result,
+                        value
+                      )
+                    }
+                  />
+                </div>
+                <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--action">
+                  <Text type="secondary">动作</Text>
+                  <FilterSelect
+                    emptyValue="all"
+                    label="动作"
+                    placeholder="动作"
+                    aria-label="筛选动作"
+                    value={operationHistoryFilters.action}
+                    options={OPERATION_HISTORY_ACTION_OPTIONS}
+                    onChange={(value) =>
+                      updateOperationHistoryFilter(
+                        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
+                        value
+                      )
+                    }
+                  />
+                </div>
+                <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
+                  <Text type="secondary">目标</Text>
+                  <FilterSelect
+                    emptyValue="all"
+                    label="目标"
+                    placeholder="目标"
+                    aria-label="筛选目标"
+                    value={operationHistoryFilters.target}
+                    options={OPERATION_HISTORY_TARGET_OPTIONS}
+                    onChange={(value) =>
+                      updateOperationHistoryFilter(
+                        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target,
+                        value
+                      )
+                    }
+                  />
+                </div>
+                <label
+                  className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--keyword"
+                  htmlFor="dev-version-history-keyword"
+                >
+                  <Text type="secondary">版本 / SHA / 操作 ID</Text>
+                  <Input
+                    id="dev-version-history-keyword"
+                    aria-label="搜索版本、SHA 或操作 ID"
+                    placeholder="输入完整内容或前几位"
+                    value={operationHistoryFilters.keyword}
+                    maxLength={128}
+                    allowClear
+                    onChange={(event) =>
+                      updateOperationHistoryFilter(
+                        DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword,
+                        event.target.value,
+                        { replace: true }
+                      )
+                    }
+                  />
+                </label>
+              </div>
+              <div className="erp-dev-operation-history-filters__meta">
+                <Text type="secondary" aria-live="polite">
+                  {!historyResult
+                    ? historyLoading
+                      ? '正在读取记录'
+                      : '记录暂不可读'
+                    : hasOperationHistoryFilters
+                      ? `匹配 ${String(historyResult?.matched ?? 0)} / 共 ${String(historyResult?.total ?? 0)} 条记录`
+                      : `共 ${String(historyResult?.total ?? 0)} 条记录`}
+                </Text>
+                {['failure', 'stale'].includes(operationHistoryState) ? (
+                  <Button
+                    type="link"
+                    onClick={retryHistory}
+                    disabled={historyLoading}
+                  >
+                    重试读取
+                  </Button>
+                ) : null}
+                {hasOperationHistoryFilters ? (
+                  <Button type="link" onClick={clearOperationHistoryFilters}>
+                    清空筛选
+                  </Button>
+                ) : null}
+              </div>
+            </div>
             {operationHistoryState === 'failure' ? null : (
               <>
-                <div
-                  className="erp-dev-operation-history-filters"
-                  role="search"
-                  aria-label="筛选发布与部署记录"
-                >
-                  <div className="erp-dev-operation-history-filters__controls">
-                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--result">
-                      <Text type="secondary">结果</Text>
-                      <Segmented
-                        aria-label="筛选结果"
-                        value={operationHistoryFilters.result}
-                        options={OPERATION_HISTORY_RESULT_OPTIONS}
-                        onChange={(value) =>
-                          updateOperationHistoryFilter(
-                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result,
-                            value
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--action">
-                      <Text type="secondary">动作</Text>
-                      <FilterSelect
-                        emptyValue="all"
-                        label="动作"
-                        placeholder="动作"
-                        aria-label="筛选动作"
-                        value={operationHistoryFilters.action}
-                        options={OPERATION_HISTORY_ACTION_OPTIONS}
-                        onChange={(value) =>
-                          updateOperationHistoryFilter(
-                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
-                            value
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
-                      <Text type="secondary">目标</Text>
-                      <FilterSelect
-                        emptyValue="all"
-                        label="目标"
-                        placeholder="目标"
-                        aria-label="筛选目标"
-                        value={operationHistoryFilters.target}
-                        options={OPERATION_HISTORY_TARGET_OPTIONS}
-                        onChange={(value) =>
-                          updateOperationHistoryFilter(
-                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target,
-                            value
-                          )
-                        }
-                      />
-                    </div>
-                    <label
-                      className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--keyword"
-                      htmlFor="dev-version-history-keyword"
-                    >
-                      <Text type="secondary">版本 / SHA / 操作 ID</Text>
-                      <Input
-                        id="dev-version-history-keyword"
-                        aria-label="搜索版本、SHA 或操作 ID"
-                        placeholder="输入完整内容或前几位"
-                        value={operationHistoryFilters.keyword}
-                        maxLength={128}
-                        allowClear
-                        onChange={(event) =>
-                          updateOperationHistoryFilter(
-                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword,
-                            event.target.value,
-                            { replace: true }
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div className="erp-dev-operation-history-filters__meta">
-                    <Text type="secondary" aria-live="polite">
-                      {hasOperationHistoryFilters
-                        ? `显示 ${String(filteredHistoryOperations.length)} / 共 ${String(historyOperations.length)} 条记录`
-                        : `共 ${String(historyOperations.length)} 条记录`}
+                {historyResult ? (
+                  <Space
+                    wrap
+                    size={[16, 4]}
+                    style={{ marginBottom: 12 }}
+                    aria-label="当前筛选的操作统计"
+                  >
+                    <Text>通过 {historyResult.statistics.counts.passed}</Text>
+                    <Text>失败 {historyResult.statistics.counts.failed}</Text>
+                    <Text>阻断 {historyResult.statistics.counts.blocked}</Text>
+                    <Text>
+                      未证明 {historyResult.statistics.counts.not_proven}
                     </Text>
-                    {hasOperationHistoryFilters ? (
-                      <Button
-                        type="link"
-                        onClick={clearOperationHistoryFilters}
-                      >
-                        清空筛选
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
+                    <Text type="secondary">
+                      成功操作耗时中位数{' '}
+                      {formatDeliveryDuration(
+                        historyResult.statistics.passedDurationMedianMs
+                      )}
+                      （{historyResult.statistics.passedDurationSamples}{' '}
+                      次，含等待）
+                    </Text>
+                  </Space>
+                ) : null}
                 <Table
                   rowKey="id"
                   columns={operationColumns}
                   dataSource={filteredHistoryOperations}
-                  loading={initialLoading}
+                  loading={historyLoading}
                   pagination={{
                     ...DEV_PAGINATION,
-                    current: historyPage,
+                    current: historyResult?.page ?? historyPage,
+                    total: historyResult?.matched ?? 0,
                     pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
                     hideOnSinglePage: true,
                     onChange: (nextPage) =>

@@ -1510,3 +1510,37 @@ test('delivery pages keep cached summaries visible while rechecking and gate wri
     /summaryRef\.current\?\.readOnly === true/u
   )
 })
+
+test('history client validates bounded server pages and statistics without loading the summary window', async () => {
+  const operation = summaryFixture().operations[0]
+  const data = {
+    kind: 'plush.dev-delivery-history',
+generatedAt: '2026-10-22T14:00:00Z',
+    page: 21,
+pageSize: 10,
+total: 231,
+matched: 231,
+    operations: Array.from({ length: 10 }, () => operation),
+    statistics: { counts: { passed: 231, failed: 0, blocked: 0, not_proven: 0 }, passedDurationSamples: 231, passedDurationMedianMs: 1000 },
+  }
+  let requested
+  const client = createDevDeliveryClient({ fetchImpl: async (url) => { requested = new URL(url, 'http://localhost'); return response(data) } })
+  assert.equal((await client.history({ page: 21, keyword: '2026' })).total, 231)
+  assert.equal(requested.pathname, '/__dev/api/delivery/operations')
+  assert.equal(requested.searchParams.get('page'), '21')
+  assert.equal(requested.searchParams.get('keyword'), '2026')
+  data.statistics.counts.passed = 230
+  await assert.rejects(client.history(), /发布历史响应无效/u)
+})
+
+test('operation details reject unrelated or executable trace links', async () => {
+  const operation = summaryFixture().operations[0]
+  const base = 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/'
+  operation.trace = { commitUrl: `${base}commit/${operation.gitSha}`, pipelinesUrl: `${base}pipelines?sha=${operation.gitSha}`, releaseUrl: `${base}releases/artifact-${operation.gitSha}`, pipelineUrl: `${base}pipelines/91` }
+  const client = createDevDeliveryClient({ fetchImpl: async () => response({ kind: 'plush.dev-delivery-operation-result', operation }) })
+  assert.equal((await client.operation(operation.id)).trace.pipelineUrl, `${base}pipelines/91`)
+  // Malformed evidence must never turn a trace link into executable code.
+  // eslint-disable-next-line no-script-url
+  operation.trace.commitUrl = 'javascript:alert(1)'
+  await assert.rejects(client.operation(operation.id), /trace links are invalid/u)
+})

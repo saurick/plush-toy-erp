@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +10,10 @@ import {
   createOrReuseDeliveryOperation,
   DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
   resolveDeliveryOperationStore,
+  readDeliveryOperation,
+  readDeliveryOperationReceipt,
+  persistDeliveryOperationReceipt,
+  transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
 
 import {
@@ -933,4 +937,34 @@ test("remote promotion advances only release-bound runtime dependencies", () => 
       source.indexOf('update_env_image_refs "$runtime_env"'),
     "the prior runtime env must be durable before service versions change",
   );
+});
+
+
+test("validated promotion receipts persist privately and cannot be rebound or overwritten", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "promotion-receipt-archive-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const store = resolveDeliveryOperationStore(root);
+  createOrReuseDeliveryOperation(store, {
+    operationId: OPERATION_ID, action: "promote", target: "demo-133", gitSha: SHA,
+    version: "2026.07.29-1", idempotencyKey: "promotion:receipt:immutable-test",
+    metadata: { promotionFingerprint: "c".repeat(64), promotionMode: "upgrade" },
+  });
+  const raw = receipt();
+  validateRemotePromotionReceipt(raw, {
+    operationId: OPERATION_ID, targetKey: "demo-133", gitSha: SHA, version: raw.version,
+    releaseManifestSha256: HASH, releaseRehearsalSha256: "9".repeat(64),
+    promotionFingerprint: "c".repeat(64), acquisitionExpectedBytes: 0,
+  });
+  const archived = persistDeliveryOperationReceipt(store, raw);
+  assert.equal(statSync(archived).mode & 0o777, 0o600);
+  assert.equal(persistDeliveryOperationReceipt(store, raw), archived);
+  const stored = readDeliveryOperationReceipt(store, readDeliveryOperation(store, OPERATION_ID));
+  assert.deepEqual(stored.receipt, raw);
+  assert.match(stored.sha256, /^[a-f0-9]{64}$/u);
+  for (const change of [{ target: "production-133" }, { gitSha: "f".repeat(40) }, { promotionFingerprint: "f".repeat(64) }]) {
+    assert.throws(() => persistDeliveryOperationReceipt(store, { ...raw, ...change }), /does not match/u);
+  }
+  assert.throws(() => persistDeliveryOperationReceipt(store, { ...raw, issueCode: "changed" }), /different content/u);
+  transitionDeliveryOperation(store, OPERATION_ID, { status: "failed", message: "preflight failed" });
+  assert.throws(() => readDeliveryOperationReceipt(store, readDeliveryOperation(store, OPERATION_ID)), /does not match/u);
 });

@@ -738,6 +738,52 @@ function validateOperation(operation) {
   ) {
     throw new Error('delivery operation is invalid')
   }
+  if (operation.trace) {
+    const base = 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/'
+    if (
+      operation.trace.commitUrl !== `${base}commit/${operation.gitSha}` ||
+      operation.trace.pipelinesUrl !==
+        `${base}pipelines?sha=${operation.gitSha}` ||
+      operation.trace.releaseUrl !==
+        `${base}releases/artifact-${operation.gitSha}` ||
+      (operation.trace.pipelineUrl !== null &&
+        !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/pipelines\/[1-9][0-9]*$/u.test(
+          operation.trace.pipelineUrl
+        ))
+    ) {
+      throw new Error('delivery trace links are invalid')
+    }
+  }
+  if (operation.evidence) {
+    const { evidence } = operation
+    const migrationVersion = (value) =>
+      value === null || /^[0-9]{14}$/u.test(String(value))
+    if (
+      !/^[a-f0-9]{64}$/u.test(String(evidence.receiptSha256)) ||
+      !['passed', 'failed', 'not_proven'].includes(evidence.status) ||
+      typeof evidence.contract !== 'string' ||
+      evidence.contract.length > 100 ||
+      !evidence.checks ||
+      Object.values(evidence.checks).some(
+        (value) => typeof value !== 'boolean'
+      ) ||
+      !evidence.migration ||
+      !migrationVersion(evidence.migration.required) ||
+      !migrationVersion(evidence.migration.readback) ||
+      ![null, 'passed', 'failed'].includes(evidence.migration.readbackStatus) ||
+      ![null, true, false].includes(evidence.migration.applyStarted) ||
+      (evidence.backup &&
+        (!/^[a-zA-Z0-9._-]{1,160}$/u.test(evidence.backup.alias) ||
+          (evidence.backup.sha256 !== null &&
+            !/^[a-f0-9]{64}$/u.test(evidence.backup.sha256)) ||
+          !Number.isSafeInteger(evidence.backup.sizeBytes) ||
+          evidence.backup.sizeBytes < 0 ||
+          typeof evidence.backup.restoreChecked !== 'boolean'))
+    ) {
+      throw new Error('delivery execution evidence is invalid')
+    }
+    validatePipelineTimestamp(evidence.finishedAt, 'delivery receipt finish')
+  }
   return operation
 }
 
@@ -1177,6 +1223,55 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
   }
 
   return {
+    async history({
+      page = 1,
+      pageSize = DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+      ...filters
+    } = {}) {
+      const query = new URLSearchParams({
+        ...resolveDevOperationHistoryFilters(filters),
+        page: String(page),
+        pageSize: String(pageSize),
+      })
+      const payload = await readJson(
+        await fetchImpl(`${DEV_DELIVERY_OPERATION_API_PREFIX}?${query}`, {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: { accept: 'application/json' },
+        })
+      )
+      if (
+        payload?.kind !== 'plush.dev-delivery-history' ||
+        !['page', 'pageSize', 'total', 'matched'].every(
+          (key) => Number.isSafeInteger(payload[key]) && payload[key] >= 0
+        ) ||
+        payload.page < 1 ||
+        payload.pageSize !== pageSize ||
+        payload.matched > payload.total ||
+        !Array.isArray(payload.operations) ||
+        payload.operations.length > pageSize ||
+        !payload.statistics ||
+        !['passed', 'failed', 'blocked', 'not_proven'].every(
+          (key) =>
+            Number.isSafeInteger(payload.statistics.counts?.[key]) &&
+            payload.statistics.counts[key] >= 0
+        ) ||
+        Object.values(payload.statistics.counts).reduce(
+          (sum, count) => sum + count,
+          0
+        ) !== payload.matched ||
+        payload.statistics.passedDurationSamples !==
+          payload.statistics.counts.passed ||
+        (payload.statistics.passedDurationMedianMs !== null &&
+          (!Number.isSafeInteger(payload.statistics.passedDurationMedianMs) ||
+            payload.statistics.passedDurationMedianMs < 0))
+      ) {
+        throw new Error('发布历史响应无效')
+      }
+      payload.operations.forEach(validateOperation)
+      return payload
+    },
     async summary() {
       return validateDevDeliverySummary(
         await readJson(

@@ -576,6 +576,7 @@ test("GitLab provider dispatches only the exact current main SHA", async () => {
     versionReference: "2026-08-27T01:00:00.000Z",
   });
   assert.equal(result.provider, "gitlab");
+  assert.equal(result.pipelineId, 92);
   assert.equal(dispatchOptions.method, "POST");
   assert.equal(dispatchOptions.headers["Content-Type"], "application/json");
   assert.deepEqual(JSON.parse(dispatchOptions.body), {
@@ -870,4 +871,50 @@ test("GitLab provider reads legacy release controls without source lookup or Mac
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true });
   }
+});
+
+
+test("release status follows the recorded pipeline instead of another attempt at the same SHA", async () => {
+  let actualSha = SHA;
+  let jobStatus = "running";
+  let hasPublishedRelease = false;
+  const seen = [];
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(), env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      seen.push(url);
+      if (url.includes("/releases?")) return json(hasPublishedRelease ? [releaseFixture()] : []);
+      if (url.includes("/packages?")) return json(hasPublishedRelease ? [{
+        id: 41, package_type: "generic", name: GITLAB_DELIVERY_PACKAGE, version: `artifact-${SHA}`,
+      }] : []);
+      if (url.includes("/packages/41/package_files")) return json(packageFiles());
+      if (url.endsWith("/pipelines/91")) return json({
+        id: 91, iid: 17, sha: actualSha, source: "api", status: jobStatus,
+        created_at: "2026-08-27T01:00:00Z", started_at: "2026-08-27T01:00:03Z",
+        finished_at: jobStatus === "running" ? null : "2026-08-27T01:01:03Z", updated_at: "2026-08-27T01:01:03Z", duration: 60, queued_duration: 3,
+        web_url: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/pipelines/91`,
+      });
+      if (url.includes("/pipelines/91/jobs?")) return json([{
+        id: 301, name: "publish_release", status: jobStatus, created_at: "2026-08-27T01:00:01Z",
+        started_at: "2026-08-27T01:00:03Z", finished_at: jobStatus === "running" ? null : "2026-08-27T01:01:03Z", duration: 60, queued_duration: 2,
+      }]);
+      throw new Error(`unexpected URL: ${url}`);
+    },
+  });
+  const result = await provider.getReleaseStatus(SHA, { pipelineId: 91 });
+  assert.equal(result.status, "running");
+  assert.equal(result.run.id, 91);
+  assert.equal(seen.some((url) => url.includes("/pipelines?")), false);
+  hasPublishedRelease = true;
+  assert.equal((await provider.getReleaseStatus(SHA, { pipelineId: 91 })).status, "running");
+  jobStatus = "failed";
+  assert.equal((await provider.getReleaseStatus(SHA, { pipelineId: 91 })).status, "failed");
+  jobStatus = "success";
+  const published = await provider.getReleaseStatus(SHA, { pipelineId: 91 });
+  assert.equal(published.status, "published");
+  assert.equal(published.run.id, 91);
+  assert.equal(published.release.gitSha, SHA);
+  await assert.rejects(provider.getReleaseStatus(SHA, { pipelineId: 0 }), /id is invalid/u);
+  actualSha = "b".repeat(40);
+  await assert.rejects(provider.getReleaseStatus(SHA, { pipelineId: 91 }), /does not match/u);
 });

@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { VersionOverview } from './VersionOverview.jsx'
 import { DatabaseRebuildPanel } from './DatabaseRebuildPanel.jsx'
 import { buildVersionCenterModel } from './buildVersionCenterModel.mjs'
+import { useOperationHistory } from './useOperationHistory.jsx'
 import { useVersionCenterState } from './useVersionCenterState.jsx'
 import { buildVersionWorkspace } from './buildVersionWorkspace.jsx'
 import { buildOperationColumns } from './buildOperationColumns.jsx'
@@ -14,7 +15,7 @@ import {
 } from './shared.jsx'
 import { message } from '@/common/utils/antdApp'
 import {
-  DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+  DEV_VERSION_CENTER_VIEW_HISTORY,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
   createDeliveryIdempotencyKey,
 } from '../../../config/devDelivery.mjs'
@@ -82,10 +83,8 @@ export function useVersionCenter() {
     customerTestRebuildEligible,
     customerTestRebuildExplanation,
     dispatchExplanation,
-    filteredHistoryOperations,
     hasOpenOperation,
     hasOperationHistoryFilters,
-    historyOperations,
     initializationPreflight,
     initializationReady,
     isMutationRunning,
@@ -94,8 +93,6 @@ export function useVersionCenter() {
     operationDetailIdempotency,
     operationDetailNeedsRetryCard,
     operationDetailView,
-    operationHistoryPresentation,
-    operationHistoryState,
     operationReleaseMetricItems,
     operationServerDigest,
     operationTargetMetricItems,
@@ -127,6 +124,22 @@ export function useVersionCenter() {
     summary,
     summaryFresh,
   })
+  const {
+    historyResult,
+    historyLoading,
+    retryHistory,
+    filteredHistoryOperations,
+    operationHistoryPresentation,
+    operationHistoryState,
+  } = useOperationHistory({
+    client,
+    enabled: customerReady && activeView === DEV_VERSION_CENTER_VIEW_HISTORY,
+    scope: deliverySnapshotKey,
+    filters: operationHistoryFilters,
+    page: historyPage,
+    refreshKey: checkedAt,
+    setPage: setHistoryPage,
+  })
   const refreshBusy = initialLoading || refreshing
   const refreshStatusText = initialLoading
     ? '正在读取最新状态'
@@ -145,16 +158,6 @@ export function useVersionCenter() {
     )
     setVersionPage((current) => Math.min(current, pageCount))
   }, [versions.length, setVersionPage])
-
-  useEffect(() => {
-    const pageCount = Math.max(
-      1,
-      Math.ceil(
-        filteredHistoryOperations.length / DEV_VERSION_CENTER_HISTORY_PAGE_SIZE
-      )
-    )
-    setHistoryPage((current) => Math.min(current, pageCount))
-  }, [filteredHistoryOperations.length, setHistoryPage])
 
   const changeTablePage = useCallback((setPage, tableRef, nextPage) => {
     setPage(nextPage)
@@ -335,7 +338,9 @@ export function useVersionCenter() {
     deliveryProviderName,
     filteredHistoryOperations,
     hasOperationHistoryFilters,
-    historyOperations,
+    historyResult,
+    historyLoading,
+    retryHistory,
     historyPage,
     historyTableRef,
     initialLoading,

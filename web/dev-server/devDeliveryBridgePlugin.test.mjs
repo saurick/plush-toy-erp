@@ -975,7 +975,7 @@ test('release dispatch is idempotent and never writes the target', async (t) => 
     dispatchRelease(input) {
       dispatchCount += 1
       dispatchedVersionReference = input.versionReference
-      return { status: 'accepted' }
+      return { status: 'accepted', pipelineId: 392 }
     },
     listVersions() {
       return []
@@ -1015,6 +1015,7 @@ test('release dispatch is idempotent and never writes the target', async (t) => 
     },
   })
   assert.equal(first.operation.status, 'waiting')
+  assert.match(first.operation.trace.pipelineUrl, /\/pipelines\/392$/u)
   assert.equal(second.operation.id, first.operation.id)
   assert.equal(second.operation.idempotency.requestCount, 2)
   assert.equal(second.operation.idempotency.reuseCount, 1)
@@ -2405,4 +2406,80 @@ test('formal rollback lineage survives the public operation and client contracts
     overview.drills.find((drill) => drill.key === 'rollback-forward').status,
     'current'
   )
+})
+
+test('delivery history searches all retained operations and returns bounded pages with matching statistics', async (t) => {
+  const { root, store } = createProject(t)
+  for (let index = 0; index < 231; index += 1) {
+    const id = `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+    const started = new Date(Date.UTC(2026, 7, 1, 0, index)).toISOString()
+    const finished = new Date(Date.parse(started) + 10_000).toISOString()
+    createOrReuseDeliveryOperation(store, {
+      operationId: id,
+      action: 'promote',
+      target: index % 2 ? 'production-133' : 'demo-133',
+      gitSha: SHA,
+      version: `2026.08.01-${index + 1}`,
+      idempotencyKey: `history-query:${id}`,
+      now: started,
+    })
+    transitionDeliveryOperation(store, id, {
+      status: 'running',
+      message: 'started',
+      now: started,
+    })
+    transitionDeliveryOperation(store, id, {
+      status: index % 3 ? 'passed' : 'failed',
+      message: 'finished',
+      now: finished,
+    })
+  }
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: { provider: 'gitlab' },
+  })
+  const all = service.history()
+  assert.equal(all.total, 231)
+  assert.equal(all.operations.length, 10)
+  assert.equal(all.statistics.counts.passed, 154)
+  assert.equal(all.statistics.counts.failed, 77)
+  assert.equal(all.statistics.passedDurationMedianMs, 10_000)
+  assert.equal(service.history({ page: '24' }).operations.length, 1)
+  assert.equal(service.history({ page: '999' }).page, 24)
+  const oldest = service.history({
+    keyword: '00000000-0000-4000-8000-000000000000',
+  })
+  assert.equal(oldest.matched, 1)
+  assert.equal(oldest.operations[0].version, '2026.08.01-1')
+  const filtered = service.history({
+    target: 'production-133',
+    result: 'attention',
+    pageSize: '50',
+  })
+  assert.equal(filtered.matched, 38)
+  assert.equal(filtered.statistics.counts.failed, 38)
+  assert.equal(filtered.statistics.passedDurationMedianMs, null)
+  assert.equal(service.history({ keyword: 'no-such-version' }).matched, 0)
+  for (const query of [
+    { page: '0' },
+    { pageSize: '51' },
+    { result: 'unexpected' },
+    { keyword: 'a'.repeat(129) },
+    { command: 'anything' },
+  ]) {
+    assert.throws(() => service.history(query), /invalid/u)
+  }
+  const middleware = createDevDeliveryMiddleware({
+    service,
+    csrfToken: 'a'.repeat(32),
+  })
+  const response = await requestMiddleware(middleware, {
+    url: '/__dev/api/delivery/operations?page=2',
+  })
+  assert.equal(response.statusCode, 200)
+  const duplicated = await requestMiddleware(middleware, {
+    url: '/__dev/api/delivery/operations?page=1&page=2',
+  })
+  assert.equal(duplicated.statusCode, 409)
 })

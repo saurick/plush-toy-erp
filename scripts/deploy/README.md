@@ -132,6 +132,14 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 
+历史页通过只读 `GET /__dev/api/delivery/operations` 查询所有留存的已结束操作，按动作、目标、结果、版本 / SHA / operation ID 筛选，默认每页 10 条、最多 50 条。摘要的最近 200 条窗口不再限制历史查询，未结束操作也不受这个窗口截断。计数与成功操作耗时中位数覆盖当前筛选的全部匹配记录；耗时包含准备、等待和结果读回，不能混称为 CI Job 执行耗时。查询失败保留同一筛选的上次结果，切换筛选后不会显示旧条件的数据。
+
+升级、初始化、数据库重建和代码回滚执行器先校验目标原始回执，再以 `0600` 原子文件归档到 store 的 `receipts/`，最后保存 operation 终态。同一 operation 的回执只能幂等重读，不能覆盖不同内容。详情按 operation / target / SHA / 版本 / 计划指纹校验归属，只公开检查结果、迁移信息、数据库恢复结论和摘要；完整原始回执及目标日志仍分别留在受控 store 和目标 `operations/<operation-id>/`。缺少回执、字段或检查时明确显示未记录 / 未证明，不根据 operation 成功、当前运行状态或聊天补造历史事实。
+
+发布请求保存 GitLab 返回的 pipeline ID，等待中的操作按该 ID 查询，避免把同 SHA 的另一次失败归到本次发布。详情提供源码提交、同 SHA 的 CI/CD、不可变 Release 和已记录的本次发布流水线链接。早期记录没有 pipeline ID 时只提供同 SHA 列表，不猜测具体流水线。旧部署回执可经相同 validator 和 `persistDeliveryOperationReceipt` 从固定目标补录，必须核对原始内容、身份及摘要，并保留补录证据；补录不改写原 operation 状态和时间。
+
+保留规则及页面分工见[每次 CI/CD 与部署留痕](../../docs/部署约定.md#devops-records)。当前文件存储查询需扫描全部 operation，适用于本项目的单人发布记录；分页约束响应体，不代表磁盘查询成本恒定。记录增长后若实测扫描拖慢页面，应迁到有索引的持久存储并验证历史完整性，不能通过截断或删除旧记录提速。
+
 ## 制品保留预览
 
 `target-preflight.mjs` 将 `target-release-retention.sh` 嵌入同一固定目标只读脚本，目标宿主无需安装 Node.js。预览保护当前前后端与公网运行版本、仍在运行的入口容器、按成功回执完成时间选出的最近两个不同恢复版本，以及失败、运行中或结果尚未收敛的操作所引用的版本。恢复版本表示已有运行证据，代码回滚仍需通过迁移和客户配置兼容性校验。

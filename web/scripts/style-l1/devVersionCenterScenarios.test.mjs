@@ -28,20 +28,19 @@ test('delivery fixture covers the target catalog and keeps unverified targets bl
 })
 
 test('shared DEV delivery route serves the validated fixture without live target reads', async () => {
-  let registeredPattern = ''
-  let registeredHandler = null
+  const handlers = new Map()
   let requestCount = 0
   const page = {
     async route(pattern, handler) {
-      registeredPattern = pattern
-      registeredHandler = handler
+      handlers.set(pattern, handler)
     },
   }
 
   const summary = await installDeliverySummaryRoute(page, () => {
     requestCount += 1
   })
-  assert.equal(registeredPattern, '**/__dev/api/delivery/summary')
+  assert.deepEqual([...handlers.keys()], ['**/__dev/api/delivery/summary', '**/__dev/api/delivery/operations?*'])
+  const registeredHandler = handlers.get('**/__dev/api/delivery/summary')
   assert.equal(typeof registeredHandler, 'function')
   assert.deepEqual(summary, createVersionCenterSummary())
   assert.deepEqual(summary.releaseVersionPolicy, {
@@ -66,17 +65,16 @@ test('shared DEV delivery route serves the validated fixture without live target
 })
 
 test('shared DEV data preparation route enters contract failure without live database reads', async () => {
-  let registeredPattern = ''
-  let registeredHandler = null
+  const handlers = new Map()
   const page = {
     async route(pattern, handler) {
-      registeredPattern = pattern
-      registeredHandler = handler
+      handlers.set(pattern, handler)
     },
   }
 
   await installDataPreparationContractFailureRoute(page)
-  assert.equal(registeredPattern, '**/__dev/api/data-preparation/summary')
+  assert.deepEqual([...handlers.keys()], ['**/__dev/api/data-preparation/summary'])
+  const registeredHandler = handlers.get('**/__dev/api/data-preparation/summary')
   assert.equal(typeof registeredHandler, 'function')
 
   let response = null
@@ -104,6 +102,7 @@ test('drill recovery installs both target and data readback isolation before nav
   assert.deepEqual(registeredPatterns, [
     '**/__dev/api/data-preparation/summary',
     '**/__dev/api/delivery/summary',
+    '**/__dev/api/delivery/operations?*',
     '**/__dev/api/qa/quality-gates',
     '**/__dev/api/delivery/operations/*',
   ])

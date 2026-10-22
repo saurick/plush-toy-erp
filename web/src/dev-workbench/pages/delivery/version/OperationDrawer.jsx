@@ -8,6 +8,7 @@ import {
   operationUpdateAction,
 } from './shared.jsx'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
+import { OperationEvidence } from './OperationEvidence.jsx'
 import { DevTimingBars } from '../../../components/DevPipelineTimingPanel.jsx'
 import {
   deliveryOperationMessagePresentation,
@@ -96,6 +97,10 @@ export function OperationDrawer({
               </Space>
             </Card>
           ) : null}
+          <OperationEvidence
+            operation={operationDetail}
+            loading={operationDetailLoading}
+          />
           <Card size="small" title="操作耗时">
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <Text strong>
@@ -175,6 +180,29 @@ export function OperationDrawer({
                 <Text type="secondary" copyable={{ text: operationDetail.id }}>
                   操作 ID：{operationDetail.id}
                 </Text>
+                <Text
+                  type="secondary"
+                  copyable={{ text: operationDetail.gitSha }}
+                >
+                  提交：{operationDetail.gitSha}
+                </Text>
+                {operationDetail.evidence ? (
+                  <>
+                    <Text type="secondary" copyable>
+                      回执 SHA256：{operationDetail.evidence.receiptSha256}
+                    </Text>
+                    {operationDetail.evidence.backup?.sha256 ? (
+                      <>
+                        <Text type="secondary" copyable>
+                          备份标识：{operationDetail.evidence.backup.alias}
+                        </Text>
+                        <Text type="secondary" copyable>
+                          备份 SHA256：{operationDetail.evidence.backup.sha256}
+                        </Text>
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
                 <Text type="secondary">
                   重复请求识别依据：
                   {operationDetailIdempotency.basis.join('、')}

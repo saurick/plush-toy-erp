@@ -641,10 +641,89 @@ export function readDeliveryOperation(store, operationId) {
   );
 }
 
-export function listDeliveryOperations(store, { limit = 50 } = {}) {
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
-    throw new Error("operation list limit is invalid");
+function deliveryReceiptSuffix(operation) {
+  if (operation.action === "promote")
+    return operation.metadata.promotionMode === "initialize"
+      ? ".target-initialization.json"
+      : ".promotion.json";
+  if (operation.action === "rollback") return ".rollback.json";
+  if (operation.action === "rebuild-database") return ".database-rebuild.json";
+  return null;
+}
+
+function assertDeliveryReceiptBinding(operation, receipt) {
+  const rollback = operation.action === "rollback";
+  const fingerprintField = rollback
+    ? "rollbackFingerprint"
+    : operation.action === "rebuild-database"
+      ? "databaseRebuildFingerprint"
+      : operation.metadata.promotionMode === "initialize"
+        ? "initializationFingerprint"
+        : "promotionFingerprint";
+  const expectedFingerprint =
+    operation.metadata[fingerprintField] ??
+    (fingerprintField === "initializationFingerprint"
+      ? operation.metadata.promotionFingerprint
+      : undefined);
+  if (
+    !deliveryReceiptSuffix(operation) ||
+    receipt?.operationId !== operation.id ||
+    receipt?.target !== operation.target ||
+    (rollback ? receipt?.toGitSha : receipt?.gitSha) !== operation.gitSha ||
+    (rollback ? receipt?.toVersion : receipt?.version) !== operation.version ||
+    !["passed", "failed", "not_proven"].includes(receipt?.status) ||
+    !SHA256_PATTERN.test(String(expectedFingerprint || "")) ||
+    receipt?.[fingerprintField] !== expectedFingerprint ||
+    (DELIVERY_OPERATION_TERMINAL_STATUSES.includes(operation.status) &&
+      operation.status !== "not_proven" &&
+      receipt.status !== operation.status)
+  ) {
+    throw new Error("delivery receipt does not match the operation");
   }
+}
+
+// Call only after the executor's complete receipt validation. Keep the original
+// receipt immutable; the page receives a separate allowlisted projection.
+export function persistDeliveryOperationReceipt(store, receipt) {
+  const operation = readDeliveryOperation(store, receipt?.operationId);
+  assertDeliveryReceiptBinding(operation, receipt);
+  const file = path.join(
+    store,
+    "receipts",
+    `${operation.id}${deliveryReceiptSuffix(operation)}`,
+  );
+  if (existsSync(file)) {
+    if (stableStringify(readPrivateJson(file)) !== stableStringify(receipt)) {
+      throw new Error("delivery receipt already exists with different content");
+    }
+  } else {
+    writePrivateJson(file, receipt);
+  }
+  return file;
+}
+
+export function readDeliveryOperationReceipt(store, operation) {
+  const suffix = deliveryReceiptSuffix(operation);
+  if (!suffix) return null;
+  const directory = path.join(store, "receipts");
+  if (!existsSync(directory)) return null;
+  if (
+    !lstatSync(directory).isDirectory() ||
+    lstatSync(directory).isSymbolicLink()
+  ) {
+    throw new Error("delivery receipt directory is invalid");
+  }
+  const file = path.join(directory, `${operation.id}${suffix}`);
+  if (!existsSync(file)) return null;
+  const receipt = readPrivateJson(file);
+  assertDeliveryReceiptBinding(operation, receipt);
+  return {
+    receipt,
+    sha256: createHash("sha256").update(readFileSync(file)).digest("hex"),
+  };
+}
+
+export function readAllDeliveryOperations(store) {
   const directory = path.join(store, "operations");
   if (!existsSync(directory)) return [];
   const directoryStat = lstatSync(directory);
@@ -654,15 +733,25 @@ export function listDeliveryOperations(store, { limit = 50 } = {}) {
   return readdirSync(directory)
     .filter((file) => UUID_V4_PATTERN.test(file.replace(/\.json$/u, "")))
     .map((file) => readDeliveryOperation(store, file.replace(/\.json$/u, "")))
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    .slice(0, limit);
+    .sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        left.id.localeCompare(right.id),
+    );
+}
+
+export function listDeliveryOperations(store, { limit = 50 } = {}) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) {
+    throw new Error("operation list limit is invalid");
+  }
+  return readAllDeliveryOperations(store).slice(0, limit);
 }
 
 export function recoverInterruptedDeliveryOperations(
   store,
   now = new Date().toISOString(),
 ) {
-  return listDeliveryOperations(store, { limit: 200 }).map((operation) =>
+  return readAllDeliveryOperations(store).map((operation) =>
     operation.status === "running" || operation.status === "launching"
       ? recoverInterruptedDeliveryOperation(store, operation.id, now)
       : { operation, recovered: false },

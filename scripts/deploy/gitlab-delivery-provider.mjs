@@ -1008,14 +1008,20 @@ export function createGitlabDeliveryProvider({
       );
     },
 
-    async getReleaseStatus(gitSha) {
+    async getReleaseStatus(gitSha, { pipelineId = null } = {}) {
       if (!SHA_PATTERN.test(String(gitSha || ""))) {
         throw new Error("release status SHA is invalid");
+      }
+      if (
+        pipelineId !== null &&
+        (!Number.isSafeInteger(pipelineId) || pipelineId < 1)
+      ) {
+        throw new Error("release pipeline id is invalid");
       }
       const release = (await this.listVersions({ limit: 50 })).find(
         (item) => item.gitSha === gitSha,
       );
-      if (release) {
+      if (release && pipelineId === null) {
         return {
           schemaVersion: DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
           status: release.completeAssets ? "published" : "failed",
@@ -1024,9 +1030,18 @@ export function createGitlabDeliveryProvider({
           run: null,
         };
       }
-      const pipelines = await listPipelines({ limit: 20, sha: gitSha });
+      const pipelines =
+        pipelineId === null
+          ? await listPipelines({ limit: 20, sha: gitSha })
+          : [{ id: pipelineId }];
       for (const raw of pipelines) {
         const pipelineValue = await readPipeline(raw);
+        if (
+          pipelineValue.gitSha !== gitSha ||
+          (pipelineId !== null && pipelineValue.id !== pipelineId)
+        ) {
+          throw new Error("release pipeline does not match the operation");
+        }
         const releaseJobs = pipelineValue.jobs.filter((job) =>
           ["publish_release", "strict"].includes(job.name),
         );
@@ -1035,11 +1050,21 @@ export function createGitlabDeliveryProvider({
           (job) => job.status === "completed" && job.conclusion !== "success",
         );
         const active = releaseJobs.some((job) => job.status !== "completed");
+        const publishedByRun = releaseJobs.some(
+          (job) => job.name === "publish_release" && job.conclusion === "success",
+        );
+        const status = failed
+          ? "failed"
+          : active
+            ? "running"
+            : release && publishedByRun
+              ? release.completeAssets ? "published" : "failed"
+              : "awaiting_release";
         return {
           schemaVersion: DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
-          status: failed ? "failed" : active ? "running" : "awaiting_release",
+          status,
           gitSha,
-          release: null,
+          release: status === "published" ? release : null,
           run: {
             id: pipelineValue.id,
             status: pipelineValue.status,
@@ -1107,6 +1132,7 @@ export function createGitlabDeliveryProvider({
         gitSha: dispatch.gitSha,
         version: dispatch.version,
         status: "accepted",
+        pipelineId: pipelineValue.id,
         redaction: { containsToken: false, containsCredentials: false },
       };
     },

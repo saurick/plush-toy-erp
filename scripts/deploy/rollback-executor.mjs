@@ -19,6 +19,7 @@ import {
   consumeDeliveryOperationStore,
   listDeliveryOperations,
   readDeliveryOperation,
+  persistDeliveryOperationReceipt,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
@@ -1027,6 +1028,7 @@ export function executeRollback(
     ) {
       throw new Error("remote rollback exit status contradicts its receipt");
     }
+    persistDeliveryOperationReceipt(store, receipt);
     operation = transitionDeliveryOperation(store, operation.id, {
       status: receipt.status,
       message:
