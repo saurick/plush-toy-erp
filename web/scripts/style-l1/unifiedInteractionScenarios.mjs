@@ -576,7 +576,44 @@ export function createUnifiedInteractionScenarios({
       verify: async (page) => {
         await expectHeading(page, '财务管理')
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
+        const toolbar = page.locator('.erp-business-operation-panel__command')
+        const assertToolbarLayout = async (width) => {
+          const layout = await toolbar.evaluate((element) => {
+            const view = element.querySelector('[aria-label="页面展示方式"]')
+            const statuses = element.querySelector('[aria-label="单据状态"]')
+            if (!view || !statuses) return null
+            const box = (node) => {
+              const { x, y, width, height, right, bottom } = node.getBoundingClientRect()
+              return { x, y, width, height, right, bottom }
+            }
+            const divider = getComputedStyle(view.closest('.erp-business-operation-panel__view-switch'), '::after')
+            return {
+              toolbar: box(element),
+              view: box(view),
+              statuses: box(statuses),
+              dividerWidth: parseFloat(divider.width),
+              dividerHeight: parseFloat(divider.height),
+              statusOverflow: statuses.scrollWidth - statuses.clientWidth,
+            }
+          })
+          assert.ok(layout, '账款视图和状态须在同一工具栏内')
+          assert.equal(layout.dividerWidth, 1, '视图与状态之间保留细竖线')
+          assert.ok(layout.dividerHeight >= 16, '竖线分组应可见')
+          assert.ok(layout.statusOverflow <= 1, '窄屏状态按钮应换行，不能裁切')
+          assert.ok(layout.statuses.right <= layout.toolbar.right + 1, '状态筛选不能溢出工具栏')
+          if (width >= 1440) {
+            assert.ok(Math.abs(layout.view.y + layout.view.height / 2 - layout.statuses.y - layout.statuses.height / 2) <= 1, '宽屏视图与状态应在同一行居中对齐')
+            assert.ok(layout.statuses.x > layout.view.right, '状态筛选位于视图切换右侧')
+          } else if (width === 390) {
+            assert.ok(layout.statuses.y >= layout.view.bottom, '窄屏状态组应自然换到下一行')
+          }
+        }
+        await assertToolbarLayout(1440)
+        const postedStatus = toolbar.getByRole('button', { name: /^已过账，/u })
+        await postedStatus.click()
         await assertBusinessViewMotion(page, 'finance-view', outputDir)
+        assert.equal(await postedStatus.getAttribute('aria-pressed'), 'true', '切换视图应保留状态筛选')
+        await toolbar.getByRole('button', { name: /^不限状态，/u }).click()
         await page.getByText('到期顺序', { exact: true }).click()
         const panel = page.getByRole('region', { name: '财务到期顺序' })
         await panel.locator('.erp-finance-due-list__row').first().waitFor()
@@ -597,6 +634,7 @@ export function createUnifiedInteractionScenarios({
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应付', exact: true, selected: true }).waitFor()
         await page.getByText('到期顺序', { exact: true }).click()
         await panel.locator('.erp-finance-due-list__row').first().waitFor()
+        await assertToolbarLayout(1440)
         assert.equal(
           await panel
             .getByRole('button', { name: /^全部/ })
@@ -639,6 +677,7 @@ export function createUnifiedInteractionScenarios({
         for (const width of [1440, 768, 390]) {
           await page.setViewportSize({ width, height: 900 })
           await assertNoHorizontalOverflow(page, `finance-${width}`)
+          await assertToolbarLayout(width)
           await captureBusinessView(
             page,
             panel,

@@ -1224,6 +1224,7 @@ export function BusinessListToolbar({ stats = [], actions = null }) {
 
 export function BusinessOperationPanel({
   filters,
+  viewSwitch,
   hidden = false,
   actions = null,
   primaryAction = null,
@@ -1282,6 +1283,7 @@ export function BusinessOperationPanel({
       )}
     >
       <div className="erp-business-operation-panel__command">
+        {viewSwitch ? <div className="erp-business-operation-panel__view-switch">{viewSwitch}</div> : null}
         {quickFilters.length ? (
           <div className="erp-business-operation-panel__quick">
             {quickFilters}

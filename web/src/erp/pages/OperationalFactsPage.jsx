@@ -857,27 +857,13 @@ export function OperationalFactWorkspace({
       onChange={setContentView}
     />
   ) : null
-  const visualizationHeader =
-    workspaceTabs || contentViewSwitch ? (
-      <div
-        className={`erp-operational-visual-toolbar${
-          workspaceTabs && contentViewSwitch
-            ? ' erp-operational-visual-toolbar--split'
-            : ''
-        }`}
-      >
-        {workspaceTabs ? (
-          <div className="erp-operational-visual-toolbar__primary">
-            {workspaceTabs}
-          </div>
-        ) : null}
-        {contentViewSwitch ? (
-          <div className="erp-operational-visual-toolbar__secondary">
-            {contentViewSwitch}
-          </div>
-        ) : null}
+  const visualizationHeader = workspaceTabs ? (
+    <div className="erp-operational-visual-toolbar">
+      <div className="erp-operational-visual-toolbar__primary">
+        {workspaceTabs}
       </div>
-    ) : null
+    </div>
+  ) : null
   const processAggregate = selectedProcessOrderID
     ? processAggregateData.rows[0] || null
     : null
@@ -917,6 +903,7 @@ export function OperationalFactWorkspace({
       <BusinessOperationPanel
         hidden={contentView === 'process'}
         compact
+        viewSwitch={contentViewSwitch}
         onClearFilters={clearFilters}
         clearFiltersDisabled={!hasActiveFilters}
         filters={

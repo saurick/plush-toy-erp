@@ -3225,6 +3225,8 @@
     .business-action-menu > summary { display:flex; width:auto; min-height:34px; padding:6px 10px; border:1px solid var(--line); font-size:14px; gap:6px; }
     .business-action-menu .task-copy-options { max-height:min(420px,60vh); overflow:auto; width:max-content; min-width:180px; }
     .command-row:has(.business-status-filters) { flex-wrap:wrap; }
+    .business-toolbar-view-switch { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+    .business-toolbar-view-switch::after { content:''; width:1px; height:20px; flex:0 0 1px; background:var(--line); }
     .business-status-filters.segment { min-width:0; max-width:100%; min-height:34px; height:auto; flex:0 1 auto; flex-wrap:wrap; gap:4px; border:0; overflow:visible; }
     .business-status-filters.segment button { min-height:34px; padding:5px 10px; flex:0 0 auto; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:none; }
     .business-status-filters.segment button.active { color:var(--brand-strong); background:var(--brand-softer); box-shadow:none; }
@@ -5832,7 +5834,7 @@ active = new Set()
       return `<div class="module-tabs-row"><h1>${hub.title}</h1><div class="page-tabs" role="tablist" aria-label="${hub.title}">${hub.tabs.map(([key,label])=>`<button type="button" role="tab" aria-selected="${state.moduleTabs[state.page]===key}" class="${state.moduleTabs[state.page]===key?'active':''}" data-action="module-tab" data-value="${key}">${label}</button>`).join('')}</div>${routeButton}</div>`;
     }
 
-    function renderBusinessViewRow(config) {
+    function renderBusinessViewRow(config, inline = false) {
       if (state.page === 'production-hub') return '';
       const productionRecordWorkspace = state.page === 'production-hub' && state.moduleTabs[state.page] === 'production-records';
       const viewKey = productionRecordWorkspace ? 'production-records' : config.key;
@@ -5841,7 +5843,9 @@ active = new Set()
       const inModule = Boolean(moduleHubs[state.page]);
       if(!setup)return inModule ? '' : `<div class="view-mode-row"><h1>${viewTitle}</h1></div>`;
       const [action,active,views]=setup;
-      return `<div class="view-mode-row${inModule?' view-mode-row--secondary':''}">${inModule?'':`<h1>${viewTitle}</h1>`}<div class="segment" role="group" aria-label="${viewTitle}视图">${views.map(([key,label])=>`<button type="button" class="${active===key?'active':''}" aria-pressed="${active===key}" data-action="${action}" data-value="${key}">${label}</button>`).join('')}</div></div>`;
+      const switcher = `<div class="segment" role="group" aria-label="${viewTitle}视图">${views.map(([key,label])=>`<button type="button" class="${active===key?'active':''}" aria-pressed="${active===key}" data-action="${action}" data-value="${key}">${label}</button>`).join('')}</div>`;
+      if (inline) return `<div class="business-toolbar-view-switch">${switcher}</div>`;
+      return `<div class="view-mode-row${inModule?' view-mode-row--secondary':''}">${inModule?'':`<h1>${viewTitle}</h1>`}${switcher}</div>`;
     }
 
     function renderSalesDeliveryView(config) {
@@ -5899,8 +5903,11 @@ active = new Set()
       const canEditSelected = selectedRows.length === 1 && canEditRecord(config, selectedRows[0]);
       const batchActions = selectedRows.map(row => getRecordAction(config, row));
       const commonBatchAction = selectedRows.length > 1 && batchActions.every(action => action?.label === batchActions[0]?.label) ? batchActions[0] : null;
-      const operation = `${renderHubTabsRow(hub,config)}${renderBusinessViewRow(config)}<section class="surface operation-surface">
+      const inlineView = ['receivables','payables'].includes(config.key);
+      const viewSwitch = renderBusinessViewRow(config, inlineView);
+      const operation = `${renderHubTabsRow(hub,config)}${inlineView?'':viewSwitch}<section class="surface operation-surface">
         <div class="command-row">
+          ${inlineView?viewSwitch:''}
           ${config.key === 'history' ? `<label class="control"><span>记录类型</span><select id="history-source" aria-label="历史记录类型">${[['基础资料', ['客户档案']], ['业务单据与版本', ['销售订单', '采购订单', '委外订单']]].map(([label, sources]) => `<optgroup label="${label}">${sources.map(source => `<option value="${source}" ${state.historySource === source ? 'selected' : ''}>${source}</option>`).join('')}</optgroup>`).join('')}</select></label>` : ''}
           <div class="segment business-status-filters" role="group" aria-label="状态筛选">${countedStatuses.map(([key,label,count])=>`<button type="button" aria-pressed="${state.status===key}" aria-label="${label}，${count===null?'数量暂不可用':`共 ${count} 条`}" class="${state.status===key?'active':''}" data-action="status" data-value="${key}">${label}<b>${count===null?'—':count}</b></button>`).join('')}</div>
           <label class="search">${icon('search')}<input id="list-search" value="${escapeHTML(state.search)}" placeholder="搜索${config.entity}、${config.party}、${config.item}" aria-label="搜索" /></label>
@@ -11928,7 +11935,7 @@ return {orders,financeCustomers};})();
         ],
         [
           "联系与交付",
-          "选择业务员 / 跟单人、联系人，核对电话、邮箱和收货资料；本次修改保存在本单。"
+          "选择业务员（跟单人）、联系人，核对电话、邮箱和收货资料；本次修改保存在本单。"
         ],
         [
           "结算与报价",
@@ -18330,7 +18337,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderVisualPager(p,key) { return `<footer class="visual-footer"><span>${p.total} 条 · 每页最多 25 条${state.visualLarge[key]?' · 大量数据样例':''}</span><div class="pager"><button class="btn" data-action="visual-page" data-value="${p.page-1}" ${p.page===1?'disabled':''}>上一页</button><span>${p.page} / ${p.pages}</span><button class="btn" data-action="visual-page" data-value="${p.page+1}" ${p.page===p.pages?'disabled':''}>下一页</button></div></footer>`; }
     function visualChip(action,value,label,count,active) {return `<button type="button" class="visual-chip ${active?'active':''}" aria-pressed="${active}" data-action="${action}" data-value="${value}">${label}${count===undefined?'':`<b>${count}</b>`}</button>`;}
     function renderVisualToolbar(config,hub,chips,placeholder) {
-      return `${renderHubTabsRow(hub,config)}${renderBusinessViewRow(config)}<section class="surface operation-surface"><div class="visual-controls"><div class="visual-chips">${chips}</div><div class="visual-query"><label class="search">${icon('search')}<input id="visual-search" aria-label="搜索当前业务" value="${escapeHTML(state.search)}" placeholder="${placeholder}"/></label>${state.search?'<button class="btn" data-action="visual-clear-search">清除搜索</button>':''}<button class="btn" data-action="open-filter">${icon('filter')}筛选${activeFilterCount()?` ${activeFilterCount()}`:''}</button><button class="btn" data-action="export">${icon('export')}导出</button><button class="btn" data-action="visual-stress" aria-pressed="${!!state.visualLarge[config.key]}">${state.visualLarge[config.key]?'恢复常规样例':'500 条样例'}</button></div></div>${state.status!=='all'?`<div class="visual-scope">沿用列表状态：${escapeHTML(config.statuses.find(item=>item[0]===state.status)?.[1]||state.status)}<button class="text-btn" data-action="visual-clear-status">清除状态条件</button></div>`:''}</section>`;
+      const inlineView = ['receivables','payables'].includes(config.key);
+      const viewSwitch = renderBusinessViewRow(config, inlineView);
+      return `${renderHubTabsRow(hub,config)}${inlineView?'':viewSwitch}<section class="surface operation-surface"><div class="visual-controls">${inlineView?viewSwitch:''}<div class="visual-chips">${chips}</div><div class="visual-query"><label class="search">${icon('search')}<input id="visual-search" aria-label="搜索当前业务" value="${escapeHTML(state.search)}" placeholder="${placeholder}"/></label>${state.search?'<button class="btn" data-action="visual-clear-search">清除搜索</button>':''}<button class="btn" data-action="open-filter">${icon('filter')}筛选${activeFilterCount()?` ${activeFilterCount()}`:''}</button><button class="btn" data-action="export">${icon('export')}导出</button><button class="btn" data-action="visual-stress" aria-pressed="${!!state.visualLarge[config.key]}">${state.visualLarge[config.key]?'恢复常规样例':'500 条样例'}</button></div></div>${state.status!=='all'?`<div class="visual-scope">沿用列表状态：${escapeHTML(config.statuses.find(item=>item[0]===state.status)?.[1]||state.status)}<button class="text-btn" data-action="visual-clear-status">清除状态条件</button></div>`:''}</section>`;
     }
     function visibleDataState(operation,title) {return state.previewState!=='data'?`${operation}${renderDataState({title})}`:null;}
     function arrivalSelectionMatches(item,selection) { const delta=dayDelta(item.date);if(selection==='overdue')return item.status==='overdue';return selection==='all'?true:selection==='today'?delta===0:selection==='week'?delta!==null&&delta>=0&&delta<=7:selection==='undated'?!item.date:item.date===selection; }

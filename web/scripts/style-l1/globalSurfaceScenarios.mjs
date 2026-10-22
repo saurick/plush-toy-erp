@@ -135,7 +135,7 @@ export function createGlobalSurfaceScenarios({
             ...root.querySelectorAll(
               '.erp-task-board-lanes, .erp-task-board-lane, .erp-business-module-tabs, ' +
                 '.erp-business-page-header-card--secondary, ' +
-                '.erp-operational-visual-toolbar, .erp-operational-visual-toolbar__secondary'
+                '.erp-operational-visual-toolbar'
             ),
           ].filter(rendered).map((node) => {
             let parent = node.parentElement
