@@ -16,6 +16,7 @@ import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAsserti
 import { createMobileFilterScrollScenarios } from './mobileFilterScrollScenarios.mjs'
 import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 import { createMobileTaskBlockerScenarios } from './mobileTaskBlockerScenarios.mjs'
+import { createMobileCardFooterScenarios } from './mobileCardFooterScenarios.mjs'
 
 async function assertMobileDetailSurface(root, assert) {
   await root.locator('.mobile-task-flow-back').click({ trial: true })
@@ -1703,7 +1704,7 @@ export function createMobileProgressScenarios({
       },
     }
   })
-  return [...scenarios, ...createMobileTaskBlockerScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...['light', 'dark'].map((themeMode) => ({
+  return [...scenarios, ...createMobileTaskBlockerScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...createMobileCardFooterScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...['light', 'dark'].map((themeMode) => ({
     ...scenarios.find((scenario) => scenario.name === 'mobile-progress-boss'),
     name: `mobile-primary-tab-geometry-${themeMode}`,
     themeMode,

@@ -151,14 +151,16 @@
   gap: 4px;
 }
 .mobile-progress-task-entry .erp-progress-attention-heading {
-  display: grid;
-  grid-template-columns: fit-content(50%) minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 4px 12px;
 }
 .mobile-progress-task-entry .erp-progress-attention-title {
   display: flex;
   min-width: 0;
+  max-width: 100%;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
@@ -170,21 +172,22 @@
   font-weight: 500;
 }
 .mobile-progress-task-entry .erp-progress-attention-owner {
+  display: flex;
   min-width: 0;
-  text-align: right;
+  max-width: 100%;
+  align-items: baseline;
+  gap: 6px;
+  text-align: left;
 }
-.erp-progress-attention-heading > .anticon {
+.erp-progress-attention-owner > span:not(.anticon) {
+  min-width: 0;
+}
+.erp-progress-attention-owner > .anticon {
   flex: 0 0 auto;
   color: var(--erp-primary-strong);
 }
 .mobile-progress-task-entry .erp-task-blocked-reason {
   color: var(--erp-visual-danger-text);
-}
-.mobile-progress-task-entry--empty .erp-progress-attention {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 8px;
 }
 .mobile-progress-card .erp-progress-delivery {
   min-height: 36px;

@@ -510,7 +510,7 @@ export default function MobileProgressPanel({
                     </button>
                   ) : (
                     <div className="mobile-progress-task-entry mobile-progress-task-entry--empty">
-                      <ProgressAttention row={row} access={data.access} />
+                      <ProgressAttention row={row} access={data.access} compact />
                     </div>
                   )}
                 </article>

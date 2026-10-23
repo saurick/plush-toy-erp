@@ -102,8 +102,12 @@ export function ProgressAttention({ row, access, compact = false, suffix }) {
             <strong>{attention.title}</strong>
             {attention.blocked ? <WorkflowTaskBlockedTag /> : null}
           </span>
-          {detail ? <span className="erp-progress-attention-owner">{detail}</span> : <span />}
-          {suffix}
+          {(detail || suffix) && (
+            <span className="erp-progress-attention-owner">
+              {detail && <span>{detail}</span>}
+              {suffix}
+            </span>
+          )}
         </span>
         <WorkflowTaskBlockedReason reason={attention.reason} />
       </span>

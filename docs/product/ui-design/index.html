@@ -1345,6 +1345,7 @@
     .rm-card-reason { padding: 6px 8px; border-radius: 8px; color: var(--danger); background: var(--danger-soft); font-size: 13px; line-height: 1.5; }
     .rm-blocked-reason { display: block; min-width: 0; padding: 2px 8px; border-radius: 8px; color: var(--danger); background: var(--danger-soft); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
     .rm-card-foot { padding-top: 4px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; border-top: 1px solid var(--line); color: var(--text-3); font-size: 13px; }
+    .rm-card-foot > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
     .rm-more {
       min-height: 43px;
       border: 1px solid var(--line);
@@ -1526,10 +1527,11 @@
     .rm-progress-task small, .rm-progress-card .rm-progress-task.empty { color: var(--text-3); }
     .rm-progress-task svg { flex-shrink: 0; }
     .rm-progress-task .rm-progress-attention { gap: 4px; }
-    .rm-progress-attention-head { display: grid; grid-template-columns: fit-content(50%) minmax(0,1fr) auto; align-items: baseline; gap: 8px; }
-    .rm-progress-attention-title { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--text); }
+    .rm-progress-attention-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+    .rm-progress-attention-title { display: flex; min-width: 0; max-width: 100%; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--text); }
     .rm-progress-attention-title strong { font-size: 15px; font-weight: 500; }
-    .rm-progress-attention-head .rm-progress-attention-owner { min-width: 0; color: var(--text-3); font-size: 14px; text-align: right; }
+    .rm-progress-attention-head .rm-progress-attention-owner { display: flex; min-width: 0; max-width: 100%; align-items: baseline; gap: 6px; color: var(--text-3); font-size: 14px; text-align: left; }
+    .rm-progress-attention-owner > span { min-width: 0; }
     .rm-stage-track { margin-top: 12px; display: grid; gap: 10px; }
     .rm-stage-track-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 38px; gap: 8px; align-items: center; font-size: 12px; }
     .rm-stage-track-row .progress-bar { margin: 0; }
@@ -16888,10 +16890,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderMobileProgressTaskEntry(row) {
       const tasks = getMobileProgressTasks(row);
-      if (!tasks.length) return '<div class="rm-progress-task empty">暂无待处理任务</div>';
+      if (!tasks.length) return `<div class="rm-progress-task empty"><span class="rm-progress-attention"><span class="rm-progress-attention-head"><span class="rm-progress-attention-title"><strong>暂无可见待办</strong></span><span class="rm-progress-attention-owner"><span>${row.salesOwner?`业务负责人：${escapeHTML(row.salesOwner)}`:'业务负责人未提供'}</span></span></span></span></div>`;
       const task = tasks[0], blocked = row.stage.includes('阻塞');
       const detail = `${task.role} · ${task.assignee || '未指定办理人'}${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}`;
-      return `<button class="rm-progress-task" data-action="mobile-progress-tasks" data-id="${row.id}"><span class="rm-progress-attention"><span class="rm-progress-attention-head"><span class="rm-progress-attention-title"><strong>${escapeHTML(task.title)}</strong>${blocked?'<span class="badge danger">受阻</span>':''}</span><span class="rm-progress-attention-owner">${escapeHTML(detail)}</span>${icon('chevron')}</span>${blocked?renderMobileBlockedReason(task.reason || row.stage):''}</span></button>`;
+      return `<button class="rm-progress-task" data-action="mobile-progress-tasks" data-id="${row.id}"><span class="rm-progress-attention"><span class="rm-progress-attention-head"><span class="rm-progress-attention-title"><strong>${escapeHTML(task.title)}</strong>${blocked?'<span class="badge danger">受阻</span>':''}</span><span class="rm-progress-attention-owner"><span>${escapeHTML(detail)}</span>${icon('chevron')}</span></span>${blocked?renderMobileBlockedReason(task.reason || row.stage):''}</span></button>`;
     }
 
     function renderProgressProductImage(row) {

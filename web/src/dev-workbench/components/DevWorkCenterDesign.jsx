@@ -64,7 +64,7 @@ function ProgressCards({ point, mobile }) {
   const rows = DESIGN_PROGRESS.map((item, index) => {
     const identity = point('identity', <ProgressIdentity row={item} />, index === 0)
     const quantity = point('quantity', <ProgressDelivery row={item} />, index === 0)
-    const attention = point('details', <ProgressAttention row={item} access={{ tasks: true }} />, index === 0)
+    const attention = point('details', <ProgressAttention row={item} access={{ tasks: true }} compact={mobile} />, index === 0)
     return mobile ? <article className="mobile-progress-card erp-wc-progress-card" key={item.key}><div className="mobile-progress-card-main"><div className="mobile-progress-card-identity">{identity}<ProgressDue row={item} snapshotAt="2026-10-21" /></div>{quantity}</div><div className="mobile-progress-task-entry mobile-progress-task-entry--empty">{attention}</div></article> : <tr className="erp-progress-row" key={item.key}><td>{identity}</td><td><ProgressDue row={item} snapshotAt="2026-10-21" /></td><td>{quantity}</td><td>{attention}</td></tr>
   })
   return <div className="erp-wc-progress-examples">{mobile ? <div className="erp-wc-card-list">{rows}</div> : <div className="erp-wc-table-wrap"><table className="erp-progress-table" data-table-lines="fixed" aria-label="电脑版进度列表样例"><thead><tr><th>订单与产品</th><th>交期</th><th>数量与单位</th><th>当前待办</th></tr></thead><tbody>{rows}</tbody></table></div>}</div>

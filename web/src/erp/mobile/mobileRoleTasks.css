@@ -1713,6 +1713,15 @@
   font-weight: 500;
 }
 
+.mobile-task-list-row__footer {
+  align-items: baseline;
+}
+
+.mobile-task-list-row__footer > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .mobile-task-list-row__footer .erp-task-timing {
   font-size: var(--erp-font-caption);
 }
