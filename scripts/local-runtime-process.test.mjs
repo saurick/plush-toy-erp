@@ -125,9 +125,8 @@ test("non-macOS keeps the existing direct process lifecycle", async (t) => {
   );
 });
 
-test(
+if (process.platform === "darwin") test(
   "native launcher preserves exit results, deletes credentials and forwards stop",
-  { skip: process.platform !== "darwin" },
   async (t) => {
     const root = fixture(t);
     const binary = path.join(root, "launcher");

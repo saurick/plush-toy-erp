@@ -341,10 +341,11 @@ export function createPrintWorkspaceControlScenarios({
           )
           assert(
             report.states.every(
-              ({ empty, focused, state }) =>
-                empty && focused === (state === 'focused')
+              ({ empty, blankDateHint, focused, state }) =>
+                (empty || (state === 'blurred' && blankDateHint)) &&
+                focused === (state === 'focused')
             ),
-            `${template.key} 清空后必须保持空值和预期焦点，不能回填或退出编辑: ${JSON.stringify(report.states.filter(({ empty, focused, state }) => !empty || focused !== (state === 'focused')).slice(0, 8))}`
+            `${template.key} 清空后必须保持空值和预期焦点，不能回填或退出编辑: ${JSON.stringify(report.states.filter(({ empty, blankDateHint, focused, state }) => !(empty || (state === 'blurred' && blankDateHint)) || focused !== (state === 'focused')).slice(0, 8))}`
           )
           await page.emulateMedia({ media: 'print' })
           const printHints = await editors.evaluateAll(

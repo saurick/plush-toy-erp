@@ -28,7 +28,7 @@ function invokeTargetHelper(args) {
   });
 }
 
-test("repository execution tools do not depend on Python", () => {
+test("quality and deployment tools stay on the existing toolchain outside the authorized Git closeout entry", () => {
   const sources = ["server/Makefile"];
   for (const directory of [
     "scripts",
@@ -44,6 +44,17 @@ test("repository execution tools do not depend on Python", () => {
     );
   }
   for (const file of sources) {
+    if (file === "scripts/git-hooks/commit-scope.py") {
+      assert.match(read(file), /^#!\/usr\/bin\/env python3\n/u);
+      const standardLibrary = new Set([
+        "argparse", "fcntl", "hashlib", "json", "os", "pathlib", "re",
+        "signal", "stat", "subprocess", "sys", "tempfile",
+      ]);
+      for (const match of read(file).matchAll(/^(?:from|import) ([a-z_]+)/gmu)) {
+        assert(standardLibrary.has(match[1]), `Git closeout must use only its reviewed standard-library dependencies: ${match[1]}`);
+      }
+      continue;
+    }
     assert.ok(!file.endsWith(".py"), `${file} requires an extra interpreter`);
     assert.doesNotMatch(
       read(file),

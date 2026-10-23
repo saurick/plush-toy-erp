@@ -674,11 +674,11 @@ test("fixed Node and Go gates require fail-closed execution summaries", () => {
   assert.match(fast, /--kind go --label server-quick/u);
   assert.match(
     fast,
-    /go test -count=1 -json\s+\\\s+-skip "\$\{CRITICAL_POSTGRES_TEST_PATTERN\}\|\^TestTemplatePDFChromiumSecurityIntegration\$"\s+\\\s+\.\/internal\/\.\.\. \.\/pkg\/\.\.\./u,
+    /go test -count=1 -json\s+\\\s+-skip "\$\{CRITICAL_POSTGRES_TEST_PATTERN\}\|\^TestTemplatePDFChromium\(\?:Security\|Lifecycle\)Integration\$"\s+\\\s+\.\/internal\/\.\.\. \.\/pkg\/\.\.\./u,
   );
   assert.match(
     fast,
-    /--kind go --label server-quick\s+\\\s+--exclude-skip-pattern "\$\{CRITICAL_POSTGRES_TEST_PATTERN\}\|\^TestTemplatePDFChromiumSecurityIntegration\$" --/u,
+    /--kind go --label server-quick\s+\\\s+--exclude-skip-pattern "\$\{CRITICAL_POSTGRES_TEST_PATTERN\}\|\^TestTemplatePDFChromium\(\?:Security\|Lifecycle\)Integration\$" --/u,
   );
   assert.match(full, /--kind node --label web-all/u);
   assert.match(full, /"\$PNPM_BIN" test --test-reporter=tap/u);

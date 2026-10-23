@@ -2,9 +2,13 @@
 
 本文是 `scripts/qa/` 的目录入口。仓库级脚本总览仍在 [scripts/README.md](../README.md)；测试选择和验证层级真源仍在 [docs/product/自动化测试策略.md](../../docs/product/自动化测试策略.md)。
 
-本地和 CI 辅助工具使用现有 Node.js，数据库测试入口共用 `postgres-target-contract.mjs` 校验一次性目标；无需 Python。目标宿主机继续使用已有 Shell、jq 和系统工具，部署前检及回执不依赖宿主 Node.js 或 Go，见[部署脚本](../deploy/README.md)。
+本地和 CI 辅助工具使用现有 Node.js，数据库测试入口共用 `postgres-target-contract.mjs` 校验一次性目标；无需 Python。独立的 Git 提交入口使用 Python 3 标准库，属于已授权的本地 Git 收口工具，不进入业务运行或目标部署链路。目标宿主机继续使用已有 Shell、jq 和系统工具，部署前检及回执不依赖宿主 Node.js 或 Go，见[部署脚本](../deploy/README.md)。
+
+macOS 原生启动器的编译、退出、凭据清理和信号转发用例仅在 Mac 注册并实际执行；Linux CI 运行直接进程生命周期合同。两类结果按执行平台保留，不用跳过的 macOS 原生用例代表 Linux 验证通过，也不把 Linux 合同写成已执行 Mac 原生检查。
 
 附件存储的真实 PostgreSQL / S3 迁移与恢复验证使用 `bash scripts/qa/attachment-storage-integration.sh`；固定 SeaweedFS 镜像，一次性本地容器，包含导出摘要门禁、私有访问、完整性、PG 加文件恢复和附件并发回归。测试前同时核对 PostgreSQL、集群健康与签名 S3 存储桶访问，就绪超时直接失败。
+
+`fast` 与 baseline 对真实 Chromium 安全及进程生命周期集成使用同一范围边界；它们由 full / strict 的受控真实浏览器环境执行并拒绝跳过，不在缺少浏览器配置的开发快检中生成未执行项。
 
 该入口不触碰登记数据库。Node 与 Go 测试摘要在失败时保留有界的用例名称，捕获的测试正文仍不进入摘要日志。Web 测试文件固定最多 4 个并发，避免高核数机器同时启动大量真实 Vite 监控器；HMR 文件更新与连接测试仍完整执行。
 

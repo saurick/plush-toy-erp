@@ -223,12 +223,12 @@ test("competition distinguishes version conflicts, wrong stages and permission d
       },
       async call(operation, params, options = {}) {
         if (operation === "submit") return submits++ === 0 ? { ok: true, data: { id: 1 } }
-          : rejected(overrides.submitCode ?? RpcErrorCode.RESOURCE_CONFLICT);
+          : rejected(overrides.submitCode ?? RpcErrorCode.RESOURCE_VERSION_CONFLICT);
         if (operation === "boss" && params.expected_version === 2)
-          return overrides.version ?? rejected(RpcErrorCode.RESOURCE_CONFLICT);
+          return overrides.version ?? rejected(RpcErrorCode.RESOURCE_VERSION_CONFLICT);
         if (operation === "finance") return options.actor === "engineering"
           ? overrides.permission ?? rejected(RpcErrorCode.PERMISSION_DENIED)
-          : overrides.stage ?? rejected(RpcErrorCode.INVALID_PARAM);
+          : overrides.stage ?? rejected(RpcErrorCode.BUSINESS_RULE_VIOLATION);
         assert.equal(operation, "boss");
         throw reachedBossCompetition;
       },
@@ -239,8 +239,10 @@ test("competition distinguishes version conflicts, wrong stages and permission d
   for (const [overrides, check] of [
     [{ submitCode: RpcErrorCode.INVALID_PARAM }, "submit_competition_unexpected_error"],
     [{ version: rejected(RpcErrorCode.INVALID_PARAM) }, "version_mismatch_rejection"],
+    [{ version: rejected(RpcErrorCode.RESOURCE_CONFLICT) }, "version_mismatch_rejection"],
     [{ version: { ok: true, code: 0 } }, "version_mismatch_rejection"],
     [{ stage: rejected(RpcErrorCode.RESOURCE_CONFLICT) }, "wrong_stage_rejection"],
+    [{ stage: rejected(RpcErrorCode.INVALID_PARAM) }, "wrong_stage_rejection"],
     [{ stage: { ok: true, code: 0 } }, "wrong_stage_rejection"],
     [{ permission: rejected(RpcErrorCode.INVALID_PARAM) }, "permission_rejection"],
     [{ permission: { ok: true, code: 0 } }, "permission_rejection"],

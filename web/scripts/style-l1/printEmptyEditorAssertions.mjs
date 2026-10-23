@@ -78,11 +78,32 @@ export async function measureEmptyEditorHints(editors) {
       }
       const width = Number.parseFloat(hint.width)
       const height = Number.parseFloat(hint.height)
-      const empty = !node.textContent.replace(/\u200b/g, '').trim()
+      const text = node.textContent.replace(/\u200b/g, '').trim()
+      const empty = !text
+      const dateField =
+        node.classList.contains('erp-material-contract-signature__date-value') ||
+        node.classList.contains('erp-processing-contract-signature__date-value')
+      const rawEmpty = node.getAttribute('data-print-empty') === 'true'
+      const focused = document.activeElement === node
+      const blankDateHint =
+        rawEmpty && dateField &&
+        text.replace(/\s/gu, '') === '年月日'
+      const dateEditing = dateField && rawEmpty && focused && empty && hint.content === 'none'
+      const selection = dateEditing ? node.ownerDocument.getSelection() : null
+      const caret = selection?.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null
+      const dateCaretVisible = Boolean(
+        dateEditing && selection?.isCollapsed &&
+        selection.anchorNode?.nodeType === 3 && node.contains(selection.anchorNode) &&
+        caret?.height > 0 && caret.left >= fieldBox.left - 1 &&
+        caret.right <= fieldBox.right + 1 && caret.top >= fieldBox.top - 1 &&
+        caret.bottom <= fieldBox.bottom + 1
+      )
       return {
         className: node.className,
         empty,
-        focused: document.activeElement === node,
+        blankDateHint,
+        dateCaretVisible,
+        focused,
         display: style.display,
         fieldWidth: node.clientWidth,
         fieldHeight: node.clientHeight,
@@ -95,6 +116,7 @@ export async function measureEmptyEditorHints(editors) {
         textWidth: metrics.textWidth,
         textFits:
           !empty ||
+          dateCaretVisible ||
           (hint.content === '"点击填写"' &&
             width > 0 &&
             metrics.requiredHeight <= height + 0.1 &&

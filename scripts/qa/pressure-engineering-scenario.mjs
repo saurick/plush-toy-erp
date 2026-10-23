@@ -265,7 +265,7 @@ function checkCompetitionResults(results, allowedCode, operation) {
   requireResult(results.every((result) => result.ok || result.code === allowedCode), operation + "_competition_unexpected_error");
 }
 export async function runEngineeringCompetition({ client, receipt, signal }) {
-  const order = receipt.orders[0], options = { signal }, conflict = RpcErrorCode.RESOURCE_CONFLICT;
+  const order = receipt.orders[0], options = { signal }, conflict = RpcErrorCode.RESOURCE_VERSION_CONFLICT;
   const preview = await client.requireCall("preview", { sales_order_id: order.id }, {
     ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "PREVIEW"),
   });
@@ -279,7 +279,7 @@ export async function runEngineeringCompetition({ client, receipt, signal }) {
   const wrongStage = await client.call("finance", reviewParams(request), options);
   const denied = await client.call("finance", reviewParams(request), { ...options, actor: "engineering" });
   requireResult(!mismatched.ok && mismatched.code === conflict, "version_mismatch_rejection");
-  requireResult(!wrongStage.ok && wrongStage.code === RpcErrorCode.INVALID_PARAM, "wrong_stage_rejection");
+  requireResult(!wrongStage.ok && wrongStage.code === RpcErrorCode.BUSINESS_RULE_VIOLATION, "wrong_stage_rejection");
   requireResult(!denied.ok && denied.code === RpcErrorCode.PERMISSION_DENIED, "permission_rejection");
   requireResult(JSON.stringify(await client.requireCall("preview", { sales_order_id: order.id }, options)) === before, "rejected_action_no_mutation");
   const bosses = await Promise.all(Array.from({ length: 20 }, () => client.call("boss", reviewParams(request), options)));
