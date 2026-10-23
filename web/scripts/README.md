@@ -239,7 +239,7 @@ Windows / WSL 保留已有 Chrome、Edge、Brave 的受管复用方式：仅检�
 
 预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。
 
-受限模式保留 `/__dev/database-migration` 恢复页、固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status`；其它 DEV API 继续阻断。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。
+受限模式保留工作台全部页面路由，侧栏菜单与深链正常切换，文档、设计等本地资料仍可查阅，不将其他菜单重定向回 `/__dev/database-migration`。固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status` 保持可用；其它 DEV API 继续阻断，相关页面按实际读取结果提示不可用。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。
 
 恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。
 

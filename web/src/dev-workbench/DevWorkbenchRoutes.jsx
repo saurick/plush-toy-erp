@@ -30,7 +30,6 @@ import {
   resolveDevPageTitle,
 } from './config/devRoutes.mjs'
 import { createDevLazyRoute } from './config/devRouteModules.mjs'
-import { isDevDatabaseMigrationRecoveryActive } from './config/devRuntimeRecovery.mjs'
 import './styles/index.css'
 
 function applyDevWorkbenchFavicon(documentRef, href) {
@@ -159,37 +158,12 @@ function DevRouteLoadingFallback({ title = '正在加载研发效能工作台' }
 
 export default function DevWorkbenchRoutes() {
   const location = useLocation()
-  const recoveryOnly = isDevDatabaseMigrationRecoveryActive()
   const appTitle = import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
   const documentTitle = resolveDevPageTitle(location.pathname, appTitle)
 
   useEffect(() => {
     applyDevWorkbenchFavicon(document, DEV_WORKBENCH_FAVICON_HREF)
   }, [])
-
-  if (recoveryOnly) {
-    return (
-      <>
-        <Helmet>
-          <title>{documentTitle}</title>
-        </Helmet>
-        <Suspense
-          fallback={<DevRouteLoadingFallback title="正在加载服务恢复页面" />}
-        >
-          <Routes>
-            <Route
-              path="database-migration"
-              element={<DevDatabaseMigrationPage />}
-            />
-            <Route
-              path="*"
-              element={<Navigate to={DEV_DATABASE_MIGRATION_ROUTE} replace />}
-            />
-          </Routes>
-        </Suspense>
-      </>
-    )
-  }
 
   return (
     <>

@@ -62,17 +62,28 @@ export function createDevDatabaseMigrationRecoveryController({
 
   const checkBackendAvailability = async ({ probeRecovery = false } = {}) => {
     if (!monitorBackend || (active && !probeRecovery)) return false
-    // Concurrent business requests and recovery reads share a health probe.
+    // Concurrent requests share probes for both process and dependency readiness.
     if (!backendCheck) {
       backendCheck = (async () => {
         try {
-          const response = await fetchImpl(`${backendOrigin}/healthz`, {
-            signal: AbortSignal.timeout(1500),
-            redirect: 'error',
-          })
-          if (!response.ok || (await response.text()).trim() !== 'ok') {
-            throw new Error('local backend unavailable')
-          }
+          const signal = AbortSignal.timeout(1500)
+          await Promise.all(
+            [
+              ['/healthz', 'ok'],
+              ['/readyz', 'ready'],
+            ].map(async ([pathname, expectedBody]) => {
+              const response = await fetchImpl(`${backendOrigin}${pathname}`, {
+                signal,
+                redirect: 'error',
+              })
+              if (
+                !response.ok ||
+                (await response.text()).trim() !== expectedBody
+              ) {
+                throw new Error('local backend unavailable')
+              }
+            })
+          )
           return true
         } catch {
           active = true

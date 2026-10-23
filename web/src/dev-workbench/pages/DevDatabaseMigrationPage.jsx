@@ -142,13 +142,13 @@ export default function DevDatabaseMigrationPage() {
               type="success"
               showIcon
               message="数据库与本地后端已经恢复"
-              description="普通 ERP 页面和 RPC 已可重新开放；进入完整效能工作台会重新载入当前页面。"
+              description="业务页面与工作台操作已恢复，可返回工作台总览继续。"
               action={
                 <Button
                   type="primary"
                   onClick={() => window.location.assign('/__dev')}
                 >
-                  进入完整效能工作台
+                  返回工作台总览
                 </Button>
               }
             />
@@ -157,7 +157,7 @@ export default function DevDatabaseMigrationPage() {
               type="info"
               showIcon
               message="当前处于数据库迁移恢复模式"
-              description="启动检查未通过时仍保留本页。请按下方提示处理并刷新状态；数据库、启动检查及后端健康均通过后，才能进入完整工作台。"
+              description="可切换左侧菜单查阅文档、设计和其他本地资料。业务请求及其他工作台接口暂不可用；请按下方提示恢复服务并刷新状态。"
             />
           )
         ) : null}

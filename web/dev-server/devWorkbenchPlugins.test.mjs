@@ -349,9 +349,9 @@ test('前端已启动后停服会关闭业务，恢复必须由完整就绪检�
   let online = true
   const recovery = createDevDatabaseMigrationRecoveryController({
     runtimeChecks: true,
-    fetchImpl: async () => {
+    fetchImpl: async (url) => {
       if (!online) throw new Error('ECONNREFUSED private diagnostic')
-      return new Response('ok')
+      return new Response(url.endsWith('/readyz') ? 'ready' : 'ok')
     },
   })
   let middleware
@@ -386,6 +386,88 @@ test('前端已启动后停服会关闭业务，恢复必须由完整就绪检�
   )
 })
 
+test('数据库断连或就绪响应异常时关闭业务，恢复仍须完整预检', async (t) => {
+  for (const [label, entryUrl, failure] of [
+    [
+      '状态读取',
+      DEV_RUNTIME_STATUS_API_PATH,
+      () => new Response('postgres not ready', { status: 503 }),
+    ],
+    ['业务请求', '/rpc/admin', () => new Response('ok')],
+    [
+      '业务页面',
+      '/erp/dashboard',
+      () => {
+        throw new Error('private connection diagnostic')
+      },
+    ],
+  ]) {
+    await t.test(label, async () => {
+      let ready = false
+      let checksPass = false
+      let checks = 0
+      const recovery = createDevDatabaseMigrationRecoveryController({
+        runtimeChecks: true,
+        fetchImpl: async (url) => {
+          if (url.endsWith('/healthz')) return new Response('ok')
+          assert.equal(url, 'http://127.0.0.1:8300/readyz')
+          return ready ? new Response('ready') : failure()
+        },
+        verifyReadiness: async () => {
+          checks++
+          if (!checksPass) throw new Error('private preflight diagnostic')
+        },
+      })
+      let middleware
+      recovery.plugin.configureServer({
+        middlewares: {
+          use: (handler) => {
+            middleware = handler
+          },
+        },
+      })
+      const status = async () => {
+        const response = await runRecoveryMiddleware(middleware, {
+          url: DEV_RUNTIME_STATUS_API_PATH,
+        })
+        assert.doesNotMatch(response.body, /postgres|private|diagnostic/u)
+        return JSON.parse(response.body).status
+      }
+      await runRecoveryMiddleware(middleware, {
+        url: entryUrl,
+        accept: 'text/html',
+      })
+      assert.equal(recovery.isActive(), true)
+      assert.equal(await status(), 'blocked')
+      assert.equal(checks, 0)
+      assert.equal(
+        (await runRecoveryMiddleware(middleware, { url: '/rpc/admin' }))
+          .statusCode,
+        503
+      )
+      assert.equal(
+        (
+          await runRecoveryMiddleware(middleware, {
+            url: DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
+            accept: 'text/html',
+          })
+        ).nextCalled,
+        true
+      )
+      ready = true
+      assert.equal(await status(), 'blocked')
+      checksPass = true
+      assert.equal(await status(), 'ready')
+      assert.equal(checks, 2)
+      assert.equal(
+        (await runRecoveryMiddleware(middleware, { url: '/rpc/admin' }))
+          .nextCalled,
+        true
+      )
+    })
+  }
+})
+
 test('只读状态等待完整启动证明，健康恢复不能跳过数据库或就绪检查，支持再次停服', async () => {
   let online = false
   let checksPass = false
@@ -393,9 +475,9 @@ test('只读状态等待完整启动证明，健康恢复不能跳过数据库�
   const recovery = createDevDatabaseMigrationRecoveryController({
     mode: 'database-migration',
     runtimeChecks: true,
-    fetchImpl: async () => {
+    fetchImpl: async (url) => {
       if (!online) throw new Error('private backend diagnostic')
-      return new Response('ok')
+      return new Response(url.endsWith('/readyz') ? 'ready' : 'ok')
     },
     verifyReadiness: async () => {
       checks++
@@ -453,7 +535,8 @@ test('并发状态检查共用完整预检，电脑和局域网手机均可读�
   const recovery = createDevDatabaseMigrationRecoveryController({
     mode: 'database-migration',
     runtimeChecks: true,
-    fetchImpl: async () => new Response('ok'),
+    fetchImpl: async (url) =>
+      new Response(url.endsWith('/readyz') ? 'ready' : 'ok'),
     verifyReadiness: () => {
       checks++
       return new Promise((resolve) => {
@@ -500,15 +583,15 @@ test('并发状态检查共用完整预检，电脑和局域网手机均可读�
   assert.equal(recovery.isActive(), false)
 })
 
-test('并发业务读取共用健康检查，静态资源、仅前端调试和外部后端不检查', async () => {
-  let resolveHealth
+test('并发业务读取共用健康与就绪检查，静态资源、仅前端调试和外部后端不检查', async () => {
+  const resolveProbes = new Map()
   let calls = 0
   const recovery = createDevDatabaseMigrationRecoveryController({
     runtimeChecks: true,
-    fetchImpl: () => {
+    fetchImpl: (url) => {
       calls += 1
       return new Promise((resolve) => {
-        resolveHealth = resolve
+        resolveProbes.set(url, resolve)
       })
     },
   })
@@ -538,8 +621,9 @@ test('并发业务读取共用健康检查，静态资源、仅前端调试和�
   const pending = ['/rpc/admin', '/rpc/workflow', '/rpc/customer_config'].map(
     (url) => runRecoveryMiddleware(middleware, { url })
   )
-  assert.equal(calls, 1)
-  resolveHealth(new Response('ok'))
+  assert.equal(calls, 2)
+  resolveProbes.get('http://127.0.0.1:8300/healthz')(new Response('ok'))
+  resolveProbes.get('http://127.0.0.1:8300/readyz')(new Response('ready'))
   assert.equal(
     (await Promise.all(pending)).every((response) => response.nextCalled),
     true

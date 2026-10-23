@@ -1,4 +1,5 @@
 import { validateDatabaseMigrationSummary } from '../../src/dev-workbench/config/devDatabaseMigration.mjs'
+import { DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL } from '../../src/dev-workbench/config/devRuntimeRecovery.mjs'
 import { installDataPreparationContractFailureRoute } from './devVersionCenterScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 
@@ -95,6 +96,46 @@ export function createDevDeliveryWorkspaceScenarios({ assert, assertNoHorizontal
   let finishDryRun
   let dryRunRequests = 0
   return [
+    {
+      name: 'dev-recovery-menu-navigation-desktop',
+      path: '/__dev/database-migration',
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.addInitScript((key) => { window[key] = true }, DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL)
+        await installMigrationRoutes(page, migrationFixture())
+      },
+      verify: async (page) => {
+        assert.equal(await page.evaluate((key) => window[key], DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL), true)
+        await page.getByText('当前处于数据库迁移恢复模式', { exact: true }).waitFor()
+        const nav = page.getByRole('navigation', { name: '开发页面导航' })
+        for (const [label, pathname] of [
+          ['项目文档', '/__dev/docs'],
+          ['产品能力', '/__dev/product-core'],
+          ['交互设计', '/__dev/ui-design'],
+          ['数据库迁移', '/__dev/database-migration'],
+        ]) {
+          await nav.getByRole('link', { name: label, exact: true }).click()
+          await expectHeading(page, label)
+          assert.equal(new URL(page.url()).pathname, pathname)
+          await assertNoHorizontalOverflow(page, `recovery-${label}`)
+          await nav.getByRole('link', { name: label, exact: true }).click()
+          assert.equal(new URL(page.url()).pathname, pathname)
+          assert.equal(await nav.getAttribute('aria-busy'), null)
+        }
+        await page.goBack()
+        await expectHeading(page, '交互设计')
+        await page.goForward()
+        await expectHeading(page, '数据库迁移')
+
+        const deepLink = new URL('/__dev/docs?path=README.md#navigation', page.url()).href
+        await page.goto(deepLink)
+        await expectHeading(page, '项目文档')
+        assert.equal(page.url(), deepLink)
+        await page.reload()
+        await expectHeading(page, '项目文档')
+        assert.equal(page.url(), deepLink)
+      },
+    },
     {
       name: 'dev-delivery-task-navigation-desktop',
 path: '/__dev/delivery',
