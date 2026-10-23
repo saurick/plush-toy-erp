@@ -6,6 +6,8 @@
 
 库已为 `20261023044447`（161/161），本轮未再 apply。旧后端连接数据库报 `no route to host`；18:33 经 `make dev_restart` 恢复，health / ready / business 通过。补齐前端运行监测的 ready 检查，避免进程存活时误放行业务。`pnpm start`、客户入口、订单读取与迁移页通过；381 项开发服务与启动测试、214 项迁移合同及生产边界检查通过。证据与精确 Git 交接见 `output/qa/runtime-recovery-20261023/`。
 
+续查两次故障均紧随 Codex 宿主退出：15:12:48 更新后 15:12:55 首错，18:23:43 退出后 18:23:54 首错；系统记录宿主网络 UUID 缓存更新，同一后端二进制重启后恢复。macOS 后端现由当前用户 launchd 加稳定 ERP 启动器托管，独立网络预检先于停旧服务，失败保留原服务。用户授予本地网络权限后，21:01 正式切换及 health / ready / business 通过；系统核对后端 responsible process 已是 ERP 启动器，旧服务与临时请求已清理，菜单切换及迁移页正常。126 项相关检查通过，含原生退出、信号、凭据清理及网络探测；未实际重启 Codex 验证，未再迁移。证据与精确交接见 `output/qa/database-network-root-cause-20261023/`。
+
 ## GitLab 部署记录整合（2026-10-23）
 
 三环境部署 / 回滚接入 GitLab 原生环境，项目回执归档 Generic Package；工作台保留项目检查、原始时间、操作入口和离线历史。183 条历史操作、22 份已有回执完成归档及逐条回读，789 个原始文件摘要不变；退役目标独立保留，缺失证据不补造。协议与补录恢复入口见 [部署脚本](scripts/deploy/README.md#gitlab-部署登记与回执归档)。本轮源码仅纳入精确任务差异；其他工作区改动排除。后续推送与三个目标发布已获用户授权，最终 SHA 与运行回执留在 ignored `output/qa/gitlab-deployment-integration/`，不能以本地验证代替发布结果。

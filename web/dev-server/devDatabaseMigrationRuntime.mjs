@@ -15,6 +15,11 @@ import {
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { stopRuntimeListeners } from '../../scripts/local-runtime-control.mjs'
+import {
+  prepareRuntimeProcess,
+  checkRuntimeProcessNetwork,
+  startRuntimeProcess,
+} from '../../scripts/local-runtime-process.mjs'
 import { migrationAuditPaths } from '../../scripts/local-migration.mjs'
 import {
   buildRuntimeBundle,
@@ -54,6 +59,8 @@ export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-runtime-bundle.mjs',
   'scripts/local-runtime-build-inputs.mjs',
   'scripts/local-runtime-control.mjs',
+  'scripts/local-runtime-process.mjs',
+  'scripts/local-runtime-launcher.swift',
   'scripts/local-runtime-start.mjs',
   'scripts/local-runtime-rehearsal.mjs',
   'scripts/local-runtime-preflight-core.mjs',
@@ -895,6 +902,11 @@ export function createDevDatabaseMigrationRuntime(
       // Stop the previous process before health checks can accept its response.
       onProgress('正在核对候选制品与当前数据库兼容性；原后端继续运行')
       await verifyBundleDatabase(root, bundle, roles.audit)
+      const preparedProcess = await prepareRuntimeProcess(root)
+      if (preparedProcess) {
+        onProgress('正在核对 ERP 独立后台进程的数据库网络权限；原后端继续运行')
+        await checkRuntimeProcessNetwork(root, preparedProcess, roles.app)
+      }
       await setLocalDatabaseMaintenance(root, false)
       onProgress('数据库兼容性核对通过；正在停止本工作区旧后端并释放登记端口')
       await stopRuntimeListeners(root, operationId, { execute: executeCommand })
@@ -904,29 +916,30 @@ export function createDevDatabaseMigrationRuntime(
       try {
         logFile = operationLogFile(root, operationId)
         const descriptor = openSync(logFile, 'a', 0o600)
-        logStartOffset = fstatSync(descriptor).size
-        const startedAt = new Date().toISOString()
         try {
-          child = spawn(path.join(bundle.directory, 'runtime/server'), [], {
-            cwd: path.join(bundle.directory, 'source/server'),
-            env: {
-              ...process.env,
-              ...fixedEnvironment,
-              PLUSH_GITLAB_READ_TOKEN: '',
-              PLUSH_GITLAB_TOKEN: '',
-              GIT_OPTIONAL_LOCKS: '0',
-              GIT_SHA: runtimeServerVersion(bundle),
-              POSTGRES_DSN: roles.app,
-              ERP_CUSTOMER_KEY: fixedEnvironment.ERP_CUSTOMER_KEY || 'yoyoosun',
-              ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG: '1',
-            },
-            detached: true,
-            stdio: ['ignore', descriptor, descriptor],
-          })
+          logStartOffset = fstatSync(descriptor).size
         } finally {
           closeSync(descriptor)
         }
-        child.unref()
+        const startedAt = new Date().toISOString()
+        child = await startRuntimeProcess(root, {
+          prepared: preparedProcess,
+          operationId,
+          executable: path.join(bundle.directory, 'runtime/server'),
+          logFile,
+          cwd: path.join(bundle.directory, 'source/server'),
+          env: {
+            ...process.env,
+            ...fixedEnvironment,
+            PLUSH_GITLAB_READ_TOKEN: '',
+            PLUSH_GITLAB_TOKEN: '',
+            GIT_OPTIONAL_LOCKS: '0',
+            GIT_SHA: runtimeServerVersion(bundle),
+            POSTGRES_DSN: roles.app,
+            ERP_CUSTOMER_KEY: fixedEnvironment.ERP_CUSTOMER_KEY || 'yoyoosun',
+            ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG: '1',
+          },
+        })
         onProgress(
           `已启动候选进程 PID=${child.pid}；地址=${apiOrigin}；启动来源=${startSource}`
         )
@@ -965,6 +978,7 @@ export function createDevDatabaseMigrationRuntime(
             logStartOffset,
             startupLogEndOffset,
             startupDurationMs,
+            ...(child.manager ? { processManager: child.manager } : {}),
           },
         })
         if (openConsole) {
@@ -982,11 +996,7 @@ export function createDevDatabaseMigrationRuntime(
           activeVersion: bundle.migrationVersion,
         }
       } catch (error) {
-        if (child?.pid && child.exitCode === null && !child.signalCode) {
-          try {
-            process.kill(-child.pid, 'SIGTERM')
-          } catch {}
-        }
+        await child?.stop().catch(() => {})
         if (logFile) {
           error.runtimeLogFile = path
             .relative(root, logFile)

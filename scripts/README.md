@@ -27,6 +27,7 @@
 | `dev-process-inspection.mjs` | 前后端共用的有超时进程检查；macOS 从系统端口表定位 PID，再逐个核对工作目录，失败时不停止服务 |
 | `local-runtime-bundle.mjs`、`local-runtime-build-inputs.mjs`、`local-runtime-start.mjs`、`local-runtime-control.mjs`、`local-runtime-preflight.mjs` | 日常后端按需构建、运行 / 停止互斥与只读状态；迁移完整候选和恢复边界见 [服务端入口](../server/README.md#快速开始) |
 | `local-runtime-console.mjs` | 将 Kratos JSON 转为紧凑终端日志，按级别和关键词筛选，回放启动记录并跟随重启；人工终端常驻，macOS 非交互启动打开日志终端，参数与运行边界见 [服务端入口](../server/README.md#快速开始) |
+| `local-runtime-process.mjs`、`local-runtime-launcher.swift` | macOS 后端使用独立应用身份与当前用户 launchd 按需运行，避免继承编辑器退出后的失效网络身份；不登录自启、不自动重试，启停仍经过原有锁与验证 |
 | `terminal-log.mjs` | 前后端启动与日志共用的终端高亮、无颜色输出和 PostgreSQL 凭据脱敏 |
 | `lib/postgres-url.mjs` | 本地数据库创建与备份源连接解析，凭据通过环境传入；一次性 PostgreSQL 测试目标由 `qa/postgres-target-contract.mjs` 限制 |
 | `local-database-roles.mjs`、`local-runtime-rehearsal.mjs` | 复用部署角色策略，使用独立只读账号审计，并在临时恢复库验证固定候选版本 |

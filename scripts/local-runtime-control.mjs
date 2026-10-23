@@ -14,6 +14,7 @@ import {
 } from "./local-runtime-bundle.mjs";
 import { readRuntimeBuildInputs } from "./local-runtime-build-inputs.mjs";
 import { checkLocalDatabaseMigrations } from "./local-runtime-preflight.mjs";
+import { stopManagedRuntimeProcess } from "./local-runtime-process.mjs";
 import {
   acquireDatabaseMigrationExecutionLock,
   readDatabaseMigrationExecutionLock,
@@ -119,6 +120,7 @@ export async function stopRuntimeListeners(
     execute = exec,
     ports = loadDevPorts,
     readLock = readDatabaseMigrationExecutionLock,
+    stopManaged = stopManagedRuntimeProcess,
   } = {},
 ) {
   const store = resolveDatabaseMigrationOperationStore(root);
@@ -126,7 +128,7 @@ export async function stopRuntimeListeners(
   if (!lock || lock.operationId !== operationId || lock.pid !== process.pid) {
     throw new Error("停止后端需要当前进程持有对应操作锁；未停止任何服务");
   }
-  return execute(
+  const result = await execute(
     "bash",
     [
       path.join(root, "scripts/dev-listener-stop.sh"),
@@ -140,6 +142,8 @@ export async function stopRuntimeListeners(
       maxBuffer: 1024 * 1024,
     },
   );
+  await stopManaged(root);
+  return result;
 }
 
 export async function stopWorkspaceRuntime(

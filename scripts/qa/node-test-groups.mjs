@@ -132,6 +132,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/local-runtime-console.test.mjs",
     "scripts/local-runtime-control.test.mjs",
     "scripts/local-runtime-preflight.test.mjs",
+    "scripts/local-runtime-process.test.mjs",
     "scripts/local-runtime-rehearsal.test.mjs",
     "scripts/local-runtime-start.test.mjs",
     "scripts/qa/attachment-console-integration.test.mjs",
