@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Git Conflict Coordination"
+  short_description: "按需核清同文件、混合改动与跨会话依赖，保留暂缓批次并串行提交"
+  default_prompt: "使用 $plush-git-conflict-coordination 处理当前已授权提交的实际冲突，联系相关会话核清归属与依赖，验证后精确提交，不推送、不动暂缓批次、不后台轮询。"

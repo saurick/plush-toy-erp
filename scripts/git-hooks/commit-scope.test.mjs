@@ -46,18 +46,27 @@ function fixture(t) {
     t.after(() => { if (child.exitCode === null) child.kill('SIGKILL') })
     return { child, finished, output: () => output }
   }
-  const patch = (name, content, label = name) => {
+  const patch = (name, content, label = name, reviewedBase = base) => {
     const index = path.join(root, '.git', `candidate-${label.replaceAll('/', '_')}`)
     const env = { ...environment, GIT_INDEX_FILE: index }
     const call = (args, input) => execFileSync('git', args, { cwd: root, env, input, encoding: 'utf8' })
-    call(['read-tree', base])
+    call(['read-tree', reviewedBase])
     const oid = call(['hash-object', '-w', '--stdin'], content).trim()
     call(['update-index', '--add', '--cacheinfo', '100644', oid, name])
     const file = path.join(root, '.git', `${label.replaceAll('/', '_')}.patch`)
-    writeFileSync(file, call(['diff', '--cached', '--binary', '--full-index', base]))
+    writeFileSync(file, call(['diff', '--cached', '--binary', '--full-index', reviewedBase]))
     return file
   }
   return { root, git, base, setHook, run, start, patch }
+}
+
+function coordination(result) {
+  const prefix = '[commit-scope:coordination] '
+  const records = (result.stderr || result.output).split('\n')
+    .filter(line => line.startsWith(prefix)).map(line => JSON.parse(line.slice(prefix.length)))
+  assert.equal(records.length, 1, result.stderr || result.output)
+  assert.equal(records[0].skill, '.agents/skills/plush-git-conflict-coordination/SKILL.md')
+  return records[0]
 }
 
 async function expectOutput(job, pattern) {
@@ -119,6 +128,7 @@ test('two concurrent commits wait on one mutex, then revalidate unrelated HEAD a
   await writeFile(fifo, 'go\n')
   const results = await Promise.all([first.finished, second.finished])
   for (const result of results) assert.equal(result.status, 0, result.output)
+  for (const result of results) assert.doesNotMatch(result.output, /\[commit-scope:coordination\]/u)
   assert.equal(f.git('rev-list', '--count', `${f.base}..HEAD`), '2')
   assert.equal(f.git('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD^'), 'a.txt')
   assert.equal(f.git('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'), 'b.txt')
@@ -135,6 +145,8 @@ test('a changed reviewed file is rejected after another commit', t => {
   const result = f.run('--patch', oldPatch)
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /其他提交中变化/u)
+  assert.equal(coordination(result).reason, 'reviewed_files_changed')
+  assert.deepEqual(coordination(result).paths, ['a.txt'])
   assert.equal(f.git('rev-parse', 'HEAD'), head)
   assert.equal(f.git('diff', '--cached'), '')
 })
@@ -148,11 +160,14 @@ test('foreign staging and native index.lock are preserved', t => {
   let result = f.run('--', 'a.txt')
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /暂存区含其他内容/u)
+  assert.equal(coordination(result).reason, 'foreign_staging')
+  assert.deepEqual(coordination(result).paths, ['a.txt', 'b.txt'])
   assert.equal(f.git('diff', '--cached', '--binary'), staged)
   writeFileSync(path.join(f.root, '.git', 'index.lock'), 'unique candidate')
   result = f.run('--', 'a.txt')
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /index.lock/u)
+  assert.equal(coordination(result).reason, 'native_index_lock')
   assert.equal(readFileSync(path.join(f.root, '.git', 'index.lock'), 'utf8'), 'unique candidate')
   assert.equal(f.git('diff', '--cached', '--binary'), staged)
 })
@@ -165,6 +180,7 @@ test('raw commits are blocked; an exactly matching reviewed staged patch can be 
   const raw = spawnSync('git', ['commit', '-m', 'test: 不受控提交'], { cwd: f.root, env: environment, encoding: 'utf8' })
   assert.notEqual(raw.status, 0)
   assert.match(raw.stderr, /commit-scope.py/u)
+  assert.doesNotMatch(raw.stderr, /\[commit-scope:coordination\]/u)
   assert.equal(f.git('rev-parse', 'HEAD'), f.base)
   assert.equal(f.git('diff', '--cached', '--name-only'), 'a.txt')
   const adopted = f.run('--patch', patch)
@@ -181,6 +197,7 @@ test('hook failure removes only this invocation staging and permits a later clea
   assert.equal(f.git('rev-parse', 'HEAD'), f.base)
   assert.equal(f.git('diff', '--cached'), '')
   assert.equal(readFileSync(path.join(f.root, 'a.txt'), 'utf8'), 'own\n')
+  assert.doesNotMatch(result.stderr, /\[commit-scope:coordination\]/u)
   f.setHook()
   assert.equal(f.run('--', 'a.txt').status, 0)
 })
@@ -206,6 +223,7 @@ test('branch identity changes during hooks stop the commit', t => {
   const result = f.run('--', 'a.txt')
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /分支在提交期间变化/u)
+  assert.equal(coordination(result).reason, 'branch_changed')
   assert.equal(f.git('rev-parse', 'HEAD'), f.base)
   assert.equal(f.git('diff', '--cached', '--name-only'), 'a.txt')
 })
@@ -218,6 +236,8 @@ test('out-of-scope staging during hooks is rejected and preserved for review', t
   const result = f.run('--', 'a.txt')
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /暂存内容偏离/u)
+  assert.equal(coordination(result).reason, 'index_changed')
+  assert.deepEqual(coordination(result).paths, ['a.txt', 'b.txt'])
   assert.equal(f.git('rev-parse', 'HEAD'), f.base)
   assert.equal(f.git('diff', '--cached', '--name-only'), 'a.txt\nb.txt')
 })
@@ -229,6 +249,8 @@ test('a concurrent scoped worktree edit is retained and never silently committed
   const result = f.run('--', 'a.txt')
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /其他写入修改/u)
+  assert.equal(coordination(result).reason, 'worktree_changed')
+  assert.deepEqual(coordination(result).paths, ['a.txt'])
   assert.equal(f.git('rev-parse', 'HEAD'), f.base)
   assert.equal(f.git('diff', '--cached'), '')
   assert.equal(readFileSync(path.join(f.root, 'a.txt'), 'utf8'), 'concurrent-write\n')
@@ -247,7 +269,43 @@ test('bounded mutex timeout leaves the active commit index unchanged', { timeout
   const result = f.run('--wait-seconds', '0.1', '--', 'b.txt')
   assert.notEqual(result.status, 0)
   assert.match(result.stderr, /等待提交入口超时/u)
+  assert.equal(coordination(result).reason, 'commit_busy')
+  assert.deepEqual(coordination(result).paths, ['b.txt'])
   assert.equal(f.git('diff', '--cached', '--binary'), staged)
   await writeFile(fifo, 'go\n')
   assert.equal((await first.finished).status, 0)
+})
+
+test('a freshly reviewed same-file patch can close out after a conflict without absorbing held edits', t => {
+  const f = fixture(t)
+  const stale = f.patch('a.txt', 'a.txt\nsecond change\n', 'stale')
+  writeFileSync(path.join(f.root, 'a.txt'), 'first change\nkeep\n')
+  assert.equal(f.run('--', 'a.txt').status, 0)
+  const head = f.git('rev-parse', 'HEAD')
+  writeFileSync(path.join(f.root, 'a.txt'), 'first change\nsecond change\nheld unrelated edit\n')
+  const conflict = f.run('--patch', stale)
+  assert.equal(coordination(conflict).reason, 'reviewed_files_changed')
+  assert.equal(f.git('diff', '--cached'), '')
+
+  const reviewed = f.patch('a.txt', 'first change\nsecond change\n', 'reviewed', head)
+  const result = f.run('--base', head, '--patch', reviewed)
+  assert.equal(result.status, 0, result.stderr + result.stdout)
+  assert.equal(f.git('show', 'HEAD:a.txt'), 'first change\nsecond change')
+  assert.equal(readFileSync(path.join(f.root, 'a.txt'), 'utf8'), 'first change\nsecond change\nheld unrelated edit\n')
+  assert.equal(f.git('rev-list', '--count', `${f.base}..HEAD`), '2')
+  assert.equal(f.git('diff', '--cached'), '')
+})
+
+test('coordination paths preserve Unicode and whitespace without including file contents', t => {
+  const f = fixture(t)
+  const name = '其他 会话.txt'
+  writeFileSync(path.join(f.root, name), 'private contents should not appear in diagnostics\n')
+  f.git('add', '--', name)
+  writeFileSync(path.join(f.root, 'a.txt'), 'own\n')
+  const result = f.run('--', 'a.txt')
+  assert.equal(coordination(result).reason, 'foreign_staging')
+  assert.deepEqual(coordination(result).paths, ['a.txt', name])
+  assert.doesNotMatch(result.stderr, /private contents/u)
+  assert.equal(f.git('rev-parse', 'HEAD'), f.base)
+  assert.equal(f.git('-c', 'core.quotePath=false', 'diff', '--cached', '--name-only'), name)
 })

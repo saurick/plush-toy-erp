@@ -2,7 +2,7 @@
 
 本目录只保存 plush-toy-erp 的专项 SOP。长期规则在 `AGENTS.md`，项目事实在正式 docs、代码、migration 和测试；通用工作流使用 `~/.codex/skills`，不在项目版重复。
 
-当前 10 个 Skill 按请求动作、对象与影响选择一个主入口；只有当前判断需要时才读取分支/引用或补充其他 Skill。切换后继续同一目标的已授权工作，不逐个执行或逐层向甲方确认；当前技能目录已能定位时无需重复读取本索引。
+当前 11 个 Skill 按请求动作、对象与影响选择一个主入口；只有当前判断需要时才读取分支/引用或补充其他 Skill。切换后继续同一目标的已授权工作，不逐个执行或逐层向甲方确认；当前技能目录已能定位时无需重复读取本索引。
 
 | Skill                                     | 适用范围                                                                                                                               |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10,6 +10,7 @@
 | `$plush-code-review-governance`           | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查                                                                  |
 | `$plush-docs-governance`                  | 当前真源、文档清单、中文文件名、读者路径和 `progress.md`                                                                               |
 | `$plush-domain-boundary-governance`       | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC、字段真源和数据增长与容量设计                      |
+| `$plush-git-conflict-coordination`        | 已授权本地提交遇到同文件、混合改动或跨会话依赖时，定向联系相关聊天核清、验证并串行收口；不推送、不后台轮询                           |
 | `$plush-page-design-governance`           | 普通 ERP 页面业务语义、字段/动作/状态、功能与数据增长、原型和浏览器回归                                                                  |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真                                                                     |
 | `$plush-seed-import-governance`           | 模块化 seed / fixture / 模拟数据、甲方资料到脱敏场景映射、增量复用、import dry-run、批次与数据 cleanup 边界                           |
@@ -31,6 +32,7 @@
 - seed / fixture / dry-run / cleanup、模拟场景覆盖、甲方资料脱敏映射和 `reuse / reverify / reseed` 判断使用 Seed；验收目录、readiness、浏览器/PDF、人工结论和签收编排使用 Manual Acceptance。
 - Manual Acceptance 只编排验收与证据；目标访问、migration、release、rollback 的真实执行仍由 Operations 负责。
 - 提示词整理使用全局显式 `$prompt-governance`。存在待提交 / 需交接改动时按 `AGENTS.md` 留一份被动 `Git handoff record`；只有当前任务已授权 commit / push 且实时现场复杂时，才使用全局 `$git-closeout-coordination`。
+- 已授权本地提交遇到实际跨会话冲突时，使用 [Git Conflict Coordination](plush-git-conflict-coordination/SKILL.md) 自动核清，沿用项目精确提交入口；无冲突时不联系其他聊天，暂缓批次不纳入。
 - 项目 skill 不重复高内聚、低耦合等通用常识，只保留项目真源、判断流程、命令和验收。
 - 修改 Skill 时核对 `agents/openai.yaml` 仍准确；仅在适用范围、入口或元数据变化时修改相关 README / metadata / 引用。验证入口与覆盖见下文；只有命中项目过程记录条件时才更新 `progress.md`。
 
@@ -64,3 +66,4 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --check -- .agents/
 | “订单按钮以后增多时仍要清楚好用。” | Page | 评估业务分组、优先级、宽度与交互恢复，选择受影响的增长场景；不自动新增功能区或后台压测。 |
 | “评估历史数据增长后的查询和导出，先别改。” | Domain / Test | 区分总量、处理范围、负载和环境，核对现有主路径并提出有依据的验证方案；不改库、不启动压测、不承诺未实测容量。 |
 | “只改一个按钮文案。” | Page | 沿用现有布局与容量边界，完成相关核对；不额外引入规模分析、造数或压测。 |
+| “提交本次修复；同文件有另一会话改动，必要依赖暂未提交。” | Git Conflict Coordination | 定向核对归属、依赖与授权，在候选上验证后串行提交；明确暂缓的依赖不纳入，只阻断相应目标。 |

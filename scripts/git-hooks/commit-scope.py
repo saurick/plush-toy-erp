@@ -16,7 +16,19 @@ import tempfile
 
 
 class Refused(Exception):
-    pass
+    def __init__(self, message, *, reason=None, paths=()):
+        super().__init__(message)
+        self.reason = reason
+        self.paths = sorted(set(paths))
+
+
+COORDINATION_SKILL = ".agents/skills/plush-git-conflict-coordination/SKILL.md"
+
+
+def index_paths(tree, env=None):
+    return [os.fsdecode(p) for p in git(
+        "diff", "--cached", "--no-ext-diff", "--no-renames", "--name-only", "-z", tree, env=env
+    ).split(b"\0") if p]
 
 
 def git(*args, env=None, data=None, ok=(0,)):
@@ -58,6 +70,11 @@ def worktree_state(paths):
     return result
 
 
+def changed_worktree_paths(expected):
+    current = worktree_state(expected)
+    return [name for name in expected if current[name] != expected[name]]
+
+
 def repository():
     root = value("rev-parse", "--show-toplevel")
     os.chdir(root)
@@ -85,26 +102,29 @@ def verify_context():
         else:
             raise Refused("提交互斥已释放，保留现场")
     if value("rev-parse", "HEAD") != context["head"]:
-        raise Refused("HEAD 在提交期间变化，保留现场")
+        raise Refused("HEAD 在提交期间变化，保留现场", reason="head_changed", paths=context["worktree"])
     if value("symbolic-ref", "-q", "HEAD", ok=(0, 1)) != context["branch"]:
-        raise Refused("分支在提交期间变化，保留现场")
+        raise Refused("分支在提交期间变化，保留现场", reason="branch_changed", paths=context["worktree"])
     if not unchanged(context["tree"]):
-        raise Refused("暂存内容偏离已核对的候选，保留现场")
-    if worktree_state(context["worktree"]) != context["worktree"]:
-        raise Refused("提交范围内文件被其他写入修改，保留现场")
+        raise Refused("暂存内容偏离已核对的候选，保留现场", reason="index_changed",
+                      paths=[*context["worktree"], *index_paths(context["tree"])])
+    changed = changed_worktree_paths(context["worktree"])
+    if changed:
+        raise Refused("提交范围内文件被其他写入修改，保留现场", reason="worktree_changed", paths=changed)
 
 
-def acquire(mutex, seconds):
+def acquire(mutex, seconds, paths):
     try:
         fcntl.flock(mutex, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return
     except BlockingIOError:
         if seconds == 0:
-            raise Refused("提交入口正在使用；未修改暂存区") from None
+            raise Refused("提交入口正在使用；未修改暂存区", reason="commit_busy", paths=paths) from None
     print(f"[commit-scope] 等待当前提交结束，最多 {seconds:g} 秒；尚未暂存", flush=True)
 
     def timed_out(_signum, _frame):
-        raise Refused("等待提交入口超时；未修改暂存区，请在当前提交结束后重新核对")
+        raise Refused("等待提交入口超时；未修改暂存区，请在当前提交结束后重新核对",
+                      reason="commit_busy", paths=paths)
 
     previous = signal.signal(signal.SIGALRM, timed_out)
     signal.setitimer(signal.ITIMER_REAL, seconds)
@@ -136,32 +156,38 @@ def commit(args):
                 if path.is_absolute() or ".." in path.parts or ".git" in path.parts or path.is_dir():
                     raise Refused(f"需要仓库相对的精确文件路径：{name}")
             git("add", "--", *args.files, env=candidate_env)
-        paths = [os.fsdecode(p) for p in git(
-            "diff", "--cached", "--no-renames", "--name-only", "-z", base, env=candidate_env
-        ).split(b"\0") if p]
+        paths = index_paths(base, env=candidate_env)
         if not paths:
             raise Refused("候选没有提交内容")
         patch = git("diff", "--cached", "--no-ext-diff", "--binary", "--full-index", base, env=candidate_env)
         scope_state = worktree_state(paths)
         with Path(str(index) + ".codex-commit-once.lock").open("a+b") as mutex:
-            acquire(mutex, args.wait_seconds)
+            acquire(mutex, args.wait_seconds, paths)
             # Never delete this persistent inode: unlinking it lets contenders lock different files.
             if Path(str(index) + ".lock").exists():
-                raise Refused("Git index.lock 存在；保留锁，按 git-closeout-coordination 核验恢复")
+                raise Refused("Git index.lock 存在；保留锁，按 git-closeout-coordination 核验恢复",
+                              reason="native_index_lock", paths=paths)
             head = value("rev-parse", "HEAD")
             branch = value("symbolic-ref", "-q", "HEAD", ok=(0, 1))
             if head != base:
                 git("merge-base", "--is-ancestor", base, head)
-                if git("diff", "--no-ext-diff", "--binary", base, head, "--", *paths):
-                    raise Refused("已核对文件在其他提交中变化；请重新核对补丁，未修改暂存区")
-            if worktree_state(paths) != scope_state:
-                raise Refused("等待期间提交范围内文件变化；未修改暂存区")
+                changed = [os.fsdecode(p) for p in git(
+                    "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base, head, "--", *paths
+                ).split(b"\0") if p]
+                if changed:
+                    raise Refused("已核对文件在其他提交中变化；请重新核对补丁，未修改暂存区",
+                                  reason="reviewed_files_changed", paths=changed)
+            changed = changed_worktree_paths(scope_state)
+            if changed:
+                raise Refused("等待期间提交范围内文件变化；未修改暂存区",
+                              reason="worktree_changed", paths=changed)
             git("read-tree", head, env=candidate_env)
             git("apply", "--cached", "--whitespace=error-all", "-", env=candidate_env, data=patch)
             tree = value("write-tree", env=candidate_env)
             staged_here = unchanged(head)
             if not staged_here and not unchanged(tree):
-                raise Refused("暂存区含其他内容；未清空或覆盖，请先由原提交完成收口")
+                raise Refused("暂存区含其他内容；未清空或覆盖，请先由原提交完成收口",
+                              reason="foreign_staging", paths=[*paths, *index_paths(head)])
             context = {"root": root, "fd": mutex.fileno(), "head": head, "branch": branch,
                        "tree": tree, "worktree": scope_state}
             context_path = temp / "context.json"
@@ -223,6 +249,12 @@ if __name__ == "__main__":
         main()
     except (Refused, OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f"[commit-scope] {error}", file=sys.stderr)
+        if isinstance(error, Refused) and error.reason:
+            # The active chat consumes this event after the mutex is released; no notifier or daemon runs here.
+            print("[commit-scope:coordination] " + json.dumps({
+                "reason": error.reason, "paths": error.paths, "skill": COORDINATION_SKILL,
+            }, ensure_ascii=False), file=sys.stderr)
+            print(f"[commit-scope] 当前会话按 {COORDINATION_SKILL} 定向核清后继续；不自动重试、不推送。", file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
         print("[commit-scope] 操作中断，需重新核对现场", file=sys.stderr)
