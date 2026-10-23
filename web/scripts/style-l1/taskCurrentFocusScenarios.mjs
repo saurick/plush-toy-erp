@@ -252,7 +252,7 @@ deviceScaleFactor: mobile ? 1 : 2,
         await page.keyboard.press('Escape')
         await menu.waitFor({ state: 'hidden' })
         assert.equal(await detail.isVisible(), true, 'Escape 只关闭菜单，保留任务详情')
-        const productsTrigger = detail.getByRole('button', { name: '共 2 项产品', exact: true })
+        const productsTrigger = detail.getByRole('button', { name: '共 2 款产品', exact: true })
         await productsTrigger.click()
         const products = page.getByRole('dialog', { name: '关联产品', exact: true })
         await products.waitFor()

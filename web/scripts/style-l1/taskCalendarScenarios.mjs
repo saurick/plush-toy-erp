@@ -88,7 +88,9 @@ deviceScaleFactor,
           const { id, method, params: q = {} } = route.request().postDataJSON()
           if (!q.calendar_month) return route.fallback()
           calls.push({ method, ...q })
-          if (heldNext) {
+          if (heldNext &&
+            (heldNext.expectedSelection === undefined || heldNext.expectedSelection === q.calendar_selection) &&
+            (heldNext.expectedKeyword === undefined || heldNext.expectedKeyword === String(q.keyword || ''))) {
             const held = heldNext
             heldNext = null
             held.id = id
@@ -169,7 +171,7 @@ revision,
             for (let parent = node.parentElement; parent; parent = parent.parentElement) parent.scrollTop = 0
           })
         }
-        const initial = { started: Promise.withResolvers(), release: Promise.withResolvers() }
+        const initial = { expectedSelection: today, started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = initial
         if (mobile) await page.getByRole('button', { name: '切换到日历', exact: true }).click()
         else await verifyMobileNavigationMotion(page, assert, switcher, 1)
@@ -218,7 +220,8 @@ revision,
         assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30)
         const monthBefore = await calendar.locator('.workflow-task-calendar__month').boundingBox()
         const emptyDay = calendar.locator('button[data-date][aria-label$="，0 项待办"]').first()
-        const held = { started: Promise.withResolvers(), release: Promise.withResolvers() }
+        const emptySelection = await emptyDay.getAttribute('data-date')
+        const held = { expectedSelection: emptySelection, started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = held
         await emptyDay.click()
         await held.started.promise
@@ -238,7 +241,7 @@ revision,
         await calendar.getByRole('button', { name: '今天', exact: true }).click()
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
         await calendar.locator('.workflow-task-calendar__agenda[aria-busy="false"]').waitFor()
-        const cancelled = { started: Promise.withResolvers(), release: Promise.withResolvers() }
+        const cancelled = { expectedSelection: emptySelection, started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = cancelled
         await page.evaluate(() => {
           const originalFetch = window.fetch
@@ -253,6 +256,7 @@ revision,
         })
         await emptyDay.click()
         await cancelled.started.promise
+        assert.equal(cancelled.selection, emptySelection, 'the held request belongs to the date the user selected')
         try {
           await calendar.getByRole('button', { name: '今天', exact: true }).click()
           await calendar.locator(`button[data-date="${today}"][aria-pressed="true"]`).waitFor()
@@ -269,7 +273,7 @@ revision,
             delete window.__calendarAbortProbe
           })
         }
-        const filtered = { started: Promise.withResolvers(), release: Promise.withResolvers() }
+        const filtered = { expectedKeyword: '未设置截止的跟进', started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = filtered
         const search = mobile ? page.getByRole('searchbox') : page.getByPlaceholder('订单 / 产品 / 物料 / 款号', { exact: true })
         await search.fill('未设置截止的跟进')
@@ -293,7 +297,7 @@ revision,
         assert.equal(await refreshSuccess.count(), 0, 'initial loads, date changes and automatic updates do not announce manual refresh success')
         tasks[0].task_status_key = 'ready'
         const refreshButton = calendar.getByRole('button', { name: '刷新待办日历', exact: true })
-        const refreshing = { started: Promise.withResolvers(), release: Promise.withResolvers() }
+        const refreshing = { expectedSelection: today, expectedKeyword: '', started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = refreshing
         await refreshButton.click()
         await refreshing.started.promise
