@@ -564,13 +564,18 @@ func (r *inventoryRepo) ListPurchaseReturns(ctx context.Context, filter biz.Purc
 		Order(ent.Desc(purchasereturn.FieldReturnedAt), ent.Desc(purchasereturn.FieldID)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
+		WithItems(func(q *ent.PurchaseReturnItemQuery) { q.Order(ent.Asc(purchasereturnitem.FieldID)) }).
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]*biz.PurchaseReturn, 0, len(rows))
 	for _, row := range rows {
-		item, err := purchaseReturnWithItems(ctx, r.data.postgres, row)
+		items, err := row.Edges.ItemsOrErr()
+		if err != nil {
+			return nil, 0, err
+		}
+		item, err := purchaseReturnFromItems(ctx, row, items)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -816,6 +821,10 @@ func purchaseReturnWithItems(ctx context.Context, client *ent.Client, purchaseRe
 	if err != nil {
 		return nil, err
 	}
+	return purchaseReturnFromItems(ctx, purchaseReturn, items)
+}
+
+func purchaseReturnFromItems(ctx context.Context, purchaseReturn *ent.PurchaseReturn, items []*ent.PurchaseReturnItem) (*biz.PurchaseReturn, error) {
 	warehouseIDs := make([]int, 0, len(items))
 	for _, item := range items {
 		warehouseIDs = append(warehouseIDs, item.WarehouseID)

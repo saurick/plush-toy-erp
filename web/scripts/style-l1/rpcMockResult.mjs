@@ -25,7 +25,10 @@ export function stylePaginatedRpcData(
   params = {},
   defaultLimit = 100
 ) {
-  const allRecords = Array.isArray(records) ? records : []
+  const allRecords = (Array.isArray(records) ? records : []).filter((record) =>
+    (!Array.isArray(params.ids) || params.ids.includes(record.id)) &&
+    (!Array.isArray(params.fact_ids) || params.fact_ids.includes(record.source_id))
+  )
   const requestedLimit = Number(params.limit ?? defaultLimit)
   const limit =
     Number.isSafeInteger(requestedLimit) &&

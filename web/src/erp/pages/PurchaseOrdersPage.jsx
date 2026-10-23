@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Form } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
+import { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
@@ -33,13 +36,11 @@ import PurchaseOrderInboundDraftModal from '../components/purchase-orders/Purcha
 import PurchaseOrderOperationPanel from '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
 import { buildPurchaseOrderColumns } from '../components/purchase-orders/purchaseOrderColumns.jsx'
 import {
-  listAllMaterials,
   listAllContactsByOwner,
   listAllPurchaseOrderItems,
   listAllPurchaseOrders,
   listPurchaseOrders,
   getPurchaseOrder,
-  listAllSuppliers,
   listAllUnits,
   listAllWarehouses,
   savePurchaseOrderWithItems,
@@ -189,8 +190,8 @@ export default function PurchaseOrdersPage() {
   const selectedRowKeysRef = useRef([])
   const lifecycleInFlightRef = useRef(false)
   const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const [suppliers, setSuppliers] = useState([])
-  const [materials, setMaterials] = useState([])
+  const [suppliers, , mergeSuppliers] = useReferenceRecords(adminProfile)
+  const [materials, , mergeMaterials] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [referenceDataState, setReferenceDataState] = useState('loading')
@@ -354,14 +355,8 @@ export default function PurchaseOrdersPage() {
     const request = beginLatestRequest('reference-data')
     setReferenceDataState('loading')
     try {
-      const [supplierData, materialData, unitData] = await Promise.all([
-        listAllSuppliers({ active_only: true }, { signal: request.signal }),
-        listAllMaterials({ active_only: true }, { signal: request.signal }),
-        listAllUnits({}, { signal: request.signal }),
-      ])
+      const unitData = await listAllUnits({}, { signal: request.signal })
       if (!request.isCurrent()) return false
-      setSuppliers(supplierData?.suppliers || [])
-      setMaterials(materialData?.materials || [])
       setUnits(unitData?.units || [])
       setReferenceDataState('ready')
       return true
@@ -569,19 +564,6 @@ export default function PurchaseOrdersPage() {
     return data.purchase_order_items
   }, [])
 
-  const loadPrintReferenceData = useCallback(async () => {
-    const [materialData, unitData] = await Promise.all([
-      listAllMaterials({ active_only: false }),
-      listAllUnits(),
-    ])
-    const nextMaterials = materialData?.materials || []
-    const nextUnits = unitData?.units || []
-    return {
-      materials: nextMaterials,
-      unitOptions: uniqueReferenceOptions(nextUnits, unitOption),
-    }
-  }, [])
-
   useEffect(() => {
     loadReferenceData()
   }, [loadReferenceData])
@@ -678,7 +660,20 @@ export default function PurchaseOrdersPage() {
         canEditPurchaseOrderSelection({ canUpdate: true, order }),
       open: () =>
         sourceDocumentOpenEditController.open({
-          loadItems: ({ signal }) => loadOrderItems(record, { signal }),
+          loadItems: async ({ signal }) => {
+            const lines = await loadOrderItems(record, { signal })
+            const [supplierData, materialData] = await Promise.all([
+              canReadReference(adminProfile, 'suppliers')
+                ? loadReferenceIDs('suppliers', [record.supplier_id], { signal }) : { suppliers: [] },
+              canReadReference(adminProfile, 'materials')
+                ? loadReferenceIDs('materials', lines.map((row) => row.material_id), { signal }) : { materials: [] },
+            ])
+            if (!signal.aborted) {
+              mergeSuppliers(supplierData.suppliers)
+              mergeMaterials(materialData.materials)
+            }
+            return lines
+          },
           enterEditing: (lines) => {
             const openLines = selectOpenSourceDocumentItems(lines).map(
               normalizePurchaseLineFormValue
@@ -1183,7 +1178,6 @@ export default function PurchaseOrdersPage() {
   const { printPurchaseContract, printPurchaseContracts, printingContract } =
     usePurchaseOrderContractPrint({
       loadOrderItems,
-      loadPrintReferenceData,
       materials,
       printTemplateDefaults: purchasePrintTemplateDefaults,
       resolveSupplierSnapshot,
@@ -1376,8 +1370,12 @@ export default function PurchaseOrdersPage() {
     />
   )
 
+  useReferenceHydration({
+    suppliers: { ids: [...orders.map((row) => row.supplier_id), editingOrder?.supplier_id, supplierFilter], records: suppliers, onRecords: mergeSuppliers, enabled: canReadReference(adminProfile, 'suppliers') },
+  }, adminProfile, orders)
+
   return (
-    <BusinessPageLayout className="erp-purchase-orders-page">
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ suppliers: mergeSuppliers, materials: mergeMaterials }} className="erp-purchase-orders-page">
       <PageHeaderCard
         viewSwitch={purchaseViewSwitch}
         helpKey="accessories-purchase"
@@ -1648,6 +1646,6 @@ export default function PurchaseOrdersPage() {
           openInboundDraftModalWithReadySource(singleSelectedOrder)
         }
       />
-    </BusinessPageLayout>
+    </ReferenceRecordsProvider>
   )
 }

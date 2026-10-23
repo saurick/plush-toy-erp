@@ -51,6 +51,16 @@ func runPurchaseReceiptWarehouseAccessReadWriteAndReplay(t *testing.T, data *Dat
 	mixed := create("PR-ACCESS-MIXED", f.warehouseID, otherWarehouse.ID)
 	initialTxnCount := client.InventoryTxn.Query().CountX(ctx)
 	initialItemCount := client.PurchaseReceiptItem.Query().CountX(ctx)
+	for _, ids := range [][]int{{allowed.ID, outside.ID, mixed.ID}, {outside.ID, mixed.ID}} {
+		items, total, err := uc.ListPurchaseReceipts(ctx, biz.PurchaseReceiptFilter{IDs: ids, WarehouseScope: &assigned, Limit: 200})
+		want := 0
+		if ids[0] == allowed.ID {
+			want = 1
+		}
+		if err != nil || total != want || len(items) != want || (want == 1 && items[0].ID != allowed.ID) {
+			t.Fatalf("exact references must preserve entire-document warehouse access: rows=%v total=%d err=%v", items, total, err)
+		}
+	}
 	for _, scope := range []biz.WarehouseDataScope{assigned, none, {Mode: "unknown"}} {
 		for _, receipt := range []*biz.PurchaseReceipt{outside, mixed} {
 			if got, err := uc.GetPurchaseReceiptForAccess(ctx, receipt.ID, scope); !errors.Is(err, biz.ErrDataScopeForbidden) || got != nil {

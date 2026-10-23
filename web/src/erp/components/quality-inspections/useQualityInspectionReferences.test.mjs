@@ -42,11 +42,11 @@ async function referenceHarness(t, handler) {
   }
 }
 
-function materialPage(params, id = 1) {
+function warehousePage(params, id = 1) {
   return {
     code: 0,
     data: {
-      materials: [{ id, code: `M-${id}` }],
+      warehouses: [{ id, code: `WH-${id}` }],
       total: 1,
       limit: params.limit,
       offset: params.offset,
@@ -54,28 +54,20 @@ function materialPage(params, id = 1) {
   }
 }
 
-test('reference reads use the effective permission intersection and leave unauthorized sets empty', async (t) => {
-  const view = await referenceHarness(t, (_method, params) =>
-    materialPage(params)
-  )
+test('initialization does not scan source catalogs; cached records are cleared when effective permissions change', async (t) => {
+  const view = await referenceHarness(t, (_method, params) => warehousePage(params))
   await view.renderProfile(profile([PermissionCode.MATERIAL_READ]))
   assert.equal(view.current.referenceDataState, 'ready')
-  assert.equal(view.calls.length, 1)
-  assert.equal(view.calls[0].method, 'list_materials')
-  assert.equal(view.calls[0].params.active_only, true)
-  assert.equal(view.current.materials[0].code, 'M-1')
+  assert.equal(view.calls.length, 0)
+  const oldMerge = view.current.referenceRecords.materials
+  await view.act(async () => oldMerge([{ id: 7, code: 'M-7' }]))
+  assert.equal(view.current.materials[0].id, 7)
+  await view.renderProfile({ is_super_admin: true, effective_session: { actions: [] } })
+  await view.act(async () => oldMerge([{ id: 8, code: 'M-8' }]))
+  assert.deepEqual(view.current.materials, [])
   assert.deepEqual(view.current.purchaseReceipts, [])
   assert.deepEqual(view.current.inventoryLots, [])
-  assert.deepEqual(view.current.products, [])
-  assert.deepEqual(view.current.warehouses, [])
-
-  await view.renderProfile({
-    is_super_admin: true,
-    effective_session: { actions: [] },
-  })
-  assert.equal(view.current.referenceDataState, 'ready')
-  assert.equal(view.calls.length, 1)
-  assert.deepEqual(view.current.materials, [])
+  assert.equal(view.calls.length, 0)
 })
 
 test('a late response from an earlier permission scope cannot repopulate reference data', async (t) => {
@@ -85,9 +77,9 @@ test('a late response from an earlier permission scope cannot repopulate referen
   })
   const view = await referenceHarness(t, async (_method, params) => {
     await pending
-    return materialPage(params)
+    return warehousePage(params)
   })
-  await view.renderProfile(profile([PermissionCode.MATERIAL_READ]))
+  await view.renderProfile(profile([PermissionCode.WAREHOUSE_INVENTORY_READ]))
   assert.equal(view.current.referenceDataState, 'loading')
   await view.renderProfile(profile())
   assert.equal(view.calls[0].init.signal.aborted, true)
@@ -97,7 +89,7 @@ test('a late response from an earlier permission scope cannot repopulate referen
   assert.deepEqual(view.current.materials, [])
 })
 
-test('authorized source dictionaries read every page and share cancellation across all five reads', async (t) => {
+test('authorized initialization reads only warehouse configuration and leaves source catalogs lazy', async (t) => {
   const keys = {
     list_purchase_receipts: 'purchase_receipts',
     list_inventory_lots: 'inventory_lots',
@@ -131,29 +123,20 @@ test('authorized source dictionaries read every page and share cancellation acro
     ])
   )
   assert.equal(view.current.referenceDataState, 'ready')
-  assert.equal(view.calls.length, 6)
-  const receiptCalls = view.calls.filter(
-    (call) => call.method === 'list_purchase_receipts'
-  )
-  assert.equal(receiptCalls[1].params.offset, receiptCalls[0].params.limit)
-  assert.equal(
-    view.current.purchaseReceipts.length,
-    receiptCalls[0].params.limit + 1
-  )
-  assert.equal(view.current.inventoryLots.length, 1)
-  assert.equal(view.current.materials.length, 1)
-  assert.equal(view.current.products.length, 1)
+  assert.equal(view.calls.length, 1)
+  assert.equal(view.calls[0].method, 'list_warehouses')
+  assert.deepEqual(view.current.purchaseReceipts, [])
+  assert.deepEqual(view.current.inventoryLots, [])
+  assert.deepEqual(view.current.materials, [])
+  assert.deepEqual(view.current.products, [])
   assert.equal(view.current.warehouses.length, 1)
-  assert.ok(
-    view.calls.every((call) => call.init.signal === view.calls[0].init.signal)
-  )
 })
 
 test('reference failures clear stale choices and an explicit retry restores the current data', async (t) => {
   let fail = false
   const view = await referenceHarness(t, (_method, params) => {
     if (fail) throw new Error('offline')
-    return materialPage(params, 2)
+    return warehousePage(params, 2)
   })
   const { message } = await import('../../../common/utils/antdApp.js')
   const originalError = message.error
@@ -162,19 +145,19 @@ test('reference failures clear stale choices and an explicit retry restores the 
   t.after(() => {
     message.error = originalError
   })
-  await view.renderProfile(profile([PermissionCode.MATERIAL_READ]))
-  assert.equal(view.current.materials[0].id, 2)
+  await view.renderProfile(profile([PermissionCode.WAREHOUSE_INVENTORY_READ]))
+  assert.equal(view.current.warehouses[0].id, 2)
   fail = true
   await view.act(async () =>
     assert.equal(await view.current.loadReferenceOptions(), false)
   )
   assert.equal(view.current.referenceDataState, 'error')
-  assert.deepEqual(view.current.materials, [])
+  assert.deepEqual(view.current.warehouses, [])
   assert.equal(errors.length, 1)
   fail = false
   await view.act(async () =>
     assert.equal(await view.current.loadReferenceOptions(), true)
   )
   assert.equal(view.current.referenceDataState, 'ready')
-  assert.equal(view.current.materials[0].id, 2)
+  assert.equal(view.current.warehouses[0].id, 2)
 })

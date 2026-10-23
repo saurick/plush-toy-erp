@@ -9,6 +9,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown } from 'antd'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import { BusinessListToolbarActions } from '../business-list/BusinessListToolbarActions.jsx'
 import BusinessTaskActions from '../workflow/BusinessTaskActions.jsx'
 import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
@@ -177,7 +178,9 @@ export default function PurchaseOrderOperationPanel({
               setStatus(value)
             }}
           />
-          <SelectFilter
+          <RemoteReferenceSelect
+            referenceType="suppliers"
+            component={SelectFilter}
             aria-label="供应商"
             className="erp-business-filter-control--status"
             value={supplierFilter}

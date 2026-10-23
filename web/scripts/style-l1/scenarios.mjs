@@ -1,3 +1,4 @@
+import { createPerformanceReferenceScenarios } from './performanceReferenceScenarios.mjs'
 import { createDensityCompletionScenarios } from './densityCompletionScenarios.mjs'
 import { createMobileTaskConsistencyScenarios } from './mobileTaskConsistencyScenarios.mjs'
 import { createGlobalDensityOptimizationScenarios } from './globalDensityOptimizationScenarios.mjs'
@@ -811,6 +812,7 @@ export function createStyleL1Scenarios(deps) {
       expectHeading,
       expectText,
     }),
+    ...createPerformanceReferenceScenarios({ customerRuntimeEffectiveSession }),
     ...createProductPaginationScenarios({
       assert,
       assertNoHorizontalOverflow,

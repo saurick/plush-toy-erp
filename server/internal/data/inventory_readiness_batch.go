@@ -6,7 +6,6 @@ import (
 	"github.com/shopspring/decimal"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorderoperation"
 	"server/internal/data/model/ent/productionwipbatch"
@@ -85,20 +84,9 @@ func productionFinishedGoodsReadinessForKeys(ctx context.Context, client *ent.Cl
 	for _, batch := range packaging {
 		packed[*batch.FinishedGoodsReceiptID] = packed[*batch.FinishedGoodsReceiptID].Add(batch.Quantity)
 	}
-	reworks, err := client.ProductionFact.Query().Where(productionfact.FactType(biz.ProductionFactRework), productionfact.SourceType(biz.ProductionFactSourceType), productionfact.SourceIDIn(ids...), productionfact.Status(biz.OperationalFactStatusPosted)).All(ctx)
+	disposed, err := productionReceiptReworkedQuantities(ctx, client, ids)
 	if err != nil {
 		return nil, err
-	}
-	disposed := map[int]decimal.Decimal{}
-	for _, row := range reworks {
-		disposed[*row.SourceID] = disposed[*row.SourceID].Add(row.Quantity)
-	}
-	txns, err := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionExceptionSourceType), inventorytxn.SourceLineIDIn(ids...)).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range txns {
-		disposed[*row.SourceLineID] = disposed[*row.SourceLineID].Sub(row.Quantity.Mul(decimal.NewFromInt(int64(row.Direction))))
 	}
 	for _, receipt := range receipts {
 		batch := receipt.Edges.ProductionWipBatch

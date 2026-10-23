@@ -5,6 +5,8 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Space } from 'antd'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
+import RemoteReferencePicker from '../RemoteReferencePicker.jsx'
 import Select from '@/common/components/select/AppSelect'
 import {
   formatUnitQuantitySummary,
@@ -18,7 +20,6 @@ import FieldWithUnitSuffix, {
   unitPrecisionFromOptions,
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
-import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -264,7 +265,8 @@ export function PurchaseOrderFormFields({
           label="供应商"
           rules={[{ required: true, message: '请选择供应商' }]}
         >
-          <Select
+          <RemoteReferenceSelect
+            referenceType="suppliers"
             placeholder="请选择供应商"
             showSearch
             options={supplierOptions}
@@ -350,7 +352,8 @@ export function PurchaseOrderFormFields({
             </Button>
           )}
           renderBeforeHeader={({ add }) => (
-            <SourceImportPickerModal
+            <RemoteReferencePicker
+              referenceType="materials"
               open={materialImportOpen}
               title={<BusinessHelpLabel label="从材料库添加" description="这里只选择材料档案；数量、单价和预计到货日期在编辑页的采购明细里维护。" />}
               rows={materials}
@@ -463,7 +466,8 @@ export function PurchaseOrderFormFields({
                   label="材料名称"
                   rules={[{ required: true, message: '请选择材料' }]}
                 >
-                  <Select
+                  <RemoteReferenceSelect
+                    referenceType="materials"
                     placeholder="请选择材料名称"
                     allowClear
                     showSearch

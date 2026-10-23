@@ -1,3 +1,4 @@
+import { loadReferenceIDs } from '../../utils/remoteReferences.mjs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { message } from '@/common/utils/antdApp'
@@ -6,9 +7,6 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   getPurchaseOrder,
   listAllPurchaseOrderItems,
-  listAllMaterials,
-  listAllUnits,
-  listAllSuppliers,
   listAllContactsByOwner,
 } from '../../api/masterDataOrderApi.mjs'
 import {
@@ -51,11 +49,12 @@ async function loadItems(record, options) {
   return data.purchase_order_items
 }
 
-async function loadReferences(options) {
+async function loadReferences(options, sources) {
+  const lines = sources.flatMap((source) => source.items)
   const [materialData, unitData, supplierData] = await Promise.all([
-    listAllMaterials({ active_only: false }, options),
-    listAllUnits({}, options),
-    listAllSuppliers({ active_only: false }, options),
+    loadReferenceIDs('materials', lines.map((item) => item.material_id), options),
+    loadReferenceIDs('units', lines.map((item) => item.unit_id), options),
+    loadReferenceIDs('suppliers', sources.map(({ record }) => record.supplier_id), options),
   ])
   return {
     materials: materialData.materials,
@@ -99,9 +98,18 @@ export function usePurchaseOrderContractPrint({
 
   const loadPurchaseContractDrafts = useCallback(
     async (records, options) => {
+      const sources = []
+      for (let offset = 0; offset < records.length; offset += 4) {
+        if (options.signal.aborted) return []
+        sources.push(...await Promise.all(records.slice(offset, offset + 4).map(async (source) => {
+          const record = await getPurchaseOrder({ id: source.id }, options)
+          if (!record || Number(record.id) !== Number(source.id)) throw new Error('采购订单已变化，请刷新后重试')
+          return { record, items: await loadOrderItems(record, options) }
+        })))
+      }
       const referenceData =
         typeof loadPrintReferenceData === 'function'
-          ? await loadPrintReferenceData(options)
+          ? await loadPrintReferenceData(options, sources)
           : {}
       const printMaterials = Array.isArray(referenceData?.materials)
         ? referenceData.materials
@@ -114,14 +122,10 @@ export function usePurchaseOrderContractPrint({
       const contracts = []
 
       // 汇总表可带入多批合同；限制同时读取数量，不截断业务范围。
-      for (let offset = 0; offset < records.length; offset += 4) {
+      for (let offset = 0; offset < sources.length; offset += 4) {
         if (options.signal.aborted) return []
         const group = await Promise.all(
-          records.slice(offset, offset + 4).map(async (source) => {
-            const record = await getPurchaseOrder({ id: source.id }, options)
-            if (!record || Number(record.id) !== Number(source.id)) {
-              throw new Error('采购订单已变化，请刷新后重试')
-            }
+          sources.slice(offset, offset + 4).map(async ({ record, items }) => {
             const supplier = printSuppliers.find(
               (item) => item.id === record.supplier_id
             )
@@ -136,10 +140,7 @@ export function usePurchaseOrderContractPrint({
                 Promise.resolve(resolveSupplierSnapshot(supplier, options))
               )
             }
-            const [items, liveSupplierSnapshot] = await Promise.all([
-              loadOrderItems(record, options),
-              supplierSnapshotPromises.get(supplierKey) || Promise.resolve({}),
-            ])
+            const liveSupplierSnapshot = await (supplierSnapshotPromises.get(supplierKey) || Promise.resolve({}))
             const printRecord = {
               ...record,
               supplier_snapshot: mergeSnapshotMissingFields(

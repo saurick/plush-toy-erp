@@ -114,6 +114,10 @@ func inventoryBalanceFilterFromParams(pm map[string]any) biz.InventoryBalanceFil
 }
 
 func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bool) {
+	ids, valid := optionalReferenceIDs(pm, "ids")
+	if !valid {
+		return biz.InventoryLotFilter{}, false
+	}
 	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
 	if !ok {
 		return biz.InventoryLotFilter{}, false
@@ -123,6 +127,7 @@ func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bo
 		return biz.InventoryLotFilter{}, false
 	}
 	return biz.InventoryLotFilter{
+		IDs:           ids,
 		SubjectType:   getString(pm, "subject_type"),
 		StockCategory: getString(pm, "stock_category"),
 		SubjectID:     getInt(pm, "subject_id", 0),

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Form, Input, InputNumber, Radio } from 'antd'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { IncomingCheckItemsForm } from './IncomingCheckItems.jsx'
 import { DateInput } from '../business-list/BusinessDateInputs.jsx'
@@ -91,7 +92,8 @@ export function QualityInspectionCreateForm({
         name="purchase_receipt_id"
         rules={[{ required: true, message: '请选择采购入库单' }]}
       >
-        <Select
+        <RemoteReferenceSelect
+          referenceType="purchase_receipts"
           allowClear
           optionFilterProp="label"
           options={purchaseReceiptOptions}

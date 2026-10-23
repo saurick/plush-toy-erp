@@ -25,6 +25,7 @@ import { listAllInventoryLots } from '../../api/inventoryApi.mjs'
 import {
   createQualityInspectionFromOutsourcingReturn,
   listAllOutsourcingReturnQualityInspections,
+  listOutsourcingReturnQualityInspectionsForFacts,
 } from '../../api/qualityApi.mjs'
 import {
   OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
@@ -184,19 +185,11 @@ export function useOutsourcingSourceFacts({
         return {}
       }
       const postedFacts = facts.filter(isPostedOutsourcingReturn)
-      const inspections = (
-        await Promise.all(
-          postedFacts.map(async (fact) => {
-            const data = await listAllOutsourcingReturnQualityInspections({
-              customer_key: activeCustomerKey || undefined,
-              fact_id: fact.id,
-            })
-            return Array.isArray(data?.quality_inspections)
-              ? data.quality_inspections
-              : []
-          })
-        )
-      ).flat()
+      const data = await listOutsourcingReturnQualityInspectionsForFacts(
+        postedFacts.map((fact) => fact.id),
+        { customer_key: activeCustomerKey || undefined }
+      )
+      const inspections = data.quality_inspections
       return groupOutsourcingReturnQualityInspections(inspections, facts)
     },
     [activeCustomerKey, canReadQualityInspection]

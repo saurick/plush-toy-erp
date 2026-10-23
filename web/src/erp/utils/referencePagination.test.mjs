@@ -5,7 +5,36 @@ import {
   REFERENCE_PAGE_SIZE,
   listAllPaginatedRecords,
   listAllReferenceRecords,
+  listReferenceRecordsByIDs,
 } from './referencePagination.mjs'
+
+test('exact references scale with requested IDs, include history and never scan an empty set', async () => {
+  for (const size of [0, 1, 50, 500]) {
+    const calls = []
+    const signal = new AbortController().signal
+    const result = await listReferenceRecordsByIDs(async (params, options) => {
+      calls.push(params)
+      assert.equal(options.signal, signal)
+      assert.equal(params.active_only, false)
+      assert.ok(params.ids.length <= 200)
+      assert.equal(params.offset, 0)
+      return { materials: params.ids.map((id) => ({ id, is_active: false })), total: params.ids.length, limit: params.limit, offset: params.offset }
+    }, { active_only: false }, 'materials', Array.from({ length: size }, (_, i) => i + 1), { signal })
+    assert.equal(calls.length, Math.ceil(size / 200))
+    assert.equal(result.materials.length, size)
+  }
+})
+
+test('batch source reads preserve every inspection and validate the source relationship', async () => {
+  const data = await listReferenceRecordsByIDs(async (params) => ({
+    quality_inspections: [{ id: 1, source_id: 7 }, { id: 2, source_id: 7 }, { id: 3, source_id: 9 }],
+    total: 3, offset: params.offset, limit: params.limit,
+  }), {}, 'quality_inspections', [7, 9, 7], {}, { filterKey: 'fact_ids', referenceKey: 'source_id' })
+  assert.deepEqual(data.quality_inspections.map((row) => row.id), [1, 2, 3])
+  await assert.rejects(listReferenceRecordsByIDs(async (params) => ({
+    inventory_lots: [{ id: 70 }], total: 1, limit: params.limit, offset: params.offset,
+  }), {}, 'inventory_lots', [7]), /关联资料不正确/u)
+})
 
 function records(start, count) {
   return Array.from({ length: count }, (_, index) => ({ id: start + index }))

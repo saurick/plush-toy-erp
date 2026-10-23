@@ -280,6 +280,7 @@ type SupplierWithContacts struct {
 }
 
 type MasterDataFilter struct {
+	IDs            []int
 	StockCategory  string
 	WarehouseTypes []string
 	Keyword        string
@@ -299,6 +300,7 @@ type ContactFilter struct {
 }
 
 type ProductSKUFilter struct {
+	IDs            []int
 	ProductID      int
 	Keyword        string
 	ActiveOnly     bool
@@ -1103,6 +1105,9 @@ func normalizeContactSaveMutations(in []*ContactSaveMutation) ([]*ContactSaveMut
 }
 
 func normalizeMasterDataFilter(in MasterDataFilter) (MasterDataFilter, error) {
+	if err := ValidateReferenceIDs(in.IDs); err != nil {
+		return MasterDataFilter{}, err
+	}
 	if in.StockCategory != "" && !ValidMaterialStockCategory(in.StockCategory) {
 		return MasterDataFilter{}, ErrBadParam
 	}
@@ -1143,6 +1148,9 @@ func normalizeMasterDataFilter(in MasterDataFilter) (MasterDataFilter, error) {
 }
 
 func normalizeProductSKUFilter(in ProductSKUFilter) (ProductSKUFilter, error) {
+	if err := ValidateReferenceIDs(in.IDs); err != nil {
+		return ProductSKUFilter{}, err
+	}
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	var scopeOK bool
 	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)

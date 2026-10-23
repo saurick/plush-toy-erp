@@ -9,17 +9,17 @@ import (
 func TestLifecycleScopeParsers(t *testing.T) {
 	t.Parallel()
 
-	masterFilter := masterDataFilterFromParams(map[string]any{
+	masterFilter, masterOK := masterDataFilterFromParams(map[string]any{
 		"lifecycle_scope": biz.LifecycleScopeHistory,
 	})
-	if masterFilter.LifecycleScope != biz.LifecycleScopeHistory {
+	if !masterOK || masterFilter.LifecycleScope != biz.LifecycleScopeHistory {
 		t.Fatalf("master lifecycle scope = %q", masterFilter.LifecycleScope)
 	}
 
-	skuFilter := productSKUFilterFromParams(map[string]any{
+	skuFilter, skuOK := productSKUFilterFromParams(map[string]any{
 		"lifecycle_scope": biz.LifecycleScopeCurrent,
 	})
-	if skuFilter.LifecycleScope != biz.LifecycleScopeCurrent {
+	if !skuOK || skuFilter.LifecycleScope != biz.LifecycleScopeCurrent {
 		t.Fatalf("product SKU lifecycle scope = %q", skuFilter.LifecycleScope)
 	}
 

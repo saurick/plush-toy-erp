@@ -156,6 +156,7 @@ type QualityInspectionDecision struct {
 }
 
 type QualityInspectionFilter struct {
+	SourceIDs                []int
 	Status                   string
 	Result                   string
 	Keyword                  string
@@ -629,6 +630,9 @@ func normalizeFinishedGoodsQualityInspectionFilter(in QualityInspectionFilter) (
 }
 
 func normalizeOutsourcingReturnQualityInspectionFilter(in QualityInspectionFilter) (QualityInspectionFilter, error) {
+	if err := ValidateReferenceIDs(in.SourceIDs); err != nil {
+		return QualityInspectionFilter{}, err
+	}
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	in.Result = strings.ToUpper(strings.TrimSpace(in.Result))
 	in.Keyword = strings.TrimSpace(in.Keyword)

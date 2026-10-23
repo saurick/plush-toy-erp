@@ -18,6 +18,7 @@ import {
   Typography,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import { loadReferenceIDs } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { sourceBusinessActionUUID,
@@ -1295,28 +1296,17 @@ export default function ShipmentsPage() {
     ]
     setQualitySourceLoading(true)
     try {
-      const [inspectionData, ...lotResults] = await Promise.all([
+      const [inspectionData, lotData] = await Promise.all([
         listAllFinishedGoodsQualityInspections(
           { shipment_id: shipment.id },
           { signal: request.signal }
         ),
-        ...lotIDs.map((lotID) =>
-          listAllInventoryLots(
-            { keyword: String(lotID) },
-            { signal: request.signal }
-          )
-        ),
+        loadReferenceIDs('inventory_lots', lotIDs, { signal: request.signal }),
       ])
       if (!request.isCurrent()) return
-      const lotIDSet = new Set(lotIDs)
-      const exactLots = lotResults
-        .flatMap((result) =>
-          Array.isArray(result?.inventory_lots) ? result.inventory_lots : []
-        )
-        .filter((lot) => lotIDSet.has(Number(lot?.id || 0)))
       setQualitySourceContext({
         shipment,
-        inventoryLots: exactLots,
+        inventoryLots: lotData.inventory_lots,
         qualityInspections: Array.isArray(inspectionData?.quality_inspections)
           ? inspectionData.quality_inspections
           : [],

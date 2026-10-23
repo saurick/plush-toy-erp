@@ -261,6 +261,7 @@ type InventoryBalanceFilter struct {
 }
 
 type InventoryLotFilter struct {
+	IDs           []int
 	StockCategory string
 	SubjectType   string
 	SubjectID     int
@@ -1090,6 +1091,9 @@ func normalizeInventoryBalanceFilter(in InventoryBalanceFilter) (InventoryBalanc
 }
 
 func normalizeInventoryLotFilter(in InventoryLotFilter) (InventoryLotFilter, error) {
+	if err := ValidateReferenceIDs(in.IDs); err != nil {
+		return InventoryLotFilter{}, err
+	}
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
 	if in.StockCategory != "" && (!ValidMaterialStockCategory(in.StockCategory) || in.SubjectType == InventorySubjectProduct) {
 		return InventoryLotFilter{}, ErrBadParam

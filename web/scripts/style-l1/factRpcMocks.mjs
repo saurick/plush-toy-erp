@@ -56,6 +56,7 @@ const OUTSOURCING_RETURN_RECEIPT_CREATE_KEYS = new Set([
 const OUTSOURCING_RETURN_QUALITY_LIST_KEYS = new Set([
   'customer_key',
   'fact_id',
+  'fact_ids',
   'status',
   'result',
   'keyword',
@@ -1569,6 +1570,7 @@ export async function installFactRpcMocks(page, context) {
         .trim()
         .toLowerCase()
       return purchaseReceipts.filter((receipt) => {
+        if (Array.isArray(params.ids) && !params.ids.includes(receipt.id)) return false
         if (status && receipt.status !== status) return false
         if (!keyword) return true
         return [receipt.receipt_no, receipt.supplier_name]
@@ -2016,6 +2018,7 @@ export async function installFactRpcMocks(page, context) {
           }
           const inventoryLots = candidates.filter(
             (item) =>
+              (!Array.isArray(params.ids) || params.ids.includes(item.id)) &&
               (!params.subject_type ||
                 item.subject_type === params.subject_type) &&
               (!params.subject_id ||

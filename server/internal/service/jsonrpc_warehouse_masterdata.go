@@ -15,7 +15,10 @@ func (d *jsonrpcDispatcher) handleWarehouseMasterData(ctx context.Context, metho
 			return id, res, nil
 		}
 		// These are master-data reference choices only; this endpoint exposes no warehouse balances or facts.
-		filter := masterDataFilterFromParams(pm)
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
 		filter.ActiveOnly, filter.LifecycleScope = true, ""
 		filter.WarehouseTypes = []string{biz.WarehouseMainMaterial, biz.WarehouseAuxiliaryMaterial, biz.WarehousePackagingMaterial, biz.WarehouseOtherMaterial, biz.WarehouseMaterial}
 		items, total, err := d.masterDataUC.ListWarehouses(ctx, filter)

@@ -2,7 +2,7 @@ import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.m
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
-import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
+import { listAllPaginatedRecords, listReferenceRecordsByIDs } from '../utils/referencePagination.mjs'
 import { QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 
 const qualityRpc = new JsonRpc({
@@ -123,6 +123,13 @@ export async function listOutsourcingReturnQualityInspections(
     options
   )
   return dataOf(result)
+}
+
+export async function listOutsourcingReturnQualityInspectionsForFacts(factIDs, params = {}, options = {}) {
+  return listReferenceRecordsByIDs(
+    listOutsourcingReturnQualityInspections, params, 'quality_inspections', factIDs, options,
+    { filterKey: 'fact_ids', referenceKey: 'source_id' }
+  )
 }
 
 export async function listAllOutsourcingReturnQualityInspections(

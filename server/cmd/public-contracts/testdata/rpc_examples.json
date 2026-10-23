@@ -13948,7 +13948,11 @@
       "total": 1
     },
     "message": "OK",
-    "params": {},
+    "params": {
+      "ids": [
+        1
+      ]
+    },
     "test": "TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules"
   },
   "masterdata.list_material_warehouses": {
@@ -14000,7 +14004,11 @@
       "total": 1
     },
     "message": "OK",
-    "params": {},
+    "params": {
+      "ids": [
+        1
+      ]
+    },
     "test": "TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules"
   },
   "masterdata.list_processes": {
@@ -14059,7 +14067,11 @@
       "total": 1
     },
     "message": "OK",
-    "params": {},
+    "params": {
+      "ids": [
+        1
+      ]
+    },
     "test": "TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules"
   },
   "masterdata.list_products": {
@@ -14112,7 +14124,11 @@
       "total": 1
     },
     "message": "OK",
-    "params": {},
+    "params": {
+      "ids": [
+        1
+      ]
+    },
     "test": "TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules"
   },
   "masterdata.list_units": {
@@ -19978,7 +19994,10 @@
     "message": "OK",
     "params": {
       "fact_id": 1,
-      "status": "REJECTED"
+      "status": "REJECTED",
+      "fact_ids": [
+        1
+      ]
     },
     "test": "TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven"
   },

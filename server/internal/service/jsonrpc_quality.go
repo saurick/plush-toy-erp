@@ -440,7 +440,11 @@ func finishedGoodsQualityInspectionFilterFromParams(pm map[string]any) (biz.Qual
 }
 
 func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
-	if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "fact_id", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
+	ids, valid := optionalReferenceIDs(pm, "fact_ids")
+	if !valid {
+		return biz.QualityInspectionFilter{}, false
+	}
+	if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "fact_id", "fact_ids", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
 		return biz.QualityInspectionFilter{}, false
 	}
 	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
@@ -452,7 +456,7 @@ func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.
 		return biz.QualityInspectionFilter{}, false
 	}
 	return biz.QualityInspectionFilter{
-		Status:         getString(pm, "status"),
+		SourceIDs: ids, Status: getString(pm, "status"),
 		Result:         getString(pm, "result"),
 		Keyword:        getString(pm, "keyword"),
 		DateFrom:       dateFrom,

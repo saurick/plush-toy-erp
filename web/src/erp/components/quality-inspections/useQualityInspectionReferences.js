@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useReferenceRecords } from '../../hooks/useReferenceRecords.js'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { isRpcAbortError } from '../../../common/utils/jsonRpc'
-import { listAllInventoryLots } from '../../api/inventoryApi.mjs'
 import {
-  listAllMaterials,
-  listAllProducts,
   listAllWarehouses,
 } from '../../api/masterDataOrderApi.mjs'
-import { listAllPurchaseReceipts } from '../../api/purchaseApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { showPageLoadError } from '../PageLoadFeedback.jsx'
@@ -24,6 +21,10 @@ function emptyReferences(referenceDataState) {
 }
 
 export default function useQualityInspectionReferences({ adminProfile }) {
+  const [purchaseReceipts, , mergePurchaseReceipts] = useReferenceRecords(adminProfile)
+  const [inventoryLots, , mergeInventoryLots] = useReferenceRecords(adminProfile)
+  const [materials, , mergeMaterials] = useReferenceRecords(adminProfile)
+  const [products, , mergeProducts] = useReferenceRecords(adminProfile)
   const [references, setReferences] = useState(() => emptyReferences('loading'))
   const beginLatestRequest = useLatestRequestCoordinator()
   const loadReferenceOptions = useCallback(async () => {
@@ -32,43 +33,11 @@ export default function useQualityInspectionReferences({ adminProfile }) {
     const canRead = (permission) =>
       hasActionPermission(adminProfile, permission)
     try {
-      const [receipts, lots, materials, products, warehouses] =
-        await Promise.all([
-          canRead(PermissionCode.PURCHASE_RECEIPT_READ)
-            ? listAllPurchaseReceipts({}, { signal: request.signal })
-            : {},
-          canRead(PermissionCode.WAREHOUSE_INVENTORY_READ)
-            ? listAllInventoryLots({}, { signal: request.signal })
-            : {},
-          canRead(PermissionCode.MATERIAL_READ)
-            ? listAllMaterials(
-                { active_only: true },
-                { signal: request.signal }
-              )
-            : {},
-          canRead(PermissionCode.PRODUCT_READ)
-            ? listAllProducts({ active_only: true }, { signal: request.signal })
-            : {},
-          canRead(PermissionCode.WAREHOUSE_INVENTORY_READ)
-            ? listAllWarehouses(
-                { active_only: true },
-                { signal: request.signal }
-              )
-            : {},
-        ])
+      const warehouses = canRead(PermissionCode.WAREHOUSE_INVENTORY_READ)
+        ? await listAllWarehouses({ active_only: true }, { signal: request.signal }) : {}
       if (!request.isCurrent()) return false
       setReferences({
         referenceDataState: 'ready',
-        purchaseReceipts: Array.isArray(receipts.purchase_receipts)
-          ? receipts.purchase_receipts
-          : [],
-        inventoryLots: Array.isArray(lots.inventory_lots)
-          ? lots.inventory_lots
-          : [],
-        materials: Array.isArray(materials.materials)
-          ? materials.materials
-          : [],
-        products: Array.isArray(products.products) ? products.products : [],
         warehouses: Array.isArray(warehouses.warehouses)
           ? warehouses.warehouses
           : [],
@@ -88,5 +57,18 @@ export default function useQualityInspectionReferences({ adminProfile }) {
     loadReferenceOptions()
   }, [loadReferenceOptions])
 
-  return { ...references, loadReferenceOptions }
+  return {
+    ...references,
+    purchaseReceipts,
+    inventoryLots,
+    materials,
+    products,
+    loadReferenceOptions,
+    referenceRecords: {
+      purchase_receipts: mergePurchaseReceipts,
+      inventory_lots: mergeInventoryLots,
+      materials: mergeMaterials,
+      products: mergeProducts,
+    },
+  }
 }

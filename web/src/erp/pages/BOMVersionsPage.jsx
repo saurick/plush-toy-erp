@@ -15,7 +15,9 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
-import Select from '@/common/components/select/AppSelect'
+import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -45,9 +47,11 @@ import {
 } from '../api/attachmentApi.mjs'
 import {
   getProduct,
+  listMaterials,
   listAllMaterials,
   listAllProducts,
   listAllUnits,
+  listUnits,
 } from '../api/masterDataOrderApi.mjs'
 import {
   BusinessActionTooltip,
@@ -311,8 +315,8 @@ export default function BOMVersionsPage() {
   const [savedRevision, setSavedRevision] = useState(null)
   const [importing, setImporting] = useState(false)
   const [importReview, setImportReview] = useState(null)
-  const [products, setProducts] = useState([])
-  const [materials, setMaterials] = useState([])
+  const [products, setProducts, mergeProducts] = useReferenceRecords(adminProfile)
+  const [materials, setMaterials, mergeMaterials] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
   const [referenceOptionsState, setReferenceOptionsState] = useState({
     loading: true,
@@ -410,6 +414,16 @@ export default function BOMVersionsPage() {
       setDetailLoading(true)
       try {
         const detail = await getBOMVersion({ id }, { signal: request.signal })
+        const [productData, materialData] = await Promise.all([
+          canReadReference(adminProfile, 'products')
+            ? loadReferenceIDs('products', [detail.product_id], { signal: request.signal }) : { products: [] },
+          canReadReference(adminProfile, 'materials')
+            ? loadReferenceIDs('materials', (detail.items || []).map((row) => row.material_id), { signal: request.signal }) : { materials: [] },
+        ])
+        if (request.isCurrent()) {
+          mergeProducts(productData.products)
+          mergeMaterials(materialData.materials)
+        }
         if (!request.isCurrent()) {
           return null
         }
@@ -428,7 +442,7 @@ export default function BOMVersionsPage() {
         }
       }
     },
-    [beginLatestRequest]
+    [adminProfile, beginLatestRequest, mergeProducts, mergeMaterials]
   )
 
   const bomListParams = useMemo(
@@ -506,17 +520,7 @@ export default function BOMVersionsPage() {
   const loadReferenceOptions = useCallback(async () => {
     setReferenceOptionsState({ loading: true, loaded: false })
     try {
-      const [productResult, materialResult, unitResult] = await Promise.all([
-        listAllProducts({ active_only: false }),
-        listAllMaterials({ active_only: false }),
-        listAllUnits(),
-      ])
-      setProducts(
-        Array.isArray(productResult?.products) ? productResult.products : []
-      )
-      setMaterials(
-        Array.isArray(materialResult?.materials) ? materialResult.materials : []
-      )
+      const unitResult = await listAllUnits()
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
       setReferenceOptionsState({ loading: false, loaded: true })
     } catch (error) {
@@ -526,7 +530,7 @@ export default function BOMVersionsPage() {
       setUnits([])
       setReferenceOptionsState({ loading: false, loaded: false })
     }
-  }, [])
+  }, [setMaterials, setProducts])
 
   useEffect(() => {
     loadVersions()
@@ -651,7 +655,7 @@ export default function BOMVersionsPage() {
     try {
       const { detail, ...references } = await loadBOMPrintSnapshot(
         activeActionVersion.id,
-        { getBOMVersion, getProduct, listAllMaterials, listAllUnits }
+        { getBOMVersion, getProduct, listMaterials, listUnits }
       )
       const builder =
         templateKey === COLOR_CARD_TEMPLATE_KEY
@@ -718,14 +722,24 @@ export default function BOMVersionsPage() {
       return
     }
 
+    const request = beginLatestRequest('import-references')
     setImporting(true)
     try {
       const parsed = await parseBOMXlsx(await file.arrayBuffer(), {
         fileName: file.name,
       })
+      if (!request.isCurrent()) return
+      // Import matching needs complete names/aliases, including historical references.
+      const [productData, materialData] = await Promise.all([
+        listAllProducts({ active_only: false }, { signal: request.signal }),
+        listAllMaterials({ active_only: false }, { signal: request.signal }),
+      ])
+      if (!request.isCurrent()) return
+      mergeProducts(productData.products)
+      mergeMaterials(materialData.materials)
       const draft = buildBOMImportDraft(parsed, {
-        products,
-        materials,
+        products: productData.products,
+        materials: materialData.materials,
         units,
       })
       headerAttachmentRef.current?.clearPendingAttachments()
@@ -742,6 +756,7 @@ export default function BOMVersionsPage() {
           : `已读取 ${draft.review.rowCount} 条明细，请核对后保存草稿`
       )
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return
       message.error(
         getActionErrorMessage(
           error,
@@ -749,7 +764,10 @@ export default function BOMVersionsPage() {
         )
       )
     } finally {
-      setImporting(false)
+      if (request.isCurrent()) {
+        setImporting(false)
+        request.finish()
+      }
     }
   }
 
@@ -1177,8 +1195,17 @@ export default function BOMVersionsPage() {
       ? 'BOM 相关资料未读取成功，请重新读取后继续编制。'
       : '')
 
+  const draftMaterialIDs = Form.useWatch(
+    (values) => (values.items || []).map((row) => row?.material_id),
+    headerForm
+  ) || []
+  useReferenceHydration({
+    products: { ids: [...versions.map((row) => row.product_id), selectedVersion?.product_id, productID, headerProductIDForSuggestion], records: products, onRecords: mergeProducts, enabled: canReadReference(adminProfile, 'products') },
+    materials: { ids: [...(selectedVersion?.items || []).map((row) => row.material_id), ...draftMaterialIDs], records: materials, onRecords: mergeMaterials, enabled: canReadReference(adminProfile, 'materials') },
+  }, adminProfile, versions)
+
   return (
-    <BusinessPageLayout>
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ products: mergeProducts, materials: mergeMaterials }}>
       <PageHeaderCard compact helpKey="material-bom" title="物料清单（BOM）" />
 
       {preparation ? (
@@ -1223,7 +1250,9 @@ export default function BOMVersionsPage() {
               }}
               onPressEnter={loadVersions}
             />
-            <Select
+            <RemoteReferenceSelect
+              referenceType="products"
+              params={{ active_only: false }}
               allowClear
               label="产品"
               optionFilterProp="label"
@@ -1863,6 +1892,6 @@ export default function BOMVersionsPage() {
       </BusinessFormPage>
 
       {columnOrderModal}
-    </BusinessPageLayout>
+    </ReferenceRecordsProvider>
   )
 }

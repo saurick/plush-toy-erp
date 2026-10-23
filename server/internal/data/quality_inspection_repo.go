@@ -531,6 +531,9 @@ func (r *inventoryRepo) qualityInspectionListQuery(filter biz.QualityInspectionF
 	if filter.SourceType != "" {
 		query = query.Where(qualityinspection.SourceType(filter.SourceType))
 	}
+	if filter.SourceIDs != nil {
+		query.Where(qualityinspection.SourceIDIn(filter.SourceIDs...))
+	}
 	if filter.SourceID > 0 {
 		query = query.Where(qualityinspection.SourceID(filter.SourceID))
 	}

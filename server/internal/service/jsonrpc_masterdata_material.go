@@ -42,7 +42,11 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.masterDataUC.ListMaterials(ctx, masterDataFilterFromParams(pm))
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListMaterials(ctx, filter)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}

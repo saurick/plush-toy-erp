@@ -309,15 +309,19 @@ func loadProductionWIPAggregate(ctx context.Context, client *ent.Client, orderID
 		if err != nil {
 			return nil, err
 		}
+		receiptIDs := make([]int, 0, len(receipts))
 		for _, receipt := range receipts {
-			reworked, err := productionReceiptReworkedQuantity(ctx, client, receipt.ID)
-			if err != nil {
-				return nil, err
-			}
+			receiptIDs = append(receiptIDs, receipt.ID)
+		}
+		reworked, err := productionReceiptReworkedQuantities(ctx, client, receiptIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, receipt := range receipts {
 			aggregate.FinishedGoodsReceipts = append(aggregate.FinishedGoodsReceipts, &biz.ProductionWIPReceiptSummary{
 				ID: receipt.ID, ProductionWIPBatchID: *receipt.ProductionWipBatchID,
 				FactNo: receipt.FactNo, Status: receipt.Status, Quantity: receipt.Quantity,
-				ReworkedQuantity: reworked,
+				ReworkedQuantity: reworked[receipt.ID],
 			})
 		}
 		allocationRows, err := client.ProductionWIPOutsourcingAllocation.Query().

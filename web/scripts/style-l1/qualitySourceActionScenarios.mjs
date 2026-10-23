@@ -1634,6 +1634,8 @@ export function createQualitySourceActionScenarios(deps) {
             .filter({ hasText: params.inspection_no })
             .first()
           await qualityRow.waitFor({ state: 'visible', timeout: 10_000 })
+          await qualityRow.getByText(/PROD-STYLE-L1/u).first().waitFor({ state: 'visible', timeout: 10_000 })
+          await qualityRow.getByText(/SKU-LOT-STYLE-L1/u).first().waitFor({ state: 'visible', timeout: 10_000 })
           const qualityRowText = String((await qualityRow.innerText()) || '')
             .replace(/\s+/gu, ' ')
             .trim()

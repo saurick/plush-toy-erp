@@ -126,6 +126,7 @@ type PurchaseReceiptItemCreate struct {
 }
 
 type PurchaseReceiptFilter struct {
+	IDs                 []int
 	WarehouseScope      *WarehouseDataScope `json:"-"`
 	Status              string
 	Keyword             string
@@ -483,6 +484,9 @@ func normalizePurchaseReceiptItemCreateForReceipt(in PurchaseReceiptItemCreate, 
 }
 
 func normalizePurchaseReceiptFilter(in PurchaseReceiptFilter) (PurchaseReceiptFilter, error) {
+	if err := ValidateReferenceIDs(in.IDs); err != nil {
+		return PurchaseReceiptFilter{}, err
+	}
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	in.SupplierName = strings.TrimSpace(in.SupplierName)

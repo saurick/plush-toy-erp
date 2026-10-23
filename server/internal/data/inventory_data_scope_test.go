@@ -60,6 +60,16 @@ func TestWarehouseDataScopeFiltersInventoryAndWarehouseCountsBeforePagination(t 
 	if err != nil || total != 2 || len(lots) != 2 {
 		t.Fatalf("scoped lots = total %d items %#v err %v", total, lots, err)
 	}
+	allIDs := data.postgres.InventoryLot.Query().IDsX(ctx)
+	exactLots, exactTotal, exactErr := inventoryUC.ListInventoryLotsForAccess(ctx, biz.InventoryLotFilter{IDs: allIDs, Limit: 200}, scope)
+	if exactErr != nil || exactTotal != total || len(exactLots) != len(lots) {
+		t.Fatalf("exact lot read bypassed scope: total=%d rows=%v err=%v", exactTotal, exactLots, exactErr)
+	}
+	for i := range lots {
+		if lots[i].ID != exactLots[i].ID {
+			t.Fatal("exact lot scope/order changed")
+		}
+	}
 	if holdCount := countInventoryLotsByStatus(lots, biz.InventoryLotHold); holdCount != 1 {
 		t.Fatalf("scoped lots must include exactly one authorized zero-balance HOLD lot, got %d in %#v", holdCount, lots)
 	}
@@ -84,6 +94,10 @@ func TestWarehouseDataScopeFiltersInventoryAndWarehouseCountsBeforePagination(t 
 	warehouses, total, err := masterDataUC.ListWarehousesForAccess(ctx, biz.MasterDataFilter{Limit: 1}, scope)
 	if err != nil || total != 1 || len(warehouses) != 1 || warehouses[0].ID != fixtures.warehouseID {
 		t.Fatalf("scoped warehouses = total %d items %#v err %v", total, warehouses, err)
+	}
+	warehouses, total, err = masterDataUC.ListWarehousesForAccess(ctx, biz.MasterDataFilter{IDs: []int{secondWarehouse.ID}, Limit: 200}, scope)
+	if err != nil || total != 0 || len(warehouses) != 0 {
+		t.Fatalf("exact warehouse escaped scope: %v %v", warehouses, err)
 	}
 }
 

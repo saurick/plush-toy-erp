@@ -3,7 +3,9 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"reflect"
 	"testing"
 
 	"server/internal/biz"
@@ -13,6 +15,70 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 )
+
+func TestOutsourcingQualityBatchEqualsIndividualReads(t *testing.T) {
+	runOutsourcingQualityBatchEqualsIndividualReads(t, false)
+}
+
+func TestQualityInspectionFromOutsourcingReturnPostgresBatchEqualsIndividualReads(t *testing.T) {
+	runOutsourcingQualityBatchEqualsIndividualReads(t, true)
+}
+
+func runOutsourcingQualityBatchEqualsIndividualReads(t *testing.T, postgres bool) {
+	t.Helper()
+	ctx := t.Context()
+	data, client, capture, f, prefix := openPerformanceReadTestData(t, "quality_outsourcing_batch", postgres)
+	logger := log.NewStdLogger(io.Discard)
+	inventory := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
+	facts := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
+	actor := client.AdminUser.Create().SetUsername(prefix + "-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	ids := make([]int, 0, 50)
+	want := map[int]*biz.QualityInspection{}
+	firstQueryCount := 0
+	for i := 1; i <= 50; i++ {
+		no := fmt.Sprintf("%s-%d", prefix, i)
+		fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventory, facts, f, actor.ID, no)
+		draft, err := inventory.CreateQualityInspectionFromOutsourcingReturn(ctx, &biz.QualityInspectionFromOutsourcingReturnCreate{InspectionNo: no, OutsourcingFactID: fact.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 2 {
+			if _, err := inventory.CancelQualityInspection(ctx, draft.ID, stringPtr("历史取消记录")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		single, _, err := inventory.ListOutsourcingReturnQualityInspections(ctx, biz.QualityInspectionFilter{SourceID: fact.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, fact.ID)
+		want[single[0].ID] = single[0]
+		if i != 1 && i != 50 {
+			continue
+		}
+		capture.reset()
+		rows, total, err := inventory.ListOutsourcingReturnQualityInspections(ctx, biz.QualityInspectionFilter{SourceIDs: ids, Limit: 200})
+		if err != nil || total != i || len(rows) != i {
+			t.Fatalf("batch size=%d total=%d err=%v", i, total, err)
+		}
+		for _, row := range rows {
+			if !reflect.DeepEqual(row, want[row.ID]) {
+				t.Fatalf("batch projection changed: %v", row)
+			}
+		}
+		queries := capture.selectCount()
+		if i == 1 {
+			firstQueryCount = queries
+		} else if queries != firstQueryCount {
+			t.Fatalf("batch SELECTs grew: first=%d current=%d", firstQueryCount, queries)
+		}
+		t.Logf("outsourcing facts=%d SELECTs=%d", i, queries)
+	}
+	rows, total, err := inventory.ListOutsourcingReturnQualityInspections(ctx, biz.QualityInspectionFilter{SourceIDs: ids[:1], SourceID: ids[1]})
+	if err != nil || total != 0 || len(rows) != 0 {
+		t.Fatal("batch filter must intersect existing exact source filter")
+	}
+}
 
 func TestQualityInspectionFromOutsourcingReturnDerivesSourceAndGuardsCancellation(t *testing.T) {
 	ctx := context.Background()

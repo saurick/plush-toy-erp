@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
 import { Button, Form, Input, Space } from 'antd'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -158,7 +159,9 @@ export function BOMHeaderFormFields({
             name="product_id"
             rules={[{ required: true, message: '请选择产品' }]}
           >
-            <Select
+            <RemoteReferenceSelect
+              referenceType="products"
+              params={{ active_only: false }}
               allowClear
               disabled={disabled || productDisabled}
               optionFilterProp="label"
@@ -329,7 +332,9 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         name="material_id"
         rules={[{ required: true, message: '请选择材料' }]}
       >
-        <Select
+        <RemoteReferenceSelect
+          referenceType="materials"
+          params={{ active_only: false }}
           allowClear
           optionFilterProp="label"
           options={materialOptions}

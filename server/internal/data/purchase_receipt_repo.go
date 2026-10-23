@@ -1199,6 +1199,9 @@ func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (_ *biz.
 func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.PurchaseReceiptFilter) (_ []*biz.PurchaseReceipt, _ int, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseReceipt.Query()
+	if filter.IDs != nil {
+		query.Where(purchasereceipt.IDIn(filter.IDs...))
+	}
 	if filter.WarehouseScope != nil {
 		scope := biz.NormalizeWarehouseDataScope(*filter.WarehouseScope)
 		switch scope.Mode {

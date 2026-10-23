@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react'
 import { Button, Form, Input, Space } from 'antd'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { BusinessLineItemsEmpty } from '../business-list/BusinessCompactFieldTable.jsx'
@@ -91,7 +92,9 @@ function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
     [canCreateMaterial, onCreateMaterial]
   )
   return (
-    <Select
+    <RemoteReferenceSelect
+      referenceType="materials"
+      params={{ active_only: false }}
       {...props}
       ref={selectRef}
       open={open}

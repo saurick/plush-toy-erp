@@ -29,7 +29,11 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 		); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.masterDataUC.ListUnits(ctx, masterDataFilterFromParams(pm))
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListUnits(ctx, filter)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}
@@ -47,7 +51,11 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 		if scopeResult != nil {
 			return id, scopeResult, nil
 		}
-		items, total, err := d.masterDataUC.ListWarehousesForAccess(ctx, masterDataFilterFromParams(pm), scope)
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListWarehousesForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}
@@ -62,13 +70,17 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 	}
 }
 
-func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
+func masterDataFilterFromParams(pm map[string]any) (biz.MasterDataFilter, bool) {
+	ids, valid := optionalReferenceIDs(pm, "ids")
+	if !valid {
+		return biz.MasterDataFilter{}, false
+	}
 	supplierTypes := getStringSlice(pm, "supplier_types")
 	if supplierType := getString(pm, "supplier_type"); supplierType != "" {
 		supplierTypes = append(supplierTypes, supplierType)
 	}
 	return biz.MasterDataFilter{
-		StockCategory:  getString(pm, "stock_category"),
+		IDs: ids, StockCategory: getString(pm, "stock_category"),
 		WarehouseTypes: getStringSlice(pm, "warehouse_types"),
 		Keyword:        getString(pm, "keyword"),
 		ActiveOnly:     getBool(pm, "active_only", false),
@@ -76,7 +88,7 @@ func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
 		SupplierTypes:  supplierTypes,
 		Limit:          getInt(pm, "limit", 50),
 		Offset:         getInt(pm, "offset", 0),
-	}
+	}, true
 }
 
 func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *v1.JsonrpcResult {

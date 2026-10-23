@@ -132,6 +132,10 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 }
 
 func purchaseReceiptFilterFromParams(pm map[string]any) (biz.PurchaseReceiptFilter, bool) {
+	ids, valid := optionalReferenceIDs(pm, "ids")
+	if !valid {
+		return biz.PurchaseReceiptFilter{}, false
+	}
 	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
 	if !ok {
 		return biz.PurchaseReceiptFilter{}, false
@@ -141,7 +145,7 @@ func purchaseReceiptFilterFromParams(pm map[string]any) (biz.PurchaseReceiptFilt
 		return biz.PurchaseReceiptFilter{}, false
 	}
 	return biz.PurchaseReceiptFilter{
-		Status:              getString(pm, "status"),
+		IDs: ids, Status: getString(pm, "status"),
 		Keyword:             getString(pm, "keyword"),
 		SupplierID:          getInt(pm, "supplier_id", 0),
 		SupplierName:        getString(pm, "supplier_name"),

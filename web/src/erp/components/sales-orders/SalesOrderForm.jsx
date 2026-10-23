@@ -11,6 +11,7 @@ import {
   InputNumber,
   Space,
 } from 'antd'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import {
   formatUnitQuantitySummary,
@@ -274,7 +275,8 @@ export function SalesOrderFormFields({
           name="customer_id"
           rules={[{ required: true, message: '请选择客户' }]}
         >
-          <Select
+          <RemoteReferenceSelect
+            referenceType="customers"
             placeholder="请选择客户"
             allowClear
             showSearch
@@ -1085,7 +1087,8 @@ export function SalesOrderItemsFormSection({
                         label="已有规格（选填）"
                         name={[field.name, 'product_sku_id']}
                       >
-                        <Select
+                        <RemoteReferenceSelect
+                          referenceType="product_skus"
                           showSearch
                           allowClear
                           disabled={!canEditLine}

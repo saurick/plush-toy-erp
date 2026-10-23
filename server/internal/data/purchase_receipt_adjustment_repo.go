@@ -548,13 +548,20 @@ func (r *inventoryRepo) ListPurchaseReceiptAdjustments(ctx context.Context, filt
 		Order(ent.Desc(purchasereceiptadjustment.FieldAdjustedAt), ent.Desc(purchasereceiptadjustment.FieldID)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
+		WithItems(func(q *ent.PurchaseReceiptAdjustmentItemQuery) {
+			q.Order(ent.Asc(purchasereceiptadjustmentitem.FieldID))
+		}).
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]*biz.PurchaseReceiptAdjustment, 0, len(rows))
 	for _, row := range rows {
-		item, err := purchaseReceiptAdjustmentWithItems(ctx, r.data.postgres, row)
+		items, err := row.Edges.ItemsOrErr()
+		if err != nil {
+			return nil, 0, err
+		}
+		item, err := purchaseReceiptAdjustmentFromItems(ctx, row, items)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -986,6 +993,10 @@ func purchaseReceiptAdjustmentWithItems(ctx context.Context, client *ent.Client,
 	if err != nil {
 		return nil, err
 	}
+	return purchaseReceiptAdjustmentFromItems(ctx, adjustment, items)
+}
+
+func purchaseReceiptAdjustmentFromItems(ctx context.Context, adjustment *ent.PurchaseReceiptAdjustment, items []*ent.PurchaseReceiptAdjustmentItem) (*biz.PurchaseReceiptAdjustment, error) {
 	warehouseIDs := make([]int, 0, len(items))
 	for _, item := range items {
 		warehouseIDs = append(warehouseIDs, item.WarehouseID)

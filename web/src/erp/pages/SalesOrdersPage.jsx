@@ -8,6 +8,9 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Space } from 'antd'
 import { useOutletContext, useLocation } from 'react-router-dom'
+import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { InventoryLotStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
@@ -48,9 +51,8 @@ import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilt
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
 import {
   getSalesOrder,
-  listAllCustomers,
   listAllContactsByOwner,
-  listAllProductSKUs,
+  listAllCustomers,
   listAllSalesOrderItems,
   listAllSalesOrderSummary,
   exportSalesOrders,
@@ -298,7 +300,7 @@ export default function SalesOrdersPage() {
     {}
   )
   const [orders, setOrders] = useState([])
-  const [customers, setCustomers] = useState([])
+  const [customers, , mergeCustomers] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
   const [total, setTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState(null)
@@ -333,7 +335,7 @@ export default function SalesOrdersPage() {
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
   const [orderForm] = Form.useForm()
-  const [productSKUs, setProductSKUs] = useState([])
+  const [productSKUs, , mergeProductSKUs] = useReferenceRecords(adminProfile)
   const [customerContacts, setCustomerContacts] = useState([])
   const [reservationOpen, setReservationOpen] = useState(false)
   const [reservationLoading, setReservationLoading] = useState(false)
@@ -630,20 +632,15 @@ export default function SalesOrdersPage() {
     ]
   )
 
+  const loadImportReferenceData = useCallback(async (options) => {
+    const data = await listAllCustomers({ active_only: true }, options)
+    mergeCustomers(data.customers)
+  }, [mergeCustomers])
+
   const loadCustomers = useCallback(async () => {
     setReferencesLoading(true)
     try {
-      const [customerResult, skuResult, unitResult] = await Promise.all([
-        listAllCustomers({ active_only: true }),
-        listAllProductSKUs({ active_only: true }),
-        listAllUnits({ active_only: true }),
-      ])
-      setCustomers(
-        Array.isArray(customerResult?.customers) ? customerResult.customers : []
-      )
-      setProductSKUs(
-        Array.isArray(skuResult?.product_skus) ? skuResult.product_skus : []
-      )
+      const unitResult = await listAllUnits({ active_only: true })
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
     } catch (error) {
       showPageLoadError(error, '加载客户、SKU 和单位选项')
@@ -1060,6 +1057,16 @@ export default function SalesOrdersPage() {
               },
               { signal }
             )
+            const [customerData, skuData] = await Promise.all([
+              canReadReference(adminProfile, 'customers')
+                ? loadReferenceIDs('customers', [order.customer_id], { signal }) : { customers: [] },
+              canReadReference(adminProfile, 'product_skus')
+                ? loadReferenceIDs('product_skus', (result?.sales_order_items || []).map((row) => row.product_sku_id), { signal }) : { product_skus: [] },
+            ])
+            if (!signal.aborted) {
+              mergeCustomers(customerData.customers)
+              mergeProductSKUs(skuData.product_skus)
+            }
             return result?.sales_order_items
           },
           enterEditing: (nextItems) => {
@@ -1540,8 +1547,12 @@ export default function SalesOrdersPage() {
     />
   )
 
+  useReferenceHydration({
+    customers: { ids: [...orders.map((row) => row.customer_id), editingOrder?.customer_id, customerFilter], records: customers, onRecords: mergeCustomers, enabled: canReadReference(adminProfile, 'customers') },
+  }, adminProfile, orders)
+
   return (
-    <BusinessPageLayout className="erp-sales-orders-page">
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ customers: mergeCustomers, product_skus: mergeProductSKUs }} className="erp-sales-orders-page">
       <PageHeaderCard
         compact
         helpKey="sales-orders"
@@ -1603,7 +1614,9 @@ export default function SalesOrdersPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              referenceType="customers"
+              component={SelectFilter}
               aria-label="客户"
               className="erp-business-filter-control--status"
               options={[{ label: '全部客户', value: '' }, ...customerOptions]}
@@ -1652,6 +1665,7 @@ export default function SalesOrdersPage() {
             <Space wrap>
               {canCreateOrder ? (
                 <SalesOrderExcelImport
+                  loadReferenceData={loadImportReferenceData}
                   customers={customers}
                   units={units}
                   unitOptions={unitOptions}
@@ -2067,6 +2081,6 @@ export default function SalesOrdersPage() {
         }}
         onSubmit={submitSalesOrderReservation}
       />
-    </BusinessPageLayout>
+    </ReferenceRecordsProvider>
   )
 }

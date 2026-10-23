@@ -7,6 +7,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorderoperation"
 	"server/internal/data/model/ent/productionwipbatch"
@@ -84,16 +85,34 @@ func productionReceiptPackagingBatches(ctx context.Context, client *ent.Client, 
 }
 
 func productionReceiptReworkedQuantity(ctx context.Context, client *ent.Client, receiptID int) (decimal.Decimal, error) {
-	rows, err := client.ProductionFact.Query().Where(productionfact.FactType(biz.ProductionFactRework), productionfact.SourceType(biz.ProductionFactSourceType), productionfact.SourceID(receiptID), productionfact.Status(biz.OperationalFactStatusPosted)).All(ctx)
-	total := decimal.Zero
-	for _, row := range rows {
-		total = total.Add(row.Quantity)
+	quantities, err := productionReceiptReworkedQuantities(ctx, client, []int{receiptID})
+	return quantities[receiptID], err
+}
+
+// Lists and single-receipt checks share the posted rework and signed
+// disposition ledger rules. Read each relation once for the requested receipts.
+func productionReceiptReworkedQuantities(ctx context.Context, client *ent.Client, receiptIDs []int) (map[int]decimal.Decimal, error) {
+	quantities := map[int]decimal.Decimal{}
+	if len(receiptIDs) == 0 {
+		return quantities, nil
 	}
+	rows, err := client.ProductionFact.Query().Where(productionfact.FactType(biz.ProductionFactRework), productionfact.SourceType(biz.ProductionFactSourceType), productionfact.SourceIDIn(receiptIDs...), productionfact.Status(biz.OperationalFactStatusPosted)).
+		Select(productionfact.FieldSourceID, productionfact.FieldQuantity).All(ctx)
 	if err != nil {
-		return total, err
+		return nil, err
 	}
-	disposed, err := productionReceiptExceptionDisposedQuantity(ctx, client, receiptID)
-	return total.Add(disposed), err
+	for _, row := range rows {
+		quantities[*row.SourceID] = quantities[*row.SourceID].Add(row.Quantity)
+	}
+	txns, err := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionExceptionSourceType), inventorytxn.SourceLineIDIn(receiptIDs...)).
+		Select(inventorytxn.FieldSourceLineID, inventorytxn.FieldQuantity, inventorytxn.FieldDirection).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range txns {
+		quantities[*row.SourceLineID] = quantities[*row.SourceLineID].Sub(row.Quantity.Mul(decimal.NewFromInt(int64(row.Direction))))
+	}
+	return quantities, nil
 }
 
 type finishedGoodsReadiness struct {

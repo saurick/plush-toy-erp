@@ -94,6 +94,9 @@ func (r *masterDataRepo) GetCustomer(ctx context.Context, id int) (*biz.Customer
 
 func (r *masterDataRepo) ListCustomers(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Customer, int, error) {
 	query := r.data.postgres.Customer.Query()
+	if filter.IDs != nil {
+		query.Where(customer.IDIn(filter.IDs...))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(customer.Or(
 			customer.CodeContains(filter.Keyword),
@@ -206,6 +209,9 @@ func (r *masterDataRepo) GetSupplier(ctx context.Context, id int) (*biz.Supplier
 
 func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Supplier, int, error) {
 	query := r.data.postgres.Supplier.Query()
+	if filter.IDs != nil {
+		query.Where(supplier.IDIn(filter.IDs...))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(supplier.Or(
 			supplier.CodeContains(filter.Keyword),
@@ -401,6 +407,9 @@ func (r *masterDataRepo) GetMaterial(ctx context.Context, id int) (*biz.Material
 
 func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Material, int, error) {
 	query := r.data.postgres.Material.Query()
+	if filter.IDs != nil {
+		query.Where(material.IDIn(filter.IDs...))
+	}
 	if filter.StockCategory != "" {
 		query.Where(material.StockCategory(filter.StockCategory))
 	}
@@ -458,6 +467,9 @@ func (r *masterDataRepo) SetMaterialActive(ctx context.Context, id int, active b
 
 func (r *masterDataRepo) ListUnits(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Unit, int, error) {
 	query := r.data.postgres.Unit.Query()
+	if filter.IDs != nil {
+		query.Where(unit.IDIn(filter.IDs...))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(unit.Or(
 			unit.CodeContainsFold(filter.Keyword),
@@ -491,6 +503,9 @@ func (r *masterDataRepo) ListWarehousesForAccess(ctx context.Context, filter biz
 
 func (r *masterDataRepo) listWarehouses(ctx context.Context, filter biz.MasterDataFilter, scope biz.WarehouseDataScope) ([]*biz.Warehouse, int, error) {
 	query := r.data.postgres.Warehouse.Query()
+	if filter.IDs != nil {
+		query.Where(warehouse.IDIn(filter.IDs...))
+	}
 	if len(filter.WarehouseTypes) > 0 {
 		query.Where(warehouse.TypeIn(filter.WarehouseTypes...))
 	}
@@ -600,6 +615,9 @@ func (r *masterDataRepo) GetProcess(ctx context.Context, id int) (*biz.Process, 
 
 func (r *masterDataRepo) ListProcesses(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Process, int, error) {
 	query := r.data.postgres.Process.Query()
+	if filter.IDs != nil {
+		query.Where(process.IDIn(filter.IDs...))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(process.Or(
 			process.CodeContains(filter.Keyword),
@@ -720,6 +738,9 @@ func (r *masterDataRepo) GetProduct(ctx context.Context, id int) (*biz.Product, 
 
 func (r *masterDataRepo) ListProducts(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Product, int, error) {
 	query := r.data.postgres.Product.Query()
+	if filter.IDs != nil {
+		query.Where(product.IDIn(filter.IDs...))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(product.Or(
 			product.CodeContains(filter.Keyword),
@@ -859,6 +880,9 @@ func (r *masterDataRepo) GetProductSKU(ctx context.Context, id int) (*biz.Produc
 
 func (r *masterDataRepo) ListProductSKUs(ctx context.Context, filter biz.ProductSKUFilter) ([]*biz.ProductSKU, int, error) {
 	query := r.data.postgres.ProductSKU.Query()
+	if filter.IDs != nil {
+		query.Where(productsku.IDIn(filter.IDs...))
+	}
 	if filter.ProductID > 0 {
 		query = query.Where(productsku.ProductID(filter.ProductID))
 	}

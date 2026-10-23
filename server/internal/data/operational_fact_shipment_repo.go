@@ -963,17 +963,18 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := q.Order(ent.Desc(shipment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := q.Order(ent.Desc(shipment.FieldID)).Limit(filter.Limit).Offset(filter.Offset).
+		WithItems(func(q *ent.ShipmentItemQuery) { q.Order(ent.Asc(shipmentitem.FieldID)) }).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]*biz.Shipment, 0, len(rows))
 	for _, row := range rows {
-		item, err := shipmentWithItems(ctx, r.data.postgres, row)
+		items, err := row.Edges.ItemsOrErr()
 		if err != nil {
 			return nil, 0, err
 		}
-		out = append(out, item)
+		out = append(out, entShipmentToBiz(row, items))
 	}
 	return out, total, nil
 }

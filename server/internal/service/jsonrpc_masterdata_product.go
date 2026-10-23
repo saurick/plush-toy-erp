@@ -50,7 +50,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.masterDataUC.ListProducts(ctx, masterDataFilterFromParams(pm))
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListProducts(ctx, filter)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}
@@ -105,7 +109,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKURead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.masterDataUC.ListProductSKUs(ctx, productSKUFilterFromParams(pm))
+		filter, valid := productSKUFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListProductSKUs(ctx, filter)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}
@@ -166,15 +174,19 @@ func productSKUMutationFromParams(pm map[string]any) (*biz.ProductSKUMutation, b
 	}, true
 }
 
-func productSKUFilterFromParams(pm map[string]any) biz.ProductSKUFilter {
+func productSKUFilterFromParams(pm map[string]any) (biz.ProductSKUFilter, bool) {
+	ids, valid := optionalReferenceIDs(pm, "ids")
+	if !valid {
+		return biz.ProductSKUFilter{}, false
+	}
 	return biz.ProductSKUFilter{
-		ProductID:      getInt(pm, "product_id", 0),
+		IDs: ids, ProductID: getInt(pm, "product_id", 0),
 		Keyword:        getString(pm, "keyword"),
 		ActiveOnly:     getBool(pm, "active_only", false),
 		LifecycleScope: getString(pm, "lifecycle_scope"),
 		Limit:          getInt(pm, "limit", 50),
 		Offset:         getInt(pm, "offset", 0),
-	}
+	}, true
 }
 
 func productMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.Product, err error) *v1.JsonrpcResult {

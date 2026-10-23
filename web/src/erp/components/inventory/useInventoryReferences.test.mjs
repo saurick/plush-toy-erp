@@ -52,16 +52,18 @@ function referencePage(method, params, id) {
   }
 }
 
-test('inventory references respect effective permissions and load only the units needed by that scope', async (t) => {
+test('inventory initialization reads only configuration and keeps catalog records scoped to effective permissions', async (t) => {
   const view = await inventoryHarness(t, (method, params) =>
     referencePage(method, params, 1)
   )
   await view.renderProfile(profile(7))
   assert.deepEqual(view.calls.map((call) => call.method).sort(), [
-    'list_materials',
     'list_units',
   ])
-  assert.equal(view.current.materials[0].id, 1)
+  assert.deepEqual(view.current.materials, [])
+  const oldMerge = view.current.referenceRecords.materials
+  await view.act(async () => oldMerge([{ id: 7, name: '历史材料' }]))
+  assert.equal(view.current.materials[0].id, 7)
   assert.equal(view.current.units[0].id, 1)
   assert.deepEqual(view.current.products, [])
   assert.deepEqual(view.current.productSKUs, [])
@@ -72,17 +74,21 @@ test('inventory references respect effective permissions and load only the units
     is_super_admin: true,
     effective_session: { actions: [] },
   })
-  assert.equal(view.calls.length, 2)
+  await view.act(async () => oldMerge([{ id: 8, name: '旧权限响应' }]))
+  assert.equal(view.calls.length, 1)
   assert.deepEqual(view.current.materials, [])
 })
 
-test('identity changes reload references even when the set of readable capabilities is unchanged', async (t) => {
+test('identity changes clear catalog caches even when the set of readable capabilities is unchanged', async (t) => {
   const view = await inventoryHarness(t, (method, params) =>
     referencePage(method, params, view.calls.length)
   )
   await view.renderProfile(profile(7))
-  const firstMaterial = view.current.materials[0].id
+  const firstUnit = view.current.units[0].id
+  await view.act(async () => view.current.referenceRecords.materials([{ id: 7 }]))
+  assert.equal(view.current.materials.length, 1)
   await view.renderProfile(profile(8))
-  assert.equal(view.calls.length, 4)
-  assert.notEqual(view.current.materials[0].id, firstMaterial)
+  assert.equal(view.calls.length, 2)
+  assert.notEqual(view.current.units[0].id, firstUnit)
+  assert.deepEqual(view.current.materials, [])
 })

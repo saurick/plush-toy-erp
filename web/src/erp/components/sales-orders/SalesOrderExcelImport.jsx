@@ -104,12 +104,14 @@ export default function SalesOrderExcelImport({
   unitOptions,
   disabled,
   onSaved,
+  loadReferenceData,
   productSKUs = [],
   salesOwnerOptions = [],
   customerKey,
 }) {
   const inputRef = useRef(null)
   const readSequence = useRef(0)
+  const referenceRequest = useRef(null)
   const readingRef = useRef(false)
   const [reading, setReading] = useState(false)
   const [workbook, setWorkbook] = useState(null)
@@ -121,6 +123,7 @@ export default function SalesOrderExcelImport({
   useEffect(
     () => () => {
       readSequence.current += 1
+      referenceRequest.current?.abort()
     },
     []
   )
@@ -128,6 +131,7 @@ export default function SalesOrderExcelImport({
   useEffect(() => {
     if (disabled) {
       readSequence.current += 1
+      referenceRequest.current?.abort()
       readingRef.current = false
       setReading(false)
       setWorkbook(null)
@@ -139,6 +143,8 @@ export default function SalesOrderExcelImport({
     event.target.value = ''
     if (!file || disabled || readingRef.current) return
     const sequence = ++readSequence.current
+    const abort = new AbortController()
+    referenceRequest.current = abort
     readingRef.current = true
     setReading(true)
     setWorkbook(null)
@@ -154,6 +160,10 @@ export default function SalesOrderExcelImport({
       const parsed = await parseSalesOrderXlsx(await file.arrayBuffer(), {
         fileName: file.name,
       })
+      // File matching needs the complete customer name set; defer that read
+      // until an import is actually requested rather than loading it per page.
+      if (sequence !== readSequence.current) return
+      await loadReferenceData?.({ signal: abort.signal })
       if (sequence !== readSequence.current) return
       setWorkbook(parsed)
     } catch (error) {

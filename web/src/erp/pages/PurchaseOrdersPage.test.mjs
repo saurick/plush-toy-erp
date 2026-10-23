@@ -72,23 +72,14 @@ test('purchase form references fail closed, support latest-wins, and distinguish
 
   assert.match(page, /useState\('loading'\)/u)
   assert.match(referenceLoader, /beginLatestRequest\('reference-data'\)/u)
-  for (const loader of [
-    'listAllSuppliers',
-    'listAllMaterials',
-    'listAllUnits',
-  ]) {
-    assert.match(
-      referenceLoader,
-      new RegExp(`${loader}\\([\\s\\S]*?signal: request\\.signal`, 'u')
-    )
-  }
+  assert.match(referenceLoader, /listAllUnits\([\s\S]*?signal: request\.signal/u)
   assert.doesNotMatch(
     referenceLoader,
-    /listAllWarehouses|listAllInventoryLots/u
+    /listAllSuppliers|listAllMaterials|listAllWarehouses|listAllInventoryLots/u
   )
   assert.match(
     referenceLoader,
-    /setMaterials\(materialData\?\.materials \|\| \[\]\)[\s\S]*setReferenceDataState\('ready'\)/u
+    /setUnits\(unitData\?\.units \|\| \[\]\)[\s\S]*setReferenceDataState\('ready'\)/u
   )
   assert.match(referenceLoader, /setReferenceDataState\('error'\)/u)
   assert.match(referenceLoader, /if \(!request\.isCurrent\(\)\) return false/u)

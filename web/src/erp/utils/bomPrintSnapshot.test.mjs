@@ -31,9 +31,11 @@ function fixture() {
       name: '产品 A',
       is_active: false,
     }),
-    listAllMaterials: async (params) => {
+    listMaterials: async (params) => {
       assert.equal(params.active_only, false)
+      assert.deepEqual(params.ids, [21])
       return {
+        total: 1, limit: params.limit, offset: params.offset,
         materials: [
           {
             id: 21,
@@ -45,7 +47,8 @@ function fixture() {
         ],
       }
     },
-    listAllUnits: async () => ({
+    listUnits: async (params) => ({
+      total: 1, limit: params.limit, offset: params.offset,
       units: [{ id: 31, name: '米', is_active: false }],
     }),
   }
@@ -115,8 +118,8 @@ test('BOM print stops on reference failures and missing linked records', async (
   for (const key of [
     'getBOMVersion',
     'getProduct',
-    'listAllMaterials',
-    'listAllUnits',
+    'listMaterials',
+    'listUnits',
   ]) {
     const deps = fixture()
     deps[key] = async () => {
@@ -127,8 +130,8 @@ test('BOM print stops on reference failures and missing linked records', async (
   for (const [key, value] of [
     ['getBOMVersion', null],
     ['getProduct', null],
-    ['listAllMaterials', { materials: [] }],
-    ['listAllUnits', { units: [] }],
+    ['listMaterials', { materials: [], total: 0, limit: 200, offset: 0 }],
+    ['listUnits', { units: [], total: 0, limit: 200, offset: 0 }],
   ]) {
     const deps = fixture()
     deps[key] = async () => value

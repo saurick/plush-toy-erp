@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"io"
+	"reflect"
 	"testing"
 	"time"
 
@@ -364,6 +365,15 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 	}))
 	if err != nil || listRes == nil || listRes.Code != errcode.OK.Code || jsonRPCInt(t, listRes.Data.AsMap(), "total") != 1 {
 		t.Fatalf("list outsourcing return quality result=%#v err=%v", listRes, err)
+	}
+	_, batchRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "list_outsourcing_return_quality_inspections", "out-list-batch", mustJSONRPCStruct(t, map[string]any{
+		"customer_key": biz.DefaultCustomerKey,
+		"fact_id":      float64(fact.ID),
+		"fact_ids":     []any{float64(fact.ID)},
+		"status":       biz.QualityInspectionStatusRejected,
+	}))
+	if err != nil || batchRes == nil || batchRes.Code != errcode.OK.Code || !reflect.DeepEqual(batchRes.Data.AsMap(), listRes.Data.AsMap()) {
+		t.Fatalf("batch outsourcing quality differs from single-source result: %#v err=%v", batchRes, err)
 	}
 }
 

@@ -21,6 +21,9 @@ import {
   Tag,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import { canReadReference } from '../utils/remoteReferences.mjs'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
@@ -207,7 +210,7 @@ export default function InventoryLedgerPage() {
     'dateFilterEnd',
     ''
   )
-  const { materials, products, productSKUs, units, warehouses, inventoryLots, loadReferenceOptions } = useInventoryReferences({ adminProfile })
+  const { materials, products, productSKUs, units, warehouses, inventoryLots, loadReferenceOptions, referenceRecords } = useInventoryReferences({ adminProfile })
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
     pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
@@ -1197,8 +1200,16 @@ export default function InventoryLedgerPage() {
     onOpenRecord: openInventoryDetails,
   })
 
+  const referenceRows = [...rows, selectedRow, detailRecord, ...(currentOperation?.items || [])].filter(Boolean)
+  useReferenceHydration({
+    materials: { ids: referenceRows.filter((row) => row.subject_type === 'MATERIAL').map((row) => row.subject_id), records: materials, onRecords: referenceRecords.materials, enabled: canReadMaterials },
+    products: { ids: referenceRows.filter((row) => row.subject_type === 'PRODUCT').map((row) => row.subject_id), records: products, onRecords: referenceRecords.products, enabled: canReadProducts },
+    product_skus: { ids: referenceRows.map((row) => row.product_sku_id), records: productSKUs, onRecords: referenceRecords.product_skus, enabled: canReadProductSKUs },
+    inventory_lots: { ids: referenceRows.flatMap((row) => [row.lot_id, row.from_lot_id, row.to_lot_id]), records: inventoryLots, onRecords: referenceRecords.inventory_lots, enabled: canReadReference(adminProfile, 'inventory_lots') },
+  }, adminProfile, rows)
+
   return (
-    <BusinessPageLayout className="erp-inventory-ledger-page">
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ ...referenceRecords }} className="erp-inventory-ledger-page">
       <PageHeaderCard
         compact
         helpKey="inventory"
@@ -1424,7 +1435,9 @@ export default function InventoryLedgerPage() {
                 resetCurrentPage()
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType={subjectType === 'PRODUCT' ? 'products' : 'materials'}
               className="erp-business-filter-control--status"
               aria-label="材料或产品"
               value={subjectID}
@@ -1442,7 +1455,10 @@ export default function InventoryLedgerPage() {
                 resetCurrentPage()
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="product_skus"
+              params={{ product_id: Number(subjectID) || undefined, active_only: false }}
               className="erp-business-filter-control--status"
               aria-label="产品规格"
               value={productSkuID}
@@ -1479,7 +1495,9 @@ export default function InventoryLedgerPage() {
                 resetCurrentPage()
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="inventory_lots"
               className="erp-business-filter-control--status"
               aria-label="批次"
               value={lotID}
@@ -1822,6 +1840,6 @@ export default function InventoryLedgerPage() {
           loadRows()
         }}
       />
-    </BusinessPageLayout>
+    </ReferenceRecordsProvider>
   )
 }

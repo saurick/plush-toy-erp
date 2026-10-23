@@ -1,6 +1,8 @@
+import { listReferenceRecordsByIDs } from './referencePagination.mjs'
+
 export async function loadBOMPrintSnapshot(
   id,
-  { getBOMVersion, getProduct, listAllMaterials, listAllUnits }
+  { getBOMVersion, getProduct, listMaterials, listUnits }
 ) {
   const detail = await getBOMVersion({ id })
   if (!detail?.product_id || !Array.isArray(detail.items)) {
@@ -10,8 +12,8 @@ export async function loadBOMPrintSnapshot(
   // the editor's active-only options or a previously selected version.
   const [product, materialData, unitData] = await Promise.all([
     getProduct({ id: detail.product_id }),
-    listAllMaterials({ active_only: false }),
-    listAllUnits(),
+    listReferenceRecordsByIDs(listMaterials, { active_only: false }, 'materials', detail.items.map((item) => item.material_id)),
+    listReferenceRecordsByIDs(listUnits, {}, 'units', detail.items.map((item) => item.unit_id)),
   ])
   const materials = materialData?.materials || []
   const units = unitData?.units || []

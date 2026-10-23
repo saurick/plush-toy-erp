@@ -574,6 +574,9 @@ func (r *inventoryRepo) ListInventoryLotsForAccess(ctx context.Context, filter b
 
 func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryLot, int, error) {
 	query := r.data.postgres.InventoryLot.Query()
+	if filter.IDs != nil {
+		query.Where(inventorylot.IDIn(filter.IDs...))
+	}
 	if filter.StockCategory != "" {
 		query.Where(inventoryMaterialCategoryPredicate(filter.StockCategory))
 	}

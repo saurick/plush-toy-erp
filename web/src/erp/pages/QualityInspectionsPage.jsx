@@ -22,6 +22,9 @@ import {
   Typography,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import { useReferenceHydration } from '../hooks/useReferenceRecords.js'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { canReadReference } from '../utils/remoteReferences.mjs'
 import Select from '@/common/components/select/AppSelect'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import { PurchaseReceiptStatus, PurchaseReturnStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
@@ -302,6 +305,7 @@ export default function QualityInspectionsPage() {
     warehouses,
     referenceDataState,
     loadReferenceOptions,
+    referenceRecords,
   } = useQualityInspectionReferences({ adminProfile })
 
   const inspectionEditor = useQualityInspectionEditor({ rows, referenceDataState })
@@ -1273,8 +1277,17 @@ export default function QualityInspectionsPage() {
     clearRouteContext()
   }, [clearRouteContext, setKeyword, keyword, linkedKeyword, resolvedRouteKeyword])
 
+  const referenceInspections = [...rows, selectedRow, correctionInspection, purchaseReturnModal?.inspection].filter(Boolean)
+  const referenceReceiptItems = purchaseReceipts.flatMap((receipt) => receipt.items || [])
+  useReferenceHydration({
+    purchase_receipts: { ids: [...referenceInspections.map((row) => row.purchase_receipt_id), selectedPurchaseReceiptID, purchaseReceiptFilter], records: purchaseReceipts, onRecords: referenceRecords.purchase_receipts, enabled: canReadReference(adminProfile, 'purchase_receipts') },
+    inventory_lots: { ids: [...referenceInspections.map((row) => row.inventory_lot_id), ...referenceReceiptItems.map((row) => row.lot_id)], records: inventoryLots, onRecords: referenceRecords.inventory_lots, enabled: canReadReference(adminProfile, 'inventory_lots') },
+    materials: { ids: [...referenceInspections.map((row) => row.material_id), ...referenceReceiptItems.map((row) => row.material_id)], records: materials, onRecords: referenceRecords.materials, enabled: canReadReference(adminProfile, 'materials') },
+    products: { ids: referenceInspections.filter((row) => row.subject_type === 'PRODUCT').map((row) => row.subject_id), records: products, onRecords: referenceRecords.products, enabled: canReadReference(adminProfile, 'products') },
+  }, adminProfile, rows)
+
   return (
-    <BusinessPageLayout className="erp-quality-inspections-page">
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ ...referenceRecords }} className="erp-quality-inspections-page">
       <PageHeaderCard compact helpKey="quality-inspections" title="质量检验" />
 
       <BusinessOperationPanel
@@ -1366,7 +1379,9 @@ export default function QualityInspectionsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="purchase_receipts"
               aria-label="入库单"
               className="erp-business-filter-control--status"
               value={purchaseReceiptFilter}
@@ -1385,7 +1400,9 @@ export default function QualityInspectionsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="materials"
               aria-label="材料"
               className="erp-business-filter-control--status"
               value={materialFilter}
@@ -1415,7 +1432,9 @@ export default function QualityInspectionsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="inventory_lots"
               aria-label="批次"
               className="erp-business-filter-control--status"
               value={lotFilter}
@@ -2092,6 +2111,6 @@ export default function QualityInspectionsPage() {
           variant="inline"
         />
       </InspectionEditor>
-    </BusinessPageLayout>
+    </ReferenceRecordsProvider>
   )
 }

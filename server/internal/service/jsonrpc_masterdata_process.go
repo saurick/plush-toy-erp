@@ -42,7 +42,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.masterDataUC.ListProcesses(ctx, masterDataFilterFromParams(pm))
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListProcesses(ctx, filter)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}

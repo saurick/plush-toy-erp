@@ -105,3 +105,27 @@ export async function listAllReferenceRecords(
     invalidResponseMessage: '服务器返回的基础资料列表不完整，请刷新后重试',
   })
 }
+
+// Exact reference reads keep historical records and the endpoint's permission
+// filters. Chunk the requested set rather than scanning unrelated catalog rows.
+export async function listReferenceRecordsByIDs(
+  listPage, params, recordKey, ids, options = {},
+  { filterKey = 'ids', referenceKey = 'id' } = {}
+) {
+  const uniqueIDs = [...new Set(ids.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0))]
+  const records = new Map()
+  for (let offset = 0; offset < uniqueIDs.length; offset += REFERENCE_PAGE_SIZE) {
+    const batch = uniqueIDs.slice(offset, offset + REFERENCE_PAGE_SIZE)
+    const requested = new Set(batch)
+    const data = await listAllReferenceRecords(
+      listPage, { ...params, [filterKey]: batch }, recordKey, options
+    )
+    for (const record of data[recordKey]) {
+      if (!requested.has(Number(record[referenceKey]))) {
+        throw invalidPaginatedResponse('服务器返回的关联资料不正确，请刷新后重试')
+      }
+      records.set(record.id, record)
+    }
+  }
+  return { [recordKey]: [...records.values()] }
+}
