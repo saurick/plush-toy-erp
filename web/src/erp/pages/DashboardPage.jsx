@@ -41,7 +41,6 @@ import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 
 import { message } from '@/common/utils/antdApp'
@@ -1506,9 +1505,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       key={`${filters.mode}:${workflowWorkbenchScopeKey}`}
                       compact
                       viewSwitch={filters.mode === 'todo' ? (
-                        <Segmented
+                        <SlidingTabList
                           aria-label="待办显示方式"
-                          hierarchy="secondary"
                           value={calendarState.layout}
                           options={[
                             { value: 'list', label: '列表' },
