@@ -169,7 +169,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 ## 制品与备份自动轮换
 
-`target-preflight.mjs` 将 `target-release-retention.sh` 嵌入同一固定目标只读脚本，目标宿主无需安装 Node.js。预览保留最近 7 个成功版本，并保护当前前后端与公网运行版本、仍在运行的入口容器、按成功回执完成时间选出的最近两个不同恢复版本，以及失败、运行中或结果尚未收敛的操作所引用的版本。恢复版本表示已有运行证据，代码回滚仍需通过迁移和客户配置兼容性校验。
+`target-preflight.mjs` 将 `target-release-retention.sh` 嵌入同一固定目标只读脚本，目标宿主无需安装 Node.js。预检包含磁盘清单与完整目标读回，总时限为 60 秒；数据库以单条只读语句读取迁移和客户配置同一快照，连接最多 5 秒、SQL 最多 10 秒，失败仍阻断写操作。预览保留最近 7 个成功版本，并保护当前前后端与公网运行版本、仍在运行的入口容器、按成功回执完成时间选出的最近两个不同恢复版本，以及失败、运行中或结果尚未收敛的操作所引用的版本。恢复版本表示已有运行证据，代码回滚仍需通过迁移和客户配置兼容性校验。
 
 历史成功操作、旧缓存和已停止入口容器不再永久锁住其全部历史版本；operation、备份、数据库、附件、env 和审计记录不进入清理候选。`retention` 分别返回源码目录候选数量 / 字节、`cacheCandidateCount / cacheCandidateBytes` 和 `stoppedPublicContainerCandidateCount`，字节是逻辑大小，不能直接当作实际可释放磁盘。`rollbackReleaseShas` 给出本次保护的恢复版本。
 

@@ -10,6 +10,9 @@ export const TARGET_PREFLIGHT_CONTRACT = "plush.target-preflight/v1";
 export const REMOTE_TARGET_PREFLIGHT_CONTRACT =
   "plush.remote-target-preflight/v1";
 export const ACTIVE_DATASET_VERSION_NOT_APPLICABLE = "not_applicable";
+// Includes filesystem inventory under backup I/O; database statements retain
+// their own shorter deadline and every check must still complete.
+export const TARGET_PREFLIGHT_TIMEOUT_MS = 60_000;
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
@@ -478,31 +481,36 @@ elif ! docker exec "$postgres_cid" sh -c 'command -v pg_dump >/dev/null 2>&1'; t
   backup_tooling_status=blocked
   block target_backup_tooling_missing
 else
-  read_database_scalar() {
-    local query="$1"
-    docker exec "$postgres_cid" sh -c '
-      psql -X --no-psqlrc -A -t -q -v ON_ERROR_STOP=1 \
+  # One read-only statement observes migration and configuration together and
+  # avoids starting five Docker/psql processes while backups share the disk.
+  database_snapshot_ok=false
+  database_snapshot_pattern='^[^|]*[|][^|]*[|][^|]*[|][^|]*[|][^|]*$'
+  if database_snapshot="$(docker exec \
+    -e PGCONNECT_TIMEOUT=5 \
+    -e 'PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=10000' \
+    "$postgres_cid" sh -c '
+      psql -X --no-psqlrc -A -t -q -F "|" -v ON_ERROR_STOP=1 \
         -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"
-    ' sh "$query" 2>/dev/null | tr -d '\r' | sed -n '1p'
-  }
-  if migration_version="$(read_database_scalar "SELECT version FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2 ORDER BY executed_at DESC LIMIT 1")" &&
-    [[ "$migration_version" =~ ^20[0-9]{12}$ ]]; then
+    ' sh "SELECT
+      COALESCE((SELECT version FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2 ORDER BY executed_at DESC LIMIT 1), ''),
+      COUNT(*), COALESCE(MAX(revision), ''), COALESCE(MAX(product_version), ''),
+      COALESCE(MAX(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion')), '')
+      FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active'" 2>/dev/null)" &&
+    [[ "$database_snapshot" != *$'\n'* && "$database_snapshot" != *$'\r'* && "$database_snapshot" =~ $database_snapshot_pattern ]]; then
+    IFS='|' read -r migration_version active_config_count active_config_revision active_config_product_version active_dataset_version <<<"$database_snapshot"
+    database_snapshot_ok=true
+  fi
+  if [[ "$database_snapshot_ok" == true && "$migration_version" =~ ^20[0-9]{12}$ ]]; then
     :
   else
     migration_version=unknown
     database_status=blocked
     block target_migration_readback_failed
   fi
-  if active_config_count="$(read_database_scalar "SELECT COUNT(*) FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active'")" &&
-    [[ "$active_config_count" =~ ^[0-9]+$ ]]; then
+  if [[ "$database_snapshot_ok" == true && "$active_config_count" =~ ^[0-9]+$ ]]; then
     if [[ "$active_config_count" == 0 ]]; then
       active_config_state=absent
-    elif [[ "$active_config_count" == 1 ]] &&
-      active_config_revision="$(read_database_scalar "SELECT revision FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-      active_config_product_version="$(read_database_scalar "SELECT product_version FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-      active_dataset_version="$(read_database_scalar "SELECT COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), '') FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-      [[ "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ ]] &&
-      [[ "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    elif [[ "$active_config_count" == 1 && "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ && "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
       active_config_state=invalid
       if [[ "$trial_target" == none && -z "$active_dataset_version" ]]; then
         active_dataset_version=__ACTIVE_DATASET_VERSION_NOT_APPLICABLE__
@@ -1109,7 +1117,7 @@ export function runTargetPreflight(
   targetKey,
   {
     runCommand = spawnSync,
-    timeoutMs = 30_000,
+    timeoutMs = TARGET_PREFLIGHT_TIMEOUT_MS,
     now = new Date().toISOString(),
     localIdentity,
   } = {},
@@ -1151,7 +1159,7 @@ export async function runTargetPreflightAsync(
   targetKey,
   {
     spawnCommand = spawn,
-    timeoutMs = 30_000,
+    timeoutMs = TARGET_PREFLIGHT_TIMEOUT_MS,
     now = new Date().toISOString(),
     localIdentity,
   } = {},
