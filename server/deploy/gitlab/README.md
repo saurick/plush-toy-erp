@@ -239,7 +239,7 @@ GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提�
 
 ## 备份、恢复和升级
 
-Compose 固定 GitLab CE `19.3.5` 的镜像 digest；该版本包含 [GitLab 官方 2026-10-12 紧急安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-4-2-released/)。该补丁包含数据库及部署后迁移，单机升级需要短暂停机；配置版本不替代目标机运行版本与升级后检查。
+Compose 固定 GitLab CE `19.3.6` 的官方镜像 digest；该版本包含 [GitLab 官方 2026-10-21 紧急安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/)。本次沿用 `19.3` 系列，补丁包含常规数据库迁移，单机升级需要短暂停机。升级前须验证完整备份及匹配配置的独立恢复，并在停写后保留同版本数据库备份、secrets、原 Compose 和旧镜像；配置版本不替代目标机运行版本与升级后检查。
 
 ### 当前暂缓决策 / Offsite deferment
 
@@ -310,7 +310,7 @@ sudo /usr/local/libexec/plush-gitlab-backup-health.sh \
 
 升级前先固定当前 compose digest、GitLab 版本、最新已验证备份和回滚窗口；按 GitLab 支持的逐版本升级路径修改 digest。不得使用浮动 `latest`，不得在失败时删除 `/srv/gitlab` 或 RAID5 备份。
 
-升级已执行数据库迁移时，回滚须在旧版本镜像中恢复同版本的升级前数据库备份，并保留匹配的 secrets 和配置；不能只切回旧镜像。具体步骤遵循 [GitLab Docker 回滚流程](https://docs.gitlab.com/update/package/downgrade/#roll-back-a-docker-instance)，恢复后重新验证迁移、就绪状态、仓库和制品读取。
+升级已执行数据库迁移时，回滚须在旧版本镜像中恢复同版本的升级前数据库备份，并保留匹配的 secrets 和配置；不能只切回旧镜像。旧容器必须完成自动 reconfigure 并通过完整 readiness，再停止 Puma / Sidekiq 后恢复数据库；仅 PostgreSQL 可连接不能证明初始化完成，否则恢复会与启动配置并发。具体步骤遵循 [GitLab Docker 回滚流程](https://docs.gitlab.com/update/package/downgrade/#roll-back-a-docker-instance)，恢复后重新验证迁移、就绪状态、仓库和制品读取。
 
 ## 运行态证据与重建边界
 
