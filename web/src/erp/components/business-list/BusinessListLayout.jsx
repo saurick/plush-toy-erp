@@ -32,7 +32,7 @@ import {
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { filterSelectOptions, isEmptyFilterValue } from '@/common/components/select/filterSelectOptions.mjs'
-import Table from '@/common/components/table/AppTable'
+import Table, { TABLE_SELECTION_COLUMN_WIDTH } from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'
@@ -65,7 +65,6 @@ export {
 const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
-const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
 const SELECTION_ACTION_PRIORITIES = {
   collaboration: 120,
   primary: 100,
@@ -724,7 +723,7 @@ export function normalizeBusinessTableColumns(columns = []) {
 function resolveBusinessTableScrollX({ columns = [], rowSelection, scrollX }) {
   const estimatedColumnsWidth = columns.reduce(
     (total, column) => total + resolveBusinessTableColumnWidth(column),
-    rowSelection ? BUSINESS_TABLE_SELECTION_COLUMN_WIDTH : 0
+    rowSelection ? TABLE_SELECTION_COLUMN_WIDTH : 0
   )
   const estimatedScrollX = Math.max(
     BUSINESS_TABLE_DEFAULT_SCROLL_X,
@@ -753,7 +752,6 @@ function resolveBusinessTableRowSelection(rowSelection) {
       : null
 
   return {
-    columnWidth: BUSINESS_TABLE_SELECTION_COLUMN_WIDTH,
     ...rowSelection,
     columnTitle,
   }

@@ -26,6 +26,16 @@ async function measureTables(page) {
     }
     return {
       overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      selectionColumns: [
+        ...document.querySelectorAll('.app-table .ant-table-selection-column'),
+      ].filter(visible).map((cell) => {
+        const control = cell.querySelector('.ant-radio-inner, .ant-checkbox-inner')
+        return {
+          tag: cell.tagName,
+          width: cell.getBoundingClientRect().width,
+          controlOffset: control ? centerOffset(cell, control) : null,
+        }
+      }),
       bodyAlignment: cells.map((cell) => ({
         text: cell.textContent.slice(0, 25),
         vertical: getComputedStyle(cell).verticalAlign,
@@ -79,12 +89,19 @@ function assertCommonAlignment(evidence) {
   )
   assert(evidence.bodyAlignment.length > 0, 'expected a rendered table body')
   assert(evidence.headers.length > 0, 'expected rendered table headers')
+  for (const cell of evidence.selectionColumns) {
+    assert(Math.abs(cell.width - 52) <= 1, `行选择列应保持 52px: ${JSON.stringify(cell)}`)
+    if (cell.controlOffset !== null) {
+      assert(Math.abs(cell.controlOffset) <= 1, `选择控件应居中: ${JSON.stringify(cell)}`)
+    }
+  }
   for (const cell of evidence.bodyAlignment) {
     assert.equal(cell.vertical, 'middle', cell.text)
   }
   for (const header of evidence.headers) {
-    if (header.expected)
+    if (header.expected) {
       assert.equal(header.align, header.expected, header.text)
+    }
     assert.equal(header.vertical, 'middle', header.text)
   }
   for (const label of evidence.labelOffsets) {
@@ -152,6 +169,19 @@ export function createTableAlignmentScenarios({
       const evidence = []
       evidence.push(await measureTables(page))
       assertAligned(evidence.at(-1))
+      assert(evidence.at(-1).selectionColumns.length >= 6, '需要单选、多选的表头与正文尺寸')
+      if (mode === 'light') {
+        for (const width of [1920, 768, 1440]) {
+          await page.setViewportSize({ width, height: 1000 })
+          evidence.push(await measureTables(page))
+          assertAligned(evidence.at(-1))
+        }
+      }
+      const radio = page.locator('#selection-table tr[data-row-key="1"]').getByRole('radio')
+      await radio.focus()
+      await radio.press('Space')
+      assert.equal(await page.locator('#radio-selection-count').textContent(), '1')
+      assert(await page.locator('#selection-table tr[data-row-key="2"]').getByRole('radio').isDisabled())
       await assertTableSemanticAlignment(page.locator('#business-table'), {
         scenarioName: `global-table-alignment-${mode}`,
         expected: {
@@ -290,6 +320,7 @@ export function createTableAlignmentScenarios({
 
       await page.locator('#toggle-empty').click()
       await page.getByText('暂无匹配记录', { exact: true }).waitFor()
+      assertCommonAlignment(await measureTables(page))
       await page.locator('#toggle-empty').click()
       evidence.push(await measureTables(page))
       assertAligned(evidence.at(-1))

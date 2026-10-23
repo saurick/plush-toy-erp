@@ -7,6 +7,13 @@
   height: var(--erp-row-height);
 }
 
+/* 自动表格布局的剩余宽度只分配给业务列。 */
+.app-table.ant-table-wrapper .ant-table-selection-column {
+  width: var(--app-table-selection-column-width);
+  min-width: var(--app-table-selection-column-width);
+  max-width: var(--app-table-selection-column-width);
+}
+
 @media screen {
   [data-erp-table-lines='grid']
     .app-table.ant-table-wrapper

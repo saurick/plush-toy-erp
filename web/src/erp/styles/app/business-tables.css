@@ -1868,14 +1868,6 @@
   overflow-wrap: normal;
 }
 
-.erp-sales-orders-page
-  .erp-business-module-table-card
-  :where(th, td).ant-table-selection-column {
-  width: 38px;
-  min-width: 38px;
-  max-width: 38px;
-}
-
 .erp-business-column-order-modal {
   display: grid;
   gap: 8px;

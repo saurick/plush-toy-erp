@@ -123,6 +123,7 @@ function Fixture() {
   const [order, setOrder] = useState(columns.map((column) => column.key))
   const [columnPanelOpen, setColumnPanelOpen] = useState(false)
   const [selected, setSelected] = useState([])
+  const [radioSelected, setRadioSelected] = useState([])
   const [opened, setOpened] = useState('')
   const listColumns = applyModuleColumnOrder(columns, order).map((column) => ({
     ...column,
@@ -177,6 +178,24 @@ function Fixture() {
             pagination={false}
             rowSelection={{ selectedRowKeys: selected, onChange: setSelected }}
             onOpenRecord={(row) => setOpened(row.code)}
+          />
+        </section>
+        <section id="selection-table" style={{ minWidth: 0 }}>
+          <h2>单选与固定表格布局</h2>
+          <output id="radio-selection-count">{radioSelected.length}</output>
+          <AppTable
+            rowKey="key"
+            columns={[columns[0], columns[4], columns[1]]}
+            dataSource={empty ? [] : rows}
+            pagination={false}
+            tableLayout="fixed"
+            scroll={{ x: 612 }}
+            rowSelection={{
+              type: 'radio',
+              selectedRowKeys: radioSelected,
+              onChange: setRadioSelected,
+              getCheckboxProps: (row) => ({ disabled: row.key === 2 }),
+            }}
           />
         </section>
         <section

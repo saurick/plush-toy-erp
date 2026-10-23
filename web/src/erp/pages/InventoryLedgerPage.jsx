@@ -1749,7 +1749,6 @@ export default function InventoryLedgerPage() {
             scroll={{ x: activeView === VIEW_TXNS ? 1900 : 1500 }}
             rowSelection={{
               type: 'radio',
-              columnWidth: 48,
               selectedRowKeys: selectedRowKey ? [selectedRowKey] : [],
               onChange: (_keys, selectedRows) =>
                 setSelectedRow(selectedRows[0] || null),

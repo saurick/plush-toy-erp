@@ -8,10 +8,11 @@ import {
   assertSingleTableScrollbar,
 } from './tableScrollControlAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { DEFAULT_BUSINESS_PAGE_SIZE } from '../../src/erp/utils/businessPagination.mjs'
 
 const tableSelector = '.erp-business-data-table-card .ant-table-wrapper'
 const contentSelector = '.ant-table-content, .ant-table-body'
-const rows = Array.from({ length: 45 }, (_, index) => ({
+const rows = Array.from({ length: DEFAULT_BUSINESS_PAGE_SIZE * 2 + 5 }, (_, index) => ({
   id: index + 1,
   shipment_no: `SHIP-SCROLL-${String(index + 1).padStart(3, '0')}`,
   status: 'DRAFT',
@@ -117,7 +118,8 @@ export function createBusinessTableScrollScenarios({
       })
     },
     verify: async (page) => {
-      await page.locator('tr[data-row-key="20"]').waitFor()
+      await page.locator(`tr[data-row-key="${DEFAULT_BUSINESS_PAGE_SIZE}"]`).waitFor()
+      assert.equal(await page.locator(`${tableSelector} tr.ant-table-row`).count(), DEFAULT_BUSINESS_PAGE_SIZE, '首屏应完整呈现默认一页数据')
       if (mode === 'dark') await clickERPThemeOption(page, '暗色')
       const initial = await measureScroll(page)
       assert.equal(initial.sticky, mode !== 'mobile', '桌面主表应接入共享吸顶，手机保留原有滚动')
@@ -220,12 +222,13 @@ export function createBusinessTableScrollScenarios({
       }
       const paging = await exerciseTableScrollPagination(page, {
         wrapper: page.locator(tableSelector),
-        trigger: page.locator(`${tableSelector} .ant-pagination-item-2`),
-        ready: page.locator('tr[data-row-key="40"]'),
+        trigger: page.locator(tableSelector).getByRole('button', { name: '下一页', exact: true }),
+        ready: page.locator(`tr[data-row-key="${DEFAULT_BUSINESS_PAGE_SIZE * 2}"]`),
         endpoint: '**/rpc/operational_fact',
         method: 'list_shipments',
-        offset: 20,
+        offset: DEFAULT_BUSINESS_PAGE_SIZE,
       })
+      assert.equal(await page.locator(`${tableSelector} tr.ant-table-row`).count(), DEFAULT_BUSINESS_PAGE_SIZE, '第二页应保留相同记录数以核对滚动位置')
       const secondPage = await scrollToTableEnd(page)
 
       const search = page.locator('.erp-business-operation-panel').getByRole('textbox')
@@ -241,7 +244,7 @@ export function createBusinessTableScrollScenarios({
         '空结果不显示横向控件'
       )
       await search.fill('')
-      await page.locator('tr[data-row-key="20"]').waitFor()
+      await page.locator(`tr[data-row-key="${DEFAULT_BUSINESS_PAGE_SIZE}"]`).waitFor()
       const restored = await scrollToTableEnd(page)
 
       await writeFile(

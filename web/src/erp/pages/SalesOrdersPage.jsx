@@ -1951,7 +1951,6 @@ export default function SalesOrdersPage() {
             emptyDescription="暂无销售订单"
             rowSelection={{
               type: 'radio',
-              columnWidth: 38,
               selectedRowKeys: selectedOrder?.id ? [selectedOrder.id] : [],
               getCheckboxProps: () => ({ disabled: saving }),
               onChange: (_keys, selectedRows) => {
