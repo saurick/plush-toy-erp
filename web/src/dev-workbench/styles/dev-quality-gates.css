@@ -940,7 +940,7 @@
 .erp-dev-quality-flow__step[data-emphasis='current'] {
   border-color: var(--erp-primary);
   background: var(--erp-primary-soft, #eef8ef);
-  box-shadow: 0 0 0 2px rgb(43 138 62 / 12%);
+  box-shadow: 0 0 0 2px var(--erp-focus-ring);
 }
 
 .erp-dev-quality-flow__step[data-emphasis='longest'] {

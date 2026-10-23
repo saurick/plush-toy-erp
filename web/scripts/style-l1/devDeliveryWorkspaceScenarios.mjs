@@ -84,6 +84,12 @@ async function installMigrationRoutes(page, fixture) {
   })
 }
 
+export async function installDatabaseMigrationFixture(page) {
+  const fixture = migrationFixture()
+  await installMigrationRoutes(page, fixture)
+  return fixture
+}
+
 export function createDevDeliveryWorkspaceScenarios({ assert, assertNoHorizontalOverflow, expectHeading }) {
   let migration
   let finishDryRun

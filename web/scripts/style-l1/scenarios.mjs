@@ -95,6 +95,8 @@ import { createFormDensityScenarios } from './formDensityScenarios.mjs'
 import { createTableDensityScenarios } from './tableDensityScenarios.mjs'
 import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
 import { createAccountAppearanceScenarios } from './accountAppearanceScenarios.mjs'
+import { createDevWorkbenchThemeScenarios } from './devWorkbenchThemeScenarios.mjs'
+import { createDevWorkbenchThemeAuditScenarios } from './devWorkbenchThemeAuditScenarios.mjs'
 import { createAccountIdentityScenarios } from './accountIdentityScenarios.mjs'
 import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
 import { createSalesOrderExportScenarios } from './salesOrderExportScenarios.mjs'
@@ -404,6 +406,8 @@ export function createStyleL1Scenarios(deps) {
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createDevWorkbenchThemeScenarios({ assertNoHorizontalOverflow, outputDir }),
+    ...createDevWorkbenchThemeAuditScenarios({ assertNoHorizontalOverflow, outputDir }),
     ...createAccountIdentityScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

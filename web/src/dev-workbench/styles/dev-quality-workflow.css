@@ -27,7 +27,7 @@
 .erp-dev-data-history {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
   background: var(--erp-surface-bg-soft);
 }
@@ -259,7 +259,7 @@
   overflow: hidden;
   border: 1px solid var(--erp-border);
   border-radius: 12px;
-  background: #fbfdfc;
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-dev-testing-disclosure:not([open]) > :not(summary) {
@@ -442,7 +442,7 @@
   height: 30px;
   place-items: center;
   border-radius: 999px;
-  background: #e8f7f4;
+  background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
   font-weight: 800;
 }
@@ -501,7 +501,7 @@
 
 .erp-dev-testing-closeout-step__sources code {
   border-radius: 6px;
-  background: #f1f5f9;
+  background: var(--erp-surface-bg-soft);
   padding: 2px 6px;
 }
 
@@ -550,7 +550,7 @@
   gap: 12px;
   border: 1px solid var(--erp-border);
   border-radius: 12px;
-  background: #fbfdfc;
+  background: var(--erp-surface-bg-soft);
   padding: 12px 14px;
 }
 
@@ -573,8 +573,8 @@
   right: -7px;
   width: 13px;
   height: 13px;
-  border-top: 1px solid #94a3b8;
-  border-right: 1px solid #94a3b8;
+  border-top: 1px solid var(--erp-border-strong);
+  border-right: 1px solid var(--erp-border-strong);
   background: var(--erp-surface-bg);
   content: '';
   transform: translateY(-50%) rotate(45deg);
@@ -584,7 +584,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   overflow: hidden;
-  border: 1px solid #dbe7e0;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
   background: var(--erp-surface-bg);
 }
@@ -690,7 +690,7 @@
   height: 22px;
   place-items: center;
   border-radius: 999px;
-  background: #e8f7f4;
+  background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
   font-size: var(--erp-font-caption);
 }
@@ -726,7 +726,7 @@
   border: 1px solid var(--erp-border);
   border-bottom: 0;
   border-radius: 12px 12px 0 0;
-  background: #f4f8f5;
+  background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
   font-size: var(--erp-font-micro);
   font-weight: 800;
@@ -802,7 +802,7 @@
   right: -18px;
   width: 36px;
   height: 2px;
-  background: #99c7bf;
+  background: var(--erp-border-strong);
   content: '';
 }
 
@@ -819,7 +819,7 @@
   justify-content: space-between;
   gap: 8px;
   border-radius: 8px;
-  background: #f4f8f5;
+  background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
   font-size: var(--erp-font-micro);
   padding: 6px 8px;
@@ -844,7 +844,7 @@
   border: 1px solid var(--erp-border);
   border-bottom: 0;
   border-radius: 12px 12px 0 0;
-  background: #f4f8f5;
+  background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
   font-size: var(--erp-font-micro);
   font-weight: 800;
@@ -857,7 +857,7 @@
   overflow: hidden;
   border: 1px solid var(--erp-border);
   border-radius: 12px;
-  background: #fbfdfc;
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-dev-testing-closeout-command-disclosure > summary {
@@ -1107,7 +1107,7 @@
   border: 1px solid var(--erp-border);
   border-bottom: 0;
   border-radius: 10px 10px 0 0;
-  background: #f4f8f5;
+  background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
   font-size: var(--erp-font-micro);
   font-weight: 800;
@@ -1276,9 +1276,9 @@
 }
 
 .erp-dev-data-local-boundary {
-  border: 1px solid #dbe7e0;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
-  background: #f8fbf9;
+  background: var(--erp-surface-bg-soft);
   padding: 9px 12px;
 }
 
@@ -1315,7 +1315,7 @@
 }
 
 .erp-dev-data-workflow-step + .erp-dev-data-workflow-step {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--erp-border);
 }
 
 .erp-dev-data-workflow-step:not(:last-child)::after {
@@ -1325,7 +1325,7 @@
   bottom: -22px;
   left: 35px;
   width: 2px;
-  background: #cbd5e1;
+  background: var(--erp-border-strong);
   content: '';
 }
 
@@ -1340,7 +1340,7 @@
   place-items: center;
   border-radius: 999px;
   background: var(--erp-primary-strong);
-  color: #ffffff;
+  color: var(--erp-on-accent);
   font-weight: 800;
 }
 
@@ -1380,7 +1380,7 @@
 .erp-dev-data-preflight-list {
   display: grid;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
 }
 
@@ -1394,7 +1394,7 @@
 }
 
 .erp-dev-data-preflight-row + .erp-dev-data-preflight-row {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--erp-border);
 }
 
 .erp-dev-data-preflight-row > div {
@@ -1461,9 +1461,9 @@
   min-width: 0;
   align-items: center;
   gap: 12px;
-  border: 1px solid #dbe7e0;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
-  background: #f8fbf9;
+  background: var(--erp-surface-bg-soft);
   padding: 11px 12px;
 }
 
@@ -1476,7 +1476,7 @@
 }
 
 .erp-dev-data-operation-technical {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -1523,7 +1523,7 @@
 }
 
 .erp-dev-data-workflow-step .ant-collapse {
-  border-color: #e2e8f0;
+  border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
 }
 
@@ -1584,35 +1584,8 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-validation-plan {
-  border-color: var(--erp-text-muted);
-  background: #0f172a;
-}
-
-[data-erp-theme='dark']
-  .erp-dev-testing-validation-plan__head
-  > .ant-btn-primary {
-  border-color: var(--erp-primary-strong);
-  background: var(--erp-primary-strong);
-  color: #fff;
-}
-
-[data-erp-theme='dark']
-  .erp-dev-testing-validation-plan__head
-  > .ant-btn-primary:not(:disabled):not(.ant-btn-disabled):hover,
-[data-erp-theme='dark']
-  .erp-dev-testing-validation-plan__head
-  > .ant-btn-primary:not(:disabled):not(.ant-btn-disabled):focus-visible {
-  border-color: var(--erp-primary);
-  background: var(--erp-primary);
-  color: #fff;
-}
-
-[data-erp-theme='dark']
-  .erp-dev-testing-validation-plan__head
-  > .ant-btn-primary:not(:disabled):not(.ant-btn-disabled):active {
-  border-color: #1e40af;
-  background: #1e40af;
-  color: #fff;
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-closeout-heading,

@@ -40,7 +40,7 @@
 
 .erp-feedback-anatomy figcaption {
   margin-bottom: 14px;
-  color: var(--erp-text-secondary, #53635c);
+  color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
 }
 
@@ -125,7 +125,7 @@
 .erp-feedback-sketch-actions b {
   padding: 7px 12px;
   border-radius: 6px;
-  color: var(--erp-primary-contrast, #fff);
+  color: var(--erp-on-accent);
   background: var(--erp-primary, #237443);
 }
 
@@ -141,7 +141,7 @@
 
 .erp-feedback-explanation p,
 .erp-feedback-note {
-  color: var(--erp-text-secondary, #53635c);
+  color: var(--erp-text-muted);
   line-height: 1.7;
 }
 

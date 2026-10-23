@@ -58,7 +58,7 @@ export function DrillRow({ drill, recommended, onOpen }) {
         >
           {drill.title}
         </Button>
-        {recommended ? <Tag color="blue">当前建议</Tag> : null}
+        {recommended ? <Tag className="erp-dev-accent-tag">当前建议</Tag> : null}
       </th>
       <td>
         <Tag color={drill.statusPresentation.color}>

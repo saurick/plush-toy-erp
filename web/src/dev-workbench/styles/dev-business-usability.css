@@ -90,7 +90,7 @@
 }
 
 .erp-dev-business-usability-summary strong {
-  color: #1f6f35;
+  color: var(--erp-primary-strong);
   font-size: 26px;
   line-height: 1;
 }
@@ -173,7 +173,7 @@
 }
 
 .erp-dev-business-usability-outcomes dt {
-  color: #496154;
+  color: var(--erp-text-muted);
   font-weight: 700;
 }
 
@@ -188,23 +188,23 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-business-usability-page {
-  background: #0f1724;
-  color: #e5edf7;
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-business-usability-header {
-  border-color: var(--erp-text-muted);
-  background: rgb(23 33 50 / 0.96);
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
 }
 
 [data-erp-theme='dark'] .erp-dev-business-usability-header p.ant-typography,
 [data-erp-theme='dark'] .erp-dev-business-usability-page-cell p,
 [data-erp-theme='dark'] .erp-dev-business-usability-outcomes dd {
-  color: #a7b3c4;
+  color: var(--erp-text-muted);
 }
 
 [data-erp-theme='dark'] .erp-dev-business-usability-page-cell strong {
-  color: #e5edf7;
+  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-business-usability-summary strong {

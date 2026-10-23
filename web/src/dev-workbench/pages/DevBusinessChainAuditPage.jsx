@@ -151,7 +151,7 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
       >
         <h2>与当前业务链定义核对</h2>
         <p>
-          <Tag color={comparison?.status === 'unchanged' ? 'blue' : 'gold'}>
+          <Tag color={comparison?.status === 'unchanged' ? undefined : 'gold'} className={comparison?.status === 'unchanged' ? 'erp-dev-accent-tag' : undefined}>
             {CHAIN_DEFINITION_STATES[comparison?.status] || '定义核对不可用'}
           </Tag>
           历史结果保持原样；定义一致也不代表当前源码已通过实测。

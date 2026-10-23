@@ -425,7 +425,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView }) {
           <Title level={2}>{flow.label}</Title>
           <KeyValue value={flow.key} />
         </div>
-        <Tag color="green">只读规则</Tag>
+        <Tag className="erp-dev-accent-tag">只读规则</Tag>
       </div>
       <Paragraph>{flow.summary}</Paragraph>
       <div

@@ -54,7 +54,7 @@ export default function DevProjectRelationships() {
         <section className="erp-dev-project-relationships__detail" aria-label="图模型与项目示例">
           <div className="erp-dev-project-relationships__heading">
             <h2>{model.title}</h2>
-            {graph ? <Tag color="blue" data-project-graph-classification>{graph.classification.label}</Tag> : null}
+            {graph ? <Tag className="erp-dev-accent-tag" data-project-graph-classification>{graph.classification.label}</Tag> : null}
           </div>
           <p className="erp-dev-project-relationships__definition">{model.definition}</p>
           <div className="erp-dev-project-relationships__controls">

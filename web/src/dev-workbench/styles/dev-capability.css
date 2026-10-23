@@ -217,10 +217,10 @@
   gap: 10px;
   align-items: center;
   min-width: 0;
-  border: 1px solid #b7d2f4;
+  border: 1px solid var(--erp-border);
   border-radius: 10px;
-  background: #f5f9ff;
-  color: #143b76;
+  background: var(--erp-primary-softer);
+  color: var(--erp-primary-strong);
   cursor: pointer;
   padding: 10px;
   text-align: left;
@@ -229,7 +229,7 @@
 .erp-dev-customer-quick-action:hover,
 .erp-dev-customer-quick-action:focus-visible {
   border-color: var(--erp-primary);
-  background: #eff6ff;
+  background: var(--erp-interactive-bg-hover);
   outline: none;
 }
 
@@ -240,7 +240,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 9px;
-  background: #dbeafe;
+  background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
   font-size: 17px;
 }
@@ -437,8 +437,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 18px;
-  background: #166534;
-  color: #f0fdf4;
+  background: var(--erp-primary);
+  color: var(--erp-on-accent);
   font-size: 34px;
   font-weight: 760;
 }
@@ -506,7 +506,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
-  border: 1px solid #cddfd8;
+  border: 1px solid var(--erp-border);
   border-radius: 12px;
   background: var(--erp-surface-bg);
   padding: 12px;
@@ -519,7 +519,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #e8f7f4;
+  background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
   font-weight: 760;
 }
@@ -621,8 +621,8 @@
   margin: 0;
   border: 1px solid var(--erp-border);
   border-radius: 10px;
-  background: #102016;
-  color: #bbf7d0;
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text);
   padding: 12px;
   font-size: var(--erp-font-caption);
   line-height: 1.55;
@@ -734,12 +734,12 @@
   align-items: start;
   border: 1px solid var(--erp-border);
   border-radius: 10px;
-  background: #102016;
+  background: var(--erp-surface-bg-soft);
   padding: 10px;
 }
 
 .erp-dev-customer-command :where(code) {
-  color: #d9fbe4;
+  color: var(--erp-text);
   font-size: var(--erp-font-caption);
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -747,7 +747,7 @@
 }
 
 .erp-dev-customer-command .ant-btn {
-  color: #bbf7d0;
+  color: var(--erp-primary-strong);
 }
 
 .erp-dev-hub-header {
@@ -807,7 +807,7 @@
   display: grid;
   gap: 8px;
   margin-bottom: 10px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--erp-border);
   padding: 0 0 10px;
 }
 
@@ -829,7 +829,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--erp-border);
   padding: 0 0 10px;
 }
 

@@ -4,12 +4,6 @@ import { PERMISSION_NAVIGATION_STATE } from '../config/devPermissionNavigation.m
 
 const { Text, Title } = Typography
 
-function modeTagColor(mode = '') {
-  if (mode === 'custom') return 'purple'
-  if (mode === 'merged') return 'geekblue'
-  return 'green'
-}
-
 function MenuItems({ items = [], emptyText = '当前没有可显示入口' }) {
   if (items.length === 0) {
     return <Text type="secondary">{emptyText}</Text>
@@ -56,7 +50,7 @@ export default function DevPermissionNavigationOverview({
           </Text>
         </div>
         <Space wrap size={[6, 6]}>
-          <Tag color={unavailable || blocked ? 'orange' : 'blue'}>
+          <Tag color={unavailable || blocked ? 'warning' : undefined} className={unavailable || blocked ? undefined : 'erp-dev-accent-tag'}>
             {unavailable
               ? '待核对'
               : blocked
@@ -67,9 +61,8 @@ export default function DevPermissionNavigationOverview({
           </Tag>
           {model?.modeLabel ? (
             <Tag
-              color={
-                unavailable || blocked ? 'orange' : modeTagColor(model?.mode)
-              }
+              color={unavailable || blocked ? 'warning' : undefined}
+              className={unavailable || blocked ? undefined : 'erp-dev-accent-tag'}
             >
               {model.modeLabel}
             </Tag>
@@ -120,7 +113,7 @@ export default function DevPermissionNavigationOverview({
               >
                 <div className="erp-permission-navigation__group-head">
                   <Text strong>{group.title}</Text>
-                  <Tag color={group.key === 'primary' ? 'blue' : undefined}>
+                  <Tag className={group.key === 'primary' ? 'erp-dev-accent-tag' : undefined}>
                     {group.items.length}
                   </Tag>
                 </div>

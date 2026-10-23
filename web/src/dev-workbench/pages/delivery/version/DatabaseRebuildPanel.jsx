@@ -20,7 +20,7 @@ export function DatabaseRebuildPanel({
     <Card
       className="erp-dev-version-table-card"
       title="test 数据方式"
-      extra={<Tag color="blue">与版本部署分开</Tag>}
+      extra={<Tag className="erp-dev-accent-tag">与版本部署分开</Tag>}
     >
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         <Alert

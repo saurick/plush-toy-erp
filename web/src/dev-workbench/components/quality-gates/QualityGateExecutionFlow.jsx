@@ -355,7 +355,7 @@ export function GateExecutionFlow({ summary, operation, profile }) {
               : `直接运行 full 共用主路径；strict 会在此之前增加 ${strictExtraCount} 个检查。`}
           </Text>
         </div>
-        <Tag color={operation ? 'blue' : 'default'}>
+        <Tag className={operation ? 'erp-dev-accent-tag' : undefined}>
           {PROFILE_LABELS[profile]} · {stages.length} 个阶段
         </Tag>
       </div>

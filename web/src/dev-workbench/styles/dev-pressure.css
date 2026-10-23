@@ -108,7 +108,7 @@
 }
 
 .erp-dev-pressure-metric > strong {
-  color: var(--erp-text-primary);
+  color: var(--erp-text);
   font-size: 26px;
   font-variant-numeric: tabular-nums;
 }
@@ -165,7 +165,7 @@
 }
 
 .erp-dev-pressure-bar--rpc {
-  background: var(--erp-success, #16826a);
+  background: #16826a;
 }
 
 .erp-dev-pressure-methods {
@@ -209,7 +209,7 @@
 }
 
 .erp-dev-pressure-over-limit {
-  color: var(--erp-danger, #c43838);
+  color: var(--erp-visual-danger-text);
   font-weight: 700;
 }
 

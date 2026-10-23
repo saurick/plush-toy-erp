@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import http from 'node:http'
+import { createHash } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises'
 import os from 'node:os'
@@ -24,7 +25,8 @@ async function fixture(t, options = {}) {
   let calls = 0
   const events = []
   const server = await createStandaloneWorkbenchServer({
-    staticRoot: root, httpsOrigin: origin,
+    staticRoot: root,
+    httpsOrigin: origin,
     credentials: { username, passwordHash, ...options },
     plugins: [{ configureServer: ({ middlewares }) => middlewares.use((request, response, next) => {
       if (request.url.startsWith('/__dev/api/test')) { calls++; response.end('protected sink') }
@@ -37,8 +39,10 @@ async function fixture(t, options = {}) {
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); await rm(root, { recursive: true }) })
   const address = `http://127.0.0.1:${server.address().port}`
   const headers = {
-    host: 'workbench.example.test', 'x-forwarded-proto': 'https',
-    'x-forwarded-for': '203.0.113.42', 'sec-fetch-site': 'same-origin',
+    host: 'workbench.example.test',
+    'x-forwarded-proto': 'https',
+    'x-forwarded-for': '203.0.113.42',
+    'sec-fetch-site': 'same-origin',
   }
   // Node fetch replaces Host, so exercise the actual TLS proxy contract with
   // HTTP requests whose Host matches the configured public origin.
@@ -57,7 +61,8 @@ async function fixture(t, options = {}) {
     outgoing.end(init.body ? String(init.body) : undefined)
   })
   const login = (overrides = {}, cookie = '') => request('/__dev/auth/login', {
-    method: 'POST', headers: {
+    method: 'POST',
+    headers: {
       origin, 'content-type': 'application/x-www-form-urlencoded', ...(cookie ? { cookie } : {}),
     },
     body: new URLSearchParams({ username, password, returnTo: '/__dev/docs?path=README.md#overview', ...overrides }),
@@ -102,6 +107,22 @@ test('login page is a real form with protected transport, bounded fields and an 
   assert.equal((await request('/__dev/login', { headers: { 'x-forwarded-proto': 'http' } })).status, 403)
   assert.equal((await request('/__dev/login', { headers: { host: 'evil.test' } })).status, 403)
   assert.equal((await request('/__dev/login', { headers: { 'x-forwarded-for': '1.2.3.4, 10.0.0.1' } })).status, 403)
+})
+
+test('login permits only its exact appearance bootstrap and escapes supplied HTML', async (t) => {
+  const { request } = await fixture(t)
+  const response = await request('/__dev/login?returnTo=%2F__dev%2Fdocs%3Fx%3D%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E')
+  const body = await response.text()
+  const scripts = [...body.matchAll(/<script id="workbench-appearance">([\s\S]*?)<\/script>/gu)]
+  assert.equal(scripts.length, 1)
+  assert.equal([...body.matchAll(/<script\b/gu)].length, 1)
+  const hash = createHash('sha256').update(scripts[0][1]).digest('base64')
+  const csp = response.headers.get('content-security-policy')
+  assert.equal(csp.split('; ').find((part) => part.startsWith('script-src ')), `script-src 'sha256-${hash}'`)
+  assert.match(csp, /^default-src 'none';/u)
+  assert.match(csp, /form-action 'self'; base-uri 'none'; frame-ancestors 'none'$/u)
+  assert.match(scripts[0][1], /plush_workbench_appearance/u)
+  assert.doesNotMatch(scripts[0][1], /admin_erp_preferences|fetch\(|XMLHttpRequest/u)
 })
 
 test('the login favicon is public only through the trusted HTTPS boundary and cannot open other resources', async (t) => {
@@ -151,8 +172,13 @@ test('correct login restores the deep link, uses a secure opaque cookie and prot
 
 test('external top-level links reach only the public login form while cross-site tools and frames stay closed', async (t) => {
   const { request, calls } = await fixture(t)
-  const headers = { accept: 'text/html', referer: 'https://outside.example/',
-    'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }
+  const headers = {
+    accept: 'text/html',
+    referer: 'https://outside.example/',
+    'sec-fetch-site': 'cross-site',
+    'sec-fetch-mode': 'navigate',
+    'sec-fetch-dest': 'document',
+  }
   const entry = await request('/__dev/docs?path=README.md', { headers })
   assert.equal(entry.status, 303)
   assert.equal(entry.headers.get('location'), '/__dev/login?returnTo=%2F__dev%2Fdocs%3Fpath%3DREADME.md')

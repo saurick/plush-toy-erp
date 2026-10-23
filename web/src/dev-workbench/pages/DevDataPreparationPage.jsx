@@ -222,7 +222,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
             <Paragraph>{selectedChain.summary}</Paragraph>
             <Space wrap size={[4, 4]}>
               {selectedChain.scenarioKinds.map((kind) => (
-                <Tag color="green" key={kind}>
+                <Tag className="erp-dev-accent-tag" key={kind}>
                   {scenarioLabelByKey.get(kind) || kind}
                 </Tag>
               ))}
@@ -407,7 +407,7 @@ function DatasetEnvironmentContract({ summary }) {
         <Space wrap size={[4, 4]}>
           <Tag>{contract.dataVersion}</Tag>
           <Tag>{contract.runId}</Tag>
-          <Tag color="blue">仅模拟数据</Tag>
+          <Tag className="erp-dev-accent-tag">仅模拟数据</Tag>
         </Space>
       </header>
       <Descriptions

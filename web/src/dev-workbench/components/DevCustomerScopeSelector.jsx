@@ -51,7 +51,7 @@ export default function DevCustomerScopeSelector({
           <div className="erp-dev-customer-scope__title">
             <Text strong>{label}</Text>
             {!compact && ready && scope.defaulted ? (
-              <Tag color="green">默认</Tag>
+              <Tag className="erp-dev-accent-tag">默认</Tag>
             ) : null}
             {!ready ? <Tag color="warning">{invalidTag}</Tag> : null}
           </div>

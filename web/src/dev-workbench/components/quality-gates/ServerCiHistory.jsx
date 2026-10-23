@@ -64,7 +64,7 @@ export function ServerCiHistory({ evidence, currentCommit }) {
                     <td data-label="提交">
                       <Space size={6} wrap>
                         <Text code>{shortCommit(run.gitSha)}</Text>
-                        {current ? <Tag color="blue">当前提交</Tag> : null}
+                        {current ? <Tag className="erp-dev-accent-tag">当前提交</Tag> : null}
                       </Space>
                     </td>
                     <td data-label="时间">

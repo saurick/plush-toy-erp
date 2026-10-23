@@ -176,7 +176,7 @@ export function RunView({
                   <Title level={2}>{PROFILE_LABELS[operation.profile]}</Title>
                   <OperationStatusTag operation={operation} />
                   {operation.displayContext === 'current-proof' ? (
-                    <Tag color="blue">当前正式回执</Tag>
+                    <Tag className="erp-dev-accent-tag">当前正式回执</Tag>
                   ) : null}
                   {operation.displayContext === 'history' ? (
                     <Tag color="warning">本机历史</Tag>

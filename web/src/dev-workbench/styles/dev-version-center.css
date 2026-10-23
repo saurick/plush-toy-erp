@@ -784,7 +784,7 @@
 }
 
 :root[data-erp-theme='dark'] .erp-dev-pipeline-timing__critical-path {
-  background: rgba(22, 119, 255, 0.2);
+  background: var(--erp-primary-soft);
 }
 
 :root[data-erp-theme='dark'] .erp-dev-pipeline-timing__jobs > details {

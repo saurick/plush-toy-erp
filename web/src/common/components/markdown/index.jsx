@@ -35,38 +35,9 @@ import {
 } from './mermaidViewport.mjs'
 import './mermaid.css'
 import { bindMermaidNodeActions } from './mermaidNodeActions.mjs'
+import { getMermaidTheme } from './mermaidTheme.mjs'
 
 export { extractMarkdownHeadings }
-
-const MERMAID_FONT_FAMILY =
-  '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-
-const MERMAID_THEME_CONFIG = {
-  light: {
-    theme: 'base',
-    themeVariables: {
-      primaryColor: '#eef7ef',
-      primaryTextColor: '#173f2a',
-      primaryBorderColor: '#8cc49a',
-      lineColor: '#2f6f4e',
-      secondaryColor: '#f8fbf8',
-      tertiaryColor: '#ffffff',
-      fontFamily: MERMAID_FONT_FAMILY,
-    },
-  },
-  dark: {
-    theme: 'dark',
-    themeVariables: {
-      primaryColor: '#16351f',
-      primaryTextColor: '#e5edf5',
-      primaryBorderColor: '#3f7d53',
-      lineColor: '#86efac',
-      secondaryColor: '#0f172a',
-      tertiaryColor: '#111827',
-      fontFamily: MERMAID_FONT_FAMILY,
-    },
-  },
-}
 
 let mermaidRenderSequence = 0
 let mermaidRenderQueue = Promise.resolve()
@@ -80,15 +51,13 @@ function enqueueMermaidRender(render) {
   return queuedRender
 }
 
-function getCurrentERPTheme() {
-  if (typeof document === 'undefined') {
-    return 'light'
-  }
-  return document.documentElement.dataset.erpTheme === 'dark' ? 'dark' : 'light'
+function getCurrentERPAppearance() {
+  const root = typeof document === 'undefined' ? undefined : document.documentElement
+  return { mode: root?.dataset.erpTheme === 'dark' ? 'dark' : 'light', accent: root?.dataset.erpAccent }
 }
 
-function useCurrentERPTheme() {
-  const [theme, setTheme] = useState(getCurrentERPTheme)
+function useCurrentERPAppearance() {
+  const [appearance, setAppearance] = useState(getCurrentERPAppearance)
 
   useEffect(() => {
     if (
@@ -100,18 +69,19 @@ function useCurrentERPTheme() {
 
     const root = document.documentElement
     const syncTheme = () => {
-      setTheme(getCurrentERPTheme())
+      const next = getCurrentERPAppearance()
+      setAppearance((previous) => previous.mode === next.mode && previous.accent === next.accent ? previous : next)
     }
     const observer = new MutationObserver(syncTheme)
     observer.observe(root, {
       attributes: true,
-      attributeFilter: ['data-erp-theme'],
+      attributeFilter: ['data-erp-theme', 'data-erp-accent'],
     })
     syncTheme()
     return () => observer.disconnect()
   }, [])
 
-  return theme
+  return appearance
 }
 
 /* eslint-disable react/no-danger */
@@ -128,9 +98,10 @@ export function MermaidDiagram({
   selectedNodeId,
   onNodeSelect,
 }) {
-  const currentTheme = useCurrentERPTheme()
-  const theme =
-    themeMode === 'light' || themeMode === 'dark' ? themeMode : currentTheme
+  const appearance = useCurrentERPAppearance()
+  const fixedTheme = themeMode === 'light' || themeMode === 'dark'
+  const theme = fixedTheme ? themeMode : appearance.mode
+  const accent = fixedTheme ? null : appearance.accent
   const useFlowchartHtmlLabels = flowchartHtmlLabels !== false
   const fitInitially = initialZoom === 'fit'
   const initialZoomMode = fitInitially ? 'fit-all' : 'manual'
@@ -350,8 +321,7 @@ export function MermaidDiagram({
       try {
         const mermaidModule = await import('mermaid')
         const mermaid = mermaidModule.default || mermaidModule
-        const renderTheme =
-          MERMAID_THEME_CONFIG[theme] || MERMAID_THEME_CONFIG.light
+        const renderTheme = getMermaidTheme({ mode: theme, accent, fixed: fixedTheme })
         const { svg } = await enqueueMermaidRender(async () => {
           mermaid.initialize({
             startOnLoad: false,
@@ -379,6 +349,8 @@ export function MermaidDiagram({
           const intrinsicHeight = Number(viewBox?.[3])
           setRenderState({
             status: 'rendered',
+            theme,
+            accent: accent || 'fixed',
             chart,
             source: renderedChart,
             svg,
@@ -402,7 +374,7 @@ export function MermaidDiagram({
     return () => {
       cancelled = true
     }
-  }, [chart, renderedChart, diagramId, theme, useFlowchartHtmlLabels])
+  }, [chart, renderedChart, diagramId, theme, accent, fixedTheme, useFlowchartHtmlLabels])
 
   useEffect(() => {
     if (renderState.chart !== chart || typeof onNodeSelect !== 'function') {
@@ -514,7 +486,8 @@ export function MermaidDiagram({
         .filter(Boolean)
         .join(' ')}
       data-mermaid-status={renderState.status}
-      data-mermaid-theme={theme}
+      data-mermaid-theme={renderState.theme || theme}
+      data-mermaid-accent={renderState.accent}
       data-mermaid-html-labels={useFlowchartHtmlLabels ? 'true' : 'false'}
       data-mermaid-direction={activeDirection || undefined}
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}

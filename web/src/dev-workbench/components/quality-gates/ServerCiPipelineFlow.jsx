@@ -35,8 +35,8 @@ export function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
         </div>
         {dag.status === 'available' ? (
           <Space size={6} wrap>
-            <Tag color="blue">{dag.nodeCount} 个 Job</Tag>
-            <Tag color="purple">{dag.edgeCount} 条依赖</Tag>
+            <Tag className="erp-dev-accent-tag">{dag.nodeCount} 个 Job</Tag>
+            <Tag>{dag.edgeCount} 条依赖</Tag>
           </Space>
         ) : (
           <Tag>未证明</Tag>

@@ -34,14 +34,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: #e6f4ea;
-  color: #23813b;
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
   font-size: 21px;
 }
 
 .erp-dev-permission-relationships-header h1.ant-typography {
   margin: 2px 0 4px;
-  color: #172b1e;
+  color: var(--erp-text);
   font-size: 28px;
   line-height: 1.22;
 }
@@ -49,7 +49,7 @@
 .erp-dev-permission-relationships-header p.ant-typography {
   max-width: 780px;
   margin: 0;
-  color: #526157;
+  color: var(--erp-text-muted);
   line-height: 1.65;
 }
 
@@ -114,7 +114,7 @@
 }
 
 .erp-permission-relationship__intro h2.ant-typography {
-  color: #203326;
+  color: var(--erp-text);
   font-size: 20px;
 }
 
@@ -403,7 +403,7 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-permission-relationships-page {
-  background: #0f1720;
+  background: var(--erp-page-bg);
   color: var(--erp-text, var(--erp-border));
 }
 
@@ -428,13 +428,13 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-permission-relationships-header__icon {
-  border: 1px solid #365342;
-  background: #183324;
-  color: #8ed59f;
+  border: 1px solid var(--erp-border);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
 }
 
 [data-erp-theme='dark'] .erp-dev-permission-relationships-eyebrow {
-  color: #9bd8aa;
+  color: var(--erp-primary-strong);
 }
 
 [data-erp-theme='dark']
