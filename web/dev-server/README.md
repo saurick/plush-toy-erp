@@ -50,6 +50,7 @@
 - 133 Scenario 只能在对应目标卡中准备和二次确认；执行前重新读取固定 target attestation，并创建绑定 exact release / database / migration 的新备份回滚点。备份通过 `erp_backup` 只读角色生成并校验，只向页面返回 alias、hash、大小和时间。
 - 接口与集成复用质量门禁的只读 `GET /__dev/api/qa/quality-gates/integration-evidence`；`devIntegrationEvidence.mjs` 只投影既有隔离数据库运行回执和 digest 绑定的 Go JSON。场景与方法关联读取正式 API 文档，源码身份不一致显示历史；缺失、失败、跳过、损坏报告分别保留边界，不接受浏览器传入路径、报告或执行参数。
 - 同一场景证据响应的 `ruleTests` 按关键规则目录投影具名 PostgreSQL 用例，供测试页关联规则、测试和门禁；不新增运行存储或执行入口。普通 Go 用例继续读取覆盖基线，数据库回执还须保留执行前后源码身份和清理读回。
+- 业务数据一致性复用 testing operation 的固定 `business-consistency` 动作，执行登记的前端与 Go 用例并更新覆盖报告，沿用 CSRF、幂等、QA 锁和执行前后源码身份。测试页只接受完整登记、有效执行数和当前身份的证据；PostgreSQL 结果仍由隔离运行回执证明，专项不会迁移共享数据库。
 - 接口合同变更复用同一 middleware 的只读 `GET /__dev/api/qa/quality-gates/rpc-contract-review?range=worktree|staged`；只允许单一范围参数，由固定公共契约生成入口读取 HEAD、工作区或 index，不生成、不暂存。
 
   样例实际执行通过原 testing operation 的固定 `rpc-examples` 动作调用 `--verify-examples`，沿用 CSRF、幂等、QA 锁及源码身份；回执验证与边界见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md#接口差异与执行证据--rpc-review)。

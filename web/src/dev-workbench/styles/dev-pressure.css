@@ -36,17 +36,6 @@
   background: var(--erp-surface-bg-soft);
 }
 
-.erp-dev-pressure-panel summary {
-  width: fit-content;
-  color: var(--erp-text-muted);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.erp-dev-pressure-panel details[open] > summary {
-  margin-bottom: 12px;
-}
-
 .erp-dev-pressure-panel code,
 .erp-dev-pressure-panel dd {
   overflow-wrap: anywhere;

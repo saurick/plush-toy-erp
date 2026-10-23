@@ -1,6 +1,7 @@
 import React from 'react'
 import { flushSync } from 'react-dom'
 import { Button } from 'antd'
+import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { fulfillmentStepMatchesRole } from '../../../erp/utils/workflowFulfillment.mjs'
 import { buildFulfillmentChain, buildFulfillmentChainWires, fulfillmentChainColumns } from '../../config/devFulfillmentChain.mjs'
 import './fulfillmentChain.css'
@@ -11,7 +12,7 @@ const relativeRect = (node, base) => {
   return { x: box.left - base.left, y: box.top - base.top, width: box.width, height: box.height }
 }
 
-export default function FulfillmentChainCanvas({ role, selectedStage, handlingOpen, selectedGuide, detailID, overviewRef, onSelectStage, onOpenException }) {
+export default function FulfillmentChainCanvas({ role, selectedStage, selectedGuide, detailID, overviewRef, onSelectStage, onOpenException }) {
   const mapRef = React.useRef(null)
   const [geometry, setGeometry] = React.useState({ width: 0, height: 0, stages: {} })
   const columns = fulfillmentChainColumns(geometry.width || 900)
@@ -65,7 +66,10 @@ export default function FulfillmentChainCanvas({ role, selectedStage, handlingOp
                   <button className="erp-dev-chain__stage-card erp-dev-chain__stage-main" data-stage-card data-selected={selectedStage === step.stage || undefined} type="button" title={step.label} aria-label={`${number} ${step.label}`} aria-expanded={selectedStage === step.stage} aria-controls={selectedStage === step.stage ? detailID : undefined} onClick={() => onSelectStage(step.stage)}>
                     <span>{number}</span><strong>{label}</strong>{step.branch ? <small>按约定</small> : null}
                   </button>
-                  {step.handling ? <div className="erp-dev-chain__stage-branch"><button className="erp-dev-chain__exception-trigger" data-stage-exception={step.stage} type="button" aria-label={`查看第${number}环节异常`} aria-pressed={selectedStage === step.stage && handlingOpen} aria-controls={selectedStage === step.stage ? detailID : undefined} onClick={() => onSelectStage(step.stage, true)}>异常</button></div> : null}
+                  {step.handling?.guides.map((key) => {
+                    const guide = catalog.exception_guides.find((item) => item.key === key)
+                    return <div className="erp-dev-chain__stage-branch" key={key}><button className="erp-dev-chain__exception-trigger" data-stage-exception={step.stage} data-stage-guide={key} type="button" aria-label={`${number} · ${guide.diagram.branch_label}`} aria-pressed={selectedStage === step.stage && selectedGuide === key} onClick={() => onOpenException(guide, step.stage)}>{guide.diagram.branch_label}</button></div>
+                  })}
                 </div>
               ))}
             </div>

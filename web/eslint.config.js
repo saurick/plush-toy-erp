@@ -83,6 +83,35 @@ const selectClearExceptionRule = {
   },
 }
 
+const selectDuplicateLabelRule = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: { duplicate: '下拉框已有可见标签，不再传入同义 label 前缀；为选中值和清空入口保留空间。' },
+  },
+  create(context) {
+    const normalize = (value) => typeof value === 'string' ? value.replace(/[：:\s]/gu, '') : ''
+    const attributeText = (attribute) => attribute?.value?.value ?? attribute?.value?.expression?.value
+    return {
+      'JSXAttribute[name.name="label"]': (node) => {
+        const name = node.parent.name?.name || node.parent.name?.property?.name || ''
+        const label = normalize(attributeText(node))
+        if (!/(?:Select|SelectFilter)$/u.test(name) || !label) return
+        const duplicate = context.sourceCode.getAncestors(node).some((ancestor) => {
+          if (ancestor.type !== 'JSXElement') return false
+          const tag = ancestor.openingElement.name
+          if (tag.name === 'label') {
+            return normalize(ancestor.children.filter((child) => child.type === 'JSXText').map((child) => child.value).join('')) === label
+          }
+          return tag.object?.name === 'Form' && tag.property?.name === 'Item' &&
+            normalize(attributeText(ancestor.openingElement.attributes.find((attribute) => attribute.name?.name === 'label'))) === label
+        })
+        if (duplicate) context.report({ node, messageId: 'duplicate' })
+      },
+    }
+  },
+}
+
 export default [
   ...compat.config({
     env: {
@@ -188,9 +217,10 @@ export default [
   {
     files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],
     ignores: ['src/**/*.test.{js,jsx,mjs,ts,tsx}'],
-    plugins: { 'select-controls': { rules: { 'clear-exception': selectClearExceptionRule } } },
+    plugins: { 'select-controls': { rules: { 'clear-exception': selectClearExceptionRule, 'duplicate-label': selectDuplicateLabelRule } } },
     rules: {
       'select-controls/clear-exception': 'error',
+      'select-controls/duplicate-label': 'error',
       'no-restricted-imports': sharedImportRestrictions(),
       'no-restricted-syntax': ['error', ...sharedSyntaxRestrictions],
     },

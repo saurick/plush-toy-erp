@@ -1196,8 +1196,7 @@ func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (_ *biz.
 	return purchaseReceiptWithItems(ctx, r.data.postgres, receipt)
 }
 
-func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.PurchaseReceiptFilter) (_ []*biz.PurchaseReceipt, _ int, resultErr error) {
-	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
+func (r *inventoryRepo) purchaseReceiptListQuery(filter biz.PurchaseReceiptFilter) *ent.PurchaseReceiptQuery {
 	query := r.data.postgres.PurchaseReceipt.Query()
 	if filter.IDs != nil {
 		query.Where(purchasereceipt.IDIn(filter.IDs...))
@@ -1206,7 +1205,7 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 		scope := biz.NormalizeWarehouseDataScope(*filter.WarehouseScope)
 		switch scope.Mode {
 		case biz.DataScopeModeNone:
-			return []*biz.PurchaseReceipt{}, 0, nil
+			query = query.Where(purchasereceipt.IDIn())
 		case biz.DataScopeModeAssigned:
 			query = query.Where(
 				purchasereceipt.HasItems(),
@@ -1234,7 +1233,7 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 		query = query.Where(purchasereceipt.ReceivedAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		query = query.Where(purchasereceipt.ReceivedAtLTE(endOfDateFilter(*filter.DateTo)))
+		query = query.Where(purchasereceipt.ReceivedAtLTE(*filter.DateTo))
 	}
 	itemPredicates := []predicate.PurchaseReceiptItem{}
 	if filter.MaterialID > 0 {
@@ -1260,6 +1259,12 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 	if len(itemPredicates) > 0 {
 		query = query.Where(purchasereceipt.HasItemsWith(itemPredicates...))
 	}
+	return query
+}
+
+func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.PurchaseReceiptFilter) (_ []*biz.PurchaseReceipt, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
+	query := r.purchaseReceiptListQuery(filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -1564,7 +1569,7 @@ func lockPurchaseOrderForReceipt(ctx context.Context, tx *inventoryDBTx, purchas
 
 func purchaseReceiptPriceAndAmount(item *ent.PurchaseOrderItem, quantity decimal.Decimal) (*decimal.Decimal, *decimal.Decimal) {
 	if item.UnitPrice != nil {
-		amount := item.UnitPrice.Mul(quantity)
+		amount := item.UnitPrice.Mul(quantity).Round(6)
 		return item.UnitPrice, &amount
 	}
 	if item.Amount != nil && quantity.Equal(item.PurchasedQuantity) {
@@ -2290,4 +2295,9 @@ func validatePurchaseReceiptLineWarehouses(ctx context.Context, client *ent.Clie
 		}
 	}
 	return nil
+}
+
+func (r *inventoryRepo) CountPurchaseReceiptsByStatus(ctx context.Context, filter biz.PurchaseReceiptFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.purchaseReceiptListQuery(filter).GroupBy(purchasereceipt.FieldStatus).Aggregate(ent.Count()).Scan)
 }

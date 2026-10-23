@@ -68,6 +68,13 @@ export const FINANCE_STATUS_OPTIONS = STATUS_OPTIONS.filter(({ value }) =>
   ['', OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED, OperationalFactStatus.SETTLED, OperationalFactStatus.CANCELLED].includes(value)
 )
 
+export const PRODUCTION_STATUS_OPTIONS = STATUS_OPTIONS.filter(({ value }) =>
+  !value || [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED, OperationalFactStatus.CANCELLED].includes(value)
+)
+export const RESERVATION_STATUS_OPTIONS = STATUS_OPTIONS.filter(({ value }) =>
+  !value || Object.values(StockReservationStatus).includes(value)
+)
+
 export const OCCURRED_DATE_FILTER_OPTIONS = [
   { label: '发生日期', value: 'occurred_at' },
 ]

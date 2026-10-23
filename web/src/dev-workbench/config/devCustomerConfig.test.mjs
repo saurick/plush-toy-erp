@@ -109,9 +109,9 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert.equal(summary.sourceLabel, '客户菜单配置')
   assert.equal(summary.runtimeStatus, 'runtime_frontend_only')
   assert.equal(summary.sectionCount, 13)
-  assert.equal(summary.itemCount, 28)
+  assert.equal(summary.itemCount, 27)
   assert.equal(summary.routeOnlyItemCount, 2)
-  assert.equal(summary.formalPageCount, 30)
+  assert.equal(summary.formalPageCount, 29)
   assert.deepEqual(summary.routeOnlyItemKeys, [
     'production-scheduling',
     'production-exceptions',
@@ -148,11 +148,9 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
         section.title === '产品工程' && section.items.includes('processes')
     )
   )
-  assert(
-    summary.sections.some(
-      (section) =>
-        section.title === '出货管理' && section.items.includes('shipments')
-    )
+  assert.deepEqual(
+    summary.sections.find((section) => section.title === '出货管理')?.items,
+    ['shipments', 'outbound']
   )
   assert(
     summary.sections.some(

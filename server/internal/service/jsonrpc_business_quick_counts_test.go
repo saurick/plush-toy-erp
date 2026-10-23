@@ -22,7 +22,9 @@ func TestRPCDocumentedBusinessQuickCounts(t *testing.T) {
 	d := newBOMJSONRPCTestData(t, data, admin)
 	activateOperationalFactTestCustomerConfig(t, d, customerConfigPublishParamsWithRevisionAndModuleState(t, customerConfigPublishParams(t), "quick-counts-production", "production", "enabled"))
 	logger := log.NewStdLogger(io.Discard)
+	d.adminManageUC = newAllWarehouseScopeAdminUsecase()
 	d.operationalFactUC = biz.NewOperationalFactUsecase(datarepo.NewOperationalFactRepo(data, logger))
+	d.workflowUC = biz.NewWorkflowUsecase(datarepo.NewWorkflowRepo(data, logger))
 	raw, err := os.ReadFile("../../cmd/public-contracts/testdata/rpc_examples.json")
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +33,7 @@ func TestRPCDocumentedBusinessQuickCounts(t *testing.T) {
 	if err := json.Unmarshal(raw, &examples); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"operational_fact.list_production_exceptions"} {
+	for _, key := range []string{"purchase.list_purchase_receipts", "bom.list_bom_versions", "operational_fact.list_production_facts", "operational_fact.list_stock_reservations", "operational_fact.list_production_exceptions", "workflow.list_tasks"} {
 		t.Run(key, func(t *testing.T) {
 			example, present := examples[key]
 			if !present || example.Verify == nil || example.Verify.Test != "TestRPCDocumentedBusinessQuickCounts" || example.Verify.Case != key {
@@ -103,10 +105,22 @@ func TestRPCDocumentedBusinessQuickCounts(t *testing.T) {
 	}
 }
 
+func (*documentedInventoryRepo) CountInventoryLotsByStatusForAccess(context.Context, biz.InventoryLotFilter, biz.WarehouseDataScope) (map[string]int, error) {
+	return map[string]int{"ACTIVE": 1}, nil
+}
+
 func businessQuickCountsRPCCall(t *testing.T, d *jsonrpcDispatcher, ctx context.Context, key string, params map[string]any) *v1.JsonrpcResult {
 	t.Helper()
 	parts := strings.SplitN(key, ".", 2)
-	handler := d.handleOperationalFact
+	handler := d.handlePurchase
+	switch parts[0] {
+	case "bom":
+		handler = d.handleBOM
+	case "operational_fact":
+		handler = d.handleOperationalFact
+	case "workflow":
+		handler = d.handleWorkflow
+	}
 	_, result, err := handler(ctx, parts[1], "counts", mustJSONRPCStruct(t, params))
 	if err != nil || result == nil {
 		t.Fatalf("result=%v err=%v", result, err)

@@ -86,3 +86,20 @@ test('下拉清空规则不干预普通输入框的清空配置', async () => {
   )
   assert.equal(result.messages.filter(({ ruleId }) => ruleId === 'select-controls/clear-exception').length, 0)
 })
+
+test('下拉用途前缀不重复已有可见标签', async () => {
+  for (const [markup, errors] of [
+    ['<label>显示比例<span><Select label="显示比例" /></span></label>', 1],
+    ['<Form.Item label="单位"><Select label={"单位"} /></Form.Item>', 1],
+    ['<label>显示比例：<Select placeholder="显示比例" aria-label="显示比例" /></label>', 0],
+    ['<Form.Item label="单位"><Select placeholder="请选择单位" /></Form.Item>', 0],
+    ['<Select label="显示比例" />', 0],
+    ['<label>显示比例<Select label={dynamicLabel} /></label>', 0],
+  ]) {
+    const [result] = await lint.lintText(
+      `export default function Fixture() { return ${markup} }\n`,
+      { filePath: 'src/erp/pages/SelectGuardFixture.jsx' }
+    )
+    assert.equal(result.messages.filter(({ ruleId }) => ruleId === 'select-controls/duplicate-label').length, errors, markup)
+  }
+})

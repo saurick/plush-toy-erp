@@ -11,7 +11,7 @@ import {
 
 const deriveKey = promisify(scrypt)
 export const WORKBENCH_SESSION_COOKIE = '__Host-plush-workbench-session'
-export const WORKBENCH_SESSION_TTL_MS = 8 * 60 * 60 * 1000
+export const WORKBENCH_SESSION_TTL_MS = 60 * 60 * 1000
 const LOGIN_WINDOW_MS = 15 * 60 * 1000
 const digest = (value) => createHash('sha256').update(value).digest('hex')
 

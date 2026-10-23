@@ -108,19 +108,7 @@
   .erp-dev-flow-header
   > .erp-dev-flow-concepts
   > summary {
-  min-height: 44px;
   flex-direction: row;
-  padding: 8px 18px;
-  color: var(--erp-text, #263d2d);
-}
-
-.erp-dev-flow-state-page
-  .erp-dev-flow-header
-  > .erp-dev-flow-concepts
-  > summary:focus-visible {
-  border-radius: 8px;
-  outline: 2px solid var(--erp-primary);
-  outline-offset: -3px;
 }
 
 .erp-dev-flow-state-page
@@ -324,16 +312,8 @@
 
 .erp-dev-flow-guidance > summary {
   display: flex;
-  min-height: 50px;
   align-items: center;
   gap: 10px;
-  padding: 9px 13px;
-  list-style: none;
-  cursor: pointer;
-}
-
-.erp-dev-flow-guidance > summary::-webkit-details-marker {
-  display: none;
 }
 
 .erp-dev-flow-guidance > summary > .anticon {
@@ -354,27 +334,6 @@
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
   font-weight: 400;
-}
-
-.erp-dev-flow-guidance > summary::after {
-  content: '展开';
-  flex: 0 0 auto;
-  border: 1px solid var(--erp-border);
-  border-radius: 999px;
-  padding: 3px 8px;
-  color: var(--erp-text-muted);
-  background: var(--erp-surface-bg, #fff);
-  font-size: var(--erp-font-micro);
-  font-weight: 650;
-}
-
-.erp-dev-flow-guidance[open] > summary::after {
-  content: '收起';
-}
-
-.erp-dev-flow-guidance > summary:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: -2px;
 }
 
 .erp-dev-flow-guidance__body {
@@ -423,56 +382,18 @@
 
 .erp-dev-flow-search-groups > section {
   min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: var(--erp-surface-bg-soft);
-}
-
-.erp-dev-flow-search-groups h3 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 0 0 8px;
-  font-size: var(--erp-font-body);
 }
 
 .erp-dev-flow-search-groups h3 span {
-  min-width: 24px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  color: var(--erp-text-muted);
-  background: var(--erp-surface-bg, #fff);
-  text-align: center;
+  font-weight: 400;
 }
 
 .erp-dev-flow-search-groups ul {
   display: grid;
-  gap: 6px;
+  gap: 2px;
   padding: 0;
   margin: 0;
   list-style: none;
-}
-
-.erp-dev-flow-search-groups button {
-  display: grid;
-  width: 100%;
-  min-height: 48px;
-  gap: 3px;
-  padding: 8px 10px;
-  border: 1px solid var(--erp-border);
-  border-radius: 8px;
-  color: inherit;
-  background: var(--erp-surface-bg, #fff);
-  text-align: left;
-  cursor: pointer;
-}
-
-.erp-dev-flow-search-groups button:hover,
-.erp-dev-flow-search-groups button:focus-visible {
-  border-color: var(--erp-primary);
-  outline: 2px solid color-mix(in srgb, var(--erp-primary) 20%, transparent);
 }
 
 .erp-dev-flow-search-groups code,
@@ -694,13 +615,6 @@
   background: var(--erp-surface-bg, #fff);
 }
 
-.erp-dev-flow-overview-relations > summary {
-  min-height: 44px;
-  padding: 11px 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 .erp-dev-flow-overview-relations ul {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -750,13 +664,9 @@
 .erp-dev-flow-developer-details > summary,
 .erp-dev-flow-node-technical > summary {
   display: flex;
-  min-height: 42px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 11px;
-  color: var(--erp-text, #203b28);
-  cursor: pointer;
 }
 
 .erp-dev-flow-developer-details > dl,
@@ -997,20 +907,6 @@
   padding-top: 9px;
 }
 
-.erp-dev-flow-evidence summary,
-.erp-dev-flow-cross-cutting summary,
-.erp-dev-flow-node-relations summary,
-.erp-dev-flow-process-definition
-  > details:not(.erp-dev-flow-guidance)
-  > summary,
-.erp-dev-flow-transitions summary {
-  min-height: 40px;
-  padding-block: 8px;
-  color: var(--erp-primary);
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .erp-dev-flow-evidence ul {
   display: grid;
   gap: 6px;
@@ -1074,23 +970,23 @@
   background: var(--erp-surface-bg-soft);
 }
 
-.erp-dev-flow-task-finder form {
+.erp-dev-flow-task-finder__controls {
   display: grid;
-  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
   gap: 8px;
   align-items: center;
 }
 
-.erp-dev-flow-task-finder form label {
+.erp-dev-flow-task-finder__controls label {
   font-weight: 600;
 }
 
-.erp-dev-flow-task-finder form > .erp-search-input,
-.erp-dev-flow-task-finder form > .ant-input-affix-wrapper {
+.erp-dev-flow-task-finder__controls > .erp-search-input,
+.erp-dev-flow-task-finder__controls > .ant-input-affix-wrapper {
   width: 100%;
 }
 
-.erp-dev-flow-task-finder .ant-btn {
+.erp-dev-flow-task-finder__controls > .ant-btn {
   min-height: 40px;
 }
 
@@ -1110,27 +1006,6 @@
   padding: 0;
   margin: 0;
   list-style: none;
-}
-
-.erp-dev-flow-task-results li button {
-  display: grid;
-  width: 100%;
-  min-height: 82px;
-  gap: 3px;
-  padding: 10px;
-  overflow: hidden;
-  border: 1px solid var(--erp-border);
-  border-radius: 9px;
-  color: inherit;
-  background: var(--erp-surface-bg, #fff);
-  text-align: left;
-  cursor: pointer;
-}
-
-.erp-dev-flow-task-results li button:hover,
-.erp-dev-flow-task-results li button:focus-visible {
-  border-color: var(--erp-primary);
-  outline: 2px solid color-mix(in srgb, var(--erp-primary) 20%, transparent);
 }
 
 .erp-dev-flow-task-results li button > span {
@@ -1438,38 +1313,12 @@
 
 .erp-dev-flow-state-list ul {
   display: grid;
-  gap: 7px;
+  gap: 2px;
   max-height: 460px;
   padding: 0 3px 0 0;
   margin: 0;
   overflow-y: auto;
   list-style: none;
-}
-
-.erp-dev-flow-state-list button {
-  display: grid;
-  width: 100%;
-  min-height: 66px;
-  gap: 3px;
-  padding: 9px 10px;
-  border: 1px solid var(--erp-border);
-  border-radius: 8px;
-  color: inherit;
-  background: var(--erp-surface-bg-soft);
-  text-align: left;
-  cursor: pointer;
-}
-
-.erp-dev-flow-state-list button:hover,
-.erp-dev-flow-state-list button:focus-visible,
-.erp-dev-flow-state-list button.is-selected {
-  border-color: var(--erp-primary);
-  outline: 2px solid color-mix(in srgb, var(--erp-primary) 18%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--erp-primary) 7%,
-    var(--erp-surface-bg-soft)
-  );
 }
 
 .erp-dev-flow-state-list button > span {
@@ -2130,22 +1979,9 @@
     .erp-dev-flow-header
     > .erp-dev-flow-concepts
     > summary {
-    position: relative;
-    min-height: 56px;
     align-items: flex-start;
     flex-direction: column;
     gap: 2px;
-    padding: 9px 68px 9px 16px;
-  }
-
-  .erp-dev-flow-state-page
-    .erp-dev-flow-header
-    > .erp-dev-flow-concepts
-    > summary::after {
-    position: absolute;
-    top: 50%;
-    right: 12px;
-    transform: translateY(-50%);
   }
 
   .erp-dev-flow-state-page
@@ -2234,7 +2070,7 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-flow-task-finder form,
+  .erp-dev-flow-task-finder__controls,
   .erp-dev-flow-definition-selector,
   .erp-dev-flow-selected-state {
     grid-template-columns: 1fr;
@@ -2292,7 +2128,7 @@
     justify-content: flex-start;
   }
 
-  .erp-dev-flow-task-finder form > .ant-btn,
+  .erp-dev-flow-task-finder__controls > .ant-btn,
   .erp-dev-flow-definition-selector > .ant-select {
     width: 100%;
   }
@@ -2347,10 +2183,6 @@
 
   .erp-dev-flow-search-guide > ul > li {
     grid-template-columns: 1fr;
-  }
-
-  .erp-dev-flow-guidance > summary {
-    min-height: 56px;
   }
 
   .erp-dev-flow-guidance > summary > span {
@@ -2537,7 +2369,11 @@
 }
 
 /* Prepare the same geometry before window.print so measured diagrams stay aligned. */
+html:has([data-flow-print-current]),
 body:has([data-flow-print-current]) {
+  page: flow-observation;
+  height: auto;
+  min-height: 0;
   background: white;
 }
 
@@ -2550,6 +2386,8 @@ body:has([data-flow-print-current]) > :not(#root) {
   display: block;
   /* Match A4 landscape minus page margins before measuring diagram connectors. */
   width: 277mm;
+  min-height: 0;
+  height: auto;
   padding: 0;
   margin: 0;
   background: white;
@@ -2594,8 +2432,10 @@ body:has([data-flow-print-current]) > :not(#root) {
   overflow: visible;
 }
 
-[data-flow-print-current] .erp-markdown-mermaid__canvas {
+[data-flow-print-current] .erp-markdown-mermaid__canvas,
+[data-flow-print-current] .erp-markdown-mermaid[data-mermaid-native-size] .erp-markdown-mermaid__canvas {
   width: 100%;
+  min-height: 0;
 }
 
 [data-flow-print-current] .erp-markdown-mermaid__canvas > svg {

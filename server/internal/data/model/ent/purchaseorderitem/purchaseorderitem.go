@@ -28,6 +28,12 @@ const (
 	FieldMaterialCodeSnapshot = "material_code_snapshot"
 	// FieldMaterialNameSnapshot holds the string denoting the material_name_snapshot field in the database.
 	FieldMaterialNameSnapshot = "material_name_snapshot"
+	// FieldMaterialSpecSnapshot holds the string denoting the material_spec_snapshot field in the database.
+	FieldMaterialSpecSnapshot = "material_spec_snapshot"
+	// FieldSupplierItemNoSnapshot holds the string denoting the supplier_item_no_snapshot field in the database.
+	FieldSupplierItemNoSnapshot = "supplier_item_no_snapshot"
+	// FieldUnitNameSnapshot holds the string denoting the unit_name_snapshot field in the database.
+	FieldUnitNameSnapshot = "unit_name_snapshot"
 	// FieldColorSnapshot holds the string denoting the color_snapshot field in the database.
 	FieldColorSnapshot = "color_snapshot"
 	// FieldProductOrderNoSnapshot holds the string denoting the product_order_no_snapshot field in the database.
@@ -102,6 +108,9 @@ var Columns = []string{
 	FieldUnitID,
 	FieldMaterialCodeSnapshot,
 	FieldMaterialNameSnapshot,
+	FieldMaterialSpecSnapshot,
+	FieldSupplierItemNoSnapshot,
+	FieldUnitNameSnapshot,
 	FieldColorSnapshot,
 	FieldProductOrderNoSnapshot,
 	FieldProductNoSnapshot,
@@ -141,6 +150,12 @@ var (
 	MaterialCodeSnapshotValidator func(string) error
 	// MaterialNameSnapshotValidator is a validator for the "material_name_snapshot" field. It is called by the builders before save.
 	MaterialNameSnapshotValidator func(string) error
+	// MaterialSpecSnapshotValidator is a validator for the "material_spec_snapshot" field. It is called by the builders before save.
+	MaterialSpecSnapshotValidator func(string) error
+	// SupplierItemNoSnapshotValidator is a validator for the "supplier_item_no_snapshot" field. It is called by the builders before save.
+	SupplierItemNoSnapshotValidator func(string) error
+	// UnitNameSnapshotValidator is a validator for the "unit_name_snapshot" field. It is called by the builders before save.
+	UnitNameSnapshotValidator func(string) error
 	// ColorSnapshotValidator is a validator for the "color_snapshot" field. It is called by the builders before save.
 	ColorSnapshotValidator func(string) error
 	// ProductOrderNoSnapshotValidator is a validator for the "product_order_no_snapshot" field. It is called by the builders before save.
@@ -204,6 +219,21 @@ func ByMaterialCodeSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByMaterialNameSnapshot orders the results by the material_name_snapshot field.
 func ByMaterialNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaterialNameSnapshot, opts...).ToFunc()
+}
+
+// ByMaterialSpecSnapshot orders the results by the material_spec_snapshot field.
+func ByMaterialSpecSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaterialSpecSnapshot, opts...).ToFunc()
+}
+
+// BySupplierItemNoSnapshot orders the results by the supplier_item_no_snapshot field.
+func BySupplierItemNoSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupplierItemNoSnapshot, opts...).ToFunc()
+}
+
+// ByUnitNameSnapshot orders the results by the unit_name_snapshot field.
+func ByUnitNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUnitNameSnapshot, opts...).ToFunc()
 }
 
 // ByColorSnapshot orders the results by the color_snapshot field.

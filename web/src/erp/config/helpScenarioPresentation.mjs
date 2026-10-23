@@ -12,16 +12,6 @@ export const HELP_OVERVIEW_LAYOUTS = {
     },
   },
   materials: { kind: 'steps' },
-  'shipping-release': {
-    kind: 'chain',
-    exception: {
-      from: 's2',
-      back: 's1',
-      label: '审批退回',
-      title: '回来源核对本单版本',
-      owner: '销售 / 财务',
-    },
-  },
   outbound: { kind: 'steps' },
   approvals: {
     kind: 'chain',

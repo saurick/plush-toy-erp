@@ -530,7 +530,7 @@
   margin-inline-end: 0;
 }
 
-.erp-mobile-search input[type='search']::-webkit-search-cancel-button {
+.erp-search-input input[type='search']::-webkit-search-cancel-button {
   display: none;
 }
 

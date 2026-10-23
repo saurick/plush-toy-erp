@@ -11,7 +11,8 @@ async function setup(t, props = {}) {
   ])
   let form
   function DecisionForm() {
-    [form] = Form.useForm()
+    const [instance] = Form.useForm()
+    form = instance
     return createElement(components.QualityInspectionDecisionForm, { form, mode: 'pass', ...props })
   }
   return {
@@ -41,8 +42,8 @@ test('quality decision validates the actual form and clears custom defect percen
   await ui.click(ui.radio('CUSTOM'))
   await ui.fill(document.querySelector('input[aria-label="自定义不良比例"]'), '100.01')
   assert.match(JSON.stringify((await ui.validate()).error.errorFields), /0% 到 100%/u)
-  await ui.fill(document.querySelector('input[aria-label="自定义不良比例"]'), '12.345')
-  assert.match(JSON.stringify((await ui.validate()).error.errorFields), /最多保留两位小数/u)
+  await ui.fill(document.querySelector('input[aria-label="自定义不良比例"]'), '12.3456789')
+  assert.match(JSON.stringify((await ui.validate()).error.errorFields), /最多保留 6 位小数/u)
   await ui.fill(document.querySelector('input[aria-label="自定义不良比例"]'), '12.30')
   const valid = await ui.validate()
   assert.equal(valid.error, undefined)

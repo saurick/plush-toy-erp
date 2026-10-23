@@ -894,7 +894,6 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "production-scheduling", Label: "排产确认", Path: "/erp/production/scheduling", RequiredAny: []string{PermissionPMCPlanRead}, RequiredAll: []string{PermissionWorkflowTaskRead}},
 	{Key: "production-progress", Label: "生产记录", Path: "/erp/production/progress", RequiredAny: []string{PermissionProductionFactRead}},
 	{Key: "production-exceptions", Label: "异常处理", Path: "/erp/production/exceptions", RequiredAny: []string{PermissionWorkflowTaskRead, PermissionPMCRiskRead, PermissionProductionFactRead, PermissionProductionExceptionSubmit, PermissionProductionExceptionApprove}},
-	{Key: "shipping-release", Label: "出货放行", Path: "/erp/warehouse/shipping-release", RequiredAny: []string{PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionSalesOrderRead}, RequiredAll: []string{PermissionWorkflowTaskRead}},
 	{Key: "outbound", Label: "库存预留", Path: "/erp/warehouse/outbound", RequiredAny: []string{PermissionWarehouseOutboundRead}},
 	{Key: "shipments", Label: "出货单", Path: "/erp/warehouse/shipments", RequiredAny: []string{PermissionShipmentRead}},
 	{Key: "reconciliation", Label: "对账管理", Path: "/erp/finance/reconciliation", RequiredAny: []string{PermissionFinanceReconciliationRead}},

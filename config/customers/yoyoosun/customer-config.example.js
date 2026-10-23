@@ -80,7 +80,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
       }),
       Object.freeze({
         title: "出货管理",
-        items: Object.freeze(["shipments", "shipping-release", "outbound"]),
+        items: Object.freeze(["shipments", "outbound"]),
       }),
       Object.freeze({
         title: "财务管理",

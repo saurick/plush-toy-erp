@@ -3222,6 +3222,9 @@ var (
 		{Name: "display_order", Type: field.TypeInt, Nullable: true},
 		{Name: "material_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "material_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "material_spec_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "supplier_item_no_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "unit_name_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "product_order_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "product_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
@@ -3246,19 +3249,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_order_items_materials_purchase_order_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[17]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[20]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_order_items_purchase_orders_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[18]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[21]},
 				RefColumns: []*schema.Column{PurchaseOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_order_items_units_purchase_order_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[19]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[22]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3267,27 +3270,27 @@ var (
 			{
 				Name:    "purchaseorderitem_purchase_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[18], PurchaseOrderItemsColumns[1]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[21], PurchaseOrderItemsColumns[1]},
 			},
 			{
 				Name:    "purchaseorderitem_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[17]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[20]},
 			},
 			{
 				Name:    "purchaseorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[19]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[22]},
 			},
 			{
 				Name:    "purchaseorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[13]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[16]},
 			},
 			{
 				Name:    "purchaseorderitem_expected_arrival_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[12]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[15]},
 			},
 		},
 	}
@@ -4425,6 +4428,10 @@ var (
 		{Name: "gross_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "volume_m3", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "shipping_mark", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "receivable_amount_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "quoted_freight_amount_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "tax_amount_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "tax_mode_snapshot", Type: field.TypeString, Nullable: true, Size: 16},
 		{Name: "freight_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "freight_currency", Type: field.TypeString, Nullable: true, Size: 16},
 		{Name: "total_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
@@ -4443,13 +4450,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipments_customers_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[30]},
+				Columns:    []*schema.Column{ShipmentsColumns[34]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipments_sales_orders_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[31]},
+				Columns:    []*schema.Column{ShipmentsColumns[35]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -4468,12 +4475,12 @@ var (
 			{
 				Name:    "shipment_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[31]},
+				Columns: []*schema.Column{ShipmentsColumns[35]},
 			},
 			{
 				Name:    "shipment_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[30]},
+				Columns: []*schema.Column{ShipmentsColumns[34]},
 			},
 			{
 				Name:    "shipment_status",

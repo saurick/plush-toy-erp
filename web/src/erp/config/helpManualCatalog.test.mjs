@@ -137,9 +137,9 @@ test('已开放页面补入阅读目录，岗位常用推荐与未开放说明�
     allowedMenuPaths: BUSINESS_USABILITY_CATALOG.map((entry) => entry.path),
   }
   const expected = {
-    warehouse: ['materials', 'inbound', 'inventory', 'production-orders', 'production-progress', 'shipping-release', 'outbound'],
+    warehouse: ['materials', 'inbound', 'inventory', 'production-orders', 'production-progress', 'shipments', 'outbound'],
     engineering: ['products', 'materials', 'material-bom', 'processes', 'engineering-material-request'],
-    finance: ['shipping-release', 'receivables', 'payables', 'finance-payments', 'reconciliation', 'invoices', 'engineering-material-request'],
+    finance: ['shipments', 'receivables', 'payables', 'finance-payments', 'reconciliation', 'invoices', 'engineering-material-request'],
     admin: [],
   }
   for (const [key, pageKeys] of Object.entries(expected)) {

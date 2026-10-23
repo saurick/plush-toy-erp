@@ -102,9 +102,20 @@ export function createSearchSubmissionScenarios(deps) {
         const references = () => page.searchRPCs.filter((call) => ['list_customers', 'list_product_skus', 'list_units'].includes(call?.method)).map((call) => call.method)
         const baseline = references()
         assert.deepEqual(baseline.toSorted(), ['list_customers', 'list_units'], 'initial hydration loads the visible customer and units without preloading every SKU')
+        assert.deepEqual(page.searchRPCs.find((call) => call.method === 'list_customers').params.ids, [1], 'customer readback is bounded by the displayed order IDs')
         const before = page.statusCountRequests.length
-        await search.fill('指')
-        await search.fill('指定')
+        const client = await page.context().newCDPSession(page)
+        try {
+          await search.click()
+          await client.send('Input.imeSetComposition', { text: 'zhi', selectionStart: 3, selectionEnd: 3 })
+          await client.send('Input.imeSetComposition', { text: 'zhiding', selectionStart: 7, selectionEnd: 7 })
+          assert.equal(await search.inputValue(), 'zhiding', 'submitted search retains the active composition')
+          assert.equal(page.statusCountRequests.length, before, 'composition must not request the order list')
+          await client.send('Input.insertText', { text: '指定' })
+          assert.equal(await search.inputValue(), '指定', 'candidate confirmation must not append to unfinished pinyin')
+        } finally {
+          await client.detach()
+        }
         await delay(450)
         assert.equal(page.statusCountRequests.length, before, 'typing must not request the order list')
         await page.locator('.erp-business-operation-panel__search').getByRole('button', { name: '搜索', exact: true }).click()

@@ -82,8 +82,8 @@ export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, ass
         assert.equal(await page.locator('.erp-task-progress-rail__value').count(), 3)
         await page.locator('.erp-task-progress-rail [data-lane="exception"]').click()
         await page.waitForURL(/lane=exception/)
-        await page.getByRole('button', { name: '任务概览', exact: true }).click()
-        await page.locator('.erp-task-board-lanes:not(.erp-task-board-lanes--focused)').waitFor()
+        await page.getByRole('button', { name: /^(全部待办|全部分类)$/u, exact: true }).click()
+        await page.locator('.erp-task-board-lanes--focused').waitFor()
       }
       assert.equal(await header.locator('.erp-business-page-header-card__stat').count(), 0)
       if (route.startsWith('/erp')) {

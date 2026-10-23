@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { DownloadOutlined, FullscreenOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Result, Space } from 'antd'
+import { Link } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
-import { prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
+import { getUIDesignStateOptions, prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
 
 export default function DevUIDesignPreview({ active, page, pageSelector }) {
@@ -12,6 +13,7 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
   const previewId = `${page}-${previewRevision}`
   const [previewState, setPreviewState] = useState(null)
   const previewStatus = previewState?.id === previewId ? previewState.status : 'loading'
+  const stateOptions = getUIDesignStateOptions(page)
   const frameRef = useRef(null)
   const readerRef = useRef(null)
   const fullscreenButtonRef = useRef(null)
@@ -154,15 +156,12 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
       <div className="erp-dev-ui-design-toolbar">
         {pageSelector}
         <Space wrap>
-          {page === 'workspace' ? (
+          {stateOptions.length ? (
             <Dropdown
               trigger={['click']}
               getPopupContainer={(trigger) => trigger.parentElement}
               menu={{
-                items: [
-                  ['data', '正常'], ['loading', '加载中'], ['empty', '空结果'],
-                  ['error', '读取失败'], ['forbidden', '无权限'], ['stress', '边界压力'],
-                ].map(([key, label]) => ({ key, label })),
+                items: stateOptions,
                 onClick: ({ key }) => frameRef.current?.contentWindow?.postMessage(
                   { type: 'ui-design-data-state', value: key }, '*'
                 ),
@@ -171,6 +170,7 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
               <Button disabled={previewStatus !== 'ready'}>状态模拟</Button>
             </Dropdown>
           ) : null}
+          {stateOptions.length ? <Link to="/__dev/ui-design?page=controls&control=empty">页面状态样例</Link> : null}
           {['task-handling', 'mobile-tasks'].includes(page) ? <TaskFulfillmentGuideButton /> : null}
           <Button icon={<ReloadOutlined />} onClick={() => setPreviewRevision((value) => value + 1)}>
             重置演示

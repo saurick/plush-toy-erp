@@ -194,11 +194,17 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.operationalFactUC.CountProductionFactsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
 		items, total, err := d.operationalFactUC.ListProductionFacts(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"production_facts": productionFactsToAny(items), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(withBusinessStatusCounts(map[string]any{"production_facts": productionFactsToAny(items), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}, statusCounts)), nil
 	case "list_production_order_material_requirements":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
 			return id, res, nil

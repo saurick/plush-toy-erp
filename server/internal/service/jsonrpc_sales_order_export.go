@@ -92,11 +92,11 @@ func salesOrderListFilterFromParams(pm map[string]any) (biz.SalesOrderFilter, bo
 			return biz.SalesOrderFilter{}, false
 		}
 	}
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.SalesOrderFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.SalesOrderFilter{}, false
 	}

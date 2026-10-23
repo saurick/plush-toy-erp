@@ -12,6 +12,8 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 ## Project Page Gates
 
 - 每个受影响元素都应支持岗位判断、动作或反馈；优化先按[信息密度与减法](references/page-semantics.md#density-and-subtraction)检查删除、合并和按需查看，保留已有好用布局与交互。
+- 工作台和 ERP 均按[页内理解与上下文](../../../docs/engineering/可视化表达规范.md#页内理解与上下文--in-context-reading)选择图、表、表单与短说明；核对查看是否留在当前任务、导航目的地是否明确、关闭或返回是否恢复上下文。
+- 涉及可视化时按[图形关键信息](../../../docs/engineering/可视化表达规范.md#chart-inspection)落实 hover、键盘 focus 与手机点按的同等提示；核验数值／单位／口径、权限边界、关闭和原有下钻，避免只给桌面悬停。
 - 页面不能补造业务事实、掩盖后端或权限缺口，也不能以局部字段映射替代共享真源。
 - 任务详情、流程/异常追踪及 ERP 桌面与手机一致性，按 [任务聚焦与两端一致](references/page-semantics.md#task-focus-and-cross-device-parity) 核对信息层级、入口和实际结果。
 - 复用设计系统和共享业务组件，按 [Visual Finish](references/page-implementation.md#visual-finish) 保留简洁页面的视觉完成度。布局或交互变化必须以真实浏览器证据和 DOM / box metrics 验证，覆盖受影响的默认、交互、恢复、边界与相邻区域；主题、移动端和共享组件按实际影响扩大范围。

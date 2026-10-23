@@ -52,12 +52,12 @@
   width: 210mm;
   min-height: 297mm;
   margin: 0 auto;
-  padding: 10mm 5mm;
+  padding: 8mm 6mm;
   box-sizing: border-box;
   background-color: white;
   border-radius: 14px;
   box-shadow: 0 22px 58px rgb(15 23 42 / 0.12);
-  color: #111827;
+  color: #000;
   font-family: 'Noto Serif SC Variable', serif;
 }
 
@@ -159,25 +159,25 @@
 }
 
 .erp-material-contract-paper__title {
-  margin-bottom: 5mm;
+  margin-bottom: 1.5mm;
   text-align: center;
-  font-size: 8.6mm;
+  font-size: 11pt;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .erp-material-contract-meta {
   display: grid;
-  row-gap: 1.4mm;
-  margin-bottom: 3mm;
-  font-size: 4mm;
-  line-height: 1.55;
+  row-gap: 0;
+  margin-bottom: 0;
+  font-size: 10pt;
+  line-height: 1.25;
 }
 
 .erp-material-contract-meta__pair {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  column-gap: 10mm;
+  grid-template-columns: 46% minmax(0, 1fr);
+  column-gap: 0;
 }
 
 .erp-material-contract-meta__cell {
@@ -185,24 +185,24 @@
 }
 
 .erp-material-contract-meta__cell--left {
-  --erp-material-contract-label-width: 28mm;
+  --erp-material-contract-label-width: 20mm;
 }
 
 .erp-material-contract-meta__cell--right {
-  --erp-material-contract-label-width: 21mm;
-  padding-left: 3mm;
+  --erp-material-contract-label-width: 20mm;
+  padding-left: 0;
 }
 
 .erp-material-contract-meta__top-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 6mm;
+  column-gap: 4mm;
 }
 
 .erp-material-contract-meta__row {
   display: grid;
   grid-template-columns: var(--erp-material-contract-label-width) minmax(0, 1fr);
-  gap: 1.5mm;
+  gap: 1mm;
   align-items: start;
   min-width: 0;
 }
@@ -225,7 +225,7 @@
 
 .erp-material-contract-editable {
   min-width: 0;
-  min-height: 4.5mm;
+  min-height: 4.2mm;
   white-space: pre-wrap;
   word-break: break-word;
   outline: none;
@@ -241,16 +241,16 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  margin-top: 2mm;
-  font-size: 3.8mm;
+  margin-top: 0;
+  font-size: 10pt;
 }
 
 .erp-material-contract-paper .erp-material-contract-table thead th,
 .erp-material-contract-paper .erp-material-contract-table tbody td {
-  border: 1px solid rgb(17 24 39 / 55%);
+  border: 0.5pt solid #000;
   text-align: center;
   vertical-align: middle;
-  padding: 1.4mm 1.2mm;
+  padding: 0.5mm 0.6mm;
 }
 
 .erp-material-contract-paper .erp-material-contract-table thead th {
@@ -259,13 +259,13 @@
   white-space: nowrap;
   word-break: keep-all;
   overflow-wrap: normal;
-  font-size: 3mm;
+  font-size: 7.3pt;
   line-height: 1.25;
-  padding: 1.2mm 0.5mm;
+  padding: 0.8mm 0.4mm;
 }
 
 .erp-material-contract-paper .erp-material-contract-table tbody td {
-  min-height: 15mm;
+  height: 18mm;
   position: relative;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -278,7 +278,7 @@
   justify-content: center;
   width: 100%;
   min-width: 0;
-  min-height: 12.5mm;
+  min-height: 16.5mm;
   padding: 0;
   text-align: center;
   white-space: normal;
@@ -287,7 +287,7 @@
 }
 
 .erp-material-contract-table__editable-multiline {
-  min-height: 14.5mm;
+  min-height: 16.5mm;
 }
 
 .erp-material-contract-paper
@@ -320,9 +320,9 @@
   tbody
   tr.erp-material-contract-table__total
   td {
-  min-height: auto;
-  padding: 1.2mm 1mm;
-  font-weight: 700;
+  height: 7mm;
+  padding: 0.5mm;
+  font-weight: 400;
 }
 
 .erp-contract-table__total-value {
@@ -335,19 +335,19 @@
 
 .erp-material-contract-clauses {
   display: grid;
-  gap: 2.2mm;
-  margin-top: 3mm;
-  font-size: 3.85mm;
-  line-height: 1.62;
+  gap: 1mm;
+  margin-top: 1mm;
+  font-size: 8pt;
+  line-height: 1.5;
 }
 
 .erp-material-contract-clause-block {
   display: grid;
-  gap: 0.8mm;
+  gap: 0.5mm;
 }
 
 .erp-material-contract-clause-block__title {
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .erp-material-contract-clause-block__list {
@@ -355,7 +355,7 @@
   padding-left: 0;
   list-style: none;
   display: grid;
-  gap: 1.2mm;
+  gap: 0.8mm;
 }
 
 .erp-material-contract-clause-block__item {
@@ -376,16 +376,16 @@
 }
 
 .erp-material-contract-signature {
-  margin-top: 7mm;
+  margin-top: 5mm;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18mm;
-  font-size: 4mm;
+  gap: 12mm;
+  font-size: 8pt;
 }
 
 .erp-material-contract-signature__block {
   display: grid;
-  gap: 3mm;
+  gap: 2mm;
   min-width: 0;
 }
 
@@ -399,12 +399,12 @@
 
 .erp-material-contract-signature__name {
   min-height: 7mm;
-  font-size: 7mm;
-  letter-spacing: 0.08em;
+  font-size: 12pt;
+  letter-spacing: 0;
 }
 
 .erp-material-contract-signature__date-value {
-  min-height: 4.5mm;
+  min-height: 4.2mm;
 }
 
 .erp-material-contract-pdf-frame {
@@ -457,4 +457,19 @@
     background: transparent;
     box-shadow: none;
   }
+}
+
+.erp-material-contract-table
+  td[data-print-blank-field='unitPrice']
+  .erp-material-contract-table__editable,
+.erp-material-contract-table
+  td[data-print-blank-field='amount']
+  .erp-material-contract-table__editable {
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-print-shell
+  .erp-material-contract-signature
+  .erp-material-contract-signature__date-value[data-print-empty='true']::before {
+  content: none;
 }

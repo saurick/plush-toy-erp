@@ -627,7 +627,11 @@ func shipmentFinanceAmountFromSnapshots(ctx context.Context, client *ent.Client,
 	if !amount.GreaterThan(decimal.Zero) {
 		return decimal.Zero, biz.ErrFinanceFactShipmentAmountInvalid
 	}
-	return amount, nil
+	parent, err := client.Shipment.Get(ctx, shipmentID)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	return shipmentCommercialTotal(parent, amount)
 }
 
 func recordFinanceFactProcessCommandResultInTx(
@@ -803,7 +807,7 @@ func (r *operationalFactRepo) financeFactListQuery(filter biz.OperationalFactFil
 		q = q.Where(financefact.OccurredAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		q = q.Where(financefact.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
+		q = q.Where(financefact.OccurredAtLTE(*filter.DateTo))
 	}
 	return q
 }

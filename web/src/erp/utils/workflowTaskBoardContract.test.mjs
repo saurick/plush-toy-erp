@@ -107,3 +107,19 @@ test('workflowTaskBoardContract: 按服务端上限接受 limit 200 被收敛为
     response
   )
 })
+
+test('workflowTaskBoardContract: 全部分页总数与筛选范围一致且拒绝终态混入待办', () => {
+  const response = overviewResponse()
+  response.lanes = [{ key: 'all', total: 4, limit: 20, offset: 20, tasks: response.lanes.flatMap((lane) => lane.tasks) }]
+  const request = { lane_key: 'all', limit: 20, offset: 20 }
+  assert.equal(requireWorkflowTaskBoardResponse(response, request), response)
+  assert.throws(() => requireWorkflowTaskBoardResponse(response, { ...request, offset: 0 }), /暂时无法显示/)
+  response.lanes[0].total = 3
+  assert.throws(() => requireWorkflowTaskBoardResponse(response, request), /暂时无法显示/)
+  response.lanes[0].total = 4
+  response.counts.finished = 0
+  response.counts.actionable = 2
+  assert.throws(() => requireWorkflowTaskBoardResponse(response, { ...request, todo_only: true }), /暂时无法显示/)
+  response.lanes[0].tasks.pop()
+  assert.equal(requireWorkflowTaskBoardResponse(response, { ...request, todo_only: true }), response)
+})

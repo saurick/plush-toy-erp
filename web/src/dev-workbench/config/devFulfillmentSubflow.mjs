@@ -53,8 +53,13 @@ export function buildSubflowMermaid(flow, { role = 'all', compact = false, direc
   const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 28', '---', `flowchart ${direction === 'LR' ? 'LR' : 'TB'}`]
   for (const node of flow.nodes) {
     const label = compact ? getFulfillmentSubstepCopy(node) : node.label
-    const owner = compact && node.role ? `<br/>${escapeLabel(node.role)}` : ''
-    const body = `"${escapeLabel(label)}${owner}"`
+    const wrap = (value) => {
+      const text = String(value)
+      const width = Math.max(1, Math.ceil(text.length / Math.ceil(text.length / 10)))
+      return text.match(new RegExp(`.{1,${width}}`, 'gu'))?.map(escapeLabel).join('<br/>') || ''
+    }
+    const owner = compact && node.role && node.kind !== 'main' ? `<br/>${wrap(node.role)}` : ''
+    const body = `"${compact ? wrap(label) : escapeLabel(label)}${owner}"`
     lines.push(`  ${ids.get(node.key)}[${body}]`)
     if (role !== 'all' && fulfillmentStepMatchesRole(node, role)) {
       lines.push(`  class ${ids.get(node.key)} fulfillmentRoleMatch`)

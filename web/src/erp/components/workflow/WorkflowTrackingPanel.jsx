@@ -12,7 +12,6 @@ import { formatWorkflowTaskEventTime } from '../../utils/workflowTaskEventPresen
 import { trackingHandoff, trackingResponsibilityParts, trackingStatus, trackingStatusColor, trackingTitle } from '../../utils/workflowTracking.mjs'
 import { WORKFLOW_TASKS_CHANGED } from '../../utils/workflowTaskChanges.mjs'
 import { openWorkflowTaskRow } from '../../utils/workflowTaskEntry.mjs'
-import { getWorkflowTaskSourceNo } from '../../utils/dashboardTaskDisplay.mjs'
 import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
 import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import WorkflowTrackingDrawer from './WorkflowTrackingDrawer.jsx'
@@ -106,24 +105,24 @@ export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, o
   }
   const columns = [
     {
-      title: '事项 / 来源单号',
+      title: '事项',
       key: 'title',
+      width: 150,
       render: (_, entry) => (
         <div className="erp-workflow-tracking-title">
           <strong>{trackingTitle(entry)}</strong>
-          <WorkflowTaskSource task={entry} label={getWorkflowTaskSourceNo(entry)} />
         </div>
       ),
     },
-    { title: '关联产品 / 物料',
+    { title: '关联内容 / 来源',
 key: 'identity',
-width: 320,
+width: 400,
 render: (_, entry) => entry.display_context
-      ? <WorkflowTaskIdentity task={entry} keyword={keyword} compact showStyleNo /> : <span className="erp-task-identity erp-task-identity--compact"><WorkflowTaskAssociation task={entry} emptyLabel="关联内容未提供" /></span> },
-    { title: '当前状态', key: 'status', width: 130, render: (_, entry) => <Tag color={trackingStatusColor(entry)}>{trackingStatus(entry)}</Tag> },
-    { title: '当前去向 / 办理人', key: 'owner', render: (_, entry) => entry.current_tasks.length ? <WorkflowResponsibilities items={entry.current_tasks.map(trackingResponsibilityParts)} /> : trackingHandoff(entry) },
-    { title: '发起人', key: 'initiator', width: 150, render: (_, entry) => <WorkflowInitiator summary={entry} /> },
-    { title: '发起时间', dataIndex: 'started_at', width: 185, render: formatWorkflowTaskEventTime },
+      ? <WorkflowTaskIdentity task={entry} keyword={keyword} compact showStyleNo source={<WorkflowTaskSource task={entry} showUnavailable={false} />} /> : <span className="erp-task-identity erp-task-identity--compact"><WorkflowTaskAssociation task={entry} emptyLabel="关联内容未提供" source={<WorkflowTaskSource task={entry} />} /></span> },
+    { title: '当前状态', key: 'status', width: 110, render: (_, entry) => <Tag color={trackingStatusColor(entry)}>{trackingStatus(entry)}</Tag> },
+    { title: '当前去向 / 办理人', key: 'owner', width: 175, render: (_, entry) => entry.current_tasks.length ? <WorkflowResponsibilities items={entry.current_tasks.map(trackingResponsibilityParts)} /> : trackingHandoff(entry) },
+    { title: '发起人', key: 'initiator', width: 130, render: (_, entry) => <WorkflowInitiator summary={entry} /> },
+    { title: '发起时间', dataIndex: 'started_at', width: 183, render: formatWorkflowTaskEventTime },
     { title: '',
 key: 'open',
 width: 52,

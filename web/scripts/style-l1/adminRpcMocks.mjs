@@ -26,11 +26,6 @@ const mockMenuPermissionRequirements = Object.freeze({
   'material-bom': ['bom.read'],
   'production-orders': ['production.wip.read'],
   inventory: ['warehouse.inventory.read'],
-  'shipping-release': [
-    'warehouse.outbound.read',
-    'finance.receivable.read',
-    'sales_order.read',
-  ],
   reconciliation: ['finance.reconciliation.read'],
   payables: ['finance.payable.read'],
   receivables: ['finance.receivable.read'],
@@ -62,18 +57,16 @@ const mockControlPlanePermissionModules = new Set([
 
 const mockPermissionUsageMenuKeys = Object.freeze({
   'finance.receivable.confirm': ['receivables'],
-  'finance.receivable.read': ['receivables', 'shipping-release'],
-  'sales_order.read': ['sales-orders', 'shipping-release'],
+  'finance.receivable.read': ['receivables'],
+  'sales_order.read': ['sales-orders'],
 })
 
 const mockPermissionUsageControlTypes = Object.freeze({
   'finance.receivable.read': {
     receivables: 'page',
-    'shipping-release': 'section',
   },
   'sales_order.read': {
     'sales-orders': 'page',
-    'shipping-release': 'section',
   },
 })
 

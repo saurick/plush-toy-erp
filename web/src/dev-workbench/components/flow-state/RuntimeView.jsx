@@ -112,7 +112,7 @@ function ProcessDefinitionCard({ definition }) {
           ))}
         </ol>
       </div>
-      <details>
+      <details className="erp-dev-disclosure">
         <summary>查看定义边与代码证据</summary>
         <ul>
           {definition.edges.map((edge) => (

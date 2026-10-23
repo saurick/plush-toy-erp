@@ -300,7 +300,7 @@ function DevDocsTreeNode({
           type="button"
           data-dev-doc-dir={node.path}
           title={node.path}
-          className="erp-dev-docs-tree__row erp-dev-docs-tree__folder"
+          className="erp-dev-directory-item erp-dev-docs-tree__row erp-dev-docs-tree__folder"
           style={{ '--depth-offset': `${depth * 14}px` }}
           aria-expanded={expanded}
           onClick={() => onToggleDirectory(node.key)}
@@ -344,7 +344,7 @@ function DevDocsTreeNode({
     >
       <button
         type="button"
-        className="erp-dev-docs-tree__row erp-dev-docs-tree__doc"
+        className="erp-dev-directory-item erp-dev-docs-tree__row erp-dev-docs-tree__doc"
         title={`${node.item.title}\n${node.item.path}`}
         aria-current={active ? 'true' : undefined}
         onClick={() => onSelectDoc(node.item.key)}
@@ -941,7 +941,7 @@ export default function DevDocsPage() {
           >
             文档首页
           </Button>
-          <details className="erp-dev-docs-boundary-details">
+          <details className="erp-dev-disclosure erp-dev-docs-boundary-details">
             <summary>收录范围</summary>
             <Paragraph>
               {
@@ -972,7 +972,7 @@ export default function DevDocsPage() {
                 ? '当前仅搜索文档标题；切换“全部”可搜索路径和正文'
                 : '搜索时按需加载当前层级正文，匹配标题、路径和完整正文'
             }
-            onChange={(event) => setKeyword(event.target.value)}
+            onSearch={(value) => setKeyword(value)}
             className="erp-dev-docs-search"
           />
           <div className="erp-dev-docs-search-scope">
@@ -991,7 +991,7 @@ export default function DevDocsPage() {
       <main className="erp-dev-docs-shell">
         <aside className="erp-dev-docs-sidebar">
           {pinnedDocs.length > 0 ? (
-            <details className="erp-dev-docs-sidebar__section erp-dev-docs-pinned erp-dev-docs-pinned-disclosure">
+            <details className="erp-dev-disclosure erp-dev-docs-sidebar__section erp-dev-docs-pinned erp-dev-docs-pinned-disclosure">
               <summary>
                 <span>
                   <PushpinOutlined className="erp-dev-docs-sidebar__section-icon" />
@@ -1011,7 +1011,7 @@ export default function DevDocsPage() {
                   >
                     <button
                       type="button"
-                      className="erp-dev-docs-pinned__open"
+                      className="erp-dev-directory-item erp-dev-docs-pinned__open"
                       title={`${item.title}\n${item.path}`}
                       aria-current={
                         item.key === selectedDoc?.key ? 'true' : undefined
@@ -1096,7 +1096,7 @@ export default function DevDocsPage() {
                     >
                       <button
                         type="button"
-                        className="erp-dev-docs-list__open"
+                        className="erp-dev-directory-item erp-dev-directory-item--stacked erp-dev-docs-list__open"
                         title={item.title}
                         aria-current={
                           item.key === selectedDoc?.key ? 'true' : undefined
@@ -1108,9 +1108,9 @@ export default function DevDocsPage() {
                           {getDevDocsDisplayTitle(item.title)}
                         </span>
                         <span className="erp-dev-docs-list__meta">
-                          <Tag className="erp-dev-docs-list__tag">
+                          <span className="erp-dev-docs-list__tag">
                             {item.group}
-                          </Tag>
+                          </span>
                         </span>
                         <span className="erp-dev-docs-list__path">
                           {item.path}
@@ -1267,7 +1267,7 @@ export default function DevDocsPage() {
                   <button
                     type="button"
                     key={heading.id}
-                    className="erp-dev-docs-toc__tag"
+                    className="erp-dev-directory-item erp-dev-docs-toc__tag"
                     data-dev-doc-heading-id={heading.id}
                     data-dev-doc-heading-level={heading.level}
                     style={{ '--heading-depth': Math.max(0, heading.level - 2) }}

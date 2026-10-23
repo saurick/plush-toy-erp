@@ -514,7 +514,7 @@ function MobileTrackingContent({
                     showStyleNo
                     source={<WorkflowTaskSource task={entry} copyable={false} showUnavailable={false} />}
                   />
-                ) : <span className="erp-task-identity erp-task-identity--compact"><WorkflowTaskAssociation task={entry} emptyLabel="关联内容未提供" /><WorkflowTaskSource task={entry} copyable={false} /></span>}
+                ) : <span className="erp-task-identity erp-task-identity--compact"><WorkflowTaskAssociation task={entry} emptyLabel="关联内容未提供" source={<WorkflowTaskSource task={entry} copyable={false} />} /></span>}
                 <div className="erp-task-card__footer mobile-workflow-tracking-footer">
                   <div className="mobile-workflow-tracking-owner">
                     {entry.current_tasks.length ? (

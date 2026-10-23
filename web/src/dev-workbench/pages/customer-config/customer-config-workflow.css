@@ -219,11 +219,6 @@
   margin-top: 14px;
 }
 
-.erp-dev-customer-result-details summary {
-  cursor: pointer;
-  color: var(--erp-text-muted);
-}
-
 .erp-dev-customer-diff-table th:first-child {
   width: 18%;
 }

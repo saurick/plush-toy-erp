@@ -665,16 +665,16 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert(
       metrics.laneRects.length === 1,
-      `${scenarioName} 任务管理应展示一张待处理预览表: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理应展示一张完整分页任务表: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.laneRects.every((lane) => lane.width >= 180 && lane.height > 0),
       `${scenarioName} 任务管理泳道尺寸异常: ${JSON.stringify(metrics)}`
     )
-    assert.equal(metrics.tableCount, 1, `${scenarioName} 概览与分类复用同一任务表格`)
+    assert.equal(metrics.tableCount, 1, `${scenarioName} 全部与分类复用同一任务表格`)
     assert.ok(metrics.laneContentGaps.every((lane) => lane.tableFirst && Math.abs(lane.tableGap) <= 1), `${scenarioName} 分类与搜索后直接显示任务表，不保留重复说明或空行: ${JSON.stringify(metrics.laneContentGaps)}`)
     assert.equal(metrics.nestedCards, 0, `${scenarioName} 任务表内不叠加分类卡片`)
-    assert.equal(new Set(metrics.rowKeys).size, metrics.rowKeys.length, `${scenarioName} 概览预览不重复任务`)
+    assert.equal(new Set(metrics.rowKeys).size, metrics.rowKeys.length, `${scenarioName} 全部列表不重复任务`)
     assert(
       metrics.lanes.top - metrics.boardContent.top <=
         (metrics.viewport.width < 768 ? 280 : 140),

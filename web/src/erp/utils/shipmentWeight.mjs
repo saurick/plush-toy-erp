@@ -1,4 +1,14 @@
 import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+import { numeric20Scale6Units } from './numeric20Scale6.mjs'
+
+export function shipmentGrossNetWeightError(netWeightG, grossWeightKg) {
+  const net = numeric20Scale6Units(netWeightG)
+  const gross = numeric20Scale6Units(grossWeightKg)
+  if (net === null || gross === null) return ''
+  return compareUnsignedDecimalStrings(`${gross}000`, net) < 0
+    ? '毛重不能小于总净重，请核对千克与克的单位'
+    : ''
+}
 
 const DECIMAL_SCALE = NumericContract.scale
 const MAX_NET_WEIGHT_SCALED = NumericContract.maxUnits

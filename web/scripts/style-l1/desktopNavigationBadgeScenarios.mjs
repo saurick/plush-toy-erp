@@ -143,7 +143,7 @@ export function createDesktopNavigationBadgeScenarios({
         await menu.click()
         await page.waitForURL('**/erp/task-board?mode=todo')
         await page
-          .locator('.erp-task-board-lane--overview .erp-task-table-row')
+          .locator('.erp-task-board-lane--all .erp-task-table-row')
           .first()
           .waitFor()
         assert.equal(

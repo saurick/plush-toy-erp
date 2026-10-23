@@ -12,8 +12,27 @@ import {
   resolveShipmentSubmittedTotalNetWeight,
   resolveShipmentWeightPreview,
   shipmentWeightItemsSignature,
+  shipmentGrossNetWeightError,
   shipmentWeightReferenceOption,
 } from './shipmentWeight.mjs'
+
+test('business data consistency: gross kilograms cannot be below net grams', () => {
+  for (const gross of ['0.5', '0.999999'])
+    { assert.match(
+      shipmentGrossNetWeightError('1000', gross),
+      /毛重不能小于总净重/u
+    ) }
+  for (const gross of ['1', '1.000001', '', undefined])
+    { assert.equal(shipmentGrossNetWeightError('1000', gross), '') }
+  assert.equal(shipmentGrossNetWeightError(undefined, '0.5'), '')
+  assert.equal(
+    shipmentGrossNetWeightError(
+      '99999999999999.999999',
+      '99999999999999.999999'
+    ),
+    ''
+  )
+})
 
 const products = [
   {

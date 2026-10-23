@@ -62,16 +62,22 @@ func (d *jsonrpcDispatcher) handleInventory(
 		if scopeResult != nil {
 			return id, scopeResult, nil
 		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountInventoryLotsByStatusForAccess(ctx, filter, scope)
+		})
+		if err != nil {
+			return id, d.mapInventoryError(ctx, err), nil
+		}
 		items, total, err := d.inventoryUC.ListInventoryLotsForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
-		return id, okData(map[string]any{
+		return id, okData(withBusinessStatusCounts(map[string]any{
 			"inventory_lots": inventoryLotsToAny(items),
 			"total":          total,
 			"limit":          normalizedBusinessListLimit(pm),
 			"offset":         normalizedOffset(pm),
-		}), nil
+		}, statusCounts)), nil
 	case "list_inventory_txns":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
@@ -118,11 +124,11 @@ func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bo
 	if !valid {
 		return biz.InventoryLotFilter{}, false
 	}
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.InventoryLotFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.InventoryLotFilter{}, false
 	}
@@ -143,11 +149,11 @@ func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bo
 }
 
 func inventoryTxnFilterFromParams(pm map[string]any) (biz.InventoryTxnFilter, bool) {
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.InventoryTxnFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.InventoryTxnFilter{}, false
 	}

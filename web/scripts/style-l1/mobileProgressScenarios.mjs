@@ -37,6 +37,7 @@ async function assertMobileDetailSurface(root, assert) {
         : null
     }
     return {
+      progress: node.matches('.erp-progress-drawer--mobile'),
       taskFlow: node.matches('.mobile-role-tasks-page--detail'),
       taskInfo: node.matches('.mobile-role-tasks-page--task-info'),
       header: box(header),
@@ -55,7 +56,7 @@ async function assertMobileDetailSurface(root, assert) {
         .map((button) => button.textContent),
     }
   })
-  assert.equal(geometry.padding, geometry.taskFlow && !geometry.taskInfo ? '16px' : '12px')
+  assert.equal(geometry.padding, geometry.progress ? '0px' : geometry.taskFlow && !geometry.taskInfo ? '16px' : '12px')
   assert.equal(geometry.titleSize, '18px')
   assert(Math.abs(geometry.header.left) <= 1)
   assert(geometry.main.top >= geometry.header.bottom - 1)
@@ -402,6 +403,11 @@ export function createMobileProgressScenarios({
               unit: '',
             })
           }
+          if (method === 'get_progress' && longDetail) {
+            const record = data.sections.production[0]
+            data.sections.production = Array.from({ length: 12 }, (_, index) => ({ ...record, id: 100 + index, number: `MO-LONG-${index + 1}` }))
+            data.sections.tasks[0].note = '这是一条用于验证长任务返回位置的模拟说明。'.repeat(80)
+          }
           if (method === 'get_progress' && sparseDetail) {
             data.sections.production = []
             data.sections.batches = []
@@ -510,7 +516,7 @@ export function createMobileProgressScenarios({
           return {
             height: card.getBoundingClientRect().height,
             main: card.querySelector('.mobile-progress-card-main').getBoundingClientRect().height,
-            reason: card.querySelector('.erp-task-blocked-reason')?.getBoundingClientRect().height || 0,
+            reason: card.querySelector('.erp-task-reason')?.getBoundingClientRect().height || 0,
             taskHeading: card.querySelector('.erp-progress-attention-heading')?.getBoundingClientRect().height || 0,
             imageSize: card.querySelector('.erp-task-product-image').getBoundingClientRect().width,
             deliveryGap: footer.top - delivery.getBoundingClientRect().bottom,
@@ -815,8 +821,8 @@ export function createMobileProgressScenarios({
           )
           return header && Math.abs(header.getBoundingClientRect().left) <= 1
         })
-        await drawer.locator('.mobile-progress-overview-product img').first().waitFor()
-        await page.waitForFunction(() => document.querySelector('.erp-progress-drawer--mobile .mobile-progress-overview-product img')?.naturalWidth > 0)
+        await drawer.locator('.erp-progress-overview-product img').first().waitFor()
+        await page.waitForFunction(() => document.querySelector('.erp-progress-drawer--mobile .erp-progress-overview-product img')?.naturalWidth > 0)
         assert(imageCalls.some(({ method, params }) => method === 'list_product_image_references' && params.product_ids?.includes(7)))
         const detailGeometry = await assertMobileDetailSurface(drawer, assert)
         const stageRegion = drawer.getByRole('region', { name: '阶段进度' })
@@ -840,163 +846,49 @@ export function createMobileProgressScenarios({
           0
         )
         const overviewGeometry = await drawer.evaluate((root) => {
-          const content = root.querySelector('.mobile-detail-content')
-          const summary = root.querySelector('[aria-label="单据摘要"]')
-          const stages = root.querySelector('[aria-label="阶段进度"]')
+          const nav = root.querySelector('.erp-progress-detail-tabs')
+          const scroll = root.querySelector('.erp-progress-detail-scroll')
+          const header = root.querySelector('.erp-progress-detail-header')
           const footer = root.querySelector('.mobile-progress-detail-actions')
-          const buttons = [...footer.querySelectorAll('button')].map((button) =>
-            button.getBoundingClientRect()
-          )
           return {
-            sections: [
-              ...content.querySelectorAll(':scope > .mobile-detail-section'),
-            ]
-              .filter((section) => section.getClientRects().length > 0)
-              .map((section) => section.getAttribute('aria-label')),
-            summaryRows: summary.querySelectorAll('.mobile-detail-fact').length,
-            stageHeight: stages.getBoundingClientRect().height,
-            backWidth: buttons[0].width,
-            primaryWidth: buttons[1].width,
-            buttonHeight: buttons[1].height,
+            tabs: [...nav.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent),
+            facts: root.querySelectorAll('.erp-progress-overview-facts > div').length,
+            top: scroll.getBoundingClientRect().top,
+            navBottom: nav.getBoundingClientRect().bottom,
+            headerBottom: header.getBoundingClientRect().bottom,
+            navTop: nav.getBoundingClientRect().top,
+            paddingRight: parseFloat(getComputedStyle(scroll).paddingRight),
+            footerButtons: [...footer.querySelectorAll('button')].map((button) => ({ text: button.textContent, height: button.getBoundingClientRect().height })),
           }
         })
-        assert.deepEqual(overviewGeometry.sections, [
-          '单据摘要',
-          '阶段进度',
-          '最近记录',
-        ])
-        assert.equal(overviewGeometry.summaryRows, 4)
-        assert(
-          overviewGeometry.stageHeight < 220,
-          JSON.stringify(overviewGeometry)
-        )
-        assert(
-          overviewGeometry.primaryWidth > overviewGeometry.backWidth * 2,
-          JSON.stringify(overviewGeometry)
-        )
-        assert.equal(overviewGeometry.buttonHeight, 44)
-        assert.equal(await stageRegion.getByRole('button').count(), 0)
-        await page.screenshot({
-          path: path.join(outputDir, `mobile-progress-${role}-detail.png`),
-        })
-        await drawer
-          .getByRole('button', { name: '查看业务明细', exact: true })
-          .click()
-        const detailGroupNames = await drawer
-          .locator('.mobile-progress-detail-group-trigger')
-          .evaluateAll((buttons) =>
-            buttons.map((button) => button.getAttribute('aria-label'))
-          )
-        assert.deepEqual(detailGroupNames, [
-          '产品信息，1 项',
-          '生产执行，1 单 · 1 批次 · 1 项领料',
-          '关联任务，1 项',
-        ])
-        const detailGroupGeometry = await drawer
-          .locator('.mobile-progress-detail-groups')
-          .evaluate((root) => {
-            const rootRect = root.getBoundingClientRect()
-            return {
-              overflow: root.scrollWidth - root.clientWidth,
-              buttons: [
-                ...root.querySelectorAll(
-                  '.mobile-progress-detail-group-trigger'
-                ),
-              ].map((button) => {
-                const rect = button.getBoundingClientRect()
-                return {
-                  height: rect.height,
-                  left: rect.left - rootRect.left,
-                  right: rootRect.right - rect.right,
-                  width: rect.width,
-                }
-              }),
-            }
-          })
-        assert(
-          detailGroupGeometry.overflow <= 1 &&
-            detailGroupGeometry.buttons.every(
-              ({ height, left, right, width }) =>
-                height >= 52 && left >= -1 && right >= -1 && width > 280
-            ),
-          JSON.stringify(detailGroupGeometry)
-        )
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '产品信息，1 项', exact: true })
-            .getAttribute('aria-expanded'),
-          'true'
-        )
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '打开原单', exact: true })
-            .count(),
-          0
-        )
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '查看 1', exact: true })
-            .count(),
-          0
-        )
-        await drawer
-          .getByRole('button', {
-            name: '生产执行，1 单 · 1 批次 · 1 项领料',
-            exact: true,
-          })
-          .click()
-        assert.equal(
-          await drawer
-            .getByRole('button', {
-              name: '生产执行，1 单 · 1 批次 · 1 项领料',
-              exact: true,
-            })
-            .getAttribute('aria-expanded'),
-          'true'
-        )
-        const productionGroup = drawer.getByRole('region', {
-          name: '生产执行，1 单 · 1 批次 · 1 项领料',
-        })
-        assert.deepEqual(
-          await productionGroup.getByRole('heading').allTextContents(),
-          ['生产单', '工序批次', '领料']
-        )
-        assert.equal(
-          await productionGroup
-            .getByRole('button', { name: '查看生产进度', exact: true })
-            .count(),
-          1
-        )
-        await drawer
-          .getByRole('button', { name: '产品信息，1 项', exact: true })
-          .click()
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '收起业务明细', exact: true })
-            .count(),
-          1
-        )
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '产品信息，1 项', exact: true })
-            .getAttribute('aria-expanded'),
-          'true'
-        )
-        await drawer
-          .getByRole('button', {
-            name: '生产执行，1 单 · 1 批次 · 1 项领料',
-            exact: true,
-          })
-          .click()
-        await drawer
-          .getByRole('button', { name: '查看关联任务', exact: true })
-          .click()
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '关联任务，1 项', exact: true })
-            .getAttribute('aria-expanded'),
-          'true'
-        )
+        assert.deepEqual(overviewGeometry.tabs, ['总览', '产品', '生产', '任务'])
+        assert.equal(overviewGeometry.facts, 2)
+        assert(overviewGeometry.top >= overviewGeometry.navBottom && overviewGeometry.navTop >= overviewGeometry.headerBottom - 1)
+        assert(overviewGeometry.paddingRight >= 24)
+        assert.deepEqual(overviewGeometry.footerButtons.map((button) => button.text), ['返回进度'])
+        assert(overviewGeometry.footerButtons.every((button) => button.height >= 44))
+        const metricButton = stageRegion.locator(`[data-progress-stage="${factualStage}"] .erp-progress-metric-trigger`)
+        await metricButton.tap()
+        await page.locator('.ant-popover:visible .erp-progress-metric-hint').getByText(role === 'pmc' ? '560 / 800 只' : '400 / 800 只', { exact: true }).waitFor()
+        await metricButton.press('Escape')
+        await page.locator('.ant-popover:visible .erp-progress-metric-hint').waitFor({ state: 'hidden' })
+        await page.screenshot({ path: path.join(outputDir, `mobile-progress-${role}-detail.png`) })
+        await drawer.getByRole('tab', { name: '产品', exact: true }).click()
+        assert.equal(await drawer.locator('.erp-progress-record').count(), 1)
+        await drawer.getByRole('tab', { name: '生产', exact: true }).click()
+        assert.deepEqual(await drawer.locator('.mobile-progress-detail-group-trigger').evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))), ['生产单，1 单', '工序批次，1 批次', '领料，1 项'])
+        const groups = drawer.locator('.mobile-progress-detail-group-trigger')
+        assert((await groups.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height))).every((height) => height >= 52))
+        await drawer.getByRole('button', { name: '工序批次，1 批次', exact: true }).click()
+        assert.equal(await drawer.locator('.mobile-progress-detail-group-trigger[aria-expanded="true"]').count(), 1)
+        await drawer.getByRole('button', { name: '领料，1 项', exact: true }).click()
+        await drawer.getByText('短毛绒面料', { exact: true }).waitFor()
+        await drawer.getByRole('button', { name: '生产单，1 单', exact: true }).click()
+        await drawer.getByRole('button', { name: '查看生产进度', exact: true }).waitFor()
+        assert.equal(await drawer.getByRole('button', { name: '打开原单', exact: true }).count(), 0)
+        assert.equal(await drawer.getByRole('button', { name: '查看 1', exact: true }).count(), 0)
+        await drawer.getByRole('tab', { name: '任务', exact: true }).click()
+        await drawer.getByRole('tab', { name: '任务', exact: true, selected: true }).waitFor()
         await page.waitForTimeout(350)
         await page.screenshot({
           path: path.join(outputDir, `mobile-progress-${role}-tasks.png`),
@@ -1071,14 +963,9 @@ export function createMobileProgressScenarios({
         )
         await page.goBack()
         await drawer
-          .getByRole('button', { name: '关联任务，1 项', exact: true })
+          .getByRole('tab', { name: '任务', exact: true })
           .waitFor()
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '关联任务，1 项', exact: true })
-            .getAttribute('aria-expanded'),
-          'true'
-        )
+        await drawer.getByRole('tab', { name: '任务', exact: true, selected: true }).waitFor()
         await page.goBack()
         await drawer.waitFor({ state: 'hidden' })
         failDetail = true
@@ -1099,6 +986,7 @@ export function createMobileProgressScenarios({
         longDetail = true
         failRecent = true
         await drawer.getByRole('button', { name: '重试', exact: true }).click()
+        await drawer.getByRole('tab', { name: '总览', exact: true }).click()
         await drawer
           .getByRole('button', { name: '重新读取记录', exact: true })
           .waitFor()
@@ -1130,9 +1018,11 @@ export function createMobileProgressScenarios({
             ),
           })
           await drawer
-            .getByRole('button', { name: '查看业务明细', exact: true })
+            .getByRole('tab', { name: '生产', exact: true })
             .click()
-          assert(await assertMobileBackToTop(page, drawer.locator('.ant-drawer-body'), { screenshotPath: path.join(outputDir, `mobile-back-top-${role}-detail-${width}.png`), keyboard: true }), '长进度详情支持回到顶部')
+          assert(await assertMobileBackToTop(page, drawer.locator('.erp-progress-detail-scroll'), { screenshotPath: path.join(outputDir, `mobile-back-top-${role}-detail-${width}.png`), keyboard: true }), '长进度详情支持回到顶部')
+          const contentGeometry = await drawer.locator('.erp-progress-detail-scroll').evaluate((node) => ({ height: node.clientHeight, padding: parseFloat(getComputedStyle(node).paddingRight), overflow: node.scrollWidth - node.clientWidth }))
+          assert(contentGeometry.height >= 120 && contentGeometry.padding >= 24 && contentGeometry.overflow <= 1, JSON.stringify(contentGeometry))
           const narrowGroupGeometry = await drawer
             .locator('.mobile-progress-detail-groups')
             .evaluate((root) => {
@@ -1172,15 +1062,28 @@ export function createMobileProgressScenarios({
             ),
           })
           await drawer
-            .getByRole('button', { name: '收起业务明细', exact: true })
+            .getByRole('tab', { name: '总览', exact: true })
             .click()
         }
+        await page.setViewportSize({ width: 320, height: 568 })
+        const shortViewport = await drawer.locator('.erp-progress-detail-scroll').evaluate((node) => ({ height: node.clientHeight, overflow: node.scrollWidth - node.clientWidth }))
+        assert(shortViewport.height >= 100 && shortViewport.overflow <= 1, JSON.stringify(shortViewport))
         await page.setViewportSize({ width: 390, height: 844 })
+        await drawer.getByRole('tab', { name: '任务', exact: true }).click()
+        const longDetailTaskEntry = drawer.getByRole('button', { name: '查看任务 TASK-0100' })
+        await longDetailTaskEntry.scrollIntoViewIfNeeded()
+        const longDetailScrollTop = await drawer.locator('.erp-progress-detail-scroll').evaluate((node) => node.scrollTop)
+        assert(longDetailScrollTop > 0)
+        await longDetailTaskEntry.click()
+        await page.getByTestId('mobile-task-detail-screen').waitFor()
+        await page.goBack()
+        await drawer.getByRole('tab', { name: '任务', exact: true, selected: true }).waitFor()
+        await page.waitForFunction((top) => Math.abs(document.querySelector('.erp-progress-drawer--mobile .erp-progress-detail-scroll').scrollTop - top) <= 1, longDetailScrollTop)
         await drawer
-          .getByRole('button', { name: '查看业务明细', exact: true })
+          .getByRole('tab', { name: '生产', exact: true })
           .click()
         await drawer
-          .getByRole('region', { name: '进度明细', exact: true })
+          .getByRole('tabpanel')
           .waitFor()
         await drawer
           .locator('.mobile-task-flow-header')
@@ -1194,18 +1097,8 @@ export function createMobileProgressScenarios({
             exact: true,
           })
           .click()
-        assert.equal(
-          await drawer
-            .getByRole('button', { name: '关联任务，1 项', exact: true })
-            .getAttribute('aria-expanded'),
-          'true'
-        )
-        await drawer
-          .getByRole('button', {
-            name: '生产执行，1 单 · 1 批次 · 1 项领料',
-            exact: true,
-          })
-          .click()
+        await drawer.getByRole('tab', { name: '任务', exact: true, selected: true }).waitFor()
+        await drawer.getByRole('tab', { name: '生产', exact: true }).click()
         await drawer
           .getByRole('button', { name: '查看生产进度', exact: true })
           .click()
@@ -1221,14 +1114,14 @@ export function createMobileProgressScenarios({
         await page.goBack()
         await drawer
           .getByRole('button', {
-            name: '生产执行，1 单 · 1 批次 · 1 项领料',
+            name: '生产单，1 单',
             exact: true,
           })
           .waitFor()
         assert.equal(
           await drawer
             .getByRole('button', {
-              name: '生产执行，1 单 · 1 批次 · 1 项领料',
+              name: '生产单，1 单',
               exact: true,
             })
             .getAttribute('aria-expanded'),
@@ -1253,7 +1146,7 @@ export function createMobileProgressScenarios({
           0
         )
         await drawer
-          .getByRole('button', { name: '查看业务明细', exact: true })
+          .getByRole('tab', { name: '生产', exact: true })
           .click()
         assert.deepEqual(
           await drawer
@@ -1261,7 +1154,7 @@ export function createMobileProgressScenarios({
             .evaluateAll((buttons) =>
               buttons.map((button) => button.getAttribute('aria-label'))
             ),
-          ['产品信息，1 项']
+          ['生产单，0 单', '工序批次，0 批次', '领料，0 项']
         )
         await drawer
           .locator('.mobile-task-flow-header')

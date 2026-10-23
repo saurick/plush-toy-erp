@@ -151,12 +151,12 @@ export default function LegalNoticeGate({ children }) {
         </Typography.Paragraph>
         <ul className="legal-notice-gate-links">
           <li>
-            <Link to="/legal/privacy" target="_blank" rel="noreferrer">
+            <Link to="/legal/privacy" state={{ from: fromPath }}>
               打开《个人信息处理规则》
             </Link>
           </li>
           <li>
-            <Link to="/legal/system-rules" target="_blank" rel="noreferrer">
+            <Link to="/legal/system-rules" state={{ from: fromPath }}>
               打开《系统使用规则》
             </Link>
           </li>

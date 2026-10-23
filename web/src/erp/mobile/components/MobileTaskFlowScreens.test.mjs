@@ -41,10 +41,7 @@ const listScreenSource = readFileSync(
   new URL('./MobileTaskListScreen.jsx', import.meta.url),
   'utf8'
 )
-const listSkeletonSource = readFileSync(
-  new URL('./MobileTaskListSkeleton.jsx', import.meta.url),
-  'utf8'
-)
+
 const flowHeaderSource = readFileSync(
   new URL('./MobileTaskFlowHeader.jsx', import.meta.url),
   'utf8'
@@ -290,13 +287,10 @@ test('mobile task list keeps approval in the primary filter row and gates it by 
     /data-testid=\{`mobile-role-filter-\$\{item\.key\}`\}/u
   )
   assert.match(listScreenSource, /item\.ariaLabel \|\| item\.label/u)
-  assert.match(
+  assert.doesNotMatch(
     listScreenSource,
-    /filterCount=\{canViewApprovalInbox \? 4 : 3\}/u
-  )
-  assert.match(
-    listSkeletonSource,
-    /normalizedFilterCount = filterCount === 4 \? 4 : 3/u
+    /!initialLoading && renderTaskFilters\(\)/u,
+    '首屏加载时保留真实筛选栏，权限仍由 filterItems 决定'
   )
   assert.doesNotMatch(listScreenSource, /当前岗位的审批事项/u)
   assert.doesNotMatch(roleTaskPageSource, /isMobileTaskMine/u)

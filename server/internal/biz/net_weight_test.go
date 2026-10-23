@@ -119,3 +119,19 @@ func TestCalculateShipmentTotalNetWeightG(t *testing.T) {
 		}
 	}
 }
+
+func TestShipmentGrossNetWeightConsistency(t *testing.T) {
+	net := decimal.RequireFromString("1000")
+	for _, tc := range []struct {
+		gross   string
+		invalid bool
+	}{{"0.5", true}, {"0.999999", true}, {"1", false}, {"1.000001", false}} {
+		gross := decimal.RequireFromString(tc.gross)
+		if err := ValidateShipmentWeights(&net, &gross); (err != nil) != tc.invalid {
+			t.Fatalf("gross %s net %s: %v", gross, net, err)
+		}
+	}
+	if ValidateShipmentWeights(&net, nil) != nil || ValidateShipmentWeights(nil, nil) != nil {
+		t.Fatal("missing weight must remain optional")
+	}
+}

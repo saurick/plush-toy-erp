@@ -465,28 +465,6 @@ export const businessModuleDefinitions = Object.freeze([
     ],
   },
   {
-    key: 'shipping-release',
-    tabLabel: '放行审批',
-    sectionKey: 'shipment',
-    label: '出货放行',
-    title: '出货放行',
-    path: '/erp/warehouse/shipping-release',
-    shortLabel: '放行',
-    pageKind: 'formal',
-    description:
-      '出货放行用于财务办理版本化出货审批；批准后仍须由业务在出货单页面独立确认实际出货。',
-    primaryEntity: 'process_instances / workflow_tasks / shipments',
-    factSource: 'shipments -> ProcessRuntime -> Shipment finance gate',
-    boundary:
-      '当前不提供通用新建任务；财务审批只记录当前出货单版本的放行结果，不代表已经出货、已经扣减库存，也不会生成应收、开票或收付款记录。',
-    sourceRefs: ['shipments', 'process_instances', 'workflow_tasks'],
-    currentScope: [
-      '出货单启动交付流程后生成的财务审批任务',
-      '审批 / 退回 / 阻塞 / 恢复 / 催办',
-      '核对流程轨迹、财务放行锚点和来源出货单',
-    ],
-  },
-  {
     key: 'outbound',
     sectionKey: 'shipment',
     label: '库存预留',

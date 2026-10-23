@@ -529,7 +529,7 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId: 'FL_sales_order_item_amount__keeps_manual_snapshot_without_inputs',
-    title: '销售订单明细数量或单价缺失时保留手工金额快照',
+    title: '销售订单只读回显保留缺输入的历史金额快照，编辑清空不回用',
     fieldKeys: ['itemAmount'],
     scenarioKey: 'manual_snapshot_retained',
     layer: 'web',

@@ -251,15 +251,26 @@ function quantityInputText(value) {
   return units === null ? text : numeric20Scale6TextFromUnits(units)
 }
 
-function normalizeLossRate(value) {
+function normalizeLossRate(value, percentColumn = false) {
   const text = normalizeText(value)
-  if (!text) return null
-  const hasPercentSign = /[%％]/u.test(text)
-  const number = parseFiniteNumber(text.replace(/[%％]/gu, ''))
-  if (number === null || number < 0) return null
-  const normalized = hasPercentSign || number > 1 ? number / 100 : number
-  if (!Number.isFinite(normalized) || normalized > 1000000) return null
-  return formatDecimal(normalized, { nonNegative: true }) || null
+  const match = text.match(/^\+?(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?([%％])?$/u)
+  if (!match) return null
+  const integer = match[1] || '0'
+  const digits = `${integer}${match[2] || match[3] || ''}`
+  if (!/[1-9]/u.test(digits)) return '0'
+  const exponent = Number(match[4] || 0)
+  const point = integer.length + exponent - (match[5] || percentColumn ? 2 : 0)
+  // Keep extreme input visible for validation without expanding an unbounded exponent.
+  if (!Number.isSafeInteger(point) || Math.abs(point) > digits.length + 400) return text
+  const expanded = point <= 0
+    ? `0.${'0'.repeat(-point)}${digits}`
+    : point >= digits.length
+      ? `${digits}${'0'.repeat(point - digits.length)}`
+      : `${digits.slice(0, point)}.${digits.slice(point)}`
+  const [whole, decimal = ''] = expanded.split('.')
+  const normalizedInteger = whole.replace(/^0+(?=\d)/u, '')
+  const fraction = decimal.replace(/0+$/u, '')
+  return fraction ? `${normalizedInteger}.${fraction}` : normalizedInteger
 }
 
 function inferLossRate({ orderQuantity, totalQuantity, unitQuantity }) {
@@ -290,13 +301,16 @@ function lossRatesDiffer(left, right) {
 
 function resolveLossRate({
   explicitValue,
+  percentColumn = false,
   headerDefault,
   orderQuantity,
   totalQuantity,
   unitQuantity,
 }) {
   const explicitText = normalizeText(explicitValue)
-  const explicit = explicitText ? normalizeLossRate(explicitText) : null
+  const explicit = explicitText
+    ? normalizeLossRate(explicitText, percentColumn)
+    : null
   const inferred = inferLossRate({
     orderQuantity,
     totalQuantity,
@@ -308,6 +322,13 @@ function resolveLossRate({
       value: '',
       source: 'unresolved',
       issue: `原表损耗率“${explicitText}”无法识别`,
+    }
+  }
+  if (explicit !== null && numeric20Scale6Units(explicit) === null) {
+    return {
+      value: explicit,
+      source: 'unresolved',
+      issue: `原表损耗率“${explicitText}”转换后超出六位精度或范围，请核对原值`,
     }
   }
   if (explicit !== null && lossRatesDiffer(explicit, inferred)) {
@@ -497,7 +518,13 @@ function extractBOMRows(sheet, header, context) {
     if (!position && !rawUnitQuantity) continue
 
     const totalQuantity = valueByAlias(row, header, 'totalQuantity')
+    const lossDescriptor = descriptorsByAlias(header, 'lossRate').find(
+      (descriptor) => normalizeText(row.values[descriptor.startColumn - 1])
+    )
     const loss = resolveLossRate({
+      percentColumn:
+        Boolean(lossDescriptor?.label.includes('%')) &&
+        !row.percentStyles?.[lossDescriptor.startColumn - 1],
       explicitValue: valueByAlias(row, header, 'lossRate'),
       headerDefault: headerDefaultLossRate,
       orderQuantity: context.quantityText,

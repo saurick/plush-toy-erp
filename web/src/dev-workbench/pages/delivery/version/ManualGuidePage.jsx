@@ -87,6 +87,7 @@ export default function ManualGuidePage() {
         <Typography.Title level={2}>章节目录</Typography.Title>
         <nav aria-label="操作指引章节目录">
           <Anchor
+            className="erp-dev-directory-anchor"
             affix={false}
             offsetTop={16}
             items={guideChapters}

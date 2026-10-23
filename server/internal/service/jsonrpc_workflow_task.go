@@ -72,6 +72,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := rejectUnknownWorkflowTaskParams(
 			pm,
 			method,
+			"include_status_counts",
 			"keyword",
 			"owner_role_key",
 			"task_status_key",
@@ -120,6 +121,10 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			return id, visibilityResult, nil
 		}
 		filter.VisibilityScope = visibilityScope
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) { return d.workflowUC.CountWorkflowTasksByStatus(ctx, filter) })
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
 		tasks, total, err := d.workflowUC.ListTasks(ctx, filter)
 		if err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
@@ -127,12 +132,12 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
-			Data: newDataStruct(map[string]any{
+			Data: newDataStruct(withBusinessStatusCounts(map[string]any{
 				"tasks":  workflowTasksToAny(tasks),
 				"total":  total,
 				"limit":  limit,
 				"offset": offset,
-			}),
+			}, statusCounts)),
 		}, nil
 	case "list_role_tasks":
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {

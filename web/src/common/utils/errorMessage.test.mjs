@@ -7,8 +7,17 @@ import {
 } from '../consts/errorCodes.js'
 import {
   getActionErrorMessage,
+  getPageLoadErrorMessage,
   getUserFacingErrorMessage,
 } from './errorMessage.js'
+
+test('page load failures distinguish interface errors from editable validation and retain permission guidance', () => {
+  const mismatch = { code: RpcErrorCode.INVALID_PARAM, message: 'list_tasks 不接收参数 include_status_counts' }
+  assert.equal(getPageLoadErrorMessage(mismatch, '加载任务失败'), '加载任务失败，请刷新后重试')
+  assert.equal(getActionErrorMessage(mismatch, '保存'), '请检查填写内容后重试')
+  assert.equal(getPageLoadErrorMessage({ code: RpcErrorCode.INVALID_PARAM, message: '开始日期不能晚于结束日期' }, '加载任务'), '开始日期不能晚于结束日期')
+  assert.equal(getPageLoadErrorMessage({ code: RpcErrorCode.PERMISSION_DENIED }, '加载任务'), DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED])
+})
 
 test('errorMessage: 网络错误统一翻译为中文', () => {
   assert.equal(

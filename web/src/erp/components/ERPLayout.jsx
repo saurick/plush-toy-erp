@@ -1,4 +1,5 @@
 import React, {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -1633,7 +1634,18 @@ export default function ERPLayout({ legalNotice }) {
                 ) : shouldGuardProductCoreBusinessData ? (
                   <ProductCoreCapabilityReview currentEntry={currentEntry} />
                 ) : (
-                  <Outlet context={outletContext} key={businessPageGeneration} />
+                  <Suspense
+                    key={location.pathname}
+                    fallback={
+                      <Loading
+                        className="erp-route-loading"
+                        title={`正在加载${currentEntry?.label || '页面'}`}
+                        description={null}
+                      />
+                    }
+                  >
+                    <Outlet context={outletContext} key={businessPageGeneration} />
+                  </Suspense>
                 )}
               </div>
             </Content>

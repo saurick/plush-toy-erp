@@ -572,7 +572,7 @@ func (r *inventoryRepo) ListInventoryLotsForAccess(ctx context.Context, filter b
 	return r.listInventoryLots(ctx, filter, biz.NormalizeWarehouseDataScope(scope))
 }
 
-func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryLot, int, error) {
+func (r *inventoryRepo) inventoryLotListQuery(filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) *ent.InventoryLotQuery {
 	query := r.data.postgres.InventoryLot.Query()
 	if filter.IDs != nil {
 		query.Where(inventorylot.IDIn(filter.IDs...))
@@ -592,7 +592,7 @@ func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.Invent
 		))
 	case biz.DataScopeModeAll:
 	default:
-		return []*biz.InventoryLot{}, 0, nil
+		query = query.Where(inventorylot.IDIn())
 	}
 	if filter.SubjectType != "" {
 		query = query.Where(inventorylot.SubjectTypeEQ(filter.SubjectType))
@@ -631,8 +631,13 @@ func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.Invent
 		query = query.Where(inventorylot.ReceivedAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		query = query.Where(inventorylot.ReceivedAtLTE(endOfDateFilter(*filter.DateTo)))
+		query = query.Where(inventorylot.ReceivedAtLTE(*filter.DateTo))
 	}
+	return query
+}
+
+func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryLot, int, error) {
+	query := r.inventoryLotListQuery(filter, scope)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -733,7 +738,7 @@ func (r *inventoryRepo) listInventoryTxns(ctx context.Context, filter biz.Invent
 		query = query.Where(inventorytxn.OccurredAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		query = query.Where(inventorytxn.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
+		query = query.Where(inventorytxn.OccurredAtLTE(*filter.DateTo))
 	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
@@ -1368,8 +1373,7 @@ WHERE subject_type = %s AND subject_id = %s AND warehouse_id = %s AND unit_id = 
 	return result.RowsAffected()
 }
 
-func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeaderFilter) (_ []*biz.BOMHeader, _ int, resultErr error) {
-	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
+func (r *inventoryRepo) bomHeaderListQuery(filter biz.BOMHeaderFilter) *ent.BOMHeaderQuery {
 	query := r.data.postgres.BOMHeader.Query()
 	if filter.ProductID > 0 {
 		query = query.Where(bomheader.ProductID(filter.ProductID))
@@ -1386,6 +1390,12 @@ func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeader
 	if filter.Keyword != "" {
 		query = query.Where(businessDocumentKeyword("bom", filter.Keyword))
 	}
+	return query
+}
+
+func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeaderFilter) (_ []*biz.BOMHeader, _ int, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrBOMRecordConflict) }()
+	query := r.bomHeaderListQuery(filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -1882,4 +1892,14 @@ func entBOMItemToBiz(row *ent.BOMItem) *biz.BOMItem {
 		CreatedAt:          row.CreatedAt,
 		UpdatedAt:          row.UpdatedAt,
 	}
+}
+
+func (r *inventoryRepo) CountBOMHeadersByStatus(ctx context.Context, filter biz.BOMHeaderFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.bomHeaderListQuery(filter).GroupBy(bomheader.FieldStatus).Aggregate(ent.Count()).Scan)
+}
+
+func (r *inventoryRepo) CountInventoryLotsByStatusForAccess(ctx context.Context, filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.inventoryLotListQuery(filter, biz.NormalizeWarehouseDataScope(scope)).GroupBy(inventorylot.FieldStatus).Aggregate(ent.Count()).Scan)
 }

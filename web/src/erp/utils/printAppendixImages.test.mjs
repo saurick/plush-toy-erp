@@ -224,3 +224,20 @@ test('printAppendixImages: 按打印宽度缩放且超长图切片连续覆盖�
     segments: [],
   })
 })
+
+test('加工合同两图或三图同行，手动半宽、整行和长图仍独立生效', () => {
+  const images = [0, 1, 2].map((index) => createImage(index, { width: 1000, height: 1500 }))
+  const rows = groupPrintAppendixImageRows(images, { autoColumns: 3 })
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].columns, 3)
+  assert.equal(groupPrintAppendixImageRows(images.slice(0, 2), { autoColumns: 3 })[0].columns, 2)
+  const mixed = groupPrintAppendixImageRows([
+    images[0],
+    { ...images[1], layoutMode: 'half' },
+    { ...images[2], layoutMode: 'full' },
+    createImage(3, { width: 1000, height: 6000 }),
+  ], { autoColumns: 3 })
+  assert.deepEqual(mixed.map(row => row.layout), ['half', 'half', 'full', 'full'])
+  assert.deepEqual(mixed.flatMap(row => row.images.map(image => image.id)), ['appendix-1', 'appendix-2', 'appendix-3', 'appendix-4'])
+  assert.equal(images[0].layoutMode, 'auto')
+})

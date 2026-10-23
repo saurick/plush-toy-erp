@@ -248,6 +248,39 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	if focused.Total != board.Total || focused.Counts != board.Counts || fmt.Sprint(focused.SourceTypes) != fmt.Sprint(board.SourceTypes) {
 		t.Fatalf("focused page must retain complete summary, got %#v", focused)
 	}
+	for _, sortKey := range []string{biz.WorkflowTaskBoardSortSmart, biz.WorkflowTaskBoardSortDueSoon, biz.WorkflowTaskBoardSortNewest} {
+		seen := map[int]bool{}
+		for offset := 0; offset < board.Total; offset += 3 {
+			page, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{LaneKey: biz.WorkflowTaskBoardLaneAll, Sort: sortKey, Limit: 3, Offset: offset, SnapshotAt: snapshotAt})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if page.Total != board.Total || page.Counts != board.Counts || len(page.Lanes) != 1 || page.Lanes[0].Total != board.Total || page.Lanes[0].Offset != offset || len(page.Lanes[0].Tasks) != min(3, board.Total-offset) {
+				t.Fatalf("all page lost summary or pagination: %+v", page)
+			}
+			for _, task := range page.Lanes[0].Tasks {
+				if seen[task.ID] {
+					t.Fatalf("duplicate task across pages: %d", task.ID)
+				}
+				seen[task.ID] = true
+				if (task.TaskStatusKey == "done" || task.TaskStatusKey == "rejected") && task.BlockedReason != nil {
+					t.Fatalf("all page retained stale reason: %+v", task)
+				}
+			}
+		}
+		if len(seen) != len(fixtures) {
+			t.Fatalf("all page missed tasks: %d", len(seen))
+		}
+	}
+	for _, query := range []biz.WorkflowTaskBoardQuery{
+		{LaneKey: biz.WorkflowTaskBoardLaneAll, Keyword: "客户特殊款", Limit: 20, SnapshotAt: snapshotAt},
+		{LaneKey: biz.WorkflowTaskBoardLaneAll, Status: "blocked", Due: "overdue", SourceType: "alpha", Limit: 20, SnapshotAt: snapshotAt},
+	} {
+		page, err := repo.GetWorkflowTaskBoard(ctx, query)
+		if err != nil || page.Total != 1 || len(page.Lanes[0].Tasks) != 1 {
+			t.Fatalf("all page filters: %+v %v", page, err)
+		}
+	}
 }
 
 func TestWorkflowRepo_GetWorkflowTaskBoardTodoCountsUnsettledResponsibilitiesOnce(t *testing.T) {
@@ -300,6 +333,20 @@ func TestWorkflowRepo_GetWorkflowTaskBoardTodoCountsUnsettledResponsibilitiesOnc
 		if len(lane.Tasks) > 1 {
 			t.Fatalf("limit must bound rows, not counts: %#v", lane)
 		}
+	}
+	query.LaneKey = biz.WorkflowTaskBoardLaneAll
+	seen := map[int]bool{}
+	for offset := 0; offset < board.Total; offset++ {
+		query.Offset = offset
+		page, err := repo.GetWorkflowTaskBoard(ctx, query)
+		if err != nil || page.Total != 4 || page.Counts != board.Counts || len(page.Lanes) != 1 || len(page.Lanes[0].Tasks) != 1 {
+			t.Fatalf("all todo page: %+v %v", page, err)
+		}
+		task := page.Lanes[0].Tasks[0]
+		if seen[task.ID] || (task.TaskStatusKey != "ready" && task.TaskStatusKey != "blocked") {
+			t.Fatalf("duplicate or settled todo: %+v", task)
+		}
+		seen[task.ID] = true
 	}
 	query.TodoOnly = false
 	all, err := repo.GetWorkflowTaskBoard(ctx, query)

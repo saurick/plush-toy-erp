@@ -30,6 +30,7 @@ import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
+import { shipmentApprovalPath } from '../utils/shipmentApproval.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   ShipmentStatus,
@@ -278,6 +279,7 @@ export default function ShipmentsPage() {
   )
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [rows, setRows] = useState([])
+  const [rowsLoadFailed, setRowsLoadFailed] = useState(false)
   const [total, setTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState(null)
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
@@ -638,6 +640,7 @@ export default function ShipmentsPage() {
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
     setLoading(true)
+    setRowsLoadFailed(false)
     setStatusCounts(null)
     try {
       const routeSelectedID = Number(routeShipmentID || 0)
@@ -687,6 +690,10 @@ export default function ShipmentsPage() {
         return
       }
       showPageLoadError(error, '加载出货单')
+      setRowsLoadFailed(true)
+      setRows([])
+      setTotal(0)
+      setSelectedRow(null)
     } finally {
       if (request.isCurrent()) {
         setLoading(false)
@@ -1860,11 +1867,25 @@ export default function ShipmentsPage() {
                   className="erp-business-module-status-action"
                   data-business-action-key="shipment-release"
                   data-business-action-role="primary"
+                  data-business-action-group="collaboration"
                   disabled={shipmentActionAvailability.release.disabled}
                 >
-                  核对出货审批
+                  提交出货审批
                 </Button>
               </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ) ? (
+            <BusinessActionTooltip disabled={!selectedRow || saving} disabledReason="请先选择一张出货单">
+              <Button
+                size="small"
+                data-business-action-key="shipment-approval"
+                data-business-action-role="related"
+                disabled={!selectedRow || saving}
+                onClick={() => navigate(shipmentApprovalPath(selectedRow))}
+              >
+                查看审批
+              </Button>
             </BusinessActionTooltip>
           ) : null}
           {shipmentActionAvailability.ship.visible ? (
@@ -1988,7 +2009,7 @@ export default function ShipmentsPage() {
           total,
           onChange: (current, pageSize) => setPagination({ current, pageSize }),
         })}
-        emptyDescription="暂无出货单"
+        emptyDescription={rowsLoadFailed ? <span role="alert">出货单读取失败，<Button type="link" onClick={loadRows}>重新读取</Button></span> : '暂无出货单'}
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selectedRow ? [selectedRow.id] : [],
@@ -2006,6 +2027,7 @@ export default function ShipmentsPage() {
       {columnOrderModal}
 
       <ShipmentEditor
+        canReadApproval={hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)}
         canCreate={canCreate}
         canUpdate={canUpdate}
         canImportSalesOrderSource={canImportSalesOrderSource}

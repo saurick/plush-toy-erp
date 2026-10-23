@@ -21,7 +21,7 @@ function FieldDescription({ field }) {
   return (
     <>
       {summary ? <Markdown source={summary} /> : null}
-      <details className="erp-dev-integration__field-source">
+      <details className="erp-dev-disclosure erp-dev-integration__field-source">
         <summary aria-label={`${field.name} 的解析依据`}>解析依据</summary>
         <Markdown source={source} />
       </details>

@@ -4,6 +4,99 @@
   color: var(--erp-primary-strong);
 }
 
+.erp-dev-directory-item,
+.erp-dev-directory-anchor.ant-anchor-wrapper .ant-anchor-link-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--erp-text);
+  font: inherit;
+  font-size: var(--erp-font-small);
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.erp-dev-directory-item > :where(span, strong) {
+  min-width: 0;
+}
+
+.erp-dev-directory-item :where(strong) {
+  font-weight: inherit;
+}
+
+.erp-dev-directory-item:where(:not([aria-current]:not([aria-current='false']), [aria-pressed='true'])):hover,
+.erp-dev-directory-anchor .ant-anchor-link-title:where(:not(.ant-anchor-link-title-active)):hover {
+  background: var(--erp-interactive-bg-hover);
+}
+
+.erp-dev-directory-item:focus-visible,
+.erp-dev-directory-anchor .ant-anchor-link-title:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+
+.erp-dev-directory-item:is([aria-current]:not([aria-current='false']), [aria-pressed='true']),
+.erp-dev-directory-anchor.ant-anchor-wrapper .ant-anchor-link-title-active {
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+  font-weight: 600;
+}
+
+.erp-dev-directory-item--nested {
+  padding-inline-start: 22px;
+}
+
+.erp-dev-directory-item--stacked {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-directory-anchor.ant-anchor-wrapper .ant-anchor {
+  padding-inline-start: 0;
+}
+
+.erp-dev-directory-anchor .ant-anchor::before,
+.erp-dev-directory-anchor .ant-anchor-ink {
+  display: none;
+}
+
+.erp-dev-directory-anchor.ant-anchor-wrapper .ant-anchor-link {
+  padding: 0;
+  margin-block: 2px;
+}
+
+.erp-dev-directory-anchor.ant-anchor-wrapper .ant-anchor-link .ant-anchor-link {
+  padding-inline-start: 14px;
+}
+
+.erp-dev-directory-group-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 10px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-weight: 600;
+  cursor: default;
+}
+
+.erp-dev-directory-group-title::after {
+  content: '';
+  min-width: 12px;
+  flex: 1;
+  border-top: 1px solid var(--erp-border);
+}
+
 .erp-dev-hub-card {
   position: relative;
   display: grid;

@@ -153,6 +153,7 @@ export async function verifyRPCContractReviewWorkspace(page, { assert, assertNoH
     await page.getByRole('link', { name: '测试执行', exact: true }).click()
     await page.getByRole('heading', { name: '测试执行', exact: true }).waitFor()
     assert.equal(await page.getByRole('tab', { name: '接口合同', exact: true }).count(), 0)
+    await page.getByRole('tab', { name: '本轮验证', exact: true }).click()
     const summaryRow = page.locator('[data-action-key="rpc-examples"]')
     await summaryRow.getByRole('link', { name: '查看并运行', exact: true }).click()
     await workspace.getByText('本轮无接口合同变化', { exact: true }).waitFor()

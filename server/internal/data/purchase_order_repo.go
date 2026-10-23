@@ -784,12 +784,18 @@ func validatePurchaseOrderSettlementDependencies(ctx context.Context, tx *ent.Tx
 }
 
 func (r *purchaseOrderRepo) AddPurchaseOrderItem(ctx context.Context, in *biz.PurchaseOrderItemMutation) (*biz.PurchaseOrderItem, error) {
+	if err := preparePurchaseItemPrintSnapshots(ctx, r.data.postgres, in, nil); err != nil {
+		return nil, err
+	}
 	row, err := r.data.postgres.PurchaseOrderItem.Create().
 		SetPurchaseOrderID(in.PurchaseOrderID).
 		SetLineNo(in.LineNo).
 		SetDisplayOrder(in.LineNo).
 		SetMaterialID(in.MaterialID).
 		SetUnitID(in.UnitID).
+		SetNillableMaterialSpecSnapshot(in.MaterialSpecSnapshot).
+		SetNillableSupplierItemNoSnapshot(in.SupplierItemNoSnapshot).
+		SetNillableUnitNameSnapshot(in.UnitNameSnapshot).
 		SetNillableMaterialCodeSnapshot(in.MaterialCodeSnapshot).
 		SetNillableMaterialNameSnapshot(in.MaterialNameSnapshot).
 		SetNillableColorSnapshot(in.ColorSnapshot).
@@ -810,12 +816,34 @@ func (r *purchaseOrderRepo) AddPurchaseOrderItem(ctx context.Context, in *biz.Pu
 }
 
 func (r *purchaseOrderRepo) UpdatePurchaseOrderItem(ctx context.Context, id int, in *biz.PurchaseOrderItemMutation) (*biz.PurchaseOrderItem, error) {
+	current, err := r.data.postgres.PurchaseOrderItem.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := preparePurchaseItemPrintSnapshots(ctx, r.data.postgres, in, current); err != nil {
+		return nil, err
+	}
 	update := r.data.postgres.PurchaseOrderItem.UpdateOneID(id).
 		SetPurchaseOrderID(in.PurchaseOrderID).
 		SetLineNo(in.LineNo).
 		SetMaterialID(in.MaterialID).
 		SetUnitID(in.UnitID).
 		SetPurchasedQuantity(in.PurchasedQuantity)
+	if in.MaterialSpecSnapshot == nil {
+		update.ClearMaterialSpecSnapshot()
+	} else {
+		update.SetMaterialSpecSnapshot(*in.MaterialSpecSnapshot)
+	}
+	if in.SupplierItemNoSnapshot == nil {
+		update.ClearSupplierItemNoSnapshot()
+	} else {
+		update.SetSupplierItemNoSnapshot(*in.SupplierItemNoSnapshot)
+	}
+	if in.UnitNameSnapshot == nil {
+		update.ClearUnitNameSnapshot()
+	} else {
+		update.SetUnitNameSnapshot(*in.UnitNameSnapshot)
+	}
 	if in.MaterialCodeSnapshot == nil {
 		update.ClearMaterialCodeSnapshot()
 	} else {
@@ -1078,12 +1106,18 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			if current.LineStatus == biz.PurchaseOrderItemStatusCanceled || current.LineStatus == biz.PurchaseOrderItemStatusClosed {
 				return nil, biz.ErrSourceOrderStateInvalid
 			}
+			if err := preparePurchaseItemPrintSnapshots(ctx, tx.Client(), &mutation, current); err != nil {
+				return nil, err
+			}
 			mutation.LineNo = current.LineNo
 			if _, err := savePurchaseOrderItemUpdate(ctx, tx, item.ID, displayOrder, &mutation); err != nil {
 				return nil, err
 			}
 			submittedIDs[item.ID] = struct{}{}
 			continue
+		}
+		if err := preparePurchaseItemPrintSnapshots(ctx, tx.Client(), &mutation, nil); err != nil {
+			return nil, err
 		}
 		maxLineNo++
 		mutation.LineNo = maxLineNo
@@ -1093,6 +1127,9 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			SetDisplayOrder(displayOrder).
 			SetMaterialID(mutation.MaterialID).
 			SetUnitID(mutation.UnitID).
+			SetNillableMaterialSpecSnapshot(mutation.MaterialSpecSnapshot).
+			SetNillableSupplierItemNoSnapshot(mutation.SupplierItemNoSnapshot).
+			SetNillableUnitNameSnapshot(mutation.UnitNameSnapshot).
 			SetNillableMaterialCodeSnapshot(mutation.MaterialCodeSnapshot).
 			SetNillableMaterialNameSnapshot(mutation.MaterialNameSnapshot).
 			SetNillableColorSnapshot(mutation.ColorSnapshot).
@@ -1232,6 +1269,21 @@ func savePurchaseOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, displa
 		SetMaterialID(in.MaterialID).
 		SetUnitID(in.UnitID).
 		SetPurchasedQuantity(in.PurchasedQuantity)
+	if in.MaterialSpecSnapshot == nil {
+		update.ClearMaterialSpecSnapshot()
+	} else {
+		update.SetMaterialSpecSnapshot(*in.MaterialSpecSnapshot)
+	}
+	if in.SupplierItemNoSnapshot == nil {
+		update.ClearSupplierItemNoSnapshot()
+	} else {
+		update.SetSupplierItemNoSnapshot(*in.SupplierItemNoSnapshot)
+	}
+	if in.UnitNameSnapshot == nil {
+		update.ClearUnitNameSnapshot()
+	} else {
+		update.SetUnitNameSnapshot(*in.UnitNameSnapshot)
+	}
 	if in.MaterialCodeSnapshot == nil {
 		update.ClearMaterialCodeSnapshot()
 	} else {
@@ -1343,6 +1395,9 @@ func entPurchaseOrderItemToBiz(row *ent.PurchaseOrderItem) *biz.PurchaseOrderIte
 		LineNo:                 row.LineNo,
 		MaterialID:             row.MaterialID,
 		UnitID:                 row.UnitID,
+		MaterialSpecSnapshot:   row.MaterialSpecSnapshot,
+		SupplierItemNoSnapshot: row.SupplierItemNoSnapshot,
+		UnitNameSnapshot:       row.UnitNameSnapshot,
 		MaterialCodeSnapshot:   row.MaterialCodeSnapshot,
 		MaterialNameSnapshot:   row.MaterialNameSnapshot,
 		ColorSnapshot:          row.ColorSnapshot,
@@ -1366,4 +1421,30 @@ func entPurchaseOrderItemsToBiz(rows []*ent.PurchaseOrderItem) []*biz.PurchaseOr
 		out = append(out, entPurchaseOrderItemToBiz(row))
 	}
 	return out
+}
+
+// Source identity changes take a fresh snapshot; ordinary edits preserve the saved
+// contract values, including unknown values on orders created before these fields.
+func preparePurchaseItemPrintSnapshots(ctx context.Context, client *ent.Client, in *biz.PurchaseOrderItemMutation, current *ent.PurchaseOrderItem) error {
+	if current != nil && current.MaterialID == in.MaterialID {
+		in.MaterialSpecSnapshot = current.MaterialSpecSnapshot
+		in.SupplierItemNoSnapshot = current.SupplierItemNoSnapshot
+	} else {
+		material, err := client.Material.Get(ctx, in.MaterialID)
+		if err != nil {
+			return err
+		}
+		in.MaterialSpecSnapshot = material.Spec
+		in.SupplierItemNoSnapshot = material.SupplierItemNo
+	}
+	if current != nil && current.UnitID == in.UnitID {
+		in.UnitNameSnapshot = current.UnitNameSnapshot
+	} else {
+		unit, err := client.Unit.Get(ctx, in.UnitID)
+		if err != nil {
+			return err
+		}
+		in.UnitNameSnapshot = &unit.Name
+	}
+	return nil
 }

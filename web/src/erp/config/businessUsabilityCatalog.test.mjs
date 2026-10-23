@@ -78,7 +78,7 @@ test('businessUsabilityCatalog: 新页完成条件不把审批、预留或业务
     entry('production-exceptions').flowSteps[2],
     /审批通过不等于已执行/u
   )
-  assert.match(entry('shipping-release').completion, /实际发货由业务在出货单确认/u)
+  assert.match(entry('shipments').flowSteps.join(' '), /任务管理的待我审批/u)
   assert.match(entry('outbound').completion, /实际出货另行确认/u)
   assert.match(entry('reconciliation').completion, /不表示已收款或付款/u)
   assert.match(entry('invoices').completion, /实际开票结果另行核实/u)

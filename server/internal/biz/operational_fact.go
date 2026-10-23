@@ -191,6 +191,10 @@ type Shipment struct {
 	CustomerID                      *int
 	CustomerSnapshot                *string
 	DeliverySnapshot                map[string]any
+	ReceivableAmountSnapshot        *decimal.Decimal
+	QuotedFreightAmountSnapshot     *decimal.Decimal
+	TaxAmountSnapshot               *decimal.Decimal
+	TaxModeSnapshot                 *string
 	Status                          string
 	Version                         int
 	FinanceReleaseStatus            string
@@ -1767,7 +1771,7 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	out.ShippingMark = normalizeOptionalString(out.ShippingMark)
 	out.FreightCurrency = normalizeOptionalUpperString(out.FreightCurrency)
 	out.Note = normalizeOptionalString(out.Note)
-	if !validNetWeightG(out.TotalNetWeightG) {
+	if ValidateShipmentWeights(out.TotalNetWeightG, out.GrossWeightKg) != nil {
 		return nil, ErrBadParam
 	}
 	if out.PackageCount != nil && *out.PackageCount <= 0 {
@@ -1887,7 +1891,7 @@ func normalizeShipmentDraftSave(in *ShipmentDraftSave) (*ShipmentDraftSave, erro
 		plannedShipAt := out.PlannedShipAt.UTC().Truncate(time.Microsecond)
 		out.PlannedShipAt = &plannedShipAt
 	}
-	if out.ShipmentNo == "" || !validNetWeightG(out.TotalNetWeightG) ||
+	if out.ShipmentNo == "" || ValidateShipmentWeights(out.TotalNetWeightG, out.GrossWeightKg) != nil ||
 		(out.PackageCount != nil && *out.PackageCount <= 0) ||
 		!validOptionalPositiveNumeric20Scale6(out.GrossWeightKg) ||
 		!validOptionalPositiveNumeric20Scale6(out.VolumeM3) {

@@ -253,7 +253,7 @@ function Exception({ scenario, model, onResume }) {
   )
 }
 
-export default function HelpScenarioContent({ scenario, roleKey }) {
+export default function HelpScenarioContent({ scenario, roleKey, compact = false }) {
   const model = useMemo(
     () => getHelpScenarioPresentation(scenario, roleKey),
     [scenario, roleKey]
@@ -304,7 +304,7 @@ export default function HelpScenarioContent({ scenario, roleKey }) {
         >
           {selected.view === 'guide' ? (
             <>
-              {visual ? (
+              {visual && !compact ? (
                 <>
                   <p className="erp-help-caption">
                     点击 A / B / C 查看操作位置；示例仅帮助理解。
@@ -355,30 +355,34 @@ export default function HelpScenarioContent({ scenario, roleKey }) {
                   </div>
                 </div>
               )}
-              <details className="erp-help-source-details">
-                <summary>查看完整办理说明</summary>
-                <ol>
-                  {scenario.steps.map((step) => (
-                    <li key={step.title}>
-                      <strong>
-                        {step.title} · {step.owner}
-                      </strong>
-                      <p>{step.description}</p>
-                    </li>
+              {!compact ? (
+                <>
+                  <details className="erp-help-source-details">
+                    <summary>查看完整办理说明</summary>
+                    <ol>
+                      {scenario.steps.map((step) => (
+                        <li key={step.title}>
+                          <strong>
+                            {step.title} · {step.owner}
+                          </strong>
+                          <p>{step.description}</p>
+                        </li>
                   ))}
-                </ol>
-              </details>
-              <section className="erp-help-step-checks" aria-label="完成标准与常见问题">
-                <h4>怎样算办成了</h4>
-                <p>{scenario.completion}</p>
-                <h4>完成后交给谁</h4>
-                <p>{scenario.handoff}</p>
-                <details>
-                  <summary className="erp-help-step-checks-toggle">卡住时看这里</summary>
-                  <p>{scenario.exception.trigger}</p>
-                  <p>{scenario.exception.action}</p>
-                </details>
-              </section>
+                    </ol>
+                  </details>
+                  <section className="erp-help-step-checks" aria-label="完成标准与常见问题">
+                    <h4>怎样算办成了</h4>
+                    <p>{scenario.completion}</p>
+                    <h4>完成后交给谁</h4>
+                    <p>{scenario.handoff}</p>
+                    <details>
+                      <summary className="erp-help-step-checks-toggle">卡住时看这里</summary>
+                      <p>{scenario.exception.trigger}</p>
+                      <p>{scenario.exception.action}</p>
+                    </details>
+                  </section>
+                </>
+              ) : null}
             </>
           ) : selected.view === 'result' ? (
             <Outcomes scenario={scenario} visual={visual} />

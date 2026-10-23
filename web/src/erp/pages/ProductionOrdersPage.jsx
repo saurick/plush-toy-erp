@@ -1905,6 +1905,7 @@ export default function ProductionOrdersPage() {
               <Button
                 data-business-action-key="production-scheduling"
                 data-business-action-role="action"
+                data-business-action-group="collaboration"
                 disabled={productionSchedulingActionAvailability.disabled}
                 onClick={() => openProductionScheduling(selected)}
               >

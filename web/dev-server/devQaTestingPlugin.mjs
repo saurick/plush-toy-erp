@@ -51,7 +51,7 @@ const OPERATION_PATH_PATTERN = new RegExp(
   'u'
 )
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|rpc-examples|pressure-quick|pressure-capacity):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|pressure-quick|pressure-capacity):[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const ACTION_MESSAGES = Object.freeze({
   fast: Object.freeze({
     running: '正在运行开发门禁',
@@ -68,6 +68,11 @@ const ACTION_MESSAGES = Object.freeze({
     running: '正在运行字段联动专项',
     passed: '字段联动专项完成，新报告已原子发布',
     failed: '字段联动专项未通过，上一份报告保持不变',
+  }),
+  'business-consistency': Object.freeze({
+    running: '正在核对业务数据精度、计算、缺值与快照',
+    passed: '业务数据一致性专项通过，覆盖报告已更新',
+    failed: '业务数据一致性专项未通过，请查看关键规则与用例证据',
   }),
   'rpc-examples': Object.freeze({
     running: '正在核对接口文档样例与实际服务响应',
@@ -261,6 +266,10 @@ export function buildDevQaTestingCommand({
       'output/qa/yoyoosun-role-jsonrpc-access/report.json',
     ],
     'field-linkage': ['scripts/qa/erp-field-linkage.mjs'],
+    'business-consistency': [
+      'scripts/qa/business-data-consistency.mjs',
+      '--write',
+    ],
     'rpc-examples': ['scripts/gen-public-contracts.mjs', '--verify-examples'],
     'pressure-quick': [
       'scripts/qa/pressure-isolated-lifecycle.mjs',

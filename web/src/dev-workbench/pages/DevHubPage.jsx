@@ -117,7 +117,7 @@ export default function DevHubPage() {
             aria-label="搜索全部开发工具"
             placeholder="搜索工具名称或用途"
             value={keyword}
-            onChange={(event) => selectParam('q', event.target.value, true)}
+            onSearch={(value) => selectParam('q', value, true)}
           />
           <FilterSelect
             emptyValue="all"

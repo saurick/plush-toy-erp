@@ -55,9 +55,9 @@ test('FL_processing_contract_table_headers__paper_uses_shared_subject_aware_colu
     'utf8'
   )
 
-  assert.equal(columnLabels.processingItem, '加工项目')
+  assert.equal(columnLabels.processingItem, '工序名称')
   assert.equal(columnLabels.processCategory, '工序类别')
-  assert.equal(columnLabels.productNo, '产品 / 材料编号')
+  assert.equal(columnLabels.productNo, '产品编号')
   assert.match(paperSource, /PROCESSING_CONTRACT_TABLE_COLUMNS\.map/u)
   assert.doesNotMatch(paperSource, /<th>产品编号<\/th>/u)
   assert.doesNotMatch(paperSource, /<th>工序名称<\/th>/u)
@@ -409,9 +409,9 @@ test('FL_processing_contract_material_subject__maps_material_snapshots processin
       column.label,
     ])
   )
-  assert.equal(columnLabels.productOrderNo, '来源订单编号')
-  assert.equal(columnLabels.productNo, '产品 / 材料编号')
-  assert.equal(columnLabels.productName, '产品 / 材料名称')
+  assert.equal(columnLabels.productOrderNo, '产品订单编号')
+  assert.equal(columnLabels.productNo, '产品编号')
+  assert.equal(columnLabels.productName, '产品名称')
 
   const draft = buildProcessingContractDraftFromOutsourcingOrder(
     {

@@ -144,11 +144,11 @@ func purchaseReturnFilterFromParams(pm map[string]any) (biz.PurchaseReturnFilter
 	if !jsonRPCParamsAllowed(pm, "status", "keyword", "supplier_name", "purchase_receipt_id", "quality_inspection_id", "material_id", "warehouse_id", "lot_id", "date_from", "date_to", "limit", "offset") {
 		return biz.PurchaseReturnFilter{}, false
 	}
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.PurchaseReturnFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.PurchaseReturnFilter{}, false
 	}
@@ -172,11 +172,11 @@ func purchaseReceiptAdjustmentFilterFromParams(pm map[string]any) (biz.PurchaseR
 	if !jsonRPCParamsAllowed(pm, "status", "keyword", "purchase_receipt_id", "adjust_type", "material_id", "warehouse_id", "lot_id", "date_from", "date_to", "limit", "offset") {
 		return biz.PurchaseReceiptAdjustmentFilter{}, false
 	}
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.PurchaseReceiptAdjustmentFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.PurchaseReceiptAdjustmentFilter{}, false
 	}

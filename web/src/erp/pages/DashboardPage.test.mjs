@@ -25,11 +25,11 @@ const desktopTaskActionSource = readFileSync(
   ),
   'utf8'
 )
-test('task board exposes server sorting only after focusing one lane', () => {
+test('task board exposes server sorting for every list', () => {
   assert.match(source, /TASK_BOARD_SORT_OPTIONS/u)
   assert.match(
     source,
-    /taskBoardModel\.focused\s*\?\s*\([\s\S]{0,260}aria-label="任务排序"[\s\S]{0,260}updateFilter\('sort', value\)/u
+    /!calendarView\s*\?\s*\([\s\S]{0,260}aria-label="任务排序"[\s\S]{0,260}updateFilter\('sort', value\)/u
   )
   assert.match(
     source,

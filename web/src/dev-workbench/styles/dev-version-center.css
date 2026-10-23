@@ -610,21 +610,6 @@
 .erp-dev-operation-technical-details > summary {
   display: flex;
   align-items: center;
-  min-height: 44px;
-  padding: 8px 12px;
-  cursor: pointer;
-  color: var(--ant-color-primary, var(--erp-primary));
-  list-style: none;
-}
-
-.erp-dev-operation-technical-details > summary::-webkit-details-marker {
-  display: none;
-}
-
-.erp-dev-operation-technical-details > summary::before {
-  content: '▸';
-  margin-right: 6px;
-  transition: transform 160ms ease;
 }
 
 .erp-dev-operation-technical-details__content {
@@ -716,26 +701,8 @@
 }
 
 .erp-dev-pipeline-timing__details > summary {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  width: fit-content;
-  min-height: 44px;
-  padding: 8px 4px;
-  cursor: pointer;
-  color: var(--ant-color-primary, var(--erp-primary));
-}
-
-.erp-dev-pipeline-timing__details > summary::before,
-.erp-dev-pipeline-timing__jobs > details > summary::before {
-  content: '▸';
-  margin-right: 6px;
-  transition: transform 160ms ease;
-}
-
-.erp-dev-operation-technical-details[open] > summary::before,
-.erp-dev-pipeline-timing__details[open] > summary::before,
-.erp-dev-pipeline-timing__jobs > details[open] > summary::before {
-  transform: rotate(90deg);
 }
 
 .erp-dev-pipeline-timing__jobs-toolbar {
@@ -755,23 +722,12 @@
 .erp-dev-pipeline-timing__jobs > details > summary {
   display: flex;
   align-items: center;
-  min-height: 44px;
-  padding: 10px 14px;
-  cursor: pointer;
   gap: 10px;
   flex-wrap: wrap;
 }
 
 .erp-dev-pipeline-timing__job-steps {
   padding: 4px 14px 14px;
-}
-
-.erp-dev-operation-technical-details > summary:focus-visible,
-.erp-dev-pipeline-timing__details > summary:focus-visible,
-.erp-dev-pipeline-timing__jobs > details > summary:focus-visible {
-  border-radius: 6px;
-  outline: 2px solid var(--ant-color-primary, var(--erp-primary));
-  outline-offset: 2px;
 }
 
 :root[data-erp-theme='dark'] .erp-dev-pipeline-status-strip__metrics > div,

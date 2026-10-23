@@ -196,8 +196,8 @@ export default function DevUIDesignDocument({ source, specification, view }) {
               placeholder="搜索主题或规则"
               value={query}
               allowClear
-              onChange={(event) =>
-                updateLocation({ q: event.target.value }, true)
+              onSearch={(value) =>
+                updateLocation({ q: value }, true)
               }
             />
             <span role="status">
@@ -212,21 +212,20 @@ export default function DevUIDesignDocument({ source, specification, view }) {
           >
             {groups.map((group) => (
               <div key={group} className="erp-design-topic-group">
-                <h3>{group}</h3>
+                <h3 className="erp-dev-directory-group-title">{group}</h3>
                 {filtered
                   .filter((entry) => (entry.group || '规范章节') === group)
                   .map((entry) => (
                     <button
                       type="button"
                       key={entry.key || entry.id}
-                      className="erp-design-topic-button"
+                      className="erp-dev-directory-item erp-dev-directory-item--nested erp-design-topic-button"
                       aria-current={
                         (entry.key || entry.id) === current ? 'page' : undefined
                       }
                       onClick={() => selectEntry(entry)}
                     >
                       <span>{entry.title}</span>
-                      <ArrowRightOutlined aria-hidden="true" />
                     </button>
                   ))}
               </div>

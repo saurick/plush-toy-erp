@@ -391,11 +391,11 @@ func qualityInspectionDefectRateFromParams(pm map[string]any) (*string, *decimal
 }
 
 func qualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
@@ -447,11 +447,11 @@ func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.
 	if !jsonRPCParamsAllowed(pm, "include_status_counts", "customer_key", "fact_id", "fact_ids", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
 		return biz.QualityInspectionFilter{}, false
 	}
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
@@ -486,11 +486,11 @@ func productionStageQualityInspectionFilterFromParams(pm map[string]any) (biz.Qu
 	) {
 		return biz.QualityInspectionFilter{}, false
 	}
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.QualityInspectionFilter{}, false
 	}

@@ -8,6 +8,8 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { PurchaseReceiptAdjustmentStatus, PurchaseReceiptStatus, PurchaseReturnStatus } from '../../common/consts/statuses.generated.mjs'
@@ -190,6 +192,7 @@ export default function PurchaseReceiptsPage() {
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
+  const [statusCounts, setStatusCounts] = useState(null)
   const [statusFilter, setStatusFilter] = useBusinessPageState(
     'statusFilter',
     ''
@@ -549,6 +552,7 @@ export default function PurchaseReceiptsPage() {
 
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
+    setStatusCounts(null)
     setLoading(true)
     try {
       const routeSelectedID = Number(routeReceiptID || 0)
@@ -556,6 +560,7 @@ export default function PurchaseReceiptsPage() {
         listPurchaseReceipts(
           {
             ...receiptListParams,
+            include_status_counts: true,
             ...getBusinessPaginationParams(pagination),
           },
           { signal: request.signal }
@@ -579,6 +584,9 @@ export default function PurchaseReceiptsPage() {
         hasExactContext: routeSelectedID > 0,
         total: Number(data?.total || 0),
       })
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeReceipt,
+      }))
       const nextRows = exactPage.records
       setRows(nextRows)
       setSelectedRow((current) => {
@@ -1037,7 +1045,6 @@ export default function PurchaseReceiptsPage() {
     recordLabel: '采购入库单',
   })
   const activeFilterCount = [
-    statusFilter,
     supplierFilter,
     materialFilter,
     warehouseFilter,
@@ -1047,7 +1054,6 @@ export default function PurchaseReceiptsPage() {
     routeReceiptID,
   ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setStatusFilter('')
     setSupplierFilter('')
     setMaterialFilter('')
     setWarehouseFilter('')
@@ -1068,7 +1074,6 @@ export default function PurchaseReceiptsPage() {
     setDateFilterStart,
     setLotFilter,
     setMaterialFilter,
-    setStatusFilter,
     setSupplierFilter,
     setWarehouseFilter,
   ])
@@ -1099,7 +1104,11 @@ export default function PurchaseReceiptsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <BusinessStatusFilter
+              inline
+              counts={statusCounts}
+              loading={loading}
+              exact={Boolean(routeReceiptID)}
               aria-label="单据状态"
               className="erp-business-filter-control--status"
               value={statusFilter}

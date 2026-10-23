@@ -522,7 +522,7 @@ func (r *inventoryRepo) ListPurchaseReceiptAdjustments(ctx context.Context, filt
 		query = query.Where(purchasereceiptadjustment.AdjustedAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		query = query.Where(purchasereceiptadjustment.AdjustedAtLTE(endOfDateFilter(*filter.DateTo)))
+		query = query.Where(purchasereceiptadjustment.AdjustedAtLTE(*filter.DateTo))
 	}
 	itemPredicates := []predicate.PurchaseReceiptAdjustmentItem{}
 	if filter.AdjustType != "" {

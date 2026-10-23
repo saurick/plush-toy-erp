@@ -191,23 +191,27 @@ export default function MobileRoleTasksPage() {
     dateFrom: taskDateFrom = '',
     dateTo: taskDateTo = '',
   } = taskQueryOptions
-  const updateActiveTaskQueryOptions = useCallback(
-    (update) => {
+  const updateTaskQueryOptions = useCallback(
+    (pageKey, update) => {
       setTaskQueryOptionsByPage((current) => {
         const currentOptions =
-          current[activeTaskQueryPageKey] || normalizeMobileTaskQueryOptions(DEFAULT_MOBILE_TASK_QUERY_OPTIONS, activeTaskQueryPageKey === MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY)
+          current[pageKey] || normalizeMobileTaskQueryOptions(DEFAULT_MOBILE_TASK_QUERY_OPTIONS, pageKey === MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY)
         const nextOptions =
           typeof update === 'function'
             ? update(currentOptions)
             : { ...currentOptions, ...update }
         return {
           ...current,
-          [activeTaskQueryPageKey]:
-            normalizeMobileTaskQueryOptions(nextOptions, activeTaskQueryPageKey === MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY),
+          [pageKey]:
+            normalizeMobileTaskQueryOptions(nextOptions, pageKey === MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY),
         }
       })
     },
-    [activeTaskQueryPageKey]
+    []
+  )
+  const updateActiveTaskQueryOptions = useCallback(
+    (update) => updateTaskQueryOptions(activeTaskQueryPageKey, update),
+    [activeTaskQueryPageKey, updateTaskQueryOptions]
   )
   const setTaskKeyword = useCallback(
     (keyword) => {
@@ -262,7 +266,7 @@ export default function MobileRoleTasksPage() {
     createMobileRoleTaskViewCounters()
   )
   const [activeMessageTabKey, setActiveMessageTabKey] = useState(() =>
-    taskQueryOptionsByPage[MOBILE_TASK_QUERY_PAGE_KEYS.RISKS]?.due ? MOBILE_MESSAGE_TAB_KEYS.WARNING : mobileTaskHistoryChoice(
+    taskQueryOptionsByPage[MOBILE_TASK_QUERY_PAGE_KEYS.RISKS]?.due !== 'overdue' ? MOBILE_MESSAGE_TAB_KEYS.WARNING : mobileTaskHistoryChoice(
       initialHistoryState[MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY],
       Object.values(MOBILE_MESSAGE_TAB_KEYS),
       MOBILE_MESSAGE_TAB_KEYS.WARNING
@@ -274,9 +278,21 @@ export default function MobileRoleTasksPage() {
       Object.values(MOBILE_TASK_FILTER_KEYS),
       MOBILE_TASK_FILTER_KEYS.ALL
     )
-    return filter === MOBILE_TASK_FILTER_KEYS.OVERDUE && taskQueryOptionsByPage[MOBILE_TASK_QUERY_PAGE_KEYS.TASKS]?.due
+    return filter === MOBILE_TASK_FILTER_KEYS.OVERDUE && taskQueryOptionsByPage[MOBILE_TASK_QUERY_PAGE_KEYS.TASKS]?.due !== 'overdue'
       ? MOBILE_TASK_FILTER_KEYS.ALL : filter
   })
+  const changeTaskFilter = useCallback((next) => {
+    if (next === MOBILE_TASK_FILTER_KEYS.OVERDUE || activeFilterKey === MOBILE_TASK_FILTER_KEYS.OVERDUE) {
+      updateTaskQueryOptions(MOBILE_TASK_QUERY_PAGE_KEYS.TASKS, { due: next === MOBILE_TASK_FILTER_KEYS.OVERDUE ? 'overdue' : '' })
+    }
+    setActiveFilterKey(next)
+  }, [activeFilterKey, updateTaskQueryOptions])
+  const changeRiskFilter = useCallback((next) => {
+    if (next === MOBILE_MESSAGE_TAB_KEYS.NOTICE || activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.NOTICE) {
+      updateTaskQueryOptions(MOBILE_TASK_QUERY_PAGE_KEYS.RISKS, { due: next === MOBILE_MESSAGE_TAB_KEYS.NOTICE ? 'overdue' : '' })
+    }
+    setActiveMessageTabKey(next)
+  }, [activeMessageTabKey, updateTaskQueryOptions])
   const [selectedTaskID, setSelectedTaskID] = useState(() =>
     returnedTaskID || (initialHistoryScreen
       ? initialHistoryState[MOBILE_TASK_HISTORY_TASK_KEY] || null
@@ -346,7 +362,6 @@ export default function MobileRoleTasksPage() {
     doneTasks,
     riskTasks,
     approvalTasks,
-    overdueTasks,
     activeTaskViewState,
     filteredTasks,
     filterItems,
@@ -1991,6 +2006,7 @@ render,
         activeMessageTabKey={activeMessageTabKey}
         activeViewHasData={activeTaskSlot.items.length > 0}
         activeViewHasMore={activeTaskSlot.has_more}
+        activeViewLoaded={activeTaskSlot.loaded}
         activeTasks={activeTasks}
         adminProfile={adminProfile}
         approvalTasks={approvalTasks}
@@ -2021,7 +2037,6 @@ render,
         loading={loading}
         loadingMore={loading && activeTaskSlot.items.length > 0}
         loggingOut={loggingOut}
-        overdueTasks={overdueTasks}
         riskTasks={riskTasks}
         riskScope={riskScope}
         roleLabel={roleLabel}
@@ -2030,9 +2045,9 @@ render,
         refreshScopeKey={`${taskScopeKey}|${activeTaskViewKey}`}
         scrollContainerRef={scrollContainerRef}
         selectedTask={selectedTask}
-        setActiveFilterKey={setActiveFilterKey}
+        setActiveFilterKey={changeTaskFilter}
         setActiveMainTabKey={setActiveMainTabKey}
-        setActiveMessageTabKey={setActiveMessageTabKey}
+        setActiveMessageTabKey={changeRiskFilter}
         setDetailAction={setDetailAction}
         setSelectedTaskID={handleSelectTaskID}
         setVisibleListLimitsByKey={setVisibleListLimitsByKey}

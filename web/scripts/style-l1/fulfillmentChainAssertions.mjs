@@ -2,9 +2,7 @@ import assert from 'node:assert/strict'
 import { expect } from 'playwright/test'
 
 export async function openFulfillmentExceptionDirectory(guide) {
-  const topics = guide.getByRole('button', { name: '按业务查阅', exact: true })
-  if (await topics.count()) await topics.click()
-  await guide.getByRole('radiogroup', { name: '查阅目录', exact: true }).getByText('异常目录', { exact: true }).click()
+  await guide.getByRole('radiogroup', { name: '流程视图', exact: true }).getByText('异常处理', { exact: true }).click()
 }
 
 export async function assertFulfillmentDetailGeometry(detail) {
@@ -29,11 +27,15 @@ export async function assertFulfillmentDetailGeometry(detail) {
       width: root.clientWidth,
       scrollWidth: root.scrollWidth,
       collisions,
+      clippedNodes: [...root.querySelectorAll('.erp-markdown-mermaid g.node foreignObject')].filter((node) => node.firstElementChild && rect(node.firstElementChild).height > rect(node).height + 2).map((node) => node.textContent),
+      diagramOutside: viewer && (rect(viewer).left < rect(root).left - 1 || rect(viewer).right > rect(root).right + 1),
       clippedText: [...root.querySelectorAll('p,dt,dd,h3,summary')].filter((node) => node.clientWidth > 0 && node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent),
     }
   })
   assert.deepEqual(geometry.collisions, [], '环节说明与控件不得重叠')
   assert.deepEqual(geometry.clippedText, [], '处理条件与说明不得挤出容器')
+  assert.deepEqual(geometry.clippedNodes, [], '节点文字不得受外层段落行高影响而裁切')
+  assert(!geometry.diagramOutside, '长流程应在画布内滚动，不能撑宽详情区域')
   assert(geometry.scrollWidth <= geometry.width + 1, '环节详情不得横向挤出页面')
 }
 

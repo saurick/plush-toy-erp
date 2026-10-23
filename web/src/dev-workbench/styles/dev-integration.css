@@ -156,15 +156,6 @@
 }
 
 
-.erp-dev-integration__graph > summary,
-.erp-dev-integration__relationships > summary,
-.erp-dev-integration__evidence-disclosure > summary {
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-
 .erp-dev-integration__guide table {
   width: 100%;
   table-layout: fixed;
@@ -193,11 +184,6 @@
 
 .erp-dev-integration__guide-notes {
   margin-top: 12px;
-}
-
-.erp-dev-integration__guide-notes > summary {
-  color: var(--erp-text-muted);
-  cursor: pointer;
 }
 
 .erp-dev-integration__section-heading,
@@ -395,12 +381,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
-}
-
-.erp-dev-integration__permission-conditions > summary {
-  margin-top: 12px;
-  color: var(--erp-text-muted);
-  cursor: pointer;
 }
 
 .erp-dev-integration__permission-conditions > div {

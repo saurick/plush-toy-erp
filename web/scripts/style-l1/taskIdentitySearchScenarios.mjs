@@ -115,10 +115,10 @@ export function createTaskIdentitySearchScenarios({ assert }) {
         assert.match(metrics.taskTitle, /核对产品资料/u)
         assert.doesNotMatch(metrics.taskTitle, /雪花小鹿/u)
         assert.equal(metrics.productTitle, '雪花小鹿共 3 款产品')
-        assert.equal(metrics.image.width, 48)
-        assert.equal(metrics.image.height, 48)
+        assert.equal(metrics.image.width, 64)
+        assert.equal(metrics.image.height, 64)
         if (mobile) {
-          assert(metrics.bodyTop >= metrics.headingBottom + 7, JSON.stringify(metrics))
+          assert.equal(metrics.bodyTop - metrics.headingBottom, 4, JSON.stringify(metrics))
           assert(metrics.statusRight <= metrics.rowRight - 8, JSON.stringify(metrics))
           assert(metrics.footer, '手机版办理人集中在卡片底部')
           assert(new URL(page.url()).pathname.startsWith('/m/'))

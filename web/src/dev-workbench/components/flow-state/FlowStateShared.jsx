@@ -139,7 +139,7 @@ function EvidenceDisclosure({ value, label = '查看代码与文档证据' }) {
   const refs = evidenceRefs(value)
   if (refs.length === 0) return null
   return (
-    <details className="erp-dev-flow-evidence" data-evidence-disclosure>
+    <details className="erp-dev-disclosure erp-dev-flow-evidence" data-evidence-disclosure>
       <summary>
         {label}（{refs.length}）
       </summary>
@@ -224,7 +224,7 @@ function MemoryStrip() {
 
 function GuidanceDisclosure({ guidanceKey, title, summary, description }) {
   return (
-    <details className="erp-dev-flow-guidance" data-flow-guidance={guidanceKey}>
+    <details className="erp-dev-disclosure erp-dev-flow-guidance" data-flow-guidance={guidanceKey}>
       <summary>
         <InfoCircleOutlined aria-hidden="true" />
         <span>

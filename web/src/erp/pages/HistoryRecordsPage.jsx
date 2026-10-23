@@ -379,6 +379,7 @@ export default function HistoryRecordsPage() {
               size="small"
               disabled={!selectedRecord || loading}
               data-business-action-key="history-view-detail"
+              data-business-action-group="query"
               onClick={() => openDetail(selectedRecord)}
             >
               查看详情
@@ -392,6 +393,7 @@ export default function HistoryRecordsPage() {
               size="small"
               disabled={!selectedRecord || loading}
               data-business-action-key="history-source-module"
+              data-business-action-group="query"
               onClick={() => navigate(selectedRecord.link)}
             >
               前往所属模块

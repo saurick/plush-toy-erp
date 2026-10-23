@@ -12,6 +12,76 @@ export function createPrintWorkspaceControlScenarios({
 }) {
   return [
     {
+      name: 'print-workspace-zoom-clear',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 3840, height: 2160 },
+      verify: async (page) => {
+        const records = []
+        const measure = () => page.locator('.print-zoom-control').evaluate((control) => {
+          const selected = control.querySelector('.ant-select-selection-item, .ant-select-selection-placeholder')
+          const clear = control.querySelector('.ant-select-clear')
+          const stage = document.querySelector('.erp-print-shell__stage')
+          const paper = stage.querySelector('.erp-print-shell__stage-wrap > *')
+          return {
+            text: control.innerText,
+            selected: selected?.textContent,
+            textWidth: selected?.scrollWidth,
+            availableWidth: selected?.clientWidth,
+            fontSize: selected ? getComputedStyle(selected).fontSize : '',
+            controlWidth: control.getBoundingClientRect().width,
+            clearVisible: Boolean(clear && getComputedStyle(clear).opacity === '1'),
+            scale: Number(stage.style.getPropertyValue('--print-view-scale')),
+            paperWidth: paper.offsetWidth,
+            overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          }
+        })
+        for (const template of printTemplateCatalog.filter((item) => item.runtime?.workspace)) {
+          await page.setViewportSize({ width: 3840, height: 2160 })
+          await gotoScenarioPath(page, `/erp/print-workspace/${template.key}?draft=fresh&state=zoom-clear`)
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          const zoom = page.getByRole('combobox', { name: '显示比例', exact: true })
+          const control = page.locator('.print-zoom-control')
+          const initial = await measure()
+          records.push({ template: template.key, initial })
+          await writeFile(path.join(outputDir, 'print-zoom-clear.json'), JSON.stringify(records, null, 2))
+          assert.equal((initial.text.match(/显示比例/gu) || []).length, 1, '显示比例用途只显示一次')
+          assert(initial.textWidth <= initial.availableWidth + 1, '适应宽度的选中值必须完整显示')
+          assert(initial.clearVisible, '默认显示比例也提供无需悬停的清空入口')
+          for (const viewport of [{ width: 3840, height: 2160 }, { width: 760, height: 960 }]) {
+            await page.setViewportSize(viewport)
+            await chooseSelectOption(zoom, '1.5')
+            const enlarged = await measure()
+            assert.equal(enlarged.scale, 1.5)
+            assert.equal(enlarged.paperWidth, initial.paperWidth, '缩放不改变纸张排版宽度')
+            assert(enlarged.textWidth <= enlarged.availableWidth + 1, '选择比例后文字完整显示')
+            await page.mouse.move(0, 0)
+            assert((await measure()).clearVisible, '移开指针后清空入口仍然可见')
+            await control.locator('.ant-select-clear').click()
+            await control.locator('.ant-select-selection-placeholder').waitFor()
+            const cleared = await measure()
+            assert.equal(cleared.selected, '显示比例')
+            assert.equal(cleared.clearVisible, false)
+            assert(Number.isFinite(cleared.scale) && cleared.scale > 0 && cleared.scale <= 1, '清空恢复有效的适应宽度')
+            assert.equal(cleared.paperWidth, initial.paperWidth, '清空不修改纸张排版')
+            assert.equal(cleared.overflow, false, '清空后页面无横向溢出')
+            await zoom.press('ArrowDown')
+            await zoom.press('Escape')
+            assert.equal(await control.locator('.ant-select-selection-item').count(), 0, '打开再关闭选项不自动回选')
+            await chooseSelectOption(zoom, 'fit')
+            const restored = await measure()
+            records.push({ template: template.key, viewport, enlarged, cleared, restored })
+            await writeFile(path.join(outputDir, 'print-zoom-clear.json'), JSON.stringify(records, null, 2))
+            assert(Math.abs(restored.scale - cleared.scale) < 0.001, '主动选择适应宽度与清空后的纸面比例一致')
+            assert(restored.textWidth <= restored.availableWidth + 1, '窄窗口也完整显示适应宽度')
+            assert.equal(restored.overflow, false, '重新选择后页面无横向溢出')
+          }
+        }
+        await writeFile(path.join(outputDir, 'print-zoom-clear.json'), JSON.stringify(records, null, 2))
+      },
+    },
+    {
       name: 'print-workspace-session-isolation',
       path: '/print-window-shell.html?state=retired-window',
       mockAdminRpc: true,
@@ -461,7 +531,7 @@ export function createPrintWorkspaceControlScenarios({
             }
           })
           assert.equal(await page.locator('select').count(), 0, '打印工具不再打开系统原生菜单')
-          assert.equal(controls.zoom.width, '120px')
+          assert.equal(controls.zoom.width, '200px')
           assert.equal(controls.zoom.height, '32px')
           assert.equal(
             controls.zoom.borderRadius,
@@ -761,7 +831,7 @@ export function createPrintWorkspaceControlScenarios({
           )
           const narrowZoom = await page.locator('.print-zoom-select .ant-select').boundingBox()
           assert(
-            Math.abs(narrowZoom.width - 120) < 1,
+            Math.abs(narrowZoom.width - 200) < 1,
             '窄窗口的缩放控件保持完整宽度'
           )
           await chooseSelectOption(zoom, '1.5')

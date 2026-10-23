@@ -90,3 +90,14 @@ func CalculateShipmentTotalNetWeightG(lines []ShipmentNetWeightLine) (*decimal.D
 	}
 	return &total, true, nil
 }
+
+// ValidateShipmentWeights compares like dimensions without rounding the kg-to-g conversion.
+func ValidateShipmentWeights(netG, grossKg *decimal.Decimal) error {
+	if !validNetWeightG(netG) || !validOptionalPositiveNumeric20Scale6(grossKg) {
+		return ErrBadParam
+	}
+	if netG != nil && grossKg != nil && grossKg.Mul(decimal.NewFromInt(1000)).LessThan(*netG) {
+		return ErrBadParam
+	}
+	return nil
+}

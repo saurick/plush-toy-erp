@@ -79,7 +79,7 @@ const SCENARIO_DATASET_RUN_ID = MANUAL_ACCEPTANCE_CORE_CONTRACT.runId
 const CREATED_AT = '2026-07-29T02:00:00.000Z'
 const UPDATED_AT = '2026-07-29T02:01:00.000Z'
 const ACCEPTANCE_PLAN = buildManualAcceptanceBusinessChainReviewPlan({
-  catalogTargetCount: 51,
+  catalogTargetCount: 50,
   datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
 })
 
@@ -163,8 +163,8 @@ function scenarioReadbackFixture(overrides = {}) {
     sourceDocumentCount: 16,
     processRuntimeCount: 20,
     factCount: 14,
-    catalogReadyCount: 41,
-    catalogTargetCount: 51,
+    catalogReadyCount: 40,
+    catalogTargetCount: 50,
     browserChecksPending: 10,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
@@ -346,7 +346,7 @@ function summaryFixture() {
       {
         key: 'full-acceptance',
         title: '完整验收数据',
-        purpose: '在隔离库执行 51 项验收',
+        purpose: '在隔离库执行 50 项验收',
         writesDatabase: true,
         dataRetention: 'ephemeral',
         cleanupMode: 'automatic',
@@ -515,7 +515,7 @@ test('summary contract requires three fixed profiles and fail-closed boundaries'
   assert.equal(
     validateDevDataPreparationSummary(summaryFixture()).acceptancePlan
       .catalogTargetCount,
-    51
+    50
   )
 })
 
@@ -634,7 +634,7 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
     scenarioOperationFixture()
   )
   assert.equal(operation.profileKey, 'scenario-demo')
-  assert.equal(operation.readback.catalogReadyCount, 41)
+  assert.equal(operation.readback.catalogReadyCount, 40)
   assert.equal(operation.readback.browserChecksPending, 10)
   assert.equal(operation.readback.cleanupSupported, false)
   assert.equal(operation.readback.manualAcceptanceCompleted, false)
@@ -707,7 +707,7 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
     () =>
       validateDevDataPreparationOperation(
         scenarioOperationFixture({
-          readback: scenarioReadbackFixture({ catalogReadyCount: 51 }),
+          readback: scenarioReadbackFixture({ catalogReadyCount: 50 }),
         })
       ),
     /scenario demo readback/u

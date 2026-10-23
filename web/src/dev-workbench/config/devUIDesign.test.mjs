@@ -309,14 +309,14 @@ test('mobile progress design groups business details without desktop source jump
   )
 
   assert.ok(detail)
-  assert.match(detail[1], /label: '产品信息'/u)
-  assert.match(detail[1], /label: '生产执行'/u)
-  assert.match(detail[1], /label: '关联任务'/u)
-  assert.match(detail[1], /mobile-progress-details-toggle/u)
-  assert.match(detail[1], /mobile-open-production-progress/u)
-  assert.doesNotMatch(detail[1], /打开原单/u)
-  assert.match(specification, /产品信息 \/ 生产执行 \/ 关联任务/u)
-  assert.match(rationale, /手机进度明细按判断路径分组/u)
+  assert.match(detail[1], /renderUnifiedProgressDetail/u)
+  const panel = html.match(/function renderProgressDesignPanel\([\s\S]*?(?=function renderUnifiedProgressDetail)/u)?.[0]
+  assert.match(html, /\['overview','总览'\],\['lines','产品'\],\['execution','生产'\],\['tasks','任务'\]/u)
+  assert.match(panel, /name="progress-production-/u)
+  assert.match(panel, /mobile-open-production-progress/u)
+  assert.doesNotMatch(detail[1], /打开原单|查看业务明细/u)
+  assert.match(specification, /总览、产品、生产、任务/u)
+  assert.match(rationale, /固定分类与独立滚动/u)
 })
 
 test('UI design keeps persistent page headings concise like the formal ERP', () => {

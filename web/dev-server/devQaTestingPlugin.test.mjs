@@ -141,11 +141,42 @@ test('testing command registry maps actions to fixed repository scripts', () => 
     ['scripts/qa/erp-field-linkage.mjs']
   )
   assert.deepEqual(
+    buildDevQaTestingCommand({ ...common, action: 'business-consistency' }).args,
+    ['scripts/qa/business-data-consistency.mjs', '--write']
+  )
+  assert.equal(
+    validateDevQaTestingAction({
+      action: 'business-consistency',
+      payload: { idempotencyKey: `testing:business-consistency:${ID}` },
+    }).action,
+    'business-consistency'
+  )
+  for (const payload of [
+    { idempotencyKey: `testing:fast:${ID}` },
+    { idempotencyKey: `testing:business-consistency:${ID}`, command: 'arbitrary' },
+  ]) {
+    assert.throws(() => validateDevQaTestingAction({ action: 'business-consistency', payload }))
+  }
+  assert.deepEqual(
     buildDevQaTestingCommand({ ...common, action: 'rpc-examples' }).args,
     ['scripts/gen-public-contracts.mjs', '--verify-examples']
   )
-  assert.equal(validateDevQaTestingAction({ action: 'rpc-examples', payload: { idempotencyKey: `testing:rpc-examples:${ID}` } }).action, 'rpc-examples')
-  assert.throws(() => validateDevQaTestingAction({ action: 'rpc-examples', payload: { idempotencyKey: `testing:rpc-examples:${ID}`, command: 'arbitrary' } }))
+  assert.equal(
+    validateDevQaTestingAction({
+      action: 'rpc-examples',
+      payload: { idempotencyKey: `testing:rpc-examples:${ID}` },
+    }).action,
+    'rpc-examples'
+  )
+  assert.throws(() =>
+    validateDevQaTestingAction({
+      action: 'rpc-examples',
+      payload: {
+        idempotencyKey: `testing:rpc-examples:${ID}`,
+        command: 'arbitrary',
+      },
+    })
+  )
 })
 
 test('testing hook governance reports wiring only and fails closed', async (t) => {
@@ -405,9 +436,10 @@ test('testing middleware is loopback-only and plugin is serve-only', async () =>
           fast: null,
           'role-access': null,
           'field-linkage': null,
-      'rpc-examples': null,
-      'pressure-quick': null,
-      'pressure-capacity': null,
+          'business-consistency': null,
+          'rpc-examples': null,
+          'pressure-quick': null,
+          'pressure-capacity': null,
         },
       }),
     },

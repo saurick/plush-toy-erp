@@ -22,6 +22,29 @@ function ids(plan) {
   return plan.commands.map((item) => item.id);
 }
 
+test("business data consistency changes select the registered specialist and focused browser follow-up", () => {
+  for (const file of [
+    "web/src/erp/utils/xlsxWorkbook.mjs",
+    "web/src/erp/utils/sourceOrderAmounts.mjs",
+    "web/src/erp/components/print/MaterialPurchaseContractPaper.jsx",
+    "web/src/erp/components/shipments/ShipmentEditor.jsx",
+    "server/internal/data/shipment_commercial_snapshot.go",
+    "server/internal/data/purchase_receipt_repo.go",
+    "server/internal/data/purchase_return_repo.go",
+    "server/internal/data/operational_fact_shipment_repo.go",
+    "server/internal/data/engineering_material_request_repo.go",
+    "server/internal/biz/operational_fact.go",
+    "server/internal/service/jsonrpc_date_filter.go",
+    "scripts/qa/business-data-consistency.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert(ids(plan).includes("business-consistency"), file);
+    assert(selectedTests(plan).includes("scripts/qa/business-data-consistency.test.mjs"), file);
+    assert.match(plan.followUps.find((item) => item.id === "browser-regression")?.text || "", /dev-business-consistency-evidence/u, file);
+    assert(!ids(plan).includes("full"), file);
+  }
+})
+
 test("sales export growth changes select existing checks and an explicit bounded load follow-up", () => {
   for (const file of [
     "server/internal/data/sales_order_export.go",

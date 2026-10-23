@@ -510,6 +510,86 @@ func (_u *ShipmentUpdate) ClearShippingMark() *ShipmentUpdate {
 	return _u
 }
 
+// SetReceivableAmountSnapshot sets the "receivable_amount_snapshot" field.
+func (_u *ShipmentUpdate) SetReceivableAmountSnapshot(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetReceivableAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableReceivableAmountSnapshot sets the "receivable_amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableReceivableAmountSnapshot(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetReceivableAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearReceivableAmountSnapshot clears the value of the "receivable_amount_snapshot" field.
+func (_u *ShipmentUpdate) ClearReceivableAmountSnapshot() *ShipmentUpdate {
+	_u.mutation.ClearReceivableAmountSnapshot()
+	return _u
+}
+
+// SetQuotedFreightAmountSnapshot sets the "quoted_freight_amount_snapshot" field.
+func (_u *ShipmentUpdate) SetQuotedFreightAmountSnapshot(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetQuotedFreightAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableQuotedFreightAmountSnapshot sets the "quoted_freight_amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableQuotedFreightAmountSnapshot(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetQuotedFreightAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearQuotedFreightAmountSnapshot clears the value of the "quoted_freight_amount_snapshot" field.
+func (_u *ShipmentUpdate) ClearQuotedFreightAmountSnapshot() *ShipmentUpdate {
+	_u.mutation.ClearQuotedFreightAmountSnapshot()
+	return _u
+}
+
+// SetTaxAmountSnapshot sets the "tax_amount_snapshot" field.
+func (_u *ShipmentUpdate) SetTaxAmountSnapshot(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetTaxAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableTaxAmountSnapshot sets the "tax_amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableTaxAmountSnapshot(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetTaxAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearTaxAmountSnapshot clears the value of the "tax_amount_snapshot" field.
+func (_u *ShipmentUpdate) ClearTaxAmountSnapshot() *ShipmentUpdate {
+	_u.mutation.ClearTaxAmountSnapshot()
+	return _u
+}
+
+// SetTaxModeSnapshot sets the "tax_mode_snapshot" field.
+func (_u *ShipmentUpdate) SetTaxModeSnapshot(v string) *ShipmentUpdate {
+	_u.mutation.SetTaxModeSnapshot(v)
+	return _u
+}
+
+// SetNillableTaxModeSnapshot sets the "tax_mode_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableTaxModeSnapshot(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetTaxModeSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearTaxModeSnapshot clears the value of the "tax_mode_snapshot" field.
+func (_u *ShipmentUpdate) ClearTaxModeSnapshot() *ShipmentUpdate {
+	_u.mutation.ClearTaxModeSnapshot()
+	return _u
+}
+
 // SetFreightAmount sets the "freight_amount" field.
 func (_u *ShipmentUpdate) SetFreightAmount(v decimal.Decimal) *ShipmentUpdate {
 	_u.mutation.SetFreightAmount(v)
@@ -813,6 +893,11 @@ func (_u *ShipmentUpdate) check() error {
 			return &ValidationError{Name: "shipping_mark", err: fmt.Errorf(`ent: validator failed for field "Shipment.shipping_mark": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TaxModeSnapshot(); ok {
+		if err := shipment.TaxModeSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "tax_mode_snapshot", err: fmt.Errorf(`ent: validator failed for field "Shipment.tax_mode_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.FreightCurrency(); ok {
 		if err := shipment.FreightCurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "freight_currency", err: fmt.Errorf(`ent: validator failed for field "Shipment.freight_currency": %w`, err)}
@@ -969,6 +1054,30 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ShippingMarkCleared() {
 		_spec.ClearField(shipment.FieldShippingMark, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReceivableAmountSnapshot(); ok {
+		_spec.SetField(shipment.FieldReceivableAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.ReceivableAmountSnapshotCleared() {
+		_spec.ClearField(shipment.FieldReceivableAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.QuotedFreightAmountSnapshot(); ok {
+		_spec.SetField(shipment.FieldQuotedFreightAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.QuotedFreightAmountSnapshotCleared() {
+		_spec.ClearField(shipment.FieldQuotedFreightAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.TaxAmountSnapshot(); ok {
+		_spec.SetField(shipment.FieldTaxAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.TaxAmountSnapshotCleared() {
+		_spec.ClearField(shipment.FieldTaxAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.TaxModeSnapshot(); ok {
+		_spec.SetField(shipment.FieldTaxModeSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.TaxModeSnapshotCleared() {
+		_spec.ClearField(shipment.FieldTaxModeSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.FreightAmount(); ok {
 		_spec.SetField(shipment.FieldFreightAmount, field.TypeOther, value)
@@ -1604,6 +1713,86 @@ func (_u *ShipmentUpdateOne) ClearShippingMark() *ShipmentUpdateOne {
 	return _u
 }
 
+// SetReceivableAmountSnapshot sets the "receivable_amount_snapshot" field.
+func (_u *ShipmentUpdateOne) SetReceivableAmountSnapshot(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetReceivableAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableReceivableAmountSnapshot sets the "receivable_amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableReceivableAmountSnapshot(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetReceivableAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearReceivableAmountSnapshot clears the value of the "receivable_amount_snapshot" field.
+func (_u *ShipmentUpdateOne) ClearReceivableAmountSnapshot() *ShipmentUpdateOne {
+	_u.mutation.ClearReceivableAmountSnapshot()
+	return _u
+}
+
+// SetQuotedFreightAmountSnapshot sets the "quoted_freight_amount_snapshot" field.
+func (_u *ShipmentUpdateOne) SetQuotedFreightAmountSnapshot(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetQuotedFreightAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableQuotedFreightAmountSnapshot sets the "quoted_freight_amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableQuotedFreightAmountSnapshot(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetQuotedFreightAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearQuotedFreightAmountSnapshot clears the value of the "quoted_freight_amount_snapshot" field.
+func (_u *ShipmentUpdateOne) ClearQuotedFreightAmountSnapshot() *ShipmentUpdateOne {
+	_u.mutation.ClearQuotedFreightAmountSnapshot()
+	return _u
+}
+
+// SetTaxAmountSnapshot sets the "tax_amount_snapshot" field.
+func (_u *ShipmentUpdateOne) SetTaxAmountSnapshot(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetTaxAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableTaxAmountSnapshot sets the "tax_amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableTaxAmountSnapshot(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetTaxAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearTaxAmountSnapshot clears the value of the "tax_amount_snapshot" field.
+func (_u *ShipmentUpdateOne) ClearTaxAmountSnapshot() *ShipmentUpdateOne {
+	_u.mutation.ClearTaxAmountSnapshot()
+	return _u
+}
+
+// SetTaxModeSnapshot sets the "tax_mode_snapshot" field.
+func (_u *ShipmentUpdateOne) SetTaxModeSnapshot(v string) *ShipmentUpdateOne {
+	_u.mutation.SetTaxModeSnapshot(v)
+	return _u
+}
+
+// SetNillableTaxModeSnapshot sets the "tax_mode_snapshot" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableTaxModeSnapshot(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetTaxModeSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearTaxModeSnapshot clears the value of the "tax_mode_snapshot" field.
+func (_u *ShipmentUpdateOne) ClearTaxModeSnapshot() *ShipmentUpdateOne {
+	_u.mutation.ClearTaxModeSnapshot()
+	return _u
+}
+
 // SetFreightAmount sets the "freight_amount" field.
 func (_u *ShipmentUpdateOne) SetFreightAmount(v decimal.Decimal) *ShipmentUpdateOne {
 	_u.mutation.SetFreightAmount(v)
@@ -1920,6 +2109,11 @@ func (_u *ShipmentUpdateOne) check() error {
 			return &ValidationError{Name: "shipping_mark", err: fmt.Errorf(`ent: validator failed for field "Shipment.shipping_mark": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TaxModeSnapshot(); ok {
+		if err := shipment.TaxModeSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "tax_mode_snapshot", err: fmt.Errorf(`ent: validator failed for field "Shipment.tax_mode_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.FreightCurrency(); ok {
 		if err := shipment.FreightCurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "freight_currency", err: fmt.Errorf(`ent: validator failed for field "Shipment.freight_currency": %w`, err)}
@@ -2093,6 +2287,30 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	}
 	if _u.mutation.ShippingMarkCleared() {
 		_spec.ClearField(shipment.FieldShippingMark, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReceivableAmountSnapshot(); ok {
+		_spec.SetField(shipment.FieldReceivableAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.ReceivableAmountSnapshotCleared() {
+		_spec.ClearField(shipment.FieldReceivableAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.QuotedFreightAmountSnapshot(); ok {
+		_spec.SetField(shipment.FieldQuotedFreightAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.QuotedFreightAmountSnapshotCleared() {
+		_spec.ClearField(shipment.FieldQuotedFreightAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.TaxAmountSnapshot(); ok {
+		_spec.SetField(shipment.FieldTaxAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.TaxAmountSnapshotCleared() {
+		_spec.ClearField(shipment.FieldTaxAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.TaxModeSnapshot(); ok {
+		_spec.SetField(shipment.FieldTaxModeSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.TaxModeSnapshotCleared() {
+		_spec.ClearField(shipment.FieldTaxModeSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.FreightAmount(); ok {
 		_spec.SetField(shipment.FieldFreightAmount, field.TypeOther, value)

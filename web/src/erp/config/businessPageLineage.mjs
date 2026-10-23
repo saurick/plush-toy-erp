@@ -173,7 +173,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
           '草稿出货单可按产品 / SKU、仓库和批次送检粒度发起出货前成品检验；该来源关联不启动 Workflow。',
         ],
-        ['shipping-release', 'shipments'],
         ['outbound', 'inventory'],
         ['outbound', 'shipments'],
         ['shipments', 'outbound'],
@@ -609,9 +608,8 @@ export const businessPageFlowDefinitions = Object.freeze(
           'cancel_outsourcing_fact',
         ],
         ['outbound', 'outbound', 'release_stock_reservation'],
-        ['shipments', 'shipping-release', 'ship_shipment'],
+        ['shipments', 'shipments', 'ship_shipment'],
         ['shipments', 'shipments', 'cancel_shipment'],
-        ['shipments', 'shipping-release', 'cancel_shipment'],
         ['payables', 'payables', 'cancel_finance_fact'],
         ['receivables', 'receivables', 'cancel_finance_fact'],
         ['invoices', 'invoices', 'cancel_finance_fact'],
@@ -787,11 +785,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           'start_material_supply_purchase_order_process',
         ],
         ['shipments', 'shipments', 'start_finished_goods_delivery_process'],
-        [
-          'shipments',
-          'shipping-release',
-          'start_finished_goods_delivery_process',
-        ],
         ['inbound', 'inbound', 'execute_material_supply_quality_gate'],
         [
           'finance-payments',
@@ -1191,19 +1184,6 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     availabilityNote:
       '报废、超领和在制让步由正式处置申请生成老板审批任务；审批不代替库存或在制办理，批准后仍须由对应生产入口确认执行。返工来源提醒由任务管理和岗位任务端独立承接。',
   },
-  'shipping-release': {
-    pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,
-    upstreamPageKeys: ['shipments'],
-    producerActions: ['start_finished_goods_delivery_process'],
-    sourceTypes: ['shipment'],
-    downstreamPageKeys: ['shipments'],
-    taskGroups: ['shipment_finance_approval'],
-    allowsGenericPageCreate: false,
-    availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
-    taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.IMPLEMENTED,
-    availabilityNote:
-      '草稿出货单由页面启动版本化财务审批；启动时只复核已有成品质检结果，不创建或判定新的质检记录。审批完成只记录当前出货单版本的放行结果，正式出货、库存扣减与应收仍需分别办理。',
-  },
   outbound: {
     pageRole: BUSINESS_PAGE_ROLES.FACT_PROCESSING,
     upstreamPageKeys: ['sales-orders'],
@@ -1219,12 +1199,11 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   shipments: {
     pageRole: BUSINESS_PAGE_ROLES.FACT_OWNER,
     upstreamPageKeys: ['sales-orders', 'products'],
-    producerActions: ['create_shipment_with_items'],
+    producerActions: ['create_shipment_with_items', 'start_finished_goods_delivery_process'],
     sourceTypes: [],
     downstreamPageKeys: [
       'outbound',
       'quality-inspections',
-      'shipping-release',
       'inventory',
       'receivables',
       'invoices',

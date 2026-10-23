@@ -10,13 +10,11 @@ import {
   isTaskBlockedProgress,
   isTaskDueSoon,
   isTaskHighPriority,
-  isTaskOverdue,
   isTaskReadyProgress,
 } from './mobileRoleTaskModel.mjs'
 
 const TASK_FILTERS = {
   [MOBILE_TASK_FILTER_KEYS.ALERT]: isTaskAlerted,
-  [MOBILE_TASK_FILTER_KEYS.OVERDUE]: isTaskOverdue,
   [MOBILE_TASK_FILTER_KEYS.DUE_SOON]: isTaskDueSoon,
   [MOBILE_TASK_FILTER_KEYS.HIGH_PRIORITY]: isTaskHighPriority,
   [MOBILE_TASK_FILTER_KEYS.BLOCKED]: isTaskBlockedProgress,
@@ -39,8 +37,7 @@ export function buildMobileRoleTaskLists({ slots, roleKey }) {
   )
   const riskTasks = project(MOBILE_ROLE_TASK_VIEW_KEYS.RISK)
   const approvalTasks = project(MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL)
-  const overdueTasks = riskTasks.filter(isTaskOverdue)
-  return { activeTasks, doneTasks, riskTasks, approvalTasks, overdueTasks }
+  return { activeTasks, doneTasks, riskTasks, approvalTasks }
 }
 
 export function buildMobileRoleTaskListView({

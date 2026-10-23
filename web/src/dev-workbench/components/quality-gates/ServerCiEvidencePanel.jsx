@@ -83,7 +83,7 @@ export function ServerCiEvidencePanel({
           <div>
             <Text type="secondary">流水线</Text>
             {evidence.pipeline?.url ? (
-              <Link href={evidence.pipeline.url} target="_blank" rel="noreferrer">
+              <Link href={evidence.pipeline.url} rel="noreferrer">
                 #{evidence.pipeline.id}
               </Link>
             ) : (

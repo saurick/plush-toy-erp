@@ -5,7 +5,7 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { getBusinessPageHandbookSections } from '../../src/erp/config/businessHandbook.mjs'
 import { ROLE_HELP_GUIDES } from '../../src/erp/config/roleHelpContent.mjs'
-import { getRoleHelpScenarios } from '../../src/erp/config/helpScenarios.mjs'
+import { getBusinessPageHelpScenario, getRoleHelpScenarios } from '../../src/erp/config/helpScenarios.mjs'
 import {
   BUSINESS_USABILITY_CATALOG,
   getBusinessHelpItem,
@@ -255,7 +255,7 @@ export function createHelpCenterScenarios({
   const verifyPopoverKeyboardLink = async (page, popover) => {
     await page.keyboard.press('Tab')
     const reference = popover.getByRole('link', {
-      name: '查看完整参考词条 →',
+      name: '打开帮助中心',
       exact: true,
     })
     assert(
@@ -1175,7 +1175,7 @@ export function createHelpCenterScenarios({
         await fieldHelp.tap()
         await page
           .locator('.erp-business-inline-help-popover:visible')
-          .getByRole('link', { name: '查看完整参考词条 →', exact: true })
+          .getByRole('link', { name: '打开帮助中心', exact: true })
           .click()
         await page
           .locator('[data-help-reference="inventory:available-quantity"]')
@@ -1189,8 +1189,9 @@ export function createHelpCenterScenarios({
           .click()
         await page
           .getByRole('dialog')
-          .getByRole('button', { name: '查阅本页参考手册', exact: true })
+          .getByRole('button', { name: '我知道了', exact: true })
           .click()
+        await page.goto(new URL('/erp/help-center?view=reference&ref=inventory', page.url()).href)
         await page.locator('[data-help-reference="inventory"]').waitFor()
         assert.equal(
           await page.locator('.erp-help-reference-content img').count(),
@@ -1272,6 +1273,11 @@ export function createHelpCenterScenarios({
             name: `${entry.title}怎么用`,
             exact: true,
           })
+          assert.equal(new URL(page.url()).pathname, entry.path, '页内帮助保留来源页面')
+          if (getBusinessPageHelpScenario(entry.key)) {
+            await dialog.getByRole('region', { name: '办理概览', exact: true }).waitFor()
+            await dialog.getByRole('tab', { name: '完成后', exact: true }).click()
+          }
           await dialog.getByText(entry.completion, { exact: true }).waitFor()
           await dialog.getByText(entry.handoff, { exact: true }).waitFor()
           const explanations = dialog.locator('.erp-business-page-help__item')

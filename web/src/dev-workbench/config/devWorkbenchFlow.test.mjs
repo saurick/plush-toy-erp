@@ -21,6 +21,8 @@ test('every guide action points to a registered runtime entry and every tool des
       'selection must not imply completion'
     )
   }
+  const validation = DEV_WORKBENCH_GUIDE.find(({ action }) => action === '开始本轮验证')
+  assert.equal(new URL(validation.route, 'http://localhost').searchParams.get('view'), 'tiers')
   assert.equal(
     new URL(
       DEV_WORKBENCH_GUIDE.at(-1).route,

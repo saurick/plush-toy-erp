@@ -609,7 +609,7 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 		q = q.Where(outsourcingfact.OccurredAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		q = q.Where(outsourcingfact.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
+		q = q.Where(outsourcingfact.OccurredAtLTE(*filter.DateTo))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {

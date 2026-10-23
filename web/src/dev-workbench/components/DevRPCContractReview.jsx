@@ -111,7 +111,7 @@ function ExampleResult({ report, selected, execution }) {
         <p>切回工作区后运行样例；工作区执行回执不代替暂存快照验证。</p>
       ) : null}
       {selected ? (
-        <details className="erp-dev-rpc-review__method-examples">
+        <details className="erp-dev-disclosure erp-dev-rpc-review__method-examples">
           <summary>所选接口样例 · {selected.label}</summary>
           <p>
             {!registered ? '该接口尚未登记可执行的文档样例。' : !row
@@ -137,7 +137,7 @@ function ExampleResult({ report, selected, execution }) {
           ) : null}
         </details>
       ) : null}
-      <details className="erp-dev-rpc-review__evidence">
+      <details className="erp-dev-disclosure erp-dev-rpc-review__evidence">
         <summary>{result.historical ? '历史回执与来源' : '命令与证据来源'}</summary>
         {result.historical ? (
           <p><Status status={evidence.status} historical />未覆盖当前比较对象。</p>
@@ -294,7 +294,7 @@ export default function DevRPCContractReview() {
                   <button
                     type="button"
                     key={row.key}
-                    className="erp-dev-rpc-review__method"
+                    className="erp-dev-directory-item erp-dev-directory-item--stacked erp-dev-rpc-review__method"
                     aria-pressed={selected?.key === row.key}
                     onClick={() => update({ change: row.key })}
                   >
@@ -364,7 +364,7 @@ export default function DevRPCContractReview() {
                           </span>
                         )}
                   </div>
-                  <details>
+                  <details className="erp-dev-disclosure">
                     <summary>来源与比较范围</summary>
                     <code>{selected.source || '见正式接口分发'}</code>
                     <span>
@@ -375,7 +375,7 @@ export default function DevRPCContractReview() {
               </section>
             </div>
           ) : null}
-          <details className="erp-dev-rpc-review__files">
+          <details className="erp-dev-disclosure erp-dev-rpc-review__files">
             <summary>合同相关改动与暂存范围 · {report.files.length} 个文件</summary>
             <Table
               rowKey="path"

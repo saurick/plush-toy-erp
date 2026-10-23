@@ -93,7 +93,7 @@ export function DryRunSummary({ dryRunState }) {
           </Text>
         </div>
       </div>
-      <details className="erp-dev-customer-result-details">
+      <details className="erp-dev-disclosure erp-dev-customer-result-details">
         <summary>报告详情</summary>
         <div className="erp-dev-customer-dry-run-paths">
           <Text type="secondary">输出目录</Text>

@@ -90,7 +90,7 @@ func TestWorkflowUsecase_GetTaskBoardNormalizesReadContract(t *testing.T) {
 		t.Fatalf("get task board: %v", err)
 	}
 	got := repo.query
-	if got.Keyword != "工程任务" || got.Status != "all" || got.OwnerRoleKey != SalesRoleKey || got.Due != "all" || got.SourceType != "" || got.LaneKey != "" || got.Sort != WorkflowTaskBoardSortSmart {
+	if got.Keyword != "工程任务" || got.Status != "all" || got.OwnerRoleKey != SalesRoleKey || got.Due != "all" || got.SourceType != "" || got.LaneKey != WorkflowTaskBoardLaneAll || got.Sort != WorkflowTaskBoardSortSmart {
 		t.Fatalf("unexpected normalized query %#v", got)
 	}
 	if got.Limit != 100 || got.Offset != 0 {

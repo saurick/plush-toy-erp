@@ -56,7 +56,7 @@ export function createBusinessAttachmentScenarios({
     })
     return {
       name: `business-attachment-manager-${key}`,
-      path: '/erp/warehouse/shipping-release',
+      path: '/erp/production/scheduling',
       auth: 'admin',
       themeMode,
       effectiveSession: readonly
@@ -72,9 +72,9 @@ export function createBusinessAttachmentScenarios({
         {
           id: 9101,
           task_code: 'style-l1-attachment-review',
-          task_group: 'shipment_finance_approval',
+          task_group: 'production_scheduling',
           task_name: '附件交互验收',
-          source_type: 'shipment',
+          source_type: 'production_order',
           source_id: 501,
           source_no: 'SHIP-ATTACHMENT-L1',
           task_status_key: 'ready',

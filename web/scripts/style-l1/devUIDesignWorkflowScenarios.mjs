@@ -183,9 +183,11 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         await placeholder.waitFor({ state: 'visible' })
         const search = frame.getByRole('textbox', { name: '搜索', exact: true })
         await search.fill('不存在的BOM样例')
+        await search.press('Enter')
         await frame.getByText('没有匹配的记录', { exact: true }).first().waitFor({ state: 'visible' })
         assert.equal(await placeholder.count(), 0, '空列表不保留操作占位')
         await search.fill('')
+        await search.press('Enter')
         await placeholder.waitFor({ state: 'visible' })
         await shot(page, 'persistent-operation-bar-design')
       },
@@ -866,12 +868,13 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
             const title = node.querySelector('.rm-card-head > strong').getBoundingClientRect()
             const status = node.querySelector('.rm-card-head .badge').getBoundingClientRect()
             const body = node.querySelector('.rm-card-body').getBoundingClientRect()
+            const image = node.querySelector('.rm-card-body > .product-thumb, .rm-card-body > .rm-card-image').getBoundingClientRect()
             const source = node.querySelector('.rm-card-source').getBoundingClientRect()
-            return { titleRight: title.right, statusLeft: status.left, bodyTop: body.top, titleBottom: title.bottom, sourceTop: source.top, bodyBottom: body.bottom, overflow: node.scrollWidth > node.clientWidth + 1 }
+            return { titleRight: title.right, statusLeft: status.left, bodyTop: body.top, titleBottom: title.bottom, sourceLeft: source.left, sourceBottom: source.bottom, imageRight: image.right, bodyBottom: body.bottom, overflow: node.scrollWidth > node.clientWidth + 1 }
           })
           assert(geometry.titleRight <= geometry.statusLeft, '长任务标题不挤压任务状态')
           assert(geometry.bodyTop >= geometry.titleBottom)
-          assert(geometry.sourceTop >= geometry.bodyBottom)
+          assert(geometry.sourceLeft >= geometry.imageRight + 9 && geometry.sourceBottom <= geometry.bodyBottom + 1, '单据来源在图片右侧，长内容由关联区容纳')
           assert.equal(geometry.overflow, false)
           await assertNoHorizontalOverflow(page, `手机版任务预览-${width}`)
         }

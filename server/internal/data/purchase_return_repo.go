@@ -541,7 +541,7 @@ func (r *inventoryRepo) ListPurchaseReturns(ctx context.Context, filter biz.Purc
 		query = query.Where(purchasereturn.ReturnedAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		query = query.Where(purchasereturn.ReturnedAtLTE(endOfDateFilter(*filter.DateTo)))
+		query = query.Where(purchasereturn.ReturnedAtLTE(*filter.DateTo))
 	}
 	itemPredicates := []predicate.PurchaseReturnItem{}
 	if filter.MaterialID > 0 {

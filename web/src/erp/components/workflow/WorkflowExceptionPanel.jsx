@@ -284,7 +284,6 @@ export default function WorkflowExceptionPanel({
           maxLength={100}
           allowClear
         />}
-
       </div>
       {compact && stateFilters}
       {compact && <MobileScrollEdge scrollContainerRef={scrollContainerRef} />}

@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	WorkflowTaskBoardLaneAll        = "all"
 	WorkflowTaskBoardLaneActionable = "actionable"
 	WorkflowTaskBoardLaneException  = "exception"
 	WorkflowTaskBoardLaneDue        = "due"
@@ -163,9 +164,6 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	if query.Due == "" {
 		query.Due = "all"
 	}
-	if query.LaneKey == "all" {
-		query.LaneKey = ""
-	}
 	if query.Sort == "" {
 		query.Sort = WorkflowTaskBoardSortSmart
 	}
@@ -175,7 +173,7 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	if !ValidWorkflowTaskListFilters(query.Due, query.SourceType) {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
-	if query.LaneKey != "" && !isWorkflowTaskBoardLaneKey(query.LaneKey) {
+	if query.LaneKey != "" && query.LaneKey != WorkflowTaskBoardLaneAll && !isWorkflowTaskBoardLaneKey(query.LaneKey) {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
 	if _, ok := workflowTaskBoardSortKeys[query.Sort]; !ok {

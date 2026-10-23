@@ -122,21 +122,44 @@ export default function BusinessChainTopics({
           </div>
         </section>
       )}
-      <Drawer title="系统衔接图" width={1120} open={mapOpen} onClose={() => setMapOpen(false)} rootClassName="erp-dev-chain-topics-drawer">
-        <div className="erp-dev-flow-state-page erp-dev-chain-topics__system" data-business-chain-system>
-          <p>查看业务流程之间的关联；具体办理岗位和完成条件从业务目录进入。</p>
-          {mapOpen ? <div className="erp-dev-flow-overview-graph erp-dev-docs-markdown"><Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} /></div> : null}
-          <details className="erp-dev-flow-overview-relations">
-            <summary>逐条查看衔接关系（{catalog.businessChainOverview.relations.length}）</summary>
-            <ul>{catalog.businessChainOverview.relations.map((relation) => (
-              <li key={relation.key} data-overview-relation={relation.key}>
-                <strong>{relation.label}</strong>
-                <span>{chainByKey.get(relation.fromChainKey).label} → {chainByKey.get(relation.toChainKey).label}</span>
-              </li>
-            ))}
+      <Drawer
+        title="系统衔接图"
+        width={1120}
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        rootClassName="erp-dev-chain-topics-drawer"
+      >
+        <div
+          className="erp-dev-flow-state-page erp-dev-chain-topics__system"
+          data-business-chain-system
+        >
+          <p>业务专题之间的关联。</p>
+          {mapOpen ? (
+            <div className="erp-dev-flow-overview-graph erp-dev-docs-markdown">
+              <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+            </div>
+          ) : null}
+          <details className="erp-dev-disclosure erp-dev-flow-overview-relations">
+            <summary>
+              逐条查看衔接关系（{catalog.businessChainOverview.relations.length}
+              ）
+            </summary>
+            <ul>
+              {catalog.businessChainOverview.relations.map((relation) => (
+                <li key={relation.key} data-overview-relation={relation.key}>
+                  <strong>{relation.label}</strong>
+                  <span>
+                    {chainByKey.get(relation.fromChainKey).label} →{' '}
+                    {chainByKey.get(relation.toChainKey).label}
+                  </span>
+                </li>
+              ))}
             </ul>
           </details>
-          <EvidenceDisclosure value={catalog.businessChainOverview} label="查看业务总图证据" />
+          <EvidenceDisclosure
+            value={catalog.businessChainOverview}
+            label="查看业务总图证据"
+          />
         </div>
       </Drawer>
     </div>

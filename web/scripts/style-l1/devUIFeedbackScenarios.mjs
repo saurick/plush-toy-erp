@@ -37,6 +37,19 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
+        const size = page.locator('.erp-feedback-guide-tools .ant-select')
+        const defaultWidth = await page.locator('.erp-feedback-guide-tools code').textContent()
+        await size.getByRole('combobox', { name: '弹窗宽度' }).press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').getByText('单步确认', { exact: true }).click()
+        await size.locator('.ant-select-clear').click()
+        assert.equal(await size.locator('.ant-select-selection-placeholder').textContent(), '弹窗宽度')
+        assert.equal(await page.locator('.erp-feedback-guide-tools code').textContent(), defaultWidth, '清空尺寸恢复默认展示宽度')
+        assert.equal(await page.locator('.erp-feedback-anatomy').getAttribute('data-size'), 'localAction')
+        const result = page.locator('[data-feedback-example="editor"] .ant-select').first()
+        await result.locator('.ant-select-clear').click()
+        assert.equal(await result.locator('.ant-select-selection-placeholder').textContent(), '样例保存结果')
+        assert.equal(await page.getByRole('button', { name: '打开编辑弹窗', exact: true }).isDisabled(), true, '没有演示结果时保留选择入口并禁用依赖动作')
+        await chooseResult(page, '保存成功')
         const dialog = await openEditor(page)
         await save(dialog).click()
         await dialog.getByText('请填写说明标题', { exact: true }).waitFor()
@@ -231,6 +244,7 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
         await page.locator('.erp-design-prose').getByText('localAction', { exact: true }).waitFor()
         await page.goBack()
         await page.getByRole('textbox', { name: '搜索设计图解或规范' }).fill('Toast')
+        await page.getByRole('textbox', { name: '搜索设计图解或规范' }).press('Enter')
         await page.reload()
         assert.equal(await page.getByRole('textbox', { name: '搜索设计图解或规范' }).inputValue(), 'Toast')
         await directory.getByRole('button', { name: 'Toast 与反馈选择' }).click()

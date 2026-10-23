@@ -1,0 +1,85 @@
+/* 原生 details 保留键盘、默认展开、互斥分组与 onToggle；标题几何不随 open 改变。 */
+.erp-dev-disclosure {
+  min-width: 0;
+}
+
+:where(.erp-dev-disclosure) > summary {
+  display: block;
+}
+
+.erp-dev-disclosure > summary {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  margin: 0;
+  padding: 8px 12px 8px 32px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text);
+  font-size: var(--erp-font-small);
+  font-weight: 500;
+  line-height: 20px;
+  list-style: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.erp-dev-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.erp-dev-disclosure > summary::marker {
+  content: '';
+}
+
+.erp-dev-disclosure > summary::before {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: '';
+  transform: rotate(-45deg);
+  transition: transform 140ms ease;
+}
+
+.erp-dev-disclosure[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.erp-dev-disclosure > summary:hover {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+}
+
+.erp-dev-disclosure > summary:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+
+:where(.erp-dev-disclosure[open] > summary + *) {
+  margin-block-start: 8px;
+}
+
+@media (pointer: coarse) {
+  .erp-dev-disclosure > summary {
+    min-height: 44px;
+    padding-block: 11px;
+  }
+
+  .erp-dev-disclosure > summary::before {
+    top: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-dev-disclosure > summary::before {
+    transition: none;
+  }
+}

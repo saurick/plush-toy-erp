@@ -1324,7 +1324,7 @@ test('version center keeps critical state visible and uses stable tab pagination
   )
   assert.match(versionCenterPageSource, /requestedViewCount !== 1/u)
   assert.match(versionCenterPageSource, /requestedCount !== 1/u)
-  assert.equal(DEV_VERSION_CENTER_VERSION_PAGE_SIZE, 6)
+  assert.equal(DEV_VERSION_CENTER_VERSION_PAGE_SIZE, 7)
   assert.equal(DEV_VERSION_CENTER_HISTORY_PAGE_SIZE, 10)
   assert.equal(
     resolveDevOperationHistoryState({ initialLoading: true }),

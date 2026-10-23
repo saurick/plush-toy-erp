@@ -118,6 +118,8 @@ import {
   OCCURRED_DATE_FILTER_OPTIONS,
   STATUS_OPTIONS,
   FINANCE_STATUS_OPTIONS,
+  PRODUCTION_STATUS_OPTIONS,
+  RESERVATION_STATUS_OPTIONS,
   buildOperationalFactColumns,
   buildOperationalFactRelatedMenuItems,
   financeSettlementActionFor,
@@ -823,7 +825,7 @@ export function OperationalFactWorkspace({
   }
 
   const activeFilterCount = [
-    currentActiveKey !== 'finance' && statusFilter,
+    !['finance', 'production', 'reservations'].includes(currentActiveKey) && statusFilter,
     routeSalesOrderID,
     routeFactID,
     activeDateRange[0] || activeDateRange[1],
@@ -927,7 +929,7 @@ export function OperationalFactWorkspace({
                 resetPaginationForKey()
               }}
             />
-            {currentActiveKey === 'finance' ? (
+            {['finance', 'production', 'reservations'].includes(currentActiveKey) ? (
               <BusinessStatusFilter
                 inline
                 aria-label="单据状态"
@@ -935,7 +937,8 @@ export function OperationalFactWorkspace({
                 loading={loading}
                 className="erp-business-filter-control--status"
                 value={statusFilter}
-                options={FINANCE_STATUS_OPTIONS}
+                options={currentActiveKey === 'production' ? PRODUCTION_STATUS_OPTIONS : currentActiveKey === 'reservations' ? RESERVATION_STATUS_OPTIONS : FINANCE_STATUS_OPTIONS}
+                exact={currentActiveKey === 'production' && Boolean(routeFactID)}
                 onChange={(nextStatus) => {
                   setStatusFilter(nextStatus)
                   resetPaginationForKey()
@@ -1550,6 +1553,7 @@ export function OperationalFactWorkspace({
                   icon={<RollbackOutlined />}
                   data-business-action-key="reservation-release"
                   data-business-action-role="primary"
+                  data-business-action-group="lifecycle"
                   disabled={
                     !activeSelectedRow ||
                     activeSelectedRow.status !== StockReservationStatus.ACTIVE ||

@@ -117,6 +117,7 @@ export function createDevWorkbenchDesktopScenarios({
         }
         const search = page.getByRole('textbox', { name: '搜索全部开发工具' })
         await search.fill('质量门禁 / Quality Gates')
+        await search.press('Enter')
         await page
           .locator('table[aria-label="全部开发工具"] tbody tr')
           .first()
@@ -202,6 +203,7 @@ export function createDevWorkbenchDesktopScenarios({
           0
         )
         await search.fill('不存在的工具名称')
+        await search.press('Enter')
         await page.getByText('没有匹配的工具', { exact: true }).waitFor()
         await page
           .getByRole('button', { name: '清除筛选', exact: true })
@@ -375,6 +377,17 @@ export function createDevWorkbenchDesktopScenarios({
         await page.getByRole('button', { name: '全部链路', exact: true }).click()
         await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2)
+        const stepSearch = page.getByRole('textbox', { name: '搜索环节、岗位或实际读回', exact: true })
+        await stepSearch.fill('采购')
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2, 'typing keeps the current chain results')
+        await stepSearch.press('Enter')
+        await page.waitForURL(url => url.searchParams.get('q') === '采购')
+        await stepTable.getByText('1. 出货步骤', {exact:true}).waitFor({state:'hidden'})
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1)
+        await stepSearch.locator('xpath=..').getByRole('button', {name:'清除搜索',exact:true}).click()
+        await stepTable.getByText('1. 出货步骤', {exact:true}).waitFor()
+        assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2)
+
         await page.getByRole('tab', { name: '问题与复验', exact: true }).click()
         await page.getByText('本批次没有登记问题；覆盖边界以执行记录为准。', { exact: true }).waitFor()
         await page.getByRole('tab', { name: '执行与证据', exact: true }).click()
@@ -433,8 +446,10 @@ export function createDevWorkbenchDesktopScenarios({
         const totalPresets = await page.locator('.erp-dev-testing-presets article').count()
         const presetSearch = page.getByPlaceholder('搜索常用检查')
         await presetSearch.fill('没有这种检查xyz')
+        await presetSearch.press('Enter')
         await page.getByText('没有匹配的常用检查', { exact: true }).waitFor()
         await presetSearch.fill('字段')
+        await presetSearch.press('Enter')
         await page.getByText('没有匹配的常用检查', { exact: true }).waitFor({ state: 'hidden' })
         const presets = page.locator('.erp-dev-testing-presets')
         assert((await presets.locator('article').count()) > 0)
@@ -443,6 +458,7 @@ export function createDevWorkbenchDesktopScenarios({
         await presets.locator('pre').first().waitFor({ state: 'visible' })
         await assertNoHorizontalOverflow(page, '测试使用指引与命令详情')
         await presetSearch.fill('')
+        await presetSearch.press('Enter')
         await primaryTabs.getByRole('tab', { name: '本轮验证', exact: true }).click()
         const counts = {
           status: 'passed',
@@ -703,6 +719,7 @@ export function createDevWorkbenchDesktopScenarios({
         await page.getByRole('link', { name: '页面说明检查', exact: true }).click()
         await page.getByRole('heading', { name: '页面说明检查', exact: true }).waitFor()
         await page.getByRole('textbox', { name: '搜索页面说明', exact: true }).fill('可用量')
+        await page.getByRole('textbox', { name: '搜索页面说明', exact: true }).press('Enter')
         await page.getByText('当前显示 1 个页面', { exact: true }).waitFor()
         await page.reload()
         await page.getByRole('link', { name: '返回测试指引', exact: true }).click()
@@ -875,10 +892,12 @@ export function createDevWorkbenchDesktopScenarios({
         assert((await commands.count()) <= 10)
         const commandSearch = page.locator('.erp-dev-testing-search input')
         await commandSearch.fill('没有这条专项命令')
+        await commandSearch.press('Enter')
         await page
           .getByText('当前筛选没有命令块 / No command blocks', { exact: true })
           .waitFor()
         await commandSearch.fill('')
+        await commandSearch.press('Enter')
         await commands.first().waitFor()
         await assertNoHorizontalOverflow(page, '专项检查命令分页与空结果恢复')
         await page.getByRole('button', { name: '返回测试指引', exact: true }).click()
@@ -914,6 +933,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(await selectedLifecycle.innerText(), '当前')
         const search = page.getByRole('textbox', { name: '搜索项目文档' })
         await search.fill('不存在的文档检索内容 navigation-no-result')
+        await search.press('Enter')
         await page
           .getByText('没有匹配的文档，阅读操作已隐藏', { exact: true })
           .waitFor()
@@ -960,6 +980,7 @@ export function createDevWorkbenchDesktopScenarios({
         }))
         await page.locator('[aria-label="项目文档层级"]').getByText('历史', { exact: true }).click()
         await page.getByRole('textbox', { name: '搜索项目文档' }).fill(keyword)
+        await page.getByRole('textbox', { name: '搜索项目文档' }).press('Enter')
         await page.getByText('归档全文检索探针', { exact: true }).waitFor()
         assert.equal(await page.getByText('没有匹配的文档', { exact: true }).count(), 0)
         await verifyDevDocsReadingNavigation(page, assert)

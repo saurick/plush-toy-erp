@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import {
   chmodSync,
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -623,6 +624,8 @@ test("remote target preflight script is read-only and contains no build command"
     /tar --help 2>\/dev\/null \| grep -Fq -- '--zstd'/u,
   );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /retention_mode=preview_only/u);
+  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /default_transaction_read_only=on -c statement_timeout=10000/u);
+  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /PGCONNECT_TIMEOUT=5/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /if plain_directory "\$root\/backups"; then\n\s+latest_backup=/u,
@@ -647,7 +650,7 @@ test("remote target preflight script is read-only and contains no build command"
   );
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
-    /SELECT COUNT\(\*\) FROM customer_config_revisions/u,
+    /COUNT\(\*\), COALESCE\(MAX\(revision\), [\s\S]+FROM customer_config_revisions/u,
   );
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
@@ -673,4 +676,127 @@ test("production runtime readback uses the non-trial config and exact public ide
     ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
   );
   assert.equal(report.publicEntry.gitSha, SHA);
+});
+
+test("async preflight preserves a bounded stage and failure reason without stderr contents", async () => {
+  for (const mode of ["timeout", "exit", "invalid", "stderr-limit"]) {
+    let killed = false;
+    const promise = runTargetPreflightAsync("customer-test-133", {
+      timeoutMs: 20,
+      localIdentity: LOCAL_IDENTITY,
+      spawnCommand: () => {
+        const child = new EventEmitter();
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        child.stdin = new EventEmitter();
+        child.kill = () => { killed = true; };
+        child.stdin.end = () => queueMicrotask(() => {
+          child.stderr.write("PLUSH_PREFLIGHT_STA");
+          child.stderr.write("GE=retention\nsecret=do-not-log\nPLUSH_PREFLIGHT_STAGE=secret_value\n");
+          if (mode === "stderr-limit") child.stderr.write("x".repeat(1024 * 1024));
+          if (mode === "exit") child.emit("close", 141);
+          if (mode === "invalid") { child.stdout.write("private invalid report"); child.emit("close", 0); }
+        });
+        return child;
+      },
+    });
+    await assert.rejects(promise, (error) => {
+      assert.equal(error.preflightDiagnostic.stage, "retention");
+      assert.equal(error.preflightDiagnostic.transport, "local");
+      assert(error.preflightDiagnostic.elapsedMs >= 0);
+      const codes = { timeout: "timeout", exit: "process_failed", invalid: "invalid_report", "stderr-limit": "output_limit" };
+      assert.equal(error.preflightDiagnostic.code, `target_preflight_${codes[mode]}`);
+      assert.doesNotMatch(JSON.stringify(error) + error.message, /secret|do-not-log|private/u);
+      return true;
+    });
+    assert.equal(killed, ["timeout", "stderr-limit"].includes(mode));
+  }
+});
+
+
+test("timed-out local preflight terminates its child process group", async (t) => {
+  if (process.platform === "win32") return;
+  const root = mkdtempSync(path.join(tmpdir(), "plush-preflight-children-"));
+  const heartbeat = path.join(root, "heartbeat");
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let closed;
+  const leaf = `const fs=require('node:fs');setInterval(()=>fs.appendFileSync(${JSON.stringify(heartbeat)},'.'),10)`;
+  await assert.rejects(runTargetPreflightAsync("demo-133", {
+    localIdentity: LOCAL_IDENTITY,
+    timeoutMs: 500,
+    spawnCommand: (_command, _args, options) => {
+      const child = spawn(process.execPath, ["-e", `
+        process.stdin.resume();
+        process.stderr.write('PLUSH_PREFLIGHT_STAGE=database\\n');
+        require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(leaf)}],{stdio:'ignore'});
+        setInterval(()=>{},1000);
+      `], options);
+      closed = new Promise((resolve) => child.once("close", resolve));
+      return child;
+    },
+  }), /timed out/u);
+  await closed;
+  const stopped = readFileSync(heartbeat, "utf8");
+  assert(stopped.length > 0);
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(readFileSync(heartbeat, "utf8"), stopped);
+});
+
+test("database preflight reads one consistent snapshot and rejects incomplete results", (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), "plush-preflight-snapshot-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const queryLog = path.join(root, "queries");
+  const script = buildRemoteTargetPreflightScript(getDeploymentTarget("customer-test-133"));
+  const database = script.slice(script.indexOf("preflight_stage database"), script.indexOf("preflight_stage backup"));
+  const valid = "20261021142304|1|revision-1|release-1|";
+  const cases = [
+    { snapshot: valid, state: "active", database: "passed" },
+    { snapshot: "|1|revision-1|release-1|", state: "active", database: "blocked" },
+    { snapshot: "20261021142304|0|||", state: "absent", database: "blocked" },
+    { snapshot: "20261021142304|2|revision-1|release-1|", state: "invalid", database: "blocked" },
+    { snapshot: valid + "|unexpected", state: "invalid", database: "blocked" },
+    { snapshot: valid + "\n" + valid, state: "invalid", database: "blocked" },
+    { snapshot: valid, fail: true, state: "invalid", database: "blocked" },
+  ];
+  for (const item of cases) {
+    writeFileSync(queryLog, "");
+    const result = spawnSync("bash", ["-s"], {
+      encoding: "utf8",
+      env: { ...process.env, QUERY_LOG: queryLog, DB_SNAPSHOT: item.snapshot, DB_FAIL: item.fail ? "1" : "0" },
+      input: `set -euo pipefail
+migration_lock=/nonexistent/plush-retention-preflight-test
+project=fixture
+trial_target=none
+migration_version=unknown
+active_config_state=unknown
+active_config_revision=unknown
+active_config_product_version=unknown
+active_dataset_version=unknown
+database_status=passed
+backup_tooling_status=passed
+block() { :; }
+preflight_stage() { :; }
+docker() {
+  if [[ "$1" == ps ]]; then printf '%s\\n' postgres; return; fi
+  if [[ "$*" == *'command -v pg_dump'* ]]; then return; fi
+  printf 'query\\n' >>"$QUERY_LOG"
+  [[ "$DB_FAIL" == 0 ]] || return 1
+  printf '%s\\n' "$DB_SNAPSHOT"
+}
+${database}
+printf '%s\\n' "$database_status|$active_config_state|$migration_version|$active_config_revision|$active_dataset_version"
+`,
+      timeout: 5000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(queryLog, "utf8"), "query\n");
+    const [databaseStatus, state, migration, revision, dataset] = result.stdout.trim().split("|");
+    assert.equal(databaseStatus, item.database, JSON.stringify(item));
+    assert.equal(state, item.state, JSON.stringify(item));
+    if (item.database === "passed") {
+      assert.equal(migration, "20261021142304");
+      assert.equal(revision, "revision-1");
+      assert.equal(dataset, ACTIVE_DATASET_VERSION_NOT_APPLICABLE);
+    }
+  }
 });

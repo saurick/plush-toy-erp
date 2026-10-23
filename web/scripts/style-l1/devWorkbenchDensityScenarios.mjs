@@ -7,6 +7,8 @@ import { installPermissionRelationshipMock } from './permissionRelationshipScena
 import { installDatabaseMigrationFixture } from './devDeliveryWorkspaceScenarios.mjs'
 import { assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
+import { createDevDisclosureScenarios } from './devDisclosureScenarios.mjs'
+import { assertPlainDirectory, createDevWorkbenchDirectoryScenarios } from './devWorkbenchDirectoryScenarios.mjs'
 
 async function assertSidebarSelection(page, assert) {
   const selection = await page.locator('.erp-dev-workspace-nav').evaluate(async (nav) => {
@@ -53,6 +55,8 @@ export function createDevWorkbenchDensityScenarios({
   path,
 }) {
   return [
+    ...createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
+    ...createDevDisclosureScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     {
       name: 'dev-workbench-sidebar-selection-desktop-light',
       path: '/__dev/product-engineering',
@@ -245,20 +249,15 @@ export function createDevWorkbenchDensityScenarios({
             assert.equal(await root.locator('main > .erp-dev-product-core-toolbar').count(), 1, '能力筛选集中在目录上方')
           }
           if (route === '/__dev/project-skills') {
-            const selection = await root
+            await assertPlainDirectory(page, '.erp-dev-skills__item', assert)
+            const size = await root
               .locator('.erp-dev-skills__item[aria-pressed="true"]')
-              .evaluate((element) => {
-                const style = getComputedStyle(element)
-                return {
-                  marker: style.boxShadow.includes('inset'),
-                  size: Number.parseFloat(
-                    getComputedStyle(element.querySelector('strong')).fontSize
-                  ),
-                }
-              })
+              .evaluate((element) => Number.parseFloat(
+                getComputedStyle(element.querySelector('strong')).fontSize
+              ))
             assert(
-              selection.marker && selection.size >= 14,
-              'Skill 目录保留当前标记和可读的任务名称'
+              size >= 14,
+              'Skill 目录保留可读的任务名称'
             )
           }
           if (route === '/__dev/testing') {
@@ -364,6 +363,8 @@ export function createDevWorkbenchDensityScenarios({
         await page
           .getByRole('textbox', { name: '搜索全部开发工具' })
           .fill('不存在的工具名称')
+        await page
+          .getByRole('textbox', { name: '搜索全部开发工具' }).press('Enter')
         await page.getByText('没有匹配的工具', { exact: true }).waitFor()
         await page
           .getByRole('button', { name: '清除筛选', exact: true })

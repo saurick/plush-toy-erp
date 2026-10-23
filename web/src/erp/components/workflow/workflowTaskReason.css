@@ -1,0 +1,21 @@
+.erp-task-reason {
+  display: block;
+  min-width: 0;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--erp-text-muted) 10%, var(--erp-surface-bg));
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.erp-task-reason__label {
+  font-weight: 600;
+}
+
+.erp-task-reason--danger {
+  background: color-mix(in srgb, var(--erp-visual-danger-text) 7%, var(--erp-surface-bg));
+  color: var(--erp-visual-danger-text);
+}

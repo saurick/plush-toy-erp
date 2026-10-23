@@ -25,17 +25,17 @@ export function OperationEvidence({ operation, loading }) {
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         {trace ? (
           <Space wrap>
-            <Link href={trace.commitUrl} target="_blank" rel="noreferrer">
+            <Link href={trace.commitUrl} rel="noreferrer">
               源码提交
             </Link>
-            <Link href={trace.pipelinesUrl} target="_blank" rel="noreferrer">
+            <Link href={trace.pipelinesUrl} rel="noreferrer">
               该提交的 CI / CD
             </Link>
-            <Link href={trace.releaseUrl} target="_blank" rel="noreferrer">
+            <Link href={trace.releaseUrl} rel="noreferrer">
               版本与制品
             </Link>
             {trace.pipelineUrl ? (
-              <Link href={trace.pipelineUrl} target="_blank" rel="noreferrer">
+              <Link href={trace.pipelineUrl} rel="noreferrer">
                 本次发布流水线
               </Link>
             ) : null}

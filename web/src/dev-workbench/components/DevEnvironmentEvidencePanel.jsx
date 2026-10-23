@@ -210,7 +210,7 @@ function DeliveryOperationOverview({ summary, error, loading }) {
           查看工作台操作记录
         </RouterLink>
       ) : null}
-      <details className="erp-dev-delivery-inline-details">
+      <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
         <summary>记录范围</summary>
         <Text type="secondary">
           仅记录工作台发起的制品发布、部署、数据重建与回滚。

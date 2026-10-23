@@ -513,10 +513,8 @@ export default function DevPermissionRelationshipsPage() {
           <Button
             icon={<SettingOutlined />}
             href="/erp/system/permissions"
-            target="_blank"
-            rel="noreferrer"
           >
-            配置权限
+            打开权限管理
           </Button>
         </Space>
       </header>
@@ -636,7 +634,7 @@ export default function DevPermissionRelationshipsPage() {
                   }[globalModel.resultState] || '预览或读取不完整'}
                   </Text>
                 </div>
-                <details className="erp-dev-permission-evidence-disclosure">
+                <details className="erp-dev-disclosure erp-dev-permission-evidence-disclosure">
                   <summary>来源与版本</summary>
                   <section
                     className="erp-permission-relationship__evidence"
@@ -726,7 +724,7 @@ export default function DevPermissionRelationshipsPage() {
                               }
                             />
                           </div>
-                          <details className="erp-dev-permission-legend">
+                          <details className="erp-dev-disclosure erp-dev-permission-legend">
                             <summary>图例</summary>
                             <Space wrap size={[6, 6]}>
                               <Tag color="blue">账号</Tag>

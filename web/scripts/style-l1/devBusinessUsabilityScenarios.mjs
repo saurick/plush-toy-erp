@@ -97,6 +97,7 @@ export function createDevBusinessUsabilityScenarios({
           name: '搜索页面说明',
         })
         await search.fill('可用量')
+        await search.press('Enter')
         await page.getByText('当前显示 1 个页面', { exact: true }).waitFor()
         assert.equal(
           await page
@@ -109,9 +110,11 @@ export function createDevBusinessUsabilityScenarios({
         )
         assert.equal(await pager.count(), 0, '单页结果沿用隐藏分页的规则')
         await search.fill('不存在的分页检查页面')
+        await search.press('Enter')
         await page.getByText('没有符合当前条件的页面', { exact: true }).waitFor()
         assert.equal(await pager.count(), 0)
         await search.fill('')
+        await search.press('Enter')
         await table.getByText(`第 1-10 条 / 共 ${total} 条`, { exact: true }).waitFor()
         assert.equal(
           await rows.first().textContent(),

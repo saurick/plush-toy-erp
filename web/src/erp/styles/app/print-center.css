@@ -709,8 +709,8 @@
 .erp-print-shell .print-zoom-select {
   position: relative;
   display: inline-flex;
-  width: 120px;
-  flex: 0 0 120px;
+  width: 200px;
+  flex: 0 0 200px;
 }
 
 .erp-print-shell .print-zoom-select .ant-select {

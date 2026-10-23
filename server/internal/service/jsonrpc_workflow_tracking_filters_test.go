@@ -39,7 +39,7 @@ func TestWorkflowTrackingFilterContract(t *testing.T) {
 	if q.ActorID != 7 || q.Limit != 8 || q.Offset != 24 || q.Scope != "participated" || q.SourceID != 0 || q.SourceType != "sales_order" || q.Status != "active" || q.OwnerRoleKey != "engineering" || q.Attention != "overdue" || q.SnapshotAt.IsZero() || q.VisibilityScope == nil {
 		t.Fatalf("query=%#v", q)
 	}
-	if q.DateFrom == nil || q.DateTo == nil || q.DateFrom.UTC().Format(time.RFC3339) != "2026-10-07T16:00:00Z" || !q.DateTo.Equal(*q.DateFrom) {
+	if q.DateFrom == nil || q.DateTo == nil || q.DateFrom.UTC().Format(time.RFC3339) != "2026-10-07T16:00:00Z" || !q.DateTo.Equal(q.DateFrom.Add(24*time.Hour-time.Microsecond)) {
 		t.Fatalf("wrong business day: %#v", q)
 	}
 }

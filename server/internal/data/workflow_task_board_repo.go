@@ -177,7 +177,7 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		tasks := make([]*biz.WorkflowTask, 0, len(rows))
 		for _, row := range rows {
 			task := entWorkflowTaskToBiz(row)
-			if laneKey == biz.WorkflowTaskBoardLaneFinished && task.TaskStatusKey != "withdrawn" {
+			if task.TaskStatusKey == "done" || task.TaskStatusKey == "rejected" {
 				task.BlockedReason = nil
 				delete(task.Payload, "blocked_reason")
 				delete(task.Payload, "rejected_reason")
@@ -389,6 +389,8 @@ func workflowTaskBoardDueFilterPredicate(filter biz.WorkflowTaskBoardQuery) (pre
 
 func workflowTaskBoardLanePredicate(laneKey string, query biz.WorkflowTaskBoardQuery) (predicate.WorkflowTask, error) {
 	switch laneKey {
+	case biz.WorkflowTaskBoardLaneAll:
+		return workflowtask.TaskStatusKeyIn("ready", "blocked", "done", "rejected", "withdrawn"), nil
 	case biz.WorkflowTaskBoardLaneException:
 		return workflowtask.Or(workflowtask.TaskStatusKey("blocked"), workflowtask.And(workflowtask.TaskStatusKey("ready"), workflowExceptionTaskPredicate())), nil
 	case biz.WorkflowTaskBoardLaneFinished:
@@ -442,6 +444,8 @@ func setWorkflowTaskBoardLaneCount(counts *biz.WorkflowTaskBoardCounts, laneKey 
 
 func workflowTaskBoardLaneCount(counts biz.WorkflowTaskBoardCounts, laneKey string) int {
 	switch laneKey {
+	case biz.WorkflowTaskBoardLaneAll:
+		return counts.Actionable + counts.Exception + counts.Due + counts.Finished
 	case biz.WorkflowTaskBoardLaneActionable:
 		return counts.Actionable
 	case biz.WorkflowTaskBoardLaneException:

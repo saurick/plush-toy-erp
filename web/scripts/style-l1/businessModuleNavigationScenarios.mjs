@@ -539,7 +539,7 @@ export function createBusinessModuleNavigationScenarios({
           .waitFor()
         assert.deepEqual(
           await moduleTabs(page).getByRole('tab').allTextContents(),
-          ['出货单', '放行审批', '库存预留']
+          ['出货单', '库存预留']
         )
         const search = page.getByPlaceholder(
           BUSINESS_SEARCH_SCOPES.shipment.placeholder,
@@ -557,22 +557,9 @@ export function createBusinessModuleNavigationScenarios({
             .count(),
           0
         )
-        await switchTab(page, '放行审批')
-        await moduleTabs(page)
-          .getByRole('tab', { name: '放行审批', exact: true, selected: true })
-          .waitFor()
-        const approvalSearch = page.getByRole('textbox', {
-          name: '搜索待办任务', exact: true,
-        })
-        await approvalSearch.fill('放行导航查询')
-        await approvalSearch.press('Enter')
-        await verifyModuleMotion(page, '库存预留')
         await verifyModuleMotion(page, '出货单', true)
         await search.waitFor()
         assert.equal(await search.inputValue(), '出货导航查询')
-        await switchTab(page, '放行审批')
-        await approvalSearch.waitFor()
-        assert.equal(await approvalSearch.inputValue(), '放行导航查询')
         await switchTab(page, '库存预留')
         await financeMenu.click()
         await moduleTabs(page)

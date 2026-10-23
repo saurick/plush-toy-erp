@@ -208,7 +208,7 @@ function QuickPreset({ preset }) {
           复制
         </Button>
       </div>
-      <details>
+      <details className="erp-dev-disclosure">
         <summary>用途与命令</summary>
         <p>{preset.description}</p>
         <pre><code>{preset.commands.join('\n')}</code></pre>
@@ -253,7 +253,7 @@ function CommandBlock({ block, onOpenSource }) {
           </Button>
         </Space>
       </div>
-      <details className="erp-dev-testing-command-block__details">
+      <details className="erp-dev-disclosure erp-dev-testing-command-block__details">
         <summary>查看固定命令</summary>
         <pre>
           <code>{block.commandText}</code>
@@ -371,7 +371,7 @@ function CoverageEvidenceCard({ item, showScenarios = false }) {
           <p className="erp-dev-testing-coverage-card__note">{item.note}</p>
         ) : null}
         {evidence.length > 0 || counts.length > 0 ? (
-          <details className="erp-dev-testing-coverage-card__details">
+          <details className="erp-dev-disclosure erp-dev-testing-coverage-card__details">
             <summary>证据与计数</summary>
             {counts.length > 0 ? <p>{counts.map(([key, value]) => `${COVERAGE_COUNT_LABELS[key] || key} ${value}`).join(' · ')}</p> : null}
             <div className="erp-dev-testing-coverage-card__evidence">
@@ -384,7 +384,7 @@ function CoverageEvidenceCard({ item, showScenarios = false }) {
       </div>
       {scenarios.length > 0 ? (
         <ScenarioContainer
-          className="erp-dev-testing-coverage-scenarios"
+          className="erp-dev-disclosure erp-dev-testing-coverage-scenarios"
           open={
             !showScenarios && item.key === 'go' && item.status === 'failed' ? true : undefined
           }
@@ -418,7 +418,7 @@ function CoverageEvidenceCard({ item, showScenarios = false }) {
                       </td>
                       <td>
                         {scenario.matchedTests.length > 0 || scenario.package ? (
-                          <details>
+                          <details className="erp-dev-disclosure">
                             <summary>{scenario.matchedTests.length} 条记录</summary>
                             {scenario.package ? <code>{scenario.package}</code> : null}
                             <ul>
@@ -580,7 +580,7 @@ function GitCloseoutView({ hooks, loading, error, onReload }) {
                           {wiring.readyCount}/{wiring.checkCount} 项完整
                         </strong>
                       </div>
-                      <details className="erp-dev-testing-closeout-step__details">
+                      <details className="erp-dev-disclosure erp-dev-testing-closeout-step__details">
                         <summary>查看边界与来源</summary>
                         <small>{stage.boundary}</small>
                         <div className="erp-dev-testing-closeout-step__sources">
@@ -632,7 +632,7 @@ function GitCloseoutView({ hooks, loading, error, onReload }) {
             </div>
           </section>
 
-          <details className="erp-dev-testing-closeout-command-disclosure">
+          <details className="erp-dev-disclosure erp-dev-testing-closeout-command-disclosure">
             <summary>
               <span>
                 <strong>需要时再复制</strong>
@@ -787,7 +787,7 @@ function CoverageOperationPanel({ operation, error }) {
       />
       {operation?.message ? <p>{operation.message}</p> : null}
       {operation?.events?.length ? (
-        <details>
+        <details className="erp-dev-disclosure">
           <summary>查看 {operation.events.length} 条采集事件</summary>
           <ol>
             {operation.events.map((event, index) => (
@@ -864,7 +864,7 @@ function ValidationPlanPanel({ plan, tiers, loading, error, busy, onGenerate, ch
               description="计划只说明选择结果，不会替你执行 full、数据库、浏览器、发布或 UAT。"
             />
           ) : null}
-          <details className="erp-dev-testing-validation-plan__details">
+          <details className="erp-dev-disclosure erp-dev-testing-validation-plan__details">
             <summary>查看建议命令、待补证据与计划身份</summary>
             <p>T0–T8 只表示选测范围，不表示检查已执行。</p>
             <div className="erp-dev-testing-validation-plan__identity">
@@ -1111,6 +1111,7 @@ function CoverageReportView({
   qaBusy,
   qaReady,
   onCollect,
+  onRunConsistency,
   onReload,
 }) {
   const { search: reportSearch } = useLocation()
@@ -1201,7 +1202,7 @@ function CoverageReportView({
         {operationError || (operation && operation.status !== 'completed') ? (
           <CoverageOperationPanel operation={operation} error={operationError} />
         ) : operation ? (
-          <details className="erp-dev-testing-coverage-last-run">
+          <details className="erp-dev-disclosure erp-dev-testing-coverage-last-run">
             <summary>上次采集：{operationPresentation.label}</summary>
             <CoverageOperationPanel operation={operation} error={operationError} />
           </details>
@@ -1237,7 +1238,7 @@ function CoverageReportView({
         className="erp-dev-testing-coverage-panel"
         tabIndex={0}
       >
-        {section === 'rules' ? <DevBusinessRulesPanel report={report} reportCurrent={source === 'workspace' && activeState?.status === 'current'} /> : null}
+        {section === 'rules' ? <DevBusinessRulesPanel report={report} reportCurrent={source === 'workspace' && activeState?.status === 'current'} onRunConsistency={onRunConsistency} consistencyBusy={!qaReady || qaBusy?.active} /> : null}
 
         {section === 'acceptance' ? (
           <DevTestingStrategyGuide source={strategySource} evidence />
@@ -1263,7 +1264,7 @@ function CoverageReportView({
 
         {report && section !== 'rules' ? (
           <>
-            <details className="erp-dev-testing-coverage-report-details">
+            <details className="erp-dev-disclosure erp-dev-testing-coverage-report-details">
               <summary>报告详情 · <DevTimestamp value={report.generatedAt} missing="时间未记录" /></summary>
               <div className="erp-dev-testing-coverage-identity">
                 <span><small>来源</small>{source === 'snapshot' ? '历史隔离验证' : '工作区报告'}</span>
@@ -1396,7 +1397,7 @@ function CoverageReportView({
           </>
         ) : null}
       </div>
-      <details className="erp-dev-testing-coverage-boundary">
+      <details className="erp-dev-disclosure erp-dev-testing-coverage-boundary">
         <summary>采集与判定说明</summary>
         <div className="erp-dev-testing-coverage-scope-map">
           <section>
@@ -1471,6 +1472,13 @@ export default function DevTestingPage() {
     reloadTestingSummary,
     runTestingAction: startTestingAction,
   } = useDevTestingOperations()
+  const consistencyTerminal = testingSummary?.operations?.['business-consistency']
+  const consistencyStatus = consistencyTerminal?.status
+  React.useEffect(() => {
+    if (['completed', 'failed'].includes(consistencyStatus)) {
+      setCoverageReloadKey((value) => value + 1)
+    }
+  }, [consistencyTerminal?.id, consistencyTerminal?.revision, consistencyStatus])
   const docs = useMemo(() => buildDevTestingDocs(markdownModules), [])
   const strategySource =
     docs.find((item) => item.path === DEV_TESTING_STRATEGY_SOURCE_PATH)
@@ -1997,7 +2005,7 @@ export default function DevTestingPage() {
                 ) : (
                   <section className="erp-dev-testing-guide-presets">
                     <div className="erp-dev-testing-related">
-                      <SearchInput allowClear placeholder="搜索常用检查" value={keyword} onChange={(event) => setCommandKeyword(event.target.value)} />
+                      <SearchInput allowClear placeholder="搜索常用检查" value={keyword} onSearch={(value) => setCommandKeyword(value)} />
                       <Button onClick={() => selectView(VIEW_COMMANDS)}>查专项命令</Button>
                     </div>
                     <div className="erp-dev-testing-presets" aria-label="常用测试命令预设">
@@ -2023,7 +2031,7 @@ export default function DevTestingPage() {
                   className="erp-dev-testing-search"
                   placeholder="搜索命令、来源、验收词"
                   value={keyword}
-                  onChange={(event) => setCommandKeyword(event.target.value)}
+                  onSearch={(value) => setCommandKeyword(value)}
                 />
                 <div
                   className="erp-dev-testing-filter"
@@ -2110,6 +2118,7 @@ export default function DevTestingPage() {
               qaBusy={testingBusy}
               qaReady={Boolean(testingSummary) && !testingSummaryError}
               onCollect={collectCoverage}
+              onRunConsistency={() => runTestingAction('business-consistency')}
               onReload={reloadCoverage}
             />
           ) : null}

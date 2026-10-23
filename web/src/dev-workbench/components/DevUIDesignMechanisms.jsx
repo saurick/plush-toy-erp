@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Button, Input } from 'antd'
+import SearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { MermaidDiagram } from '@/common/components/markdown'
 
@@ -54,17 +55,18 @@ function NavigationExample() {
         </div>
       ) : (
         <div className="erp-design-wire-page">
-          <Input
+          <SearchInput
             aria-label="示例查询条件"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            allowClear
+            onSearch={setQuery}
           />
           <div className="erp-design-example-record">
             <span>样例订单 A</span>
             <span>1,280 件</span>
             <Button onClick={() => setDetail(true)}>查看样例详情</Button>
           </div>
-          <small>输入任意查询备注，再打开并返回，观察输入是否保留。</small>
+          <small>输入并提交查询条件，再打开详情并返回，观察已提交条件是否保留。</small>
         </div>
       )}
     </figure>

@@ -32,17 +32,20 @@ function IdentityCode({ item, copyable = true }) {
   )
 }
 
-function CompactIdentityCodes({ item, sourceNo, copyable, showStyleNo, showReference = true }) {
+function CompactIdentityCodes({ item, sourceNo, source, copyable, showStyleNo }) {
   return (
     <>
-      {showReference ? <span className="erp-task-identity__code"><IdentityCode item={item} copyable={copyable} /></span> : null}
-      {showStyleNo && item.kind === 'product' && (!item.styleNo || item.styleNo !== item.code) ? (
-        <span className="erp-task-identity__code">
-          {item.styleNo ? copyable ? <TaskCopyField value={item.styleNo} label="内部款号"><IdentityField label="内部款号" value={item.styleNo} /></TaskCopyField> : <IdentityField label="内部款号" value={item.styleNo} /> : '内部款号未填写'}
-        </span>
-      ) : null}
+      <span className="erp-task-identity__metadata">
+        <span className="erp-task-identity__code"><IdentityCode item={item} copyable={copyable} /></span>
+        {source ? <span className="erp-task-identity__source">{source}</span> : null}
+        {showStyleNo && item.kind === 'product' && (!item.styleNo || item.styleNo !== item.code) ? (
+          <span className="erp-task-identity__code">
+            {item.styleNo ? copyable ? <TaskCopyField value={item.styleNo} label="内部款号"><IdentityField label="内部款号" value={item.styleNo} /></TaskCopyField> : <IdentityField label="内部款号" value={item.styleNo} /> : '内部款号未填写'}
+          </span>
+        ) : null}
+      </span>
       {item.orderNo && item.orderNo !== sourceNo ? (
-        <span className="erp-task-identity__code">
+        <span className="erp-task-identity__code erp-task-identity__order">
           {copyable ? <TaskCopyField value={item.orderNo} label="订单编号"><IdentityField label="关联订单" value={item.orderNo} /></TaskCopyField> : <IdentityField label="关联订单" value={item.orderNo} />}
         </span>
       ) : null}
@@ -98,7 +101,7 @@ function IdentityItem({ item, copyable = true, codeCopyable = copyable, summaryC
   )
 }
 
-export function WorkflowTaskAssociation({ task, keyword = '', copyable = false, showStyleNo = false, emptyLabel = '未关联产品／物料', heading = null }) {
+export function WorkflowTaskAssociation({ task, keyword = '', copyable = false, showStyleNo = false, emptyLabel = '未关联产品／物料', heading = null, source = null }) {
   const identity = getWorkflowTaskIdentityPresentation(task, keyword)
   const sourceKey = JSON.stringify([task?.id, task?.source_type, task?.source_id, identity])
   const [openedSourceKey, setOpenedSourceKey] = React.useState(null)
@@ -113,7 +116,7 @@ export function WorkflowTaskAssociation({ task, keyword = '', copyable = false, 
     return (
       <span className="erp-task-identity__card-body erp-task-identity__card-body--empty" aria-label="任务关联内容">
         <span className="erp-task-product-image erp-task-product-image--placeholder" aria-hidden="true"><Icon /></span>
-        {renderContent(<span className="erp-task-identity__item"><span className="erp-task-identity__unavailable">{label}</span></span>)}
+        {renderContent(<span className="erp-task-identity__item"><span className="erp-task-identity__unavailable">{label}</span>{source ? <span className="erp-task-identity__metadata"><span className="erp-task-identity__source">{source}</span></span> : null}</span>)}
       </span>
     )
   }
@@ -123,27 +126,28 @@ export function WorkflowTaskAssociation({ task, keyword = '', copyable = false, 
         <WorkflowTaskProductImage item={first} />
         {renderContent(
           <span className="erp-task-identity__item">
-            {identity.items.length > 1 ? (
-              <button
-                type="button"
-                className="erp-task-identity__association-open"
-                aria-label={`查看${identity.associationCountLabel.replace(/^共\s*/u, '')}`}
-                aria-haspopup="dialog"
-                aria-expanded={open}
-                onDoubleClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  event.currentTarget.focus({ preventScroll: true })
-                  setOpenedSourceKey(sourceKey)
-                }}
-              />
-            ) : null}
             <span className="erp-task-identity__product">
               {first.name || `${first.kind === 'material' ? '物料' : '产品'}名称未填写`}
-              {identity.compactCountLabel ? <span className={`erp-task-identity__count-label${identity.items.length > 1 ? ' erp-task-identity__count-label--link' : ''}`}>{identity.compactCountLabel}{identity.items.length > 1 ? <RightOutlined aria-hidden="true" /> : null}</span> : null}
+              {identity.items.length > 1 ? (
+                <button
+                  type="button"
+                  className="erp-task-identity__association-open erp-task-identity__count-label erp-task-identity__count-label--link"
+                  aria-label={`查看${identity.associationCountLabel.replace(/^共\s*/u, '')}`}
+                  aria-haspopup="dialog"
+                  aria-expanded={open}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    event.currentTarget.focus({ preventScroll: true })
+                    setOpenedSourceKey(sourceKey)
+                  }}
+                >
+                  {identity.compactCountLabel || identity.associationCountLabel}<RightOutlined aria-hidden="true" />
+                </button>
+              ) : identity.compactCountLabel ? <span className="erp-task-identity__count-label">{identity.compactCountLabel}</span> : null}
             </span>
-            <CompactIdentityCodes item={first} sourceNo={identity.sourceNo} copyable={copyable} showStyleNo={showStyleNo} />
+            <CompactIdentityCodes item={first} sourceNo={identity.sourceNo} source={source} copyable={copyable} showStyleNo={showStyleNo} />
           </span>
         )}
       </span>
@@ -199,8 +203,7 @@ export default function WorkflowTaskIdentity({
     return (
       <span className={`erp-task-identity erp-task-identity--compact erp-task-identity--card${layout === 'table' ? ' erp-task-identity--table' : ''}`}>
         {layout === 'table' ? null : heading}
-        <WorkflowTaskAssociation task={task} keyword={keyword} copyable={copyable} showStyleNo={showStyleNo} heading={layout === 'table' ? heading : null} />
-        {source ? <span className="erp-task-identity__source">{source}</span> : null}
+        <WorkflowTaskAssociation task={task} keyword={keyword} copyable={copyable} showStyleNo={showStyleNo} heading={layout === 'table' ? heading : null} source={source} />
       </span>
     )
   }
@@ -208,8 +211,7 @@ export default function WorkflowTaskIdentity({
     return (
       <span className="erp-task-identity erp-task-identity--compact">
         {renderTitle ? renderTitle() : null}
-        <WorkflowTaskAssociation task={task} keyword={keyword} copyable={copyable} showStyleNo={showStyleNo} />
-        {source ? <span className="erp-task-identity__source">{source}</span> : null}
+        <WorkflowTaskAssociation task={task} keyword={keyword} copyable={copyable} showStyleNo={showStyleNo} source={source} />
       </span>
     )
   }

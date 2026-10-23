@@ -50,6 +50,22 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
           } else if (method === 'list_tasks' && params.source_type === 'sales_order' && params.source_id === 1) {
             const approval = { id: 100, version: 1, task_code: 'SO-APPROVAL-100', task_name: '销售订单审批', task_group: 'sales_order_approval', source_type: 'sales_order', source_id: 1, owner_role_key: 'sales', task_status_key: 'ready' }
             data = { tasks: created ? [created, approval] : [approval], total: created ? 2 : 1, limit: params.limit, offset: params.offset }
+          } else if (method === 'get_tracking' && params.kind === 'task' && params.id === created?.id) {
+            data = { tracking: {
+              summary: {
+                kind: 'task', id: created.id, process_key: '', title: created.task_name,
+                source_type: created.source_type, source_id: created.source_id, source_no: created.source_no,
+                display_context: null, status: created.task_status_key, resolution_kind: null,
+                started_at: created.created_at, updated_at: created.updated_at, completed_at: created.updated_at,
+                initiator_name: '业务人员', initiator_role_key: 'sales', current_tasks: [],
+              },
+              tasks: [{
+                task_id: created.id, task_name: created.task_name, node_instance_id: null,
+                owner_role_key: created.owner_role_key, assignee_name: '', status: created.task_status_key,
+                created_at: created.created_at, completed_at: created.updated_at, due_at: created.due_at || null,
+              }],
+              nodes: [], events: [], current_task_access: [], events_truncated: false, next_event_id: 0,
+            } }
           } else if (method === 'list_tracking') {
             assert.equal(params.scope, 'visible')
             assert.equal(params.source_type, 'sales_order')
@@ -261,11 +277,21 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await drawer.waitFor({ state: 'hidden' })
         await related.getByRole('button', { name: '确认包装尺寸' }).waitFor()
         await page.screenshot({ path: path.join(outputDir, `business-followup-related-${page.viewportSize().width}.png`), animations: 'disabled' })
+        const sourceURL = page.url()
         await related.getByRole('button', { name: '流程跟踪', exact: true }).click()
-        await page.waitForURL('**/erp/task-board?*')
-        assert.equal(new URL(page.url()).searchParams.get('track_source_type'), 'sales_order')
-        assert.equal(new URL(page.url()).searchParams.get('track_source_id'), '1')
-        await page.locator('.erp-workflow-tracking-panel').getByText('确认包装尺寸', { exact: true }).waitFor()
+        const tracking = page.getByRole('dialog', { name: '流程跟踪', exact: true })
+        await tracking.getByRole('region', { name: '流程概况', exact: true }).waitFor()
+        await related.waitFor({ state: 'hidden' })
+        assert.equal(page.url(), sourceURL, '查看流程保留当前单据页面')
+        assert.equal(await page.getByRole('dialog').count(), 1, '相关任务与流程查看只保留一个活动面板')
+        await tracking.getByText('确认包装尺寸', { exact: true }).first().waitFor()
+        await tracking.getByRole('button', { name: '返回当前单据', exact: true }).click()
+        await tracking.waitFor({ state: 'hidden' })
+        await related.waitFor()
+        await related.getByRole('button', { name: '确认包装尺寸', exact: true }).waitFor()
+        await page.waitForFunction(() => document.activeElement?.textContent === '流程跟踪')
+        assert.equal(page.url(), sourceURL, '返回恢复同一单据的任务窗口')
+        assert.equal(await page.locator('[data-selection-layout-locked="true"]').count(), 1, '返回任务窗口后继续保护操作栏，避免窄屏重排卸载窗口')
         await assertNoHorizontalOverflow(page, 'business-followup-create-retry-and-track')
       },
     },

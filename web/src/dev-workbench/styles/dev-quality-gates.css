@@ -343,13 +343,6 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-quality-server-evidence__jobs > summary {
-  width: fit-content;
-  color: var(--erp-primary);
-  cursor: pointer;
-  font-weight: 600;
-}
-
 .erp-dev-quality-server-evidence__jobs[open] {
   display: grid;
   gap: 8px;
@@ -499,14 +492,6 @@
 
 .erp-dev-quality-server-performance__table tbody tr[data-attention='queued'] {
   background: color-mix(in srgb, var(--erp-primary) 7%, transparent);
-}
-
-.erp-dev-quality-server-performance__remaining > summary,
-.erp-dev-quality-server-history__jobs > summary {
-  width: fit-content;
-  color: var(--erp-primary);
-  cursor: pointer;
-  font-weight: 600;
 }
 
 .erp-dev-quality-server-performance__remaining[open],
@@ -736,13 +721,6 @@
 .erp-dev-quality-managed-database {
   padding-top: 10px;
   border-top: 1px solid var(--erp-border);
-}
-
-.erp-dev-quality-managed-database > summary {
-  width: fit-content;
-  color: var(--erp-primary);
-  cursor: pointer;
-  font-weight: 600;
 }
 
 .erp-dev-quality-managed-database__body {
@@ -1122,14 +1100,6 @@
   border: 1px solid var(--erp-border, #dce8dd);
   border-radius: 9px;
   background: var(--erp-surface-bg, #fff);
-}
-
-.erp-dev-quality-technical summary,
-.erp-dev-quality-flow__step summary,
-.erp-dev-quality-gap-category summary {
-  width: fit-content;
-  color: var(--erp-primary);
-  cursor: pointer;
 }
 
 .erp-dev-quality-technical[open] {

@@ -1245,6 +1245,7 @@ function normalizeCoverageReport(report) {
       ])
     ),
     policy: normalizeCoveragePolicy(report.policy),
+    ...(report.businessConsistency ? { businessConsistency: report.businessConsistency } : {}),
   }
 }
 

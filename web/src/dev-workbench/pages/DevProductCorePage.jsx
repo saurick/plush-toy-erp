@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react'
-import { AppstoreOutlined, ArrowLeftOutlined, FileTextOutlined, RightOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Alert, Button, Drawer, Empty, Tag, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PRODUCT_CORE_ROUTE } from '../config/devRoutes.mjs'
@@ -120,8 +120,7 @@ export default function DevProductCorePage() {
     setSearchParams(nextParams)
   }
 
-  const handleKeywordChange = (event) => {
-    const nextKeyword = event.target.value
+  const handleKeywordSearch = (nextKeyword) => {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('capability')
     if (nextKeyword.trim()) {
@@ -199,7 +198,7 @@ export default function DevProductCorePage() {
               placeholder="搜索能力、范围或边界"
               searchHint="可搜索能力名称、当前可用范围、状态和当前边界"
               value={keyword}
-              onChange={handleKeywordChange}
+              onSearch={handleKeywordSearch}
             />
             <Text className="erp-dev-product-core-result-count" type="secondary" aria-live="polite">{filteredCapabilities.length} 项</Text>
             <Button disabled={!hasActiveFilter} onClick={handleReset}>清除筛选</Button>
@@ -225,17 +224,17 @@ export default function DevProductCorePage() {
               <div className="erp-dev-product-core-groups">
                 {capabilityGroups.map((group) => (
                   <section className="erp-dev-product-core-group" key={group.key} data-membership={group.key}>
-                    <Title level={2}>{group.items[0].membership}</Title>
+                    <h2 className="erp-dev-directory-group-title">{group.items[0].membership}</h2>
                     <ul>
                       {group.items.map((item) => (
                         <li key={item.key}>
                           <button
                             type="button"
+                            className="erp-dev-directory-item erp-dev-directory-item--nested"
                             aria-haspopup="dialog"
                             onClick={(event) => selectCapability(item, event)}
                           >
                             <span>{item.capability}</span>
-                            <RightOutlined aria-hidden="true" />
                           </button>
                         </li>
                       ))}

@@ -9,9 +9,12 @@ import {
 import { Alert, Button, Input, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -109,10 +112,16 @@ function workflowRoleOption(value) {
 
 const TASK_STATUS_OPTIONS = Object.freeze([
   { label: '全部状态', value: '' },
-  { label: '可执行', value: 'ready' },
-  { label: '阻塞', value: 'blocked' },
-  { label: '退回', value: 'rejected' },
-  { label: '已完成', value: 'done' },
+  ...[
+    WorkflowTaskStatus.READY,
+    WorkflowTaskStatus.BLOCKED,
+    WorkflowTaskStatus.REJECTED,
+    WorkflowTaskStatus.DONE,
+    WorkflowTaskStatus.WITHDRAWN,
+  ].map((value) => ({
+    value,
+    label: getWorkflowTaskStatusMeta({ task_status_key: value }).label,
+  })),
 ])
 const DUE_DATE_FILTER_OPTIONS = Object.freeze([
   { label: '到期日期', value: 'due_at' },
@@ -138,17 +147,7 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
     ownerRoleOptions: [workflowRoleOption('boss')],
     payloadScope: 'production_exception_decision_process_approval',
   },
-  'shipping-release': {
-    taskGroup: 'shipment_finance_approval',
-    completionMessage:
-      '出货财务审批已完成；仓库仍需在出货单中独立确认实际出货。',
-    emptyText: '暂无出货财务审批任务。',
-    ownerRoleOptions: [
-      workflowRoleOption('finance'),
-      workflowRoleOption('boss'),
-    ],
-    payloadScope: 'shipment_finance_approval_process_only',
-  },
+
 })
 
 function toUnixSeconds(value) {
@@ -193,7 +192,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const [statusCounts, setStatusCounts] = useState(null)
   const [tasks, setTasks] = useState([])
+  const [taskLoadFailed, setTaskLoadFailed] = useState(false)
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
@@ -271,6 +272,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
 
   const loadWorkflowTasks = useCallback(async () => {
     const request = beginLatestRequest('workflow-business-tasks')
+    setTaskLoadFailed(false)
+    setStatusCounts(null)
     if (!isWorkflowTaskWorkspaceActive) {
       if (request.isCurrent()) {
         setLoading(false)
@@ -302,7 +305,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         sourceID: hasRouteSourceContext ? routeSourceID : 0,
         pagination,
       })
-      const data = await listWorkflowTasks(query, { signal: request.signal })
+      const data = await listWorkflowTasks({ ...query, include_status_counts: true }, { signal: request.signal })
       if (!request.isCurrent()) return false
       const page = requireWorkflowBusinessTaskPage(data, {
         taskGroup: config.taskGroup,
@@ -314,6 +317,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         total: page.total,
         pagination,
       })
+      setStatusCounts(resolveBusinessStatusCounts(data))
       setTotal(page.total)
       setTasks(pageState.tasks)
       setSelectedTaskKeys(
@@ -344,6 +348,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       setSelectedTaskKeys([])
       setDetailTask(null)
       showPageLoadError(error, `加载${moduleItem?.title || '当前页面'}任务失败`)
+      setTaskLoadFailed(true)
       return false
     } finally {
       if (request.isCurrent()) {
@@ -1027,13 +1032,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       columns,
     })
   const activeFilterCount = [
-    status,
     ownerRoleKey,
     dueFrom || dueTo,
     hasRouteSourceContext,
   ].filter(Boolean).length
   const clearFilters = useCallback(() => {
-    setStatus('')
     setOwnerRoleKey('')
     setDueFrom('')
     setDueTo('')
@@ -1045,7 +1048,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   }, [
     searchParams,
     setSearchParams,
-    setStatus,
     setOwnerRoleKey,
     setDueFrom,
     setDueTo,
@@ -1087,7 +1089,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <BusinessStatusFilter
+              inline
+              counts={statusCounts}
+              loading={loading}
               aria-label="任务状态"
               value={status}
               options={TASK_STATUS_OPTIONS}
@@ -1413,7 +1418,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         dataSource={tasks}
         scroll={{ x: 1000 }}
         emptyDescription={
-          canReadWorkflowTasks ? config.emptyText : '当前账号不能查看此类任务。'
+          !canReadWorkflowTasks ? '当前账号不能查看此类任务。' : taskLoadFailed ? <span role="alert">任务读取失败，<Button type="link" onClick={loadWorkflowTasks}>重新读取</Button></span> : config.emptyText
         }
         rowSelection={{
           type: 'radio',

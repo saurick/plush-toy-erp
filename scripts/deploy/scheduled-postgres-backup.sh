@@ -11,7 +11,7 @@ print_help() {
     --backup-dir </absolute/local-backup-dir> \
     --offsite-dir </absolute/mounted-offsite-dir> \
     --age-recipient-file </absolute/age-recipient.txt> \
-    [--retention-days 35]
+    [--retention-count 7]
 
 作用:
   通过生产 Compose 中的 postgres 容器执行 custom-format pg_dump，完成
@@ -20,7 +20,7 @@ print_help() {
 边界:
   默认要求 --offsite-dir 和 --age-recipient-file。只有隔离开发验证可显式使用
   --allow-local-only；该模式不会形成正式日常备份证据。
-  仅清理指定目录内由本脚本生成、且超过保留期的 plush_erp-* 文件。
+  仅清理指定目录内由本脚本生成、且超出最近 7 份、未受保护的 plush_erp-* 文件。
 USAGE
 }
 
@@ -29,7 +29,7 @@ env_file=""
 backup_dir=""
 offsite_dir=""
 age_recipient_file=""
-retention_days="35"
+retention_count="7"
 allow_local_only="false"
 
 while [[ $# -gt 0 ]]; do
@@ -54,8 +54,8 @@ while [[ $# -gt 0 ]]; do
     age_recipient_file="${2:-}"
     shift 2
     ;;
-  --retention-days)
-    retention_days="${2:-}"
+  --retention-count)
+    retention_count="${2:-}"
     shift 2
     ;;
   --allow-local-only)
@@ -112,8 +112,8 @@ validate_backup_directory() {
 
 validate_plain_absolute_file "$compose_file" "--compose-file"
 validate_plain_absolute_file "$env_file" "--env-file"
-[[ "$retention_days" =~ ^[0-9]+$ && "$retention_days" -ge 7 && "$retention_days" -le 366 ]] || {
-  echo "[scheduled-backup] --retention-days 必须是 7-366 的整数" >&2
+[[ "$retention_count" =~ ^[0-9]+$ && "$retention_count" -eq 7 ]] || {
+  echo "[scheduled-backup] --retention-count 必须为 7" >&2
   exit 2
 }
 validate_backup_directory "$backup_dir" "--backup-dir"
@@ -307,18 +307,19 @@ if [[ -n "$offsite_dir" ]]; then
   offsite_encrypted="true"
 fi
 
-prune_managed_backups() {
-  local target_dir="$1"
-  find "$target_dir" -maxdepth 1 -type f \
-    \( -name 'plush_erp-*.dump' -o -name 'plush_erp-*.dump.age' -o -name 'plush_erp-*.sha256' \) \
-    -mtime "+$retention_days" -delete
+retention_tool="${PLUSH_RETENTION_RUNTIME:-/opt/plush-retention/current}/scripts/deploy/retention-files.mjs"
+[[ -f "$retention_tool" && ! -L "$retention_tool" ]] || {
+  echo "[scheduled-backup] retention runtime missing" >&2
+  exit 1
 }
-
-prune_managed_backups "$backup_dir"
+node "$retention_tool" scheduled "$backup_dir" --execute
 if [[ -n "$offsite_dir" ]]; then
-  prune_managed_backups "$offsite_dir"
+  node "$retention_tool" scheduled "$offsite_dir" --execute
 fi
 
 write_status passed
+mkdir -p "$backup_dir/receipts"
+chmod 700 "$backup_dir/receipts"
+cp -- "$status_file" "$backup_dir/receipts/$backup_id.env"
 completed="true"
 echo "[scheduled-backup] status=passed backupId=$backup_id sizeBytes=$backup_size offsiteCopied=$offsite_copied offsiteEncrypted=$offsite_encrypted"

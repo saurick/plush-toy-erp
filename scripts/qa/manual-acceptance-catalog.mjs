@@ -18,7 +18,7 @@ import {
   isSupportedPrintWorkspaceTemplate,
 } from "../../web/src/erp/utils/printWorkspace.js";
 
-const EXPECTED_DESKTOP_PAGE_COUNT = 30;
+const EXPECTED_DESKTOP_PAGE_COUNT = 29;
 const EXPECTED_MOBILE_PAGE_COUNT = 9;
 const EXPECTED_PRINT_TEMPLATE_COUNT = 5;
 const FORMAL_TRIAL_ACCOUNT_COUNT = 10;
@@ -178,6 +178,7 @@ const DESKTOP_PLANS = Object.freeze({
     keyStates: ["可执行", "临近到期", "已阻塞", "已退回", "已完成", "已逾期"],
     whatToDo: [
       "你要按岗位、状态和到期时间筛选任务，并打开几条长标题和多次处理记录。",
+      "你要以财务岗位在待我审批中办理出货审批，核对来源出货单、审批意见和轨迹；审批通过后仓库仍须独立确认实际出货。",
       "你要完成一条任务、阻塞一条任务并填写原因，再恢复到原来的筛选条件。",
     ],
     whatToSee: [
@@ -428,20 +429,6 @@ const DESKTOP_PLANS = Object.freeze({
     whatToSee: [
       "应看到异常申请、正式审批任务和 ProcessRuntime 指向同一来源，状态为已批准且批准数量清楚可核对。",
       "应看到超领审批只形成可消费额度，不会自行写领料事实；生产岗位仍须从生产订单显式领料。",
-    ],
-  },
-  "shipping-release": {
-    isList: true,
-    minimumRecords: 45,
-    minimumRecordUnit: "已出货记录对应的正式财务审批任务",
-    keyStates: ["已完成"],
-    whatToDo: [
-      "你要以财务岗位按任务编号、状态和来源出货单查找，打开正式的出货财务审批任务。",
-      "你要核对审批意见、办理轨迹和财务放行记录，再到出货单页面核对仓库实际出货结果。",
-    ],
-    whatToSee: [
-      "应看到任务来源、财务主办岗位、审批结果和流程轨迹清楚，并能关联回同一张出货单。",
-      "应看到财务审批只记录出货门禁；仓库仍须独立执行实际出货，审批任务不会冒充库存扣减、应收或收付款。",
     ],
   },
   outbound: {

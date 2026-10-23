@@ -139,7 +139,8 @@ test('progress lists and details share independently previewable product identit
   assert.doesNotMatch(progressContent, /return row\.product_match_count|preview=\{false\}/u)
   assert.match(source, /<ProgressIdentity row=\{row\}/u)
   assert.match(summary, /<ProgressProductIdentity row=\{row\}/u)
-  assert.match(mobileSummary, /<ProgressProductIdentity row=\{row\}/u)
+  assert.match(mobileSummary, /<BusinessProgressSummary/u)
+  assert.match(drawer, /<BusinessProgressHeader/u)
   assert.match(progressContent, /<ProductIdentity\b[^>]*productId=\{row\.product_id\}/u)
   assert.match(drawer, /record\.kind === 'sales_line'/u)
   assert.match(drawer, /productId=\{record\.product_id\}/u)
@@ -166,7 +167,10 @@ test('detail and business product images retain their existing sizes', () => {
     taskImageStyles,
     /\.erp-task-identity--compact \.erp-task-product-image \{[\s\S]*?width: var\(--erp-work-item-image-size\);/u
   )
-  assert.match(designTokens, /--erp-work-item-image-size: 48px;/u)
+  assert.deepEqual(
+    [...designTokens.matchAll(/--erp-work-item-image-size:\s*([^;]+);/gu)].map((match) => match[1]),
+    ['64px']
+  )
   assert.match(
     materialSummaryStyles,
     /\.erp-material-product \.erp-task-product-image \{[\s\S]*?width: 64px;/u
@@ -184,7 +188,7 @@ test('mobile progress restores history details without replaying the drawer open
   )
   assert.match(
     mobilePanel,
-    /const open = \(row, section = 'lines'\) => \{[\s\S]*?setSuppressDetailOpenMotion\(false\)/u
+    /const open = \(row, section = null\) => \{[\s\S]*?setSuppressDetailOpenMotion\(false\)/u
   )
   assert.match(
     mobilePanel,
@@ -203,10 +207,9 @@ test('mobile progress groups business details without desktop source links', asy
   })
   assert.match(
     drawer,
-    /const MOBILE_GROUPS = \[[\s\S]*?产品信息[\s\S]*?生产执行[\s\S]*?关联任务/u
+    /const MOBILE_TABS = \[[\s\S]*?总览[\s\S]*?产品[\s\S]*?生产[\s\S]*?任务/u
   )
-  assert.match(drawer, /sections: \['production', 'batches', 'materials'\]/u)
-  assert.match(drawer, /mobile\s*\? sectionRecords\(item\.key\)\.length > 0/u)
+  assert.match(drawer, /const PRODUCTION_SECTIONS = \['production', 'batches', 'materials'\]/u)
   assert.match(drawer, /!mobile && sourcePath && canOpen\(sourcePath\)/u)
   assert.match(drawer, /!mobile && canOpen\(path\)/u)
   assert.doesNotMatch(drawer, /mobile-progress-detail-source/u)
@@ -214,10 +217,8 @@ test('mobile progress groups business details without desktop source links', asy
     drawer,
     /mobile-progress-detail-group-trigger[\s\S]*?aria-expanded=\{expanded\}/u
   )
-  assert.match(
-    drawer,
-    /sectionRecords\('tasks'\)\.length > 0[\s\S]*?查看关联任务/u
-  )
+  assert.doesNotMatch(drawer, /查看业务明细|查看关联任务/u)
+  assert.match(drawer, /erp-progress-detail-scroll/u)
   assert.match(
     mobileProgressStyles,
     /\.mobile-progress-detail-group-trigger \{[\s\S]*?min-height: 52px;/u

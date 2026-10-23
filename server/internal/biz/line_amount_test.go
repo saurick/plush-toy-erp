@@ -33,3 +33,29 @@ func TestNormalizeCalculatedLineAmount(t *testing.T) {
 		t.Fatalf("high precision amount must round to database scale: %v, %v", got, err)
 	}
 }
+
+func TestCalculatedLineAmountStorageBoundary(t *testing.T) {
+	for _, tc := range []struct {
+		quantity, price, want string
+		reject                bool
+	}{
+		{"1", "99999999999999.999999", "99999999999999.999999", false},
+		{"2", "60000000000000", "", true},
+		{"0.123456", "0.123456", "0.015241", false},
+		{"1", "0", "0", false},
+	} {
+		t.Run(tc.quantity+"x"+tc.price, func(t *testing.T) {
+			price := decimal.RequireFromString(tc.price)
+			got, err := normalizeCalculatedLineAmount(decimal.RequireFromString(tc.quantity), &price, nil)
+			if tc.reject {
+				if err == nil {
+					t.Fatal("overflow accepted")
+				}
+				return
+			}
+			if err != nil || got == nil || got.String() != tc.want {
+				t.Fatalf("got %v %v, want %s", got, err, tc.want)
+			}
+		})
+	}
+}

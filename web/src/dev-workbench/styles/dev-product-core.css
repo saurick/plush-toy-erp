@@ -64,11 +64,6 @@
   min-width: 0;
 }
 
-.erp-dev-product-core-group h2.ant-typography {
-  margin: 0 0 16px;
-  font-size: 16px;
-}
-
 .erp-dev-product-core-group ul {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -76,41 +71,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.erp-dev-product-core-group button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--erp-text);
-  font: inherit;
-  line-height: 1.6;
-  text-align: left;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-
-.erp-dev-product-core-group button > .anticon {
-  flex: 0 0 auto;
-  color: var(--erp-text-muted);
-  font-size: 12px;
-}
-
-.erp-dev-product-core-group button:hover {
-  background: var(--erp-surface-bg-soft);
-  color: var(--erp-primary-strong);
-}
-
-.erp-dev-product-core-group button:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
 }
 
 .erp-dev-product-core-detail {

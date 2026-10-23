@@ -57,7 +57,8 @@ function multiplyUnsignedDecimalToFixed(left, right, fractionDigits = 6) {
   const rawValue = leftDecimal.value * rightDecimal.value
   const rawScale = leftDecimal.scale + rightDecimal.scale
   if (rawScale <= fractionDigits) {
-    return trimDecimalZeros(formatFixedMinorUnits(rawValue, rawScale))
+    const result = trimDecimalZeros(formatFixedMinorUnits(rawValue, rawScale))
+    return numeric20Scale6Units(result) === null ? undefined : result
   }
   const divisor = pow10(rawScale)
   const targetMultiplier = pow10(fractionDigits)
@@ -66,21 +67,36 @@ function multiplyUnsignedDecimalToFixed(left, right, fractionDigits = 6) {
   if ((scaledValue % divisor) * BigInt(2) >= divisor) {
     roundedValue += BigInt(1)
   }
-  return trimDecimalZeros(formatFixedMinorUnits(roundedValue, fractionDigits))
-}
-
-function deriveOrderItemAmount(values, quantityField) {
-  const sourceValues = values || {}
-  return (
-    multiplyUnsignedDecimalToFixed(
-      sourceValues[quantityField],
-      sourceValues.unit_price
-    ) || trimOptional(sourceValues.amount)
+  const result = trimDecimalZeros(
+    formatFixedMinorUnits(roundedValue, fractionDigits)
   )
+  return numeric20Scale6Units(result) === null ? undefined : result
 }
 
-function deriveSalesOrderItemAmount(values = {}) {
-  return deriveOrderItemAmount(values, 'ordered_quantity')
+function deriveOrderItemAmount(
+  values,
+  quantityField,
+  { allowSnapshotFallback = false } = {}
+) {
+  const sourceValues = values || {}
+  const amount = multiplyUnsignedDecimalToFixed(
+    sourceValues[quantityField],
+    sourceValues.unit_price
+  )
+  if (amount !== undefined) return amount
+  const missingInput =
+    !trimOptional(sourceValues[quantityField]) ||
+    !trimOptional(sourceValues.unit_price)
+  const snapshot = trimOptional(sourceValues.amount)
+  return allowSnapshotFallback &&
+    missingInput &&
+    numeric20Scale6Units(snapshot) !== null
+    ? snapshot
+    : undefined
+}
+
+function deriveSalesOrderItemAmount(values = {}, options = {}) {
+  return deriveOrderItemAmount(values, 'ordered_quantity', options)
 }
 
 function divideAndRoundNonNegative(numerator, denominator) {
@@ -110,6 +126,9 @@ function calculateSalesOrderAmounts({
     BigInt(0)
   )
   const goodsAmount = numeric20Scale6TextFromUnits(goodsUnits.toString())
+  if (numeric20Scale6Units(goodsAmount) === null) {
+    return { complete: false, goodsAmount: '', taxAmount: '', orderTotal: '' }
+  }
   const normalizedFreightTerms = String(freightTerms || '')
     .trim()
     .toUpperCase()
@@ -121,6 +140,13 @@ function calculateSalesOrderAmounts({
     }
     commercialBaseUnits += BigInt(quotedFreightUnits)
   } else if (normalizedFreightTerms !== 'INCLUDED') {
+    return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
+  }
+  if (
+    numeric20Scale6Units(
+      numeric20Scale6TextFromUnits(commercialBaseUnits.toString())
+    ) === null
+  ) {
     return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
   }
   const mode = String(taxMode || '')
@@ -159,6 +185,13 @@ function calculateSalesOrderAmounts({
   }
   const orderTotalUnits =
     mode === 'EXCLUSIVE' ? commercialBaseUnits + taxUnits : commercialBaseUnits
+  if (
+    numeric20Scale6Units(
+      numeric20Scale6TextFromUnits(orderTotalUnits.toString())
+    ) === null
+  ) {
+    return { complete: false, goodsAmount, taxAmount: '', orderTotal: '' }
+  }
   return {
     complete: true,
     goodsAmount,
@@ -167,8 +200,8 @@ function calculateSalesOrderAmounts({
   }
 }
 
-function derivePurchaseOrderItemAmount(values = {}) {
-  return deriveOrderItemAmount(values, 'purchased_quantity')
+function derivePurchaseOrderItemAmount(values = {}, options = {}) {
+  return deriveOrderItemAmount(values, 'purchased_quantity', options)
 }
 
 function deriveOutsourcingOrderItemAmount(values = {}) {
@@ -249,18 +282,14 @@ function summarizeSalesOrderLines(lines = [], snapshot = {}) {
       ]),
     }
   }
-  return summarizeOrderLines(
-    items,
-    'ordered_quantity',
-    deriveSalesOrderItemAmount
+  return summarizeOrderLines(items, 'ordered_quantity', (line) =>
+    deriveSalesOrderItemAmount(line, { allowSnapshotFallback: true })
   )
 }
 
 function summarizePurchaseOrderLines(lines = []) {
-  return summarizeOrderLines(
-    lines,
-    'purchased_quantity',
-    derivePurchaseOrderItemAmount
+  return summarizeOrderLines(lines, 'purchased_quantity', (line) =>
+    derivePurchaseOrderItemAmount(line, { allowSnapshotFallback: true })
   )
 }
 

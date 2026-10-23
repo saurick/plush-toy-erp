@@ -813,10 +813,12 @@
     "id": "shipments",
     "book": "business",
     "title": "出货单怎么用",
-    "source_hash": "4da8291a9e79bb53cc7d846e424527785e55e76e01dbd49670ef663f44f0da6b",
+    "source_hash": "111f1cd97dab5e6ad748e5efd5ab34e088063e14a4b5743b0d12c931b34463da",
     "path": "/erp/warehouse/shipments",
     "roles": [
-      "sales"
+      "sales",
+      "finance",
+      "warehouse"
     ],
     "supplement": true
   },
@@ -824,10 +826,12 @@
     "id": "shipments:release-vs-shipped",
     "book": "business",
     "title": "“财务放行”和“已出货”有什么区别",
-    "source_hash": "9a6618519b807c106e795bdfc941aa0132343d5451f1636e2e70a8099dc5d2b1",
+    "source_hash": "fdfece31c87d9d8de65be882f3f874bdcd19a78b6d288807705ddfdab4c18844",
     "path": "/erp/warehouse/shipments",
     "roles": [
-      "sales"
+      "sales",
+      "finance",
+      "warehouse"
     ],
     "supplement": false
   },
@@ -835,10 +839,12 @@
     "id": "shipments:shipment-source",
     "book": "business",
     "title": "客户、产品和可出货数量从哪里来",
-    "source_hash": "33364f040190185fb67d5e550c7caba93d3cd3c3f77d521e6761f601e42da94e",
+    "source_hash": "8a9b93cfaa1efd4d5edf2ade1ec722737cc728d147bbd8f6b6d810ab4b32957a",
     "path": "/erp/warehouse/shipments",
     "roles": [
-      "sales"
+      "sales",
+      "finance",
+      "warehouse"
     ],
     "supplement": false
   },
@@ -846,56 +852,10 @@
     "id": "shipments:shipment-action-disabled",
     "book": "business",
     "title": "为什么不能启动放行或确认出货",
-    "source_hash": "f7efbb79c5d6f1f04a78b0761a0c9e3675359d41457688b2b455a4262a856bce",
+    "source_hash": "71e0c5163786c5eb187d121eb6d321804bf76ca4b5656fd5bd97704fd38ec2de",
     "path": "/erp/warehouse/shipments",
     "roles": [
-      "sales"
-    ],
-    "supplement": false
-  },
-  {
-    "id": "shipping-release",
-    "book": "business",
-    "title": "出货放行怎么用",
-    "source_hash": "eb14d11ea2a68cd8b5dfe78531827cd563c377935ea797dd43ae37bfdce98cca",
-    "path": "/erp/warehouse/shipping-release",
-    "roles": [
-      "finance",
-      "warehouse"
-    ],
-    "supplement": true
-  },
-  {
-    "id": "shipping-release:release-vs-shipped",
-    "book": "business",
-    "title": "放行就是已经出货吗",
-    "source_hash": "b11f7695062737a4f9ccd2c733b3e5bb5e1fb174044603cc4c84fe47e35c253e",
-    "path": "/erp/warehouse/shipping-release",
-    "roles": [
-      "finance",
-      "warehouse"
-    ],
-    "supplement": false
-  },
-  {
-    "id": "shipping-release:release-source",
-    "book": "business",
-    "title": "这次审批针对哪张单",
-    "source_hash": "2d5adc9bfb16f453292055878806fe4aec1e3b30ce9c0793d78c839eec572b79",
-    "path": "/erp/warehouse/shipping-release",
-    "roles": [
-      "finance",
-      "warehouse"
-    ],
-    "supplement": false
-  },
-  {
-    "id": "shipping-release:release-blocked",
-    "book": "business",
-    "title": "为什么不能继续放行",
-    "source_hash": "fec716b11ab8e3fa3bedb8ae62056def68b9a06e4c5fa3d994008b0b713ed2d9",
-    "path": "/erp/warehouse/shipping-release",
-    "roles": [
+      "sales",
       "finance",
       "warehouse"
     ],
@@ -1394,10 +1354,12 @@
     "id": "guide:shipments",
     "book": "business",
     "title": "办理实际发货",
-    "source_hash": "1546ed2bfb603049d8d5297011f66cb038d1da35b8bd82bd510ea7a9baa0390a",
+    "source_hash": "7f5aebedc1c8c91e784d3c5501aa6f2135929f515d343789b3abb684a24c09b7",
     "path": "/erp/warehouse/shipments",
     "roles": [
-      "sales"
+      "sales",
+      "warehouse",
+      "finance"
     ],
     "supplement": false
   },
@@ -1528,18 +1490,6 @@
     "path": "/erp/warehouse/inventory",
     "roles": [
       "warehouse"
-    ],
-    "supplement": false
-  },
-  {
-    "id": "guide:shipping-release",
-    "book": "business",
-    "title": "出货放行",
-    "source_hash": "608cda3110d19c817338b0b16dae578e7c95dcc5a1ae5ce2858d7b7497d02c45",
-    "path": "/erp/warehouse/shipping-release",
-    "roles": [
-      "warehouse",
-      "finance"
     ],
     "supplement": false
   },

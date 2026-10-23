@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { parse } from '@babel/parser'
 import { act, createElement } from 'react'
 import { registerJSXTestLoader, installTestDOM } from '../../../scripts/test/reactRuntime.mjs'
 
@@ -70,6 +71,36 @@ test('search icons and connected search inputs only come from the shared compone
   assert.deepEqual(connectedSearchSources, [])
 })
 
+test('all standalone search consumers submit through onSearch and never query on input or Enter separately', () => {
+  const violations = []
+  const visit = (node, filePath) => {
+    if (!node || typeof node !== 'object') return
+    if (node.type === 'JSXOpeningElement' && ['Input', 'input'].includes(node.name.name)) {
+      const searchAttribute = node.attributes.some((item) =>
+        ['aria-label', 'placeholder', 'type'].includes(item.name?.name) && /搜索|^search$/u.test(item.value?.value || '')
+      )
+      if (searchAttribute) violations.push(`${relative(srcRoot, filePath)}:${node.loc.start.line}: bypasses shared search`)
+    }
+    if (node.type === 'JSXOpeningElement' && ['SearchInput', 'MobileSearchInput', 'SearchControl'].includes(node.name.name)) {
+      const attributes = node.attributes.map((item) => item.name?.name)
+      const hasSearch = attributes.includes('onSearch') || node.attributes.some((item) => item.type === 'JSXSpreadAttribute')
+      if (!hasSearch || attributes.some((name) => ['onChange', 'onPressEnter'].includes(name))) {
+        violations.push(`${relative(srcRoot, filePath)}:${node.loc.start.line}`)
+      }
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'loc') continue
+      if (Array.isArray(value)) value.forEach((item) => visit(item, filePath))
+      else if (value && typeof value === 'object') visit(value, filePath)
+    }
+  }
+  for (const filePath of collectJsxFiles(srcRoot)) {
+    const source = readFileSync(filePath, 'utf8')
+    visit(parse(source, { sourceType: 'module', plugins: ['jsx'] }), filePath)
+  }
+  assert.deepEqual(violations, [])
+})
+
 test('search scope is discoverable on focus, dismisses on Escape and blur, and preserves handlers', async (t) => {
   const dom = installTestDOM()
   registerJSXTestLoader()
@@ -90,7 +121,7 @@ test('search scope is discoverable on focus, dismisses on Escape and blur, and p
     searchHint: '可搜索：单号、产品、来源订单',
     onFocus: () => calls.push('focus'),
     onBlur: () => calls.push('blur'),
-    onPressEnter: () => calls.push('enter'),
+    onSubmitted: () => calls.push('enter'),
   })))
   const input = container.querySelector('input')
   const initialDescription = input.getAttribute('aria-describedby')

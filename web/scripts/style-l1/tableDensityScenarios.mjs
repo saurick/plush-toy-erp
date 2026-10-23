@@ -90,10 +90,17 @@ export function createTableDensityScenarios(deps) {
     const samples = []
     for (const label of ['标准', '紧凑', '标准']) {
       await setDensity(page, label)
+      const images = await rows.locator('.erp-task-product-image').evaluateAll((items) => items.map((image) => {
+        const box = image.getBoundingClientRect()
+        const picture = image.querySelector('img')
+        return { width: box.width, height: box.height, fit: picture ? getComputedStyle(picture).objectFit : null }
+      }))
+      assert(images.length > 0 && images.every((image) => image.width === 64 && image.height === 64 && (!image.fit || image.fit === 'contain')), `各密度下图片和占位均固定 64px，长内容不拉伸图片，真实图完整等比显示：${JSON.stringify(images)}`)
       const metrics = await rows.evaluateAll((items) => items.filter((row) => !row.dataset.taskId || Number(row.dataset.taskId) <= 97405).slice(0, 5).map((row) => ({
         height: row.getBoundingClientRect().height,
         text: row.innerText,
         longContent: row.dataset.progressOrderId === '4',
+        identityHeight: row.querySelector('.erp-task-identity')?.getBoundingClientRect().height ?? null,
         image: row.querySelector('.erp-task-product-image').getBoundingClientRect().width,
         clipped: [...row.querySelectorAll('td *')].some((node) => {
           const box = node.getBoundingClientRect()
@@ -104,7 +111,7 @@ export function createTableDensityScenarios(deps) {
       assert(metrics.length > 0 && metrics.every((row) => !row.clipped), JSON.stringify(metrics))
       samples.push(metrics)
       if (label === '紧凑') {
-        assert(metrics.every((row) => row.image === 48 && row.height >= 72 && (row.longContent ? row.height > 80 : row.height <= 80)), `普通行保持紧凑，长产品名称完整换行：${JSON.stringify(metrics)}`)
+        assert(metrics.every((row) => row.image === 64 && row.height >= 72 && (row.identityHeight !== null ? row.height <= Math.max(76, row.identityHeight + 13) : row.longContent ? row.height > 80 : row.height <= 80)), `紧凑行只由实际身份内容和必要内边距撑高，编号与来源换行不截断：${JSON.stringify(metrics)}`)
         if (selector.includes('erp-task-table-row')) {
           const longRow = page.locator('tr[data-task-id="97407"]')
           assert((await longRow.boundingBox()).height > metrics[0].height, '紧凑模式保留长内容并自然增高')

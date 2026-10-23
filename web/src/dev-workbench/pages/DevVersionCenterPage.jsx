@@ -223,7 +223,7 @@ export default function DevVersionCenterPage() {
               }))}
               onChange={setSelectedTargetKey}
             />
-            <details className="erp-dev-target-data-boundary">
+            <details className="erp-dev-disclosure erp-dev-target-data-boundary">
               <summary>数据保留方式</summary>
               <Text type="secondary">
                 {selectedTargetDefinition.dataBoundary}

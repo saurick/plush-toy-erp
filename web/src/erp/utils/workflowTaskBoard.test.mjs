@@ -3,10 +3,8 @@ import test from 'node:test'
 
 import {
   TASK_BOARD_FOCUS_PAGE_SIZE,
-  TASK_BOARD_OVERVIEW_LIMIT,
   TASK_BOARD_SORT_OPTIONS,
   buildWorkflowTaskBoardModel,
-  buildWorkflowTaskOverviewTasks,
   buildWorkflowTaskBoardRequest,
   buildWorkflowTaskBoardRoleOptions,
   getWorkflowTaskBoardRequestKey,
@@ -41,21 +39,21 @@ test('task filter count excludes search, visible category and sorting, counting 
   assert.equal(workflowTaskBoardExtraFilterCount({ due: 'overdue' }, { calendar: true }), 0)
 })
 
-test('task overview prioritizes exceptions and due work, deduplicates overlapping previews and leaves finished work in its category', () => {
-  const blocked = { id: 1, task_status_key: 'blocked' }
-  const due = { id: 2, task_status_key: 'ready' }
-  const ready = { id: 3, task_status_key: 'ready' }
-  const finished = { id: 4, task_status_key: 'done' }
-  const lanes = [
-    { key: 'actionable', tasks: [due, ready] },
-    { key: 'finished', tasks: [finished] },
-    { key: 'due', tasks: [blocked, due] },
-    { key: 'exception', tasks: [blocked] },
-  ]
-  assert.deepEqual(buildWorkflowTaskOverviewTasks(lanes), [blocked, due, ready])
-  assert.deepEqual(lanes[0].tasks, [due, ready])
-  assert.deepEqual(buildWorkflowTaskOverviewTasks([{ key: 'finished', tasks: [finished] }]), [])
-  assert.deepEqual(buildWorkflowTaskOverviewTasks(), [])
+test('all-task pages retain every server row and restore pagination, sorting and filters', () => {
+  const filters = readWorkflowTaskBoardFiltersFromSearch('mode=todo&page=2&sort=newest&q=包装&role=warehouse')
+  assert.deepEqual(readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', filters)), filters)
+  const request = buildWorkflowTaskBoardRequest(filters)
+  assert.deepEqual(request, { todo_only: true, lane_key: 'all', sort: 'newest', keyword: '包装', owner_role_key: 'warehouse', limit: 20, offset: 20 })
+  const tasks = Array.from({ length: 20 }, (_, index) => ({ id: 21 + index, version: 1, task_status_key: index % 2 ? 'blocked' : 'ready' }))
+  const response = { snapshot_at: now, total: 45, counts: { actionable: 25, exception: 10, due: 10, finished: 0 }, lanes: [{ key: 'all', total: 45, limit: 20, offset: 20, tasks }], source_types: [], owner_role_keys: [] }
+  const model = buildWorkflowTaskBoardModel(response, filters)
+  assert.equal(model.pageCount, 3)
+  assert.equal(model.page, 2)
+  assert.equal(model.visibleLanes.length, 1)
+  assert.equal(model.visibleLanes[0].title, '全部待办')
+  assert.equal(model.visibleLanes[0].count, 45)
+  assert.deepEqual(model.visibleLanes[0].tasks, tasks)
+  assert.deepEqual(buildWorkflowTaskBoardRequest(filters, { calendar: true }), { todo_only: true, keyword: '包装', owner_role_key: 'warehouse', limit: 20, offset: 0 })
 })
 
 test('terminal status filters focus the finished category and survive URL restoration', () => {
@@ -82,7 +80,7 @@ test('workflowTaskBoard: 待我处理保留网址范围，清除结束状态并�
   assert.equal(filters.mode, 'todo')
   assert.equal(filters.lane, 'all')
   assert.equal(filters.status, 'all')
-  assert.deepEqual(buildWorkflowTaskBoardRequest(filters), { todo_only: true, keyword: '包装', limit: TASK_BOARD_OVERVIEW_LIMIT, offset: 0 })
+  assert.deepEqual(buildWorkflowTaskBoardRequest(filters), { todo_only: true, keyword: '包装', lane_key: 'all', sort: 'smart', limit: 20, offset: 0 })
   assert.deepEqual(readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', filters)), filters)
   assert.equal(buildWorkflowTaskBoardRequest({ mode: 'approval' }).todo_only, undefined)
   assert.equal(buildWorkflowTaskBoardRequest({ mode: 'todo' }).approval_only, undefined)
@@ -91,15 +89,15 @@ test('workflowTaskBoard: 待我处理保留网址范围，清除结束状态并�
     snapshot_at: now,
 total: 6,
     counts: { actionable: 3, exception: 2, due: 1, finished: 0 },
-    lanes: ['actionable', 'exception', 'due', 'finished'].map((key) => ({ key, total: ({ actionable: 3, exception: 2, due: 1, finished: 0 })[key], limit: TASK_BOARD_OVERVIEW_LIMIT, offset: 0, tasks: [] })),
+    lanes: [{ key: 'all', total: 6, limit: 20, offset: 0, tasks: [] }],
     source_types: [],
 owner_role_keys: [],
   }
   const model = buildWorkflowTaskBoardModel(response, { mode: 'todo' })
-  assert.deepEqual(model.visibleLanes.map((lane) => lane.key), ['actionable', 'exception', 'due'])
+  assert.deepEqual(model.visibleLanes.map((lane) => lane.key), ['all'])
   response.total += 1
   response.counts.finished = 1
-  response.lanes[3].total = 1
+  response.lanes[0].total += 1
   assert.throws(() => buildWorkflowTaskBoardModel(response, { mode: 'todo' }), /暂时无法显示/)
 })
 
@@ -371,67 +369,14 @@ test('workflowTaskBoard: 任务编号缺失时不拼内部 ID', () => {
   assert.equal(getWorkflowTaskCodeLabel({ id: 88 }), '任务已关联')
 })
 
-test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', () => {
-  const boardTask = (id, taskStatusKey) => ({
-    id,
-    version: 1,
-    task_status_key: taskStatusKey,
-  })
-  const response = {
-    snapshot_at: now,
-    total: 12,
-    counts: { actionable: 6, exception: 2, due: 3, finished: 1 },
-    lanes: [
-      {
-        key: 'actionable',
-        total: 6,
-        limit: TASK_BOARD_OVERVIEW_LIMIT,
-        offset: 0,
-        tasks: Array.from({ length: TASK_BOARD_OVERVIEW_LIMIT }, (_, index) =>
-          boardTask(index + 1, 'ready')
-        ),
-      },
-      {
-        key: 'exception',
-        total: 2,
-        limit: TASK_BOARD_OVERVIEW_LIMIT,
-        offset: 0,
-        tasks: [boardTask(7, 'blocked'), boardTask(8, 'blocked')],
-      },
-      {
-        key: 'due',
-        total: 3,
-        limit: TASK_BOARD_OVERVIEW_LIMIT,
-        offset: 0,
-        tasks: [boardTask(9, 'ready'), boardTask(10, 'ready')],
-      },
-      {
-        key: 'finished',
-        total: 1,
-        limit: TASK_BOARD_OVERVIEW_LIMIT,
-        offset: 0,
-        tasks: [boardTask(12, 'rejected')],
-      },
-    ],
-    source_types: ['inbound', 'project-orders'],
-    owner_role_keys: ['warehouse', 'finance'],
-  }
+test('workflowTaskBoard: 全部列表使用全量计数并保留来源和岗位候选', () => {
+  const response = { snapshot_at: now, total: 12, counts: { actionable: 6, exception: 2, due: 3, finished: 1 }, lanes: [{ key: 'all', total: 12, limit: 20, offset: 0, tasks: Array.from({ length: 12 }, (_, index) => ({ id: index + 1, version: 1, task_status_key: index === 11 ? 'done' : 'ready' })) }], source_types: ['inbound', 'project-orders'], owner_role_keys: ['warehouse', 'finance'] }
   const model = buildWorkflowTaskBoardModel(response)
-  assert.deepEqual(
-    model.lanes.map((lane) => [lane.key, lane.count]),
-    [
-      ['actionable', 6],
-      ['exception', 2],
-      ['due', 3],
-      ['finished', 1],
-    ]
-  )
-  assert.equal(model.lanes[0].title, '常规待办')
-  assert.equal(model.lanes[0].tasks.length, TASK_BOARD_OVERVIEW_LIMIT)
-  assert.equal(model.lanes[0].hiddenCount, 4)
-  assert.equal(model.visibleLanes.length, 4)
-  assert.deepEqual(model.sourceTypes, ['inbound', 'project-orders'])
-  assert.deepEqual(model.ownerRoleKeys, ['warehouse', 'finance'])
+  assert.deepEqual(model.counts, response.counts)
+  assert.equal(model.visibleLanes[0].count, 12)
+  assert.equal(model.visibleLanes[0].tasks.length, 12)
+  assert.deepEqual(model.sourceTypes, response.source_types)
+  assert.deepEqual(model.ownerRoleKeys, response.owner_role_keys)
 })
 
 test('workflowTaskBoard: 从 URL 读取任务管理筛选并过滤非法值', () => {
@@ -534,7 +479,7 @@ test('workflowTaskBoard: 页容量在 URL、请求与末页计算中保持一致
   assert.equal(model.visibleLanes[0].limit, 20)
   assert.equal(
     buildWorkflowTaskBoardRequest({ ...filters, lane: 'all' }).limit,
-    2
+    20
   )
   assert.equal(
     getWorkflowTaskBoardSummaryRequestKey(request),
@@ -590,13 +535,10 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页二十条计算 off
       offset: 40,
     }
   )
-  assert.deepEqual(buildWorkflowTaskBoardRequest({}), {
-    limit: TASK_BOARD_OVERVIEW_LIMIT,
-    offset: 0,
-  })
+  assert.deepEqual(buildWorkflowTaskBoardRequest({}), { lane_key: 'all', sort: 'smart', limit: 20, offset: 0 })
 })
 
-test('workflowTaskBoard: 排序只属于聚焦泳道并保持顶部摘要复用', () => {
+test('workflowTaskBoard: 全部与分类列表均支持排序并复用顶部摘要', () => {
   assert.deepEqual(TASK_BOARD_SORT_OPTIONS, [
     { value: 'smart', label: '智能优先' },
     { value: 'due_soon', label: '最早到期' },
@@ -604,7 +546,7 @@ test('workflowTaskBoard: 排序只属于聚焦泳道并保持顶部摘要复用'
   ])
   assert.equal(
     readWorkflowTaskBoardFiltersFromSearch('?sort=newest').sort,
-    'smart'
+    'newest'
   )
   const dueRequest = buildWorkflowTaskBoardRequest({
     lane: 'due',
@@ -625,7 +567,9 @@ test('workflowTaskBoard: 排序只属于聚焦泳道并保持顶部摘要复用'
 test('workflowTaskBoard: 待我审批使用服务端审批筛选而非分页后本地过滤', () => {
   assert.deepEqual(buildWorkflowTaskBoardRequest({ mode: 'approval' }), {
     approval_only: true,
-    limit: TASK_BOARD_OVERVIEW_LIMIT,
+    lane_key: 'all',
+    sort: 'smart',
+    limit: TASK_BOARD_FOCUS_PAGE_SIZE,
     offset: 0,
   })
   assert.equal(
@@ -736,7 +680,6 @@ test('workflowTaskBoard: 聚焦页保留服务端总数并把越界展示页收�
     page: 3,
   })
 
-  assert.equal(model.focused, true)
   assert.equal(model.visibleLanes.length, 1)
   assert.equal(model.visibleLanes[0].count, 35)
   assert.equal(model.requestedPage, 3)

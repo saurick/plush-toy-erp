@@ -30,17 +30,11 @@ func (uc *WorkflowUsecase) ListTasks(ctx context.Context, filter WorkflowTaskFil
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	filter = normalizeWorkflowTaskFilter(filter)
-	if filter.TaskStatusKey != "" && !IsKnownWorkflowTaskState(filter.TaskStatusKey) {
-		return nil, 0, ErrBadParam
+	normalized, err := normalizeWorkflowTaskListFilter(filter)
+	if err != nil {
+		return nil, 0, err
 	}
-	if utf8.RuneCountInString(filter.Keyword) > 200 ||
-		(filter.DueFrom != nil && filter.DueFrom.IsZero()) ||
-		(filter.DueTo != nil && filter.DueTo.IsZero()) ||
-		(filter.DueFrom != nil && filter.DueTo != nil && filter.DueFrom.After(*filter.DueTo)) {
-		return nil, 0, ErrBadParam
-	}
-	return uc.repo.ListWorkflowTasks(ctx, filter)
+	return uc.repo.ListWorkflowTasks(ctx, normalized)
 }
 
 func (uc *WorkflowUsecase) GetTask(ctx context.Context, id int) (*WorkflowTask, error) {
@@ -1061,4 +1055,18 @@ func normalizeWorkflowBusinessStateUpsert(in WorkflowBusinessStateUpsert) (Workf
 		return WorkflowBusinessStateUpsert{}, ErrBadParam
 	}
 	return in, nil
+}
+
+func normalizeWorkflowTaskListFilter(filter WorkflowTaskFilter) (WorkflowTaskFilter, error) {
+	filter = normalizeWorkflowTaskFilter(filter)
+	if filter.TaskStatusKey != "" && !IsKnownWorkflowTaskState(filter.TaskStatusKey) {
+		return WorkflowTaskFilter{}, ErrBadParam
+	}
+	if utf8.RuneCountInString(filter.Keyword) > 200 ||
+		(filter.DueFrom != nil && filter.DueFrom.IsZero()) ||
+		(filter.DueTo != nil && filter.DueTo.IsZero()) ||
+		(filter.DueFrom != nil && filter.DueTo != nil && filter.DueFrom.After(*filter.DueTo)) {
+		return WorkflowTaskFilter{}, ErrBadParam
+	}
+	return filter, nil
 }

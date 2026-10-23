@@ -21,6 +21,8 @@ import {
   Tag,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { canReadReference } from '../utils/remoteReferences.mjs'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
 import { useReferenceHydration } from '../hooks/useReferenceRecords.js'
@@ -183,6 +185,7 @@ export default function InventoryLedgerPage() {
     'balanceDisplay',
     'list'
   )
+  const [statusCounts, setStatusCounts] = useState(null)
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
@@ -381,6 +384,7 @@ export default function InventoryLedgerPage() {
           compactParams({
             ...commonParams,
             status: lotStatus,
+            include_status_counts: all ? undefined : true,
             date_field: 'received_at',
             date_from: dateFilterStart || undefined,
             date_to: dateFilterEnd || undefined,
@@ -446,6 +450,7 @@ export default function InventoryLedgerPage() {
 
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
+    setStatusCounts(null)
     if (!canReadInventory) {
       if (request.isCurrent()) {
         setRows([])
@@ -461,6 +466,7 @@ export default function InventoryLedgerPage() {
       if (!request.isCurrent()) {
         return
       }
+      setStatusCounts(activeView === VIEW_LOTS ? resolveBusinessStatusCounts(data) : null)
       const nextRows = getRowsFromData(activeView, data)
       setRows(nextRows)
       setSelectedRow((current) =>
@@ -1109,7 +1115,6 @@ export default function InventoryLedgerPage() {
     productSkuID,
     warehouseID,
     lotID,
-    activeView === VIEW_LOTS && lotStatus,
     activeView === VIEW_TXNS && txnType,
     activeView === VIEW_TXNS && sourceType,
     activeView !== VIEW_BALANCES && (dateFilterStart || dateFilterEnd),
@@ -1123,7 +1128,6 @@ export default function InventoryLedgerPage() {
     setProductSkuID('')
     setWarehouseID('')
     setLotID('')
-    setLotStatus('')
     setTxnType('')
     setSourceType('')
     setDateFilterStart('')
@@ -1138,7 +1142,6 @@ export default function InventoryLedgerPage() {
     setDateFilterEnd,
     setDateFilterStart,
     setLotID,
-    setLotStatus,
     setProductSkuID,
     setSourceType,
     setStockCategory,
@@ -1514,7 +1517,10 @@ export default function InventoryLedgerPage() {
               }}
             />
             {activeView === VIEW_LOTS ? (
-              <SelectFilter
+              <BusinessStatusFilter
+                inline
+                counts={statusCounts}
+                loading={loading}
                 aria-label="批次状态"
                 className="erp-business-filter-control--status"
                 value={lotStatus}
@@ -1599,9 +1605,9 @@ export default function InventoryLedgerPage() {
               adminProfile,
               PermissionCode.WAREHOUSE_MANAGE
             ) ? (
-              <Dropdown trigger={['click']} menu={{ items: [{ key: 'warehouses', label: '仓库设置', onClick: () => setWarehouseSettingsOpen(true) }] }}>
-                <Button aria-label="管理">管理 <DownOutlined /></Button>
-              </Dropdown>
+              <Button onClick={() => setWarehouseSettingsOpen(true)}>
+                仓库设置
+              </Button>
             ) : null}
             <BusinessListToolbarActions
               moduleTitle="库存台账"

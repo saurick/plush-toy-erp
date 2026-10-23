@@ -27,7 +27,7 @@ const { Text } = Typography
 export function TechnicalDetails({ operation }) {
   if (!operation) return null
   return (
-    <details className="erp-dev-quality-technical">
+    <details className="erp-dev-disclosure erp-dev-quality-technical">
       <summary>查看技术详情</summary>
       <Descriptions
         size="small"
@@ -191,7 +191,7 @@ function StageDetails({ stage, operation }) {
   const hasSubsteps = stage.substeps.length > 0
   if (!hasSubsteps && !operation) return null
   return (
-    <details className="erp-dev-quality-flow__details">
+    <details className="erp-dev-disclosure erp-dev-quality-flow__details">
       <summary>
         {hasSubsteps
           ? `固定子步骤 ${stage.substeps.length} 项`
@@ -295,7 +295,7 @@ export function ManagedDatabaseLifecycleGuide() {
   const [diagramOpen, setDiagramOpen] = useState(false)
   return (
     <details
-      className="erp-dev-quality-managed-database"
+      className="erp-dev-disclosure erp-dev-quality-managed-database"
       onToggle={(event) => setDiagramOpen(event.currentTarget.open)}
     >
       <summary>查看本机托管数据库的静态运行与清理流程</summary>

@@ -63,5 +63,13 @@ export async function assertMobileFilterClearControl({ assert, trigger, active =
   assert(Math.abs(geometry.clear.left - geometry.trigger.right) <= 1 && Math.abs(geometry.clear.top - geometry.trigger.top) <= 1, '筛选与取消并排、独立且对齐')
   assert(geometry.group.left >= 0 && geometry.group.right <= geometry.viewportWidth && geometry.overflow <= 1, JSON.stringify(geometry))
   if (geometry.search) assert(geometry.search.right <= geometry.group.left && Math.abs(geometry.search.top - geometry.group.top) <= 1 && Math.abs(geometry.search.height - geometry.group.height) <= 1, `搜索与筛选不重叠且保持同高：${JSON.stringify(geometry)}`)
-  if (geometry.input) assert(geometry.input.width >= 44, '窄屏保留可操作的搜索输入区域')
+  if (geometry.input && geometry.input.width < 44) {
+    assert(geometry.search.width >= 44, '紧凑搜索入口保留触摸区域')
+    const search = group.locator('xpath=preceding-sibling::*[1]')
+    await search.locator('.ant-input-affix-wrapper').click({ position: { x: 10, y: 23 } })
+    await waitForFiniteAnimations(trigger.page())
+    assert((await search.locator('input').boundingBox()).width >= 44, '展开后搜索输入区域可操作')
+    await search.getByRole('button', { name: '取消搜索', exact: true }).click()
+    await trigger.waitFor({ state: 'visible' })
+  }
 }

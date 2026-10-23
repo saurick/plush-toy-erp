@@ -249,7 +249,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
           )}
         />
       )}
-      <details className="erp-dev-data-reuse-rules" onToggle={(event) => setReuseRulesOpen(event.currentTarget.open)}>
+      <details className="erp-dev-disclosure erp-dev-data-reuse-rules" onToggle={(event) => setReuseRulesOpen(event.currentTarget.open)}>
         <summary>代码变化后，旧数据怎么处理</summary>
         <div className="erp-dev-data-table-wrap">
           <table data-table-lines="fixed">
@@ -540,7 +540,7 @@ const READBACK_PRESENTATIONS = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo]: (readback) => ({
     column: { xs: 1, sm: 2, lg: 3 },
     notice:
-      '本读回只证明固定批次业务场景已精确创建或读回：41 / 51 项已由数据查询证明，另 10 项只能在浏览器中确认。51 项页面操作与人工验收均未执行，不代表完整验收。',
+      '本读回只证明固定批次业务场景已精确创建或读回：40 / 50 项已由数据查询证明，另 10 项只能在浏览器中确认。50 项页面操作与人工验收均未执行，不代表完整验收。',
     items: [
       {
         key: 'targetKey',
@@ -811,7 +811,7 @@ function OperationDetail({ operation, acceptancePlan, compact = false }) {
       </div>
       <OperationIssues issues={operation.issues} />
       <details
-        className="erp-dev-data-operation-technical"
+        className="erp-dev-disclosure erp-dev-data-operation-technical"
         open={technicalOpen}
         onToggle={(event) => setTechnicalOpen(event.currentTarget.open)}
       >
@@ -1615,7 +1615,7 @@ export default function DevDataPreparationPage() {
                       ))}
                     </section>
                   ) : null}
-                  <details className="erp-dev-data-disclosure">
+                  <details className="erp-dev-disclosure erp-dev-data-disclosure">
                     <summary>数据范围与执行前置</summary>
                     <p>{selectedProfileCopy.scope}</p>
                     <p>{selectedProfileCopy.prepareDescription}</p>
@@ -1654,7 +1654,7 @@ export default function DevDataPreparationPage() {
                     </ol>
                   </details>
                 </div>
-                <details className="erp-dev-data-disclosure">
+                <details className="erp-dev-disclosure erp-dev-data-disclosure">
                   <summary>
                     业务链与场景范围 · {summary.acceptancePlan.chainCount}{' '}
                     条业务链 / {summary.acceptancePlan.scenarioCount} 项场景
@@ -1665,7 +1665,7 @@ export default function DevDataPreparationPage() {
                     onSelectChain={setSelectedChainKey}
                   />
                 </details>
-                <details className="erp-dev-data-disclosure">
+                <details className="erp-dev-disclosure erp-dev-data-disclosure">
                   <summary>环境与数据合同</summary>
                   <DatasetEnvironmentContract summary={summary} />
                 </details>
@@ -1766,7 +1766,7 @@ export default function DevDataPreparationPage() {
                   />
                 ) : null}
                 {historicalOperationReferences.length > 0 ? (
-                  <details className="erp-dev-data-history">
+                  <details className="erp-dev-disclosure erp-dev-data-history">
                     <summary>
                       展开旧合同与未识别合同记录（
                       {historicalOperationReferences.length}）

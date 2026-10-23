@@ -118,43 +118,6 @@ export async function verifyBusinessCoreAppearance(page, deps) {
   })
   await page.setViewportSize({ width: 390, height: 844 })
 
-  await gotoScenarioPath(page, '/erp/warehouse/shipping-release', {
-    waitUntil: 'domcontentloaded',
-  })
-
-  await assertERPThemeMode(page, {
-    scenarioName: 'business-formal-shipping-release-mobile',
-    expectedMode: 'light',
-    expectedEffectiveTheme: 'light',
-  })
-
-  await expectHeading(page, '放行审批')
-
-  await assertTextAbsent(page, '业务处理分开完成')
-
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-workflow-shipping-release-mobile'
-  )
-
-  await assertTextAbsent(page, '发起放行协同')
-
-  await assertUnifiedListToolbarShell(page, {
-    scenarioName: 'business-workflow-shipping-release-mobile',
-    exportVisible: false,
-  })
-
-  await assertTextAbsent(page, '新建放行单')
-
-  await assertTextAbsent(page, '生成出货放行')
-
-  await assertTextAbsent(page, '导出预览字段')
-
-  await assertNoHorizontalOverflow(
-    page,
-    'business-workflow-shipping-release-mobile'
-  )
-
   await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
     waitUntil: 'domcontentloaded',
   })

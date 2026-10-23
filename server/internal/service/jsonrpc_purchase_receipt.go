@@ -142,16 +142,22 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 			return id, res, nil
 		}
 		filter.WarehouseScope = &scope
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountPurchaseReceiptsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapPurchaseError(ctx, err), nil
+		}
 		items, total, err := d.inventoryUC.ListPurchaseReceipts(ctx, filter)
 		if err != nil {
 			return id, d.mapPurchaseError(ctx, err), nil
 		}
-		return id, okData(map[string]any{
+		return id, okData(withBusinessStatusCounts(map[string]any{
 			"purchase_receipts": purchaseReceiptsToAny(items),
 			"total":             total,
 			"limit":             normalizedBusinessListLimit(pm),
 			"offset":            normalizedOffset(pm),
-		}), nil
+		}, statusCounts)), nil
 	default:
 		return id, unknownPurchaseResult(method), nil
 	}

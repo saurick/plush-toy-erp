@@ -1,3 +1,11 @@
+import { deriveOutsourcingOrderItemAmount } from './sourceOrderAmounts.mjs'
+import {
+  formatNumeric20Scale6Summary,
+  numeric20Scale6Units,
+  sumNumeric20Scale6Values,
+} from './numeric20Scale6.mjs'
+import { isBusinessCurrency } from './businessCurrency.mjs'
+
 const text = (value) => String(value ?? '').trim()
 
 function activeContractItems(items = []) {
@@ -10,19 +18,6 @@ function activeContractItems(items = []) {
 function partySnapshot(order = {}, key = '') {
   const value = order?.[key]
   return value && typeof value === 'object' ? value : {}
-}
-
-function amountOf(item = {}) {
-  const savedAmountText = text(item.amount).replaceAll(',', '')
-  if (savedAmountText) {
-    const savedAmount = Number(savedAmountText)
-    if (Number.isFinite(savedAmount)) return savedAmount
-  }
-  const quantity = Number(text(item.outsourcing_quantity).replaceAll(',', ''))
-  const unitPrice = Number(text(item.unit_price).replaceAll(',', ''))
-  return Number.isFinite(quantity) && Number.isFinite(unitPrice)
-    ? quantity * unitPrice
-    : 0
 }
 
 export function inspectOutsourcingContractReadiness(order = {}, items = []) {
@@ -50,14 +45,26 @@ export function inspectOutsourcingContractReadiness(order = {}, items = []) {
     missing.push('每条明细的加工项目')
   }
 
-  const totalAmount = activeItems.reduce((sum, item) => sum + amountOf(item), 0)
+  const currency = text(order.currency).toUpperCase()
+  if (!isBusinessCurrency(currency)) missing.push('合同币种')
+  const amounts = activeItems.map(deriveOutsourcingOrderItemAmount)
+  const unpricedCount = amounts.filter((amount) => amount === undefined).length
+  if (unpricedCount) missing.push('每条明细的数量及单价')
+  const totalAmount = unpricedCount ? '' : sumNumeric20Scale6Values(amounts)
+  if (totalAmount && numeric20Scale6Units(totalAmount) === null)
+    { missing.push('合同金额超出范围') }
   return {
     complete: missing.length === 0,
     missing,
     activeItems,
     lineCount: activeItems.length,
     totalAmount,
-    totalAmountText: totalAmount.toFixed(2),
+    currency,
+    unpricedCount,
+    totalAmountText:
+      totalAmount && numeric20Scale6Units(totalAmount) !== null
+        ? `${formatNumeric20Scale6Summary(totalAmount, 2)} ${currency}`.trim()
+        : '待补齐金额',
   }
 }
 

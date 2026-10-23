@@ -52,8 +52,8 @@ function scenarioReadback(overrides = {}) {
     sourceDocumentCount: 135,
     processRuntimeCount: 5,
     factCount: 500,
-    catalogReadyCount: 41,
-    catalogTargetCount: 51,
+    catalogReadyCount: 40,
+    catalogTargetCount: 50,
     browserChecksPending: 10,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
@@ -116,7 +116,7 @@ test("scenario-demo operation store accepts only the current 41+10 forward-only 
     now: "2026-07-29T02:03:07.000Z",
   });
   assert.equal(passed.readback.runId, MANUAL_ACCEPTANCE_CORE_CONTRACT.runId);
-  assert.equal(passed.readback.catalogReadyCount, 41);
+  assert.equal(passed.readback.catalogReadyCount, 40);
   assert.equal(passed.readback.browserChecksPending, 10);
   assert.equal(passed.readback.cleanupSupported, false);
   assert.equal(passed.readback.manualAcceptanceCompleted, false);
@@ -155,8 +155,8 @@ test("scenario-demo operation store rejects run drift, inflated catalog readines
         readback: historicalScenarioReadback({
           dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
           runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-          catalogReadyCount: 41,
-          catalogTargetCount: 51,
+          catalogReadyCount: 40,
+          catalogTargetCount: 50,
         }),
         now: "2026-07-29T02:03:07.000Z",
       }),
@@ -213,6 +213,8 @@ test("persisted V6 receipts remain readable but cannot replace the current basel
   const oldReadback = scenarioReadback({
     dataVersion: "2026.08.15-v6",
     runId: "20260815-V6",
+    catalogReadyCount: 41,
+    catalogTargetCount: 51,
   });
   assert.throws(
     () =>

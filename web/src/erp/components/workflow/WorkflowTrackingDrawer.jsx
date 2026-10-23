@@ -30,7 +30,7 @@ function TrackingExceptions({ trackingRef, onOpenTask, refreshKey }) {
   )
 }
 
-export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTask, onAfterClose, refreshKey = '', closeLabel = '返回列表' }) {
+export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTask, onAfterClose, refreshKey = '', closeLabel = '返回列表', open = Boolean(trackingRef), overview = null, navigation = null }) {
   const [result, setResult] = useState(null)
   const [reload, setReload] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -152,13 +152,13 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
       extra={identity.available && identity.items.length > 0 ? <WorkflowTaskCopySummary task={summary} compact includeTask={false} includeLink={false} /> : null}
       closeIcon={<LeftOutlined aria-hidden />}
       closable={{ placement: 'start', 'aria-label': closeLabel }}
-      open={Boolean(trackingRef)}
+      open={open}
       onClose={onClose}
       afterOpenChange={(open) => { if (!open) onAfterClose?.() }}
       width="min(760px, 100vw)"
       forceRender
       className="erp-workflow-drawer erp-workflow-tracking-drawer"
-      footer={
+      footer={trackingRef ? (
         <div className="erp-workflow-tracking-footer">
           {taskError ? <p role="alert" className="erp-workflow-tracking-task-error">{taskError}</p> : null}
           {availableTasks.length > 1 ? (
@@ -185,9 +185,10 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
             {availableTasks.length ? <Button type={selectedTask?.canHandle ? 'primary' : 'default'} className="erp-workflow-tracking-open-task" aria-label={taskActionLabel} aria-haspopup="dialog" disabled={!selectedTask} loading={Boolean(openingTask)} onClick={() => openTask(selectedTask.task_id)}>{taskActionLabel}</Button> : null}
           </div>
         </div>
-      }
+      ) : null}
     >
-      {!current ? <Spin tip="正在读取任务进度"><div className="erp-workflow-tracking-loading" /></Spin> : current.error ? (
+      {navigation}
+      {!trackingRef ? overview : !current ? <Spin tip="正在读取任务进度"><div className="erp-workflow-tracking-loading" /></Spin> : current.error ? (
         <Alert
           type="error"
           showIcon

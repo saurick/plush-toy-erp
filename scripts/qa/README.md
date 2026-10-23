@@ -498,7 +498,7 @@ demo 造数前必须先在固定 release 上完成登记 target 的 migration、
 
 ### 页面、业务链与证据合同
 
-51 个正式验收目标统一登记在 `manual-acceptance-page-data-contract.mjs`。每页只能引用共享的 `role / source / task / facts / catalog` 阶段，不允许页面自带 builder、脚本或另一套 fixture；业务看板可以同时消费多个共享阶段，但不能另造页面数据。
+50 个正式验收目标统一登记在 `manual-acceptance-page-data-contract.mjs`。每页只能引用共享的 `role / source / task / facts / catalog` 阶段，不允许页面自带 builder、脚本或另一套 fixture；业务看板可以同时消费多个共享阶段，但不能另造页面数据。
 
 `manual-acceptance-dataset-runner.mjs` 直接消费相同的阶段入口。新增页面、probe 或入口发生漏登、重复或分叉时，readiness 合同测试会 fail closed。
 
@@ -508,7 +508,7 @@ demo 造数前必须先在固定 release 上完成登记 target 的 migration、
 
 这个合同不新增 writer，顶层 `manual-acceptance-dataset.mjs` 和现有串行 runner 仍是唯一整批造数入口。
 
-`/__dev/data-preparation` 直接读取该合同的可读投影，当前同时显示 11 条业务链、77 个步骤、66 个场景合同、9 个现有造数阶段和 51 个页面目标。页面里的业务链选择只用于展开核对，不创建局部 writer；“按最新业务链完整回归”每次都使用现有 lifecycle 建立新隔离批次，执行全部已登记场景合同，成功或失败后自动清理。
+`/__dev/data-preparation` 直接读取该合同的可读投影，当前同时显示 11 条业务链、77 个步骤、66 个场景合同、9 个现有造数阶段和 50 个页面目标。页面里的业务链选择只用于展开核对，不创建局部 writer；“按最新业务链完整回归”每次都使用现有 lifecycle 建立新隔离批次，执行全部已登记场景合同，成功或失败后自动清理。
 
 规范 apply 回执记录造数总 `startedAt / completedAt / durationMs`，并对 9 个阶段分别记录同样的真实耗时；未开始的阶段保持空值，不能冒充 `0 ms`。
 
@@ -576,7 +576,7 @@ node scripts/qa/manual-acceptance-data-depth.mjs
 
 ### 本地隔离验收与自动清理
 
-`local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.133:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、十个单岗位模拟账号与一个财务兼采购账号的受控预配置 bootstrap、客户配置、core、九岗位数据、51 项只读浏览器和三条真实写异常流。
+`local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.133:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、十个单岗位模拟账号与一个财务兼采购账号的受控预配置 bootstrap、客户配置、core、九岗位数据、50 项只读浏览器和三条真实写异常流。
 
 预配置 bootstrap 只在 runtime identity、精确数据库、环境、super admin、目标确认和账号确认均通过后走 `admin.create`，不直写账号表；它先满足客户配置审批责任岗位的“有可办理员工”发布门禁，dataset role 阶段仍会重新核对账号并补齐正式岗位权限和仓库范围。
 
@@ -802,7 +802,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 
 ### 写后读回与打印待验
 
-写入后只读核对 51 项验收目标：
+写入后只读核对 50 项验收目标：
 
 ```bash
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
@@ -821,7 +821,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 
 顶层 dataset runner 只在“0 项查询失败、恰好这 10 项打印目标 `not_proven`、其余 41 项全过”时把数据底座记为已证明，同时明确写入 `browserEvidencePending=true`；任意其他缺口仍立即阻断。浏览器还必须为 5 个预览各证明至少 1 份可见数据，并为每个打印工作台证明本批来源至少 5 条，再打开精确 25 行单据和真实 PDF。
 
-最终只有同批浏览器报告的 `acceptancePassed=true` 才能宣称 51 项自动化验收完成。
+最终只有同批浏览器报告的 `acceptancePassed=true` 才能宣称 50 项自动化验收完成。
 
 出货数据是精确合同：同批必须恰好 47 张出货单，且恰好 1 张有 25 行明细。fact 写入报告、readiness 读回和出货页面 DOM 任一出现 45、46、48 张，或出现零张/多张 25 行单据，都必须失败。
 
@@ -865,7 +865,7 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 
 ### 共享开发库的只读验收
 
-登记共享开发库的长期 `scenario-demo` 批次使用同一 51 项浏览器目录，必须显式加 `--scenario-demo-shared-local`（API 为 `scenarioDemoSharedLocal: true`）。
+登记共享开发库的长期 `scenario-demo` 批次使用同一 50 项浏览器目录，必须显式加 `--scenario-demo-shared-local`（API 为 `scenarioDemoSharedLocal: true`）。
 
 该模式只接受既有 target policy 登记的长期开发库、后端 `http://127.0.0.1:8300` 和当前版本 `scenario-demo/` 下原位 canonical 报告，要求 `volume` 配方、全部完成阶段、component digest、当前阶段逻辑指纹及正式 persistent baseline。
 
@@ -1650,3 +1650,7 @@ fast 保留试用账号 RBAC、浏览器 smoke 脚本语法与真实登录共享
 没有可识别覆盖、文件删除、全局入口或 CSS 变更仍选择 Web 全集；页面的真实浏览器 follow-up 继续单列。纯测试文件修改只运行相关测试，不机械追加业务页面 lint 或浏览器。
 
 `scripts/deploy/` 中已登记在现有 `release` 测试组且仍存在的 `.test.mjs` 可定向串行执行。发布执行逻辑、删除或未登记的测试以及 `resource_sensitive` 组仍走完整门禁；定向测试不等于发布或恢复验证。main 的完整 CI、发布前置证据和测试执行数检查保持原有合同。
+
+## 业务数据一致性 / Business Data Consistency
+
+运行 `node scripts/qa/business-data-consistency.mjs --write`，或在测试工作台运行“业务数据一致性专项”。`--plan` 仅列出登记用例对应命令。目录、结果身份与证据边界见[自动化测试策略](../../docs/product/自动化测试策略.md#业务数据一致性专项--business-data-consistency)；真实数据库仍复用 `test-critical` 隔离门禁。

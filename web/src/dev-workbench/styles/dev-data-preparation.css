@@ -196,12 +196,6 @@
   overflow-x: auto;
 }
 
-.erp-dev-data-reuse-rules > summary {
-  padding: 12px 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .erp-dev-data-table-wrap {
   padding: 0 14px 14px;
 }
@@ -527,17 +521,6 @@
 .erp-dev-data-disclosure {
   min-width: 0;
   border-top: 1px solid var(--dev-data-border);
-}
-
-.erp-dev-data-disclosure > summary {
-  padding: 12px 0;
-  color: var(--dev-data-muted);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.erp-dev-data-disclosure[open] > summary {
-  margin-bottom: 8px;
 }
 
 

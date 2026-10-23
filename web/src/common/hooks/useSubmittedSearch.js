@@ -44,7 +44,12 @@ export default function useSubmittedSearch({ value = '', onSearch, resetKey }) {
 
   return {
     value: draft,
-    onChange: (event) => setDraft(event.currentTarget.value),
+    composing,
+    onChange: (event) => {
+      // Native search cancellation can omit compositionend; the next ordinary input ends it.
+      if (event.nativeEvent?.isComposing === false) composing.current = false
+      setDraft(event.currentTarget.value)
+    },
     onCompositionStart: () => {
       composing.current = true
     },
@@ -53,8 +58,10 @@ export default function useSubmittedSearch({ value = '', onSearch, resetKey }) {
       setDraft(event.currentTarget.value)
     },
     cancel: () => {
+      const changed = draft !== submitted.current
       composing.current = false
       setDraft(submitted.current)
+      return changed
     },
     clear: () => {
       composing.current = false

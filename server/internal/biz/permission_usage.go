@@ -315,7 +315,6 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	add(PermissionSalesOrderRead,
 		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary"), businessUsageConditions),
 		menuPermissionSurface("sales-orders", "sales-orders", "销售订单", "sales-order-list", "销售订单列表和详情", permissionControlPage, "允许进入并查看", salesOrderReadMethods, businessUsageConditions),
-		menuPermissionSurface("shipping-release", "sales-order-release-context", "销售订单", "sales-order-release-reference", "出货放行的订单依据", permissionControlSection, "允许查看", permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), businessUsageConditions),
 		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-order-reference", "出货单可导入的销售订单", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
 	)
 	add(PermissionEngineeringMaterialRead,
@@ -357,9 +356,9 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	}
 	workflowTaskReadSurfaces = append(
 		workflowTaskReadSurfaces,
+		menuPermissionSurface("shipments", "shipment-approval", "财务审批", "shipment-approval", "查看审批", permissionControlButton, "允许查看当前出货单的审批流程", permissionMethods("workflow", "list_tracking", "get_tracking"), workflowUsageConditions),
 		menuPermissionSurface("production-scheduling", "production-scheduling", "排产确认", "production-scheduling-task-list", "排产确认任务列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 		menuPermissionSurface("production-exceptions", "production-exceptions", "异常处理", "production-exception-task-list", "异常处理任务列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
-		menuPermissionSurface("shipping-release", "shipping-release", "出货放行", "shipping-release-task-list", "出货放行任务列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 	)
 	workflowTaskCreateSurfaces := []PermissionUsageSurface{}
 	for _, pageKey := range []string{"sales-orders", "accessories-purchase", "processing-contracts", "production-orders", "shipments"} {
@@ -372,7 +371,6 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("task-board", "task-supervision", "协同任务", "cross-role-task-list", "跨岗位任务监督", permissionControlSection, "允许只读查看其他责任岗位任务", permissionMethods("workflow", "list_tasks", "get_task_board", "get_workbench"), workflowUsageConditions),
 		menuPermissionSurface("production-scheduling", "task-supervision", "排产确认", "cross-role-scheduling-list", "跨岗位排产确认任务监督", permissionControlSection, "允许只读查看其他责任岗位排产确认任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 		menuPermissionSurface("production-exceptions", "task-supervision", "异常处理", "cross-role-exception-list", "跨岗位异常处理任务监督", permissionControlSection, "允许只读查看其他责任岗位异常任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
-		menuPermissionSurface("shipping-release", "task-supervision", "出货放行", "cross-role-release-list", "跨岗位放行任务监督", permissionControlSection, "允许只读查看其他责任岗位放行任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 	)
 
 	add(PermissionWorkflowTaskUpdate, workflowSurfaces("update-task", "更新、阻塞和恢复任务", permissionControlForm, "显示并允许更新", permissionMethods("workflow", "block_task_action", "resume_task_action", "urge_task"))...)
@@ -437,7 +435,6 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("production-progress", "production-fact-actions", "生产记录与成品入库", "confirm-finished-goods-inbound", "核对并确认成品入库", permissionControlButton, "显示并允许核对、确认或撤销", permissionMethods("operational_fact", "save_production_completion_draft", "post_production_fact", "cancel_production_fact"), businessUsageConditions),
 	)
 	add(PermissionWarehouseOutboundRead,
-		menuPermissionSurface("shipping-release", "shipping-release", "出货放行", "shipping-release-content", "出货放行内容", permissionControlPage, "允许进入并查看", nil, businessUsageConditions),
 		menuPermissionSurface("outbound", "warehouse-outbound", "库存预留", "outbound-content", "库存预留内容", permissionControlPage, "允许进入并查看", nil, businessUsageConditions),
 	)
 	addMenu(PermissionWarehouseOutboundConfirm, "outbound", "warehouse-outbound", "库存预留", "confirm-outbound", "确认出库", permissionControlButton, "显示并允许确认", nil, businessUsageConditions)
@@ -497,7 +494,6 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionFinanceInvoiceConfirm, "invoices", "invoice-actions", "发票动作", "confirm-invoice", "生成、确认或取消发票业务记录", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "create_invoice_from_shipment", "post_finance_fact", "cancel_finance_fact"), businessUsageConditions)
 	add(PermissionFinanceReceivableRead,
 		menuPermissionSurface("receivables", "receivables", "应收管理", "receivable-list", "应收列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("operational_fact", "list_finance_facts"), permissionMethods("customer_config", "execute_finance_payment_post")...), businessUsageConditions),
-		menuPermissionSurface("shipping-release", "finance-release", "财务放行", "receivable-release", "应收放行区域", permissionControlSection, "允许查看", nil, businessUsageConditions),
 	)
 	addMenu(PermissionFinanceReceivableConfirm, "receivables", "receivable-actions", "应收动作", "confirm-receivable", "生成、确认或取消应收", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "create_receivable_from_shipment", "post_finance_fact", "cancel_finance_fact"), businessUsageConditions)
 	addMenu(PermissionFinanceReconciliationRead, "reconciliation", "reconciliation", "对账管理", "reconciliation-list", "对账列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "list_finance_facts"), businessUsageConditions)

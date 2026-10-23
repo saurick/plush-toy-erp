@@ -59,11 +59,12 @@ export default function DevProjectRelationships() {
           />
           {(modelCatalog ? DEV_PROJECT_GRAPH_GROUPS : DEV_PROJECT_GRAPH_TOPIC_GROUPS).map((group) => (
             <section key={group.label}>
-              <h2>{group.label}</h2>
+              <h2 className="erp-dev-directory-group-title">{group.label}</h2>
               {(modelCatalog ? group.models : group.examples).map((key) => (
                 <button
                   type="button"
                   key={key}
+                  className="erp-dev-directory-item erp-dev-directory-item--nested"
                   aria-pressed={(modelCatalog ? selected.modelKey : selected.exampleKey) === key}
                   onClick={() => {
                     if (modelCatalog) {
@@ -109,7 +110,7 @@ export default function DevProjectRelationships() {
           ) : null}
           {graph ? <DevProjectGraphView graph={graph} selectedNodeId={selected.nodeId} onNodeSelect={selectNode} /> : <Empty description="请选择项目示例" />}
           {graph ? (
-            <details className="erp-dev-project-relationships__evidence">
+            <details className="erp-dev-disclosure erp-dev-project-relationships__evidence">
               <summary>图模型说明与对应工具</summary>
               <p><strong>{model.title}</strong> · {model.definition}</p>
               <p>{judgment}</p>

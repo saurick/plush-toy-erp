@@ -2560,7 +2560,18 @@ export function buildCurrentBatchDOMRecords({
   }
   return {
     ...(source ? canonicalSourceOrderRecords(source) : {}),
-    "task-board": taskCodes,
+    "task-board": [...taskCodes, ...(refs.shipments || []).flatMap((row) => {
+      const identifier = String(
+        row.finance_approval_task_code || row.financeApprovalTaskCode || "",
+      ).trim();
+      if (!identifier) return [];
+      const taskID = Number(
+        row.finance_approval_task_id || row.financeApprovalTaskID,
+      );
+      if (!Number.isSafeInteger(taskID) || taskID <= 0)
+        throw new BrowserAcceptanceError("出货报告缺少财务审批任务 ID");
+      return [{ key: String(taskID), identifier }];
+    })],
     "production-orders": entries(refs.productionOrders, [
       "order_no",
       "orderNo",
@@ -2591,18 +2602,6 @@ export function buildCurrentBatchDOMRecords({
         key: "",
         identifier: `source-production-scheduling-${row.id}`,
       })),
-    "shipping-release": (refs.shipments || []).flatMap((row) => {
-      const identifier = String(
-        row.finance_approval_task_code || row.financeApprovalTaskCode || "",
-      ).trim();
-      if (!identifier) return [];
-      const taskID = Number(
-        row.finance_approval_task_id || row.financeApprovalTaskID,
-      );
-      if (!Number.isSafeInteger(taskID) || taskID <= 0)
-        throw new BrowserAcceptanceError("出货报告缺少财务审批任务 ID");
-      return [{ key: String(taskID), identifier }];
-    }),
     receivables: finance("RECEIVABLE"),
     payables: finance("PAYABLE"),
     reconciliation: finance("RECONCILIATION"),
@@ -4156,34 +4155,6 @@ export function currentBatchFactIdentifiers(factReport) {
           ).startsWith("PROC-"),
       );
       return String(decision?.decision_no || decision?.decisionNo || "");
-    })(),
-    "shipping-release": (() => {
-      const shipment = records.shipments.find(
-        (item) =>
-          String(item?.status || "").toUpperCase() === "SHIPPED" &&
-          String(
-            item?.finance_release_status || item?.financeReleaseStatus || "",
-          ).toUpperCase() === "APPROVED" &&
-          Number(
-            item?.finance_release_process_instance_id ||
-              item?.financeReleaseProcessInstanceID ||
-              0,
-          ) > 0 &&
-          Number(
-            item?.finance_approval_process_node_id ||
-              item?.financeApprovalProcessNodeID ||
-              0,
-          ) > 0 &&
-          String(
-            item?.finance_approval_task_code ||
-              item?.financeApprovalTaskCode ||
-              "",
-          ).startsWith("PROC-"),
-      );
-      if (!shipment) return "";
-      return String(
-        shipment.finance_approval_task_code || shipment.financeApprovalTaskCode,
-      );
     })(),
     outbound: firstCurrentBatchBusinessNo(records.stockReservations, [
       "reservation_no",

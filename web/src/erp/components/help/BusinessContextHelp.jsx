@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react'
-import { ArrowRightOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Popover, Tag, Typography } from 'antd'
 import Link from '../business-list/BusinessLink.jsx'
-import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import { getHelpCenterHref } from '../../config/helpManualCatalog.mjs'
+import { getBusinessPageHelpScenario } from '../../config/helpScenarios.mjs'
+import HelpScenarioContent from './HelpScenarioContent.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import {
   BUSINESS_HELP_TYPE_PRESENTATION,
@@ -46,7 +47,7 @@ function ExplanationDetails({ item, pageKey, showHeading = true }) {
       ) : null}
       {pageKey ? (
         <Link to={getHelpCenterHref({ pageKey, itemKey: item.key })}>
-          查看完整参考词条 →
+          打开帮助中心
         </Link>
       ) : null}
     </div>
@@ -54,42 +55,42 @@ function ExplanationDetails({ item, pageKey, showHeading = true }) {
 }
 
 function PageGuideContent({ entry }) {
+  const scenario = getBusinessPageHelpScenario(entry.key)
   return (
     <div className="erp-business-page-help">
-      <section aria-labelledby={`${entry.key}-page-task`}>
-        <Text type="secondary">当前页要做什么</Text>
-        <Title level={4} id={`${entry.key}-page-task`}>
-          {entry.task}
-        </Title>
-      </section>
+      <p>{entry.task}</p>
 
-      <div className="erp-business-page-help__outcomes">
-        <section>
-          <Text type="secondary">做到什么算完成</Text>
-          <p>{entry.completion}</p>
-        </section>
-        <section>
-          <Text type="secondary">完成后交给谁</Text>
-          <p>{entry.handoff}</p>
-        </section>
-      </div>
+      {scenario ? <HelpScenarioContent scenario={scenario} compact /> : (
+        <>
+          <div className="erp-business-page-help__outcomes">
+            <section>
+              <Text type="secondary">做到什么算完成</Text>
+              <p>{entry.completion}</p>
+            </section>
+            <section>
+              <Text type="secondary">完成后交给谁</Text>
+              <p>{entry.handoff}</p>
+            </section>
+          </div>
 
-      <section
-        className="erp-business-page-help__flow"
-        aria-labelledby={`${entry.key}-page-flow`}
-      >
-        <Title level={5} id={`${entry.key}-page-flow`}>
-          办理顺序
-        </Title>
-        <ol>
-          {entry.flowSteps.map((step, index) => (
-            <li key={step}>
-              <span aria-hidden="true">{index + 1}</span>
-              <p>{step}</p>
-            </li>
+          <section
+            className="erp-business-page-help__flow"
+            aria-labelledby={`${entry.key}-page-flow`}
+          >
+            <Title level={5} id={`${entry.key}-page-flow`}>
+              办理顺序
+            </Title>
+            <ol>
+              {entry.flowSteps.map((step, index) => (
+                <li key={step}>
+                  <span aria-hidden="true">{index + 1}</span>
+                  <p>{step}</p>
+                </li>
           ))}
-        </ol>
-      </section>
+            </ol>
+          </section>
+        </>
+      )}
 
       {entry.items.length > 0 ? (
         <section
@@ -105,7 +106,6 @@ function PageGuideContent({ entry }) {
                 <summary>{item.title}</summary>
                 <ExplanationDetails
                   item={item}
-                  pageKey={entry.key}
                   showHeading={false}
                 />
               </details>
@@ -124,7 +124,6 @@ function PageGuideContent({ entry }) {
 
 export function BusinessPageHelpTrigger({ pageKey = '' }) {
   const [open, setOpen] = useState(false)
-  const navigate = useBusinessNavigate()
   const trigger = useRef(null)
   const entry = getBusinessUsabilityEntry(pageKey)
 
@@ -150,31 +149,12 @@ export function BusinessPageHelpTrigger({ pageKey = '' }) {
         keyboard
         maskClosable
         className="erp-business-page-help-modal"
-        size="localAction"
+        size={getBusinessPageHelpScenario(pageKey) ? 'recordDetails' : 'localAction'}
         open={open}
         title={`${entry.title}怎么用`}
         onCancel={() => setOpen(false)}
         afterClose={() => trigger.current?.focus({ preventScroll: true })}
         footer={[
-          <Button
-            key="role-help"
-            onClick={() => {
-              setOpen(false)
-              navigate(getHelpCenterHref({ pageKey, view: 'guide' }))
-            }}
-          >
-            查看本页操作图解
-            <ArrowRightOutlined />
-          </Button>,
-          <Button
-            key="reference-help"
-            onClick={() => {
-              setOpen(false)
-              navigate(getHelpCenterHref({ pageKey }))
-            }}
-          >
-            查阅本页参考手册
-          </Button>,
           <Button key="done" type="primary" onClick={() => setOpen(false)}>
             我知道了
           </Button>,

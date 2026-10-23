@@ -440,7 +440,7 @@ export default function DevQualityGatesPage() {
                 <Text strong>下一步：{displayedStatus.recommendation}</Text>
               ) : null}
               {!summaryError && activeView !== 'server' && displayedStatus?.notProven?.length ? (
-                <details>
+                <details className="erp-dev-disclosure">
                   <summary>证据边界</summary>
                   <Text type="secondary">尚未证明：{displayedStatus.notProven.join('、')}</Text>
                 </details>

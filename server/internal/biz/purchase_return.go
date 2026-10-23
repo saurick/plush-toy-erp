@@ -202,7 +202,7 @@ func (uc *InventoryUsecase) CreatePurchaseReturnFromReceipt(ctx context.Context,
 			Note:                  requested.Note,
 		}
 		if source.UnitPrice != nil {
-			amount := source.UnitPrice.Mul(requested.Quantity)
+			amount := source.UnitPrice.Mul(requested.Quantity).Round(6)
 			item.Amount = &amount
 		}
 		normalized, err := normalizePurchaseReturnItemCreateForReturn(item, false)

@@ -43,10 +43,6 @@
   border-radius: 8px;
 }
 
-.erp-dev-business-rules summary {
-  cursor: pointer;
-}
-
 .erp-dev-business-rules__tests {
   margin-block: 16px;
   overflow-x: auto;

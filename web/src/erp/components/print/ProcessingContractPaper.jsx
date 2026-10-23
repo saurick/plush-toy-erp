@@ -1,4 +1,11 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useLayoutEffect, useRef } from 'react'
+import ContractBlankRows from './ContractBlankRows.jsx'
+import {
+  formatContractPaperPrice,
+  formatContractPaperAmount,
+  formatContractPaperDate,
+} from '../../utils/contractPaperPresentation.mjs'
+
 import PrintEditableText from './PrintEditableText.jsx'
 import {
   calculateProcessingContractTotals,
@@ -31,8 +38,15 @@ function EditableText({
   multiline = false,
   onCommit,
   disabled = false,
+  formatValue = String,
 }) {
-  const displayText = String(renderPrintValue(value))
+  const displayText = formatValue(value ?? '') || '\u00A0'
+  const presentedText = useRef(displayText)
+  const rawValue = useRef(value ?? '')
+  useLayoutEffect(() => {
+    rawValue.current = value ?? ''
+    presentedText.current = displayText
+  }, [value, displayText])
   const commitElementValue = useCallback(
     (element, { normalizeElement = false } = {}) => {
       if (disabled) {
@@ -43,13 +57,23 @@ function EditableText({
           multiline ? element.innerText : element.textContent,
           multiline
         )
-        if (normalizeElement && element.textContent !== (nextValue || '\u00A0')) {
-          element.textContent = nextValue || '\u00A0'
+        const unchanged =
+          (presentedText.current !== null &&
+            nextValue ===
+              normalizeEditableText(presentedText.current, multiline)) ||
+          nextValue === normalizeEditableText(rawValue.current, multiline)
+        if (!unchanged) {
+          rawValue.current = nextValue
+          presentedText.current = null
+          onCommit(nextValue)
         }
-        onCommit(nextValue)
+        if (normalizeElement) {
+          presentedText.current = formatValue(rawValue.current) || '\u00A0'
+          element.textContent = presentedText.current
+        }
       }
     },
-    [disabled, multiline, onCommit]
+    [disabled, multiline, onCommit, formatValue]
   )
 
   return (
@@ -88,13 +112,19 @@ function ContractTableCell({
   onCommit,
   readOnly = false,
   disabled = false,
+  formatValue = String,
 }) {
   if (readOnly || disabled) {
-    return <span className={className}>{renderPrintValue(value)}</span>
+    return (
+      <span className={className}>
+        {renderPrintValue(formatValue(value ?? ''))}
+      </span>
+    )
   }
 
   return (
     <EditableText
+      formatValue={formatValue}
       value={value}
       className={className}
       multiline={multiline}
@@ -119,18 +149,23 @@ export default function ProcessingContractPaper({
   onClauseChange,
   onClauseTitleChange,
   onClauseFocus,
+  readOnly = false,
+  preview = false,
 }) {
   const printableLines = Array.isArray(contract?.lines) ? contract.lines : []
   const totals = calculateProcessingContractTotals(contract?.lines || [], {
     merges: contract?.merges,
   })
-  const templateModesActive = lineSelectionMode || cellSelectionMode
+  const templateModesActive = readOnly || lineSelectionMode || cellSelectionMode
   const clauseGroups = visibleContractClauseGroups(contract.clauses)
 
   return (
-    <div className="erp-processing-contract-paper" ref={paperRef}>
+    <div
+      className={`erp-processing-contract-paper${preview ? ' erp-processing-contract-paper--preview' : ''}`}
+      ref={paperRef}
+    >
       <header className="erp-processing-contract-paper__header">
-        <div className="erp-processing-contract-paper__title">加工合同</div>
+        <div className="erp-processing-contract-paper__title">合同订单</div>
       </header>
 
       <section
@@ -214,18 +249,14 @@ export default function ProcessingContractPaper({
 
       <table className="erp-processing-contract-table" data-table-lines="fixed">
         <colgroup>
-          <col style={{ width: '11.5%' }} />
-          <col style={{ width: '10.5%' }} />
-          <col style={{ width: '10.5%' }} />
-          <col style={{ width: '10.5%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '6.5%' }} />
-          <col style={{ width: '7%' }} />
-          <col style={{ width: '4%' }} />
-          <col style={{ width: '4.5%' }} />
-          <col style={{ width: '9.5%' }} />
-          <col style={{ width: '10%' }} />
-          <col style={{ width: '8.5%' }} />
+          {PROCESSING_CONTRACT_TABLE_COLUMNS.map((column) => (
+            <col
+              key={column.key}
+              style={{
+                width: `${(column.width / PROCESSING_CONTRACT_TABLE_COLUMNS.reduce((sum, item) => sum + item.width, 0)) * 100}%`,
+              }}
+            />
+          ))}
         </colgroup>
         <thead>
           <tr>
@@ -313,6 +344,13 @@ export default function ProcessingContractPaper({
                       }}
                     >
                       <ContractTableCell
+                        formatValue={
+                          column.key === 'unitPrice'
+                            ? formatContractPaperPrice
+                            : column.key === 'amount'
+                              ? formatContractPaperAmount
+                              : String
+                        }
                         value={value}
                         className={`erp-processing-contract-table__cell${
                           column.multiline
@@ -336,8 +374,14 @@ export default function ProcessingContractPaper({
               </tr>
             )
           })}
+          <ContractBlankRows
+            lineCount={printableLines.length}
+            columns={PROCESSING_CONTRACT_TABLE_COLUMNS}
+          />
           <tr className="erp-processing-contract-table__total">
-            <td colSpan={6} />
+            {PROCESSING_CONTRACT_TABLE_COLUMNS.slice(0, 6).map(({ key }) => (
+              <td key={key} />
+            ))}
             <td className="erp-processing-contract-table__total-label">合计</td>
             <td />
             <td />
@@ -345,7 +389,7 @@ export default function ProcessingContractPaper({
               {totals.totalQuantityText || '\u00A0'}
             </td>
             <td className="erp-contract-table__total-value">
-              {totals.totalAmountText || '\u00A0'}
+              {formatContractPaperAmount(totals.totalAmountText) || '\u00A0'}
             </td>
             <td />
           </tr>
@@ -420,6 +464,7 @@ export default function ProcessingContractPaper({
           <div className="erp-processing-contract-signature__date">
             日期：
             <EditableText
+              formatValue={formatContractPaperDate}
               value={contract.buyerSignDateText}
               className="erp-processing-contract-signature__date-value"
               disabled={templateModesActive}
@@ -440,6 +485,7 @@ export default function ProcessingContractPaper({
           <div className="erp-processing-contract-signature__date">
             日期：
             <EditableText
+              formatValue={formatContractPaperDate}
               value={contract.supplierSignDateText}
               className="erp-processing-contract-signature__date-value"
               disabled={templateModesActive}
@@ -449,7 +495,7 @@ export default function ProcessingContractPaper({
         </div>
       </section>
 
-      <PrintAppendixImages images={contract.appendixImages} />
+      <PrintAppendixImages images={contract.appendixImages} autoColumns={3} />
     </div>
   )
 }

@@ -139,7 +139,6 @@ function EditorExample({ size = 'localAction' }) {
       <Space wrap>
         <label htmlFor={`scenario-${key}`}>保存结果</label>
         <Select
-          allowClear={false /* 不可清空：保存演示必须明确模拟结果，空值会混淆成功和失败分支。 */}
           placeholder="样例保存结果"
           id={`scenario-${key}`}
           aria-label="样例保存结果"
@@ -155,7 +154,7 @@ function EditorExample({ size = 'localAction' }) {
             { value: 'unknown', label: '结果未知，先查询' },
           ]}
         />
-        <Button type="primary" onClick={() => setOpen(true)}>
+        <Button type="primary" disabled={!scenario} onClick={() => setOpen(true)}>
           打开编辑弹窗
         </Button>
         <Button onClick={reset} disabled={busy}>

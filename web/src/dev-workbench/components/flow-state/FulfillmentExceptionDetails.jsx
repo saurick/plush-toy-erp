@@ -1,44 +1,135 @@
 import React from 'react'
 import { Button } from 'antd'
-import { fulfillmentStepMatchesRole } from '../../../erp/utils/workflowFulfillment.mjs'
-import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
+import { MermaidDiagram } from '@/common/components/markdown'
+import FilterSelect from '@/common/components/select/FilterSelect'
+import { buildSubflowMermaid } from '../../config/devFulfillmentSubflow.mjs'
 import { getFulfillmentStageCopy } from '../../config/devFulfillmentPresentation.mjs'
 
-export default function FulfillmentExceptionDetails({ selection, context, role, onSelectPlan, onSelectStep, onSelectStage }) {
-  const { guide, plan, steps, selected, related, returnStage, reentryStage } = selection
-  const stageLabel = (step) => `${catalog.fulfillment_flow.indexOf(step) + 1} ${getFulfillmentStageCopy(step).label}`
-  const destination = reentryStage || returnStage
+export default function FulfillmentExceptionDetails({
+  selection,
+  role,
+  onSelectPlan,
+  onSelectStep,
+  onSelectOrigin,
+  onSelectStage,
+}) {
+  const { guide, plan, selected, related, origin } = selection
+  const origins = related.filter((step) =>
+    guide.entry_stages.includes(step.stage)
+  )
+  // Without a chosen plan, the diagram is a menu of registered alternatives.
+  const flow = React.useMemo(
+    () =>
+      selection.graph || {
+        nodes: [
+          { key: 'source', label: guide.diagram.branch_label },
+          ...guide.plans.map((item) => ({ key: item.key, label: item.label })),
+        ],
+        edges: guide.plans.map((item) => ({ from: 'source', to: item.key })),
+      },
+    [selection.graph, guide]
+  )
+  const graph = React.useMemo(
+    () => buildSubflowMermaid(flow, { role, compact: true, direction: 'LR' }),
+    [flow, role]
+  )
+  const onNodeSelect = (id) => {
+    const node = graph.nodes.find((item) => item.id === id)
+    if (!node || node.key === 'source') return
+    if (!plan) onSelectPlan(node.key)
+    else onSelectStep(node.key)
+  }
   return (
-    <section className="erp-dev-fulfillment-guide__exception" data-exception-guide={guide.key}>
-      {context ? <h4>{guide.label}</h4> : <p>{guide.source}</p>}
-      {related.length > 1 || !context && related.length ? (
-        <div className="erp-dev-fulfillment-guide__involved"><span>涉及环节</span>{related.map((step) => <Button key={step.stage} type="link" size="small" aria-pressed={context?.stage === step.stage} onClick={() => onSelectStage(step.stage, true, true)}>{stageLabel(step)}</Button>)}</div>
-      ) : null}
-      <div className="erp-dev-fulfillment-guide__choices" role="group" aria-label="处理方式">
-        <span>处理方式</span>
-        {guide.plans.length === 1 ? <strong>{guide.plans[0].label}</strong> : guide.plans.map((item) => <Button key={item.key} aria-pressed={plan?.key === item.key} onClick={() => onSelectPlan(plan?.key === item.key ? null : item.key)}>{item.label}</Button>)}
+    <section
+      className="erp-dev-fulfillment-guide__exception"
+      data-exception-guide={guide.key}
+    >
+      <div className="erp-dev-fulfillment-guide__choices">
+        {origins.length ? (
+          <FilterSelect
+            label="发生环节"
+            aria-label="发生环节"
+            placeholder="选择发生环节"
+            value={origin?.stage}
+            onChange={onSelectOrigin}
+            options={origins.map((step) => ({
+              value: step.stage,
+              label: getFulfillmentStageCopy(step).label,
+            }))}
+            virtual={false}
+          />
+        ) : (
+          <span>独立业务</span>
+        )}
+        {guide.plans.length > 1 ? (
+          <FilterSelect
+            label="处理方案"
+            aria-label="处理方案"
+            placeholder="选择处理方案"
+            value={plan?.key}
+            onChange={onSelectPlan}
+            options={guide.plans.map((item) => ({
+              value: item.key,
+              label: item.label,
+            }))}
+            virtual={false}
+          />
+        ) : (
+          <span>{plan.label}</span>
+        )}
       </div>
+      <div
+        data-exception-handling={plan ? '' : undefined}
+        data-exception-plan={plan?.key}
+      >
+        <MermaidDiagram
+          chart={graph.chart}
+          label={`${guide.label}流程图`}
+          toolbar="compact"
+          initialZoom={1}
+          nativeSize
+          interactiveNodes={graph.nodes}
+          selectedNodeId={
+            graph.nodes.find((node) => node.key === selected?.key)?.id
+          }
+          onNodeSelect={onNodeSelect}
+          showSourceOnError={false}
+        />
+      </div>
+      {selected ? (
+        <div
+          className="erp-dev-fulfillment-guide__focus"
+          aria-live="polite"
+          data-selected-exception-node={selected.key}
+        >
+          <strong>{selected.label}</strong>
+          <p>{selected.result || selected.condition}</p>
+          {selected.stage ? (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => onSelectStage(selected.stage)}
+            >
+              查看该环节
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="erp-dev-fulfillment-guide__hint">
+          点选图中的方案，展开办理与回接路径。
+        </p>
+      )}
       {plan ? (
-        <section className="erp-dev-chain__details" aria-label="异常步骤与岗位" data-exception-handling data-exception-plan={plan.key}>
-          <ol className="erp-dev-chain__handling-steps">
-            {steps.map((step, index) => (
-              <React.Fragment key={step.key}>
-                {plan.continuation.reentry?.before_step === step.key ? <li className="erp-dev-chain__reentry-note">重新进入 {stageLabel(reentryStage)}{plan.continuation.original_terminal ? ' · 新批' : ''}</li> : null}
-                <li data-role-match={role === 'all' ? undefined : fulfillmentStepMatchesRole(step, role)}>
-                  <button type="button" aria-pressed={selected.key === step.key} onClick={() => onSelectStep(step.key)}><span>{index + 1}</span><strong>{step.label}</strong>{step.role && !step.label.includes(step.role) ? <small>{step.role}</small> : null}</button>
-                </li>
-              </React.Fragment>
-            ))}
-          </ol>
-          <p className="erp-dev-fulfillment-guide__focus" aria-live="polite" data-selected-exception-node={selected.key}>{selected.result || selected.condition}</p>
-          <section className="erp-dev-fulfillment-guide__continuation"><h4>{plan.continuation.kind === 'stop' ? '结束条件' : '继续条件'}</h4><p>{plan.closure}</p><div><span>{plan.continuation.label}</span>{destination ? <Button type="link" size="small" onClick={() => onSelectStage(destination.stage)}>查看第 {catalog.fulfillment_flow.indexOf(destination) + 1} 环节</Button> : null}</div></section>
-        </section>
+        <details
+          className="erp-dev-disclosure erp-dev-fulfillment-guide__instructions"
+          key={`${guide.key}:${plan.key}`}
+        >
+          <summary>完成条件与撤销规则</summary>
+          <p>{plan.closure}</p>
+          <p>{plan.recovery}</p>
+          {guide.approval ? <p>{guide.approval.withdrawal}</p> : null}
+        </details>
       ) : null}
-      <details className="erp-dev-fulfillment-guide__instructions" key={`${guide.key}:${plan?.key || ''}:${context?.stage || ''}`}><summary>处理规则</summary>
-        {context?.handling ? <><p>{context.handling.action}</p><p>{context.handling.resume}</p></> : null}
-        {plan ? <p>撤销或失败：{plan.recovery}</p> : null}
-        {guide.approval ? <><p>审批未通过：{guide.approval.rejected}</p><p>取消：{guide.approval.withdrawal}</p></> : null}
-      </details>
     </section>
   )
 }

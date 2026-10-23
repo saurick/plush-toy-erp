@@ -4,7 +4,6 @@
 .erp-dev-chain-topics__toolbar > .ant-select { width: min(100%, 420px); }
 .erp-dev-chain-topics__diagram { display: grid; gap: 12px; min-width: 0; }
 .erp-dev-chain-topics__system { display: grid; gap: 16px; }
-.erp-dev-chain-topics__system > p { margin: 0; color: var(--erp-text-muted); }
-.erp-dev-chain-topics__system .erp-dev-flow-overview-relations ul { grid-template-columns: minmax(0, 1fr); }
-[data-flow-print-current] .erp-dev-chain-topics__toolbar { display: none; }
+.erp-dev-chain-topics__system .erp-dev-flow-overview-relations li { display: grid; gap: 4px; }
+[data-flow-print-current] .erp-dev-chain-topics__toolbar { margin-block: 12px; }
 [data-flow-print-current] .erp-dev-chain-topics__print-title { display: block; margin-block: 12px; }

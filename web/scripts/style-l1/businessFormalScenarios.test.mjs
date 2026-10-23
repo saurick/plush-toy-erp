@@ -132,13 +132,6 @@ test('product table headers keep the shared single-line browser regression', () 
   assert.match(scenario, /business-table-headers-single-line-dark-narrow\.png/u)
 })
 
-test('workflow list failure assertion follows the current module title', () => {
-  const source = readScenarioSource('shipmentReleaseScenarios')
-
-  assert.match(readScenarioSource('businessCoreProductionChecks'), /expectText\(page, '加载出货放行任务失败'\)/u)
-  assert.doesNotMatch(source, /加载出货放行协同任务失败/u)
-})
-
 test('production exception workflow scenario follows the current approval empty state', () => {
   const source = readScenarioSource('productionRecordScenarios')
 
@@ -178,72 +171,11 @@ test('production exception workflow scenario follows the current approval empty 
   assert.match(source, /taskWorkspaceRenderedGap/u)
 })
 
-test('read-only shipment release mock preserves requested paging metadata', () => {
-  const source = readScenarioSource('shipmentReleaseScenarios')
-
-  const startIndex = source.indexOf('const readonlyShipmentReleaseTask')
-  const routeCase = source.slice(startIndex, startIndex + 6_000)
-
-  assert.ok(startIndex >= 0)
-  assert.match(routeCase, /stylePaginatedRpcData/u)
-  assert.match(routeCase, /'tasks'/u)
-  assert.match(routeCase, /body\.params \|\| \{\}/u)
-  assert.doesNotMatch(routeCase, /limit:\s*100|offset:\s*0/u)
-})
-
-test('shipping release L1 scenarios use the formal finance approval process task', () => {
-  const source = readScenarioSource('shipmentReleaseScenarios')
-
-  const fixture = readScenarioSource('shipmentApprovalFixtures')
-  const currentScenarios = source
-  const readonlyScenario = source.slice(
-    source.indexOf(
-      "name: 'business-formal-shipping-release-readonly-actions-desktop'"
-    ),
-    source.indexOf(
-      "name: 'business-formal-shipping-release-readonly-actions-desktop'"
-    ) + 7_000
-  )
-
-  assert.match(fixture, /task_group: 'shipment_finance_approval'/u)
-  assert.match(fixture, /source_type: 'shipment'/u)
-  assert.match(fixture, /owner_role_key: 'finance'/u)
-  assert.match(fixture, /required_capability_key: 'workflow\.task\.approve'/u)
-  assert.match(
-    fixture,
-    /task_code: `PROC-\$\{processInstanceID\}-NODE-\$\{processNodeInstanceID\}-A1`/u
-  )
-  assert.match(
-    currentScenarios,
-    /createShipmentFinanceApprovalTaskFixture\(\{/u
-  )
-  assert.match(readonlyScenario, /role_key: 'finance', name: '财务'/u)
-  assert.doesNotMatch(currentScenarios, /taskGroup: 'shipment_release'/u)
-  assert.doesNotMatch(currentScenarios, /出货放行(?:协同确认|刷新后协同确认)/u)
-  assert.doesNotMatch(readonlyScenario, /role_key: 'warehouse', name: '仓库'/u)
-})
-
 test('business-core detail and lineage checks are scoped to their surfaces', () => {
   const source = readScenarioSource('businessCoreShipmentChecks')
 
   assert.match(readScenarioSource('businessListPresentationScenarios'), /afterModalOpen: async \(modal\)/u)
   assert.match(readScenarioSource('businessListPresentationScenarios'), /modal[\s\S]{0,120}getByText\('PR-STYLE-L1'/u)
-  assert.match(
-    readScenarioSource('businessCoreProductionChecks'),
-    /shippingReleaseTaskRow[\s\S]{0,220}getByText\('可执行'/u
-  )
-  assert.match(
-    readScenarioSource('shipmentReleaseScenarios'),
-    /readonlyShippingReleaseRow[\s\S]{0,220}getByText\('可执行'/u
-  )
-  assert.match(
-    readScenarioSource('businessCoreProductionChecks'),
-    /business-workflow-shipping-release-attachment-modal[\s\S]{0,180}modalTitle: '任务附件',[\s\S]{0,80}panelTitle: '任务附件'/u
-  )
-  assert.match(
-    readScenarioSource('businessCoreProductionChecks'),
-    /const viewTaskButton = await findSelectionActionButton\([\s\S]{0,80}'查看任务'[\s\S]{0,180}viewTaskButton\.isDisabled\(\)/u
-  )
   assert.match(
     readScenarioSource('businessCoreQualityChecks'),
     /erp-business-selection-action-menu:visible[\s\S]{0,180}keyboard\.press\('Escape'\)/u

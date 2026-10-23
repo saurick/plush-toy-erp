@@ -39,7 +39,7 @@ function displayOptionalValue(value, fallback = '-') {
 }
 
 function displaySalesOrderItemAmount(record, fallback = '-') {
-  return displayOptionalValue(deriveSalesOrderItemAmount(record), fallback)
+  return displayOptionalValue(deriveSalesOrderItemAmount(record, { allowSnapshotFallback: true }), fallback)
 }
 
 function contactText(snapshot = {}, fallback = '-') {
@@ -419,7 +419,7 @@ export function buildSalesOrderColumnProfile(adminProfile, listColumns) {
     const members = column.sourceColumnKeys || [key]
     for (const member of members) keys.set(member, key)
     const savedMembers = members.filter((member) => savedOrder.includes(member))
-    if (savedMembers.length && savedMembers.every((member) => savedHidden.includes(member))) hidden.push(key)
+    if (savedMembers.length && savedMembers.every((member) => savedHidden.includes(member))) { hidden.push(key) }
   }
   const order = [...new Set(savedOrder.map((key) => keys.get(key)).filter(Boolean))]
   return {
@@ -495,8 +495,8 @@ export function buildSalesOrderItemColumns() {
       width: 100,
       sorter: (a, b) =>
         compareNumeric20Scale6Values(
-          deriveSalesOrderItemAmount(a),
-          deriveSalesOrderItemAmount(b)
+          deriveSalesOrderItemAmount(a, { allowSnapshotFallback: true }),
+          deriveSalesOrderItemAmount(b, { allowSnapshotFallback: true })
         ),
       render: (value, record) => displaySalesOrderItemAmount(record),
       exportValue: (record) => displaySalesOrderItemAmount(record, ''),

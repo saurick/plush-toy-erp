@@ -566,17 +566,10 @@
   white-space: nowrap;
 }
 
-.erp-dev-permission-overview .erp-dev-permission-evidence-disclosure[open] {
+.erp-dev-permission-overview .erp-dev-permission-evidence-disclosure {
   flex-basis: 100%;
 }
 
 .erp-dev-permission-legend > summary {
-  min-height: 32px;
   align-content: center;
-  color: var(--erp-text-muted);
-  cursor: pointer;
-}
-
-.erp-dev-permission-legend[open] > summary {
-  margin-bottom: 8px;
 }

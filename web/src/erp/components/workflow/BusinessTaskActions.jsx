@@ -45,6 +45,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   const compact = screens.sm === false
   const [form] = Form.useForm()
   const [open, setOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
   const [view, setView] = useState('create')
   const [context, setContext] = useState(null)
   const [options, setOptions] = useState(null)
@@ -297,7 +298,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
     <>
       {panelOpen === undefined ? <Button size="small" className="erp-business-task-collaboration-entry" icon={<UnorderedListOutlined />} data-business-action-key="related-tasks" disabled={disabled || (!source && !pending)} title={!source && !pending ? '请先选择一张单据' : undefined} onClick={() => openView(pending ? 'create' : 'related')}>{pending ? '确认任务创建结果' : '任务协作'}</Button> : null}
       <BusinessFormModal
-        open={open}
+        open={open && !progressOpen}
         forceRender
         title={view === 'related' ? '相关任务' : view === 'receipt' ? '跟进任务已创建' : '新建跟进任务'}
         className="business-task-panel"
@@ -339,7 +340,10 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
           {view === 'related' ? (
             <Space wrap size={8} className="business-task-panel__toolbar" aria-label="当前单据任务操作">
               {createAction}
-              <WorkflowSourceProgressButton sourceType={contextType} sourceID={sourceID} profile={adminProfile} disabled={disabled || sourceLoading || !matchingSource} />
+              {/* 任务窗口统一保留操作栏，避免子抽屉关闭时提前解锁。 */}
+              <SelectionActionOverlayContext.Provider value={null}>
+                <WorkflowSourceProgressButton sourceType={contextType} sourceID={sourceID} profile={adminProfile} disabled={disabled || sourceLoading || !matchingSource} onOpenChange={setProgressOpen} />
+              </SelectionActionOverlayContext.Provider>
             </Space>
           ) : null}
           {view === 'related' ? compact ? (

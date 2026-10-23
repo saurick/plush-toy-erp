@@ -502,6 +502,48 @@ export function progressDelivery(row) {
   }
 }
 
+export function progressDeliveryDetails(row) {
+  const delivery = progressDelivery(row)
+  const actual = row.view === 'orders' ? row.shipped_quantity : row.completed_quantity
+  return {
+    label: delivery.label,
+    value: delivery.text,
+    percent: delivery.percent === undefined
+      ? undefined
+      : (Number(actual) / Number(row.ordered_quantity)) * 100,
+    note: row.view === 'orders'
+      ? '按实际出货数量核对订购数量，任务完成不代表已经出货。不同单位分别查看明细。'
+      : '按有效完工数量核对计划数量，任务完成不代表已经完工。不同单位分别查看明细。',
+  }
+}
+
+export function progressMetricDetails(row, key, access = {}) {
+  const stage = progressStages(row, access).find((item) => item.key === key)
+  if (!stage || stage.disabled) return null
+  if (key === 'engineering') {
+    return {
+      label: '资料确认',
+      value: stage.text,
+      percent: stage.percent,
+      note: '已确认的产品资料项数 / 需确认的资料项数。',
+    }
+  }
+  if (key === 'materials') {
+    return {
+      label: '领料',
+      percent: stage.percent,
+      value: row.material_total > 0
+        ? `${Math.max(0, row.material_total - row.material_pending)} / ${row.material_total} 项已领齐`
+        : '暂无可核对的领料项',
+      note: '按已登记领料与计划用量核对；尚未领齐不代表库存缺料。',
+    }
+  }
+  if (key === 'shipment' || (key === 'production' && row.view === 'production')) {
+    return progressDeliveryDetails(row)
+  }
+  return { label: stage.label, value: stage.text, note: '按已登记的工序批次核对，任务完成不代表生产或质检事实完成。' }
+}
+
 export function progressSourcePath(record, view = 'orders') {
   if (record.kind === 'task') {
     return `/erp/task-board?q=${encodeURIComponent(record.number)}&status=all`

@@ -116,18 +116,20 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
   assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
-  assert.match(page, /renderTopics=\{\(\{ onSelectTopic, selectedTopicKey \}\) => <BusinessChainTopics/u);
+  assert.match(page, /renderTopics=\{\(\{ onSelectTopic, selectedTopicKey \}\) => \(\s*<BusinessChainTopics/u);
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
-  assert.match(guide, /按业务查阅/u);
+  assert.match(guide, /aria-label="流程视图"/u);
+  assert.match(guide, /业务专题/u);
+  assert.doesNotMatch(guide, /按业务查阅|返回完整流程|topic-nodes/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
   assert.match(guide, /aria-label="流程详情"/u);
-  assert.match(guide, /<ExceptionFlowDirectory/u);
+  assert.match(guide, /aria-label="异常处理目录"/u);
   assert.match(guide, /data-exception-entry=\{guide.key\}/u);
   assert.doesNotMatch(guide, /完整交接与审批说明|按文字选择子步骤/u);
   assert.match(guide, /关注岗位/u);
   assert.match(guide, /fulfillmentStepMatchesRole/u);
   assert.match(guide, /fulfillmentTaskLinks/u);
-  assert.match(guide, /完整流程/u);
+  assert.match(guide, /订单全流程/u);
   assert.match(chain, /data-stage-exception=\{step.stage\}/u);
   assert.match(guide, /<FulfillmentChainCanvas/u, "the main chain remains present while an exception is open");
   assert.match(chainModel, /buildFulfillmentOverview\(flow\)/u, "the total flow groups the canonical source stages");
@@ -234,15 +236,14 @@ test("dev flow state observatory: pasted business text search is local, grouped,
   );
   assert.match(search, /点击示例会直接带入并搜索/u);
   assert.match(search, /去查真实任务/u);
-  assert.match(search, /const keyword = draftKeyword/u);
+  assert.match(search, /const keyword = searchKeyword/u);
   assert.match(
     search,
     /clearSearch\(\)[\s\S]{0,100}?onOpenTaskLookup\(keyword\)/u,
   );
   assert.match(search, /没有匹配定义/u);
-  assert.match(search, /onCompositionStart/u);
-  assert.match(search, /onCompositionEnd/u);
-  assert.match(search, /event\.nativeEvent\.isComposing/u);
+  assert.match(search, /onSearch=\{\(value\) => setSearchKeyword\(value\)\}/u);
+  assert.doesNotMatch(search, /onCompositionStart|onCompositionEnd|onChange=/u);
   assert.match(search, /erp-dev-flow-search-results/u);
   assert.doesNotMatch(search, /setSearchParams|QUERY_KEYS\.search/u);
   assert.match(helper, /normalizedValue\.includes\(normalizedTerm\)/u);
@@ -278,7 +279,6 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "flow_role",
     "flow_stage",
     "flow_substep",
-    "flow_handling",
     "flow_tab",
     "flow_topic",
     "flow_exception",
@@ -327,10 +327,10 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
   assert.match(page, /erp-dev-flow-context-path/u);
   assert.match(page, /data-selected-chain-node/u);
   assert.match(page, /data-business-chain-overview/u);
-  assert.match(page, /data-overview-chain/u);
+  assert.match(page, /data-topic-diagram/u);
   assert.match(page, /data-overview-relation/u);
   assert.match(page, /buildDevBusinessChainTopics\(catalog, role\)/u);
-  assert.match(page, /<Drawer title="系统衔接图"/u);
+  assert.match(page, /title="系统衔接图"/u);
 });
 
 test("dev flow state observatory: customer review print is generated from the shared catalog and contains no second flow catalog", () => {

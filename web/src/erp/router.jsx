@@ -372,15 +372,6 @@ function businessTaskRoutes() {
               }
       />
       <Route
-        path="warehouse/shipping-release"
-        element={
-          <WorkflowBusinessModulePage
-            key="shipping-release"
-            moduleKey="shipping-release"
-          />
-              }
-      />
-      <Route
         path="warehouse/outbound"
         element={<OperationalFactPage moduleKey="outbound" />}
       />

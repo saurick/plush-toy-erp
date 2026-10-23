@@ -1705,7 +1705,7 @@ func (r *operationalFactRepo) GetProductionFactTransitionPolicy(ctx context.Cont
 	}, nil
 }
 
-func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {
+func (r *operationalFactRepo) productionFactListQuery(filter biz.OperationalFactFilter) *ent.ProductionFactQuery {
 	q := r.data.postgres.ProductionFact.Query()
 	if filter.Status != "" {
 		q = q.Where(productionfact.Status(filter.Status))
@@ -1756,8 +1756,13 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 		q = q.Where(productionfact.OccurredAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		q = q.Where(productionfact.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
+		q = q.Where(productionfact.OccurredAtLTE(*filter.DateTo))
 	}
+	return q
+}
+
+func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {
+	q := r.productionFactListQuery(filter)
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -2352,4 +2357,9 @@ func entProductionFactToBiz(row *ent.ProductionFact) *biz.ProductionFact {
 		out.SKUCodeSnapshot = row.Edges.ProductSku.SkuCode
 	}
 	return out
+}
+
+func (r *operationalFactRepo) CountProductionFactsByStatus(ctx context.Context, filter biz.OperationalFactFilter) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, r.productionFactListQuery(filter).GroupBy(productionfact.FieldStatus).Aggregate(ent.Count()).Scan)
 }

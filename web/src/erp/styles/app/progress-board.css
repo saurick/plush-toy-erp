@@ -153,19 +153,16 @@
   font-size: var(--erp-font-caption);
 }
 .erp-progress-table th:nth-child(1) {
-  width: 29%;
+  width: 32%;
 }
 .erp-progress-table th:nth-child(2) {
   width: 15%;
 }
 .erp-progress-table th:nth-child(3) {
-  width: 20%;
+  width: 22%;
 }
 .erp-progress-table th:nth-child(4) {
-  width: 28%;
-}
-.erp-progress-table th:nth-child(5) {
-  width: 8%;
+  width: 31%;
 }
 .erp-progress-table td {
   min-width: 0;
@@ -177,11 +174,20 @@
 .erp-progress-row.is-selected {
   background: var(--erp-primary-softer);
 }
+@media (hover: hover) {
+  .erp-progress-row:has(.erp-progress-row-open):hover {
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+.erp-progress-row:has(.erp-progress-row-open) {
+  cursor: pointer;
+}
 .erp-progress-row-open {
   width: 100%;
-  min-height: 44px;
+  min-height: 24px;
   padding: 0;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -214,11 +220,16 @@
 .erp-progress-table .erp-progress-product {
   align-items: center;
 }
-.erp-progress-identity > strong {
+.erp-progress-identity > strong,
+.erp-progress-row-open {
   color: var(--erp-text);
   font-size: var(--erp-font-body);
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+.erp-progress-row-open:focus-visible {
+  outline: 2px solid var(--erp-control-focus-border);
+  outline-offset: 3px;
 }
 .erp-progress-reference,
 .erp-progress-customer {
@@ -308,16 +319,26 @@
   font-size: var(--erp-font-small);
   font-weight: 500;
 }
-.erp-progress-attention > span {
+.erp-progress-attention > span:where(:not(.erp-task-reason)) {
   color: var(--erp-text-muted);
 }
-.erp-progress-attention-cell,
-.erp-progress-action-cell {
+.erp-progress-attention-cell {
   text-align: left;
 }
-.erp-progress-action-cell .ant-btn {
+.erp-progress-attention-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.erp-progress-attention-content > .erp-progress-attention {
+  flex: 1;
+}
+.erp-progress-task-entry.ant-btn {
+  flex: 0 0 auto;
   height: auto;
-  min-height: 36px;
+  min-height: 32px;
   padding: 4px 0;
   font-size: var(--erp-font-caption);
 }
@@ -359,11 +380,10 @@
     grid-column: 1 / -1;
   }
   .erp-progress-attention-cell {
-    grid-column: 1;
+    grid-column: 1 / -1;
   }
-  .erp-progress-action-cell {
-    grid-column: 2;
-    align-self: end;
+  .erp-progress-task-entry.ant-btn {
+    min-height: 44px;
   }
 }
 .erp-progress-record-main,
@@ -467,24 +487,33 @@
   margin-top: 12px;
 }
 .erp-progress-modal .ant-modal-body {
-  max-height: min(70dvh, 760px);
+  display: flex;
+  flex-direction: column;
+  height: min(74dvh, 800px);
+  overflow: hidden;
+}
+.erp-progress-detail-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 16px 28px 20px 0;
 }
-.erp-progress-detail-records {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--erp-border);
+.erp-progress-detail-scroll:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
 }
 .erp-progress-detail-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 16px;
+  flex: 0 0 auto;
+  gap: 4px;
+  border-bottom: 1px solid var(--erp-border);
 }
-.erp-progress-detail-tabs > [role='tab'] {
-  min-height: 44px;
-}
+.erp-progress-modal .erp-progress-detail-tabs.erp-navigation-tabs > [role='tab'] { min-height: 44px; }
+.erp-progress-detail-scroll > .ant-spin-nested-loading { min-height: 80px; }
+.erp-progress-record-main { min-width: 0; overflow-wrap: anywhere; }
 .erp-progress-detail-actions {
   display: flex;
   flex-wrap: wrap;
@@ -530,4 +559,10 @@
   color: var(--erp-primary-strong);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+@media (width <= 600px) {
+  .erp-progress-modal .erp-progress-detail-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .erp-progress-modal .erp-progress-overview-identity { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .erp-progress-modal .erp-progress-header-meta { justify-items: start; }
 }

@@ -136,7 +136,6 @@ export function VersionOverview({
                     href={
                       publicEntry?.endpoint || selectedTargetDefinition.endpoint
                     }
-                    target="_blank"
                     rel="noreferrer"
                   >
                     打开公网页面
@@ -202,7 +201,7 @@ export function VersionOverview({
               {strictSummaryLabel}
             </Tag>
           </Space>
-          <details className="erp-dev-delivery-inline-details">
+          <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
             <summary>时间与耗时</summary>
             <Text type="secondary">
               实际耗时{' '}

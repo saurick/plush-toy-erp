@@ -392,7 +392,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
                 ? `失败原因：${deliveryPipelinePresentation(summary.failureReason.job).label} / ${deliveryPipelinePresentation(summary.failureReason.step).label}`
                 : '最近流水线没有失败步骤'}
             </Text>
-            <Link href={latestRun.url} target="_blank" rel="noreferrer">
+            <Link href={latestRun.url} rel="noreferrer">
               {latestRun.url.includes('github.com')
                 ? '查看 GitHub 运行'
                 : '查看 GitLab pipeline'}
@@ -433,7 +433,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
               <Text type="secondary">此处保留发布复用、关键路径与耗时汇总；原始任务记录由 GitLab 管理。</Text>
             </Space>
           ) : analysisJobs.length > 0 ? (
-            <details className="erp-dev-pipeline-timing__details">
+            <details className="erp-dev-disclosure erp-dev-pipeline-timing__details">
               <summary>
                 查看全部任务与步骤（{String(analysisJobs.length)} 个任务）
               </summary>
@@ -466,6 +466,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
                   )
                   return (
                     <details
+                      className="erp-dev-disclosure"
                       key={job.id}
                       open={expandedJobIdSet.has(job.id)}
                       onToggle={(event) =>

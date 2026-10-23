@@ -57,6 +57,7 @@ export function createDevSharedComponentScenarios({
           exact: true,
         })
         await search.fill('PrintEditableText')
+        await search.press('Enter')
         await page.waitForURL((url) => url.searchParams.get('controlq') === 'PrintEditableText')
         await directory.getByRole('button').nth(1).waitFor({ state: 'detached' })
         assert.equal(await directory.getByRole('button').count(), 1)
@@ -78,6 +79,7 @@ export function createDevSharedComponentScenarios({
         await catalog.waitFor()
         assert.equal(await search.inputValue(), 'PrintEditableText')
         await search.fill('没有这样的控件')
+        await search.press('Enter')
         await directory.getByText('没有匹配的控件', { exact: true }).waitFor()
         await directory
           .getByRole('button', { name: '清除搜索', exact: true })

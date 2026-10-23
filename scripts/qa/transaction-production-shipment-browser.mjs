@@ -1320,7 +1320,7 @@ export async function productionShipmentFlow(
     await expect(
       page.locator('[data-business-action-key="shipment-ship"]'),
     ).toBeDisabled();
-    await pageAction(page, "核对出货审批");
+    await pageAction(page, "提交出货审批");
     const releasePopup = page.locator(".ant-popover:visible");
     await clickRPC(page, "start_finished_goods_delivery_process", () =>
       releasePopup

@@ -46,7 +46,9 @@ test("scheduled backup is bounded, verified, offsite and failure-visible", () =>
   assert.match(backupSource, /durationSeconds/u);
   assert.match(backupSource, /write_status failed/u);
   assert.match(backupSource, /lock_acquired.*completed/u);
-  assert.match(backupSource, /-mtime "\+\$retention_days" -delete/u);
+  assert.match(backupSource, /retention-files[.]mjs/u);
+  assert.match(backupSource, /scheduled "\$backup_dir" --execute/u);
+  assert.doesNotMatch(backupSource, /-mtime[^\n]*-delete/u);
   assert.doesNotMatch(
     backupSource,
     /docker\s+(?:volume|image|system)\s+prune/u,

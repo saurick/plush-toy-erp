@@ -10,6 +10,9 @@ export const TARGET_PREFLIGHT_CONTRACT = "plush.target-preflight/v1";
 export const REMOTE_TARGET_PREFLIGHT_CONTRACT =
   "plush.remote-target-preflight/v1";
 export const ACTIVE_DATASET_VERSION_NOT_APPLICABLE = "not_applicable";
+// Includes filesystem inventory under backup I/O; database statements retain
+// their own shorter deadline and every check must still complete.
+export const TARGET_PREFLIGHT_TIMEOUT_MS = 60_000;
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
@@ -82,6 +85,9 @@ const REPORT_KEYS = Object.freeze([
 const REMOTE_TARGET_PREFLIGHT_SCRIPT_TEMPLATE = String.raw`#!/usr/bin/env bash
 set -euo pipefail
 umask 077
+
+preflight_stage() { printf 'PLUSH_PREFLIGHT_STAGE=%s\n' "$1" >&2; }
+preflight_stage identity
 
 target_key=__TARGET_KEY__
 expected_hostname=__EXPECTED_HOSTNAME__
@@ -341,6 +347,7 @@ else
   resource_identity_status=blocked
 fi
 
+preflight_stage configuration
 clean_env=(
   env -i
   "HOME=$HOME"
@@ -379,6 +386,7 @@ read_git_sha() {
     head -n1
 }
 
+preflight_stage runtime
 if inspect_container "$server_container" app-server; then
   server_sha="$(read_git_sha "$server_container")"
 else
@@ -396,6 +404,7 @@ if [[ ! "$server_sha" =~ ^[0-9a-f]{40}$ || ! "$web_sha" =~ ^[0-9a-f]{40}$ || "$s
   block target_runtime_sha_mismatch
 fi
 
+preflight_stage health
 curl --fail --silent --show-error --max-time 5 "$server_endpoint/healthz" >/dev/null 2>&1 &&
   server_health=passed ||
   block target_server_health_failed
@@ -406,6 +415,7 @@ curl --fail --silent --show-error --max-time 5 "$web_endpoint/healthz" >/dev/nul
   web_health=passed ||
   block target_web_health_failed
 
+preflight_stage public_entry
 public_containers="$(
   docker ps --format '{{.Names}}' 2>/dev/null |
     grep -E "^\${public_container_prefix}[0-9a-f]{8}$" || true
@@ -450,8 +460,10 @@ else
 fi
 
 __TARGET_RELEASE_RETENTION_SCRIPT__
+preflight_stage retention
 preview_target_release_retention
 
+preflight_stage database
 if [[ -e "$migration_lock" ]]; then
   if command -v lslocks >/dev/null 2>&1 &&
     lslocks --noheadings --output PATH 2>/dev/null | grep -Fxq "$migration_lock"; then
@@ -469,31 +481,36 @@ elif ! docker exec "$postgres_cid" sh -c 'command -v pg_dump >/dev/null 2>&1'; t
   backup_tooling_status=blocked
   block target_backup_tooling_missing
 else
-  read_database_scalar() {
-    local query="$1"
-    docker exec "$postgres_cid" sh -c '
-      psql -X --no-psqlrc -A -t -q -v ON_ERROR_STOP=1 \
+  # One read-only statement observes migration and configuration together and
+  # avoids starting five Docker/psql processes while backups share the disk.
+  database_snapshot_ok=false
+  database_snapshot_pattern='^[^|]*[|][^|]*[|][^|]*[|][^|]*[|][^|]*$'
+  if database_snapshot="$(docker exec \
+    -e PGCONNECT_TIMEOUT=5 \
+    -e 'PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=10000' \
+    "$postgres_cid" sh -c '
+      psql -X --no-psqlrc -A -t -q -F "|" -v ON_ERROR_STOP=1 \
         -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"
-    ' sh "$query" 2>/dev/null | tr -d '\r' | sed -n '1p'
-  }
-  if migration_version="$(read_database_scalar "SELECT version FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2 ORDER BY executed_at DESC LIMIT 1")" &&
-    [[ "$migration_version" =~ ^20[0-9]{12}$ ]]; then
+    ' sh "SELECT
+      COALESCE((SELECT version FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2 ORDER BY executed_at DESC LIMIT 1), ''),
+      COUNT(*), COALESCE(MAX(revision), ''), COALESCE(MAX(product_version), ''),
+      COALESCE(MAX(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion')), '')
+      FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active'" 2>/dev/null)" &&
+    [[ "$database_snapshot" != *$'\n'* && "$database_snapshot" != *$'\r'* && "$database_snapshot" =~ $database_snapshot_pattern ]]; then
+    IFS='|' read -r migration_version active_config_count active_config_revision active_config_product_version active_dataset_version <<<"$database_snapshot"
+    database_snapshot_ok=true
+  fi
+  if [[ "$database_snapshot_ok" == true && "$migration_version" =~ ^20[0-9]{12}$ ]]; then
     :
   else
     migration_version=unknown
     database_status=blocked
     block target_migration_readback_failed
   fi
-  if active_config_count="$(read_database_scalar "SELECT COUNT(*) FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active'")" &&
-    [[ "$active_config_count" =~ ^[0-9]+$ ]]; then
+  if [[ "$database_snapshot_ok" == true && "$active_config_count" =~ ^[0-9]+$ ]]; then
     if [[ "$active_config_count" == 0 ]]; then
       active_config_state=absent
-    elif [[ "$active_config_count" == 1 ]] &&
-      active_config_revision="$(read_database_scalar "SELECT revision FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-      active_config_product_version="$(read_database_scalar "SELECT product_version FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-      active_dataset_version="$(read_database_scalar "SELECT COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), '') FROM customer_config_revisions WHERE customer_key = 'yoyoosun' AND status = 'active' ORDER BY id DESC LIMIT 1")" &&
-      [[ "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ ]] &&
-      [[ "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    elif [[ "$active_config_count" == 1 && "$active_config_revision" =~ ^[A-Za-z0-9._-]+$ && "$active_config_product_version" =~ ^[A-Za-z0-9._-]+$ ]]; then
       active_config_state=invalid
       if [[ "$trial_target" == none && -z "$active_dataset_version" ]]; then
         active_dataset_version=__ACTIVE_DATASET_VERSION_NOT_APPLICABLE__
@@ -516,6 +533,7 @@ else
   fi
 fi
 
+preflight_stage backup
 if plain_directory "$root/backups"; then
   latest_backup="$(find "$root/backups" -maxdepth 1 -type f -name '*.dump' -size +0c -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
   if [[ -n "$latest_backup" && -f "$latest_backup" && ! -L "$latest_backup" ]]; then
@@ -524,6 +542,7 @@ if plain_directory "$root/backups"; then
   fi
 fi
 
+preflight_stage report
 blockers_csv=none
 if (( \${#blockers[@]} > 0 )); then
   blockers_csv="$(printf '%s\n' "\${blockers[@]}" | sort -u | paste -sd, -)"
@@ -1098,7 +1117,7 @@ export function runTargetPreflight(
   targetKey,
   {
     runCommand = spawnSync,
-    timeoutMs = 30_000,
+    timeoutMs = TARGET_PREFLIGHT_TIMEOUT_MS,
     now = new Date().toISOString(),
     localIdentity,
   } = {},
@@ -1131,25 +1150,45 @@ export function runTargetPreflight(
   return publicTargetPreflight(target, remote, now);
 }
 
+const PREFLIGHT_STAGES = new Set([
+  "identity", "configuration", "runtime", "health", "public_entry",
+  "retention", "database", "backup", "report",
+]);
+
 export async function runTargetPreflightAsync(
   targetKey,
   {
     spawnCommand = spawn,
-    timeoutMs = 30_000,
+    timeoutMs = TARGET_PREFLIGHT_TIMEOUT_MS,
     now = new Date().toISOString(),
     localIdentity,
   } = {},
 ) {
-  const execution = resolveTargetReadOnlyExecution(targetKey, {
-    localIdentity,
-  });
+  const execution = resolveTargetReadOnlyExecution(targetKey, { localIdentity });
   const { target } = execution;
-  const child = spawnCommand(execution.command, execution.args, {
-    env: process.env,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const started = Date.now();
+  let stage = "identity";
+  const failure = (code, message, exitCode = null) => {
+    const error = new Error(message);
+    error.preflightDiagnostic = {
+      code, stage, elapsedMs: Date.now() - started, exitCode,
+      transport: execution.transport === "SSH" ? "ssh" : "local",
+    };
+    return error;
+  };
+  let child;
+  try {
+    child = spawnCommand(execution.command, execution.args, {
+      env: process.env,
+      stdio: ["pipe", "pipe", "pipe"],
+      detached: process.platform !== "win32",
+    });
+  } catch {
+    throw failure("target_preflight_start_failed", "target preflight could not start");
+  }
   return new Promise((resolve, reject) => {
     let stdout = "";
+    let stderrLine = "";
     let outputBytes = 0;
     let settled = false;
     let timer;
@@ -1159,66 +1198,60 @@ export async function runTargetPreflightAsync(
       if (timer) clearTimeout(timer);
       callback();
     };
-    const collect = (chunk) => {
-      outputBytes += chunk.length;
-      if (outputBytes > 1024 * 1024) {
-        child.kill("SIGTERM");
-        finish(() => reject(new Error("target preflight output is too large")));
-        return;
+    const stop = () => {
+      if (settled) return;
+      // A timed-out local shell must not leave docker/psql/retention children
+      // running behind the next refresh. This group belongs only to this probe.
+      if (process.platform !== "win32" && Number.isSafeInteger(child.pid)) {
+        try { process.kill(-child.pid, "SIGTERM"); return; } catch {}
       }
-      stdout += chunk.toString("utf8");
+      child.kill("SIGTERM");
     };
-    child.stdout.on("data", collect);
-    child.stderr.on("data", (chunk) => {
+    const count = (chunk) => {
+      if (settled) return false;
       outputBytes += chunk.length;
-      if (outputBytes > 1024 * 1024) child.kill("SIGTERM");
+      if (outputBytes <= 1024 * 1024) return true;
+      stop();
+      finish(() => reject(failure("target_preflight_output_limit", "target preflight output is too large")));
+      return false;
+    };
+    child.stdout.on("data", (chunk) => {
+      if (count(chunk)) stdout += chunk.toString("utf8");
     });
-    child.on("error", (error) => {
-      finish(() =>
-        reject(
-          new Error(
-            `target preflight ${execution.transport} could not start: ${error.message}`,
-          ),
-        ),
-      );
+    child.stderr.on("data", (chunk) => {
+      if (!count(chunk)) return;
+      const lines = (stderrLine + chunk.toString("utf8")).split("\n");
+      stderrLine = lines.pop().slice(-128);
+      for (const line of lines) {
+        const value = line.match(/^PLUSH_PREFLIGHT_STAGE=([a-z_]+)$/u)?.[1];
+        if (PREFLIGHT_STAGES.has(value)) stage = value;
+      }
+    });
+    child.on("error", () => {
+      stop();
+      finish(() => reject(failure("target_preflight_start_failed", "target preflight could not start")));
     });
     child.on("close", (code) => {
       finish(() => {
         if (code !== 0) {
-          reject(
-            new Error(
-              `target preflight ${execution.transport} failed with exit ${String(code)}`,
-            ),
-          );
+          reject(failure("target_preflight_process_failed", `target preflight ${execution.transport} failed with exit ${String(code)}`,
+            Number.isInteger(code) ? code : null));
           return;
         }
         try {
-          resolve(
-            publicTargetPreflight(
-              target,
-              parseRemoteTargetPreflight(stdout, target),
-              now,
-            ),
-          );
-        } catch (error) {
-          reject(error);
+          resolve(publicTargetPreflight(target, parseRemoteTargetPreflight(stdout, target), now));
+        } catch {
+          reject(failure("target_preflight_invalid_report", "target preflight report is invalid"));
         }
       });
     });
-    child.stdin.on("error", (error) => {
-      finish(() =>
-        reject(
-          new Error(
-            `target preflight ${execution.transport} input failed: ${error.message}`,
-          ),
-        ),
-      );
+    child.stdin.on("error", () => {
+      stop();
+      finish(() => reject(failure("target_preflight_input_failed", "target preflight input failed")));
     });
     timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      finish(() =>
-        reject(new Error(`target preflight ${execution.transport} timed out`)),
-      );
+      stop();
+      finish(() => reject(failure("target_preflight_timeout", `target preflight ${execution.transport} timed out`)));
     }, timeoutMs);
     child.stdin.end(buildRemoteTargetPreflightScript(target));
   });

@@ -29,18 +29,18 @@ export {
 } from './detailCellMerge.mjs'
 
 const MATERIAL_DETAIL_COLUMNS = [
-  { key: 'contractNo', label: '采购订单号', editable: true },
-  { key: 'productOrderNo', label: '产品订单编号', editable: true },
-  { key: 'productNo', label: '产品编号', editable: true },
-  { key: 'productName', label: '产品名称', editable: true },
-  { key: 'materialName', label: '材料品名', editable: true },
-  { key: 'vendorCode', label: '款号', editable: true },
-  { key: 'spec', label: '规格', editable: true },
-  { key: 'unit', label: '单位', editable: true },
-  { key: 'unitPrice', label: '单价', editable: true, numeric: true },
-  { key: 'quantity', label: '采购数量', editable: true, numeric: true },
-  { key: 'amount', label: '采购金额', editable: true, numeric: true },
-  { key: 'remark', label: '备注', editable: true, multiline: true },
+  { key: 'contractNo', width: 19.55, label: '采购订单号', editable: true },
+  { key: 'productOrderNo', width: 20.316667, label: '产品订单编号', editable: true },
+  { key: 'productNo', width: 25.316667, label: '产品编号', editable: true },
+  { key: 'productName', width: 21.25, label: '产品名称', editable: true },
+  { key: 'materialName', width: 24.058333, label: '材料品名', editable: true },
+  { key: 'vendorCode', width: 19.775, label: '厂商料号', editable: true },
+  { key: 'spec', width: 21.558333, label: '规格', editable: true },
+  { key: 'unit', width: 12.266667, label: '单位', editable: true },
+  { key: 'unitPrice', width: 15.908333, label: '单价', editable: true, numeric: true },
+  { key: 'quantity', width: 16.133333, label: '采购数量', editable: true, numeric: true },
+  { key: 'amount', width: 18.633333, label: '采购金额', editable: true, numeric: true },
+  { key: 'remark', width: 24.375, label: '备注', editable: true, multiline: true },
 ]
 
 const DEFAULT_CLAUSES = {
@@ -53,7 +53,7 @@ const DEFAULT_CLAUSES = {
     '在订单约定日期前交货。如因货期延误，影响到我司正常上货计划的，我司将对供应商收取违约金。实际交货日期比合同货期延误一天以上的，每延误一天，按100元/款来处罚，直接从货款扣除。',
     '交货中，如因特殊原因不能按期交货，须提前与我司采购沟通确认，经同意后方可延期， 否则订单作废或上款收取违约金；',
     '违约责任和解决合同纠纷的方式：按《经济合同法》和《购销合同条例》规定，需承担的责任进行友好协商或按《合同法》办理。',
-    '因乙方产品质量问题造成经济纠纷，或者延误交期造成的损失均由乙方负责。',
+    '其它约定事项：如因乙方产品质量等问题造成经济纠纷，或者延误交期造成的损失均由乙方负责。',
   ],
   settlement: [
     '按我仓库确认收到货物日期，次月开始对账，每月15号之前完成对账。',
@@ -267,6 +267,7 @@ export const buildMaterialPurchaseContractDraft = (sample = {}) => {
   return {
     printMode: sample.printMode === 'blank' ? 'blank' : 'document',
     contractNo: toText(sample.contractNo),
+    currency: toText(sample.currency).toUpperCase(),
     orderDateText: toText(sample.orderDateText),
     returnDateText: toText(sample.returnDateText),
     supplierName: toText(sample.supplierName),
@@ -312,6 +313,7 @@ export const buildBlankMaterialPurchaseContractDraft = (draft = {}) => {
     ...normalizedDraft,
     printMode: 'blank',
     contractNo: '',
+    currency: '',
     orderDateText: '',
     returnDateText: '',
     supplierName: '',

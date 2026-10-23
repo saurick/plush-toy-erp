@@ -60,7 +60,7 @@ function BusinessChainProjectionContext({
   )
 }
 
-function TaskLookupResults({ lookup, onSelectTask }) {
+function TaskLookupResults({ lookup, onSelectTask, onRetry }) {
   if (lookup.status === 'loading') {
     return (
       <div className="erp-dev-flow-loading" role="status" aria-live="polite">
@@ -75,6 +75,7 @@ function TaskLookupResults({ lookup, onSelectTask }) {
         showIcon
         type="error"
         message="任务查找失败"
+        action={<Button onClick={onRetry}>重试</Button>}
         description={lookup.error}
       />
     )
@@ -119,6 +120,7 @@ function TaskLookupResults({ lookup, onSelectTask }) {
             <li key={task.id}>
               <button
                 type="button"
+                className="erp-dev-directory-item erp-dev-directory-item--stacked"
                 onClick={() => onSelectTask(task)}
                 aria-label={`读取任务：${getWorkflowTaskDisplayName(task)}；任务编号：${task.task_code}；来源单号：${sourceNo}`}
               >
@@ -146,6 +148,8 @@ function TaskFinder({
   taskId,
 }) {
   const controllerRef = useRef(null)
+  const inputRef = useRef(null)
+  const requestedKeywordRef = useRef(null)
   const [lookup, setLookup] = useState({
     status: 'idle',
     candidates: [],
@@ -168,9 +172,11 @@ function TaskFinder({
     onSelectTask(task.id, task)
   }
 
-  const submit = async (form) => {
+  const submit = async (keyword) => {
+    requestedKeywordRef.current = keyword
     controllerRef.current?.abort()
-    const directTaskId = parseDevFlowStateTaskIDReference(draft)
+    onDraftChange(keyword)
+    const directTaskId = parseDevFlowStateTaskIDReference(keyword)
     if (directTaskId) {
       setLookup((current) => ({
         ...current,
@@ -183,7 +189,7 @@ function TaskFinder({
     }
     let query
     try {
-      query = buildDevFlowStateTaskLookupQuery(draft)
+      query = buildDevFlowStateTaskLookupQuery(keyword)
     } catch (error) {
       setLookup({
         status: 'invalid',
@@ -193,7 +199,7 @@ function TaskFinder({
         serverMatchCount: 0,
         error: error.message,
       })
-      form.elements.namedItem('dev-flow-task-search')?.focus()
+      inputRef.current?.focus()
       return
     }
     const controller = new AbortController()
@@ -209,7 +215,7 @@ function TaskFinder({
     try {
       const data = await listWorkflowTasks(query, { signal: controller.signal })
       if (controller.signal.aborted) return
-      const resolved = resolveDevFlowStateTaskLookupPage(data, draft)
+      const resolved = resolveDevFlowStateTaskLookupPage(data, keyword)
       if (resolved.autoSelectedTask) {
         selectTask(resolved.autoSelectedTask)
         return
@@ -233,14 +239,10 @@ function TaskFinder({
 
   return (
     <div className="erp-dev-flow-task-finder">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          submit(event.currentTarget)
-        }}
-      >
+      <div className="erp-dev-flow-task-finder__controls">
         <label htmlFor="dev-flow-task-search">定位业务</label>
         <SearchInput
+          ref={inputRef}
           id="dev-flow-task-search"
           allowClear
           maxLength={200}
@@ -250,24 +252,21 @@ function TaskFinder({
           status={lookup.status === 'invalid' ? 'error' : undefined}
           aria-invalid={lookup.status === 'invalid' || undefined}
           aria-describedby={lookup.status === 'invalid' ? 'dev-flow-task-input-error' : undefined}
-          onChange={(event) => {
+          onSearch={(keyword) => {
+            if (keyword) return submit(keyword)
             controllerRef.current?.abort()
-            setLookup((current) => ({
-              ...current,
-              status: 'idle',
-              candidates: [],
-              error: '',
-            }))
-            onDraftChange(event.target.value)
+            requestedKeywordRef.current = null
+            onDraftChange('')
+            setLookup({ status: 'idle', candidates: [], complete: true, loadedCount: 0, serverMatchCount: 0, error: '' })
+          }}
+          onSubmitted={(keyword) => {
+            // A keyword carried from definition search has not been looked up yet.
+            if (!keyword || requestedKeywordRef.current !== keyword) submit(keyword)
+          }}
+          onInput={() => {
+            if (lookup.status === 'invalid') setLookup((current) => ({ ...current, status: 'idle', error: '' }))
           }}
         />
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={lookup.status === 'loading'}
-        >
-          定位
-        </Button>
         {taskId ? <Button onClick={onClearTask}>清除当前任务</Button> : null}
         {lookup.status === 'invalid' ? (
           <Text
@@ -279,8 +278,8 @@ function TaskFinder({
             {lookup.error}
           </Text>
         ) : null}
-      </form>
-      <TaskLookupResults lookup={lookup} onSelectTask={selectTask} />
+      </div>
+      <TaskLookupResults lookup={lookup} onSelectTask={selectTask} onRetry={() => submit(draft)} />
     </div>
   )
 }

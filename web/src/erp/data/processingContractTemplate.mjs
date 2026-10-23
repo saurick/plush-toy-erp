@@ -12,28 +12,30 @@ import {
 export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
 export const PROCESSING_CONTRACT_DRAFT_VERSION = 4
 export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
-  { key: 'contractNo', fieldKey: 'contractNo', label: '委外加工订单号' },
-  { key: 'productOrderNo', fieldKey: 'productOrderNo', label: '来源订单编号' },
-  { key: 'productNo', fieldKey: 'productNo', label: '产品 / 材料编号' },
+  { key: 'contractNo', width: 19.766667, fieldKey: 'contractNo', label: '委外加工订单号' },
+  { key: 'productOrderNo', width: 21.591667, fieldKey: 'productOrderNo', label: '产品订单编号' },
+  { key: 'productNo', width: 19.775, fieldKey: 'productNo', label: '产品编号' },
   {
     key: 'productName',
+    width: 27.816667,
     fieldKey: 'productName',
-    label: '产品 / 材料名称',
+    label: '产品名称',
     multiline: true,
   },
   {
     key: 'processingItem',
+    width: 29.058333,
     fieldKey: 'processingItem',
-    label: '加工项目',
+    label: '工序名称',
     multiline: true,
   },
-  { key: 'supplierAlias', fieldKey: 'supplierAlias', label: '加工厂商' },
-  { key: 'processCategory', fieldKey: 'processCategory', label: '工序类别' },
-  { key: 'unit', fieldKey: 'unit', label: '单位' },
-  { key: 'unitPrice', fieldKey: 'unitPrice', label: '单价' },
-  { key: 'quantity', fieldKey: 'quantity', label: '委托加工数量' },
-  { key: 'amount', fieldKey: null, label: '委托加工金额' },
-  { key: 'remark', fieldKey: 'remark', label: '备注', multiline: true },
+  { key: 'supplierAlias', width: 16.141667, fieldKey: 'supplierAlias', label: '加工厂商' },
+  { key: 'processCategory', width: 17.041667, fieldKey: 'processCategory', label: '工序类别' },
+  { key: 'unit', width: 10.225, fieldKey: 'unit', label: '单位' },
+  { key: 'unitPrice', width: 15.45, fieldKey: 'unitPrice', label: '单价' },
+  { key: 'quantity', width: 16.816667, fieldKey: 'quantity', label: '委托加工数量' },
+  { key: 'amount', width: 22.5, fieldKey: null, label: '委托加工金额' },
+  { key: 'remark', width: 24.375, fieldKey: 'remark', label: '备注', multiline: true },
 ]
 
 const processingContractColumnIndex = Object.fromEntries(
@@ -70,6 +72,7 @@ const LEGACY_PROCESSING_ATTACHMENT_KEYS = ['attachment-1', 'attachment-2']
 const defaultLines = [
   {
     contractNo: 'SIM-OS-001',
+    currency: 'CNY',
     productOrderNo: 'SIM-SO-001',
     productNo: 'SIM-PROD-001',
     productName: '合成玩偶甲',
@@ -83,6 +86,7 @@ const defaultLines = [
   },
   {
     contractNo: 'SIM-OS-001',
+    currency: 'CNY',
     productOrderNo: 'SIM-SO-001',
     productNo: 'SIM-PROD-001',
     productName: '合成玩偶甲',
@@ -96,6 +100,7 @@ const defaultLines = [
   },
   {
     contractNo: 'SIM-OS-001',
+    currency: 'CNY',
     productOrderNo: 'SIM-SO-001',
     productNo: 'SIM-PROD-001',
     productName: '合成玩偶甲',
@@ -128,7 +133,7 @@ export const processingContractTemplateMeta = {
     '加工合同和采购合同都使用独立打印窗口；其他汇总表和报表模板仍提供示例预览。',
     '先打开可编辑打印窗口，再预览、下载或打印 PDF。',
     '在明细上方或下方插入时会新增空白行，不会复制相邻行内容。',
-    '末尾附图通过工作台统一管理：普通图片自动两张一行，长图自动整行，每张可切换排版，并随 PDF / 打印一起输出。',
+    '末尾附图通过工作台统一管理：普通图片自动每行最多三张，长图自动整行，每张可切换半宽或整行，并随 PDF / 打印一起输出。',
   ],
   tags: ['固定版式', '合同内容', 'PDF / 打印', '可编辑窗口'],
   previewLines: [
@@ -147,6 +152,12 @@ export const processingContractTemplateMeta = {
     '委外订单中标记为合同附图的图片会在打开打印窗口时冻结带入末尾；窗口内新增或调整后按当前顺序随 PDF 或打印件输出。',
   ],
   fieldRequirements: [
+    {
+      key: 'currency',
+      label: '币种',
+      source: '来源委外订单',
+      boundary: 'CNY / USD / HKD；缺失保留空白，打印编辑不回写订单',
+    },
     {
       key: 'outsourcing_header_snapshot',
       label: '加工合同头',
@@ -415,6 +426,7 @@ export function createProcessingContractDraft() {
   return {
     draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     contractNo: 'SIM-OS-001',
+    currency: 'CNY',
     orderDateText: '250608',
     returnDateText: '2025-06-11',
     supplierName: '示例加工厂',
@@ -441,6 +453,7 @@ export function createBlankProcessingContractDraft(draft = {}) {
     ...createProcessingContractDraft(),
     draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     contractNo: '',
+    currency: '',
     orderDateText: '',
     returnDateText: '',
     supplierName: '',
@@ -474,6 +487,7 @@ export function normalizeProcessingContractDraft(draft = {}) {
   return {
     ...createProcessingContractDraft(),
     ...rest,
+    currency: normalizeText(draft.currency).toUpperCase(),
     draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     lines: Array.isArray(lines)
       ? lines.map((line) => normalizeProcessingLine(line))
@@ -496,6 +510,7 @@ export function createProcessingContractBusinessDraft(draft = {}) {
   return {
     ...createBlankProcessingContractDraft({ clauses }),
     ...rest,
+    currency: normalizeText(draft.currency).toUpperCase(),
     draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     lines: Array.isArray(lines)
       ? lines.map((line) => normalizeProcessingLine(line))
@@ -637,6 +652,7 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
   return {
     ...draft,
     contractNo,
+    currency: normalizeText(order.currency).toUpperCase(),
     supplierName,
     supplierContact: normalizeText(supplierSnapshot.contact_name),
     supplierPhone:

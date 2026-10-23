@@ -108,7 +108,7 @@ export default function DevPressureDataset({ report, reports }) {
         历史背景已生成采购单 {format(data.history.purchaseOrders)} 张、采购明细{' '}
         {format(data.history.purchaseItems)} 条；计时流程只消耗当轮订单池。
       </p>
-      <details>
+      <details className="erp-dev-disclosure">
         <summary>背景状态、查询数据与存储占用</summary>
         <p>
           未提交 {format(data.history.states.PREVIEW)}，待老板审批{' '}

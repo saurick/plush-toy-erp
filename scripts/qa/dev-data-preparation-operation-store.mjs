@@ -47,8 +47,8 @@ const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,39}$/u;
 const CURRENT_SCENARIO_READBACK_BASELINE = Object.freeze({
   dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
   runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-  catalogReadyCount: 41,
-  catalogTargetCount: 51,
+  catalogReadyCount: 40,
+  catalogTargetCount: 50,
   browserChecksPending: 10,
 });
 export const DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES =

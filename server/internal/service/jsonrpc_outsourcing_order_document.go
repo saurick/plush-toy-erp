@@ -68,11 +68,11 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {
 			return id, res, nil
 		}
-		dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+		dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+		dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 		if !ok {
 			return id, invalidParamResult(), nil
 		}

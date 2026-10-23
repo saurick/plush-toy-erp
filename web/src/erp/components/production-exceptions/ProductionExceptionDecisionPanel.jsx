@@ -709,6 +709,7 @@ export default function ProductionExceptionDecisionPanel({
                 size="small"
                 data-business-action-key="production-exception-approval"
                 data-business-action-role="action"
+                data-business-action-group="collaboration"
                 disabled={actionAvailability.approval.disabled}
                 onClick={() => ensureApprovalProcess(selectedRecord)}
               >
@@ -728,6 +729,7 @@ export default function ProductionExceptionDecisionPanel({
                 type="primary"
                 data-business-action-key="production-exception-decide"
                 data-business-action-role="primary"
+                data-business-action-group="collaboration"
                 onClick={() => navigate('/erp/task-board')}
                 disabled={actionAvailability.decide.disabled}
               >
@@ -885,14 +887,9 @@ export default function ProductionExceptionDecisionPanel({
           { title: '执行原因', dataIndex: 'execution_reason' },
           { title: '冲正原因', dataIndex: 'reverse_reason' },
         ]}
-        actions={
-          <>
-            <WorkflowSourceProgressButton sourceType="production_exception_decision" sourceID={detailRecord?.id} profile={adminProfile} disabled={loading} />
-            {detailID === selectedID && actionAvailability.execute.visible ? (
-              <Button type="primary" disabled={actionAvailability.execute.disabled} onClick={beginExecution}>确认执行</Button>
-            ) : null}
-          </>
-        }
+        actions={detailID === selectedID && actionAvailability.execute.visible ? (
+          <Button type="primary" disabled={actionAvailability.execute.disabled} onClick={beginExecution}>确认执行</Button>
+        ) : null}
       />
       <BusinessModal
         size="confirm"

@@ -1974,7 +1974,7 @@ export function createMobileTaskAssertions(deps) {
     while (!(await deepTaskButton.isVisible().catch(() => false))) {
       expansionCount += 1
       assert(
-        expansionCount <= 10,
+        expansionCount <= 15,
         `${scenarioName} 未能通过分页找到深层任务 ${deepTaskName}`
       )
       const toggle = page.getByTestId('mobile-role-list-toggle-todo')
@@ -2222,13 +2222,13 @@ export function createMobileTaskAssertions(deps) {
         firstBlock instanceof HTMLElement
           ? window.getComputedStyle(firstBlock)
           : null
-      const list = skeletonNode?.querySelector('.mobile-role-skeleton__list')
+      const list = skeletonNode
       const listRect = list?.getBoundingClientRect()
       const skeletonRect = skeletonNode?.getBoundingClientRect()
       return {
         scrollAriaBusy: scroll?.getAttribute('aria-busy') || '',
         ariaHidden: skeletonNode?.getAttribute('aria-hidden') || '',
-        filterCount: Number(skeletonNode?.dataset?.skeletonFilterCount || 0),
+        filterCount: document.querySelectorAll('[data-testid="mobile-role-task-filters"] .mobile-role-task-filter').length,
         rowCount: Number(skeletonNode?.dataset?.skeletonRowCount || 0),
         blockCount:
           skeletonNode?.querySelectorAll('.mobile-role-skeleton__block')
@@ -2280,7 +2280,7 @@ export function createMobileTaskAssertions(deps) {
     assert.equal(
       defaultMetrics.filterCount,
       4,
-      `${scenarioName} 有审批权限时首屏骨架应预留四项筛选，避免加载后跳动: ${JSON.stringify(defaultMetrics)}`
+      `${scenarioName} 有审批权限时首屏应保留四项真实筛选，避免加载后跳动: ${JSON.stringify(defaultMetrics)}`
     )
     assert(
       defaultMetrics.blockCount > 0 && defaultMetrics.blockCount <= 40,
@@ -2320,18 +2320,17 @@ export function createMobileTaskAssertions(deps) {
 
     await page.emulateMedia({ reducedMotion: 'reduce' })
     const reducedMotionMetrics = await page.evaluate(() => {
-      const block = document.querySelector('.mobile-role-skeleton__block')
+      const block = document.querySelector('.mobile-role-skeleton__row > .erp-task-card__content')
       const style =
         block instanceof HTMLElement ? window.getComputedStyle(block) : null
       return {
-        animationDuration: style?.animationDuration || '',
+        animationName: style?.animationName || '',
+        runningAnimations: block?.getAnimations().length || 0,
       }
     })
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     assert(
-      String(reducedMotionMetrics.animationDuration)
-        .split(',')
-        .every((part) => Number.parseFloat(part) <= 0.01),
+      reducedMotionMetrics.animationName === 'none' && reducedMotionMetrics.runningAnimations === 0,
       `${scenarioName} reduced-motion 下骨架动画未降级: ${JSON.stringify(reducedMotionMetrics)}`
     )
 
@@ -2485,6 +2484,7 @@ export function createMobileTaskAssertions(deps) {
   }
 
   async function readMobileTaskRiskFilterMetrics(page) {
+    await page.locator('[data-testid="mobile-role-task-list"][aria-busy="false"] .mobile-role-message-section').waitFor({ state: 'visible' })
     return page.evaluate(() => {
       const filters = document.querySelector('[data-testid="mobile-role-risk-filters"]')
       const sections = Array.from(document.querySelectorAll('.mobile-role-message-section'))

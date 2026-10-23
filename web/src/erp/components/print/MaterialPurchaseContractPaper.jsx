@@ -1,4 +1,11 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useLayoutEffect, useRef } from 'react'
+import ContractBlankRows from './ContractBlankRows.jsx'
+import {
+  formatContractPaperPrice,
+  formatContractPaperAmount,
+  formatContractPaperDate,
+} from '../../utils/contractPaperPresentation.mjs'
+
 import PrintEditableText from './PrintEditableText.jsx'
 import MaterialContractMetaPair from './MaterialContractMetaPair.jsx'
 import {
@@ -16,8 +23,16 @@ function EditableText({
   className = '',
   multiline = false,
   disabled = false,
+  formatValue = String,
 }) {
   const Tag = multiline ? 'div' : 'span'
+  const displayText = formatValue(value ?? '')
+  const presentedText = useRef(displayText)
+  const rawValue = useRef(value ?? '')
+  useLayoutEffect(() => {
+    rawValue.current = value ?? ''
+    presentedText.current = displayText
+  }, [value, displayText])
   const commitElementValue = useCallback(
     (element, { normalizeElement = false } = {}) => {
       const elementText = multiline ? element.innerText : element.textContent
@@ -29,20 +44,27 @@ function EditableText({
         : String(elementText ?? '')
             .replaceAll('\r', '')
             .trim()
-      if (normalizeElement && element.textContent !== (nextValue || '\u00A0')) {
-        element.textContent = nextValue || '\u00A0'
+      const unchanged =
+        nextValue === presentedText.current?.trim() ||
+        nextValue === String(rawValue.current).trim()
+      if (!disabled && !unchanged) {
+        rawValue.current = nextValue
+        presentedText.current = null
+        onCommit?.(nextValue)
       }
-      if (nextValue !== String(value ?? '')) {
-        onCommit(nextValue)
+      if (normalizeElement) {
+        presentedText.current = formatValue(rawValue.current) || '\u00A0'
+        element.textContent = presentedText.current
       }
     },
-    [multiline, onCommit, value]
+    [multiline, onCommit, disabled, formatValue]
   )
 
   return (
     <PrintEditableText
       as={Tag}
       value={value}
+      text={displayText || '\u00A0'}
       commitElementValue={commitElementValue}
       disabled={disabled}
       className={`erp-material-contract-editable ${className} ${
@@ -50,8 +72,10 @@ function EditableText({
       }`}
       onKeyDown={(event) => {
         if (
-          !multiline && event.key === 'Enter' &&
-          !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229
+          !multiline &&
+          event.key === 'Enter' &&
+          !event.nativeEvent.isComposing &&
+          event.nativeEvent.keyCode !== 229
         ) {
           event.preventDefault()
           event.currentTarget.blur()
@@ -158,10 +182,14 @@ export default function MaterialPurchaseContractPaper({
   cellSelectionMode,
   handleSelectCell,
   totals,
+  preview = false,
 }) {
   const clauseGroups = visibleContractClauseGroups(draft.clauses)
   return (
-    <div className="erp-material-contract-paper" ref={paperRef}>
+    <div
+      className={`erp-material-contract-paper${preview ? ' erp-material-contract-paper--preview' : ''}`}
+      ref={paperRef}
+    >
       <div className="erp-material-contract-paper__title">合同订单</div>
 
       <section
@@ -294,18 +322,14 @@ export default function MaterialPurchaseContractPaper({
 
       <table className="erp-material-contract-table" data-table-lines="fixed">
         <colgroup>
-          <col style={{ width: '10.5%' }} />
-          <col style={{ width: '11%' }} />
-          <col style={{ width: '7.5%' }} />
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '9.5%' }} />
-          <col style={{ width: '9.5%' }} />
-          <col style={{ width: '8.5%' }} />
-          <col style={{ width: '5%' }} />
-          <col style={{ width: '5.5%' }} />
-          <col style={{ width: '8%' }} />
-          <col style={{ width: '8%' }} />
-          <col style={{ width: '8%' }} />
+          {MATERIAL_PURCHASE_DETAIL_COLUMNS.map((column) => (
+            <col
+              key={column.key}
+              style={{
+                width: `${(column.width / MATERIAL_PURCHASE_DETAIL_COLUMNS.reduce((sum, item) => sum + item.width, 0)) * 100}%`,
+              }}
+            />
+          ))}
         </colgroup>
         <thead>
           <tr>
@@ -380,6 +404,13 @@ export default function MaterialPurchaseContractPaper({
                     }}
                   >
                     <EditableText
+                      formatValue={
+                        column.key === 'unitPrice'
+                          ? formatContractPaperPrice
+                          : column.key === 'amount'
+                            ? formatContractPaperAmount
+                            : String
+                      }
                       value={line[column.key]}
                       onCommit={(nextValue) =>
                         handleLineCommit(rowIndex, column.key, nextValue)
@@ -397,8 +428,13 @@ export default function MaterialPurchaseContractPaper({
               })}
             </tr>
           ))}
+          <ContractBlankRows
+            lineCount={draft.lines.length}
+            columns={MATERIAL_PURCHASE_DETAIL_COLUMNS}
+          />
           <tr className="erp-material-contract-table__total">
-            <td colSpan={8} />
+            <td colSpan={7} />
+            <td />
             <td>合计</td>
             <td className="erp-contract-table__total-value">
               {totals.quantityText}
@@ -449,6 +485,7 @@ export default function MaterialPurchaseContractPaper({
           <div className="erp-material-contract-signature__row erp-material-contract-signature__row--date">
             <div className="erp-material-contract-signature__label">日期：</div>
             <EditableText
+              formatValue={formatContractPaperDate}
               value={draft.signDateText}
               onCommit={(nextValue) =>
                 handleFieldCommit('signDateText', nextValue)
@@ -475,6 +512,7 @@ export default function MaterialPurchaseContractPaper({
           <div className="erp-material-contract-signature__row erp-material-contract-signature__row--date">
             <div className="erp-material-contract-signature__label">日期：</div>
             <EditableText
+              formatValue={formatContractPaperDate}
               value={draft.supplierSignDateText}
               onCommit={(nextValue) =>
                 handleFieldCommit('supplierSignDateText', nextValue)

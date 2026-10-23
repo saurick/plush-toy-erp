@@ -40,6 +40,15 @@ export const DEV_TESTING_FIXED_ACTIONS = Object.freeze([
     boundary: '不连接数据库、不启动真实业务浏览器，也不代替端到端验收。',
   }),
   Object.freeze({
+    key: 'business-consistency',
+    priority: 'P1',
+    label: '业务数据一致性专项',
+    shortLabel: '数据一致性',
+    description: '数量、金额、比例、单位、日期、缺值与快照。',
+    boundary:
+      '运行登记的前端与后端测试；真实 PostgreSQL 复用隔离门禁，浏览器与 PDF 单独验证。',
+  }),
+  Object.freeze({
     key: 'rpc-examples',
     priority: 'P1',
     label: '接口文档样例执行核对',
@@ -176,7 +185,7 @@ const AFFECTED_SCOPE_PATTERN = /^T[0-8]$/u
 const PLAN_COMMAND_SCOPE_PATTERN = /^(?:T[0-8]|LOCAL_FULL)$/u
 const LOCAL_GATE_VALUES = Object.freeze(['focused', 'full'])
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|rpc-examples|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
+  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
 const STATUS_META = Object.freeze({
   queued: Object.freeze({ label: '等待启动', tone: 'primary' }),
   running: Object.freeze({ label: '运行中', tone: 'primary' }),
@@ -285,7 +294,7 @@ export function normalizeDevTestingOperation(operation) {
     throw new Error('testing operation is invalid')
   }
   if (Object.hasOwn(operation, 'dataScale')) {
-    if (!operation.action.startsWith('pressure-')) throw new Error('data scale only applies to pressure actions')
+    if (!operation.action.startsWith('pressure-')) { throw new Error('data scale only applies to pressure actions') }
     pressureDataScale(operation.dataScale)
   }
   const terminal = DEV_TESTING_OPERATION_TERMINAL_STATUSES.includes(
@@ -605,7 +614,7 @@ export function createDevTestingOperationClient({
         throw new Error('固定验证请求标识无效')
       }
       if (action.startsWith('pressure-')) pressureDataScale(dataScale)
-      else if (dataScale !== undefined) throw new Error('data scale only applies to pressure actions')
+      else if (dataScale !== undefined) { throw new Error('data scale only applies to pressure actions') }
       const csrfToken = await readSession(signal)
       const response = await fetchImpl(DEV_TESTING_OPERATION_ACTION_API_PATH, {
         method: 'POST',

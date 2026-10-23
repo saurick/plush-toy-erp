@@ -532,25 +532,16 @@ func TestAdminMenuRequirementsDistinguishAnyAndAll(t *testing.T) {
 		}
 	})
 
-	t.Run("shipping release requires workflow task read and one business context", func(t *testing.T) {
-		businessReads := []string{
-			PermissionWarehouseOutboundRead,
-			PermissionFinanceReceivableRead,
-			PermissionSalesOrderRead,
+	t.Run("shipment approval uses task management without a separate release menu", func(t *testing.T) {
+		menus := AdminVisibleMenus(&AdminUser{IsSuperAdmin: true})
+		if adminMenusContainKey(menus, "shipping-release") {
+			t.Fatal("removed release page must not remain in menus")
 		}
-		if adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionWorkflowTaskRead}}), "shipping-release") {
-			t.Fatal("workflow task read alone must not expose shipping release without a business context")
-		}
-		for _, permission := range businessReads {
-			if adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: []string{permission}}), "shipping-release") {
-				t.Fatalf("business context %q alone must not expose a page whose initial list requires workflow task read", permission)
-			}
-			permissions := []string{PermissionWorkflowTaskRead, permission}
-			if !adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: permissions}), "shipping-release") {
-				t.Fatalf("permissions %#v must expose shipping release", permissions)
-			}
+		if !adminMenusContainKey(menus, "task-board") {
+			t.Fatal("approval task management must remain available")
 		}
 	})
+
 }
 
 func adminMenusContainKey(menus []AdminMenu, key string) bool {

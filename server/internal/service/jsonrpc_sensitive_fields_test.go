@@ -12,6 +12,7 @@ func TestRedactSensitiveFieldMapRemovesNestedPrivateAndCommercialFields(t *testi
 		"customer": map[string]any{
 			"name": "客户甲", "phone": "13800138000", "tax_no": "TAX-1",
 			"quoted_freight_amount": "88.5", "goods_amount": "25", "order_total": "113.5",
+			"receivable_amount_snapshot": "124.3", "tax_amount_snapshot": "14.3", "quoted_freight_amount_snapshot": "10",
 			"items": []any{map[string]any{
 				"product_name": "玩偶", "unit_price": "12.5", "amount": "25",
 			}},
@@ -23,6 +24,11 @@ func TestRedactSensitiveFieldMapRemovesNestedPrivateAndCommercialFields(t *testi
 		t.Fatalf("party redaction mismatch: %#v", customer)
 	}
 	item := customer["items"].([]any)[0].(map[string]any)
+	for _, key := range []string{"receivable_amount_snapshot", "tax_amount_snapshot", "quoted_freight_amount_snapshot"} {
+		if _, ok := customer[key]; ok {
+			t.Fatalf("commercial snapshot was not redacted: %s", key)
+		}
+	}
 	if item["product_name"] != "玩偶" || item["unit_price"] != nil || item["amount"] != nil {
 		t.Fatalf("commercial redaction mismatch: %#v", item)
 	}

@@ -9,6 +9,7 @@ export const WORKFLOW_TASK_BOARD_LANE_KEYS = Object.freeze([
 ])
 
 const WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE = Object.freeze({
+  all: new Set(Object.values(WorkflowTaskStatus)),
   actionable: new Set([WorkflowTaskStatus.READY]),
   exception: new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED]),
   due: new Set([WorkflowTaskStatus.READY]),
@@ -59,7 +60,7 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
     : WORKFLOW_TASK_BOARD_LANE_KEYS
   if (
     expectedLaneKeys.some(
-      (key) => !WORKFLOW_TASK_BOARD_LANE_KEYS.includes(key)
+      (key) => key !== 'all' && !WORKFLOW_TASK_BOARD_LANE_KEYS.includes(key)
     ) ||
     response.lanes.length !== expectedLaneKeys.length
   ) {
@@ -80,7 +81,7 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
       !expectedLaneKeys.includes(key) ||
       seenLaneKeys.has(key) ||
       !isNonNegativeSafeInteger(lane.total) ||
-      lane.total !== response.counts[key] ||
+      lane.total !== (key === 'all' ? response.total : response.counts[key]) ||
       !isNonNegativeSafeInteger(lane.limit) ||
       !isNonNegativeSafeInteger(lane.offset) ||
       (Number.isSafeInteger(expectedLimit) && lane.limit !== expectedLimit) ||
@@ -97,6 +98,7 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
           task.id <= 0 ||
           !Number.isSafeInteger(task.version) ||
           task.version <= 0 ||
+          (request.todo_only === true && ![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key)) ||
           !WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE[key].has(
             task.task_status_key
           )

@@ -146,7 +146,8 @@ function inspectSelectionAction(action) {
   const role = action.props['data-business-action-role'] || action.type?.selectionActionRole
   const priorityValue = action.props.selectionActionPriority ?? action.type?.selectionActionPriority
   const priority = typeof priorityValue === 'function' ? priorityValue(action.props) : priorityValue
-  const actionGroup = action.props['data-business-action-group'] || action.type?.selectionActionGroup ||
+  const groupValue = action.props['data-business-action-group'] || action.type?.selectionActionGroup
+  const actionGroup = (typeof groupValue === 'function' ? groupValue(action.props) : groupValue) ||
     SELECTION_ACTION_ROLE_GROUPS[role] || nestedActions[0]?.group || 'business'
   const group = Object.hasOwn(SELECTION_ACTION_GROUPS, actionGroup) ? actionGroup : 'other'
   const nestedScore = nestedActions.length ? Math.max(...nestedActions.map((item) => item.score)) : 30
@@ -1470,8 +1471,12 @@ function isClosingLifecycleAction(action) {
   return ['normal_close', 'short_close', 'cancel'].includes(action?.key)
 }
 
+function getLifecycleActionGroup({ action }) {
+  return isClosingLifecycleAction(action) ? 'lifecycle' : 'business'
+}
+
 BusinessLifecyclePrimaryAction.selectionActionPriority = ({ action }) => isClosingLifecycleAction(action) ? 20 : 100
-BusinessLifecyclePrimaryAction.selectionActionGroup = 'lifecycle'
+BusinessLifecyclePrimaryAction.selectionActionGroup = getLifecycleActionGroup
 
 export function BusinessLifecycleSecondaryAction({
   action = null,
@@ -1498,7 +1503,7 @@ export function BusinessLifecycleSecondaryAction({
 }
 
 BusinessLifecycleSecondaryAction.selectionActionRole = 'secondary'
-BusinessLifecycleSecondaryAction.selectionActionGroup = 'lifecycle'
+BusinessLifecycleSecondaryAction.selectionActionGroup = getLifecycleActionGroup
 
 export function SelectedItemsSummaryTag({
   selectedCount,

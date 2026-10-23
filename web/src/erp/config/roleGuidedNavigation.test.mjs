@@ -393,10 +393,6 @@ test('roleGuidedNavigation: 其他入口沿用 Admin 菜单分组且保留原始
       title: '出货管理',
       items: [
         {
-          key: 'shipping-release',
-          path: '/erp/warehouse/shipping-release',
-        },
-        {
           key: 'shipments',
           path: '/erp/warehouse/shipments',
         },
@@ -429,7 +425,6 @@ test('roleGuidedNavigation: 其他入口沿用 Admin 菜单分组且保留原始
     '/erp/quality/inspections',
     '/erp/master/partners/suppliers',
     '/erp/warehouse/inventory',
-    '/erp/warehouse/shipping-release',
     '/erp/print-center',
   ]
   const result = buildRoleGuidedNavigation({
@@ -473,7 +468,7 @@ test('roleGuidedNavigation: 其他入口沿用 Admin 菜单分组且保留原始
       ['/erp/sales/project-orders/sales-orders'],
       ['/erp/quality/inspections'],
       ['/erp/warehouse/inventory'],
-      ['/erp/warehouse/shipments', '/erp/warehouse/shipping-release'],
+      ['/erp/warehouse/shipments'],
       ['/erp/print-center'],
       ['/erp/help-center'],
     ]

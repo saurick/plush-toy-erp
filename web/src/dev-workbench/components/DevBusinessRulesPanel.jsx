@@ -27,7 +27,7 @@ import FilterSelect from '@/common/components/select/FilterSelect'
 const categoryLabel = (key) =>
   BUSINESS_RULE_CATEGORIES.find((entry) => entry.value === key)?.label
 const gateLabel = (key) =>
-  key === 'server' ? '后端单元与合同' : '关键 PostgreSQL'
+  ({ server: '后端单元与合同', web: '前端数据与打印', postgres: '关键 PostgreSQL' })[key]
 const docsLink = (path) => `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(path)}`
 
 function RuleStatus({ status }) {
@@ -36,7 +36,7 @@ function RuleStatus({ status }) {
   return <Tag color={color}>{label}</Tag>
 }
 
-export default function DevBusinessRulesPanel({ report, reportCurrent }) {
+export default function DevBusinessRulesPanel({ report, reportCurrent, onRunConsistency, consistencyBusy }) {
   const [params, setParams] = useSearchParams()
   const [evidence, setEvidence] = useState(null)
   const [error, setError] = useState('')
@@ -138,10 +138,11 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
         个关键用例。普通测试读取所选覆盖报告，数据库测试复用隔离运行回执；静态关联和历史结果均不代表当前版本通过。
       </Typography.Paragraph>
       <p className="erp-dev-business-rules__run">
-        普通 Go 证据：<Tag>{!report ? '未采集' : reportCurrent ? '当前工作区' : '历史报告'}</Tag>
+        前端与后端证据：<Tag>{!report ? '未采集' : reportCurrent ? '当前工作区' : '历史报告'}</Tag>
         {report ? <DevTimestamp value={report.generatedAt} missing="采集时间未证明" /> : null}
       </p>
       <div className="erp-dev-business-rules__toolbar">
+        <Button disabled={consistencyBusy || !onRunConsistency} onClick={onRunConsistency}>运行业务数据一致性专项</Button>
         <FilterSelect
           label="关键规则专项"
           placeholder="关键规则专项"
@@ -160,7 +161,7 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
           aria-label="搜索关键规则"
           placeholder="搜索规则、业务或测试名"
           value={filters.query}
-          onChange={(event) => update('ruleQuery', event.target.value)}
+          onSearch={(value) => update('ruleQuery', value)}
           allowClear
         />
         <Button
@@ -171,6 +172,7 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
           重新读取数据库证据
         </Button>
       </div>
+      {filters.category === 'consistency' ? <Typography.Paragraph type="secondary">专项运行前端与后端用例；PostgreSQL 复用隔离数据库门禁。命令：<code>node scripts/qa/business-data-consistency.mjs --write</code>。缺失、跳过及历史证据不能计为当前通过。</Typography.Paragraph> : null}
       {error ? <Alert type="error" showIcon message={error} /> : null}
       {evidence?.run ? (
         <p className="erp-dev-business-rules__run">
@@ -244,6 +246,7 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
             </table>
           </div>
           <details
+            className="erp-dev-disclosure"
             key={selected.id}
             onToggle={(event) =>
               setDiagramRule(event.currentTarget.open ? selected.id : '')
@@ -259,7 +262,7 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
           </details>
         </section>
       ) : null}
-      <details className="erp-dev-business-rules__policy">
+      <details className="erp-dev-disclosure erp-dev-business-rules__policy">
         <summary>部署前执行范围与维护入口</summary>
         <p>
           每个候选提交的后端单元与合同、关键 PostgreSQL

@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Space,
   Tag,
   Typography,
 } from 'antd'
@@ -27,6 +28,11 @@ import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
+import BusinessLink from '../business-list/BusinessLink.jsx'
+import {
+  shipmentApprovalPath,
+  shipmentApprovalState,
+} from '../../utils/shipmentApproval.mjs'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import BusinessLineItemsFooter, {
   BusinessLineItemsHeader,
@@ -51,6 +57,7 @@ import {
   normalizeNetWeightG,
   normalizeShipmentQuantity,
   resolveShipmentWeightPreview,
+  shipmentGrossNetWeightError,
   shipmentWeightItemsSignature,
 } from '../../utils/shipmentWeight.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -131,6 +138,8 @@ function ShipmentFormFields({
   storedFreightCurrency = '',
   sourceSelectionOnly = false,
   sourceLocked = false,
+  products = [],
+  productSKUs = [],
   itemsSection,
   attachmentPanel,
 }) {
@@ -292,6 +301,7 @@ function ShipmentFormFields({
           className="erp-business-action-form__field"
           label="毛重（千克）"
           name="gross_weight_kg"
+          dependencies={['total_net_weight_g', 'items']}
           rules={[
             {
               validator: async (_, value) => {
@@ -301,6 +311,9 @@ function ShipmentFormFields({
                 if (!isPositiveNumeric20Scale6(value)) {
                   throw new Error('毛重必须大于 0，且最多保留 6 位小数')
                 }
+                const preview = resolveShipmentWeightPreview({ items: form.getFieldValue('items'), products, productSKUs })
+                const error = shipmentGrossNetWeightError(preview.complete ? preview.totalNetWeightG : form.getFieldValue('total_net_weight_g'), value)
+                if (error) throw new Error(error)
               },
             },
           ]}
@@ -937,6 +950,7 @@ function ShipmentItemsTable({
 }
 
 export default function ShipmentEditor({
+  canReadApproval = false,
   canCreate = false,
   canUpdate = false,
   canImportSalesOrderSource = false,
@@ -1015,9 +1029,28 @@ export default function ShipmentEditor({
       confirmLoading={saving}
       okButtonProps={{ disabled: !canSave, hidden: isViewModal }}
     >
+      {isViewModal && modalSelectedShipment ? (
+        <BusinessFormSection title="财务审批">
+          <Space wrap>
+            <Tag color={shipmentApprovalState(modalSelectedShipment).color}>
+              {shipmentApprovalState(modalSelectedShipment).label}
+            </Tag>
+            {modalSelectedShipment.finance_release_note ? (
+              <span>{modalSelectedShipment.finance_release_note}</span>
+            ) : null}
+            {canReadApproval ? (
+              <BusinessLink to={shipmentApprovalPath(modalSelectedShipment)}>
+                查看审批
+              </BusinessLink>
+            ) : null}
+          </Space>
+        </BusinessFormSection>
+      ) : null}
       <Form layout="vertical" form={form} className="erp-business-action-form">
         <ShipmentFormFields
           form={form}
+          products={products}
+          productSKUs={productSKUs}
           customerOptions={customerOptions}
           disabled={!isWritableModal}
           copyShipmentNo={isViewModal ? modalSelectedShipment?.shipment_no : ''}

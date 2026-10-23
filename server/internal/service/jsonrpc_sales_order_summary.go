@@ -40,11 +40,11 @@ func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, id stri
 		}
 	}
 	var ok bool
-	filter.DateFrom, ok = getOptionalJSONRPCTime(pm, "date_from")
+	filter.DateFrom, ok = getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return id, invalidParamResult(), nil
 	}
-	filter.DateTo, ok = getOptionalJSONRPCTime(pm, "date_to")
+	filter.DateTo, ok = getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return id, invalidParamResult(), nil
 	}

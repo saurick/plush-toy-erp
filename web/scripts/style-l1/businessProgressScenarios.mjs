@@ -108,6 +108,10 @@ export function createBusinessProgressScenarios({
                 })
               }
             }
+            if (data.sections?.batches && data.row.id === 2) {
+              const batch = data.sections.batches[0]
+              data.sections.batches = Array.from({ length: 12 }, (_, index) => ({ ...batch, id: 1000 + index, number: `BATCH-LONG-${index + 1}` }))
+            }
             if (data.sections?.tasks) {
               data.sections.tasks[0].label = 'order_approval'
             }
@@ -127,6 +131,58 @@ export function createBusinessProgressScenarios({
         const board = page.getByRole('region', { name: '进度看板', exact: true })
         const progressCard = (orderNo) => board.getByRole('button', { name: `查看 ${orderNo} 完整进度`, exact: true })
         const search = board.getByPlaceholder('搜单号、客户、产品')
+        const waitForDetail = async (orderNo) => {
+          const dialog = page.getByRole('dialog')
+          await dialog.getByRole('heading', { name: orderNo, exact: true }).waitFor()
+          await dialog.locator('.erp-progress-detail-header').waitFor()
+          await page.waitForFunction(() => document.activeElement?.closest('.erp-progress-modal[role="dialog"]'), null, { timeout: 10000 }).catch(async (failure) => {
+            const focus = await page.evaluate(() => ({ active: document.activeElement?.outerHTML?.slice(0, 600), dialogs: [...document.querySelectorAll('[role="dialog"]')].map((node) => ({ className: node.className, visible: Boolean(node.getClientRects().length), focused: node.contains(document.activeElement) })) }))
+            throw new Error(`${failure.message}\n${JSON.stringify(focus)}`)
+          })
+        }
+        const openFromRow = async (orderNo) => {
+          const row = board.locator('.erp-progress-row').filter({ hasText: orderNo })
+          const entry = progressCard(orderNo)
+          const dialog = page.getByRole('dialog')
+          const reference = row.locator('.erp-progress-reference')
+          await reference.scrollIntoViewIfNeeded()
+          if (!narrow) {
+            const box = await reference.boundingBox()
+            await page.mouse.move(box.x + 3, box.y + box.height / 2)
+            await page.mouse.down()
+            await page.mouse.move(box.x + Math.min(box.width - 3, 90), box.y + box.height / 2, { steps: 8 })
+            await page.mouse.up()
+            assert(await page.evaluate(() => String(window.getSelection()).length > 0), '进度单号可拖选复制')
+            assert.equal(await dialog.isVisible(), false, '拖选文字不误开进度')
+            await page.evaluate(() => window.getSelection().removeAllRanges())
+          }
+          const targets = name === 'erp-business-dashboard-desktop'
+            ? ['.erp-progress-reference', '.erp-progress-delivery-copy > strong', '.erp-progress-attention strong', '.erp-progress-due-cell']
+            : ['.erp-progress-due-cell']
+          for (const [index, selector] of targets.entries()) {
+            await row.locator(selector).scrollIntoViewIfNeeded()
+            const scrollTop = await board.locator('.erp-progress-list').evaluate((node) => node.scrollTop)
+            const query = new URL(page.url()).searchParams
+            query.delete('selected')
+            const listReads = calls.filter((call) => call.method === 'list_progress').length
+            const detailReads = calls.filter((call) => call.method === 'get_progress').length
+            await row.locator(selector).click()
+            await waitForDetail(orderNo)
+            assert.equal(calls.filter((call) => call.method === 'get_progress').length, detailReads + 1, '整行点击只读取一次详情')
+            assert.equal(calls.filter((call) => call.method === 'list_progress').length, listReads, '查看详情不重新读取列表')
+            await page.keyboard.press('Escape')
+            await dialog.waitFor({ state: 'hidden' })
+            assert(await entry.evaluate((node) => node === document.activeElement), '关闭后焦点返回本行产品名称')
+            assert(Math.abs(await board.locator('.erp-progress-list').evaluate((node) => node.scrollTop) - scrollTop) <= 1, '关闭后保留列表滚动位置')
+            const restoredQuery = new URL(page.url()).searchParams
+            restoredQuery.delete('selected')
+            assert.equal(restoredQuery.toString(), query.toString(), '查看和关闭保留查询与分页')
+            if (index === targets.length - 1) {
+              await entry.press('Enter')
+              await waitForDetail(orderNo)
+            }
+          }
+        }
         if (failed) {
           await board.getByRole('button', { name: '重试', exact: true }).waitFor()
           assert((await board.getByRole('group', { name: '交期情况', exact: true }).locator('.erp-filter-chip__count').allTextContents()).every((count) => count === '—'))
@@ -134,6 +190,8 @@ export function createBusinessProgressScenarios({
           await board.getByRole('button', { name: '重试', exact: true }).click()
         }
         await progressCard('SO-0001').waitFor()
+        assert.equal(await board.locator('.erp-progress-table th').count(), 4, '订单与生产列表均不保留独立查看列')
+        assert.equal(await board.locator('.erp-progress-action-cell').count(), 0)
         assert.equal(await board.locator('.erp-progress-summary').count(), 0)
         const firstImage = board.locator('.erp-progress-row').first().locator('.erp-product-identity img')
         await firstImage.waitFor()
@@ -157,11 +215,12 @@ export function createBusinessProgressScenarios({
           assert(await blocked.isDisabled())
           assert.equal(await blocked.locator('.erp-filter-chip__count').innerText(), '—')
           await board.getByText('任务无查看权限').first().waitFor()
+          assert.equal(await board.locator('.erp-progress-task-entry').count(), 0, '无任务权限不显示任务入口')
           assert.equal(await board.getByText('面料交期尚未确认', { exact: true }).count(), 0)
           await progressCard('SO-0001').click()
           const detail = page.getByRole('dialog')
-          await detail.getByRole('button', { name: /生产：无权限/ }).waitFor()
-          assert(await detail.getByRole('button', { name: /生产：无权限/ }).isDisabled())
+          await detail.getByRole('button', { name: '查看生产明细' }).waitFor()
+          assert(await detail.getByRole('button', { name: '查看生产明细' }).isDisabled())
           await page.keyboard.press('Escape')
           return
         }
@@ -173,25 +232,58 @@ export function createBusinessProgressScenarios({
         await board.getByText('工程资料', { exact: true }).waitFor()
         assert.equal(await board.getByText('engineering_data', { exact: true }).count(), 0)
         const listReadCount = calls.filter((call) => call.method === 'list_progress').length
-        await progressCard('SO-0002').click()
+        assert.equal(await board.locator('.erp-progress-attention-cell').getByRole('button', { name: '查看 SO-0002 的关联任务', exact: true }).count(), 1, '关联任务入口位于当前关注区域')
+        const listMetric = board.locator('.erp-progress-row').filter({ hasText: 'SO-0002' }).getByRole('button', { name: '查看已出货 / 订购数值与口径', exact: true })
+        await listMetric.hover()
+        await page.locator('.ant-popover:visible .erp-progress-metric-hint').getByText('400 / 800 只', { exact: true }).waitFor()
+        await listMetric.focus()
+        await listMetric.press('Escape')
+        await page.locator('.ant-popover:visible .erp-progress-metric-hint').waitFor({ state: 'hidden' })
+        assert(await listMetric.evaluate((node) => node === document.activeElement))
+        assert.equal(await page.getByRole('dialog').count(), 0)
+        await openFromRow('SO-0002')
         let drawer = page.getByRole('dialog')
-        await drawer.getByRole('heading', { name: 'SO-0002', exact: true }).waitFor()
+        await waitForDetail('SO-0002')
         assert.equal(new URL(page.url()).searchParams.get('selected'), 'orders:2')
         assert.equal(calls.filter((call) => call.method === 'list_progress').length, listReadCount)
-        await drawer.getByRole('button', { name: '质检：1 批待检', exact: true }).click()
+        await drawer.getByRole('tab', { name: '进度总览', exact: true, selected: true }).waitFor()
+        const stageMetric = drawer.getByRole('button', { name: '查看已出货 / 订购数值与口径', exact: true })
+        await stageMetric.focus()
+        await page.locator('.ant-popover:visible .erp-progress-metric-hint').getByText('400 / 800 只', { exact: true }).waitFor()
+        await stageMetric.press('Escape')
+        await page.locator('.ant-popover:visible .erp-progress-metric-hint').waitFor({ state: 'hidden' })
+        assert(await drawer.isVisible(), '关闭提示不关闭详情')
+        await drawer.getByRole('button', { name: '查看质检明细', exact: true }).click()
         await drawer.getByRole('tab', { name: '工序批次', exact: true, selected: true }).waitFor()
+        const detailScroll = drawer.locator('.erp-progress-detail-scroll')
+        const navTop = await drawer.getByRole('tablist', { name: '进度明细分类' }).evaluate((node) => node.getBoundingClientRect().top)
+        await detailScroll.evaluate((node) => { node.scrollTop = node.scrollHeight })
+        const shell = await drawer.evaluate((root) => {
+          const scroll = root.querySelector('.erp-progress-detail-scroll')
+          const last = scroll.querySelector('.erp-progress-record:last-child')
+          const box = scroll.getBoundingClientRect()
+          const tail = last.getBoundingClientRect()
+          return { top: scroll.scrollTop, navTop: root.querySelector('.erp-progress-detail-tabs').getBoundingClientRect().top, bottomGap: box.bottom - tail.bottom, rightGap: box.right - tail.right, overflow: scroll.scrollWidth - scroll.clientWidth }
+        })
+        assert(shell.top > 0 && Math.abs(shell.navTop - navTop) <= 1 && shell.bottomGap >= 0 && shell.rightGap >= 28 && shell.overflow <= 1, JSON.stringify(shell))
+        await drawer.getByRole('tab', { name: '产品明细', exact: true }).click()
+        await drawer.getByRole('tab', { name: '工序批次', exact: true }).click()
+        await page.waitForFunction((top) => Math.abs(document.querySelector('.erp-progress-detail-scroll').scrollTop - top) <= 1, shell.top)
+        await page.screenshot({ path: path.join(outputDir, `${name}-detail-scroll.png`) })
         await assertBusinessModalViewport(page, drawer, { label: name })
         await page.keyboard.press('Escape')
         await drawer.waitFor({ state: 'hidden' })
         assert(await progressCard('SO-0002').evaluate((node) => node === document.activeElement))
         await progressCard('SO-0001').focus()
         await page.keyboard.press('Space')
-        await page.getByRole('dialog').getByRole('heading', { name: 'SO-0001', exact: true }).waitFor()
+        await waitForDetail('SO-0001')
         await page.keyboard.press('Escape')
         await page.getByRole('dialog').waitFor({ state: 'hidden' })
         if (name === 'erp-business-dashboard-desktop') {
+          const detailReads = calls.filter((call) => call.method === 'get_progress').length
           await board.getByRole('button', { name: '查看 SO-0002 的关联任务', exact: true }).click()
           await page.waitForURL((url) => url.pathname === '/erp/task-board' && url.searchParams.get('link_task') === '102')
+          assert.equal(calls.filter((call) => call.method === 'get_progress').length, detailReads, '直达任务不同时打开进度')
           await page.goBack()
           await progressCard('SO-0002').waitFor()
           const pagination = board.getByRole('navigation', { name: '进度分页' })
@@ -209,6 +301,7 @@ export function createBusinessProgressScenarios({
           await progressCard('SO-0001').waitFor()
           await board.getByRole('button', { name: /^筛选进度/ }).click()
           await page.getByPlaceholder('输入姓名').fill('查无负责人')
+          await page.getByPlaceholder('输入姓名').press('Enter')
           await board.getByText('没有符合条件的记录').waitFor()
           assert.equal(new URL(page.url()).searchParams.get('owner'), '查无负责人')
           await page.getByRole('button', { name: '重置筛选', exact: true }).click()
@@ -226,6 +319,7 @@ export function createBusinessProgressScenarios({
         await drawer.getByText('订单审批', { exact: true }).waitFor()
         await drawer.getByRole('tab', { name: '产品明细', exact: true }).click()
         await drawer.getByText('已出货 400', { exact: true }).waitFor()
+        await drawer.getByRole('tab', { name: '进度总览', exact: true }).click()
         const stageLabels = await drawer.locator('[data-progress-stage]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-progress-stage')))
         assert.deepEqual(stageLabels, ['engineering', 'materials', 'production', 'quality', 'shipment'])
         await drawer.getByRole('tab', { name: '领料', exact: true }).click()
@@ -265,6 +359,10 @@ export function createBusinessProgressScenarios({
         await progressCard('SO-0001').waitFor()
         await verifyProgressMotion(page, assert, false)
         await progressCard('MO-0001').waitFor()
+        assert.equal(await board.locator('.erp-progress-table th').count(), 4)
+        await openFromRow('MO-0002')
+        await page.keyboard.press('Escape')
+        await page.getByRole('dialog').waitFor({ state: 'hidden' })
         await verifyProgressMotion(page, assert, true)
         await board.getByRole('button', { name: /^筛选进度/ }).click()
         await page.getByPlaceholder('输入姓名').waitFor()
@@ -290,7 +388,7 @@ export function createBusinessProgressScenarios({
         await board.locator('[aria-label="进度查看方式"]').getByText('生产执行', { exact: true }).click()
         await progressCard('MO-0003').waitFor()
         assert.equal(new URL(page.url()).searchParams.get('unlinked_only'), 'true')
-        await progressCard('MO-0003').click()
+        await board.locator('.erp-progress-row').filter({ hasText: 'MO-0003' }).getByRole('button', { name: '按明细查看', exact: true }).click()
         drawer = page.getByRole('dialog')
         await drawer.getByRole('tab', { name: '产品明细', exact: true }).waitFor()
         if (name === 'erp-business-dashboard-desktop') {

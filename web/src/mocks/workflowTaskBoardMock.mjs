@@ -226,7 +226,7 @@ export function buildWorkflowTaskBoardMock({
   )
   const laneKey = normalizeText(params.lane_key)
   const selectedLaneKeys = laneKey ? [laneKey] : TASK_BOARD_LANE_KEYS
-  if (laneKey && !TASK_BOARD_LANE_KEYS.includes(laneKey)) {
+  if (laneKey && laneKey !== 'all' && !TASK_BOARD_LANE_KEYS.includes(laneKey)) {
     throw new TypeError(`unsupported workflow task board lane: ${laneKey}`)
   }
   const limit = normalizeLimit(params.limit)
@@ -238,10 +238,10 @@ export function buildWorkflowTaskBoardMock({
     counts,
     lanes: selectedLaneKeys.map((key) => ({
       key,
-      total: counts[key],
+      total: key === 'all' ? filteredTasks.length : counts[key],
       limit,
       offset,
-      tasks: laneTasks[key].slice(offset, offset + limit),
+      tasks: (key === 'all' ? filteredTasks : laneTasks[key]).slice(offset, offset + limit),
     })),
     source_types: sourceTypes,
     owner_role_keys: ownerRoleKeys,

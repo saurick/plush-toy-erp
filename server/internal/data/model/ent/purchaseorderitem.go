@@ -35,6 +35,12 @@ type PurchaseOrderItem struct {
 	MaterialCodeSnapshot *string `json:"material_code_snapshot,omitempty"`
 	// MaterialNameSnapshot holds the value of the "material_name_snapshot" field.
 	MaterialNameSnapshot *string `json:"material_name_snapshot,omitempty"`
+	// MaterialSpecSnapshot holds the value of the "material_spec_snapshot" field.
+	MaterialSpecSnapshot *string `json:"material_spec_snapshot,omitempty"`
+	// SupplierItemNoSnapshot holds the value of the "supplier_item_no_snapshot" field.
+	SupplierItemNoSnapshot *string `json:"supplier_item_no_snapshot,omitempty"`
+	// UnitNameSnapshot holds the value of the "unit_name_snapshot" field.
+	UnitNameSnapshot *string `json:"unit_name_snapshot,omitempty"`
 	// ColorSnapshot holds the value of the "color_snapshot" field.
 	ColorSnapshot *string `json:"color_snapshot,omitempty"`
 	// ProductOrderNoSnapshot holds the value of the "product_order_no_snapshot" field.
@@ -133,7 +139,7 @@ func (*PurchaseOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case purchaseorderitem.FieldID, purchaseorderitem.FieldPurchaseOrderID, purchaseorderitem.FieldLineNo, purchaseorderitem.FieldDisplayOrder, purchaseorderitem.FieldMaterialID, purchaseorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case purchaseorderitem.FieldMaterialCodeSnapshot, purchaseorderitem.FieldMaterialNameSnapshot, purchaseorderitem.FieldColorSnapshot, purchaseorderitem.FieldProductOrderNoSnapshot, purchaseorderitem.FieldProductNoSnapshot, purchaseorderitem.FieldProductNameSnapshot, purchaseorderitem.FieldLineStatus, purchaseorderitem.FieldNote:
+		case purchaseorderitem.FieldMaterialCodeSnapshot, purchaseorderitem.FieldMaterialNameSnapshot, purchaseorderitem.FieldMaterialSpecSnapshot, purchaseorderitem.FieldSupplierItemNoSnapshot, purchaseorderitem.FieldUnitNameSnapshot, purchaseorderitem.FieldColorSnapshot, purchaseorderitem.FieldProductOrderNoSnapshot, purchaseorderitem.FieldProductNoSnapshot, purchaseorderitem.FieldProductNameSnapshot, purchaseorderitem.FieldLineStatus, purchaseorderitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case purchaseorderitem.FieldExpectedArrivalDate, purchaseorderitem.FieldCreatedAt, purchaseorderitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -202,6 +208,27 @@ func (_m *PurchaseOrderItem) assignValues(columns []string, values []any) error 
 			} else if value.Valid {
 				_m.MaterialNameSnapshot = new(string)
 				*_m.MaterialNameSnapshot = value.String
+			}
+		case purchaseorderitem.FieldMaterialSpecSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field material_spec_snapshot", values[i])
+			} else if value.Valid {
+				_m.MaterialSpecSnapshot = new(string)
+				*_m.MaterialSpecSnapshot = value.String
+			}
+		case purchaseorderitem.FieldSupplierItemNoSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field supplier_item_no_snapshot", values[i])
+			} else if value.Valid {
+				_m.SupplierItemNoSnapshot = new(string)
+				*_m.SupplierItemNoSnapshot = value.String
+			}
+		case purchaseorderitem.FieldUnitNameSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field unit_name_snapshot", values[i])
+			} else if value.Valid {
+				_m.UnitNameSnapshot = new(string)
+				*_m.UnitNameSnapshot = value.String
 			}
 		case purchaseorderitem.FieldColorSnapshot:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -363,6 +390,21 @@ func (_m *PurchaseOrderItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.MaterialNameSnapshot; v != nil {
 		builder.WriteString("material_name_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.MaterialSpecSnapshot; v != nil {
+		builder.WriteString("material_spec_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SupplierItemNoSnapshot; v != nil {
+		builder.WriteString("supplier_item_no_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.UnitNameSnapshot; v != nil {
+		builder.WriteString("unit_name_snapshot=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

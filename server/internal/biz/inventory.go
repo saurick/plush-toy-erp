@@ -865,26 +865,11 @@ func (uc *InventoryUsecase) ListBOMHeaders(ctx context.Context, filter BOMHeader
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
-	var scopeOK bool
-	filter.LifecycleScope, scopeOK = NormalizeLifecycleScope(filter.LifecycleScope)
-	filter.Keyword = strings.TrimSpace(filter.Keyword)
-	if !scopeOK || (filter.Status != "" && !IsValidBOMStatus(filter.Status)) {
-		return nil, 0, ErrBadParam
+	normalized, err := normalizeBOMHeaderFilter(filter)
+	if err != nil {
+		return nil, 0, err
 	}
-	if !LifecycleScopeAllowsStatus(
-		filter.LifecycleScope,
-		filter.Status,
-		[]string{BOMStatusDraft, BOMStatusActive},
-		[]string{BOMStatusArchived},
-	) {
-		return nil, 0, ErrBadParam
-	}
-	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
-	if filter.Offset < 0 {
-		filter.Offset = 0
-	}
-	return uc.repo.ListBOMHeaders(ctx, filter)
+	return uc.repo.ListBOMHeaders(ctx, normalized)
 }
 
 func (uc *InventoryUsecase) GetBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error) {
@@ -1267,4 +1252,27 @@ func normalizeBOMItemUpdate(in BOMItemUpdate) (BOMItemUpdate, error) {
 		return BOMItemUpdate{}, ErrBadParam
 	}
 	return in, nil
+}
+
+func normalizeBOMHeaderFilter(filter BOMHeaderFilter) (BOMHeaderFilter, error) {
+	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	var scopeOK bool
+	filter.LifecycleScope, scopeOK = NormalizeLifecycleScope(filter.LifecycleScope)
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
+	if !scopeOK || (filter.Status != "" && !IsValidBOMStatus(filter.Status)) {
+		return BOMHeaderFilter{}, ErrBadParam
+	}
+	if !LifecycleScopeAllowsStatus(
+		filter.LifecycleScope,
+		filter.Status,
+		[]string{BOMStatusDraft, BOMStatusActive},
+		[]string{BOMStatusArchived},
+	) {
+		return BOMHeaderFilter{}, ErrBadParam
+	}
+	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
+	if filter.Offset < 0 {
+		filter.Offset = 0
+	}
+	return filter, nil
 }

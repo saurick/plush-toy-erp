@@ -1,59 +1,52 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import test from 'node:test'
+import test, { after } from 'node:test'
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { installTestDOM, registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs'
 
-const listScreenSource = readFileSync(
-  new URL('./MobileTaskListScreen.jsx', import.meta.url),
-  'utf8'
-)
-const roleTaskPageSource = readFileSync(
-  new URL('../pages/MobileRoleTasksPage.jsx', import.meta.url),
-  'utf8'
-)
+const testDOM = installTestDOM()
+after(() => testDOM.restore())
+registerJSXTestLoader()
+const { default: MobileTaskListContent } = await import('./MobileTaskListContent.jsx')
 
-test('mobile task filter cold load keeps full skeleton exclusive to the first page load', () => {
-  assert.match(
-    roleTaskPageSource,
-    /const activeViewInitialLoading =\s*loading &&\s*!activeTaskSlot\.loaded &&\s*activeTaskSlot\.items\.length === 0/u
-  )
-  assert.match(
-    roleTaskPageSource,
-    /const hasLoadedTaskView = Object\.values\(taskSlots\)\.some\(\s*\(slot\) => slot\.loaded\s*\)/u
-  )
-  assert.match(
-    roleTaskPageSource,
-    /const initialLoading =\s*activeViewInitialLoading &&\s*!hasLoadedTaskView &&\s*loadedAccessScopeRef\.current !== taskAccessScopeKey/u
-  )
-  assert.match(
-    listScreenSource,
-    /initialLoading \? \(\s*<MobileTaskListSkeleton/u
-  )
-  assert.equal(
-    (listScreenSource.match(/<MobileTaskListSkeleton/gu) || []).length,
-    1
-  )
-})
+test('mobile list distinguishes first load, cold view, refresh and resolved content', async () => {
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  const render = async (props) => act(async () => {
+    root.render(createElement(
+      MobileTaskListContent,
+      { label: '正在加载已办任务', ...props },
+      createElement('button', { 'data-testid': 'real-task' }, '查看任务')
+    ))
+  })
+  try {
+    await render({ loading: true, pending: true, initialLoading: true })
+    const skeleton = container.querySelector('[data-testid="mobile-role-task-skeleton"]')
+    assert.ok(skeleton)
+    assert.equal(skeleton.getAttribute('aria-hidden'), 'true')
+    assert.equal(skeleton.querySelectorAll('button,a,input,select,textarea,[tabindex]').length, 0)
+    assert.equal(container.querySelector('[role="status"]').textContent, '正在加载已办任务')
+    assert.equal(container.querySelector('[data-testid="real-task"]'), null)
 
-test('mobile task filter cold load scopes busy state and feedback to the task list', () => {
-  assert.match(
-    listScreenSource,
-    /const taskListLoading =\s*loading && !activeViewHasData && !initialLoading/u
-  )
-  assert.match(listScreenSource, /className="mobile-role-task-search/u)
-  assert.match(listScreenSource, /data-testid="mobile-role-task-filters"/u)
-  assert.match(listScreenSource, /data-testid="mobile-role-bottom-nav"/u)
-  assert.match(listScreenSource, /data-testid="mobile-role-task-list"/u)
-  assert.match(
-    listScreenSource,
-    /data-testid="mobile-role-task-list"[\s\S]*?aria-busy=\{taskListLoading \? 'true' : 'false'\}/u
-  )
-  assert.match(
-    listScreenSource,
-    /data-testid="mobile-role-task-list-loading"[\s\S]*?role="status"[\s\S]*?aria-live="polite"/u
-  )
-  assert.match(listScreenSource, /正在加载\{activeFilterLabel\}任务/u)
-  assert.match(
-    listScreenSource,
-    /data-testid="mobile-role-scroll"[\s\S]*?aria-busy=\{!isTracking && !isExceptions && initialLoading \? 'true' : 'false'\}/u
-  )
+    await render({ loading: true, pending: true, initialLoading: false })
+    assert.equal(container.querySelector('[data-testid="mobile-role-task-skeleton"]'), null)
+    assert.equal(container.querySelector('[data-testid="mobile-role-task-list-loading"]').textContent, '正在加载已办任务')
+    assert.equal(container.firstElementChild.getAttribute('aria-busy'), 'true')
+
+    await render({ loading: false, pending: false, initialLoading: false })
+    const task = container.querySelector('[data-testid="real-task"]')
+    assert.ok(task)
+    assert.equal(container.firstElementChild.getAttribute('aria-busy'), 'false')
+    await render({ loading: true, pending: false, initialLoading: false })
+    assert.equal(container.querySelector('[data-testid="real-task"]'), task, '刷新应保留真实内容节点和焦点入口')
+    assert.equal(container.querySelector('[role="status"]'), null)
+    assert.equal(container.firstElementChild.getAttribute('aria-busy'), 'true')
+    await render({ loading: false, pending: false, initialLoading: false })
+    assert.equal(container.querySelector('[data-testid="real-task"]'), task)
+    assert.equal(container.firstElementChild.getAttribute('aria-busy'), 'false')
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+  }
 })

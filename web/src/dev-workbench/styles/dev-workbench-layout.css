@@ -104,10 +104,6 @@
   text-align: left;
   vertical-align: middle;
 }
-.erp-dev-tool-table__details summary {
-  width: fit-content;
-  cursor: pointer;
-}
 .erp-dev-tool-table__details p {
   margin: 8px 0;
   overflow-wrap: anywhere;
@@ -121,11 +117,6 @@
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
   font-weight: 400;
-}
-.erp-dev-data-contract-disclosure > summary,
-.erp-dev-migration-flow-details > summary {
-  width: fit-content;
-  cursor: pointer;
 }
 .erp-dev-migration-overview p {
   margin: 6px 0;
@@ -150,10 +141,6 @@
   margin: 5px 0;
   font-size: var(--erp-font-caption);
   color: var(--erp-text-muted);
-}
-.erp-dev-environment-evidence__table summary {
-  width: fit-content;
-  cursor: pointer;
 }
 .erp-dev-environment-evidence__table dl {
   display: grid;
@@ -191,10 +178,6 @@
 .erp-dev-tool-table tbody th {
   width: 180px;
   font-weight: 600;
-}
-.erp-dev-testing-validation-row details summary {
-  width: fit-content;
-  cursor: pointer;
 }
 .erp-dev-environment-evidence__table thead th {
   background: var(--erp-surface-bg-soft);
@@ -258,9 +241,6 @@
 }
 .erp-dev-tool-table .erp-dev-tool-table__pin {
   width: 56px;
-}
-.erp-dev-data-contract-disclosure[open] > summary {
-  margin-bottom: 12px;
 }
 .erp-dev-version-facts td > .ant-typography {
   display: block;
@@ -349,19 +329,6 @@
 .erp-dev-tool-disclosure {
   min-width: 0;
   color: var(--erp-text-muted);
-}
-
-.erp-dev-tool-page .erp-dev-permission-evidence-disclosure > summary,
-.erp-dev-tool-page .erp-dev-tool-disclosure > summary,
-.erp-dev-tool-page .erp-dev-target-data-boundary > summary {
-  width: fit-content;
-  cursor: pointer;
-}
-
-.erp-dev-permission-evidence-disclosure[open] > summary,
-.erp-dev-tool-disclosure[open] > summary,
-.erp-dev-target-data-boundary[open] > summary {
-  margin-bottom: 8px;
 }
 
 .erp-dev-tool-page .erp-permission-relationship__evidence {

@@ -448,7 +448,25 @@ export function normalizeText(value) {
   return text || ''
 }
 
-function parseSheetRows(xml, sharedStrings) {
+function percentageStyles(xml) {
+  const formats = new Map([
+    ['9', '0%'],
+    ['10', '0.00%'],
+  ])
+  for (const match of xml.matchAll(/<numFmt\b([^>]*)\/?\s*>/gu)) {
+    const attributes = parseXmlAttributes(match[1])
+    formats.set(attributes.numFmtId, attributes.formatCode || '')
+  }
+  const cellFormats =
+    xml.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/u)?.[1] || ''
+  return [...cellFormats.matchAll(/<xf\b([^>]*)>/gu)].map((match) => {
+    const format = formats.get(parseXmlAttributes(match[1]).numFmtId) || ''
+    // Quoted and escaped percent characters are literal text, not scaling.
+    return format.replace(/"[^"]*"|\\./gu, '').includes('%')
+  })
+}
+
+function parseSheetRows(xml, sharedStrings, percentFormats) {
   const rows = []
   let cellCount = 0
   for (const rowMatch of xml.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/gu)) {
@@ -460,6 +478,7 @@ function parseSheetRows(xml, sharedStrings) {
     const values = []
     const formulas = []
     const cellTypes = []
+    const percentStyles = []
     for (const cellMatch of rowMatch[2].matchAll(
       /<c\b([^>]*)\/>|<c\b([^>]*)>([\s\S]*?)<\/c>/gu
     )) {
@@ -473,6 +492,9 @@ function parseSheetRows(xml, sharedStrings) {
         fail('Excel 单元格列号无效', 'invalid_cell_reference')
       }
       cellTypes[column - 1] = attributes.t || 'n'
+      percentStyles[column - 1] =
+        cellTypes[column - 1] === 'n' &&
+        Boolean(percentFormats[Number(attributes.s || 0)])
       values[column - 1] = normalizeText(
         extractCellValue(cellMatch[3] ?? '', attributes, sharedStrings)
       )
@@ -487,6 +509,7 @@ function parseSheetRows(xml, sharedStrings) {
       values,
       formulas,
       cellTypes,
+      percentStyles,
     }
     if (values.some(Boolean) || formulas.some(Boolean)) rows.push(normalizedRow)
   }
@@ -523,6 +546,9 @@ export async function readXlsxWorkbook(
   }
   const sharedStrings = zip.entries.has('xl/sharedStrings.xml')
     ? parseSharedStrings(await readZipText(zip, 'xl/sharedStrings.xml'))
+    : []
+  const percentFormats = zip.entries.has('xl/styles.xml')
+    ? percentageStyles(await readZipText(zip, 'xl/styles.xml'))
     : []
   const sheets = []
   const imagesByID = new Map()
@@ -609,7 +635,7 @@ export async function readXlsxWorkbook(
     }
     sheets.push({
       name: normalizeText(info.name),
-      rows: parseSheetRows(xml, sharedStrings),
+      rows: parseSheetRows(xml, sharedStrings, percentFormats),
       mergeRanges: parseMergeRanges(xml),
       imagesByCell,
     })

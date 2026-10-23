@@ -77,7 +77,7 @@ export function TestApplySummary({
           复制配置版本 / Revision
         </Button>
       </div>
-      <details className="erp-dev-customer-result-details">
+      <details className="erp-dev-disclosure erp-dev-customer-result-details">
         <summary>查看执行步骤与身份核对</summary>
         <div className="erp-dev-customer-test-apply-steps">
           {result.steps?.map((step) => (

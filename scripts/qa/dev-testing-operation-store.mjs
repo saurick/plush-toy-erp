@@ -16,12 +16,12 @@ import path from "node:path";
 import process from "node:process";
 import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
 
-export const DEV_TESTING_OPERATION_SCHEMA =
-  "plush.dev-qa-testing-operation/v1";
+export const DEV_TESTING_OPERATION_SCHEMA = "plush.dev-qa-testing-operation/v1";
 export const DEV_TESTING_ACTIONS = Object.freeze([
   "fast",
   "role-access",
   "field-linkage",
+  "business-consistency",
   "rpc-examples",
   "pressure-quick",
   "pressure-capacity",
@@ -46,7 +46,7 @@ export const DEV_TESTING_OPERATION_STAGES = Object.freeze([
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const IDEMPOTENCY_PATTERN =
-  /^testing:(fast|role-access|field-linkage|rpc-examples|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
+  /^testing:(fast|role-access|field-linkage|business-consistency|rpc-examples|pressure-quick|pressure-capacity):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const MAX_RECORD_BYTES = 64 * 1024;
 const STAGE_INDEX = new Map(

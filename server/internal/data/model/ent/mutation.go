@@ -80137,6 +80137,9 @@ type PurchaseOrderItemMutation struct {
 	adddisplay_order              *int
 	material_code_snapshot        *string
 	material_name_snapshot        *string
+	material_spec_snapshot        *string
+	supplier_item_no_snapshot     *string
+	unit_name_snapshot            *string
 	color_snapshot                *string
 	product_order_no_snapshot     *string
 	product_no_snapshot           *string
@@ -80592,6 +80595,153 @@ func (m *PurchaseOrderItemMutation) MaterialNameSnapshotCleared() bool {
 func (m *PurchaseOrderItemMutation) ResetMaterialNameSnapshot() {
 	m.material_name_snapshot = nil
 	delete(m.clearedFields, purchaseorderitem.FieldMaterialNameSnapshot)
+}
+
+// SetMaterialSpecSnapshot sets the "material_spec_snapshot" field.
+func (m *PurchaseOrderItemMutation) SetMaterialSpecSnapshot(s string) {
+	m.material_spec_snapshot = &s
+}
+
+// MaterialSpecSnapshot returns the value of the "material_spec_snapshot" field in the mutation.
+func (m *PurchaseOrderItemMutation) MaterialSpecSnapshot() (r string, exists bool) {
+	v := m.material_spec_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaterialSpecSnapshot returns the old "material_spec_snapshot" field's value of the PurchaseOrderItem entity.
+// If the PurchaseOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderItemMutation) OldMaterialSpecSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaterialSpecSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaterialSpecSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaterialSpecSnapshot: %w", err)
+	}
+	return oldValue.MaterialSpecSnapshot, nil
+}
+
+// ClearMaterialSpecSnapshot clears the value of the "material_spec_snapshot" field.
+func (m *PurchaseOrderItemMutation) ClearMaterialSpecSnapshot() {
+	m.material_spec_snapshot = nil
+	m.clearedFields[purchaseorderitem.FieldMaterialSpecSnapshot] = struct{}{}
+}
+
+// MaterialSpecSnapshotCleared returns if the "material_spec_snapshot" field was cleared in this mutation.
+func (m *PurchaseOrderItemMutation) MaterialSpecSnapshotCleared() bool {
+	_, ok := m.clearedFields[purchaseorderitem.FieldMaterialSpecSnapshot]
+	return ok
+}
+
+// ResetMaterialSpecSnapshot resets all changes to the "material_spec_snapshot" field.
+func (m *PurchaseOrderItemMutation) ResetMaterialSpecSnapshot() {
+	m.material_spec_snapshot = nil
+	delete(m.clearedFields, purchaseorderitem.FieldMaterialSpecSnapshot)
+}
+
+// SetSupplierItemNoSnapshot sets the "supplier_item_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) SetSupplierItemNoSnapshot(s string) {
+	m.supplier_item_no_snapshot = &s
+}
+
+// SupplierItemNoSnapshot returns the value of the "supplier_item_no_snapshot" field in the mutation.
+func (m *PurchaseOrderItemMutation) SupplierItemNoSnapshot() (r string, exists bool) {
+	v := m.supplier_item_no_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSupplierItemNoSnapshot returns the old "supplier_item_no_snapshot" field's value of the PurchaseOrderItem entity.
+// If the PurchaseOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderItemMutation) OldSupplierItemNoSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSupplierItemNoSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSupplierItemNoSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSupplierItemNoSnapshot: %w", err)
+	}
+	return oldValue.SupplierItemNoSnapshot, nil
+}
+
+// ClearSupplierItemNoSnapshot clears the value of the "supplier_item_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) ClearSupplierItemNoSnapshot() {
+	m.supplier_item_no_snapshot = nil
+	m.clearedFields[purchaseorderitem.FieldSupplierItemNoSnapshot] = struct{}{}
+}
+
+// SupplierItemNoSnapshotCleared returns if the "supplier_item_no_snapshot" field was cleared in this mutation.
+func (m *PurchaseOrderItemMutation) SupplierItemNoSnapshotCleared() bool {
+	_, ok := m.clearedFields[purchaseorderitem.FieldSupplierItemNoSnapshot]
+	return ok
+}
+
+// ResetSupplierItemNoSnapshot resets all changes to the "supplier_item_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) ResetSupplierItemNoSnapshot() {
+	m.supplier_item_no_snapshot = nil
+	delete(m.clearedFields, purchaseorderitem.FieldSupplierItemNoSnapshot)
+}
+
+// SetUnitNameSnapshot sets the "unit_name_snapshot" field.
+func (m *PurchaseOrderItemMutation) SetUnitNameSnapshot(s string) {
+	m.unit_name_snapshot = &s
+}
+
+// UnitNameSnapshot returns the value of the "unit_name_snapshot" field in the mutation.
+func (m *PurchaseOrderItemMutation) UnitNameSnapshot() (r string, exists bool) {
+	v := m.unit_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitNameSnapshot returns the old "unit_name_snapshot" field's value of the PurchaseOrderItem entity.
+// If the PurchaseOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderItemMutation) OldUnitNameSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitNameSnapshot: %w", err)
+	}
+	return oldValue.UnitNameSnapshot, nil
+}
+
+// ClearUnitNameSnapshot clears the value of the "unit_name_snapshot" field.
+func (m *PurchaseOrderItemMutation) ClearUnitNameSnapshot() {
+	m.unit_name_snapshot = nil
+	m.clearedFields[purchaseorderitem.FieldUnitNameSnapshot] = struct{}{}
+}
+
+// UnitNameSnapshotCleared returns if the "unit_name_snapshot" field was cleared in this mutation.
+func (m *PurchaseOrderItemMutation) UnitNameSnapshotCleared() bool {
+	_, ok := m.clearedFields[purchaseorderitem.FieldUnitNameSnapshot]
+	return ok
+}
+
+// ResetUnitNameSnapshot resets all changes to the "unit_name_snapshot" field.
+func (m *PurchaseOrderItemMutation) ResetUnitNameSnapshot() {
+	m.unit_name_snapshot = nil
+	delete(m.clearedFields, purchaseorderitem.FieldUnitNameSnapshot)
 }
 
 // SetColorSnapshot sets the "color_snapshot" field.
@@ -81299,7 +81449,7 @@ func (m *PurchaseOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 22)
 	if m.purchase_order != nil {
 		fields = append(fields, purchaseorderitem.FieldPurchaseOrderID)
 	}
@@ -81320,6 +81470,15 @@ func (m *PurchaseOrderItemMutation) Fields() []string {
 	}
 	if m.material_name_snapshot != nil {
 		fields = append(fields, purchaseorderitem.FieldMaterialNameSnapshot)
+	}
+	if m.material_spec_snapshot != nil {
+		fields = append(fields, purchaseorderitem.FieldMaterialSpecSnapshot)
+	}
+	if m.supplier_item_no_snapshot != nil {
+		fields = append(fields, purchaseorderitem.FieldSupplierItemNoSnapshot)
+	}
+	if m.unit_name_snapshot != nil {
+		fields = append(fields, purchaseorderitem.FieldUnitNameSnapshot)
 	}
 	if m.color_snapshot != nil {
 		fields = append(fields, purchaseorderitem.FieldColorSnapshot)
@@ -81379,6 +81538,12 @@ func (m *PurchaseOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.MaterialCodeSnapshot()
 	case purchaseorderitem.FieldMaterialNameSnapshot:
 		return m.MaterialNameSnapshot()
+	case purchaseorderitem.FieldMaterialSpecSnapshot:
+		return m.MaterialSpecSnapshot()
+	case purchaseorderitem.FieldSupplierItemNoSnapshot:
+		return m.SupplierItemNoSnapshot()
+	case purchaseorderitem.FieldUnitNameSnapshot:
+		return m.UnitNameSnapshot()
 	case purchaseorderitem.FieldColorSnapshot:
 		return m.ColorSnapshot()
 	case purchaseorderitem.FieldProductOrderNoSnapshot:
@@ -81426,6 +81591,12 @@ func (m *PurchaseOrderItemMutation) OldField(ctx context.Context, name string) (
 		return m.OldMaterialCodeSnapshot(ctx)
 	case purchaseorderitem.FieldMaterialNameSnapshot:
 		return m.OldMaterialNameSnapshot(ctx)
+	case purchaseorderitem.FieldMaterialSpecSnapshot:
+		return m.OldMaterialSpecSnapshot(ctx)
+	case purchaseorderitem.FieldSupplierItemNoSnapshot:
+		return m.OldSupplierItemNoSnapshot(ctx)
+	case purchaseorderitem.FieldUnitNameSnapshot:
+		return m.OldUnitNameSnapshot(ctx)
 	case purchaseorderitem.FieldColorSnapshot:
 		return m.OldColorSnapshot(ctx)
 	case purchaseorderitem.FieldProductOrderNoSnapshot:
@@ -81507,6 +81678,27 @@ func (m *PurchaseOrderItemMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMaterialNameSnapshot(v)
+		return nil
+	case purchaseorderitem.FieldMaterialSpecSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaterialSpecSnapshot(v)
+		return nil
+	case purchaseorderitem.FieldSupplierItemNoSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSupplierItemNoSnapshot(v)
+		return nil
+	case purchaseorderitem.FieldUnitNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitNameSnapshot(v)
 		return nil
 	case purchaseorderitem.FieldColorSnapshot:
 		v, ok := value.(string)
@@ -81658,6 +81850,15 @@ func (m *PurchaseOrderItemMutation) ClearedFields() []string {
 	if m.FieldCleared(purchaseorderitem.FieldMaterialNameSnapshot) {
 		fields = append(fields, purchaseorderitem.FieldMaterialNameSnapshot)
 	}
+	if m.FieldCleared(purchaseorderitem.FieldMaterialSpecSnapshot) {
+		fields = append(fields, purchaseorderitem.FieldMaterialSpecSnapshot)
+	}
+	if m.FieldCleared(purchaseorderitem.FieldSupplierItemNoSnapshot) {
+		fields = append(fields, purchaseorderitem.FieldSupplierItemNoSnapshot)
+	}
+	if m.FieldCleared(purchaseorderitem.FieldUnitNameSnapshot) {
+		fields = append(fields, purchaseorderitem.FieldUnitNameSnapshot)
+	}
 	if m.FieldCleared(purchaseorderitem.FieldColorSnapshot) {
 		fields = append(fields, purchaseorderitem.FieldColorSnapshot)
 	}
@@ -81704,6 +81905,15 @@ func (m *PurchaseOrderItemMutation) ClearField(name string) error {
 		return nil
 	case purchaseorderitem.FieldMaterialNameSnapshot:
 		m.ClearMaterialNameSnapshot()
+		return nil
+	case purchaseorderitem.FieldMaterialSpecSnapshot:
+		m.ClearMaterialSpecSnapshot()
+		return nil
+	case purchaseorderitem.FieldSupplierItemNoSnapshot:
+		m.ClearSupplierItemNoSnapshot()
+		return nil
+	case purchaseorderitem.FieldUnitNameSnapshot:
+		m.ClearUnitNameSnapshot()
 		return nil
 	case purchaseorderitem.FieldColorSnapshot:
 		m.ClearColorSnapshot()
@@ -81757,6 +81967,15 @@ func (m *PurchaseOrderItemMutation) ResetField(name string) error {
 		return nil
 	case purchaseorderitem.FieldMaterialNameSnapshot:
 		m.ResetMaterialNameSnapshot()
+		return nil
+	case purchaseorderitem.FieldMaterialSpecSnapshot:
+		m.ResetMaterialSpecSnapshot()
+		return nil
+	case purchaseorderitem.FieldSupplierItemNoSnapshot:
+		m.ResetSupplierItemNoSnapshot()
+		return nil
+	case purchaseorderitem.FieldUnitNameSnapshot:
+		m.ResetUnitNameSnapshot()
 		return nil
 	case purchaseorderitem.FieldColorSnapshot:
 		m.ResetColorSnapshot()
@@ -105432,6 +105651,10 @@ type ShipmentMutation struct {
 	gross_weight_kg                        *decimal.Decimal
 	volume_m3                              *decimal.Decimal
 	shipping_mark                          *string
+	receivable_amount_snapshot             *decimal.Decimal
+	quoted_freight_amount_snapshot         *decimal.Decimal
+	tax_amount_snapshot                    *decimal.Decimal
+	tax_mode_snapshot                      *string
 	freight_amount                         *decimal.Decimal
 	freight_currency                       *string
 	total_net_weight_g                     *decimal.Decimal
@@ -106772,6 +106995,202 @@ func (m *ShipmentMutation) ResetShippingMark() {
 	delete(m.clearedFields, shipment.FieldShippingMark)
 }
 
+// SetReceivableAmountSnapshot sets the "receivable_amount_snapshot" field.
+func (m *ShipmentMutation) SetReceivableAmountSnapshot(d decimal.Decimal) {
+	m.receivable_amount_snapshot = &d
+}
+
+// ReceivableAmountSnapshot returns the value of the "receivable_amount_snapshot" field in the mutation.
+func (m *ShipmentMutation) ReceivableAmountSnapshot() (r decimal.Decimal, exists bool) {
+	v := m.receivable_amount_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceivableAmountSnapshot returns the old "receivable_amount_snapshot" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldReceivableAmountSnapshot(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceivableAmountSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceivableAmountSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceivableAmountSnapshot: %w", err)
+	}
+	return oldValue.ReceivableAmountSnapshot, nil
+}
+
+// ClearReceivableAmountSnapshot clears the value of the "receivable_amount_snapshot" field.
+func (m *ShipmentMutation) ClearReceivableAmountSnapshot() {
+	m.receivable_amount_snapshot = nil
+	m.clearedFields[shipment.FieldReceivableAmountSnapshot] = struct{}{}
+}
+
+// ReceivableAmountSnapshotCleared returns if the "receivable_amount_snapshot" field was cleared in this mutation.
+func (m *ShipmentMutation) ReceivableAmountSnapshotCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldReceivableAmountSnapshot]
+	return ok
+}
+
+// ResetReceivableAmountSnapshot resets all changes to the "receivable_amount_snapshot" field.
+func (m *ShipmentMutation) ResetReceivableAmountSnapshot() {
+	m.receivable_amount_snapshot = nil
+	delete(m.clearedFields, shipment.FieldReceivableAmountSnapshot)
+}
+
+// SetQuotedFreightAmountSnapshot sets the "quoted_freight_amount_snapshot" field.
+func (m *ShipmentMutation) SetQuotedFreightAmountSnapshot(d decimal.Decimal) {
+	m.quoted_freight_amount_snapshot = &d
+}
+
+// QuotedFreightAmountSnapshot returns the value of the "quoted_freight_amount_snapshot" field in the mutation.
+func (m *ShipmentMutation) QuotedFreightAmountSnapshot() (r decimal.Decimal, exists bool) {
+	v := m.quoted_freight_amount_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQuotedFreightAmountSnapshot returns the old "quoted_freight_amount_snapshot" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldQuotedFreightAmountSnapshot(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQuotedFreightAmountSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQuotedFreightAmountSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQuotedFreightAmountSnapshot: %w", err)
+	}
+	return oldValue.QuotedFreightAmountSnapshot, nil
+}
+
+// ClearQuotedFreightAmountSnapshot clears the value of the "quoted_freight_amount_snapshot" field.
+func (m *ShipmentMutation) ClearQuotedFreightAmountSnapshot() {
+	m.quoted_freight_amount_snapshot = nil
+	m.clearedFields[shipment.FieldQuotedFreightAmountSnapshot] = struct{}{}
+}
+
+// QuotedFreightAmountSnapshotCleared returns if the "quoted_freight_amount_snapshot" field was cleared in this mutation.
+func (m *ShipmentMutation) QuotedFreightAmountSnapshotCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldQuotedFreightAmountSnapshot]
+	return ok
+}
+
+// ResetQuotedFreightAmountSnapshot resets all changes to the "quoted_freight_amount_snapshot" field.
+func (m *ShipmentMutation) ResetQuotedFreightAmountSnapshot() {
+	m.quoted_freight_amount_snapshot = nil
+	delete(m.clearedFields, shipment.FieldQuotedFreightAmountSnapshot)
+}
+
+// SetTaxAmountSnapshot sets the "tax_amount_snapshot" field.
+func (m *ShipmentMutation) SetTaxAmountSnapshot(d decimal.Decimal) {
+	m.tax_amount_snapshot = &d
+}
+
+// TaxAmountSnapshot returns the value of the "tax_amount_snapshot" field in the mutation.
+func (m *ShipmentMutation) TaxAmountSnapshot() (r decimal.Decimal, exists bool) {
+	v := m.tax_amount_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTaxAmountSnapshot returns the old "tax_amount_snapshot" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldTaxAmountSnapshot(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTaxAmountSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTaxAmountSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTaxAmountSnapshot: %w", err)
+	}
+	return oldValue.TaxAmountSnapshot, nil
+}
+
+// ClearTaxAmountSnapshot clears the value of the "tax_amount_snapshot" field.
+func (m *ShipmentMutation) ClearTaxAmountSnapshot() {
+	m.tax_amount_snapshot = nil
+	m.clearedFields[shipment.FieldTaxAmountSnapshot] = struct{}{}
+}
+
+// TaxAmountSnapshotCleared returns if the "tax_amount_snapshot" field was cleared in this mutation.
+func (m *ShipmentMutation) TaxAmountSnapshotCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldTaxAmountSnapshot]
+	return ok
+}
+
+// ResetTaxAmountSnapshot resets all changes to the "tax_amount_snapshot" field.
+func (m *ShipmentMutation) ResetTaxAmountSnapshot() {
+	m.tax_amount_snapshot = nil
+	delete(m.clearedFields, shipment.FieldTaxAmountSnapshot)
+}
+
+// SetTaxModeSnapshot sets the "tax_mode_snapshot" field.
+func (m *ShipmentMutation) SetTaxModeSnapshot(s string) {
+	m.tax_mode_snapshot = &s
+}
+
+// TaxModeSnapshot returns the value of the "tax_mode_snapshot" field in the mutation.
+func (m *ShipmentMutation) TaxModeSnapshot() (r string, exists bool) {
+	v := m.tax_mode_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTaxModeSnapshot returns the old "tax_mode_snapshot" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldTaxModeSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTaxModeSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTaxModeSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTaxModeSnapshot: %w", err)
+	}
+	return oldValue.TaxModeSnapshot, nil
+}
+
+// ClearTaxModeSnapshot clears the value of the "tax_mode_snapshot" field.
+func (m *ShipmentMutation) ClearTaxModeSnapshot() {
+	m.tax_mode_snapshot = nil
+	m.clearedFields[shipment.FieldTaxModeSnapshot] = struct{}{}
+}
+
+// TaxModeSnapshotCleared returns if the "tax_mode_snapshot" field was cleared in this mutation.
+func (m *ShipmentMutation) TaxModeSnapshotCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldTaxModeSnapshot]
+	return ok
+}
+
+// ResetTaxModeSnapshot resets all changes to the "tax_mode_snapshot" field.
+func (m *ShipmentMutation) ResetTaxModeSnapshot() {
+	m.tax_mode_snapshot = nil
+	delete(m.clearedFields, shipment.FieldTaxModeSnapshot)
+}
+
 // SetFreightAmount sets the "freight_amount" field.
 func (m *ShipmentMutation) SetFreightAmount(d decimal.Decimal) {
 	m.freight_amount = &d
@@ -107231,7 +107650,7 @@ func (m *ShipmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShipmentMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 35)
 	if m.shipment_no != nil {
 		fields = append(fields, shipment.FieldShipmentNo)
 	}
@@ -107303,6 +107722,18 @@ func (m *ShipmentMutation) Fields() []string {
 	}
 	if m.shipping_mark != nil {
 		fields = append(fields, shipment.FieldShippingMark)
+	}
+	if m.receivable_amount_snapshot != nil {
+		fields = append(fields, shipment.FieldReceivableAmountSnapshot)
+	}
+	if m.quoted_freight_amount_snapshot != nil {
+		fields = append(fields, shipment.FieldQuotedFreightAmountSnapshot)
+	}
+	if m.tax_amount_snapshot != nil {
+		fields = append(fields, shipment.FieldTaxAmountSnapshot)
+	}
+	if m.tax_mode_snapshot != nil {
+		fields = append(fields, shipment.FieldTaxModeSnapshot)
 	}
 	if m.freight_amount != nil {
 		fields = append(fields, shipment.FieldFreightAmount)
@@ -107381,6 +107812,14 @@ func (m *ShipmentMutation) Field(name string) (ent.Value, bool) {
 		return m.VolumeM3()
 	case shipment.FieldShippingMark:
 		return m.ShippingMark()
+	case shipment.FieldReceivableAmountSnapshot:
+		return m.ReceivableAmountSnapshot()
+	case shipment.FieldQuotedFreightAmountSnapshot:
+		return m.QuotedFreightAmountSnapshot()
+	case shipment.FieldTaxAmountSnapshot:
+		return m.TaxAmountSnapshot()
+	case shipment.FieldTaxModeSnapshot:
+		return m.TaxModeSnapshot()
 	case shipment.FieldFreightAmount:
 		return m.FreightAmount()
 	case shipment.FieldFreightCurrency:
@@ -107452,6 +107891,14 @@ func (m *ShipmentMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldVolumeM3(ctx)
 	case shipment.FieldShippingMark:
 		return m.OldShippingMark(ctx)
+	case shipment.FieldReceivableAmountSnapshot:
+		return m.OldReceivableAmountSnapshot(ctx)
+	case shipment.FieldQuotedFreightAmountSnapshot:
+		return m.OldQuotedFreightAmountSnapshot(ctx)
+	case shipment.FieldTaxAmountSnapshot:
+		return m.OldTaxAmountSnapshot(ctx)
+	case shipment.FieldTaxModeSnapshot:
+		return m.OldTaxModeSnapshot(ctx)
 	case shipment.FieldFreightAmount:
 		return m.OldFreightAmount(ctx)
 	case shipment.FieldFreightCurrency:
@@ -107642,6 +108089,34 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetShippingMark(v)
+		return nil
+	case shipment.FieldReceivableAmountSnapshot:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceivableAmountSnapshot(v)
+		return nil
+	case shipment.FieldQuotedFreightAmountSnapshot:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQuotedFreightAmountSnapshot(v)
+		return nil
+	case shipment.FieldTaxAmountSnapshot:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTaxAmountSnapshot(v)
+		return nil
+	case shipment.FieldTaxModeSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTaxModeSnapshot(v)
 		return nil
 	case shipment.FieldFreightAmount:
 		v, ok := value.(decimal.Decimal)
@@ -107851,6 +108326,18 @@ func (m *ShipmentMutation) ClearedFields() []string {
 	if m.FieldCleared(shipment.FieldShippingMark) {
 		fields = append(fields, shipment.FieldShippingMark)
 	}
+	if m.FieldCleared(shipment.FieldReceivableAmountSnapshot) {
+		fields = append(fields, shipment.FieldReceivableAmountSnapshot)
+	}
+	if m.FieldCleared(shipment.FieldQuotedFreightAmountSnapshot) {
+		fields = append(fields, shipment.FieldQuotedFreightAmountSnapshot)
+	}
+	if m.FieldCleared(shipment.FieldTaxAmountSnapshot) {
+		fields = append(fields, shipment.FieldTaxAmountSnapshot)
+	}
+	if m.FieldCleared(shipment.FieldTaxModeSnapshot) {
+		fields = append(fields, shipment.FieldTaxModeSnapshot)
+	}
 	if m.FieldCleared(shipment.FieldFreightAmount) {
 		fields = append(fields, shipment.FieldFreightAmount)
 	}
@@ -107933,6 +108420,18 @@ func (m *ShipmentMutation) ClearField(name string) error {
 		return nil
 	case shipment.FieldShippingMark:
 		m.ClearShippingMark()
+		return nil
+	case shipment.FieldReceivableAmountSnapshot:
+		m.ClearReceivableAmountSnapshot()
+		return nil
+	case shipment.FieldQuotedFreightAmountSnapshot:
+		m.ClearQuotedFreightAmountSnapshot()
+		return nil
+	case shipment.FieldTaxAmountSnapshot:
+		m.ClearTaxAmountSnapshot()
+		return nil
+	case shipment.FieldTaxModeSnapshot:
+		m.ClearTaxModeSnapshot()
 		return nil
 	case shipment.FieldFreightAmount:
 		m.ClearFreightAmount()
@@ -108028,6 +108527,18 @@ func (m *ShipmentMutation) ResetField(name string) error {
 		return nil
 	case shipment.FieldShippingMark:
 		m.ResetShippingMark()
+		return nil
+	case shipment.FieldReceivableAmountSnapshot:
+		m.ResetReceivableAmountSnapshot()
+		return nil
+	case shipment.FieldQuotedFreightAmountSnapshot:
+		m.ResetQuotedFreightAmountSnapshot()
+		return nil
+	case shipment.FieldTaxAmountSnapshot:
+		m.ResetTaxAmountSnapshot()
+		return nil
+	case shipment.FieldTaxModeSnapshot:
+		m.ResetTaxModeSnapshot()
 		return nil
 	case shipment.FieldFreightAmount:
 		m.ResetFreightAmount()

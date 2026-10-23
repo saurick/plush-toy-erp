@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { requireCompatibleNode } from "./runtime.mjs";
 import {
   ReplicaError,
   loadConfig,
@@ -19,7 +21,11 @@ import {
 import { SSHSource } from "./transport.mjs";
 import { synchronize } from "./sync.mjs";
 import { verifyRestore } from "./restore.mjs";
+import { GitlabSource, synchronizeGitlab } from "./gitlab-sync.mjs";
+import { verifyGitlab } from "./gitlab-restore.mjs";
 import { prepareInstallation, finishInstallation } from "./install.mjs";
+import { checkHealth } from "./health.mjs";
+import { readRetentionLedger } from "./retention.mjs";
 
 export function restoreDue(c, previous, clock = Date.now()) {
   return (
@@ -29,6 +35,7 @@ export function restoreDue(c, previous, clock = Date.now()) {
     previous.destinationId !== c.destination.id ||
     previous.volumeUUID !== c.destination.volumeUUID ||
     !Number.isFinite(Date.parse(previous.checkedAt)) ||
+    clock < Date.parse(previous.checkedAt) ||
     clock - Date.parse(previous.checkedAt) >= c.restore.everyDays * 86400_000
   );
 }
@@ -36,14 +43,12 @@ export async function execute(
   action,
   c,
   configFile,
-  {
-    signal,
-    volume = resolveVolume,
-    source = new SSHSource(c, signal),
-    restore = verifyRestore,
-  } = {},
+  { signal, volume = resolveVolume, source, restore } = {},
 ) {
   const state = privateDirectory(c.stateDirectory);
+  const gitlab = c.source.kind === "gitlab";
+  source ??= gitlab ? new GitlabSource(c, signal) : new SSHSource(c, signal);
+  restore ??= gitlab ? verifyGitlab : verifyRestore;
   let mount;
   try {
     mount = volume(c);
@@ -57,9 +62,10 @@ export async function execute(
       };
     throw error;
   }
-  if (["sync", "verify", "run"].includes(action))
+  if (["sync", "verify", "run", "check"].includes(action))
     await checkDestinationAccess(c, mount, { signal });
   const root = destination(c, mount, action === "init");
+  if (action === "check") return checkHealth(c, root);
   if (action === "init")
     return {
       status: "passed",
@@ -69,15 +75,101 @@ export async function execute(
     };
   if (action === "prepare-install")
     return prepareInstallation(c, configFile, state, { signal });
-  if (action === "verify") return restore(c, root, state, { signal });
-  const result = await synchronize(c, root, source, { signal });
+  const attemptFile = path.join(state, "latest-restore-attempt.json");
+  const history = privateDirectory(path.join(state, "receipts"));
+  const performRestore = async () => {
+    const identity = {
+      sourceId: c.source.id,
+      destinationId: c.destination.id,
+      volumeUUID: c.destination.volumeUUID,
+    };
+    atomicJSON(attemptFile, {
+      ...identity,
+      status: "running",
+      checkedAt: now(),
+    });
+    try {
+      const result = await restore(c, root, state, { signal });
+      atomicJSON(attemptFile, {
+        ...identity,
+        status: "passed",
+        checkedAt: result.checkedAt ?? now(),
+      });
+      atomicJSON(
+        path.join(
+          history,
+          `restore-${(result.checkedAt ?? now()).replaceAll(":", "-")}.json`,
+        ),
+        result,
+      );
+      return result;
+    } catch (error) {
+      atomicJSON(attemptFile, {
+        ...identity,
+        status: "failed",
+        checkedAt: now(),
+        reason: error.code ?? error.name,
+        stage: error.stage,
+      });
+      atomicJSON(
+        path.join(history, `restore-failed-${now().replaceAll(":", "-")}.json`),
+        JSON.parse(fs.readFileSync(attemptFile)),
+      );
+      throw error;
+    }
+  };
+  if (action === "verify") return performRestore();
+  const result = await (gitlab ? synchronizeGitlab : synchronize)(
+    c,
+    root,
+    source,
+    {
+      signal,
+      ensureTarget: () => {
+        requireValue(volume(c) === mount, "volume_identity_mismatch");
+        destination(c, mount);
+      },
+    },
+  );
   atomicJSON(path.join(state, "latest-sync.json"), result);
+  atomicJSON(
+    path.join(history, `sync-${result.checkedAt.replaceAll(":", "-")}.json`),
+    result,
+  );
+  if (source.publishRetention) {
+    const ledger = readRetentionLedger(root, c.source.id);
+    await source.publishRetention({
+      schemaVersion: "plush.replica-retention-report/v1",
+      sourceId: c.source.id,
+      retentionCount: 7,
+      generatedAt: result.checkedAt,
+      records: Object.values(ledger.records).map(
+        ({ id, createdAt, state, reasons, cleanedAt, files, sizeBytes }) => ({
+          id,
+          createdAt,
+          state,
+          reasons,
+          cleanedAt: cleanedAt ?? null,
+          files: [
+            {
+              sizeBytes:
+                sizeBytes ?? (files ?? []).reduce((n, f) => n + f.sizeBytes, 0),
+            },
+          ],
+        }),
+      ),
+    });
+  }
   if (action === "run") {
     const file = path.join(state, "latest-restore.json"),
       previous = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : null;
-    result.restore = restoreDue(c, previous)
-      ? await restore(c, root, state, { signal })
-      : { status: "not_due", lastVerifiedAt: previous.checkedAt };
+    const attempt = fs.existsSync(attemptFile)
+      ? JSON.parse(fs.readFileSync(attemptFile))
+      : null;
+    result.restore =
+      restoreDue(c, previous) || (attempt && restoreDue(c, attempt))
+        ? await performRestore()
+        : { status: "not_due", lastVerifiedAt: previous.checkedAt };
   }
   atomicJSON(path.join(state, "last-success.json"), result);
   return result;
@@ -170,12 +262,29 @@ function producer() {
   if (!fs.existsSync(file))
     return { sourceState: "working-tree", nodeVersion: process.version };
   const identity = JSON.parse(fs.readFileSync(file));
+  requireCompatibleNode(identity.nodeVersion);
   requireValue(
-    identity.nodeVersion === process.version,
-    "runtime_node_version_mismatch",
+    Array.isArray(identity.files) && identity.files.length > 0,
+    "runtime_artifact_invalid",
+  );
+  const hash = createHash("sha256");
+  for (const name of identity.files) {
+    requireValue(
+      /^[a-z0-9-]+\.(?:mjs|sh|rb)$/u.test(name),
+      "runtime_artifact_invalid",
+    );
+    hash.update(name + "\0");
+    hash.update(fs.readFileSync(path.join(path.dirname(file), name)));
+  }
+  requireValue(
+    hash.digest("hex") === identity.sha256,
+    "runtime_artifact_drift",
   );
   return {
-    sourceCommit: identity.gitSha,
+    sourceCommit:
+      identity.sourceState === "content-snapshot" ? undefined : identity.gitSha,
+    baseCommit: identity.gitSha,
+    sourceState: identity.sourceState ?? "committed",
     contentSha256: identity.sha256,
     nodeVersion: process.version,
   };
@@ -184,7 +293,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.umask(0o077);
   if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) {
     console.log(
-      "node cli.mjs <init|sync|verify|run|status|install> --config <private.json>",
+      "node cli.mjs <init|sync|verify|run|check|status|install> --config <private.json>",
     );
     return 0;
   }
@@ -198,7 +307,6 @@ export async function main(argv = process.argv.slice(2)) {
     exit = 0,
     identity = { nodeVersion: process.version };
   try {
-    identity = producer();
     requireValue(
       argv.length === 3 &&
         argv[1] === "--config" &&
@@ -207,6 +315,7 @@ export async function main(argv = process.argv.slice(2)) {
           "sync",
           "verify",
           "run",
+          "check",
           "status",
           "install",
           ...(process.env.PLUSH_BACKUP_REPLICA_LOCKED === "1"
@@ -217,6 +326,7 @@ export async function main(argv = process.argv.slice(2)) {
     );
     const file = path.resolve(argv[2]);
     c = loadConfig(file);
+    identity = producer();
     if (action === "status") {
       const status = path.join(c.stateDirectory, "latest-operation.json");
       result = fs.existsSync(status)
@@ -248,7 +358,7 @@ export async function main(argv = process.argv.slice(2)) {
     };
   }
   if (action !== "status" || !result.producer) result.producer = identity;
-  if (c && !["status", "install", "prepare-install"].includes(action))
+  if (c && !["status", "check", "install", "prepare-install"].includes(action))
     atomicJSON(
       path.join(privateDirectory(c.stateDirectory), "latest-operation.json"),
       result,

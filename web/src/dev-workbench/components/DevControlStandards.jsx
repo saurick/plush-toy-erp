@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
-import { Alert, Button, ConfigProvider, Empty, Popover, theme } from 'antd'
+import { Button, ConfigProvider, Empty, Popover, theme } from 'antd'
 import {
   ArrowRightOutlined,
   DownOutlined,
@@ -19,6 +19,7 @@ import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
 import DevSharedComponentGuide, { SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
+import DevUIPageStateExamples from './DevUIPageStateExamples.jsx'
 import { BasicInputExample, DateInputExample } from './DevUIInputExamples.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
@@ -190,21 +191,25 @@ const TOPICS = [
   },
   {
     key: 'empty',
-    title: '空白与错误',
-    summary: '区分无记录、无结果和失败',
+    title: '页面状态',
+    summary: '加载、空白、失败与恢复',
     guide: 'states',
-    description: '同样没有数据可显示，原因不同，页面给出的下一步也不同。',
+    description: '操作手机任务和电脑切页样例，核对等待期间保留什么，以及完成读取或失败后的恢复。',
     rules: [
+      ['手机首次读取', '卡片骨架', '复用任务卡片布局，保留页签与筛选；未知数量不显示为零。'],
+      ['栏目首次读取', '列表区等待', '不混入其他栏目的记录；页签保持挂载。'],
+      ['同一查询刷新', '保留已有内容', '保留选择和滚动；失败时保留上次结果并明确提示尚未更新。'],
+      ['电脑切页', '内容区等待', '使用共享 Loading，主导航始终可操作。'],
       ['尚无记录', '中性空状态', '没有风险，不显示黄色警告框。'],
       ['筛选未命中', '保留条件 + 清除入口', '让用户理解当前范围，继续调整。'],
       ['读取失败', '错误 + 重试', '不能伪装成空记录，也不能丢失查询上下文。'],
     ],
     checks: [
-      '依次切换三种原因，比较文字和动作。',
-      '无结果时清除条件；失败时重试并核对结果。',
-      '浅深主题中核对图标、文字和操作入口。',
+      '切换首次加载、栏目读取和刷新，完成读取后比较卡片与页签的位置。',
+      '选择一张卡片后刷新并模拟失败；核对选择保留、重试和清除条件。',
+      '选择电脑切页，在等待期间点击另一导航；手机样例可切换宽度和外观。',
     ],
-    source: 'Ant Design Empty / Alert · 共享空状态配置',
+    source: 'MobileTaskListContent · MobileTaskListSkeleton · WorkflowTaskCard · Loading · Ant Design Empty / Alert',
   },
   {
     key: 'counts',
@@ -603,57 +608,6 @@ function ActionsExample() {
   )
 }
 
-function EmptyExample() {
-  const [state, setState] = useState('empty')
-  const [recovered, setRecovered] = useState(false)
-  return (
-    <div className="erp-control-example-stack">
-      <SlidingSegmented
-        aria-label="空白与错误原因"
-        value={state}
-        onChange={(value) => {
-          setState(value)
-          setRecovered(false)
-        }}
-        options={[
-          { value: 'empty', label: '尚无记录' },
-          { value: 'filtered', label: '筛选无结果' },
-          { value: 'failed', label: '读取失败' },
-        ]}
-      />
-      <div className="erp-control-empty-stage">
-        {recovered ? (
-          <Alert
-            type="success"
-            showIcon
-            message="重新读取成功：已恢复 1 条样例记录"
-          />
-        ) : state === 'failed' ? (
-          <Alert
-            type="error"
-            showIcon
-            message="本次读取失败，条件已保留"
-            description="失败不能显示成空记录。此处重试只改变本地样例。"
-            action={
-              <Button onClick={() => setRecovered(true)}>重试读取</Button>
-            }
-          />
-        ) : (
-          <Empty
-            description={
-              state === 'filtered' ? '没有符合条件的记录' : '当前范围暂无记录'
-            }
-          >
-            {state === 'filtered' && (
-              <Button onClick={() => setState('empty')}>清除条件</Button>
-            )}
-          </Empty>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function DevControlStandards() {
   const [params, setParams] = useSearchParams()
   const { accent, effectiveTheme } = useERPTheme()
@@ -698,13 +652,14 @@ export default function DevControlStandards() {
           placeholder="控件或场景"
           value={query}
           allowClear
-          onChange={(event) => update({ controlq: event.target.value })}
+          onSearch={(value) => update({ controlq: value })}
         />
         <nav aria-label="控件设计目录">
           {matches.map((topic) => (
             <button
               key={topic.key}
               type="button"
+              className="erp-dev-directory-item"
               aria-current={current.key === topic.key ? 'page' : undefined}
               onClick={() => update({ control: topic.key, controlq: '' })}
             >
@@ -712,7 +667,6 @@ export default function DevControlStandards() {
                 <strong>{topic.title}</strong>
                 <small>{topic.summary}</small>
               </span>
-              <ArrowRightOutlined aria-hidden="true" />
             </button>
           ))}
           {!matches.length && (
@@ -803,7 +757,7 @@ export default function DevControlStandards() {
                     ) : current.key === 'pagination' ? (
                       <DevUIPaginationExample />
                     ) : (
-                      <EmptyExample />
+                      <DevUIPageStateExamples />
                     )}
                   </div>
                 </ConfigProvider>
@@ -846,7 +800,7 @@ export default function DevControlStandards() {
                 </table>
               </div>
             </section>
-            <details className="erp-control-library-source">
+            <details className="erp-dev-disclosure erp-control-library-source">
               <summary>共享实现与尺寸</summary>
               <p>{current.source}</p>
               <p>

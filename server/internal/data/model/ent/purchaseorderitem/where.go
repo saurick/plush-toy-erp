@@ -91,6 +91,21 @@ func MaterialNameSnapshot(v string) predicate.PurchaseOrderItem {
 	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldMaterialNameSnapshot, v))
 }
 
+// MaterialSpecSnapshot applies equality check predicate on the "material_spec_snapshot" field. It's identical to MaterialSpecSnapshotEQ.
+func MaterialSpecSnapshot(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldMaterialSpecSnapshot, v))
+}
+
+// SupplierItemNoSnapshot applies equality check predicate on the "supplier_item_no_snapshot" field. It's identical to SupplierItemNoSnapshotEQ.
+func SupplierItemNoSnapshot(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldSupplierItemNoSnapshot, v))
+}
+
+// UnitNameSnapshot applies equality check predicate on the "unit_name_snapshot" field. It's identical to UnitNameSnapshotEQ.
+func UnitNameSnapshot(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldUnitNameSnapshot, v))
+}
+
 // ColorSnapshot applies equality check predicate on the "color_snapshot" field. It's identical to ColorSnapshotEQ.
 func ColorSnapshot(v string) predicate.PurchaseOrderItem {
 	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldColorSnapshot, v))
@@ -449,6 +464,231 @@ func MaterialNameSnapshotEqualFold(v string) predicate.PurchaseOrderItem {
 // MaterialNameSnapshotContainsFold applies the ContainsFold predicate on the "material_name_snapshot" field.
 func MaterialNameSnapshotContainsFold(v string) predicate.PurchaseOrderItem {
 	return predicate.PurchaseOrderItem(sql.FieldContainsFold(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialSpecSnapshotEQ applies the EQ predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotEQ(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotNEQ applies the NEQ predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotNEQ(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNEQ(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotIn applies the In predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotIn(vs ...string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldIn(FieldMaterialSpecSnapshot, vs...))
+}
+
+// MaterialSpecSnapshotNotIn applies the NotIn predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotNotIn(vs ...string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNotIn(FieldMaterialSpecSnapshot, vs...))
+}
+
+// MaterialSpecSnapshotGT applies the GT predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotGT(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldGT(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotGTE applies the GTE predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotGTE(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldGTE(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotLT applies the LT predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotLT(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldLT(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotLTE applies the LTE predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotLTE(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldLTE(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotContains applies the Contains predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotContains(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldContains(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotHasPrefix applies the HasPrefix predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotHasPrefix(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldHasPrefix(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotHasSuffix applies the HasSuffix predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotHasSuffix(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldHasSuffix(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotIsNil applies the IsNil predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotIsNil() predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldIsNull(FieldMaterialSpecSnapshot))
+}
+
+// MaterialSpecSnapshotNotNil applies the NotNil predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotNotNil() predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNotNull(FieldMaterialSpecSnapshot))
+}
+
+// MaterialSpecSnapshotEqualFold applies the EqualFold predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotEqualFold(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEqualFold(FieldMaterialSpecSnapshot, v))
+}
+
+// MaterialSpecSnapshotContainsFold applies the ContainsFold predicate on the "material_spec_snapshot" field.
+func MaterialSpecSnapshotContainsFold(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldContainsFold(FieldMaterialSpecSnapshot, v))
+}
+
+// SupplierItemNoSnapshotEQ applies the EQ predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotEQ(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotNEQ applies the NEQ predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotNEQ(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNEQ(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotIn applies the In predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotIn(vs ...string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldIn(FieldSupplierItemNoSnapshot, vs...))
+}
+
+// SupplierItemNoSnapshotNotIn applies the NotIn predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotNotIn(vs ...string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNotIn(FieldSupplierItemNoSnapshot, vs...))
+}
+
+// SupplierItemNoSnapshotGT applies the GT predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotGT(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldGT(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotGTE applies the GTE predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotGTE(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldGTE(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotLT applies the LT predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotLT(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldLT(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotLTE applies the LTE predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotLTE(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldLTE(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotContains applies the Contains predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotContains(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldContains(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotHasPrefix applies the HasPrefix predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotHasPrefix(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldHasPrefix(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotHasSuffix applies the HasSuffix predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotHasSuffix(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldHasSuffix(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotIsNil applies the IsNil predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotIsNil() predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldIsNull(FieldSupplierItemNoSnapshot))
+}
+
+// SupplierItemNoSnapshotNotNil applies the NotNil predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotNotNil() predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNotNull(FieldSupplierItemNoSnapshot))
+}
+
+// SupplierItemNoSnapshotEqualFold applies the EqualFold predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotEqualFold(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEqualFold(FieldSupplierItemNoSnapshot, v))
+}
+
+// SupplierItemNoSnapshotContainsFold applies the ContainsFold predicate on the "supplier_item_no_snapshot" field.
+func SupplierItemNoSnapshotContainsFold(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldContainsFold(FieldSupplierItemNoSnapshot, v))
+}
+
+// UnitNameSnapshotEQ applies the EQ predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotEQ(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEQ(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotNEQ applies the NEQ predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotNEQ(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNEQ(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotIn applies the In predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotIn(vs ...string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldIn(FieldUnitNameSnapshot, vs...))
+}
+
+// UnitNameSnapshotNotIn applies the NotIn predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotNotIn(vs ...string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNotIn(FieldUnitNameSnapshot, vs...))
+}
+
+// UnitNameSnapshotGT applies the GT predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotGT(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldGT(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotGTE applies the GTE predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotGTE(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldGTE(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotLT applies the LT predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotLT(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldLT(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotLTE applies the LTE predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotLTE(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldLTE(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotContains applies the Contains predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotContains(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldContains(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotHasPrefix applies the HasPrefix predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotHasPrefix(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldHasPrefix(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotHasSuffix applies the HasSuffix predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotHasSuffix(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldHasSuffix(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotIsNil applies the IsNil predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotIsNil() predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldIsNull(FieldUnitNameSnapshot))
+}
+
+// UnitNameSnapshotNotNil applies the NotNil predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotNotNil() predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldNotNull(FieldUnitNameSnapshot))
+}
+
+// UnitNameSnapshotEqualFold applies the EqualFold predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotEqualFold(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldEqualFold(FieldUnitNameSnapshot, v))
+}
+
+// UnitNameSnapshotContainsFold applies the ContainsFold predicate on the "unit_name_snapshot" field.
+func UnitNameSnapshotContainsFold(v string) predicate.PurchaseOrderItem {
+	return predicate.PurchaseOrderItem(sql.FieldContainsFold(FieldUnitNameSnapshot, v))
 }
 
 // ColorSnapshotEQ applies the EQ predicate on the "color_snapshot" field.

@@ -285,6 +285,15 @@ const financeScenarios = {
   '/erp/finance/reconciliation': financeScenario('reconciliation'),
 }
 
+export function getBusinessPageHelpScenario(pageKey) {
+  const entry = getBusinessUsabilityEntry(pageKey)
+  if (!entry) return null
+  const scenarios = businessScenarios[entry.path] || masterScenarios[entry.path] ||
+    financeScenarios[entry.path] || supportingScenarios[entry.path]
+  return (Array.isArray(scenarios) ? scenarios : [scenarios])
+    .find((scenario) => scenario?.pageKey === pageKey) || null
+}
+
 function roleScenario(guide, key) {
   return {
     key,

@@ -42,7 +42,6 @@ function ServerJobPerformanceTable({ rows, label }) {
                   <Space size={6} wrap>
                     <Link
                       href={row.latestJobUrl || row.latestPipelineUrl}
-                      target="_blank"
                       rel="noreferrer"
                     >
                       <Text code>{row.name}</Text>
@@ -170,7 +169,7 @@ export function ServerJobPerformance({ evidence }) {
         label="需要关注的历史 Job 性能"
       />
       {remaining.length ? (
-        <details className="erp-dev-quality-server-performance__remaining">
+        <details className="erp-dev-disclosure erp-dev-quality-server-performance__remaining">
           <summary>展开其余 {remaining.length} 个 Job</summary>
           <ServerJobPerformanceTable
             rows={remaining}

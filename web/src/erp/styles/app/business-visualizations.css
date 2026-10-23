@@ -49,7 +49,7 @@
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
-  gap: 7px 14px;
+  gap: 7px;
 }
 
 .erp-inventory-ledger-view-bar > .ant-tabs {
@@ -60,7 +60,15 @@
 
 .erp-inventory-ledger-view-bar .erp-business-visual-switch {
   flex: 0 0 auto;
+  gap: 7px;
   max-width: 100%;
+}
+
+.erp-inventory-ledger-view-bar .erp-business-visual-switch::before {
+  content: '';
+  flex: 0 0 1px;
+  height: 20px;
+  background: var(--erp-border);
 }
 
 .erp-inventory-ledger-page .erp-business-operation-panel__command {
@@ -71,12 +79,6 @@
   min-width: 0;
   max-width: 100%;
   flex-shrink: 1;
-}
-
-.erp-inventory-ledger-page .erp-business-operation-panel__search {
-  min-width: min(240px, 100%);
-  max-width: 320px;
-  flex: 1 1 280px;
 }
 
 .erp-business-visual-frame > .erp-business-visual-switch {
@@ -1192,7 +1194,7 @@
   cursor: pointer;
 }
 
-.erp-task-progress-rail__item--overview {
+.erp-task-progress-rail__item--all {
   padding-inline: 14px;
 }
 
@@ -1383,9 +1385,8 @@ button.erp-production-process__step {
     flex-wrap: wrap;
   }
 
-  .erp-inventory-ledger-page .erp-business-operation-panel__search {
-    max-width: none;
-    flex-basis: 100%;
+  .erp-inventory-ledger-view-bar .erp-business-visual-switch::before {
+    display: none;
   }
 
   .erp-business-visual-metric {

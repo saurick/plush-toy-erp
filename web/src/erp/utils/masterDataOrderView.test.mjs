@@ -1576,10 +1576,6 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
   })
   assert.deepEqual(draft.lines[1], {
     contractNo: 'PO-PRINT-001',
-    materialName: '辅料',
-    vendorCode: '示例配件CD-002#',
-    spec: '12mm',
-    unit: '码',
     quantity: '2',
     remark: '红色',
   })
@@ -1597,6 +1593,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     ),
     {
       contractNo: 'PO-MISSING-DATE',
+      currency: '',
       lines: [],
     }
   )
@@ -1841,12 +1838,13 @@ test('FL_sales_order_item_amount__derives_from_quantity_and_unit_price masterDat
 })
 
 test('FL_sales_order_item_amount__keeps_manual_snapshot_without_inputs masterDataOrderView: sales order item amount keeps manual snapshot without complete inputs', () => {
+  const readOnly = { allowSnapshotFallback: true }
   assert.equal(
     deriveSalesOrderItemAmount({
       ordered_quantity: '',
       unit_price: '3.2',
       amount: ' 88 ',
-    }),
+    }, readOnly),
     '88'
   )
   assert.equal(
@@ -1854,7 +1852,7 @@ test('FL_sales_order_item_amount__keeps_manual_snapshot_without_inputs masterDat
       ordered_quantity: '3',
       unit_price: '',
       amount: ' 99.50 ',
-    }),
+    }, readOnly),
     '99.50'
   )
   assert.equal(
@@ -1862,8 +1860,12 @@ test('FL_sales_order_item_amount__keeps_manual_snapshot_without_inputs masterDat
       ordered_quantity: '',
       unit_price: '',
       amount: ' 0 ',
-    }),
+    }, readOnly),
     '0'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({ ordered_quantity: '3', unit_price: '', amount: '99.50' }),
+    undefined
   )
 })
 

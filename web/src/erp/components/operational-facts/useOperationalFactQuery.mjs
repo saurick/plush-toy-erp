@@ -241,6 +241,10 @@ export function useOperationalFactQuery({
       if (!config) {
         return
       }
+      const requestVersion = listRequestVersionRef.current + 1
+      listRequestVersionRef.current = requestVersion
+      const shouldApplyRequest = () =>
+        mountedRef.current && requestVersion === listRequestVersionRef.current
       if (
         Array.isArray(config.readPermissions) &&
         config.readPermissions.length > 0 &&
@@ -253,10 +257,6 @@ export function useOperationalFactQuery({
         setLoading(false)
         return
       }
-      const requestVersion = listRequestVersionRef.current + 1
-      listRequestVersionRef.current = requestVersion
-      const shouldApplyRequest = () =>
-        mountedRef.current && requestVersion === listRequestVersionRef.current
       setLoading(true)
       setStatusCountsByKey((prev) => ({ ...prev, [key]: null }))
       try {
@@ -273,7 +273,7 @@ export function useOperationalFactQuery({
               })
             : await config.list(
                 compactParams({
-                  include_status_counts: key === 'finance' ? true : undefined,
+                  include_status_counts: ['finance', 'production', 'reservations'].includes(key) ? true : undefined,
                   status: statusFilter,
                   keyword: trimOptional(
                     linkedDocumentRequestKeyword({
@@ -304,7 +304,7 @@ export function useOperationalFactQuery({
         }
         setStatusCountsByKey((prev) => ({
           ...prev,
-          [key]: resolveBusinessStatusCounts(data),
+          [key]: resolveBusinessStatusCounts(data, { hasExactContext: exactProductionFactID > 0, exactRecord: nextRows[0] || null }),
         }))
         setRowsByKey((prev) => ({
           ...prev,
@@ -461,7 +461,7 @@ export function useOperationalFactQuery({
   )
 
   const clearFilters = useCallback((searchKeyword = linkedKeyword || keyword) => {
-    if (currentActiveKey !== 'finance') setStatusFilter('')
+    if (!['finance', 'production', 'reservations'].includes(currentActiveKey)) setStatusFilter('')
     setDateFieldByKey((prev) => ({
       ...prev,
       [currentActiveKey]: activeConfig.defaultDateField || 'occurred_at',

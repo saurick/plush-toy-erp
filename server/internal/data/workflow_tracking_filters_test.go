@@ -59,13 +59,16 @@ func TestWorkflowTrackingFiltersUseCurrentResponsibilityAndBusinessDay(t *testin
 	count(q, 0)
 	q.Attention = "blocked"
 	count(q, 0)
-	day := time.Date(2026, 10, 8, 0, 0, 0, 0, time.FixedZone("Asia/Shanghai", 8*3600))
+	day := time.Date(2026, 10, 8, 0, 0, 0, 0, time.FixedZone("Asia/Shanghai", 8*3600)).UTC()
 	for index, offset := range []time.Duration{-time.Second, 0, 24*time.Hour - time.Second, 24 * time.Hour} {
 		client.ProcessInstance.Create().SetProcessKey(biz.ProcessKeySalesOrderAcceptance).SetProcessVersion("v1").SetConfigRevision("frozen").SetDefinitionHash("hash").SetBusinessRefType("sales_order").SetBusinessRefID(index + 10).SetIdempotencyKey(fmt.Sprintf("filter-date-%d", index)).SetCreatedBy(7).SetStartedAt(day.Add(offset)).SaveX(ctx)
 		client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("TRACK-DATE-%d", index)).SetTaskGroup(biz.WorkflowFollowupTaskGroup).SetTaskName("核对交期").SetSourceType("sales_order").SetSourceID(index + 10).SetOwnerRoleKey("sales").SetTaskStatusKey("ready").SetCreatedBy(7).SetCreatedAt(day.Add(offset)).SaveX(ctx)
 	}
 	q = trackingQuery(7, "started")
 	q.DateFrom, q.DateTo = &day, &day
+	count(q, 2)
+	end := day.Add(24*time.Hour - time.Microsecond)
+	q.DateTo = &end
 	count(q, 4)
 }
 

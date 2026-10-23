@@ -135,6 +135,7 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
         const clear = operation.getByRole('button', { name: '清空筛选', exact: true })
         const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         await search.fill('指定')
+        await search.press('Enter')
         await ready(page, 2)
         await choose(page, '销售订单状态', '草稿', 1)
         await ready(page, 2)
@@ -189,7 +190,7 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
           ['/erp/master/partners/suppliers', '记录范围', '历史记录'],
           ['/erp/master/materials', '记录范围', '历史记录'],
           ['/erp/purchase/material-bom', '记录范围', '历史记录'],
-          ['/erp/warehouse/inbound', '单据状态', '草稿'],
+          ['/erp/warehouse/inbound', null, null],
           ['/erp/warehouse/inventory?view=balances', '存货类型', '材料'],
           ['/erp/system/audit-logs', null, null],
         ]
@@ -220,7 +221,7 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
 path: '/__dev/ui-design',
 viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
+        await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/ }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
@@ -333,6 +334,7 @@ viewport: { width: 1440, height: 900 },
           await selected.click()
           await ready(page, 0, label)
           await search.fill('筛选核对')
+          await search.press('Enter')
           await ready(page, 0, label)
           assert.equal(await trigger.getAttribute('aria-label'), '筛选', `${url} 快捷状态和搜索不计数`)
           assert.equal(await operation.getByRole('button', { name: '清空筛选', exact: true }).count(), 0)
@@ -352,6 +354,7 @@ viewport: { width: 1440, height: 900 },
           await ready(page, 0, label)
           assert.equal(await selected.getAttribute('aria-pressed'), 'false')
           await search.fill('')
+          await search.press('Enter')
           await ready(page, 0, label)
           if (label === '质检状态') {
             await page.locator('.erp-business-operation-panel').getByRole('button', { name: '筛选', exact: true }).click()

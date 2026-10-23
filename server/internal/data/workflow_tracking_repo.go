@@ -115,7 +115,7 @@ func trackingProcessPredicates(q biz.WorkflowTrackingQuery) []predicate.ProcessI
 		filters = append(filters, processinstance.StartedAtGTE(*q.DateFrom))
 	}
 	if q.DateTo != nil {
-		filters = append(filters, processinstance.StartedAtLTE(endOfDateFilter(*q.DateTo)))
+		filters = append(filters, processinstance.StartedAtLTE(*q.DateTo))
 	}
 	return filters
 }
@@ -160,7 +160,7 @@ func trackingStandaloneTaskPredicates(q biz.WorkflowTrackingQuery) []predicate.W
 		filters = append(filters, workflowtask.CreatedAtGTE(*q.DateFrom))
 	}
 	if q.DateTo != nil {
-		filters = append(filters, workflowtask.CreatedAtLTE(endOfDateFilter(*q.DateTo)))
+		filters = append(filters, workflowtask.CreatedAtLTE(*q.DateTo))
 	}
 	return filters
 }

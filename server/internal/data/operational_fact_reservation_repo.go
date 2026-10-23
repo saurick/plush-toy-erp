@@ -403,18 +403,8 @@ func (r *operationalFactRepo) ListStockReservations(ctx context.Context, filter 
 	})
 }
 
-func (r *operationalFactRepo) ListStockReservationsForAccess(
-	ctx context.Context,
-	filter biz.OperationalFactFilter,
-	scope biz.StockReservationReadScope,
-) ([]*biz.StockReservation, int, error) {
-	snapshot, err := beginReadSnapshot(ctx, r.data)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer snapshot.Rollback()
-
-	q := snapshot.client.StockReservation.Query()
+func stockReservationListQuery(client *ent.Client, filter biz.OperationalFactFilter, scope biz.StockReservationReadScope) *ent.StockReservationQuery {
+	q := client.StockReservation.Query()
 	if filter.Status != "" {
 		q = q.Where(stockreservation.Status(filter.Status))
 	}
@@ -476,8 +466,23 @@ func (r *operationalFactRepo) ListStockReservationsForAccess(
 		q = q.Where(stockreservation.ReservedAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		q = q.Where(stockreservation.ReservedAtLTE(endOfDateFilter(*filter.DateTo)))
+		q = q.Where(stockreservation.ReservedAtLTE(*filter.DateTo))
 	}
+	return q
+}
+
+func (r *operationalFactRepo) ListStockReservationsForAccess(
+	ctx context.Context,
+	filter biz.OperationalFactFilter,
+	scope biz.StockReservationReadScope,
+) ([]*biz.StockReservation, int, error) {
+	snapshot, err := beginReadSnapshot(ctx, r.data)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer snapshot.Rollback()
+
+	q := stockReservationListQuery(snapshot.client, filter, scope)
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -624,4 +629,9 @@ func entStockReservationToBiz(row *ent.StockReservation) *biz.StockReservation {
 		out.LotNo = &row.Edges.InventoryLot.LotNo
 	}
 	return out
+}
+
+func (r *operationalFactRepo) CountStockReservationsByStatusForAccess(ctx context.Context, filter biz.OperationalFactFilter, scope biz.StockReservationReadScope) (map[string]int, error) {
+	filter.Status = ""
+	return scanBusinessStatusCounts(ctx, stockReservationListQuery(r.data.postgres, filter, scope).GroupBy(stockreservation.FieldStatus).Aggregate(ent.Count()).Scan)
 }

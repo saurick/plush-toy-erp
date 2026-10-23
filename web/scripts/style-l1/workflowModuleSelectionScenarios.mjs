@@ -1,3 +1,4 @@
+import { DEFAULT_BUSINESS_PAGE_SIZE } from '../../src/erp/utils/businessPagination.mjs'
 import {
   createWorkflowModuleSelectionFixtures,
   workflowModuleSelectionDefinitions,
@@ -202,7 +203,7 @@ export function createWorkflowModuleSelectionScenarios(deps) {
             const complete = taskAction(page, 'complete')
             assert.equal(
               await complete.innerText(),
-              definition.key === 'shipping-release' ? '审批通过' : '完成任务'
+              '完成任务'
             )
             assert.equal(await complete.isEnabled(), true)
             const geometry = await assertSelectedGeometry(page, assert, name)
@@ -281,14 +282,14 @@ export function createWorkflowModuleSelectionScenarios(deps) {
               }
             }
             await page.locator('.ant-pagination-next button').click()
-            await taskRow(page, readyID + 10).waitFor({ state: 'visible' })
+            await taskRow(page, readyID + DEFAULT_BUSINESS_PAGE_SIZE).waitFor({ state: 'visible' })
             await hint.waitFor({ state: 'visible' })
             assert.equal(
               await actionBar(page).count(),
               1,
               'paging clears a stale selection'
             )
-            await taskRow(page, readyID + 10)
+            await taskRow(page, readyID + DEFAULT_BUSINESS_PAGE_SIZE)
               .getByRole('radio')
               .check()
             await actionBar(page)
@@ -306,55 +307,6 @@ export function createWorkflowModuleSelectionScenarios(deps) {
               .click()
 
             await taskAction(page, 'complete').click()
-            if (definition.key === 'shipping-release') {
-              const approvalDialog = page.getByRole('dialog')
-              await approvalDialog.waitFor({ state: 'visible' })
-              assert.equal(
-                workflowWrites.filter(
-                  (call) => call.method === 'complete_task_action'
-                ).length,
-                0,
-                'opening approval must not submit it'
-              )
-              await approvalDialog
-                .getByRole('button', { name: '确认通过', exact: true })
-                .click()
-              await page
-                .getByText('请先填写原因', { exact: true })
-                .waitFor({ state: 'visible' })
-              assert.equal(
-                workflowWrites.filter(
-                  (call) => call.method === 'complete_task_action'
-                ).length,
-                0,
-                'approval requires an opinion before submission'
-              )
-              await approvalDialog
-                .getByRole('textbox')
-                .fill('财务资料已核对，同意放行；实际出货由仓库独立确认')
-              await approvalDialog
-                .getByRole('button', { name: '取消', exact: true })
-                .click()
-              await approvalDialog.waitFor({ state: 'hidden' })
-              assert.equal(
-                workflowWrites.filter(
-                  (call) => call.method === 'complete_task_action'
-                ).length,
-                0,
-                'canceling approval must not submit it'
-              )
-              assert.equal(
-                await taskRow(page, readyID).getByRole('radio').isChecked(),
-                true
-              )
-              await taskAction(page, 'complete').click()
-              await approvalDialog
-                .getByRole('textbox')
-                .fill('财务资料已核对，同意放行；实际出货由仓库独立确认')
-              await approvalDialog
-                .getByRole('button', { name: '确认通过', exact: true })
-                .click()
-            }
             await taskAction(page, 'complete')
               .locator('.anticon-loading')
               .waitFor({ state: 'visible' })
@@ -371,13 +323,7 @@ export function createWorkflowModuleSelectionScenarios(deps) {
             assert.equal(completionCalls[0].params.task_id, readyID)
             assert.equal(completionCalls[0].params.expected_version, 1)
             assert.ok(completionCalls[0].params.idempotency_key)
-            if (definition.key === 'shipping-release') {
-              assert.match(completionCalls[0].params.reason, /同意放行/u)
-            }
             releaseCompletion()
-            if (definition.key === 'shipping-release') {
-              await page.getByRole('dialog').waitFor({ state: 'hidden' })
-            }
             await taskRow(page, readyID)
               .getByText('已完成', { exact: true })
               .waitFor({ state: 'visible' })

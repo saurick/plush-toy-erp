@@ -321,3 +321,32 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardApprovalRequiresAnyRegisteredCapa
 		t.Fatalf("denied approval query must not reach repo, query=%#v", repo.query)
 	}
 }
+
+func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage(t *testing.T) {
+	repo := &recordingWorkflowTaskBoardJSONRPCRepo{result: &biz.WorkflowTaskBoard{
+		SnapshotAt: time.Unix(1792670400, 0),
+		Lanes:      []biz.WorkflowTaskBoardLane{{Key: biz.WorkflowTaskBoardLaneAll, Limit: 20, Offset: 20, Tasks: []*biz.WorkflowTask{}}},
+	}}
+	dispatcher := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.NewStdLogger(io.Discard)),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead)},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_board", "all-todo", mustJSONRPCStruct(t, map[string]any{
+		"lane_key": "all", "todo_only": true, "sort": "newest", "limit": 20, "offset": 20, "keyword": "包装",
+	}))
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("all todo page: %+v %v", res, err)
+	}
+	q := repo.query
+	if q.LaneKey != biz.WorkflowTaskBoardLaneAll || !q.TodoOnly || q.Limit != 20 || q.Offset != 20 || q.Sort != biz.WorkflowTaskBoardSortNewest || q.Keyword != "包装" {
+		t.Fatalf("all todo query lost pagination or filters: %+v", q)
+	}
+	if q.VisibilityScope == nil || q.VisibilityScope.StandaloneAllowAllOwnerRoles || len(q.VisibilityScope.StandaloneVisibleOwnerRoleKeys) != 1 || q.VisibilityScope.StandaloneVisibleOwnerRoleKeys[0] != biz.SalesRoleKey {
+		t.Fatalf("all todo query widened responsibility scope: %+v", q.VisibilityScope)
+	}
+	lanes := res.Data.AsMap()["lanes"].([]any)
+	if len(lanes) != 1 || lanes[0].(map[string]any)["key"] != "all" || lanes[0].(map[string]any)["offset"] != float64(20) {
+		t.Fatalf("invalid all page projection: %+v", lanes)
+	}
+}

@@ -100,7 +100,7 @@ test('tracking keeps pure code copies and inline multi-product expansion when th
   assert.deepEqual(writes, ['P-LONG-20261018-000000000002'])
 })
 
-test('compact card keeps identity, task, source and status separate and clears removed associations', async (t) => {
+test('compact card groups code and source beside the image and clears removed associations', async (t) => {
   const { container, render } = await createReactTestHarness(t)
   const { default: WorkflowTaskIdentity } = await import('./WorkflowTaskIdentity.jsx')
   const { WorkflowTaskSource } = await import('./WorkflowTaskCopy.jsx')
@@ -119,7 +119,8 @@ test('compact card keeps identity, task, source and status separate and clears r
   assert.doesNotMatch(container.querySelector('.erp-task-identity__card-heading').textContent, /海盐企鹅/u)
   assert.match(container.querySelector('.erp-task-identity__card-body').textContent, /海盐企鹅.*27007#/u)
   assert.match(container.querySelector('.erp-task-identity__source').textContent, /YS8-XD-043/u)
-  assert.equal(container.querySelector('.erp-task-identity__source').closest('.erp-task-identity__card-body'), null)
+  assert.ok(container.querySelector('.erp-task-identity__source').closest('.erp-task-identity__card-body'))
+  assert.match(container.querySelector('.erp-task-identity__metadata').textContent, /27007#.*YS8-XD-043/u)
   assert.equal(container.querySelectorAll('.erp-task-copy').length, 0)
   await render(display({ ...current, display_context: { available: true, source_no: 'YS8-XD-044', items: [] } }))
   assert.match(container.querySelector('.erp-task-identity__card-heading').textContent, /核对样品.*待处理/u)
@@ -142,6 +143,29 @@ test('compact tracking without products still shows its source and never borrows
   assert.equal(container.textContent, '未关联产品／物料生产批次 DEMO-WIP-001')
   assert.equal(container.querySelectorAll('.erp-task-product-image').length, 1)
   assert.equal(container.querySelectorAll('.erp-task-identity__code, .erp-task-identity__association-open').length, 0)
+})
+
+test('table source copy preserves the current number without opening the multi-product list or task', async (t) => {
+  const { container, render, act } = await createReactTestHarness(t)
+  const { default: WorkflowTaskIdentity } = await import('./WorkflowTaskIdentity.jsx')
+  const { WorkflowTaskSource } = await import('./WorkflowTaskCopy.jsx')
+  const writes = []
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => writes.push(value) } })
+  let parentClicks = 0
+  const current = { ...task, display_context: { ...task.display_context, items: [...task.display_context.items, { kind: 'product', name: '小熊', code: 'BEAR-1' }] } }
+  const display = (next) => createElement('div', { onClick: () => parentClicks++ }, createElement(WorkflowTaskIdentity, {
+    task: next, compact: true, layout: 'table', source: createElement(WorkflowTaskSource, { task: next, showUnavailable: false }),
+  }))
+  await render(display(current))
+  await act(async () => container.querySelector('[aria-label="复制单据编号"]').click())
+  assert.deepEqual(writes, ['YS8-XD-043'])
+  assert.equal(parentClicks, 0)
+  assert.equal(container.querySelector('.erp-task-identity__association-open').getAttribute('aria-expanded'), 'false')
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
+  await render(display({ ...current, source_type: null, source_id: null, payload: {}, display_context: { available: true, source_no: '', items: [] } }))
+  assert.match(container.querySelector('.erp-task-identity__card-body').textContent, /未关联产品／物料.*未关联业务单据/u)
+  assert.equal(container.querySelectorAll('.erp-task-copy').length, 0)
+  assert.doesNotMatch(container.textContent, /YS8-XD-043|27007#|BEAR-1/u)
 })
 
 test('standalone and linked tasks show business fields without data-nature badges', async (t) => {

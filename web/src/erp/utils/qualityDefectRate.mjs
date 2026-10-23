@@ -1,3 +1,5 @@
+import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+
 export const QUALITY_DEFECT_RATE_OPERATORS = Object.freeze({
   APPROX: 'APPROX',
   GT: 'GT',
@@ -33,8 +35,10 @@ export function normalizeQualityDefectPercent(value) {
   }
 
   const source = String(value).trim()
-  if (!/^\d+(?:\.\d{1,2})?$/u.test(source)) {
-    throw new TypeError('估算不良比例最多保留两位小数')
+  const parts = /^(\d+)(?:\.(\d+))?$/u.exec(source)
+  const fraction = (parts?.[2] || '').replace(/0+$/u, '')
+  if (!parts || fraction.length > NumericContract.scale) {
+    throw new TypeError(`估算不良比例最多保留 ${NumericContract.scale} 位小数`)
   }
 
   const numeric = Number(source)
@@ -42,11 +46,9 @@ export function normalizeQualityDefectPercent(value) {
     throw new RangeError('估算不良比例须在 0% 到 100% 之间')
   }
 
-  const [integerPart, decimalPart = ''] = source.split('.')
-  const normalizedInteger = String(Number(integerPart))
-  const normalizedDecimal = decimalPart.replace(/0+$/u, '')
-  return normalizedDecimal
-    ? `${normalizedInteger}.${normalizedDecimal}`
+  const normalizedInteger = String(Number(parts[1]))
+  return fraction
+    ? `${normalizedInteger}.${fraction}`
     : normalizedInteger
 }
 

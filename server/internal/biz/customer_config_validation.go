@@ -34,7 +34,7 @@ var productModuleCatalog = map[string]productModuleCatalogItem{
 	"shipments":           {Name: "出货单", Layer: "Fact", Maturity: "runtime_available", Dependencies: []string{"sales_orders", "inventory"}, PageKeys: []string{"shipments", "outbound"}},
 	"finance":             {Name: "财务业务", Layer: "FactCandidate", Maturity: "workflow_assisted", PageKeys: []string{"finance-dashboard", "payable-reconciliation", "shipment-finance"}},
 	"finance_payments":    {Name: "收付款与核销", Layer: "Fact", Maturity: "runtime_available", Dependencies: []string{"finance", "customers", "suppliers"}, PageKeys: []string{"finance-payments"}},
-	"workflow_tasks":      {Name: "协同任务", Layer: "Workflow", Maturity: "runtime_available", PageKeys: []string{"task-board", "shipping-release"}},
+	"workflow_tasks":      {Name: "协同任务", Layer: "Workflow", Maturity: "runtime_available", PageKeys: []string{"task-board"}},
 	"production":          {Name: "生产协同", Layer: "Workflow", Maturity: "workflow_assisted", PageKeys: []string{"production-progress"}},
 }
 

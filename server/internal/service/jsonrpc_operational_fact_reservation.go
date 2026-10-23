@@ -67,11 +67,17 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.operationalFactUC.CountStockReservationsByStatusForAccess(ctx, filter, scope)
+		})
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
 		items, total, err := d.operationalFactUC.ListStockReservationsForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"stock_reservations": stockReservationsForAccessToAny(items, scope), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(withBusinessStatusCounts(map[string]any{"stock_reservations": stockReservationsForAccessToAny(items, scope), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}, statusCounts)), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}

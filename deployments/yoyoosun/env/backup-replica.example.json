@@ -12,7 +12,8 @@
     "relativeDirectory": "plush-toy-erp-backups/production"
   },
   "stateDirectory": "/Users/your-user/Library/Application Support/plush-toy-erp/backup-replica/state",
-  "retentionDays": 90,
+  "retentionCount": 7,
+  "minimumFreeBytes": 68719476736,
   "maxSourceAgeHours": 36,
   "transferTimeoutSeconds": 600,
   "restore": {

@@ -1,138 +1,560 @@
 // 只登记需要持续保护的业务约束及其测试，不在这里重新实现业务公式或状态机。
 export const BUSINESS_RULE_CATEGORIES = Object.freeze([
-  { value: 'transaction', label: '事务与回滚' },
-  { value: 'quantity', label: '数量与金额' },
-  { value: 'concurrency', label: '并发与幂等' },
-  { value: 'boundary', label: '权限与事实边界' },
-  { value: 'growth', label: '数据增长与资源边界' },
-])
+  { value: "transaction", label: "事务与回滚" },
+  { value: "quantity", label: "数量与金额" },
+  { value: "consistency", label: "业务数据一致性" },
+  { value: "concurrency", label: "并发与幂等" },
+  { value: "boundary", label: "权限与事实边界" },
+  { value: "growth", label: "数据增长与资源边界" },
+]);
 
-const source = (file, name, gate = 'postgres') => Object.freeze({
-  file: `server/internal/${file}`,
-  package: `server/internal/${file.slice(0, file.lastIndexOf('/'))}`,
-  name,
-  gate,
-})
-const rule = (id, label, category, domain, standard, tests) => Object.freeze({
-  id, label, category, domain, standard, tests: Object.freeze(tests),
-})
+const source = (file, name, gate = "postgres") =>
+  Object.freeze({
+    file: `server/internal/${file}`,
+    package: `server/internal/${file.slice(0, file.lastIndexOf("/"))}`,
+    name,
+    gate,
+  });
+const rule = (id, label, category, domain, standard, tests) =>
+  Object.freeze({
+    id,
+    label,
+    category,
+    domain,
+    standard,
+    tests: Object.freeze(tests),
+  });
+const web = (file, name) =>
+  Object.freeze({
+    file: `web/src/erp/utils/${file}`,
+    package: `web/src/erp/utils/${file}`,
+    name,
+    gate: "web",
+  });
 
 export const BUSINESS_RULES = Object.freeze([
-  rule('sales-export-snapshot', '销售导出快照与完整结果', 'growth', 'source-documents',
-    '订单集合、表头、明细数量和工程状态属于同一只读快照，稳定排序且不截断结果。', [
-      source('data/sales_order_export_postgres_test.go', 'TestSourceDocumentPostgresSalesOrderExportSnapshot'),
-    ]),
-  rule('sales-export-budget', '销售导出预算、准入与取消释放', 'growth', 'source-documents',
-    '行数和未压缩数据超限时整次拒绝；准备名额与期限有界，取消或失败后释放连接并允许重试。', [
-      source('biz/sales_order_export_test.go', 'TestSalesOrderExportAdmissionCancellationAndPreparation', 'server'),
-      source('biz/sales_order_export_test.go', 'TestSalesOrderExportFailureAndDeadline', 'server'),
-      source('service/jsonrpc_sales_order_export_test.go', 'TestSalesOrderExportServiceReleasesAdmissionAfterFailure', 'server'),
-      source('data/sales_order_export_postgres_test.go', 'TestSourceDocumentPostgresSalesOrderExportBudgets'),
-      source('data/sales_order_export_postgres_test.go', 'TestSourceDocumentPostgresSalesOrderExportCancelReleasesConnection'),
-    ]),
-  rule('unit-quantity', '单位精度与应需取整', 'quantity', 'master-data',
-    '录入数量不静默舍入；应需量按单位精度向上取整，越界拒绝。', [
-      source('biz/unit_quantity_test.go', 'TestValidateUnitQuantity', 'server'),
-      source('biz/unit_quantity_test.go', 'TestRoundRequiredUnitQuantity', 'server'),
-      source('biz/unit_quantity_test.go', 'FuzzRoundRequiredUnitQuantity', 'server'),
-    ]),
-  rule('material-demand', '算料归并与冻结数量', 'quantity', 'source-documents',
-    '先归并再取整，库存和在途只作参考；大数与六位精度持久化保持一致。', [
-      source('data/engineering_material_calculation_test.go', 'TestEngineeringMaterialCalculationGroupsBeforeRounding', 'server'),
-      source('data/engineering_material_calculation_test.go', 'TestEngineeringMaterialCalculationRejectsGroupedOverflow', 'server'),
-      source('data/engineering_material_calculation_test.go', 'TestEngineeringMaterialInventoryDoesNotReduceDemand', 'server'),
-      source('data/engineering_material_calculation_test.go', 'TestSourceDocumentPostgresEngineeringMaterialQuantities'),
-    ]),
-  rule('money-precision', '金额精度与分配输入', 'quantity', 'fact-finance',
-    '金额按精确十进制保存；分配金额须为正且不越界，非法输入不进入存储。', [
-      source('core/value/value_test.go', 'TestMoney', 'server'),
-      source('biz/finance_payment_usecase_behavior_test.go', 'TestFinancePaymentUsecaseAllocationRejectsInvalidAmountsBeforeStorage', 'server'),
-    ]),
-  rule('inventory-atomicity', '库存多行写入与失败重试', 'transaction', 'fact-inventory',
-    '任一行失败时余额、流水和单据共同回滚；重试只产生一组事实。', [
-      source('data/inventory_postgres_operation_recovery_test.go', 'TestInventoryPostgresOperationMultiLineRollbackAndRetry'),
-      source('data/inventory_postgres_operation_concurrency_test.go', 'TestInventoryPostgresOperationFirstBalanceAndRollback'),
-    ]),
-  rule('stock-capacity', '库存扣减与预留竞争', 'concurrency', 'fact-inventory',
-    '并发扣减与预留不得超用同粒度可用库存；余额与流水一致。', [
-      source('data/inventory_postgres_test.go', 'TestInventoryPostgresConcurrentOutbound'),
-      source('data/inventory_postgres_test.go', 'TestInventoryPostgresConcurrentReservationAndOutboundPreserveAvailableStock'),
-      source('data/inventory_postgres_lot_bom_test.go', 'TestInventoryLotPostgresConcurrentOutbound'),
-    ]),
-  rule('purchase-replay', '采购入库过账、取消与重放', 'concurrency', 'fact-purchase',
-    '相同意图返回原结果，不同内容冲突；过账、调整与取消串行保持有效依赖。', [
-      source('data/purchase_receipt_lifecycle_concurrency_test.go', 'TestPurchaseReceiptPostgresConcurrentCommandReplayReturnsOneFactSet'),
-      source('data/purchase_receipt_lifecycle_concurrency_test.go', 'TestPurchaseReceiptPostgresConcurrentCommandPayloadConflictPersistsOneFactSet'),
-      source('data/purchase_receipt_lifecycle_concurrency_test.go', 'TestPurchaseReceiptPostgresAdjustmentPostAndReceiptCancelSerialize'),
-    ]),
-  rule('receipt-adjustment', '入库调整累计与并发上限', 'quantity', 'fact-purchase',
-    '调整后的有效数量不得被并发超扣；草稿改动不能穿透过账冻结。', [
-      source('data/inventory_postgres_purchase_adjustment_test.go', 'TestPurchaseReceiptAdjustmentPostgresEffectiveReceiptQuantityAndConcurrentAdjustOut'),
-      source('data/inventory_postgres_purchase_adjustment_test.go', 'TestPurchaseReceiptAdjustmentPostgresAddItemVsPostConcurrency'),
-    ]),
-  rule('source-freeze', '来源单据提交冻结', 'concurrency', 'source-documents',
-    '提交后拒绝旧版本保存，保留已提交的表头、明细与数量。', [
-      source('data/source_document_postgres_concurrency_test.go', 'TestSourceDocumentPostgresSaveSubmitConcurrency'),
-    ]),
-  rule('engineering-approval', '用料审批与采购生成原子性', 'transaction', 'source-documents',
-    '审批、采购结果与审计共同提交；查询保持同一快照，中途失败整批回滚，同一意图可安全重试。', [
-      source('data/engineering_material_request_repo_test.go', 'TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval'),
-      source('data/engineering_material_workflow_test.go', 'TestSourceDocumentPostgresEngineeringMaterialFinanceFailureAndRetry'),
-      source('data/engineering_material_snapshot_postgres_test.go', 'TestSourceDocumentPostgresEngineeringMaterialReadSnapshot'),
-    ]),
-  rule('production-capacity', '生产领料与获批超领上限', 'quantity', 'fact-production',
-    '并发领料不得超过计划量与有效超领批准量，同一命令重放不重复扣料。', [
-      source('data/production_order_postgres_concurrency_test.go', 'TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner'),
-      source('data/production_order_postgres_concurrency_test.go', 'TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinnerAndExactReadback'),
-    ]),
-  rule('outsourcing-capacity', '委外来源数量与在制分配', 'transaction', 'fact-outsourcing',
-    '委外事实不得超来源行，WIP 分配与订单结算保持原子性。', [
-      source('data/operational_fact_outsourcing_source_postgres_test.go', 'TestOutsourcingFactFromOrderPostgresConcurrentPostsDoNotExceedSourceLine'),
-      source('data/outsourcing_order_wip_postgres_concurrency_test.go', 'TestOutsourcingFactFromOrderPostgresWIPAllocationAndLifecycleSettlementStayAtomic'),
-    ]),
-  rule('quality-correction', '质检更正与不可变重试', 'transaction', 'fact-quality',
-    '更正、关联事实与审计保持原子性；完成后重试按原意图恢复。', [
-      source('data/quality_inspection_correction_postgres_test.go', 'TestQualityInspectionPostgresCorrectionAtomicityAndConcurrency'),
-      source('data/quality_inspection_correction_postgres_test.go', 'TestQualityInspectionPostgresCompletedCorrectionReplayUsesImmutableIntent'),
-    ]),
-  rule('shipment-capacity', '出货累计与来源取消竞争', 'quantity', 'fact-shipment',
-    '并发出货不得超过订单行；取消出货与下游质检创建必须保持来源有效。', [
-      source('data/inventory_postgres_test.go', 'TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine'),
-      source('data/shipment_cancellation_postgres_concurrency_test.go', 'TestOperationalFactPostgresShipmentCancelVsFinishedGoodsQualityCreateUsesOneSourceLock'),
-    ]),
-  rule('finance-atomicity', '收付款分配、取消与补偿', 'transaction', 'fact-finance',
-    '并发分配不得超过未结金额；取消和补偿失败完整回滚，审计只记一次。', [
-      source('data/operational_fact_finance_payment_postgres_test.go', 'TestOperationalFactRepoFinancePaymentPostgresAllocationRollbackAndRecovery'),
-      source('data/operational_fact_finance_payment_postgres_test.go', 'TestOperationalFactRepoFinancePaymentPostgresConcurrentOutstanding'),
-      source('data/finance_fact_cancel_audit_postgres_test.go', 'TestFinanceFactCancelAuditPostgresRollsBackWhenCompensationFails'),
-      source('data/finance_fact_cancel_audit_postgres_test.go', 'TestFinanceFactCancelAuditPostgresConcurrentExactReplayReturnsOneAudit'),
-    ]),
-  rule('workflow-boundary', '协同终态、幂等与事实边界', 'boundary', 'workflow',
-    '协同完成不代写库存或财务事实；并发终态只执行一次约定副作用。', [
-      source('biz/workflow_production_source_task_transition_test.go', 'TestWorkflowUsecase_ProductionSchedulingDoneConvergesBusinessProjectionWithoutFactWrite', 'server'),
-      source('data/workflow_repo_postgres_concurrency_test.go', 'TestWorkflowPostgresConflictingTerminalUpdatesApplySideEffectsOnce'),
-      source('data/workflow_repo_postgres_concurrency_test.go', 'TestWorkflowPostgresConcurrentDifferentIntentSameKeyConflicts'),
-      source('data/process_runtime_postgres_concurrency_test.go', 'TestProcessRuntimePostgresConcurrentSameIntentExecutionReconcilesOneTerminalResult'),
-    ]),
-  rule('permission-boundary', '仓库权限与角色聚合写入', 'boundary', 'rbac-api',
-    '越权仓库写入在 repository 前拒绝；并发角色设置保留一组完整权限。', [
-      source('biz/inventory_usecase_behavior_test.go', 'TestInventoryUsecaseWarehouseScopeRejectsWritesBeforeRepository', 'server'),
-      source('data/admin_manage_postgres_concurrency_test.go', 'TestAdminManagePostgresConcurrentRoleSettingsKeepsOneCompleteAggregate'),
-    ]),
-])
+  rule(
+    "consistency-money",
+    "单价、金额精度与缺值",
+    "consistency",
+    "fact-finance",
+    "录入与派生金额保持六位精度；清空单价清空派生金额，溢出拒绝，未知金额不得补零。",
+    [
+      source(
+        "biz/line_amount_test.go",
+        "TestCalculatedLineAmountStorageBoundary",
+        "server",
+      ),
+      web(
+        "sourceOrderAmounts.test.mjs",
+        "business data consistency: clearing prices clears submitted and displayed amounts",
+      ),
+      web(
+        "sourceOrderAmounts.test.mjs",
+        "business data consistency: amount preview rejects derived and aggregate overflow",
+      ),
+      web(
+        "outsourcingContractReadiness.test.mjs",
+        "business data consistency: outsourcing confirmation preserves exact money and unknown price",
+      ),
+    ],
+  ),
+  rule(
+    "consistency-ratios",
+    "损耗率与不良比例",
+    "consistency",
+    "fact-quality",
+    "百分数、比例和 Excel 百分比格式分别解释；超精度输入不可静默舍入，品质比例保留六位小数。",
+    [
+      web(
+        "bomXlsxImport.test.mjs",
+        "business data consistency: BOM percentage headers and excess precision retain their meaning",
+      ),
+      web(
+        "qualityDefectRate.test.mjs",
+        "business data consistency: backend precision survives quality display and edit",
+      ),
+    ],
+  ),
+  rule(
+    "consistency-weights",
+    "毛净重与物理单位",
+    "consistency",
+    "fact-shipment",
+    "净重以克、毛重以千克核对，保存和过账均不得毛重小于净重；缺失重量不虚构。",
+    [
+      source(
+        "biz/net_weight_test.go",
+        "TestShipmentGrossNetWeightConsistency",
+        "server",
+      ),
+      web(
+        "shipmentWeight.test.mjs",
+        "business data consistency: gross kilograms cannot be below net grams",
+      ),
+    ],
+  ),
+  rule(
+    "consistency-dates",
+    "业务日期与时间边界",
+    "consistency",
+    "rbac-api",
+    "仅日期筛选覆盖上海时区整天；显式时间戳保持原瞬间，付款到期日沿用正式 UTC 月结规则。",
+    [
+      source(
+        "service/jsonrpc_date_filter_test.go",
+        "TestBusinessDateFilterBoundaries",
+        "server",
+      ),
+    ],
+  ),
+  rule(
+    "consistency-snapshots",
+    "币种、打印与来源快照",
+    "consistency",
+    "source-documents",
+    "币种贯穿单据和打印；普通编辑保留快照，来源切换覆盖残值，历史缺值不得取当前主数据冒充。",
+    [
+      web(
+        "purchaseOrderPrintDraft.test.mjs",
+        "business data consistency: contract currency and source snapshots survive printing",
+      ),
+      source(
+        "data/business_data_consistency_test.go",
+        "TestBusinessDataConsistency",
+        "server",
+      ),
+      source(
+        "data/business_data_consistency_test.go",
+        "TestSourceDocumentPostgresBusinessDataConsistency",
+      ),
+    ],
+  ),
+  rule(
+    "consistency-allocation",
+    "分批税费、应收应付与尾差",
+    "consistency",
+    "fact-finance",
+    "税额和另计报价运费按货款占比分摊、末批结清；委外分批应付结清尾差；取消释放额度，重试保留原快照。",
+    [
+      source(
+        "biz/commercial_allocation_test.go",
+        "TestCommercialAllocationRemainder",
+        "server",
+      ),
+      source(
+        "data/business_consistency_migration_postgres_test.go",
+        "TestSourceDocumentPostgresCommercialSnapshotMigration",
+      ),
+      source(
+        "data/business_data_consistency_test.go",
+        "TestBusinessDataConsistency",
+        "server",
+      ),
+      source(
+        "data/business_data_consistency_test.go",
+        "TestSourceDocumentPostgresBusinessDataConsistency",
+      ),
+    ],
+  ),
+  rule(
+    "sales-export-snapshot",
+    "销售导出快照与完整结果",
+    "growth",
+    "source-documents",
+    "订单集合、表头、明细数量和工程状态属于同一只读快照，稳定排序且不截断结果。",
+    [
+      source(
+        "data/sales_order_export_postgres_test.go",
+        "TestSourceDocumentPostgresSalesOrderExportSnapshot",
+      ),
+    ],
+  ),
+  rule(
+    "sales-export-budget",
+    "销售导出预算、准入与取消释放",
+    "growth",
+    "source-documents",
+    "行数和未压缩数据超限时整次拒绝；准备名额与期限有界，取消或失败后释放连接并允许重试。",
+    [
+      source(
+        "biz/sales_order_export_test.go",
+        "TestSalesOrderExportAdmissionCancellationAndPreparation",
+        "server",
+      ),
+      source(
+        "biz/sales_order_export_test.go",
+        "TestSalesOrderExportFailureAndDeadline",
+        "server",
+      ),
+      source(
+        "service/jsonrpc_sales_order_export_test.go",
+        "TestSalesOrderExportServiceReleasesAdmissionAfterFailure",
+        "server",
+      ),
+      source(
+        "data/sales_order_export_postgres_test.go",
+        "TestSourceDocumentPostgresSalesOrderExportBudgets",
+      ),
+      source(
+        "data/sales_order_export_postgres_test.go",
+        "TestSourceDocumentPostgresSalesOrderExportCancelReleasesConnection",
+      ),
+    ],
+  ),
+  rule(
+    "unit-quantity",
+    "单位精度与应需取整",
+    "quantity",
+    "master-data",
+    "录入数量不静默舍入；应需量按单位精度向上取整，越界拒绝。",
+    [
+      source("biz/unit_quantity_test.go", "TestValidateUnitQuantity", "server"),
+      source(
+        "biz/unit_quantity_test.go",
+        "TestRoundRequiredUnitQuantity",
+        "server",
+      ),
+      source(
+        "biz/unit_quantity_test.go",
+        "FuzzRoundRequiredUnitQuantity",
+        "server",
+      ),
+    ],
+  ),
+  rule(
+    "material-demand",
+    "算料归并与冻结数量",
+    "quantity",
+    "source-documents",
+    "先归并再取整，库存和在途只作参考；大数与六位精度持久化保持一致。",
+    [
+      source(
+        "data/engineering_material_calculation_test.go",
+        "TestEngineeringMaterialCalculationGroupsBeforeRounding",
+        "server",
+      ),
+      source(
+        "data/engineering_material_calculation_test.go",
+        "TestEngineeringMaterialCalculationRejectsGroupedOverflow",
+        "server",
+      ),
+      source(
+        "data/engineering_material_calculation_test.go",
+        "TestEngineeringMaterialInventoryDoesNotReduceDemand",
+        "server",
+      ),
+      source(
+        "data/engineering_material_calculation_test.go",
+        "TestSourceDocumentPostgresEngineeringMaterialQuantities",
+      ),
+    ],
+  ),
+  rule(
+    "money-precision",
+    "金额精度与分配输入",
+    "quantity",
+    "fact-finance",
+    "金额按精确十进制保存；分配金额须为正且不越界，非法输入不进入存储。",
+    [
+      source("core/value/value_test.go", "TestMoney", "server"),
+      source(
+        "biz/finance_payment_usecase_behavior_test.go",
+        "TestFinancePaymentUsecaseAllocationRejectsInvalidAmountsBeforeStorage",
+        "server",
+      ),
+    ],
+  ),
+  rule(
+    "inventory-atomicity",
+    "库存多行写入与失败重试",
+    "transaction",
+    "fact-inventory",
+    "任一行失败时余额、流水和单据共同回滚；重试只产生一组事实。",
+    [
+      source(
+        "data/inventory_postgres_operation_recovery_test.go",
+        "TestInventoryPostgresOperationMultiLineRollbackAndRetry",
+      ),
+      source(
+        "data/inventory_postgres_operation_concurrency_test.go",
+        "TestInventoryPostgresOperationFirstBalanceAndRollback",
+      ),
+    ],
+  ),
+  rule(
+    "stock-capacity",
+    "库存扣减与预留竞争",
+    "concurrency",
+    "fact-inventory",
+    "并发扣减与预留不得超用同粒度可用库存；余额与流水一致。",
+    [
+      source(
+        "data/inventory_postgres_test.go",
+        "TestInventoryPostgresConcurrentOutbound",
+      ),
+      source(
+        "data/inventory_postgres_test.go",
+        "TestInventoryPostgresConcurrentReservationAndOutboundPreserveAvailableStock",
+      ),
+      source(
+        "data/inventory_postgres_lot_bom_test.go",
+        "TestInventoryLotPostgresConcurrentOutbound",
+      ),
+    ],
+  ),
+  rule(
+    "purchase-replay",
+    "采购入库过账、取消与重放",
+    "concurrency",
+    "fact-purchase",
+    "相同意图返回原结果，不同内容冲突；过账、调整与取消串行保持有效依赖。",
+    [
+      source(
+        "data/purchase_receipt_lifecycle_concurrency_test.go",
+        "TestPurchaseReceiptPostgresConcurrentCommandReplayReturnsOneFactSet",
+      ),
+      source(
+        "data/purchase_receipt_lifecycle_concurrency_test.go",
+        "TestPurchaseReceiptPostgresConcurrentCommandPayloadConflictPersistsOneFactSet",
+      ),
+      source(
+        "data/purchase_receipt_lifecycle_concurrency_test.go",
+        "TestPurchaseReceiptPostgresAdjustmentPostAndReceiptCancelSerialize",
+      ),
+    ],
+  ),
+  rule(
+    "receipt-adjustment",
+    "入库调整累计与并发上限",
+    "quantity",
+    "fact-purchase",
+    "调整后的有效数量不得被并发超扣；草稿改动不能穿透过账冻结。",
+    [
+      source(
+        "data/inventory_postgres_purchase_adjustment_test.go",
+        "TestPurchaseReceiptAdjustmentPostgresEffectiveReceiptQuantityAndConcurrentAdjustOut",
+      ),
+      source(
+        "data/inventory_postgres_purchase_adjustment_test.go",
+        "TestPurchaseReceiptAdjustmentPostgresAddItemVsPostConcurrency",
+      ),
+    ],
+  ),
+  rule(
+    "source-freeze",
+    "来源单据提交冻结",
+    "concurrency",
+    "source-documents",
+    "提交后拒绝旧版本保存，保留已提交的表头、明细与数量。",
+    [
+      source(
+        "data/source_document_postgres_concurrency_test.go",
+        "TestSourceDocumentPostgresSaveSubmitConcurrency",
+      ),
+    ],
+  ),
+  rule(
+    "engineering-approval",
+    "用料审批与采购生成原子性",
+    "transaction",
+    "source-documents",
+    "审批、采购结果与审计共同提交；查询保持同一快照，中途失败整批回滚，同一意图可安全重试。",
+    [
+      source(
+        "data/engineering_material_request_repo_test.go",
+        "TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval",
+      ),
+      source(
+        "data/engineering_material_workflow_test.go",
+        "TestSourceDocumentPostgresEngineeringMaterialFinanceFailureAndRetry",
+      ),
+      source(
+        "data/engineering_material_snapshot_postgres_test.go",
+        "TestSourceDocumentPostgresEngineeringMaterialReadSnapshot",
+      ),
+    ],
+  ),
+  rule(
+    "production-capacity",
+    "生产领料与获批超领上限",
+    "quantity",
+    "fact-production",
+    "并发领料不得超过计划量与有效超领批准量，同一命令重放不重复扣料。",
+    [
+      source(
+        "data/production_order_postgres_concurrency_test.go",
+        "TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner",
+      ),
+      source(
+        "data/production_order_postgres_concurrency_test.go",
+        "TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinnerAndExactReadback",
+      ),
+    ],
+  ),
+  rule(
+    "outsourcing-capacity",
+    "委外来源数量与在制分配",
+    "transaction",
+    "fact-outsourcing",
+    "委外事实不得超来源行，WIP 分配与订单结算保持原子性。",
+    [
+      source(
+        "data/operational_fact_outsourcing_source_postgres_test.go",
+        "TestOutsourcingFactFromOrderPostgresConcurrentPostsDoNotExceedSourceLine",
+      ),
+      source(
+        "data/outsourcing_order_wip_postgres_concurrency_test.go",
+        "TestOutsourcingFactFromOrderPostgresWIPAllocationAndLifecycleSettlementStayAtomic",
+      ),
+    ],
+  ),
+  rule(
+    "quality-correction",
+    "质检更正与不可变重试",
+    "transaction",
+    "fact-quality",
+    "更正、关联事实与审计保持原子性；完成后重试按原意图恢复。",
+    [
+      source(
+        "data/quality_inspection_correction_postgres_test.go",
+        "TestQualityInspectionPostgresCorrectionAtomicityAndConcurrency",
+      ),
+      source(
+        "data/quality_inspection_correction_postgres_test.go",
+        "TestQualityInspectionPostgresCompletedCorrectionReplayUsesImmutableIntent",
+      ),
+    ],
+  ),
+  rule(
+    "shipment-capacity",
+    "出货累计与来源取消竞争",
+    "quantity",
+    "fact-shipment",
+    "并发出货不得超过订单行；取消出货与下游质检创建必须保持来源有效。",
+    [
+      source(
+        "data/inventory_postgres_test.go",
+        "TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine",
+      ),
+      source(
+        "data/shipment_cancellation_postgres_concurrency_test.go",
+        "TestOperationalFactPostgresShipmentCancelVsFinishedGoodsQualityCreateUsesOneSourceLock",
+      ),
+    ],
+  ),
+  rule(
+    "finance-atomicity",
+    "收付款分配、取消与补偿",
+    "transaction",
+    "fact-finance",
+    "并发分配不得超过未结金额；取消和补偿失败完整回滚，审计只记一次。",
+    [
+      source(
+        "data/operational_fact_finance_payment_postgres_test.go",
+        "TestOperationalFactRepoFinancePaymentPostgresAllocationRollbackAndRecovery",
+      ),
+      source(
+        "data/operational_fact_finance_payment_postgres_test.go",
+        "TestOperationalFactRepoFinancePaymentPostgresConcurrentOutstanding",
+      ),
+      source(
+        "data/finance_fact_cancel_audit_postgres_test.go",
+        "TestFinanceFactCancelAuditPostgresRollsBackWhenCompensationFails",
+      ),
+      source(
+        "data/finance_fact_cancel_audit_postgres_test.go",
+        "TestFinanceFactCancelAuditPostgresConcurrentExactReplayReturnsOneAudit",
+      ),
+    ],
+  ),
+  rule(
+    "workflow-boundary",
+    "协同终态、幂等与事实边界",
+    "boundary",
+    "workflow",
+    "协同完成不代写库存或财务事实；并发终态只执行一次约定副作用。",
+    [
+      source(
+        "biz/workflow_production_source_task_transition_test.go",
+        "TestWorkflowUsecase_ProductionSchedulingDoneConvergesBusinessProjectionWithoutFactWrite",
+        "server",
+      ),
+      source(
+        "data/workflow_repo_postgres_concurrency_test.go",
+        "TestWorkflowPostgresConflictingTerminalUpdatesApplySideEffectsOnce",
+      ),
+      source(
+        "data/workflow_repo_postgres_concurrency_test.go",
+        "TestWorkflowPostgresConcurrentDifferentIntentSameKeyConflicts",
+      ),
+      source(
+        "data/process_runtime_postgres_concurrency_test.go",
+        "TestProcessRuntimePostgresConcurrentSameIntentExecutionReconcilesOneTerminalResult",
+      ),
+    ],
+  ),
+  rule(
+    "permission-boundary",
+    "仓库权限与角色聚合写入",
+    "boundary",
+    "rbac-api",
+    "越权仓库写入在 repository 前拒绝；并发角色设置保留一组完整权限。",
+    [
+      source(
+        "biz/inventory_usecase_behavior_test.go",
+        "TestInventoryUsecaseWarehouseScopeRejectsWritesBeforeRepository",
+        "server",
+      ),
+      source(
+        "data/admin_manage_postgres_concurrency_test.go",
+        "TestAdminManagePostgresConcurrentRoleSettingsKeepsOneCompleteAggregate",
+      ),
+    ],
+  ),
+]);
 
-export const businessTestKey = (test) => `${test.package}:${test.name}`
+export const businessTestKey = (test) => `${test.package}:${test.name}`;
 
 export function businessRuleTests(gate) {
-  if (!['server', 'postgres'].includes(gate)) throw new Error('unknown business rule gate')
-  return [...new Map(BUSINESS_RULES.flatMap((entry) => entry.tests)
-    .filter((test) => test.gate === gate)
-    .map((test) => [businessTestKey(test), test])).values()]
+  if (!["web", "server", "postgres"].includes(gate))
+    throw new Error("unknown business rule gate");
+  return [
+    ...new Map(
+      BUSINESS_RULES.flatMap((entry) => entry.tests)
+        .filter((test) => test.gate === gate)
+        .map((test) => [businessTestKey(test), test]),
+    ).values(),
+  ];
+}
+
+export function businessConsistencyTests(gate) {
+  const ids = new Set(
+    BUSINESS_RULES.filter(
+      (entry) =>
+        entry.category === "consistency" ||
+        ["unit-quantity", "money-precision"].includes(entry.id),
+    )
+      .flatMap((entry) => entry.tests)
+      .map(businessTestKey),
+  );
+  return businessRuleTests(gate).filter((entry) =>
+    ids.has(businessTestKey(entry)),
+  );
 }
 
 export const BUSINESS_RULE_DIAGRAMS = Object.freeze({
+  consistency: {
+    label: "业务数据从录入到冻结输出",
+    chart: `flowchart TD
+  source["唯一来源与明确单位"] --> input["精度、缺值与范围校验"]
+  input --> calculate["按统一口径计算与分摊"]
+  calculate --> freeze["事务内保存事实和快照"]
+  freeze --> output["页面、打印和导出读取快照"]
+  output --> reconcile["分批总额、清空与历史缺值回归"]`,
+  },
   growth: {
-    label: '有界读取与完整快照',
+    label: "有界读取与完整快照",
     chart: `flowchart TD
   request["筛选范围与稳定排序"] --> admission["有界准入与准备期限"]
   admission --> snapshot["同一只读快照核对集合与预算"]

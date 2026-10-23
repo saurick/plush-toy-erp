@@ -91,7 +91,6 @@ import {
   TASK_BOARD_SORT_OPTIONS,
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
-  buildWorkflowTaskOverviewTasks,
   buildWorkflowTaskBoardRequest,
   getWorkflowTaskBoardRequestKey,
   getWorkflowTaskBoardStatusOptions,
@@ -450,17 +449,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     taskBoardHasLoaded &&
     !taskBoardResponse &&
     !taskBoardLoadError
+  const taskBoardVisibleCount = filters.lane === 'all'
+    ? taskBoardSummaryResponse?.total ?? taskBoardModel.total
+    : taskBoardCounts[filters.lane] || 0
   const taskLanes = useMemo(
     () =>
       taskBoardModel.visibleLanes.map((lane) => ({
         ...lane,
-        count: taskBoardMetricsReady ? taskBoardCounts[lane.key] : lane.count,
+        count: taskBoardMetricsReady ? taskBoardVisibleCount : lane.count,
       })),
-    [taskBoardCounts, taskBoardMetricsReady, taskBoardModel.visibleLanes]
-  )
-  const overviewTasks = useMemo(
-    () => buildWorkflowTaskOverviewTasks(taskLanes),
-    [taskLanes]
+    [taskBoardVisibleCount, taskBoardMetricsReady, taskBoardModel.visibleLanes]
   )
   const sourceOptions = useMemo(
     () =>
@@ -531,7 +529,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
     if (pendingScroll) {
       if (
-        !taskBoardModel.focused ||
         filters.lane !== pendingScroll.lane ||
         taskBoardModel.page !== pendingScroll.page
       ) {
@@ -545,7 +542,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [
     filters.lane,
     loading,
-    taskBoardModel.focused,
     taskBoardModel.page,
     taskBoardReady,
     taskBoardRequestKey,
@@ -565,7 +561,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     if (returning && (pending?.taskID === returning.taskID || returnedBusinessTask?.path === `${location.pathname}${location.search}`)) return
     if (
       !taskBoardResponse ||
-      !taskBoardModel.focused ||
       taskBoardModel.requestedPage <= taskBoardModel.pageCount
     ) {
       return
@@ -597,7 +592,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     filters,
     searchParams,
     setSearchParams,
-    taskBoardModel.focused,
     taskBoardModel.pageCount,
     taskBoardModel.requestedPage,
     taskBoardResponse,
@@ -845,7 +839,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     const nextPageSize = normalizeWorkflowTaskPageSize(pageSize)
     const nextPage = nextPageSize !== filters.pageSize ? 1 : Number(page)
     if (
-      !taskBoardModel.focused ||
       !Number.isInteger(nextPage) ||
       nextPage < 1 ||
       (nextPage === taskBoardModel.page && nextPageSize === filters.pageSize)
@@ -1151,13 +1144,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             compact
             layout="table"
             showTaskName
+            source={<WorkflowTaskSource task={record} showUnavailable={false} />}
             renderCompactTitle={() => (
               <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} compact />
             )}
           />
-          <Text type="secondary">
-            <WorkflowTaskSource task={record} showUnavailable={false} />
-          </Text>
           {getWorkflowTaskReason(record) ? (
             <Text
               type={
@@ -1538,6 +1529,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                               updateFilter('keyword', keyword)
                             }
                           />
+                          {!calendarView ? (
+                            <SelectFilter
+                              emptyValue="smart"
+                              aria-label="任务排序"
+                              value={filters.sort}
+                              options={TASK_BOARD_SORT_OPTIONS}
+                              onChange={(value) => updateFilter('sort', value)}
+                            />
+                          ) : null}
                           <WorkflowTaskDiscoveryFilters
                             value={filters}
                             profile={adminProfile}
@@ -1624,17 +1624,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           />
                         </>
                       }
-                      actions={
-                        !calendarView && taskBoardModel.focused ? (
-                          <SelectFilter
-                            emptyValue="smart"
-                            aria-label="任务排序"
-                            value={filters.sort}
-                            options={TASK_BOARD_SORT_OPTIONS}
-                            onChange={(value) => updateFilter('sort', value)}
-                          />
-                        ) : null
-                      }
+
                     />
                   </div>
                 </div>
@@ -1646,7 +1636,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       lane: 'all',
                       due: 'all',
                       page: 1,
-                    })}
+                    }, { calendar: true })}
                     scopeKey={workflowWorkbenchScopeKey}
                     refreshKey={trackingRefresh}
                     onOpenTask={openTaskDrawer}
@@ -1665,30 +1655,22 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   <div>
                     <div
                       ref={taskBoardLanesRef}
-                      className={`erp-task-board-lanes${
-                      taskBoardModel.focused
-                        ? ' erp-task-board-lanes--focused'
-                        : ''
-                    }`}
+                      className="erp-task-board-lanes erp-task-board-lanes--focused"
                       aria-label="任务管理分类"
                       aria-busy={taskBoardUpdating}
                     >
-                      {(taskBoardModel.focused
-                      ? taskLanes
-                      : [{ key: 'overview', tasks: overviewTasks }]
-                    ).map((lane) => (
-                      <TaskLane
-                        key={lane.key}
-                        keyword={filters.keyword}
-                        lane={retainedBusinessTask ? {
-                          ...lane,
-                          tasks: retainReturnedWorkflowTask(lane.tasks, retainedBusinessTask.task, retainedBusinessTask.context?.returnPosition),
-                        } : lane}
-                        loading={taskBoardUpdating}
-                        focused={taskBoardModel.focused}
-                        onOpenTask={openTaskDrawer}
-                      />
-                    ))}
+                      {taskLanes.map((lane) => (
+                        <TaskLane
+                          key={lane.key}
+                          keyword={filters.keyword}
+                          lane={retainedBusinessTask ? {
+                            ...lane,
+                            tasks: retainReturnedWorkflowTask(lane.tasks, retainedBusinessTask.task, retainedBusinessTask.context?.returnPosition),
+                          } : lane}
+                          loading={taskBoardUpdating}
+                          onOpenTask={openTaskDrawer}
+                        />
+                      ))}
                     </div>
                     {retainedBusinessTask ? <Alert
                       type="success"
@@ -1700,9 +1682,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     /> : null}
                   </div>
                 )}
-                {!calendarView && taskBoardModel.focused ? (
+                {!calendarView ? (
                   <WorkflowTaskPagination
-                    total={taskBoardCounts[filters.lane] || 0}
+                    total={taskBoardVisibleCount}
                     current={
                       retainedBusinessTask ? filters.page : taskBoardReady ? taskBoardModel.page : filters.page
                     }

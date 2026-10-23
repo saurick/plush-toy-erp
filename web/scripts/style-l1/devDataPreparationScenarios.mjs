@@ -22,7 +22,7 @@ const RUN_ID = 'core_demo_20260729'
 const CREATED_AT = '2026-07-29T02:00:00.000Z'
 const UPDATED_AT = '2026-07-29T02:01:00.000Z'
 const ACCEPTANCE_PLAN = buildManualAcceptanceBusinessChainReviewPlan({
-  catalogTargetCount: 51,
+  catalogTargetCount: 50,
   datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
 })
 
@@ -179,7 +179,7 @@ function createSummary() {
       {
         key: 'full-acceptance',
         title: '完整验收数据',
-        purpose: '在隔离库执行 51 项验收',
+        purpose: '在隔离库执行 50 项验收',
         writesDatabase: true,
         dataRetention: 'ephemeral',
         cleanupMode: 'automatic',

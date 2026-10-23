@@ -699,25 +699,12 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-sidebar__section-head,
-[data-erp-theme='dark'] .erp-dev-docs-sidebar__section-icon,
-[data-erp-theme='dark'] .erp-dev-docs-tree__folder,
-[data-erp-theme='dark'] .erp-dev-docs-tree__doc-title {
+[data-erp-theme='dark'] .erp-dev-docs-sidebar__section-icon {
   color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-pinned__path {
   color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-dev-docs-list__item:hover,
-[data-erp-theme='dark'] .erp-dev-docs-list__item:focus-visible,
-[data-erp-theme='dark'] .erp-dev-docs-pinned__item:hover,
-[data-erp-theme='dark'] .erp-dev-docs-pinned__item:focus-visible,
-[data-erp-theme='dark'] .erp-dev-docs-tree__row:hover,
-[data-erp-theme='dark'] .erp-dev-docs-tree__row:focus-visible {
-  border-color: var(--erp-interactive-border-hover);
-  background: var(--erp-interactive-bg-hover);
-  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-row-pin {

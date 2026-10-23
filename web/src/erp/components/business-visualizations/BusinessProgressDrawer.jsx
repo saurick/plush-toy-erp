@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { Alert, Button, Drawer, Empty, Spin, Tag } from 'antd'
 import {
   ArrowRightOutlined,
@@ -15,7 +22,9 @@ import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentati
 import MobileDetailHeader from '../../mobile/components/MobileDetailHeader.jsx'
 import MobileProgressSummary from '../../mobile/components/MobileProgressSummary.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
-import BusinessProgressSummary from './BusinessProgressSummary.jsx'
+import BusinessProgressSummary, {
+  BusinessProgressHeader,
+} from './BusinessProgressSummary.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import {
   progressSourcePath,
@@ -23,6 +32,7 @@ import {
 } from '../../utils/businessProgress.mjs'
 
 const SECTIONS = [
+  { key: 'overview', label: '进度总览' },
   { key: 'lines', label: '产品明细' },
   { key: 'production', label: '生产单' },
   { key: 'batches', label: '工序批次' },
@@ -30,14 +40,12 @@ const SECTIONS = [
   { key: 'tasks', label: '关联任务' },
 ]
 
-const MOBILE_GROUPS = [
-  { key: 'products', label: '产品信息', sections: ['lines'] },
-  {
-    key: 'production',
-    label: '生产执行',
-    sections: ['production', 'batches', 'materials'],
-  },
-  { key: 'tasks', label: '关联任务', sections: ['tasks'] },
+const PRODUCTION_SECTIONS = ['production', 'batches', 'materials']
+const MOBILE_TABS = [
+  { key: 'overview', label: '总览' },
+  { key: 'lines', label: '产品' },
+  { key: 'execution', label: '生产' },
+  { key: 'tasks', label: '任务' },
 ]
 
 const SUPPRESS_OPEN_MOTION = Object.freeze({
@@ -56,16 +64,17 @@ export default function BusinessProgressDrawer({
   onOpenTask,
   onOpenProduction,
   onSectionChange,
+  onRememberContext,
 }) {
   const begin = useLatestRequestCoordinator()
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState('lines')
-  const [mobileRecordsOpen, setMobileRecordsOpen] = useState(false)
+  const [tab, setTab] = useState('overview')
+  const [productionOpen, setProductionOpen] = useState(true)
   const recordsRef = useRef(null)
   const headingRef = useRef(null)
-  const recordsRequestRef = useRef('')
+  const contextRef = useRef(new Map())
   const tabID = useId()
   const requestKey = selection ? `${selection.view}:${selection.id}` : ''
   const selectedID = selection?.id
@@ -108,76 +117,98 @@ export default function BusinessProgressDrawer({
     }
   }, [begin, load])
   useEffect(() => {
-    setTab(selection?.section || 'lines')
-  }, [requestKey, selection?.section])
-  useEffect(() => {
-    if (recordsRequestRef.current !== requestKey) {
-      recordsRequestRef.current = requestKey
-      setMobileRecordsOpen(
-        Boolean(selection?.section && selection.section !== 'lines')
-      )
-      return
-    }
-    if (selection?.section && selection.section !== 'lines') {
-      setMobileRecordsOpen(true)
-    }
-  }, [requestKey, selection?.section])
+    contextRef.current.clear()
+  }, [adminProfile])
+  useLayoutEffect(() => {
+    const previous = contextRef.current.get(requestKey)
+    setTab(selection?.section || previous?.section || 'overview')
+    setProductionOpen(
+      previous?.productionOpen ?? selection?.productionOpen ?? true
+    )
+  }, [requestKey, selection?.section, selection?.productionOpen])
   const data =
     state?.key === requestKey && state?.profile === adminProfile
       ? state.data
       : null
+  const focusHeading = useCallback(() => {
+    const heading = headingRef.current
+    if (heading && !heading.closest('[role="dialog"]')?.contains(document.activeElement)) {
+      heading.focus({ preventScroll: true })
+    }
+  }, [])
   useLayoutEffect(() => {
-    if (data && !mobile) headingRef.current?.focus({ preventScroll: true })
-  }, [data, mobile])
+    if (data && !mobile) focusHeading()
+  }, [data, focusHeading, mobile])
   const sectionRecords = (section) => data?.sections?.[section] || []
   const items = SECTIONS.filter(
     (item) =>
+      item.key === 'overview' ||
       !data ||
-      (mobile ? sectionRecords(item.key).length > 0 : data.sections[item.key])
+      (data.sections[item.key] &&
+        (item.key !== 'tasks' || data.access.tasks) &&
+        (item.key !== 'batches' || data.access.wip) &&
+        (!['production', 'materials'].includes(item.key) ||
+          data.access.production))
   )
-  const activeTab = items.some((item) => item.key === tab)
-    ? tab
-    : items[0]?.key || 'lines'
-  const mobileGroups = MOBILE_GROUPS.map((group) => {
-    const sections = group.sections.filter(
-      (section) => sectionRecords(section).length > 0
-    )
-    const counts = Object.fromEntries(
-      group.sections.map((section) => [section, sectionRecords(section).length])
-    )
-    const summary =
-      group.key === 'production'
-        ? [
-            counts.production ? `${counts.production} 单` : '',
-            counts.batches ? `${counts.batches} 批次` : '',
-            counts.materials ? `${counts.materials} 项领料` : '',
-          ]
-            .filter(Boolean)
-            .join(' · ')
-        : `${counts[group.sections[0]] || 0} 项`
-    return {
-      ...group,
-      sections,
-      summary,
-      defaultSection: sections[0],
+  const activeTab = items.some((item) => item.key === tab) ? tab : 'overview'
+  const productionSections = items.filter((item) =>
+    PRODUCTION_SECTIONS.includes(item.key)
+  )
+  const mobileItems = MOBILE_TABS.filter((item) =>
+    item.key === 'execution'
+      ? productionSections.length > 0
+      : items.some((section) => section.key === item.key)
+  )
+  const navigationTab =
+    mobile && PRODUCTION_SECTIONS.includes(activeTab) ? 'execution' : activeTab
+  const rememberContext = (changes) => {
+    if (!requestKey) return
+    contextRef.current.set(requestKey, {
+      ...contextRef.current.get(requestKey),
+      ...changes,
+    })
+    if (contextRef.current.size > 20) {
+      contextRef.current.delete(contextRef.current.keys().next().value)
     }
-  }).filter((group) => group.sections.length > 0)
-  const activeMobileGroup =
-    mobileGroups.find((group) => group.sections.includes(activeTab)) ||
-    mobileGroups[0]
-  const sourcePath = data ? progressSourcePath(data.row, data.row.view) : ''
+  }
   const changeSection = (section) => {
-    setTab(section)
-    onSectionChange?.(section)
+    const next =
+      section === 'execution'
+        ? PRODUCTION_SECTIONS.includes(activeTab)
+          ? activeTab
+          : productionSections[0]?.key
+        : section
+    if (!next) return
+    rememberContext({ section: next, productionOpen: true })
+    setProductionOpen(true)
+    setTab(next)
+    onSectionChange?.(next)
   }
   const showSection = (section) => {
-    setMobileRecordsOpen(true)
     changeSection(section)
-    if (!mobile || mobileRecordsOpen) {
-      recordsRef.current?.scrollIntoView({ block: 'start' })
+    requestAnimationFrame(() =>
       recordsRef.current?.focus({ preventScroll: true })
-    }
+    )
   }
+  useLayoutEffect(() => {
+    if (data && recordsRef.current) {
+      recordsRef.current.scrollTop =
+        contextRef.current.get(requestKey)?.scrolls?.[activeTab] ??
+        selection?.detailScroll?.[activeTab] ??
+        0
+    }
+  }, [data, activeTab, requestKey, selection?.detailScroll])
+  const rememberSelection = () =>
+    onRememberContext?.({
+      section: activeTab,
+      productionOpen,
+      detailScroll: {
+        ...selection?.detailScroll,
+        ...contextRef.current.get(requestKey)?.scrolls,
+        [activeTab]: recordsRef.current?.scrollTop || 0,
+      },
+    })
+  const sourcePath = data ? progressSourcePath(data.row, data.row.view) : ''
   const sourceAction =
     !mobile && sourcePath && canOpen(sourcePath) ? (
       <Button
@@ -199,12 +230,6 @@ export default function BusinessProgressDrawer({
     >
       <Button onClick={onClose}>返回进度</Button>
       {!mobile && sourceAction}
-      {data?.access.tasks &&
-        (mobile ? sectionRecords('tasks').length > 0 : data.sections.tasks) && (
-          <Button type="primary" onClick={() => showSection('tasks')}>
-            查看关联任务
-          </Button>
-        )}
     </div>
   )
   const surfaceProps = mobile
@@ -214,13 +239,6 @@ export default function BusinessProgressDrawer({
             title="进度详情"
             backLabel="返回进度"
             onBack={onClose}
-            trailing={
-              data ? (
-                <Tag className="mobile-task-flow-status">
-                  {progressStatusLabel(data.row.status)}
-                </Tag>
-              ) : null
-            }
           />
         ),
         width: '100%',
@@ -236,36 +254,31 @@ export default function BusinessProgressDrawer({
           : {}),
       }
     : {
-        title: `${selection?.orderNo || '订单'} · 完整进度`,
+        title: (
+          <>
+            <span role="heading" aria-level={2} ref={headingRef} tabIndex={-1}>
+              {selection?.orderNo || '订单'}
+            </span>{' '}
+            · 完整进度
+          </>
+        ),
         onCancel: onClose,
+        afterOpenChange: (open) => {
+          if (open) focusHeading()
+        },
         className: 'erp-progress-modal',
         size: 'localAction',
       }
-  useEffect(() => {
-    if (
-      !data ||
-      (mobile
-        ? !mobileRecordsOpen
-        : !selection?.section || selection.section === 'lines')
-    ) {
-      return undefined
-    }
-    const frame = requestAnimationFrame(() => {
-      recordsRef.current?.scrollIntoView({ block: 'start' })
-      recordsRef.current?.focus({ preventScroll: true })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [data, selection?.section, mobile, mobileRecordsOpen])
   const renderRecords = (section) => {
     const records = sectionRecords(section)
     return (
       <>
-        {!mobile && section === 'materials' && (
+        {section === 'materials' && (
           <p className="erp-progress-hint">
             按已登记领料与计划用量核对。尚未领齐不代表库存缺料；采购到货需到相关业务中核对。
           </p>
         )}
-        {!mobile && section === 'tasks' && (
+        {section === 'tasks' && (
           <p className="erp-progress-hint">
             仅显示当前账号可见的关联任务。任务完成不代表已经生产、入库或出货。
           </p>
@@ -351,7 +364,10 @@ export default function BusinessProgressDrawer({
                   )}
                   {mobile && record.kind === 'task' && onOpenTask && (
                     <Button
-                      onClick={() => onOpenTask(record.id)}
+                      onClick={() => {
+                        rememberSelection()
+                        onOpenTask(record.id)
+                      }}
                       aria-label={`查看任务 ${record.number || record.label}`}
                     >
                       查看任务
@@ -360,7 +376,12 @@ export default function BusinessProgressDrawer({
                   {mobile &&
                     record.kind === 'production' &&
                     onOpenProduction && (
-                      <Button onClick={() => onOpenProduction(record)}>
+                      <Button
+                        onClick={() => {
+                          rememberSelection()
+                          onOpenProduction(record)
+                        }}
+                      >
                         查看生产进度
                       </Button>
                     )}
@@ -398,159 +419,130 @@ export default function BusinessProgressDrawer({
           }
         />
       )}
-      {mobile && loading && !data ? (
-        <div className="mobile-detail-muted" role="status">
-          <Spin size="small" /> 正在读取进度…
-        </div>
-      ) : null}
-      {mobile && data ? (
-        <>
-          <MobileProgressSummary data={data} />
-          <button
-            type="button"
-            className="mobile-progress-detail-toggle"
-            aria-expanded={mobileRecordsOpen}
-            aria-controls={`${tabID}-records`}
-            onClick={() =>
-              mobileRecordsOpen
-                ? setMobileRecordsOpen(false)
-                : showSection(activeTab)
-            }
-          >
-            {mobileRecordsOpen ? '收起业务明细' : '查看业务明细'}
-          </button>
-        </>
-      ) : (
-        data && (
-          <BusinessProgressSummary
-            row={data.row}
-            access={data.access}
-            headingRef={headingRef}
-            sections={data.sections}
-            onSelectSection={showSection}
-          />
-        )
+      {data && (
+        <BusinessProgressHeader
+          mobile={mobile}
+          row={data.row}
+          access={data.access}
+          onSelectSection={showSection}
+        />
       )}
-      <section
-        id={`${tabID}-records`}
-        ref={recordsRef}
-        hidden={mobile && !mobileRecordsOpen}
-        className={
-          mobile
-            ? 'mobile-detail-section mobile-progress-detail-records'
-            : 'erp-progress-detail-records'
-        }
-        aria-label="进度明细"
-        tabIndex={-1}
+      <SlidingTabList
+        className="erp-progress-detail-tabs erp-navigation-tabs"
+        aria-label="进度明细分类"
       >
-        {mobile ? (
-          <Spin spinning={loading}>
-            {!error && data && (
+        {(mobile ? mobileItems : items).map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            id={`${tabID}-${item.key}`}
+            aria-controls={`${tabID}-panel`}
+            aria-selected={navigationTab === item.key}
+            onClick={() => changeSection(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </SlidingTabList>
+      <section
+        id={`${tabID}-panel`}
+        ref={recordsRef}
+        className="erp-progress-detail-scroll"
+        role="tabpanel"
+        aria-labelledby={`${tabID}-${navigationTab}`}
+        tabIndex={0}
+        onScroll={(event) =>
+          rememberContext({
+            scrolls: {
+              ...contextRef.current.get(requestKey)?.scrolls,
+              [activeTab]: event.currentTarget.scrollTop,
+            },
+          })
+        }
+      >
+        <Spin spinning={loading}>
+          {!error &&
+            data &&
+            (activeTab === 'overview' ? (
+              mobile ? (
+                <MobileProgressSummary
+                  data={data}
+                  onSelectSection={showSection}
+                />
+              ) : (
+                <BusinessProgressSummary
+                  row={data.row}
+                  access={data.access}
+                  sections={data.sections}
+                  onSelectSection={showSection}
+                />
+              )
+            ) : mobile && navigationTab === 'execution' ? (
               <div className="mobile-progress-detail-groups">
-                {mobileGroups.length > 0 ? (
-                  mobileGroups.map((group) => {
-                    const expanded = activeMobileGroup?.key === group.key
-                    const triggerID = `${tabID}-group-${group.key}`
-                    const panelID = `${triggerID}-panel`
-                    return (
-                      <section
-                        className="mobile-progress-detail-group"
-                        key={group.key}
+                {productionSections.map((item) => {
+                  const expanded = productionOpen && activeTab === item.key
+                  const triggerID = `${tabID}-group-${item.key}`
+                  const panelID = `${triggerID}-panel`
+                  const count = sectionRecords(item.key).length
+                  const unit =
+                    item.key === 'production'
+                      ? '单'
+                      : item.key === 'batches'
+                        ? '批次'
+                        : '项'
+                  return (
+                    <section
+                      className="mobile-progress-detail-group"
+                      key={item.key}
+                    >
+                      <button
+                        type="button"
+                        id={triggerID}
+                        className="mobile-progress-detail-group-trigger"
+                        aria-expanded={expanded}
+                        aria-controls={panelID}
+                        aria-label={`${item.label}，${count} ${unit}`}
+                        onClick={() => {
+                          if (expanded) {
+                            setProductionOpen(false)
+                            rememberContext({ productionOpen: false })
+                          } else changeSection(item.key)
+                        }}
                       >
-                        <button
-                          type="button"
-                          id={triggerID}
-                          className="mobile-progress-detail-group-trigger"
-                          aria-expanded={expanded}
-                          aria-controls={panelID}
-                          aria-label={`${group.label}，${group.summary}`}
-                          onClick={() => changeSection(group.defaultSection)}
-                        >
-                          <strong>{group.label}</strong>
-                          <span>{group.summary}</span>
-                          {expanded ? (
-                            <DownOutlined aria-hidden="true" />
-                          ) : (
-                            <RightOutlined aria-hidden="true" />
-                          )}
-                        </button>
-                        {expanded && (
-                          <div
-                            id={panelID}
-                            className="mobile-progress-detail-group-body"
-                            role="region"
-                            aria-labelledby={triggerID}
-                          >
-                            {group.sections.map((section) => (
-                              <section
-                                className="mobile-progress-detail-subsection"
-                                key={section}
-                                aria-label={
-                                  SECTIONS.find((item) => item.key === section)
-                                    ?.label
-                                }
-                              >
-                                {group.key === 'production' && (
-                                  <h3>
-                                    {
-                                      SECTIONS.find(
-                                        (item) => item.key === section
-                                      )?.label
-                                    }
-                                  </h3>
-                                )}
-                                {renderRecords(section)}
-                              </section>
-                            ))}
-                          </div>
+                        <strong>{item.label}</strong>
+                        <span>
+                          {count}
+                          {data.has_more?.[item.key] ? '+' : ''} {unit}
+                        </span>
+                        {expanded ? (
+                          <DownOutlined aria-hidden="true" />
+                        ) : (
+                          <RightOutlined aria-hidden="true" />
                         )}
-                      </section>
-                    )
-                  })
-                ) : (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="暂无业务明细"
-                  />
-                )}
+                      </button>
+                      {expanded && (
+                        <div
+                          id={panelID}
+                          className="mobile-progress-detail-group-body"
+                          role="region"
+                          aria-labelledby={triggerID}
+                        >
+                          {renderRecords(item.key)}
+                        </div>
+                      )}
+                    </section>
+                  )
+                })}
               </div>
-            )}
-          </Spin>
-        ) : (
-          <>
-            <SlidingTabList
-              className="erp-progress-detail-tabs erp-navigation-tabs"
-              aria-label="进度明细分类"
-            >
-              {items.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  role="tab"
-                  id={`${tabID}-${item.key}`}
-                  aria-controls={`${tabID}-panel`}
-                  aria-selected={activeTab === item.key}
-                  onClick={() => changeSection(item.key)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </SlidingTabList>
-            <Spin spinning={loading}>
-              {!error && data && (
-                <div
-                  role="tabpanel"
-                  id={`${tabID}-panel`}
-                  aria-labelledby={`${tabID}-${activeTab}`}
-                >
-                  {renderRecords(activeTab)}
-                </div>
-              )}
-            </Spin>
-          </>
-        )}
+            ) : (
+              <div className="erp-progress-detail-records">
+                {renderRecords(activeTab)}
+              </div>
+            ))}
+        </Spin>
+        <MobileBackToTop enabled={mobile && Boolean(selection)} />
       </section>
-      <MobileBackToTop enabled={mobile && Boolean(selection)} />
     </Surface>
   )
 }

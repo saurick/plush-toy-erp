@@ -22,7 +22,6 @@ const BUSINESS_ROUTES = [
   'warehouse/inbound',
   'warehouse/inventory',
   'warehouse/shipments',
-  'warehouse/shipping-release',
   'warehouse/outbound',
   'finance/reconciliation',
   'finance/payments',

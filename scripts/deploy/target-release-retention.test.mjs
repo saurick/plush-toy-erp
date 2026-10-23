@@ -80,7 +80,7 @@ function retentionFixture(t) {
     "release-cache-v2",
   ])
     mkdirSync(path.join(root, name));
-  for (const letter of "abcdef") {
+  for (const letter of "abcdef0123") {
     write(`releases/${letter.repeat(40)}/.plush-release-identity.json`, {
       schemaVersion: "plush.target-release-identity/v1",
       gitSha: letter.repeat(40),
@@ -124,7 +124,10 @@ function retentionFixture(t) {
     before: { runtimeSha: "e".repeat(40) },
     finishedAt: "2026-10-13T06:00:00Z",
   });
-  for (const [index, letter] of [..."abde"].entries()) {
+  for (const [i, letter] of [..."0123"].entries()) operation(10 + i, {
+    gitSha: letter.repeat(40), before: {}, finishedAt: `2026-10-${String(12 - i).padStart(2, "0")}T06:00:00Z`,
+  });
+  for (const [index, letter] of [..."ab23"].entries()) {
     write(
       `release-cache-v2/${String(index + 1).padStart(64, "0")}/release-artifact.json`,
       {
@@ -139,7 +142,7 @@ function retentionFixture(t) {
   }
   write(
     "containers.json",
-    [..."abdf"].map((letter) => ({
+    [..."ab2f"].map((letter) => ({
       name: `plush-toy-erp-demo-web-public-${letter.repeat(8)}`,
       sha: letter.repeat(40),
       running: ["a", "f"].includes(letter),
@@ -192,7 +195,7 @@ function retentionTree(root) {
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-test("retention keeps runtime and two recovery versions while retiring historical cache and stopped references", (t) => {
+test("retention keeps seven recent versions plus runtime and two recovery versions while retiring old caches", (t) => {
   const f = retentionFixture(t);
   f.write(
     "operations/00000000-0000-4000-8000-000000000001/production-preflight-report.json",
@@ -202,8 +205,8 @@ test("retention keeps runtime and two recovery versions while retiring historica
   const r = f.run();
   assert.equal(r.protection, "complete");
   assert.equal(r.rollback, `${"b".repeat(40)},${"c".repeat(40)}`);
-  assert.equal(r.protected, 4);
-  assert.equal(r.candidates, `${"d".repeat(40)},${"e".repeat(40)}`);
+  assert.equal(r.protected, 8);
+  assert.equal(r.candidates, `${"2".repeat(40)},${"3".repeat(40)}`);
   assert.equal(r.candidateCount, 2);
   assert.equal(r.cacheCount, 2);
   assert.equal(r.stopped, 1);
@@ -214,8 +217,8 @@ test("unresolved and failed operations retain their exact source and candidate r
   const f = retentionFixture(t);
   f.operation(5, {
     status: "failed",
-    gitSha: "e".repeat(40),
-    before: { runtimeSha: "d".repeat(40) },
+    gitSha: "2".repeat(40),
+    before: { runtimeSha: "3".repeat(40) },
   });
   assert.equal(f.run().candidateCount, 0);
   assert.equal(f.run().cacheCount, 0);
@@ -271,7 +274,7 @@ test("a successful terminal receipt resolves an earlier running state without pi
     operationId: "00000000-0000-4000-8000-000000000004",
     target: "demo-133",
     status: "running",
-    gitSha: "d".repeat(40),
+    gitSha: "2".repeat(40),
   });
   assert.equal(f.run().candidateCount, 2);
 });

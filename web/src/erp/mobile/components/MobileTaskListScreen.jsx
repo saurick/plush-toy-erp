@@ -36,9 +36,11 @@ import AccountIdentity from '../../components/AccountIdentity.jsx'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
 import { WorkflowTaskSource } from '../../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx'
-import { WorkflowTaskBlockedTag, WorkflowTaskBlockedReason } from '../../components/workflow/WorkflowTaskBlocker.jsx'
+import { WorkflowTaskBlockedTag } from '../../components/workflow/WorkflowTaskBlocker.jsx'
+import WorkflowTaskReason from '../../components/workflow/WorkflowTaskReason.jsx'
+import { getWorkflowTaskReasonMeta } from '../../utils/workflowTaskReason.mjs'
 import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
-import MobileTaskListSkeleton from './MobileTaskListSkeleton.jsx'
+import MobileTaskListContent from './MobileTaskListContent.jsx'
 import MobileTaskListOptions from './MobileTaskListOptions.jsx'
 import MobileTaskHistoryOptions from './MobileTaskHistoryOptions.jsx'
 import useWorkflowTaskAssignees from '../../hooks/useWorkflowTaskAssignees'
@@ -60,8 +62,6 @@ import {
   getTaskSeverityView,
   resolveTaskBusinessChip,
   resolveTaskListMeta,
-  resolveTaskReason,
-  resolveTaskReasonLabel,
   resolveMobileTaskStatusLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 
@@ -96,11 +96,11 @@ export default function MobileTaskListScreen({
   activeMessageTabKey,
   activeViewHasData,
   activeViewHasMore,
+  activeViewLoaded,
   adminProfile,
   authoritativeTaskCounts,
   taskStatusCounts,
   canEnterDesktop,
-  canViewApprovalInbox,
   canViewTracking,
   doneTasks,
   filterItems,
@@ -118,7 +118,6 @@ export default function MobileTaskListScreen({
   loading,
   loadingMore,
   loggingOut,
-  overdueTasks,
   riskTasks,
   riskScope,
   roleLabel,
@@ -176,9 +175,11 @@ export default function MobileTaskListScreen({
   const activeCalendar = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO && calendarState.layout === 'calendar' ? calendarState : null
   const calendarMode = activeCalendar && taskCalendarSelectionMode(activeCalendar.selection)
   const history = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE
+  const overdueShortcut = (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO && activeFilterKey === MOBILE_TASK_FILTER_KEYS.OVERDUE)
+    || (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES && activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.NOTICE)
   const filterTriggerRef = useRef(null)
   const appliedFilters = [
-    !history && !activeCalendar && taskHistoryOptions.due && { key: 'due', label: `截止时间：${WORKFLOW_TASK_DUE_OPTIONS.find(({ value }) => value === taskHistoryOptions.due)?.label}` },
+    !history && !activeCalendar && !overdueShortcut && taskHistoryOptions.due && { key: 'due', label: `截止时间：${WORKFLOW_TASK_DUE_OPTIONS.find(({ value }) => value === taskHistoryOptions.due)?.label}` },
     taskHistoryOptions.sourceType && { key: 'sourceType', label: `来源单据：${getWorkflowTaskSourceTypeLabel(taskHistoryOptions.sourceType)}` },
     taskStatusKey && { key: 'statusKey', label: `${history ? '处理结果' : '任务状态'}：${(history ? WORKFLOW_HISTORY_STATUS_OPTIONS : MOBILE_TASK_STATUS_OPTIONS).find(({ value }) => value === taskStatusKey)?.label}` },
     !history && !activeCalendar && taskSortKey !== 'newest' && { key: 'sortKey', label: `排序：${MOBILE_TASK_SORT_OPTIONS.find(({ value }) => value === taskSortKey)?.label}` },
@@ -203,7 +204,7 @@ export default function MobileTaskListScreen({
       statusKey: '',
       sourceType: '',
       ...(!history ? { sortKey: activeCalendar ? taskSortKey : 'newest' } : {}),
-      ...(taskHistoryOptions.due ? { due: '' } : {}),
+      ...(taskHistoryOptions.due && !overdueShortcut ? { due: '' } : {}),
     })
     if (activeCalendar) activeCalendar.change({ selection: defaultTaskCalendarDate(activeCalendar.month) })
   }
@@ -231,7 +232,11 @@ export default function MobileTaskListScreen({
       : MOBILE_LIST_KEYS.TODO
   const activeFilterLabel =
     filterItems.find((item) => item.key === activeFilterKey)?.label || '当前'
-  const taskListLoading = loading && !activeViewHasData && !initialLoading
+  const listLoadingProps = {
+    loading,
+    pending: !activeViewHasData && !loadError && (loading || !activeViewLoaded),
+    initialLoading,
+  }
   const getCollapsedListLimit = (listKey) =>
     MOBILE_LIST_COLLAPSED_LIMITS[listKey] || Number.POSITIVE_INFINITY
 
@@ -370,18 +375,11 @@ export default function MobileTaskListScreen({
         />
         {businessLabel && businessLabel !== resolveMobileTaskStatusLabel(task) ? <div className="mobile-task-list-row__business"><span>所属业务：</span><span className="mobile-task-list-business-value">{businessLabel}</span></div> : null}
         {listMeta ? <div className="mobile-task-list-row__meta">{listMeta}</div> : null}
-        {!history && !blocked && resolveTaskReason(task) ? (
-          <div className="mobile-task-list-row__reason">
-            {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
-          </div>
-        ) : null}
         <div className="erp-task-card__footer mobile-task-list-row__footer">
           {renderTaskAssignee(task)}
           <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={task.task_status_key === WorkflowTaskStatus.BLOCKED || severity.label !== '超时'} />
         </div>
-        {!history && blocked ? (
-          <WorkflowTaskBlockedReason reason={resolveTaskReason(task)} showLabel className="mobile-task-list-row__reason" />
-        ) : null}
+        <WorkflowTaskReason meta={getWorkflowTaskReasonMeta(task)} />
       </WorkflowTaskCard>
     )
   }
@@ -411,7 +409,6 @@ export default function MobileTaskListScreen({
               className="mobile-role-task-filter"
               onClick={() => {
                 const next = active ? MOBILE_TASK_FILTER_KEYS.ALL : item.key
-                if (next === MOBILE_TASK_FILTER_KEYS.OVERDUE && taskHistoryOptions.due) onTaskListOptionsChange({ due: '' })
                 setActiveFilterKey(next)
                 setSelectedTaskID(null)
                 setDetailAction(null)
@@ -438,7 +435,7 @@ export default function MobileTaskListScreen({
   }
 
   const renderEmptyState = (description) =>
-    loading || loadError ? null : <Empty description={description} />
+    !activeViewLoaded || loading || loadError ? null : <Empty description={description} />
 
   const renderListFeedback = () => (
     <>
@@ -475,68 +472,36 @@ export default function MobileTaskListScreen({
     </>
   )
 
-  const renderTodoPanel = () =>
-    initialLoading ? (
-      <MobileTaskListSkeleton filterCount={canViewApprovalInbox ? 4 : 3} />
-    ) : (
-      <>
-        {renderListFeedback()}
-        <section className="mobile-task-results">
-          <div
-            className="erp-sr-only"
-            data-testid="mobile-task-list-range"
-            aria-live="polite"
-          >
-            已显示{' '}
-            {getVisibleListItems(filteredTasks, activeTodoListKey).length} 项
-            {' / '}共{' '}
-            {filterItems.find((item) => item.key === activeFilterKey)?.count ??
-              '—'}{' '}
-            项
-          </div>
-          <div
-            className="mobile-task-list min-w-0"
-            data-testid="mobile-role-task-list"
-            aria-busy={taskListLoading ? 'true' : 'false'}
-          >
-            {taskListLoading ? (
-              <div
-                className="flex min-h-40 flex-col items-center justify-center gap-3 px-5 py-8 text-center text-sm text-slate-500"
-                data-testid="mobile-role-task-list-loading"
-                role="status"
-                aria-live="polite"
-              >
-                <ReloadOutlined
-                  className="animate-spin text-xl text-emerald-600"
-                  aria-hidden="true"
-                />
-                <span>正在加载{activeFilterLabel}任务</span>
-              </div>
-            ) : filteredTasks.length === 0 ? (
-              <>
-                {renderEmptyState('当前筛选下暂无任务')}
-                {renderListLimitControl(
-                  filteredTasks,
-                  activeTodoListKey,
-                  '条任务'
-                )}
-              </>
-            ) : (
-              <div className="mobile-task-card-list">
-                {getVisibleListItems(filteredTasks, activeTodoListKey).map(
-                  renderTaskRow
-                )}
-                {renderListLimitControl(
-                  filteredTasks,
-                  activeTodoListKey,
-                  '条任务'
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-      </>
-    )
+  const renderTodoPanel = () => (
+    <>
+      {renderListFeedback()}
+      <section className="mobile-task-results">
+        <MobileTaskListContent {...listLoadingProps} label={`正在加载${activeFilterLabel}任务`}>
+          {activeViewLoaded ? (
+            <div
+              className="erp-sr-only"
+              data-testid="mobile-task-list-range"
+              aria-live="polite"
+            >
+              已显示 {getVisibleListItems(filteredTasks, activeTodoListKey).length} 项
+              {' / '}共 {filterItems.find((item) => item.key === activeFilterKey)?.count ?? '—'} 项
+            </div>
+          ) : null}
+          {filteredTasks.length === 0 ? (
+            <>
+              {renderEmptyState('当前筛选下暂无任务')}
+              {renderListLimitControl(filteredTasks, activeTodoListKey, '条任务')}
+            </>
+          ) : (
+            <div className="mobile-task-card-list">
+              {getVisibleListItems(filteredTasks, activeTodoListKey).map(renderTaskRow)}
+              {renderListLimitControl(filteredTasks, activeTodoListKey, '条任务')}
+            </div>
+          )}
+        </MobileTaskListContent>
+      </section>
+    </>
+  )
 
   const renderDoneTaskItem = (task) => renderTaskCard(task, { history: true })
 
@@ -544,26 +509,30 @@ export default function MobileTaskListScreen({
     <>
       {renderListFeedback()}
       <section className="mobile-task-results mobile-task-history" aria-label="已办任务">
-        <div className="space-y-3">
-          {doneTasks.length === 0
-            ? renderEmptyState(taskKeyword || historyFilterSummary ? '当前筛选下暂无已办任务' : '暂无已办任务')
-            : getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).map(renderDoneTaskItem)}
-        </div>
-        <div className="mobile-task-history-summary" role="status">
-          已显示 {getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).length} / 共{' '}
-          <span
-            data-testid="mobile-role-done-count"
-            aria-label={
-              authoritativeTaskCounts
-                ? `已办任务共 ${authoritativeTaskCounts.history} 条，当前已加载 ${doneTasks.length} 条`
-                : `已办任务总数暂不可用，当前已加载 ${doneTasks.length} 条`
-            }
-          >
-            {authoritativeTaskCounts?.history ?? '—'}
-          </span>{' '}
-          条
-        </div>
-        {renderListLimitControl(doneTasks, MOBILE_LIST_KEYS.DONE, '条已办')}
+        <MobileTaskListContent {...listLoadingProps} label="正在加载已办任务">
+          <div className="space-y-3">
+            {doneTasks.length === 0
+              ? renderEmptyState(taskKeyword || historyFilterSummary ? '当前筛选下暂无已办任务' : '暂无已办任务')
+              : getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).map(renderDoneTaskItem)}
+          </div>
+          {activeViewLoaded ? (
+            <div className="mobile-task-history-summary" role="status">
+              已显示 {getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).length} / 共{' '}
+              <span
+                data-testid="mobile-role-done-count"
+                aria-label={
+                  authoritativeTaskCounts
+                    ? `已办任务共 ${authoritativeTaskCounts.history} 条，当前已加载 ${doneTasks.length} 条`
+                    : `已办任务总数暂不可用，当前已加载 ${doneTasks.length} 条`
+                }
+              >
+                {authoritativeTaskCounts?.history ?? '—'}
+              </span>{' '}
+              条
+            </div>
+          ) : null}
+          {renderListLimitControl(doneTasks, MOBILE_LIST_KEYS.DONE, '条已办')}
+        </MobileTaskListContent>
       </section>
     </>
   )
@@ -605,7 +574,6 @@ export default function MobileTaskListScreen({
               className="mobile-role-task-filter"
               onClick={() => {
                 const next = active ? MOBILE_MESSAGE_TAB_KEYS.WARNING : item.key
-                if (next === MOBILE_MESSAGE_TAB_KEYS.NOTICE && taskHistoryOptions.due) onTaskListOptionsChange({ due: '' })
                 setActiveMessageTabKey(next)
               }}
             >
@@ -653,22 +621,22 @@ export default function MobileTaskListScreen({
 
   const renderNoticeMessages = () => (
     <section className="mobile-role-message-section" aria-label="超时任务">
-      {overdueTasks.length === 0 ? (
+      {riskTasks.length === 0 ? (
         <>
           {renderEmptyState('暂无超时任务')}
           {renderListLimitControl(
-            overdueTasks,
+            riskTasks,
             MOBILE_LIST_KEYS.NOTICE,
             '条超时'
           )}
         </>
       ) : (
         <>
-          {getVisibleListItems(overdueTasks, MOBILE_LIST_KEYS.NOTICE).map(
+          {getVisibleListItems(riskTasks, MOBILE_LIST_KEYS.NOTICE).map(
             (task) => renderTaskCard(task, { messageTone: 'notice' })
           )}
           {renderListLimitControl(
-            overdueTasks,
+            riskTasks,
             MOBILE_LIST_KEYS.NOTICE,
             '条超时'
           )}
@@ -681,9 +649,14 @@ export default function MobileTaskListScreen({
     <>
       {renderListFeedback()}
       <div className="mobile-role-messages">
-        {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
-          ? renderWarningMessages()
-          : renderNoticeMessages()}
+        <MobileTaskListContent
+          {...listLoadingProps}
+          label={activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING ? '正在加载风险任务' : '正在加载超时任务'}
+        >
+          {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
+            ? renderWarningMessages()
+            : renderNoticeMessages()}
+        </MobileTaskListContent>
       </div>
     </>
   )
@@ -1052,7 +1025,7 @@ export default function MobileTaskListScreen({
               {layoutToggle && <div className="mobile-task-layout-query">{layoutToggle}</div>}
             </div>
         ) : null}
-          {activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO && calendarState.layout === 'list' && !initialLoading && renderTaskFilters()}
+          {activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO && calendarState.layout === 'list' && renderTaskFilters()}
           {history && (
             <HorizontalScroll className="mobile-role-task-filters" role="group" aria-label="已办快捷筛选">
               {WORKFLOW_HISTORY_PERIOD_OPTIONS.map(({ value, label }) => (

@@ -1408,14 +1408,19 @@
       "bom_versions": [],
       "limit": 20,
       "offset": 0,
-      "total": 0
+      "total": 0,
+      "status_counts": {}
     },
     "message": "OK",
     "params": {
-      "limit": 20,
-      "product_id": 1
+      "include_status_counts": true,
+      "limit": 20
     },
-    "test": "TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule"
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "test": "TestRPCDocumentedBusinessQuickCounts",
+      "case": "bom.list_bom_versions"
+    }
   },
   "bom.save_bom_with_items": {
     "basis": "handler-fixture",
@@ -13281,7 +13286,10 @@
       ],
       "limit": 50,
       "offset": 0,
-      "total": 1
+      "total": 1,
+      "status_counts": {
+        "ACTIVE": 1
+      }
     },
     "message": "OK",
     "params": {
@@ -13289,7 +13297,8 @@
       "date_to": "2026-06-17",
       "keyword": "INV-LEDGER-LOT",
       "status": "ACTIVE",
-      "warehouse_id": 1
+      "warehouse_id": 1,
+      "include_status_counts": true
     },
     "test": "TestRPCDocumentedExamples",
     "verification": {
@@ -15986,7 +15995,11 @@
         "transport_method": null,
         "updated_at": 1752787200,
         "version": 0,
-        "volume_m3": null
+        "volume_m3": null,
+        "receivable_amount_snapshot": null,
+        "quoted_freight_amount_snapshot": null,
+        "tax_amount_snapshot": null,
+        "tax_mode_snapshot": null
       }
     },
     "message": "OK",
@@ -16120,13 +16133,19 @@
       "limit": 20,
       "offset": 0,
       "production_facts": [],
-      "total": 4
+      "total": 0,
+      "status_counts": {}
     },
     "message": "OK",
     "params": {
+      "include_status_counts": true,
       "limit": 20
     },
-    "test": "TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule"
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "test": "TestRPCDocumentedBusinessQuickCounts",
+      "case": "operational_fact.list_production_facts"
+    }
   },
   "operational_fact.list_production_order_material_requirements": {
     "basis": "handler-fixture",
@@ -16231,13 +16250,19 @@
       "limit": 20,
       "offset": 0,
       "stock_reservations": [],
-      "total": 5
+      "total": 0,
+      "status_counts": {}
     },
     "message": "OK",
     "params": {
+      "include_status_counts": true,
       "limit": 20
     },
-    "test": "TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule"
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "test": "TestRPCDocumentedBusinessQuickCounts",
+      "case": "operational_fact.list_stock_reservations"
+    }
   },
   "operational_fact.post_finance_fact": {
     "basis": "handler-fixture",
@@ -19043,14 +19068,22 @@
   "purchase.list_purchase_receipts": {
     "basis": "handler-fixture",
     "data": {
-      "limit": 50,
+      "limit": 20,
       "offset": 0,
       "purchase_receipts": [],
-      "total": 0
+      "total": 0,
+      "status_counts": {}
     },
     "message": "OK",
-    "params": {},
-    "test": "TestPurchaseReceiptJSONRPCWarehouseScopeAndIdempotentReadback"
+    "params": {
+      "include_status_counts": true,
+      "limit": 20
+    },
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "test": "TestRPCDocumentedBusinessQuickCounts",
+      "case": "purchase.list_purchase_receipts"
+    }
   },
   "purchase.list_purchase_rejection_dispositions": {
     "basis": "backend-wire-shape",
@@ -19490,7 +19523,10 @@
           "purchased_quantity": "12.5",
           "unit_id": 1,
           "unit_price": null,
-          "updated_at": 1
+          "updated_at": 1,
+          "material_spec_snapshot": null,
+          "supplier_item_no_snapshot": null,
+          "unit_name_snapshot": null
         }
       ],
       "total": 1
@@ -20645,7 +20681,14 @@
   "sales_order.export_sales_orders": {
     "basis": "handler-fixture",
     "data": {
-      "sales_orders": [{"id": 1, "order_no": "SO-EXPORT-001", "customer_id": 1, "lifecycle_status": "draft"}],
+      "sales_orders": [
+        {
+          "id": 1,
+          "order_no": "SO-EXPORT-001",
+          "customer_id": 1,
+          "lifecycle_status": "draft"
+        }
+      ],
       "total": 1
     },
     "message": "OK",
@@ -21381,17 +21424,30 @@
         "exception": 0,
         "finished": 0
       },
-      "lanes": [],
+      "lanes": [
+        {
+          "key": "all",
+          "total": 0,
+          "limit": 20,
+          "offset": 20,
+          "tasks": []
+        }
+      ],
       "owner_role_keys": [],
-      "snapshot_at": 1792394186,
+      "snapshot_at": 1792670400,
       "source_types": [],
       "total": 0
     },
     "message": "OK",
     "params": {
-      "limit": 5
+      "lane_key": "all",
+      "todo_only": true,
+      "sort": "newest",
+      "limit": 20,
+      "offset": 20,
+      "keyword": "包装"
     },
-    "test": "TestWorkflowTaskQueryVisibilityScopeKeepsRevisionPairsAcrossAllEntryPoints"
+    "test": "TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage"
   },
   "workflow.get_task_create_options": {
     "basis": "handler-fixture",
@@ -21828,13 +21884,19 @@
       "limit": 20,
       "offset": 0,
       "tasks": [],
-      "total": 0
+      "total": 0,
+      "status_counts": {}
     },
     "message": "OK",
     "params": {
+      "include_status_counts": true,
       "limit": 20
     },
-    "test": "TestWorkflowTaskQueryVisibilityScopeKeepsRevisionPairsAcrossAllEntryPoints"
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "test": "TestRPCDocumentedBusinessQuickCounts",
+      "case": "workflow.list_tasks"
+    }
   },
   "workflow.list_tracking": {
     "basis": "handler-fixture",

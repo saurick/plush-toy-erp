@@ -1548,7 +1548,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
 
 test("dataset runner accepts only the exact ten browser-only print gaps", () => {
   const targets = [
-    ...Array.from({ length: 41 }, (_, index) => ({
+    ...Array.from({ length: 40 }, (_, index) => ({
       id: `desktopPages:query-${index + 1}`,
       catalogGroup: "desktopPages",
       dataStatus: "pass",
@@ -1571,8 +1571,8 @@ test("dataset runner accepts only the exact ten browser-only print gaps", () => 
   ];
   const report = {
     summary: {
-      totalTargets: 51,
-      passedTargetData: 41,
+      totalTargets: 50,
+      passedTargetData: 40,
       failedTargetData: 0,
       notProvenTargetData: 10,
       queryChecksPassed: true,

@@ -17,16 +17,23 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.inventoryUC.ListBOMHeaders(ctx, bomHeaderFilterFromParams(pm))
+		filter := bomHeaderFilterFromParams(pm)
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountBOMHeadersByStatus(ctx, filter)
+		})
 		if err != nil {
 			return id, d.mapBOMError(ctx, err), nil
 		}
-		return id, okData(map[string]any{
+		items, total, err := d.inventoryUC.ListBOMHeaders(ctx, filter)
+		if err != nil {
+			return id, d.mapBOMError(ctx, err), nil
+		}
+		return id, okData(withBusinessStatusCounts(map[string]any{
 			"bom_versions": bomHeadersToAny(items),
 			"total":        total,
 			"limit":        normalizedBusinessListLimit(pm),
 			"offset":       normalizedOffset(pm),
-		}), nil
+		}, statusCounts)), nil
 	case "get_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMRead); res != nil {
 			return id, res, nil

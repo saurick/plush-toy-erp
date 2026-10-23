@@ -2,6 +2,13 @@ import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Select from '@/common/components/select/FilterSelect'
+import {
+  buildChainMermaid,
+  buildDevBusinessChainProjection,
+  buildDevBusinessChainRoleGuide,
+  describeDevBusinessChainNode,
+  describeDevBusinessChainResponsibility,
+} from '../../config/devBusinessChainProjection.mjs'
 import TaskFulfillmentGuide from './TaskFulfillmentGuide.jsx'
 import BusinessChainTopics from './BusinessChainTopics.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
@@ -21,16 +28,7 @@ import {
 } from './FlowStateShared.jsx'
 import { Markdown } from '@/common/components/markdown'
 
-import {
-  getProcessLabel,
-} from '@/erp/utils/processRuntimePresentation.mjs'
-import {
-  buildChainMermaid,
-  buildDevBusinessChainProjection,
-  buildDevBusinessChainRoleGuide,
-  describeDevBusinessChainNode,
-  describeDevBusinessChainResponsibility,
-} from '../../config/devBusinessChainProjection.mjs'
+import { getProcessLabel } from '@/erp/utils/processRuntimePresentation.mjs'
 import { getDevFlowStateTaskRuntimeAssociation } from '../../pages/devFlowStateTaskLookup.mjs'
 import {
   createDevFlowDefinitionOptionFilter,
@@ -207,7 +205,6 @@ function BusinessChainSelector({ catalog, value, onChange }) {
         optionRender={renderDefinitionSelectOption}
         onChange={onChange}
       />
-
     </div>
   )
 }
@@ -236,16 +233,34 @@ function BusinessChainOverviewView({
   onOpenView,
 }) {
   const overview = catalog.businessChainOverview
-  const { runtime, matchingChain } = useBusinessChainRuntime(catalog, taskId, selectedTask)
+  const { runtime, matchingChain } = useBusinessChainRuntime(
+    catalog,
+    taskId,
+    selectedTask
+  )
   const mermaid = useMemo(
-    () => buildBusinessChainOverviewMermaid(overview, catalog.businessChains, matchingChain?.key),
+    () =>
+      buildBusinessChainOverviewMermaid(
+        overview,
+        catalog.businessChains,
+        matchingChain?.key
+      ),
     [catalog.businessChains, matchingChain?.key, overview]
   )
   return (
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
       <TaskFulfillmentGuide
         onExploreStage={onSelectChain}
-        renderTopics={({ onSelectTopic, selectedTopicKey }) => <BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} selectedTopicKey={selectedTopicKey} onSelectChain={onSelectTopic} onExploreChain={onSelectChain} />}
+        renderTopics={({ onSelectTopic, selectedTopicKey }) => (
+          <BusinessChainTopics
+            catalog={catalog}
+            mermaid={mermaid}
+            currentChainKey={matchingChain?.key}
+            selectedTopicKey={selectedTopicKey}
+            onSelectChain={onSelectTopic}
+            onExploreChain={onSelectChain}
+          />
+        )}
       />
       {taskId ? (
         <section
@@ -268,7 +283,7 @@ function BusinessChainOverviewView({
               <Spin />
               <span>正在定位任务所属业务链…</span>
             </div>
-        ) : null}
+          ) : null}
           {runtime.status === 'error' ? (
             <Alert
               showIcon
@@ -276,7 +291,7 @@ function BusinessChainOverviewView({
               message="所属业务链定位失败"
               description={runtime.error}
             />
-        ) : null}
+          ) : null}
           {runtime.status === 'unlinked' ? (
             <Alert
               showIcon
@@ -284,14 +299,14 @@ function BusinessChainOverviewView({
               message="当前任务没有正式流程运行记录"
               description="页面不会根据任务标题或相似名称猜测它属于哪条业务链。"
             />
-        ) : null}
+          ) : null}
           {runtime.status === 'ready' ? (
             <div className="erp-dev-flow-runtime-proof">
               {matchingChain ? (
                 <Tag color="orange">当前实例所属链：{matchingChain.label}</Tag>
-            ) : (
-              <Tag>当前流程未登记到业务总图</Tag>
-            )}
+              ) : (
+                <Tag>当前流程未登记到业务总图</Tag>
+              )}
               <dl>
                 <div>
                   <dt>流程</dt>
@@ -309,7 +324,7 @@ function BusinessChainOverviewView({
               <strong>
                 只证明定位到所属链；尚未证明上下游完成或业务事实已落账
               </strong>
-              <details className="erp-dev-flow-developer-details">
+              <details className="erp-dev-disclosure erp-dev-flow-developer-details">
                 <summary>查看查询边界与开发者信息</summary>
                 <dl>
                   <div>
@@ -329,10 +344,9 @@ function BusinessChainOverviewView({
                 </dl>
               </details>
             </div>
-        ) : null}
+          ) : null}
         </section>
       ) : null}
-
     </div>
   )
 }
@@ -411,17 +425,18 @@ function BusinessChainView({
 
   return (
     <div className="erp-dev-flow-view-stack">
-
       <section className="erp-dev-flow-chain-heading">
         <div>
           <div className="erp-dev-flow-chain-title">
             <Title level={2}>{chain.label}</Title>
-            <Button type="link" onClick={() => onSelectChain(ALL_BUSINESS_CHAINS_KEY)}>
-              {returningToTopics ? '返回业务目录' : '返回订单全流程'}
+            <Button
+              type="link"
+              onClick={() => onSelectChain(ALL_BUSINESS_CHAINS_KEY)}
+            >
+              {returningToTopics ? '返回业务专题' : '返回订单全流程'}
             </Button>
           </div>
           <Paragraph>{chain.summary}</Paragraph>
-
         </div>
         <div className="erp-dev-flow-chain-heading__actions">
           <BusinessChainSelector
@@ -441,15 +456,21 @@ function BusinessChainView({
             <div>
               <Text strong>当前查询任务</Text>
             </div>
-            <Button onClick={() => onOpenView('tracking')}>查看任务与异常</Button>
-            {runtime.status === 'ready' ? <Button onClick={() => onOpenView('runtime')}>查看已记录路径</Button> : null}
+            <Button onClick={() => onOpenView('tracking')}>
+              查看任务与异常
+            </Button>
+            {runtime.status === 'ready' ? (
+              <Button onClick={() => onOpenView('runtime')}>
+                查看已记录路径
+              </Button>
+            ) : null}
           </div>
           {runtime.status === 'loading' ? (
             <div className="erp-dev-flow-loading">
               <Spin />
               <span>正在读取真实流程位置…</span>
             </div>
-        ) : null}
+          ) : null}
           {runtime.status === 'error' ? (
             <Alert
               showIcon
@@ -457,28 +478,30 @@ function BusinessChainView({
               message="运行叠加查询失败"
               description={runtime.error}
             />
-        ) : null}
+          ) : null}
           {runtime.status === 'unlinked' ? (
             <Alert
               showIcon
               type="info"
               message="当前任务没有正式流程运行记录"
             />
-        ) : null}
+          ) : null}
           {runtime.status === 'ready' ? (
             <div className="erp-dev-flow-runtime-proof">
               {currentRuntimeNode ? (
-                <Tag color="orange">当前实例位于：{currentRuntimeNode.label}</Tag>
-            ) : matchingChain ? (
-              <Button
-                size="small"
-                onClick={() => onSelectChain(matchingChain.key)}
-              >
-                切换到所属业务链：{matchingChain.label}
-              </Button>
-            ) : (
-              <Tag>当前流程未登记到业务链</Tag>
-            )}
+                <Tag color="orange">
+                  当前实例位于：{currentRuntimeNode.label}
+                </Tag>
+              ) : matchingChain ? (
+                <Button
+                  size="small"
+                  onClick={() => onSelectChain(matchingChain.key)}
+                >
+                  切换到所属业务链：{matchingChain.label}
+                </Button>
+              ) : (
+                <Tag>当前流程未登记到业务链</Tag>
+              )}
               <dl>
                 <div>
                   <dt>流程</dt>
@@ -494,7 +517,7 @@ function BusinessChainView({
                 </div>
               </dl>
               <strong>尚未证明业务事实已落账</strong>
-              <details className="erp-dev-flow-developer-details">
+              <details className="erp-dev-disclosure erp-dev-flow-developer-details">
                 <summary>查看查询边界与开发者信息</summary>
                 <dl>
                   <div>
@@ -514,7 +537,7 @@ function BusinessChainView({
                 </dl>
               </details>
             </div>
-        ) : null}
+          ) : null}
         </section>
       ) : null}
 
@@ -524,12 +547,14 @@ function BusinessChainView({
         onExploreNode={(key) => {
           onSelectNode(key)
           setTechnicalOpen(true)
-          requestAnimationFrame(() => technicalRef.current?.scrollIntoView({ block: 'start' }))
+          requestAnimationFrame(() =>
+            technicalRef.current?.scrollIntoView({ block: 'start' })
+          )
         }}
       />
 
       <details
-        className="erp-dev-flow-developer-details"
+        className="erp-dev-disclosure erp-dev-flow-developer-details"
         data-business-chain-technical
         ref={technicalRef}
         open={technicalOpen}
@@ -550,10 +575,13 @@ function BusinessChainView({
                   <Tag color={item.color} key={key}>
                     {item.label}
                   </Tag>
-              ))}
+                ))}
               </Space>
             </div>
-            <ol className="erp-dev-flow-chain-steps" aria-label="业务链分层步骤">
+            <ol
+              className="erp-dev-flow-chain-steps"
+              aria-label="业务链分层步骤"
+            >
               {chain.nodes.map((item, index) => (
                 <li key={item.key}>
                   <button
@@ -563,21 +591,23 @@ function BusinessChainView({
                     data-chain-node={item.key}
                     data-chain-layer={item.layer}
                     data-runtime-current={
-                    item.key === currentRuntimeNode?.key || undefined
-                  }
+                      item.key === currentRuntimeNode?.key || undefined
+                    }
                     onClick={() => onSelectNode(item.key)}
                   >
                     <span>{index + 1}</span>
                     <span>
                       <strong>{item.label}</strong>
-                      <small>{CHAIN_LAYER_PRESENTATION[item.layer].label}</small>
+                      <small>
+                        {CHAIN_LAYER_PRESENTATION[item.layer].label}
+                      </small>
                     </span>
                     {item.key === currentRuntimeNode?.key ? (
                       <Tag color="orange">实例所在</Tag>
-                  ) : null}
+                    ) : null}
                   </button>
                 </li>
-            ))}
+              ))}
             </ol>
             <div className="erp-dev-flow-chain-graph erp-dev-docs-markdown">
               <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
@@ -591,7 +621,7 @@ function BusinessChainView({
               <Tag color={layer.color}>{layer.label}</Tag>
               {node.key === currentRuntimeNode?.key ? (
                 <Tag color="orange">真实实例所在区段</Tag>
-            ) : null}
+              ) : null}
               <Title level={2}>{node.label}</Title>
             </div>
             <div className="erp-dev-flow-node-answers">
@@ -612,20 +642,20 @@ function BusinessChainView({
                       <strong>{outcome.label}</strong>
                       {outcome.condition ? `（${outcome.condition}）` : ''}：
                       {outcome.preconditions.length
-                      ? `前提：${outcome.preconditions.join('；')}；结果：`
-                      : ''}
+                        ? `前提：${outcome.preconditions.join('；')}；结果：`
+                        : ''}
                       {outcome.results.join('；') ||
-                      '核对对应领域结果，本动作不直接改变业务状态。'}
+                        '核对对应领域结果，本动作不直接改变业务状态。'}
                     </li>
-                ))}
+                  ))}
                 </ul>
               </section>
               <section>
                 <h3>异常时怎么办</h3>
                 <p>
                   {exceptionCopy
-                  ? `只执行已登记的${exceptionCopy}场景；未登记组合不生成数据。`
-                  : layer.exception}
+                    ? `只执行已登记的${exceptionCopy}场景；未登记组合不生成数据。`
+                    : layer.exception}
                 </p>
               </section>
             </div>
@@ -634,75 +664,82 @@ function BusinessChainView({
                 <Button type="primary" onClick={() => onOpenView('workflow')}>
                   查看责任与任务
                 </Button>
-            ) : null}
+              ) : null}
               {node.processDefinitionKeys.map((key) => (
                 <Button
                   type="primary"
                   key={key}
                   onClick={() =>
-                  onOpenView('runtime', { [QUERY_KEYS.process]: key })
-                }
+                    onOpenView('runtime', { [QUERY_KEYS.process]: key })
+                  }
                 >
                   查看 {processByKey.get(key)?.label || key}
                 </Button>
-            ))}
+              ))}
               {node.factKeys.map((key) => (
                 <Button
                   type="primary"
                   key={key}
-                  onClick={() => onOpenView('facts', { [QUERY_KEYS.fact]: key })}
+                  onClick={() =>
+                    onOpenView('facts', { [QUERY_KEYS.fact]: key })
+                  }
                 >
                   查看{' '}
                   {catalog.factDefinitions.find((fact) => fact.factKey === key)
-                  ?.label || key}
+                    ?.label || key}
                 </Button>
-            ))}
+              ))}
               {node.machineKeys.map((key) => (
                 <Button
                   key={key}
                   onClick={() =>
-                  onOpenView('states', {
-                    [QUERY_KEYS.flow]: key,
-                    [QUERY_KEYS.state]: null,
-                  })
-                }
+                    onOpenView('states', {
+                      [QUERY_KEYS.flow]: key,
+                      [QUERY_KEYS.state]: null,
+                    })
+                  }
                 >
                   查看 {flowByKey.get(key)?.label || key}状态规则
                 </Button>
-            ))}
+              ))}
             </div>
             <section className="erp-dev-flow-node-relations">
               <h3>这一步与哪些步骤相连</h3>
               {relations.length > 0 ? (
                 <ul>
                   {relations.map((edge) => {
-                  const peerKey = edge.from === node.key ? edge.to : edge.from
-                  const peer = chain.nodes.find((item) => item.key === peerKey)
-                  return (
-                    <li key={edge.key}>
-                      <Tag>{CHAIN_EDGE_PRESENTATION[edge.kind]}</Tag>
-                      <strong>{edge.label}</strong>
-                      <span>
-                        {edge.from === node.key ? '流向' : '来自'}：
-                        {peer?.label || peerKey}
-                      </span>
-                      <details>
-                        <summary>查看为什么不能直接算业务完成</summary>
-                        <p>{edge.factBoundary}</p>
-                        <EvidenceDisclosure value={edge} label="查看关系证据" />
-                      </details>
-                    </li>
-                  )
-                })}
+                    const peerKey = edge.from === node.key ? edge.to : edge.from
+                    const peer = chain.nodes.find(
+                      (item) => item.key === peerKey
+                    )
+                    return (
+                      <li key={edge.key}>
+                        <Tag>{CHAIN_EDGE_PRESENTATION[edge.kind]}</Tag>
+                        <strong>{edge.label}</strong>
+                        <span>
+                          {edge.from === node.key ? '流向' : '来自'}：
+                          {peer?.label || peerKey}
+                        </span>
+                        <details className="erp-dev-disclosure">
+                          <summary>查看为什么不能直接算业务完成</summary>
+                          <p>{edge.factBoundary}</p>
+                          <EvidenceDisclosure
+                            value={edge}
+                            label="查看关系证据"
+                          />
+                        </details>
+                      </li>
+                    )
+                  })}
                 </ul>
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="当前节点没有直接关系"
-              />
-            )}
+              ) : (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="当前节点没有直接关系"
+                />
+              )}
             </section>
-            <details className="erp-dev-flow-node-technical">
+            <details className="erp-dev-disclosure erp-dev-flow-node-technical">
               <summary>查看开发者信息</summary>
               <dl>
                 <div>
@@ -720,7 +757,7 @@ function BusinessChainView({
             </details>
           </aside>
         </section>
-        <details className="erp-dev-flow-cross-cutting">
+        <details className="erp-dev-disclosure erp-dev-flow-cross-cutting">
           <summary>
             查看其他公共规则与特殊情况（
             {catalog.businessChainCoverage.excludedMachineKeys.length}）
@@ -733,7 +770,7 @@ function BusinessChainView({
                 </dt>
                 <dd>{catalog.businessChainCoverage.exclusionReasons[key]}</dd>
               </div>
-          ))}
+            ))}
           </dl>
         </details>
       </details>

@@ -261,10 +261,8 @@ function patchParams(searchParams, patch) {
 }
 
 function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
-  const [draftKeyword, setDraftKeyword] = useState('')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchGuideOpen, setSearchGuideOpen] = useState(false)
-  const composingRef = useRef(false)
   const normalized = normalizeDevFlowDefinitionSearchText(searchKeyword)
   const groups = useMemo(
     () => buildDevFlowDefinitionSearchGroups(catalog, searchKeyword),
@@ -275,8 +273,6 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
     0
   )
   const clearSearch = () => {
-    composingRef.current = false
-    setDraftKeyword('')
     setSearchKeyword('')
   }
   const openResult = (item) => {
@@ -284,13 +280,11 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
     onOpen(item)
   }
   const searchExample = (keyword) => {
-    composingRef.current = false
-    setDraftKeyword(keyword)
     setSearchKeyword(keyword)
     setSearchGuideOpen(false)
   }
   const openTaskLookup = () => {
-    const keyword = draftKeyword
+    const keyword = searchKeyword
     clearSearch()
     setSearchGuideOpen(false)
     onOpenTaskLookup(keyword)
@@ -329,7 +323,6 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
     <section
       className="erp-dev-flow-global-search"
       aria-labelledby="dev-flow-global-search-title"
-      data-search-composing={composingRef.current ? 'true' : 'false'}
     >
       <div className="erp-dev-flow-section-heading">
         <div>
@@ -365,31 +358,13 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
       <SearchInput
         allowClear
         maxLength={500}
-        value={draftKeyword}
+        value={searchKeyword}
         placeholder="例如：销售订单、销售 PMC、已提交"
         searchHint="本页 5 个视图的定义总索引，不属于当前 Tab；不搜索具体任务、运行实例或真实业务记录"
         aria-autocomplete="list"
         aria-expanded={Boolean(normalized)}
         aria-controls="dev-flow-definition-search-results"
-        onCompositionStart={() => {
-          composingRef.current = true
-        }}
-        onCompositionEnd={(event) => {
-          const { value } = event.currentTarget
-          composingRef.current = false
-          setDraftKeyword(value)
-          setSearchKeyword(value)
-        }}
-        onChange={(event) => {
-          const { value } = event.target
-          setDraftKeyword(value)
-          if (!composingRef.current && !event.nativeEvent.isComposing) {
-            setSearchKeyword(value)
-          }
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') clearSearch()
-        }}
+        onSearch={(value) => setSearchKeyword(value)}
       />
       {normalized ? (
         <div
@@ -404,7 +379,7 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
             <div className="erp-dev-flow-search-groups">
               {groups.map((group) => (
                 <section key={group.key}>
-                  <h3>
+                  <h3 className="erp-dev-directory-group-title">
                     {group.label}
                     <span>{group.items.length}</span>
                   </h3>
@@ -414,6 +389,7 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
                         <li key={`${item.type}:${item.key}`}>
                           <button
                             type="button"
+                            className="erp-dev-directory-item erp-dev-directory-item--stacked erp-dev-directory-item--nested"
                             onClick={() => openResult(item)}
                           >
                             <strong>{item.label}</strong>
@@ -1092,7 +1068,7 @@ export default function DevFlowStateObservatoryPage() {
             else openGlobalDefinitionView('workflow')
           }}
         /> : null}
-        <details className="erp-dev-flow-concepts"><summary>概念与数据边界</summary><MemoryStrip /></details>
+        <details className="erp-dev-disclosure erp-dev-flow-concepts"><summary>概念与数据边界</summary><MemoryStrip /></details>
       </Drawer>
       <Modal
         title="客户校对稿"

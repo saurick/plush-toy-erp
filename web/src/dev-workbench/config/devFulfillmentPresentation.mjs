@@ -96,7 +96,7 @@ export function selectFulfillmentException({ guideKey, planKey, originStage, ste
   const related = catalog.fulfillment_flow.filter((item) => item.handling?.guides.includes(guide.key))
   if (!plan) return { guide, plan: null, origin, related, steps: [] }
   const { steps } = fulfillmentExceptionPath(guide, plan.key)
-  const graph = origin || !guide.entry_stages.length ? buildFulfillmentExceptionGraph(guide, { planKey: plan.key, originStage }) : null
+  const graph = buildFulfillmentExceptionGraph(guide, { planKey: plan.key, originStage, overview: true })
   const { target } = plan.continuation
   const returnStage = graph?.returnStage || catalog.fulfillment_flow.find((item) => item.stage === target) || null
   const reentryStage = catalog.fulfillment_flow.find((item) => item.stage === plan.continuation.reentry?.stage) || null
@@ -105,10 +105,11 @@ export function selectFulfillmentException({ guideKey, planKey, originStage, ste
     plan,
     origin,
     related,
+    graph,
     steps,
     returnStage,
     reentryStage,
-    selected: steps.find((item) => item.key === stepKey) || steps.find((item) => fulfillmentStepMatchesRole(item, role)) || steps[0],
+    selected: graph.nodes.find((item) => item.key === stepKey) || steps.find((item) => fulfillmentStepMatchesRole(item, role)) || steps[0],
   }
 }
 

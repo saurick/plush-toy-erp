@@ -5,94 +5,128 @@ import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
 
-async function mount(t, url = '/__dev/status-flows?view=chain&chain=all') {
+async function mount(t, url = '/__dev/status-flows?view=chain&chain=all', props = {}) {
   const harness = await createReactTestHarness(t)
   const { default: Guide } = await import('./TaskFulfillmentGuide.jsx')
   const navigation = {}
-  function Probe() { Object.assign(navigation, { location: useLocation(), navigate: useNavigate() }); return h(Guide) }
-  const render = async (entry, key) => harness.render(h(MemoryRouter, { key, initialEntries: [entry], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Probe)))
-  await render(url, 'initial')
+  function Probe() { Object.assign(navigation, { location: useLocation(), navigate: useNavigate() }); return h(Guide, { renderTopics: () => h('div', null, '业务专题'), ...props }) }
+  await harness.render(h(MemoryRouter, { initialEntries: [url], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Probe)))
   const root = harness.container
-  const click = async (selector) => { const el = root.querySelector(selector); assert(el, selector); await harness.act(() => { el.focus(); el.click() }); await harness.flush() }
-  return { harness, root, navigation, render, click, params: () => new URLSearchParams(navigation.location.search) }
+  const click = async (selector) => { const el = typeof selector === 'string' ? root.querySelector(selector) : selector; assert(el, selector); await harness.act(() => { el.focus(); el.click() }); await harness.flush() }
+  return { harness, root, navigation, click, params: () => new URLSearchParams(navigation.location.search) }
 }
 
-test('all 17 stages have separate exception targets and the detail panel and mode switch stay in place', async (t) => {
-  const { root, click, params, harness } = await mount(t)
-  const panel = root.querySelector('[aria-label="流程详情"]')
-  const map = root.querySelector('[data-fulfillment-chain]')
-  for (const [index, step] of catalog.fulfillment_flow.entries()) {
-    const main = root.querySelector(`[data-chain-stage="${step.stage}"] [data-stage-card]`)
-    const entry = root.querySelector(`[data-stage-exception="${step.stage}"]`)
-    assert(entry && !main.contains(entry))
-    assert.equal(entry.getAttribute('aria-label'), `查看第${index + 1}环节异常`)
-    await click(`[data-chain-stage="${step.stage}"] [data-stage-card]`)
-    const mode = root.querySelector('[aria-label="环节办理方式"]')
-    await harness.act(() => mode.querySelectorAll('input')[1].click())
-    assert.equal(root.querySelector('[aria-label="环节办理方式"]'), mode)
-    assert.equal(root.querySelector('[aria-label="流程详情"]'), panel)
-    assert.equal(root.querySelector('[data-fulfillment-chain]'), map)
-    assert.equal(root.querySelectorAll('[data-chain-stage]').length, 17)
-    assert.equal(params().get('flow_stage'), step.stage)
-    assert(root.querySelector(`[data-stage-handling="${step.stage}"]`))
-    assert.equal(root.querySelector('[data-stage-normal]'), null)
-  }
-})
-
-test('multiple sources and plans need an explicit choice; single independent plan preserves stage context without fabricating an origin', async (t) => {
-  const { root, click, params, harness } = await mount(t)
-  await click('[data-stage-exception="incoming_quality"]')
-  assert.equal(params().has('flow_exception'), false)
-  const types = root.querySelector('[aria-label="异常类型"]')
-  assert.equal(types.querySelectorAll('button').length, 2)
-  await harness.act(() => types.querySelector('button').click())
-  assert.equal(params().get('flow_exception'), 'purchase_rejection')
-  assert.equal(params().get('flow_exception_origin'), 'incoming_quality')
-  assert.equal(params().has('flow_decision'), false)
-  assert.equal(root.querySelector('[data-exception-handling]'), null)
-  await click('[aria-label="处理方式"] button')
-  assert(root.querySelector('[data-exception-handling]'))
-  await click('[aria-label="处理方式"] button[aria-pressed="true"]')
-  assert.equal(params().has('flow_decision'), false)
-  assert.equal(params().has('flow_exception_step'), false)
-  assert.equal(root.querySelector('[data-exception-handling]'), null)
-  await click('[data-stage-exception="cutting_issue"]')
-  assert.equal(params().get('flow_exception'), 'over_issue')
-  assert.equal(params().get('flow_stage'), 'cutting_issue')
-  assert.equal(params().has('flow_exception_origin'), false)
-  assert.equal(root.querySelectorAll('[data-exception-handling]').length, 1)
-  await click('button[aria-label="收起详情"]')
-  assert.equal(params().has('flow_exception'), false)
-  assert.equal(harness.runtimeWindow.document.activeElement, root.querySelector('[data-stage-exception="cutting_issue"]'))
-})
-
-test('cross-stage browsing retains a plan and an explicit step through role changes, history and reload', async (t) => {
-  const { root, click, params, harness, render, navigation } = await mount(t, '/__dev/status-flows?view=chain&chain=all&flow_role=purchase&flow_exception=production_quality&flow_exception_origin=cutting_quality&flow_decision=original_rework&flow_exception_step=reinspect')
-  assert.equal(root.querySelector('[data-selected-exception-node]').dataset.selectedExceptionNode, 'reinspect')
-  const targets = root.querySelectorAll('.erp-dev-fulfillment-guide__involved button')
-  await harness.act(() => targets[1].click())
-  assert.equal(params().get('flow_exception_origin'), 'shell_quality')
-  assert.equal(params().get('flow_decision'), 'original_rework')
-  assert.equal(params().get('flow_exception_step'), 'reinspect')
-  const saved = navigation.location.pathname + navigation.location.search
-  await render(saved, 'reload')
-  assert.equal(root.querySelector('[data-selected-exception-node]').dataset.selectedExceptionNode, 'reinspect')
-  await click('[data-exception-handling] button')
-  await harness.act(() => navigation.navigate(-1))
-  assert.equal(root.querySelector('[data-selected-exception-node]').dataset.selectedExceptionNode, 'reinspect')
-  const remake = [...root.querySelectorAll('[aria-label="处理方式"] button')].find((button) => button.textContent === '补料重做')
-  await harness.act(() => remake.click())
-  assert.equal(params().get('flow_decision'), 'remake')
-  assert.equal(params().has('flow_exception_step'), false)
-  assert(root.querySelector('.erp-dev-chain__reentry-note').textContent.includes('新批'))
+test('总图只展示已登记的专项分支，普通受阻说明不生成异常按钮', async (t) => {
+  const { root, click, params } = await mount(t)
   assert.equal(root.querySelectorAll('[data-chain-stage]').length, 17)
+  assert.equal(root.querySelectorAll('[data-stage-exception]').length, catalog.fulfillment_flow.reduce((sum, step) => sum + step.handling.guides.length, 0))
+  for (const step of catalog.fulfillment_flow) {
+    const branches = [...root.querySelectorAll(`[data-stage-exception="${step.stage}"]`)]
+    assert.deepEqual(branches.map((item) => item.dataset.stageGuide), step.handling.guides)
+    assert(branches.every((item) => item.textContent !== '异常'))
+  }
+  await click('[data-chain-stage="handwork_execute"] [data-stage-card]')
+  assert(root.querySelector('[data-stage-normal="handwork_execute"] .erp-markdown-mermaid'))
+  assert.equal(params().get('flow_stage'), 'handwork_execute')
+  assert.equal(root.querySelector('[aria-label="环节办理方式"]'), null)
+  await click('[data-stage-exception="cutting_quality"]')
+  assert.equal(params().get('flow_exception_origin'), 'cutting_quality')
+  assert.equal(params().has('flow_decision'), false)
+  assert(root.querySelector('[data-exception-guide="production_quality"] .erp-markdown-mermaid'))
+  await click('[aria-label="返回 9 · 裁片颜色 / 尺寸检验"]')
+  assert.equal(params().has('flow_exception'), false)
+  assert(root.querySelector('[data-stage-normal="cutting_quality"] .erp-markdown-mermaid'))
+  assert.equal(root.ownerDocument.activeElement, root.querySelector('[data-stage-exception="cutting_quality"]'))
 })
 
-test('invalid source links fail explicitly and an unavailable step resolves within its selected plan', async (t) => {
-  const { root, navigation, harness } = await mount(t, '/__dev/status-flows?flow_exception=production_quality&flow_exception_origin=sales_order')
+test('两个独立异常均可返回原首付流程及子步骤，关联任务和单据不串入原环节', async (t) => {
+  const explored = []
+  const { root, click, params } = await mount(t, '/__dev/status-flows?view=chain&chain=all&flow_stage=supplier_advance&flow_substep=actual', {
+    onExploreStage: (key) => explored.push(key),
+  })
+  const open = (label) => click([...root.querySelectorAll('.erp-dev-chain__independent button')].find((button) => button.textContent === label))
+  for (const [key, label] of [['outsourcing_rejection', '委外产品回货拒收'], ['over_issue', '生产超领材料']]) {
+    await open(label)
+    assert(root.querySelector(`[data-exception-guide="${key}"] .erp-markdown-mermaid`))
+    assert.equal(params().get('flow_stage'), 'supplier_advance')
+    assert.equal(params().get('flow_substep'), 'actual')
+    assert.equal(params().has('flow_exception_origin'), false, '返回位置不是独立异常的业务来源')
+    assert.equal(root.querySelector('[aria-label="相关任务"] a[href$="stage_key=payment"]'), null)
+    await click([...root.querySelectorAll('.erp-dev-fulfillment-guide__detail-actions button')].find((button) => button.textContent === '查看关联单据'))
+    assert.equal(explored.at(-1), catalog.exception_guides.find((guide) => guide.key === key).business_chain)
+    await click('[aria-label="返回 4 · 采购 / 委外首付"]')
+    assert(root.querySelector('[data-stage-normal="supplier_advance"] .erp-markdown-mermaid'))
+    assert.equal(root.querySelector('[data-selected-substep]').dataset.selectedSubstep, 'actual')
+    assert.equal(params().has('flow_exception'), false)
+    assert.equal(root.ownerDocument.activeElement.textContent, label)
+  }
+  await open('委外产品回货拒收')
+  await open('生产超领材料')
+  await click('[aria-label="返回 4 · 采购 / 委外首付"]')
+  assert.equal(root.querySelector('[data-selected-substep]').dataset.selectedSubstep, 'actual')
+})
+
+test('异常链接刷新后仍可返回，改选主环节清理旧异常与子步骤', async (t) => {
+  const { root, click, params } = await mount(t, '/__dev/status-flows?view=chain&chain=all&flow_stage=supplier_advance&flow_substep=actual&flow_exception=over_issue&flow_exception_step=approval')
+  await click('[aria-label="返回 4 · 采购 / 委外首付"]')
+  assert.equal(root.querySelector('[data-selected-substep]').dataset.selectedSubstep, 'actual')
+  assert.equal(params().has('flow_exception_step'), false)
+  await click('[data-stage-exception="cutting_quality"]')
+  assert.equal(params().get('flow_stage'), 'cutting_quality')
+  assert.equal(params().has('flow_substep'), false)
+  await click('[data-chain-stage="supplier_advance"] [data-stage-card]')
+  assert(root.querySelector('[data-stage-normal="supplier_advance"]'))
+  assert.equal(params().has('flow_exception'), false)
+  assert.equal(params().has('flow_exception_origin'), false)
+})
+
+test('未选主环节的独立异常关闭详情，不补造返回位置', async (t) => {
+  const { root, click, params } = await mount(t)
+  await click([...root.querySelectorAll('.erp-dev-chain__independent button')].find((button) => button.textContent === '生产超领材料'))
+  assert.equal(params().has('flow_stage'), false)
+  assert.equal(root.querySelector('button[aria-label^="返回 "]'), null)
+  await click('[aria-label="收起详情"]')
+  assert.equal(root.querySelector('[aria-label="流程详情"]'), null)
+})
+
+test('专题内异常保留正确的单据入口，并能返回该专题原环节', async (t) => {
+  const explored = []
+  const { root, click } = await mount(t, '/__dev/status-flows?flow_stage=cutting_quality&flow_exception=production_quality&flow_exception_origin=cutting_quality', {
+    scoped: true,
+    steps: [{ ...catalog.fulfillment_flow.find((step) => step.stage === 'cutting_quality'), nodeKey: 'quality_source' }],
+    onExploreNode: (key) => explored.push(key),
+  })
+  await click([...root.querySelectorAll('.erp-dev-fulfillment-guide__detail-actions button')].find((button) => button.textContent === '查看关联单据'))
+  assert.deepEqual(explored, ['quality_source'])
+  await click('[aria-label="返回 1 · 裁片颜色 / 尺寸检验"]')
+  assert(root.querySelector('[data-stage-normal="cutting_quality"]'))
+})
+
+test('固定导航保持挂载，异常目录只保留正式类型且不猜测发生环节', async (t) => {
+  const { root, click, params } = await mount(t)
+  const tabs = root.querySelector('[aria-label="流程视图"]')
+  await click(tabs.querySelectorAll('input')[2])
+  assert.equal(root.querySelector('[aria-label="流程视图"]'), tabs)
+  assert.equal(root.querySelectorAll('[data-exception-entry]').length, catalog.exception_guides.length)
+  assert.equal(root.querySelectorAll('[data-handling-entry]').length, 0)
+  await click('[data-exception-entry="production_quality"]')
+  assert.equal(params().has('flow_exception_origin'), false)
+  assert.equal(params().has('flow_stage'), false)
+  await click('[data-exception-entry="over_issue"]')
+  assert.equal(root.querySelector('[aria-label="发生环节"]'), null, '独立业务不显示空的发生环节选择器')
+  assert(root.querySelector('[data-exception-guide]').textContent.includes('独立业务'))
+  await click(tabs.querySelectorAll('input')[0])
+  assert.equal(root.querySelector('[aria-label="流程视图"]'), tabs)
+  assert.equal(params().has('flow_exception'), false)
+  assert(root.querySelector('[data-fulfillment-chain]'))
+  assert(!root.textContent.includes('返回完整流程'))
+})
+
+test('方案及选中节点随链接恢复，非法来源显式失败', async (t) => {
+  const { root, navigation, harness } = await mount(t, '/__dev/status-flows?flow_tab=exceptions&flow_exception=production_quality&flow_exception_origin=shell_quality&flow_decision=remake&flow_exception_step=end:original')
+  assert.equal(root.querySelector('[data-selected-exception-node]').dataset.selectedExceptionNode, 'end:original')
+  assert(root.querySelector('[data-exception-plan="remake"] .erp-markdown-mermaid'))
+  await harness.act(() => navigation.navigate('/__dev/status-flows?flow_exception=production_quality&flow_exception_origin=sales_order'))
   assert(root.querySelector('[role="alert"]').textContent.includes('不适用'))
   assert.equal(root.querySelector('[data-exception-handling]'), null)
-  await harness.act(() => navigation.navigate('/__dev/status-flows?flow_role=purchase&flow_exception=purchase_rejection&flow_decision=return_to_vendor&flow_exception_step=arrival'))
-  assert.equal(root.querySelector('[data-selected-exception-node]').dataset.selectedExceptionNode, 'arrange')
-  assert.equal(root.querySelectorAll('.erp-dev-chain__handling-steps button').length, 3)
 })

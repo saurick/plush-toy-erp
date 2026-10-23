@@ -21,14 +21,14 @@ function stageNode(stage, key, marker) {
   }
 }
 
-export function buildFulfillmentExceptionGraph(guide, { planKey, originStage, previousStage } = {}) {
+export function buildFulfillmentExceptionGraph(guide, { planKey, originStage, previousStage, overview = false } = {}) {
   const { plan, steps } = fulfillmentExceptionPath(guide, planKey)
-  const origin = resolveFulfillmentExceptionOrigin(guide, originStage, previousStage)
+  const origin = overview && !originStage && !previousStage ? { stage: null, invalid: false } : resolveFulfillmentExceptionOrigin(guide, originStage, previousStage)
   if (origin.invalid) return { invalid: true, plan, steps, origin: null, nodes: [], edges: [] }
   const policy = plan.continuation
   if (!guide.diagram || !policy) throw new Error(`Missing exception diagram: ${guide.key}/${plan.key}`)
-  if (!origin.stage && !guide.diagram.external_entry) throw new Error(`Missing exception origin: ${guide.key}`)
-  const external = guide.diagram.external_entry
+  if (!origin.stage && !guide.diagram.external_entry && !overview) throw new Error(`Missing exception origin: ${guide.key}`)
+  const external = guide.diagram.external_entry || { label: '发生问题的环节', role_keys: [] }
   const entry = origin.stage ? stageNode(origin.stage, 'main:entry', '分出') : {
     key: 'main:entry',
     kind: 'external',
@@ -65,13 +65,19 @@ export function buildFulfillmentExceptionGraph(guide, { planKey, originStage, pr
       nodes.push({ ...entry, key: 'main:return', label: `接回 · ${policy.target_label}` })
     } else {
       const stage = policy.target === 'origin' ? origin.stage?.stage
-        : policy.target === 'next' ? catalog.fulfillment_flow[catalog.fulfillment_flow.indexOf(origin.stage) + 1]?.stage : policy.target
-      returnStage = catalog.fulfillment_flow.find((step) => step.stage === stage)
-      if (!returnStage) throw new Error(`Invalid return: ${guide.key}/${plan.key}`)
-      nodes.push(stageNode(returnStage, 'main:return', policy.target === 'next' ? '继续主链' : '接回'))
+        : policy.target === 'next' && origin.stage ? catalog.fulfillment_flow[catalog.fulfillment_flow.indexOf(origin.stage) + 1]?.stage : policy.target
+      returnStage = catalog.fulfillment_flow.find((step) => step.stage === stage) || null
+      if (!returnStage && !(overview && !origin.stage && ['origin', 'next'].includes(policy.target))) throw new Error(`Invalid return: ${guide.key}/${plan.key}`)
+      nodes.push(returnStage ? stageNode(returnStage, 'main:return', policy.target === 'next' ? '继续主链' : '接回') : { key: 'main:return', kind: 'external', label: policy.target === 'next' ? '继续后续环节' : '接回原环节', result: plan.closure, role_keys: [] })
     }
     edges.push({ from: steps.at(-1).key, to: 'main:return', label: policy.label, kind: 'return' })
   } else throw new Error(`Unknown exception outcome: ${guide.key}/${plan.key}`)
+  if (guide.approval && steps.some((step) => step.key === 'approval')) {
+    const approvedEdge = edges.find((edge) => edge.from === 'approval')
+    if (approvedEdge) approvedEdge.label = '通过'
+    nodes.push({ key: 'end:rejected', kind: 'terminal', label: '审批未通过 · 本次申请结束', result: guide.approval.rejected, role_keys: [] })
+    edges.push({ from: 'approval', to: 'end:rejected', label: '未通过' })
+  }
   const split = policy.reentry ? steps.findIndex((step) => step.key === policy.reentry.before_step) : steps.length
   return { invalid: false, guide, plan, steps, branchSteps: steps.slice(0, split), nodes, edges, origin: origin.stage, returnStage, reentryStage }
 }

@@ -37,6 +37,7 @@ const PARTS = {
 function Anatomy({ rationale, size, onSize }) {
   const [part, setPart] = useState('body')
   const [padding, setPadding] = useState(24)
+  const effectiveSize = size ?? 'localAction'
   return (
     <>
       <div className="erp-feedback-guide-tools">
@@ -44,7 +45,6 @@ function Anatomy({ rationale, size, onSize }) {
         <Select
           placeholder="弹窗宽度"
           aria-label="弹窗宽度"
-          allowClear={false /* 不可清空：尺寸演示必须使用有效宽度规格，空值无法确定弹窗布局。 */}
           id="feedback-modal-size"
           value={size}
           onChange={onSize}
@@ -54,14 +54,14 @@ function Anatomy({ rationale, size, onSize }) {
           }))}
         />
         <code>
-          {String(ERP_MODAL_WIDTHS[size])}
-          {typeof ERP_MODAL_WIDTHS[size] === 'number' ? 'px' : ''}
+          {String(ERP_MODAL_WIDTHS[effectiveSize])}
+          {typeof ERP_MODAL_WIDTHS[effectiveSize] === 'number' ? 'px' : ''}
         </code>
       </div>
       <div className="erp-feedback-anatomy-grid">
         <figure
           className="erp-feedback-anatomy"
-          data-size={size}
+          data-size={effectiveSize}
           style={{ '--demo-padding': `${padding}px` }}
         >
           <figcaption>结构示意 · 下方可打开实际尺寸</figcaption>

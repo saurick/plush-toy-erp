@@ -99,13 +99,6 @@
   --erp-work-item-table-height: 76px;
 }
 
-@media screen and (min-width: 768px) {
-  [data-erp-density='compact'] :is(.erp-task-table-row, .erp-progress-table) {
-    --erp-work-item-image-size: 48px;
-    --erp-work-item-association-height: 48px;
-  }
-}
-
 body {
   color: var(--erp-text);
   background: var(--erp-page-bg);

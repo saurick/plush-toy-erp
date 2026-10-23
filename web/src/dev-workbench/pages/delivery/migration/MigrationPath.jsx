@@ -54,7 +54,7 @@ export function MigrationPath({ pathOperation, pathStatuses }) {
           {databaseMigrationDataScopeText(pathOperation.backup)}
         </Text>
       ) : null}
-      <details className="erp-dev-migration-flow-details">
+      <details className="erp-dev-disclosure erp-dev-migration-flow-details">
         <summary>查看事务与恢复边界</summary>
         <p>
           仅点亮已有完成证据的节点。数据库事务只覆盖原库迁移；恢复演练、业务验证和版本切换分别核对。

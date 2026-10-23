@@ -494,7 +494,7 @@ func (r *inventoryRepo) qualityInspectionListQuery(filter biz.QualityInspectionF
 		query = query.Where(qualityinspection.InspectedAtGTE(*filter.DateFrom))
 	}
 	if filter.DateTo != nil {
-		query = query.Where(qualityinspection.InspectedAtLTE(endOfDateFilter(*filter.DateTo)))
+		query = query.Where(qualityinspection.InspectedAtLTE(*filter.DateTo))
 	}
 	if filter.PurchaseReceiptID > 0 {
 		query = query.Where(qualityinspection.PurchaseReceiptID(filter.PurchaseReceiptID))

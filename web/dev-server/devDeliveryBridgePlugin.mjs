@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
-import { readGitlabDeploymentRecord, syncGitlabDeploymentRecord } from '../../scripts/deploy/gitlab-deployment-records.mjs'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import path from 'node:path'
 import process from 'node:process'
 import { setImmediate as yieldReadRequests } from 'node:timers/promises'
+import { readRetentionSummary } from './devRetentionSummary.mjs'
+import { readGitlabDeploymentRecord, syncGitlabDeploymentRecord } from '../../scripts/deploy/gitlab-deployment-records.mjs'
 
 import {
   consumeDeliveryOperationStore,
@@ -101,6 +102,29 @@ const REMOTE_STAGE_LABELS = Object.freeze({
   static_preflight: '静态预检',
   service_switch: '服务切换',
 })
+
+// A refresh shares work only while it is running. Failed reads are evicted and
+// cache age starts after completion; a slow probe must not expire as it arrives.
+function readThroughCache(cache, key, ttlMs, load, { force = false } = {}) {
+  const previous = cache.get(key)
+  if (previous?.pending) return previous.pending
+  if (!force && previous && Date.now() - previous.readAt < ttlMs) {
+    return Promise.resolve(previous.value)
+  }
+  const entry = {}
+  const pending = Promise.resolve().then(load).then((value) => {
+    if (cache.get(key) === entry) {
+      Object.assign(entry, { value, readAt: Date.now(), pending: null })
+    }
+    return value
+  }, (error) => {
+    if (cache.get(key) === entry) cache.delete(key)
+    throw error
+  })
+  entry.pending = pending
+  cache.set(key, entry)
+  return pending
+}
 
 function isDeliveryTarget(value) {
   return DELIVERY_TARGET_KEYS.includes(String(value || ''))
@@ -707,6 +731,7 @@ export function createDevDeliveryService({
   operationStore,
   operationStoreRepoRoot,
   readRepositoryState = readRepositoryIdentity,
+  readRetention = async () => null,
   runPreflight = runTargetPreflightAsync,
   runInitializationPreflight = runTargetInitializationPreflightAsync,
   classifyRelation = classifyGitAncestryRelation,
@@ -721,6 +746,7 @@ export function createDevDeliveryService({
   now = () => new Date().toISOString(),
   preflightTtlMs = 30_000,
   pipelineTimingTtlMs = 60_000,
+  onDiagnostic = (event) => process.stderr.write(`${JSON.stringify(event)}\n`),
   env = process.env,
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
@@ -786,8 +812,9 @@ export function createDevDeliveryService({
   const children = new Map()
   const preflightCache = new Map()
   const initializationPreflightCache = new Map()
+  const summaryCache = new Map()
+  const pipelineTimingCache = new Map()
   const operationReadIndex = createDeliveryOperationReadIndex(store)
-  let pipelineTimingCache = null
 
   function executorEnvironment({ targetFetch = false } = {}) {
     const childEnv = { ...process.env }
@@ -1010,36 +1037,20 @@ level: 'warning',
     if (!isDeliveryTarget(targetKey)) {
       throw new Error('delivery target is not registered')
     }
-    const currentTime = Date.now()
-    const cached = preflightCache.get(targetKey)
-    if (!force && cached && currentTime - cached.readAt < preflightTtlMs) {
-      return cached.value
-    }
-    const value = await Promise.resolve(runPreflight(targetKey))
-    if (value?.target !== targetKey) {
-      throw new Error('target preflight identity does not match the request')
-    }
-    preflightCache.set(targetKey, { readAt: currentTime, value })
-    return value
+    return readThroughCache(preflightCache, targetKey, preflightTtlMs, async () => {
+      const value = await runPreflight(targetKey)
+      if (value?.target !== targetKey) {
+        throw new Error('target preflight identity does not match the request')
+      }
+      return value
+    }, { force })
   }
 
   async function readPipelineTimings({ force = false } = {}) {
     if (typeof readDeliveryProvider.listPipelineTimings !== 'function') {
       return null
     }
-    const currentTime = Date.now()
-    if (
-      !force &&
-      pipelineTimingCache &&
-      currentTime - pipelineTimingCache.readAt < pipelineTimingTtlMs
-    ) {
-      return pipelineTimingCache.value
-    }
-    const value = await Promise.resolve(
-      readDeliveryProvider.listPipelineTimings({ limit: 8 })
-    )
-    pipelineTimingCache = { readAt: currentTime, value }
-    return value
+    return readThroughCache(pipelineTimingCache, 'timings', pipelineTimingTtlMs, () => readDeliveryProvider.listPipelineTimings({ limit: 8 }), { force })
   }
 
   async function readTargetInitializationPreflight(
@@ -1049,26 +1060,18 @@ level: 'warning',
     if (!isDeliveryTarget(targetKey)) {
       throw new Error('delivery target is not registered')
     }
-    const currentTime = Date.now()
-    const cached = initializationPreflightCache.get(targetKey)
-    if (!force && cached && currentTime - cached.readAt < preflightTtlMs) {
-      return cached.value
-    }
-    const value = await Promise.resolve(runInitializationPreflight(targetKey))
-    if (value?.target !== targetKey) {
-      throw new Error(
-        'target initialization preflight identity does not match the request'
-      )
-    }
-    initializationPreflightCache.set(targetKey, {
-      readAt: currentTime,
-      value,
-    })
-    return value
+    return readThroughCache(initializationPreflightCache, targetKey, preflightTtlMs, async () => {
+      const value = await runInitializationPreflight(targetKey)
+      if (value?.target !== targetKey) {
+        throw new Error('target initialization preflight identity does not match the request')
+      }
+      return value
+    }, { force })
   }
 
-  async function getSummary({ forcePreflight = false } = {}) {
+  async function getSummary({ forcePreflight = false, requestId = randomUUID() } = {}) {
     await reconcileWaitingOperations()
+    const retentionPromise = Promise.resolve().then(() => readRetention()).catch(() => null)
     const [repositoryResult, versionsResult, timingsResult, ...targetResults] =
       await Promise.allSettled([
         readRepositoryState(root),
@@ -1088,7 +1091,7 @@ level: 'warning',
         const webSha = preflight?.remote?.runtime?.webSha
         const existingRuntimeIdentity =
           SHA_PATTERN.test(String(serverSha || '')) && serverSha === webSha
-        return preflight?.status === 'passed' || existingRuntimeIdentity
+        return !preflight || preflight.status === 'passed' || existingRuntimeIdentity
           ? Promise.resolve(null)
           : readTargetInitializationPreflight(targetKey, {
               force: forcePreflight,
@@ -1143,10 +1146,27 @@ level: 'warning',
         initializationPreflight,
       })
       if (!preflight) {
+        const error = result?.reason
+        const diagnostic = error?.preflightDiagnostic
+        const code = diagnostic?.code || 'target_preflight_unavailable'
+        // The diagnostic is an allowlisted transport result, never raw stderr,
+        // SQL, command arguments, environment values or an arbitrary exception.
+        onDiagnostic({
+          event: 'delivery_preflight',
+requestId,
+target: targetKey,
+          outcome: 'error',
+code,
+          ...(diagnostic ? { stage: diagnostic.stage,
+elapsedMs: diagnostic.elapsedMs,
+            exitCode: diagnostic.exitCode,
+transport: diagnostic.transport } : {}),
+          at: generatedAt,
+        })
         issues.push({
           code: `target_preflight_unavailable_${targetKey.replaceAll('-', '_')}`,
           level: 'error',
-          message: `${targetKey} 只读预检不可用；未启动任何目标写操作`,
+          message: `${targetKey} 只读预检${code === 'target_preflight_timeout' ? '超时' : '不可用'}；本次状态未确认，历史记录仍可查看`,
         })
       }
       return {
@@ -1191,6 +1211,7 @@ level: 'warning',
       kind: 'plush.dev-delivery-summary',
       status: issues.length === 0 ? 'success' : 'partial',
       generatedAt,
+      retention: await retentionPromise,
       repository:
         repositoryResult.status === 'fulfilled' ? repositoryResult.value : null,
       versions:
@@ -2137,8 +2158,10 @@ level: 'warning',
 
   return {
     async summary(options) {
-      recoverOperations()
-      return getSummary(options)
+      return readThroughCache(summaryCache, Boolean(options?.forcePreflight), 0, () => {
+        recoverOperations()
+        return getSummary(options)
+      })
     },
     history(query = {}) {
       const allowedKeys = [
@@ -2249,65 +2272,76 @@ level: 'warning',
     async act(request) {
       recoverOperations()
       const validated = validateDevDeliveryAction(request)
-      if (validated.action === 'sync-gitlab-record') {
-        const operation = readDeliveryOperation(store, validated.payload.operationId)
-        if (!TERMINAL_STATUSES.has(operation.status)) throw new Error('only terminal operations can be archived')
-        await syncDeploymentRecord({ store, operationId: operation.id })
-        return { kind: 'plush.dev-delivery-action-result', action: validated.action, operation: presentOperation(operation) }
+      // A read begun before a write cannot become the post-action snapshot.
+      const invalidateReads = () => {
+        summaryCache.clear()
+        preflightCache.clear()
+        initializationPreflightCache.clear()
       }
-      if (validated.action === 'dispatch-release') {
+      invalidateReads()
+      try {
+        if (validated.action === 'sync-gitlab-record') {
+          const operation = readDeliveryOperation(store, validated.payload.operationId)
+          if (!TERMINAL_STATUSES.has(operation.status)) throw new Error('only terminal operations can be archived')
+          await syncDeploymentRecord({ store, operationId: operation.id })
+          return { kind: 'plush.dev-delivery-action-result', action: validated.action, operation: presentOperation(operation) }
+        }
+        if (validated.action === 'dispatch-release') {
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            operation: await dispatchRelease(validated.payload),
+          }
+        }
+        if (validated.action === 'prepare-promotion') {
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            ...(await prepareFixedPromotion(validated.payload)),
+          }
+        }
+        if (validated.action === 'prepare-rollback') {
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            ...(await prepareFixedRollback(validated.payload)),
+          }
+        }
+        if (validated.action === 'prepare-database-rebuild') {
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            ...(await prepareFixedDatabaseRebuild(validated.payload)),
+          }
+        }
+        if (validated.action === 'retry-operation') {
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            ...(await retryOperation(validated.payload)),
+          }
+        }
+        if (validated.action === 'execute-rollback') {
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            ...(await executeFixedRollback(validated.payload)),
+          }
+        }
+        if (validated.action === 'execute-database-rebuild') {
+          return {
+            kind: 'plush.dev-delivery-action-result',
+            action: validated.action,
+            ...(await executeFixedDatabaseRebuild(validated.payload)),
+          }
+        }
         return {
           kind: 'plush.dev-delivery-action-result',
           action: validated.action,
-          operation: await dispatchRelease(validated.payload),
+          ...(await executeFixedPromotion(validated.payload)),
         }
-      }
-      if (validated.action === 'prepare-promotion') {
-        return {
-          kind: 'plush.dev-delivery-action-result',
-          action: validated.action,
-          ...(await prepareFixedPromotion(validated.payload)),
-        }
-      }
-      if (validated.action === 'prepare-rollback') {
-        return {
-          kind: 'plush.dev-delivery-action-result',
-          action: validated.action,
-          ...(await prepareFixedRollback(validated.payload)),
-        }
-      }
-      if (validated.action === 'prepare-database-rebuild') {
-        return {
-          kind: 'plush.dev-delivery-action-result',
-          action: validated.action,
-          ...(await prepareFixedDatabaseRebuild(validated.payload)),
-        }
-      }
-      if (validated.action === 'retry-operation') {
-        return {
-          kind: 'plush.dev-delivery-action-result',
-          action: validated.action,
-          ...(await retryOperation(validated.payload)),
-        }
-      }
-      if (validated.action === 'execute-rollback') {
-        return {
-          kind: 'plush.dev-delivery-action-result',
-          action: validated.action,
-          ...(await executeFixedRollback(validated.payload)),
-        }
-      }
-      if (validated.action === 'execute-database-rebuild') {
-        return {
-          kind: 'plush.dev-delivery-action-result',
-          action: validated.action,
-          ...(await executeFixedDatabaseRebuild(validated.payload)),
-        }
-      }
-      return {
-        kind: 'plush.dev-delivery-action-result',
-        action: validated.action,
-        ...(await executeFixedPromotion(validated.payload)),
+      } finally {
+        invalidateReads()
       }
     },
   }
@@ -2347,6 +2381,7 @@ export function createDevDeliveryMiddleware({
       (credential) => {
         deliveryService = createService({
           projectRoot,
+          readRetention: readRetentionSummary,
           env: { ...environment, PLUSH_GITLAB_READ_TOKEN: credential.token },
         })
         return deliveryService
@@ -2393,7 +2428,9 @@ export function createDevDeliveryMiddleware({
         request.method === 'GET' &&
         requestPath === DEV_DELIVERY_SUMMARY_API_PATH
       ) {
-        sendJson(response, 200, await deliveryService.summary())
+        sendJson(response, 200, await deliveryService.summary({
+          requestId: response.getHeader?.('x-request-id') || randomUUID(),
+        }))
         return
       }
       if (

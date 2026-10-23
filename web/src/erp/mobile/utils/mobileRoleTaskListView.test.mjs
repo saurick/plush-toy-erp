@@ -90,16 +90,12 @@ test('missing totals stay unknown and approval filters follow effective access',
   assert.equal(allowed.filterItems[1].ariaLabel, '待我审批')
 })
 
-test('risk filtering uses server time and never switches selection to a different view', () => {
-  const result = buildView(
-    fixture({ viewKey: 'risk', filterKey: 'overdue', selectedTaskID: 3 })
-  )
+test('overdue shortcut displays the server-filtered risk page and keeps selection in that view', () => {
+  const input = fixture({ viewKey: 'risk', filterKey: 'overdue', selectedTaskID: 3 })
+  input.slots.risk.items = [input.slots.risk.items[0]]
+  const result = buildView(input)
   assert.deepEqual(
     result.filteredTasks.map((task) => task.id),
-    [4]
-  )
-  assert.deepEqual(
-    result.overdueTasks.map((task) => task.id),
     [4]
   )
   assert.equal(result.activeTaskViewState.selectedTask, null)

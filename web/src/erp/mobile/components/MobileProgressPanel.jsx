@@ -324,7 +324,7 @@ export default function MobileProgressPanel({
     }
   }, [active, data, hasMore])
 
-  const open = (row, section = 'lines') => {
+  const open = (row, section = null) => {
     remember()
     setSuppressDetailOpenMotion(false)
     const next = { id: row.id, view: row.view, orderNo: row.order_no, section }
@@ -577,6 +577,10 @@ export default function MobileProgressPanel({
           open({ id: record.id, view: 'production', order_no: record.number })
         }
         onOpenTask={onOpenTask}
+        onRememberContext={(context) => {
+          latest.current.selection = { ...latest.current.selection, ...context }
+          remember({ selection: latest.current.selection })
+        }}
         onSectionChange={(section) =>
           setSelection((current) =>
             current ? { ...current, section } : current

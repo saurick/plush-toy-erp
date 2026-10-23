@@ -93,11 +93,6 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-dev-customer-source summary {
-  width: fit-content;
-  cursor: pointer;
-}
-
 .erp-dev-customer-source > .ant-typography {
   display: block;
   margin-top: 8px;
@@ -291,15 +286,6 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-dev-customer-menu-group__toggle::before {
-  content: '＋ ';
-}
-
-.erp-dev-customer-menu-group[open]
-  .erp-dev-customer-menu-group__toggle::before {
-  content: '－ ';
-}
-
 .erp-dev-customer-menu-group__close-label {
   display: none;
 }
@@ -333,29 +319,6 @@
   color: var(--customer-muted);
   font-size: var(--erp-font-micro);
   overflow-wrap: anywhere;
-}
-
-.erp-dev-customer-disclosure > summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.erp-dev-customer-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-.erp-dev-customer-disclosure__summary::after {
-  margin-left: auto;
-  color: var(--customer-muted);
-  content: '＋ 展开';
-  font-size: var(--erp-font-caption);
-  font-weight: 560;
-  white-space: nowrap;
-}
-
-.erp-dev-customer-disclosure[open]
-  > .erp-dev-customer-disclosure__summary::after {
-  content: '－ 收起';
 }
 
 .erp-dev-customer-disclosure:not([open])

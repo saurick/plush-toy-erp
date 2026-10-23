@@ -133,14 +133,7 @@ export function usePermissionRoleSettings({
 
   const [selectedRoleKey, setSelectedRoleKey] = useState('')
 
-  const [selectedRolePermissionKeys, setSelectedRolePermissionKeys] = useState(
-    []
-  )
-
-  const [selectedWarehouseScopeMode, setSelectedWarehouseScopeMode] =
-    useState('NONE')
-
-  const [selectedWarehouseScopeIDs, setSelectedWarehouseScopeIDs] = useState([])
+  const [roleDraft, setRoleDraft] = useState(null)
 
   const [roleSaveConflict, setRoleSaveConflict] = useState(null)
 
@@ -194,6 +187,52 @@ export function usePermissionRoleSettings({
     [assignablePermissionKeySet, selectedRole]
   )
 
+  const selectedRoleVersion = Number(selectedRole?.version || 0)
+
+  const selectedRoleSavedWarehouseScope = useMemo(
+    () => getRoleWarehouseScope(selectedRole || {}),
+    [selectedRole]
+  )
+
+  // 未编辑时直接使用已保存设置，避免异步回填期间把空值或上一岗位误判为修改。
+  // 版本冲突刷新需要保留用户草稿，其余刷新使用重新读取的岗位设置。
+  const currentRoleDraft =
+    selectedRole &&
+    roleDraft &&
+    (roleDraft.role === selectedRole ||
+      (getRoleKey(roleDraft.role) === selectedRoleKey &&
+        roleSaveConflict?.roleKey === selectedRoleKey))
+      ? roleDraft
+      : null
+
+  const selectedRolePermissionKeys =
+    currentRoleDraft?.permissionKeys ?? selectedRoleSavedPermissionKeys
+  const selectedWarehouseScopeMode =
+    currentRoleDraft?.warehouseScopeMode ??
+    selectedRoleSavedWarehouseScope.mode
+  const selectedWarehouseScopeIDs =
+    currentRoleDraft?.warehouseScopeIDs ??
+    selectedRoleSavedWarehouseScope.warehouseIds
+
+  const changeRoleDraft = useCallback(
+    (changes) => {
+      if (!selectedRole) return
+      setRoleDraft({
+        role: selectedRole,
+        permissionKeys: selectedRolePermissionKeys,
+        warehouseScopeMode: selectedWarehouseScopeMode,
+        warehouseScopeIDs: selectedWarehouseScopeIDs,
+        ...changes,
+      })
+    },
+    [
+      selectedRole,
+      selectedRolePermissionKeys,
+      selectedWarehouseScopeMode,
+      selectedWarehouseScopeIDs,
+    ]
+  )
+
   const rolePermissionsDirty =
     buildPermissionSignature(selectedRolePermissionKeys) !==
     buildPermissionSignature(selectedRoleSavedPermissionKeys)
@@ -201,13 +240,6 @@ export function usePermissionRoleSettings({
   const selectedRolePermissionSignature = useMemo(
     () => buildPermissionSignature(selectedRolePermissionKeys),
     [selectedRolePermissionKeys]
-  )
-
-  const selectedRoleVersion = Number(selectedRole?.version || 0)
-
-  const selectedRoleSavedWarehouseScope = useMemo(
-    () => getRoleWarehouseScope(selectedRole || {}),
-    [selectedRole]
   )
 
   const roleDataScopeDirty =
@@ -305,22 +337,14 @@ export function usePermissionRoleSettings({
         okText: '放弃修改',
         cancelText: '继续编辑',
         onOk: () => {
-          setSelectedRolePermissionKeys(selectedRoleSavedPermissionKeys)
-          setSelectedWarehouseScopeMode(selectedRoleSavedWarehouseScope.mode)
-          setSelectedWarehouseScopeIDs(
-            selectedRoleSavedWarehouseScope.warehouseIds
-          )
+          setRoleDraft(null)
           setRoleSaveConflict(null)
           onDiscard?.()
         },
         onCancel: onKeepEditing,
       })
     },
-    [
-      roleConfigurationDirty,
-      selectedRoleSavedPermissionKeys,
-      selectedRoleSavedWarehouseScope,
-    ]
+    [roleConfigurationDirty]
   )
 
   const roleSummaries = useMemo(
@@ -413,7 +437,7 @@ export function usePermissionRoleSettings({
         permissions: assignablePermissions,
         menuOptions: normalizedPermissionMenus,
       })
-      setSelectedRolePermissionKeys(result.permissionKeys)
+      changeRoleDraft({ permissionKeys: result.permissionKeys })
 
       const menuByKey = new Map(
         normalizedPermissionMenus.map((menu) => [menu.key, menu])
@@ -451,6 +475,7 @@ export function usePermissionRoleSettings({
     },
     [
       assignablePermissions,
+      changeRoleDraft,
       normalizedPermissionMenus,
       permissionDetailMap,
       selectedRolePermissionKeys,
@@ -467,6 +492,7 @@ export function usePermissionRoleSettings({
       content:
         '切换岗位会丢弃当前未保存的勾选结果。请先保存，或确认放弃本次调整。',
       onDiscard: () => {
+        setRoleDraft(null)
         setRoleSaveConflict(null)
         setSelectedRoleKey(nextRoleKey)
       },
@@ -494,26 +520,6 @@ export function usePermissionRoleSettings({
       },
     })
   }
-
-  useEffect(() => {
-    if (!selectedRole) {
-      setSelectedRolePermissionKeys([])
-      return
-    }
-    if (roleSaveConflict?.roleKey === selectedRoleKey) {
-      return
-    }
-    setSelectedRolePermissionKeys(selectedRoleSavedPermissionKeys)
-    setSelectedWarehouseScopeMode(selectedRoleSavedWarehouseScope.mode)
-    setSelectedWarehouseScopeIDs(selectedRoleSavedWarehouseScope.warehouseIds)
-  }, [
-    roleSaveConflict,
-    selectedRole,
-    selectedRoleKey,
-    selectedRoleSavedPermissionKeys,
-    selectedRoleSavedWarehouseScope,
-    selectedRoleVersion,
-  ])
 
   useEffect(() => {
     if (roles.length === 0) {
@@ -1027,12 +1033,15 @@ export function usePermissionRoleSettings({
               !canManageRolePermissions || selectedRoleReadOnly || saving
             }
             onModeChange={(nextMode) => {
-              setSelectedWarehouseScopeMode(nextMode)
-              if (nextMode !== 'ASSIGNED') {
-                setSelectedWarehouseScopeIDs([])
-              }
+              changeRoleDraft({
+                warehouseScopeMode: nextMode,
+                warehouseScopeIDs:
+                  nextMode === 'ASSIGNED' ? selectedWarehouseScopeIDs : [],
+              })
             }}
-            onWarehouseIdsChange={setSelectedWarehouseScopeIDs}
+            onWarehouseIdsChange={(warehouseScopeIDs) =>
+              changeRoleDraft({ warehouseScopeIDs })
+            }
           />
         ) : detailView === 'fields' ? (
           <SensitiveFieldOverview permissionKeys={selectedRolePermissionKeys} />

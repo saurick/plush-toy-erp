@@ -67,7 +67,7 @@
     box-shadow: none;
     border-radius: 0;
     border: 0;
-    padding: 10mm 5mm;
+    padding: 8mm 6mm;
     box-sizing: border-box;
     background: white;
     overflow: visible;
@@ -100,7 +100,7 @@
     width: 210mm;
     min-height: 297mm;
     margin: 0 auto;
-    padding: 10.5mm 5mm 10mm;
+    padding: 8mm 6mm;
     box-sizing: border-box;
     box-shadow: none;
     border-radius: 0;

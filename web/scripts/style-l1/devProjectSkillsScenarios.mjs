@@ -59,9 +59,10 @@ export function createDevProjectSkillsScenarios({
           await disclosures.evaluateAll((nodes) =>
             nodes.map((node) => node.open)
           ),
-          [true, true],
-          '关系图与引用依据首次进入应默认展开'
+          [false],
+          '关联与引用按需展开，默认保留适用任务'
         )
+        assert.equal(await page.locator('.erp-dev-skills__disclosure .erp-markdown-mermaid').count(), 0)
         const response = await page.request.get(
           new URL('/__dev/api/project-skills', page.url()).href
         )
@@ -74,6 +75,7 @@ export function createDevProjectSkillsScenarios({
         )
         const search = page.getByRole('textbox', { name: '搜索任务或 Skill' })
         await search.fill('plush-page-design-governance')
+        await search.press('Enter')
         await page.waitForFunction(
           () => document.querySelectorAll('.erp-dev-skills__item').length === 1
         )
@@ -84,6 +86,13 @@ export function createDevProjectSkillsScenarios({
           'plush-page-design-governance'
         )
         await page.reload()
+        await page.getByText('结构检查通过', { exact: true }).waitFor()
+        assert.deepEqual(
+          await disclosures.evaluateAll((nodes) => nodes.map((node) => node.open)),
+          [false],
+          '刷新后保持默认摘要，关系图由用户展开'
+        )
+        await disclosures.locator('summary').click()
         const invocationName = page.locator('.erp-dev-skills__name')
           .filter({ hasText: /^\$plush-page-design-governance$/u })
         await invocationName.waitFor()
@@ -97,8 +106,8 @@ export function createDevProjectSkillsScenarios({
           await disclosures.evaluateAll((nodes) =>
             nodes.map((node) => node.open)
           ),
-          [true, true],
-          '刷新后两处内容仍应默认展开'
+          [true],
+          '同一入口展开调用标识、关系图和引用依据'
         )
         const diagram = page.locator(
           '.erp-dev-skills__disclosure .erp-markdown-mermaid'
@@ -119,12 +128,6 @@ export function createDevProjectSkillsScenarios({
         )
         await disclosures.nth(0).locator('summary').click()
         await expectSkillGraphFits(page, diagram)
-        await disclosures.nth(1).locator('summary').click()
-        assert.equal(
-          await disclosures.nth(1).evaluate((node) => node.open),
-          false
-        )
-        await disclosures.nth(1).locator('summary').click()
         const related = page.locator('.erp-dev-skills__related button').first()
         assert(await related.count())
         await related.click()
@@ -136,7 +139,7 @@ export function createDevProjectSkillsScenarios({
           await disclosures.evaluateAll((nodes) =>
             nodes.map((node) => node.open)
           ),
-          [true, true],
+          [true],
           '切换 Skill 后保留展开内容'
         )
         await page.goto(selectedURL)
@@ -197,6 +200,7 @@ export function createDevProjectSkillsScenarios({
         await page.goto(selectedURL)
         await page.getByText('结构检查通过', { exact: true }).waitFor()
         await search.fill('没有匹配结果的任务')
+        await search.press('Enter')
         await page.getByText('没有匹配的 Skill', { exact: true }).waitFor()
         assert.equal(
           await page
@@ -204,7 +208,7 @@ export function createDevProjectSkillsScenarios({
             .count(),
           0
         )
-        await page
+        await search.locator('xpath=..')
           .getByRole('button', { name: '清除搜索', exact: true })
           .click()
         await page.waitForFunction(

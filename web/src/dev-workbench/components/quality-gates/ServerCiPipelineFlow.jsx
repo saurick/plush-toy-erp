@@ -54,7 +54,7 @@ export function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
             {dag.nodeCount} 个 Job；阶段内依赖见完整图。
           </Text>
           <details
-            className="erp-dev-static-guidance"
+            className="erp-dev-disclosure erp-dev-static-guidance"
             onToggle={(event) => setFullDagOpen(event.currentTarget.open)}
           >
             <summary>查看完整 Job 依赖图（{dag.nodeCount} 个节点）</summary>
@@ -90,7 +90,7 @@ export function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
             {timing.flowGroups.map((group) => (
               <details
                 key={group.key}
-                className="erp-dev-quality-server-pipeline__phase"
+                className="erp-dev-disclosure erp-dev-quality-server-pipeline__phase"
                 data-phase={group.key}
                 open={group.jobs.some(
                   (job) =>
@@ -181,7 +181,7 @@ export function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
           ))}
         </div>
       ) : null}
-      <details className="erp-dev-tool-disclosure">
+      <details className="erp-dev-disclosure erp-dev-tool-disclosure">
         <summary>依赖与证据来源</summary>
         <Text type="secondary">
           依赖来自同一 SHA 的 CI 配置，状态与耗时来自实际

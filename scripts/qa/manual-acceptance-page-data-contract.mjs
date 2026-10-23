@@ -2,7 +2,7 @@ import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
 
 export const MANUAL_ACCEPTANCE_PAGE_DATA_CONTRACT =
   "manual-acceptance-page-data-ownership-v2";
-export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 51;
+export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 50;
 
 export const MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS = Object.freeze([
   "role",
@@ -128,11 +128,11 @@ const WORKFLOW_TASK_GROUP_PROBES = Object.freeze({
   "production-scheduling": "workflow-tasks:production_scheduling",
   "production-exceptions":
     "workflow-tasks:production_exception_decision_approval",
-  "shipping-release": "workflow-tasks:shipment_finance_approval",
 });
 const WORKFLOW_TASK_PROBE_IDS = new Set([
   ...Object.values(WORKFLOW_TASK_GROUP_PROBES),
   "workflow-tasks:production_exception",
+  "workflow-tasks:shipment_finance_approval",
 ]);
 
 const FORBIDDEN_TARGET_ENTRYPOINT_KEY =

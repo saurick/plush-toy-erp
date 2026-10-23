@@ -333,6 +333,13 @@ export default function SalesOrdersPage() {
     window.history.replaceState({ ...history, usr }, '')
   }, [location.key, location.state, adminProfile])
   const [materialRequestOrderID, setMaterialRequestOrderID] = useState(null)
+  const canSubmitMaterialRequest = hasActionPermission(
+    adminProfile,
+    PermissionCode.ENGINEERING_MATERIAL_SUBMIT
+  )
+  const canReviewMaterialRequest =
+    hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE) ||
+    hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE)
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
   const [orderForm] = Form.useForm()
@@ -1761,23 +1768,16 @@ export default function SalesOrdersPage() {
             <Button
               data-business-action-key="engineering-material"
               data-business-action-role="action"
+              data-business-action-group={
+                canSubmitMaterialRequest || canReviewMaterialRequest ? 'business' : 'query'
+              }
               size="small"
               disabled={!selectedOrder || saving}
               onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
             >
-              {hasActionPermission(
-                adminProfile,
-                PermissionCode.ENGINEERING_MATERIAL_SUBMIT
-              )
+              {canSubmitMaterialRequest
                 ? '提交用料汇总'
-                : hasActionPermission(
-                      adminProfile,
-                      PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE
-                    ) ||
-                    hasActionPermission(
-                      adminProfile,
-                      PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE
-                    )
+                : canReviewMaterialRequest
                   ? '审核用料汇总'
                   : '查看用料汇总'}
             </Button>

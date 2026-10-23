@@ -10,7 +10,6 @@ export const DEV_FLOW_STATE_QUERY_KEYS = Object.freeze({
   role: 'flow_role',
   roleStage: 'flow_stage',
   roleSubstep: 'flow_substep',
-  roleHandling: 'flow_handling',
   roleTab: 'flow_tab',
   roleTopic: 'flow_topic',
   exception: 'flow_exception',

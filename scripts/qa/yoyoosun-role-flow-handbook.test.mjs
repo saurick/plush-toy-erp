@@ -385,23 +385,23 @@ test("production governance separates Core WIP from preview customer flows", () 
   }
 });
 
-test("full-page checklist keeps its 51-target customer boundary", () => {
+test("full-page checklist keeps its 50-target customer boundary", () => {
   const targetHeadings = fullPageChecklist.match(
     /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
   );
-  assert.equal(targetHeadings?.length, 51);
+  assert.equal(targetHeadings?.length, 50);
   assert.doesNotMatch(
     fullPageChecklist,
     /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|\b(?:key|route|system_admin)\b|岗位代码|甲方|\/erp\//iu,
   );
-  assert.match(fullPageChecklist, /完成 51 项并不自动代表正式交付/u);
+  assert.match(fullPageChecklist, /完成 50 项并不自动代表正式交付/u);
   assert.match(fullPageChecklist, /模拟展示任务不冒充流程闭环/u);
-  assert.match(fullPageChecklist, /\| 合计\s+\|\s+51\s+\|/u);
+  assert.match(fullPageChecklist, /\| 合计\s+\|\s+50\s+\|/u);
 });
 
 test("trial runbook keeps config, RBAC and release evidence boundaries", () => {
   for (const required of [
-    "51 项：2 个登录与入口、30 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台",
+    "50 项：2 个登录与入口、29 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台",
     "fresh 空库基线已记录",
     "customer-config-effective-session-probe.mjs",
     "40302 未登录",

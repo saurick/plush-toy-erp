@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import {
   Alert,
-  Button,
   Descriptions,
   List,
   Progress,
@@ -93,8 +92,6 @@ export function GovernanceView({
   onSearch,
   onFilter,
 }) {
-  const [draft, setDraft] = useState(values.q || '')
-  useEffect(() => setDraft(values.q || ''), [values.q])
   const columns = [
     {
       align: 'left',
@@ -150,28 +147,15 @@ export function GovernanceView({
   return (
     <div className="erp-dev-quality-governance-view">
       <div className="erp-dev-quality-view-tools">
-        <form
-          className="erp-dev-quality-view-search"
-          onSubmit={(event) => {
-            event.preventDefault()
-            onSearch(draft)
-          }}
-        >
+        <div className="erp-dev-quality-view-search">
           <SearchInput
             allowClear
-            value={draft}
+            value={values.q || ''}
             placeholder="搜索门禁或风险"
-            searchHint="输入门禁名称或风险后按回车搜索"
-            onChange={(event) => {
-              const nextDraft = event.target.value
-              setDraft(nextDraft)
-              if (!nextDraft && values.q) onSearch('')
-            }}
+            searchHint="搜索门禁名称或风险"
+            onSearch={onSearch}
           />
-          <Button type="primary" htmlType="submit">
-            搜索
-          </Button>
-        </form>
+        </div>
         <Segmented
           aria-label="门禁范围"
           options={GOVERNANCE_FILTER_OPTIONS}
@@ -342,7 +326,7 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
                 </Text>
               </div>
             </div>
-            <details>
+            <details className="erp-dev-disclosure">
               <summary>查看该风险的证据清单</summary>
               <ul>
                 {category.evidence.map((item) => (

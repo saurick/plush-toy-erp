@@ -3,6 +3,7 @@ import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../../src/erp/utils/mobileTaskQueries.mjs'
 import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.mjs'
+import { mobileTaskOverduePaginationScenario } from './mobileTaskOverduePaginationScenario.mjs'
 import { mobileTaskRefreshScenario } from './mobileTaskRefreshScenario.mjs'
 import { mobileTaskHistoryFiltersScenario } from './mobileTaskHistoryFiltersScenario.mjs'
 import { mobileTaskDiscoveryScenario } from './mobileTaskDiscoveryScenario.mjs'
@@ -40,6 +41,7 @@ export function createMobileTaskScenarios({
     ...createTaskIdentitySearchScenarios({ assert }),
     ...createTaskItemSemanticsScenarios({ assert }),
     mobileTaskListOptionsScenario({ assert, path, outputDir }),
+    mobileTaskOverduePaginationScenario({ assert, outputDir }),
     mobileTaskRefreshScenario({ assert, path, outputDir }),
     mobileTaskHistoryFiltersScenario({ assert, path, outputDir }),
     mobileTaskDiscoveryScenario({ assert, path, outputDir }),
@@ -2744,6 +2746,8 @@ export function createMobileTaskScenarios({
               task_status_key: 'blocked',
               owner_role_key: 'sales',
               priority: 3,
+              // 超时筛选在服务端执行，深分页恢复需要三页真实匹配的风险记录。
+              due_at: 1780272000,
               blocked_reason: `批量阻塞原因 ${index + 1}`,
               payload: {
                 critical_path: true,

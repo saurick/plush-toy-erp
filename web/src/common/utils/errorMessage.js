@@ -167,6 +167,17 @@ export function getActionErrorMessage(err, action, options = {}) {
   )
 }
 
+export function getPageLoadErrorMessage(err, action = '加载页面失败') {
+  const message = normalizeErrorText(err?.message)
+  if (
+    Number(err?.code) === RpcErrorCode.INVALID_PARAM &&
+    (!message || containsTechnicalErrorText(message) || message === '参数不合法')
+  ) {
+    return `${String(action).replace(/失败$/u, '')}失败，请刷新后重试`
+  }
+  return getActionErrorMessage(err, action)
+}
+
 export function handleRpcError(err, { onNeedLogin } = {}) {
   const code = err?.code
   const msg = getUserFacingErrorMessage(err)

@@ -43,4 +43,12 @@ var (
 
 var _ biz.FinanceFactsStatusCounter = (*operationalFactRepo)(nil)
 
-var _ biz.ProductionExceptionsStatusCounter = (*operationalFactRepo)(nil)
+var (
+	_ biz.PurchaseReceiptsStatusCounter     = (*inventoryRepo)(nil)
+	_ biz.InventoryLotsStatusCounter        = (*inventoryRepo)(nil)
+	_ biz.BOMHeadersStatusCounter           = (*inventoryRepo)(nil)
+	_ biz.WorkflowTasksStatusCounter        = (*workflowRepo)(nil)
+	_ biz.ProductionFactsStatusCounter      = (*operationalFactRepo)(nil)
+	_ biz.StockReservationsStatusCounter    = (*operationalFactRepo)(nil)
+	_ biz.ProductionExceptionsStatusCounter = (*operationalFactRepo)(nil)
+)

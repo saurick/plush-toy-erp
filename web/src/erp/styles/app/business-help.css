@@ -40,6 +40,10 @@
   min-width: 0;
 }
 
+.erp-business-page-help .erp-help-view-body {
+  min-height: 0;
+}
+
 .erp-business-page-help section > .ant-typography-secondary {
   display: block;
   margin-bottom: 4px;

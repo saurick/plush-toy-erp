@@ -46,17 +46,6 @@
   background: var(--erp-surface-bg);
 }
 
-.erp-dev-business-usability-boundary > summary {
-  width: fit-content;
-  color: var(--erp-text-muted);
-  cursor: pointer;
-}
-
-.erp-dev-business-usability-boundary > summary:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 3px;
-}
-
 .erp-dev-business-usability-boundary > .ant-typography {
   margin: 10px 0 0;
 }

@@ -27,12 +27,12 @@ const PRINT_APPENDIX_LAYOUT_OPTIONS = [
 const resolveLayoutLabel = (layout) =>
   layout === PRINT_APPENDIX_IMAGE_LAYOUT_FULL ? '整行' : '半宽'
 
-export function PrintAppendixImages({ images = [] }) {
+export function PrintAppendixImages({ images = [], autoColumns = 2 }) {
   const normalizedImages = normalizePrintAppendixImages(images)
   if (!normalizedImages.length) {
     return null
   }
-  const rows = groupPrintAppendixImageRows(normalizedImages)
+  const rows = groupPrintAppendixImageRows(normalizedImages, { autoColumns })
 
   return (
     <section
@@ -50,6 +50,11 @@ export function PrintAppendixImages({ images = [] }) {
             className={`erp-print-appendix-images__row erp-print-appendix-images__row--${row.layout}${
               hasSegments ? ' erp-print-appendix-images__row--segmented' : ''
             }`}
+            style={
+              row.columns
+                ? { '--erp-print-appendix-columns': row.columns }
+                : undefined
+            }
             data-print-appendix-row={rowIndex + 1}
             data-print-appendix-row-layout={row.layout}
             key={`appendix-row-${row.images
@@ -57,14 +62,18 @@ export function PrintAppendixImages({ images = [] }) {
               .join('-')}`}
           >
             {row.images.map((image, columnIndex) => {
-              const resolvedLayout = resolvePrintAppendixImageLayout(image)
+              const resolvedLayout = resolvePrintAppendixImageLayout(image, {
+                autoColumns,
+              })
               const segments = getPrintAppendixImageSegments(image)
               const column =
                 resolvedLayout === PRINT_APPENDIX_IMAGE_LAYOUT_FULL
                   ? 'full'
                   : columnIndex === 0
                     ? 'left'
-                    : 'right'
+                    : row.columns === 3 && columnIndex === 1
+                      ? 'middle'
+                      : 'right'
               return (
                 <figure
                   className={`erp-print-appendix-images__item erp-print-appendix-images__item--${resolvedLayout}${
@@ -113,6 +122,7 @@ export default function PrintAppendixImageManager({
   images = [],
   onImagesChange,
   onStatusChange,
+  autoColumns = 2,
 }) {
   const inputRef = useRef(null)
   const [busy, setBusy] = useState(false)
@@ -162,7 +172,11 @@ export default function PrintAppendixImageManager({
       data-print-appendix-manager
       aria-label="管理模板末尾图片"
     >
-      <p>普通图片自动两张一行，长图自动整行并分段；也可单独调整排版。</p>
+      <p>
+        {autoColumns === 3
+          ? '普通图片自动每行最多三张，长图自动整行；也可单独选择半宽或整行。'
+          : '普通图片自动两张一行，长图自动整行并分段；也可单独调整排版。'}
+      </p>
       <input
         ref={inputRef}
         className="erp-print-appendix-manager__input"
@@ -185,7 +199,9 @@ export default function PrintAppendixImageManager({
       {normalizedImages.length ? (
         <ol className="erp-print-appendix-manager__list">
           {normalizedImages.map((image, index) => {
-            const resolvedLayout = resolvePrintAppendixImageLayout(image)
+            const resolvedLayout = resolvePrintAppendixImageLayout(image, {
+              autoColumns,
+            })
             const segmentCount = getPrintAppendixImageSegments(image).length
             return (
               <li
@@ -200,7 +216,7 @@ export default function PrintAppendixImageManager({
                   <span title={image.name}>{image.name}</span>
                   <span>
                     {image.layoutMode === PRINT_APPENDIX_IMAGE_LAYOUT_AUTO
-                      ? `自动 · ${resolveLayoutLabel(resolvedLayout)}`
+                      ? `自动 · ${autoColumns === 3 && resolvedLayout !== PRINT_APPENDIX_IMAGE_LAYOUT_FULL ? '每行最多三张' : resolveLayoutLabel(resolvedLayout)}`
                       : resolveLayoutLabel(resolvedLayout)}
                     {segmentCount > 1 ? ` · ${segmentCount} 段` : ''}
                   </span>

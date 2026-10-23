@@ -105,7 +105,6 @@ func TestWorkflowBusinessPagesRegisterTheirInitialTaskRead(t *testing.T) {
 	requiredPages := map[string]bool{
 		"production-scheduling": false,
 		"production-exceptions": false,
-		"shipping-release":      false,
 	}
 	for _, surface := range usage.Surfaces {
 		if _, required := requiredPages[surface.PageKey]; !required {

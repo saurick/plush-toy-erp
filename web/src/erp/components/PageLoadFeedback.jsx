@@ -9,7 +9,7 @@ import React, {
   useState,
 } from 'react'
 import { message } from '@/common/utils/antdApp'
-import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { getPageLoadErrorMessage } from '@/common/utils/errorMessage'
 
 const LoadFeedbackContext = createContext(null)
 
@@ -17,7 +17,7 @@ const LoadFeedbackContext = createContext(null)
 export function showPageLoadError(error, action) {
   return message.error({
     key: 'erp-page-load-error',
-    content: getActionErrorMessage(error, action),
+    content: getPageLoadErrorMessage(error, action),
   })
 }
 

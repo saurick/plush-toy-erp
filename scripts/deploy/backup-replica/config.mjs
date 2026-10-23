@@ -52,6 +52,7 @@ export function plainDirectory(directory) {
 }
 export function loadConfig(file) {
   const c = JSON.parse(fs.readFileSync(privateFile(file), "utf8"));
+  const gitlab = c.source?.kind === "gitlab";
   closed(
     c,
     [
@@ -59,7 +60,8 @@ export function loadConfig(file) {
       "source",
       "destination",
       "stateDirectory",
-      "retentionDays",
+      "retentionCount",
+      "minimumFreeBytes",
       "maxSourceAgeHours",
       "transferTimeoutSeconds",
       "restore",
@@ -70,7 +72,7 @@ export function loadConfig(file) {
   requireValue(c.schemaVersion === "plush.backup-replica/v1", "invalid_schema");
   closed(
     c.source,
-    ["id", "transport", "host", "directory"],
+    ["id", "transport", "host", "directory", ...(gitlab ? ["kind"] : [])],
     "invalid_source_fields",
   );
   requireValue(c.source.transport === "ssh-directory", "unsupported_transport");
@@ -108,9 +110,10 @@ export function loadConfig(file) {
     );
   absolute(c.stateDirectory);
   for (const [name, min, max] of [
-    ["retentionDays", 35, 366],
+    ["retentionCount", 7, 7],
+    ["minimumFreeBytes", 1024 ** 3, 1024 ** 4],
     ["maxSourceAgeHours", 1, 168],
-    ["transferTimeoutSeconds", 30, 3600],
+    ["transferTimeoutSeconds", 30, 14400],
   ]) {
     requireValue(
       Number.isInteger(c[name]) && c[name] >= min && c[name] <= max,
@@ -119,20 +122,36 @@ export function loadConfig(file) {
   }
   closed(
     c.restore,
-    ["identityFile", "postgresImage", "everyDays", "timeoutSeconds"],
+    [
+      "identityFile",
+      ...(gitlab ? ["host", "directory"] : ["postgresImage"]),
+      "everyDays",
+      "timeoutSeconds",
+    ],
     "invalid_restore_fields",
   );
   absolute(c.restore.identityFile);
   requireValue(
     Number.isInteger(c.restore.timeoutSeconds) &&
       c.restore.timeoutSeconds >= 60 &&
-      c.restore.timeoutSeconds <= 5400,
+      c.restore.timeoutSeconds <= (gitlab ? 14400 : 5400),
     "invalid_restore_timeout",
   );
-  requireValue(
-    c.restore.postgresImage === "postgres:18.6",
-    "unsupported_postgres_image",
-  );
+  if (gitlab) {
+    requireValue(
+      typeof c.restore.host === "string" &&
+        /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(c.restore.host),
+      "invalid_restore_host",
+    );
+    requireValue(
+      c.restore.directory === "/srv/raid5/gitlab/restore-drills",
+      "invalid_restore_directory",
+    );
+  } else
+    requireValue(
+      c.restore.postgresImage === "postgres:18.6",
+      "unsupported_postgres_image",
+    );
   requireValue(
     Number.isInteger(c.restore.everyDays) &&
       c.restore.everyDays >= 1 &&

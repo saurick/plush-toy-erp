@@ -28,10 +28,10 @@ env_value() {
 }
 
 backup_dir="$(env_value GITLAB_RAID_BACKUP_DIR)"
-offsite_dir="$(env_value GITLAB_OFFSITE_BACKUP_DIR)"
+export_dir="$(env_value GITLAB_BACKUP_EXPORT_DIR)"
 max_age_hours="$(env_value GITLAB_BACKUP_MAX_AGE_HOURS)"
 [[ "$backup_dir" == /* && "$backup_dir" != "/" && -d "$backup_dir" && ! -L "$backup_dir" && "$(realpath -e -- "$backup_dir")" == "$backup_dir" ]]
-[[ "$offsite_dir" == /* && "$offsite_dir" != "/" && -d "$offsite_dir" && ! -L "$offsite_dir" && "$(realpath -e -- "$offsite_dir")" == "$offsite_dir" ]]
+[[ "$export_dir" == /* && "$export_dir" != "/" && -d "$export_dir" && ! -L "$export_dir" && "$(realpath -e -- "$export_dir")" == "$export_dir" ]]
 [[ "$max_age_hours" =~ ^[1-9][0-9]{0,3}$ ]]
 status_file="$backup_dir/latest-status.env"
 [[ -f "$status_file" && ! -L "$status_file" ]] || {
@@ -51,8 +51,8 @@ status_value() {
 
 [[ "$(status_value schemaVersion)" == "plush.gitlab-backup-status/v1" ]]
 [[ "$(status_value status)" == "passed" ]]
-[[ "$(status_value offsiteCopied)" == "true" ]]
-[[ "$(status_value offsiteEncrypted)" == "true" ]]
+[[ "$(status_value exportPrepared)" == "true" ]]
+[[ "$(status_value exportEncrypted)" == "true" ]]
 backup_id="$(status_value backupId)"
 completed_at="$(status_value completedAt)"
 [[ "$backup_id" =~ ^gitlab-([0-9]{8}T[0-9]{6}Z)$ ]]
@@ -64,9 +64,9 @@ age_seconds=$((now_epoch - completed_epoch))
   echo "[gitlab-backup-health] latest backup is stale" >&2
   exit 2
 }
-offsite_backup="$offsite_dir/backup-$stamp"
-[[ -d "$offsite_backup" && ! -L "$offsite_backup" && -f "$offsite_backup/encrypted.sha256" && ! -L "$offsite_backup/encrypted.sha256" && -f "$offsite_backup/manifest.env.age" && ! -L "$offsite_backup/manifest.env.age" ]] || {
-  echo "[gitlab-backup-health] matching offsite backup is missing" >&2
+export_backup="$export_dir/backup-$stamp"
+[[ -d "$export_backup" && ! -L "$export_backup" && -f "$export_backup/encrypted.sha256" && ! -L "$export_backup/encrypted.sha256" && -f "$export_backup/manifest.env.age" && ! -L "$export_backup/manifest.env.age" ]] || {
+  echo "[gitlab-backup-health] matching encrypted export is missing" >&2
   exit 2
 }
-echo "[gitlab-backup-health] status=passed backupId=$backup_id backupAgeSeconds=$age_seconds offsiteCopied=true offsiteEncrypted=true"
+echo "[gitlab-backup-health] status=passed backupId=$backup_id backupAgeSeconds=$age_seconds boundary=local-backup-and-encrypted-export offsiteCopied=false"

@@ -192,7 +192,6 @@ function PrivacyDocument({ bundle }) {
                       {processor.privacyURL ? (
                         <a
                           href={processor.privacyURL}
-                          target="_blank"
                           rel="noreferrer"
                         >
                           {processor.name}

@@ -173,7 +173,7 @@ export function OperationDrawer({
               description={issueDescription(operationDetail.issues)}
             />
           ) : null}
-          <details className="erp-dev-operation-technical-details">
+          <details className="erp-dev-disclosure erp-dev-operation-technical-details">
             <summary>技术详情与状态事件</summary>
             <div className="erp-dev-operation-technical-details__content">
               <Space direction="vertical" size={4} style={{ width: '100%' }}>

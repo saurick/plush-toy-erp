@@ -821,8 +821,8 @@ export function createPrintAssertions({
     )
     assert.equal(
       counts.paperRows,
-      draftRows + counts.totalRows,
-      `加工合同纸面仍存在多余占位空白行: ${JSON.stringify(counts)}`
+      Math.max(4, draftRows) + counts.totalRows,
+      `加工合同应补足四行版面且不增加内部明细: ${JSON.stringify(counts)}`
     )
   }
 
@@ -844,6 +844,7 @@ export function createPrintAssertions({
 
         return {
           blockTop: blockRect.top,
+          blockHeight: blockRect.height,
           labelTop: labelRect?.top || 0,
           labelBottom: labelRect?.bottom || 0,
           dateTop: dateRect?.top || 0,
@@ -870,8 +871,8 @@ export function createPrintAssertions({
         `加工合同签章区不应再渲染上方编辑框: ${JSON.stringify(metric)}`
       )
       assert(
-        metric.labelOffset >= 24,
-        `加工合同签章标签仍贴在顶部，未下移到日期附近: ${JSON.stringify(metric)}`
+        metric.labelOffset >= 0 && metric.blockHeight >= 48,
+        `加工合同签章区应保留原件的手签高度: ${JSON.stringify(metric)}`
       )
       assert(
         metric.labelToDate > 0 && metric.labelToDate <= 12,
@@ -907,7 +908,7 @@ export function createPrintAssertions({
 
   async function assertContractTableHeadersStaySingleLine(
     page,
-    { tableSelector, expectedHeaders = [] }
+    { tableSelector, expectedHeaders = [], maxLines = 1 }
   ) {
     const metrics = await page.evaluate((resolvedTableSelector) => {
       return Array.from(
@@ -937,8 +938,8 @@ export function createPrintAssertions({
     metrics.forEach((metric) => {
       assert.equal(
         metric.whiteSpace,
-        'nowrap',
-        `${tableSelector} 表头未强制单行: ${JSON.stringify(metric)}`
+        maxLines === 1 ? 'nowrap' : 'normal',
+        `${tableSelector} 表头换行方式不符合源版式: ${JSON.stringify(metric)}`
       )
       assert.equal(
         metric.overflowWrap,

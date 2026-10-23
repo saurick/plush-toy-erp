@@ -196,11 +196,6 @@ export const customerPackageCatalog = Object.freeze({
       ],
     },
     {
-      key: "shipping-release",
-      label: "出货放行",
-      requiredCapabilityKeys: ["workflow.task.read"],
-    },
-    {
       key: "outbound",
       label: "库存预留",
       requiredCapabilityKeys: [

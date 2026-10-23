@@ -1,8 +1,11 @@
 import React from 'react'
-import { buildFulfillmentSubflow } from '../../config/devFulfillmentSubflow.mjs'
+import { MermaidDiagram } from '@/common/components/markdown'
+import {
+  buildFulfillmentSubflow,
+  buildSubflowMermaid,
+} from '../../config/devFulfillmentSubflow.mjs'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
 import { selectFulfillmentSubstep } from '../../config/devFulfillmentPresentation.mjs'
-import { fulfillmentStepMatchesRole } from '../../../erp/utils/workflowFulfillment.mjs'
 
 export default function FulfillmentSubflow({
   step,
@@ -12,21 +15,24 @@ export default function FulfillmentSubflow({
   onOpenException,
 }) {
   const flow = React.useMemo(() => buildFulfillmentSubflow(step), [step])
+  const graph = React.useMemo(
+    () =>
+      flow &&
+      buildSubflowMermaid(flow, { role, compact: true, direction: 'LR' }),
+    [flow, role]
+  )
   if (!flow) return null
   const selected = selectFulfillmentSubstep(
     flow,
     searchParams.get(queryKeys.roleSubstep),
     role
   )
-  const details = [
-    ...new Map(
-      selected.details
-        .filter((detail) => detail.reference !== 'result')
-        .map((detail) => [detail.text, detail])
-    ).values(),
-  ]
-  const outgoing = flow.edges.filter((edge) => edge.from === selected.key)
-  const selectNode = (node) => {
+  const selectedID = graph.nodes.find((node) => node.key === selected.key)?.id
+  const selectNode = (id) => {
+    const node = flow.nodes.find(
+      (item) => item.key === graph.nodes.find((item) => item.id === id)?.key
+    )
+    if (!node) return
     if (node.exception_guide && onOpenException) {
       onOpenException(node.key, node.exception_guide)
       return
@@ -43,56 +49,40 @@ export default function FulfillmentSubflow({
       className="erp-dev-fulfillment-guide__subflow"
       aria-label="当前环节的子流程"
     >
-      <ul className="erp-dev-fulfillment-guide__substeps" aria-label="环节步骤">
-        {flow.nodes.map((node) => (
-          <li
-            key={node.key}
-            data-role-match={
-              role === 'all'
-                ? undefined
-                : fulfillmentStepMatchesRole(node, role)
-            }
-          >
-            <button
-              type="button"
-              aria-pressed={node.key === selected.key}
-              onClick={() => selectNode(node)}
-            >
-              <span>{node.label}</span>
-              {node.role ? <small>{node.role}</small> : null}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <MermaidDiagram
+        chart={graph.chart}
+        label={`${step.label}流程图`}
+        toolbar="compact"
+        initialZoom={1}
+        nativeSize
+        interactiveNodes={graph.nodes}
+        selectedNodeId={selectedID}
+        onNodeSelect={selectNode}
+        showSourceOnError={false}
+      />
       <div
         className="erp-dev-fulfillment-guide__focus"
         aria-live="polite"
         data-selected-substep={selected.key}
       >
-        {details.length ? (
-          details.map((detail) => (
-            <p key={detail.text} data-substep-instruction>
-              {detail.text}
-            </p>
-          ))
-        ) : (
-          <p data-substep-instruction>{step.result}</p>
-        )}
+        <strong>
+          {selected.label}
+          {selected.role ? ` · ${selected.role}` : ''}
+        </strong>
+        <p data-substep-instruction>
+          {selected.details[0]?.text || step.result}
+        </p>
+        {selected.details.length > 1 ? (
+          <details className="erp-dev-disclosure erp-dev-fulfillment-guide__instructions">
+            <summary>节点规则</summary>
+            {selected.details.slice(1).map((detail) => (
+              <p key={detail.text}>
+                {detail.label}：{detail.text}
+              </p>
+            ))}
+          </details>
+        ) : null}
       </div>
-      {outgoing.length ? (
-        <ul className="erp-dev-fulfillment-guide__transitions">
-          {outgoing.map((edge) => {
-            const target = flow.nodes.find((node) => node.key === edge.to).label
-            return (
-              <li key={`${edge.from}:${edge.to}`}>
-                {edge.label && target.startsWith(edge.label)
-                  ? target
-                  : `${edge.label || '完成后'} → ${target}`}
-              </li>
-            )
-          })}
-        </ul>
-      ) : null}
     </section>
   )
 }

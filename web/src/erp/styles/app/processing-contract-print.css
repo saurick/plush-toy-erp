@@ -1,11 +1,11 @@
 .erp-processing-contract-paper {
   width: 210mm;
   min-height: 297mm;
-  padding: 10.5mm 5mm 10mm;
+  padding: 8mm 6mm;
   box-sizing: border-box;
   border-radius: 14px;
   background: #fff;
-  color: #111827;
+  color: #000;
   box-shadow: 0 24px 50px rgb(15 23 42 / 18%);
   font-family: 'Noto Serif SC Variable', serif;
 }
@@ -13,28 +13,28 @@
 .erp-processing-contract-paper__header {
   display: flex;
   justify-content: center;
-  margin-bottom: 6mm;
+  margin-bottom: 1.5mm;
 }
 
 .erp-processing-contract-paper__title {
   font-family: 'Noto Serif SC Variable', serif;
-  font-size: 8.6mm;
+  font-size: 10pt;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .erp-processing-contract-meta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8mm;
-  margin-bottom: 3.5mm;
-  font-size: 4.2mm;
-  line-height: 1.55;
+  grid-template-columns: 48% minmax(0, 1fr);
+  gap: 0;
+  margin-bottom: 0;
+  font-size: 8.2pt;
+  line-height: 1.4;
 }
 
 .erp-processing-contract-meta__column {
   display: grid;
-  gap: 1.3mm;
+  gap: 0;
   min-width: 0;
 }
 
@@ -68,11 +68,11 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 14mm;
+  min-height: 15mm;
   padding: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.45;
+  line-height: 1.4;
   text-align: center;
 }
 
@@ -97,21 +97,22 @@
 }
 
 .erp-processing-contract-table__total td {
-  font-weight: 700;
+  height: 7mm;
+  font-weight: 400;
 }
 
 .erp-processing-contract-clauses {
   display: grid;
-  gap: 2.2mm;
-  margin-top: 3mm;
-  font-size: 3.9mm;
-  line-height: 1.5;
+  gap: 0.8mm;
+  margin-top: 1mm;
+  font-size: 7.3pt;
+  line-height: 1.4;
 }
 
 .erp-processing-contract-clauses__group ol {
   display: grid;
-  gap: 1.3mm;
-  margin: 1.4mm 0 0;
+  gap: 0;
+  margin: 0.7mm 0 0;
   padding-left: 0;
   list-style: none;
 }
@@ -129,7 +130,7 @@
 }
 
 .erp-processing-contract-clauses__title {
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .erp-processing-contract-clauses__editable {
@@ -141,14 +142,14 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12mm;
-  margin-top: 4mm;
-  font-size: 4mm;
+  margin-top: 3mm;
+  font-size: 8.2pt;
 }
 
 .erp-processing-contract-signature__block {
   display: grid;
   align-content: end;
-  min-height: 24mm;
+  min-height: 13mm;
   gap: 1.8mm;
 }
 
@@ -156,7 +157,7 @@
   display: flex;
   gap: 1.4mm;
   align-items: baseline;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .erp-processing-contract-signature__name-value {
@@ -241,27 +242,28 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 3.8mm;
+  font-size: 9.1pt;
 }
 
 .erp-processing-contract-table th,
 .erp-processing-contract-table td {
-  border: 1px solid rgb(17 24 39 / 55%);
-  padding: 1.5mm 1.2mm;
+  border: 0.5pt solid #000;
+  padding: 0.5mm 0.5mm;
   vertical-align: middle;
   text-align: center;
   word-break: break-word;
 }
 
 .erp-processing-contract-table thead th {
-  background: #f8faf8;
+  height: 8mm;
+  background: #fff;
   font-weight: 700;
-  white-space: nowrap;
-  word-break: keep-all;
+  white-space: normal;
+  word-break: normal;
   overflow-wrap: normal;
-  font-size: 2.9mm;
+  font-size: 7.3pt;
   line-height: 1.25;
-  padding: 1.2mm 0.4mm;
+  padding: 0.8mm 0.4mm;
 }
 
 .erp-print-table thead th {
@@ -430,4 +432,52 @@
     background: transparent;
     box-shadow: none;
   }
+}
+
+.erp-processing-contract-paper--preview {
+  width: min(100%, 210mm);
+  min-height: auto;
+}
+
+.erp-processing-contract-table
+  tbody
+  tr:not(.erp-processing-contract-table__total)
+  td {
+  height: 16mm;
+}
+
+.erp-processing-contract-table
+  td[data-print-blank-field='productName']
+  .erp-processing-contract-table__cell,
+.erp-processing-contract-table
+  td[data-print-blank-field='amount']
+  .erp-processing-contract-table__cell {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.erp-processing-contract-table
+  td[data-print-blank-field='unitPrice']
+  .erp-processing-contract-table__cell,
+.erp-processing-contract-table
+  td[data-print-blank-field='amount']
+  .erp-processing-contract-table__cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-processing-contract-paper .erp-print-appendix-images {
+  margin-top: 3mm;
+}
+
+.erp-processing-contract-paper
+  .erp-print-appendix-images__item:not(.erp-print-appendix-images__item--full) {
+  width: 50mm;
+  max-width: 100%;
+  justify-self: center;
+}
+
+.erp-print-shell
+  .erp-processing-contract-signature
+  .erp-processing-contract-signature__date-value[data-print-empty='true']::before {
+  content: none;
 }

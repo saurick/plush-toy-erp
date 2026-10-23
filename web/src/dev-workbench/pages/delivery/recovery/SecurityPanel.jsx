@@ -45,7 +45,7 @@ export function SecurityPanel({ activeView, overview }) {
                     </Tag>
                   </td>
                   <td>
-                    <details className="erp-dev-delivery-inline-details">
+                    <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
                       <summary>{check.actionLabel}</summary>
                       <p>{check.next}</p>
                       <p>{check.evidence}</p>

@@ -30,10 +30,7 @@ import {
   createBusinessHeaderScenarios,
 } from './businessListPresentationScenarios.mjs'
 import { createProductionRecordScenarios } from './productionRecordScenarios.mjs'
-import {
-  createShipmentReleasePermissionScenarios,
-  createShipmentReleaseReadonlyScenarios,
-} from './shipmentReleaseScenarios.mjs'
+import { createShipmentApprovalScenarios } from './shipmentApprovalScenarios.mjs'
 import { createSalesOrderAcceptanceScenarios } from './salesOrderAcceptanceScenarios.mjs'
 import { createSalesOrderReservationScenarios } from './salesOrderReservationScenarios.mjs'
 import { createProductionMaterialIssueScenarios } from './productionMaterialIssueScenarios.mjs'
@@ -69,11 +66,10 @@ export function createBusinessFormalScenarios(deps) {
     ...createSupplierProcessingScenarios(deps),
     ...createBusinessHeaderScenarios(deps),
     ...createBusinessCorePagesScenarios(deps),
-    ...createShipmentReleasePermissionScenarios(deps),
+    ...createShipmentApprovalScenarios(deps),
     ...createSalesOrderAcceptanceScenarios(deps),
     ...createSalesOrderReservationScenarios(deps),
     ...createProductionMaterialIssueScenarios(deps),
-    ...createShipmentReleaseReadonlyScenarios(deps),
     ...createBusinessAttachmentRecoveryScenarios(deps),
   ]
 }

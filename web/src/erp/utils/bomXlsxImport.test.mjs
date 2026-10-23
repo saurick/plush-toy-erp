@@ -140,7 +140,7 @@ function createSheetXml(rows, merges = []) {
           if (value === null || value === undefined || value === '') return ''
           const reference = `${columnLetters(columnIndex + 1)}${rowIndex + 1}`
           if (typeof value === 'object') {
-            return `<c r="${reference}"><f>${escapeXml(value.formula)}</f><v>${escapeXml(value.value)}</v></c>`
+            return `<c r="${reference}"${value.style === undefined ? '' : ` s="${value.style}"`}>${value.formula ? `<f>${escapeXml(value.formula)}</f>` : ''}<v>${escapeXml(value.value)}</v></c>`
           }
           return `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`
         })
@@ -156,7 +156,7 @@ function createSheetXml(rows, merges = []) {
   return `<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>${rowXml}</sheetData>${mergeXml}</worksheet>`
 }
 
-function createWorkbook(sheets) {
+function createWorkbook(sheets, styles) {
   const workbookSheets = sheets
     .map(
       (sheet, index) =>
@@ -173,6 +173,7 @@ function createWorkbook(sheets) {
     'xl/workbook.xml': `<?xml version="1.0"?><workbook xmlns:r="relationships"><sheets>${workbookSheets}</sheets></workbook>`,
     'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships>${relationships}</Relationships>`,
   }
+  if (styles) entries['xl/styles.xml'] = styles
   sheets.forEach((sheet, index) => {
     entries[`xl/worksheets/sheet${index + 1}.xml`] = createSheetXml(
       sheet.rows,
@@ -822,4 +823,73 @@ test('BOM import preserves excess precision for correction and keeps fractional 
     !issues.some((issue) => issue.field === 'quantity' && issue.itemIndex === 1)
   )
   assert.equal(draft.values.items[1].unit_id, 2)
+})
+
+test('business data consistency: BOM percentage headers and excess precision retain their meaning', async () => {
+  const result = await parseBOMXlsx(
+    createWorkbook([
+      {
+        name: '材料分析明细表',
+        rows: [
+          ['物料名称', '单位', '单位用量', '损耗%'],
+          ['面料', 'Y', '1', '0.5'],
+          ['面料', 'Y', '1', '1'],
+          ['面料', 'Y', '1', '0.00001%'],
+        ],
+      },
+    ])
+  )
+  assert.equal(result.rows[0].lossRate, '0.005')
+  assert.equal(result.rows[1].lossRate, '0.01')
+  assert.equal(result.rows[2].lossRate, '0.0000001')
+  assert.equal(result.rows[2].lossSource, 'unresolved')
+  assert.match(result.rows[2].lossIssue, /0.00001%.*六位精度/u)
+  const ratio = await parseBOMXlsx(
+    createWorkbook([
+      {
+        name: '材料分析明细表',
+        rows: [
+          ['物料名称', '单位用量', '损耗率'],
+          ['面料', '1', '0.005'],
+        ],
+      },
+    ])
+  )
+  assert.equal(ratio.rows[0].lossRate, '0.005')
+  const styled = await parseBOMXlsx(
+    createWorkbook(
+      [
+        {
+          name: '材料分析明细表',
+          rows: [
+            ['物料名称', '单位用量', '损耗%'],
+            ['面料', '1', { value: '0.005', style: 1 }],
+            ['面料', '1', { value: '0.01', style: 2 }],
+            ['面料', '1', { value: '0.5', style: 0 }],
+          ],
+        },
+      ],
+      '<styleSheet><numFmts><numFmt numFmtId="164" formatCode="0.000%"/></numFmts><cellXfs><xf numFmtId="0"/><xf numFmtId="10"/><xf numFmtId="164"/></cellXfs></styleSheet>'
+    )
+  )
+  assert.deepEqual(
+    styled.rows.map((row) => row.lossRate),
+    ['0.005', '0.01', '0.005']
+  )
+  const scientific = await parseBOMXlsx(createWorkbook([
+    {
+      name: '材料分析明细表',
+      rows: [
+        ['物料名称', '单位用量', '损耗%'],
+        ['面料', '1', { value: '5E-3', style: 1 }],
+        ['面料', '1', { value: '5E-1', style: 0 }],
+        ['面料', '1', { value: '1E-4', style: 0 }],
+        ['面料', '1', { value: '1E-7', style: 1 }],
+      ],
+    },
+  ], '<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="10"/></cellXfs></styleSheet>'))
+  assert.deepEqual(scientific.rows.slice(0, 3).map((row) => row.lossRate), ['0.005', '0.005', '0.000001'])
+  assert(scientific.rows.slice(0, 3).every((row) => !row.lossIssue))
+  assert.equal(scientific.rows[3].lossSource, 'unresolved')
+  assert.match(scientific.rows[3].lossIssue, /六位精度/u)
 })

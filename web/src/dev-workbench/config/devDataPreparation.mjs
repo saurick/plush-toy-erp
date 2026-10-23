@@ -307,8 +307,8 @@ const DATASET_KEY_PATTERN = /^[a-z][a-z0-9_-]{2,63}$/u
 const SCENARIO_DEMO_DATASET_KEY = 'yoyoosun-manual-acceptance'
 const SCENARIO_DEMO_DATA_VERSION = manualAcceptanceContract.dataVersion
 const SCENARIO_DEMO_RUN_ID = manualAcceptanceContract.runId
-const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
-const SCENARIO_DEMO_CATALOG_READY_COUNT = 41
+const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 50
+const SCENARIO_DEMO_CATALOG_READY_COUNT = 40
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
 const ACCEPTANCE_EXECUTION_SCOPE = 'all_registered_chains'
 

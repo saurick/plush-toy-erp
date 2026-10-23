@@ -167,7 +167,7 @@ export function ServerJobGuideDrawer({
             ]}
           />
           <Space size={8} wrap>
-            <Button href={selectedJob.url} target="_blank">
+            <Button href={selectedJob.url}>
               在 GitLab 查看日志
             </Button>
             <Button type="link" onClick={onShowAll}>
@@ -301,7 +301,7 @@ export function ServerJobGuideDrawer({
           ))}
         </div>
       )}
-      <details className="erp-dev-ci-diagnostic">
+      <details className="erp-dev-disclosure erp-dev-ci-diagnostic">
         <summary>
           查看与复制{selectedJob ? '本 Job' : '本次流水线'}排查信息
         </summary>

@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import { ReplicaError } from "./config.mjs";
 
 export async function command(
   args,
-  { input, output, signal, timeout = 120_000, env } = {},
+  { input, inputFile, output, signal, timeout = 120_000, env } = {},
 ) {
   const child = spawn(args[0], args.slice(1), {
     stdio: ["pipe", output ?? "pipe", "pipe"],
@@ -20,6 +21,7 @@ export async function command(
     stderrBytes += chunk.length;
   });
   const timer = setTimeout(() => child.kill("SIGTERM"), timeout);
+  let inputStream;
   const outcome = await new Promise((resolve) => {
     let failure;
     child.once("error", (error) => {
@@ -29,8 +31,16 @@ export async function command(
       resolve({ code, exitSignal, error: failure }),
     );
     child.stdin.on("error", () => {});
-    child.stdin.end(input);
+    if (inputFile) {
+      inputStream = fs.createReadStream(inputFile);
+      inputStream.once("error", (error) => {
+        failure = error;
+        child.kill("SIGTERM");
+      });
+      inputStream.pipe(child.stdin);
+    } else child.stdin.end(input);
   });
+  inputStream?.destroy();
   clearTimeout(timer);
   if (outcome.error || outcome.code !== 0) {
     const error = new ReplicaError(

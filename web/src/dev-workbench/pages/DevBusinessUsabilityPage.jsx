@@ -198,7 +198,7 @@ export default function DevBusinessUsabilityPage() {
       </header>
 
       <main className="erp-dev-business-usability-shell">
-        <details className="erp-dev-business-usability-boundary">
+        <details className="erp-dev-disclosure erp-dev-business-usability-boundary">
           <summary>检查说明与边界</summary>
           <Paragraph>推荐岗位不是权限，覆盖状态也不是客户验收。</Paragraph>
           <Paragraph>
@@ -230,7 +230,7 @@ export default function DevBusinessUsabilityPage() {
             value={keyword}
             placeholder="搜索页面、任务、公式、来源或岗位"
             aria-label="搜索页面说明"
-            onChange={(event) => updateQuery({ keyword: event.target.value })}
+            onSearch={(value) => updateQuery({ keyword: value })}
           />
           <FilterSelect
             emptyValue="all"

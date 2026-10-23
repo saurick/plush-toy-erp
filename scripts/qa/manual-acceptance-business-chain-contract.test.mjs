@@ -166,7 +166,7 @@ test("definition comparison names added and removed steps and chains even when c
 
 test("review plan preserves alternative and sequential outcomes with the shared action descriptions", () => {
   const review = buildManualAcceptanceBusinessChainReviewPlan({
-    catalogTargetCount: 51,
+    catalogTargetCount: 50,
     datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   });
   const finance = review.chains.find(
@@ -276,7 +276,7 @@ test("manual acceptance selects one chain without constructing combinations", ()
 
 test("manual acceptance review plan is a readable projection of registered steps only", () => {
   const review = buildManualAcceptanceBusinessChainReviewPlan({
-    catalogTargetCount: 51,
+    catalogTargetCount: 50,
     datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   });
 
@@ -288,7 +288,7 @@ test("manual acceptance review plan is a readable projection of registered steps
     review.dataStages.map((stage) => stage.key),
     MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   );
-  assert.equal(review.catalogTargetCount, 51);
+  assert.equal(review.catalogTargetCount, 50);
   assert.equal(review.selectorAffectsExecution, false);
   assert.equal(review.executionScope, "all_registered_chains");
   assert.equal(review.freshBatchPerRun, true);

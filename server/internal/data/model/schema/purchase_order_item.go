@@ -53,6 +53,9 @@ func (PurchaseOrderItem) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(255),
+		field.String("material_spec_snapshot").Optional().Nillable().MaxLen(255),
+		field.String("supplier_item_no_snapshot").Optional().Nillable().MaxLen(255),
+		field.String("unit_name_snapshot").Optional().Nillable().MaxLen(64),
 		field.String("color_snapshot").
 			Optional().
 			Nillable().

@@ -5,6 +5,7 @@ import {
   businessTestKey,
   businessRuleTests,
 } from '../../../../scripts/qa/lib/business-rule-catalog.mjs'
+import { validateBusinessConsistencyEvidence } from '../../../../scripts/qa/lib/business-consistency-evidence.mjs'
 
 export { BUSINESS_RULES, BUSINESS_RULE_CATEGORIES, BUSINESS_RULE_DIAGRAMS }
 
@@ -81,10 +82,31 @@ export function buildBusinessRuleRows({
   const databaseTests = new Map(
     (evidence?.ruleTests || []).map((entry) => [entry.id, entry])
   )
+  let consistency = null
+  try {
+    consistency = validateBusinessConsistencyEvidence(
+      report?.businessConsistency
+    )
+  } catch {
+    /* Unproven evidence remains missing. */
+  }
+  const consistencyTests = new Map(
+    (consistency?.tests || []).map((entry) => [entry.id, entry])
+  )
   return BUSINESS_RULES.map((rule) => {
     const tests = rule.tests.map((test) => {
       let status = 'missing'
-      if (test.gate === 'server') {
+      const fastMatch = consistencyTests.get(businessTestKey(test))
+      if (test.gate !== 'postgres' && fastMatch) {
+        status = fastMatch.status
+        if (
+          status !== 'missing' &&
+          (!reportCurrent || consistency.current !== true)
+        )
+          { status = 'stale' }
+        if (status === 'passed' && consistency.status !== 'passed')
+          { status = 'blocked' }
+      } else if (test.gate === 'server') {
         const match = unitScenarios.find(
           (entry) =>
             entry.package === test.package &&
@@ -96,7 +118,7 @@ export function buildBusinessRuleRows({
           status = BUSINESS_RULE_STATUS[match.status] ? match.status : 'missing'
           if (status !== 'missing' && !reportCurrent) status = 'stale'
         }
-      } else {
+      } else if (test.gate === 'postgres') {
         const match = databaseTests.get(businessTestKey(test))
         if (match && BUSINESS_RULE_STATUS[match.status]) {
           status = match.status

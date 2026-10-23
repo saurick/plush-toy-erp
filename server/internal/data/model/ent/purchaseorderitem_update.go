@@ -163,6 +163,66 @@ func (_u *PurchaseOrderItemUpdate) ClearMaterialNameSnapshot() *PurchaseOrderIte
 	return _u
 }
 
+// SetMaterialSpecSnapshot sets the "material_spec_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) SetMaterialSpecSnapshot(v string) *PurchaseOrderItemUpdate {
+	_u.mutation.SetMaterialSpecSnapshot(v)
+	return _u
+}
+
+// SetNillableMaterialSpecSnapshot sets the "material_spec_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdate) SetNillableMaterialSpecSnapshot(v *string) *PurchaseOrderItemUpdate {
+	if v != nil {
+		_u.SetMaterialSpecSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearMaterialSpecSnapshot clears the value of the "material_spec_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) ClearMaterialSpecSnapshot() *PurchaseOrderItemUpdate {
+	_u.mutation.ClearMaterialSpecSnapshot()
+	return _u
+}
+
+// SetSupplierItemNoSnapshot sets the "supplier_item_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) SetSupplierItemNoSnapshot(v string) *PurchaseOrderItemUpdate {
+	_u.mutation.SetSupplierItemNoSnapshot(v)
+	return _u
+}
+
+// SetNillableSupplierItemNoSnapshot sets the "supplier_item_no_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdate) SetNillableSupplierItemNoSnapshot(v *string) *PurchaseOrderItemUpdate {
+	if v != nil {
+		_u.SetSupplierItemNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearSupplierItemNoSnapshot clears the value of the "supplier_item_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) ClearSupplierItemNoSnapshot() *PurchaseOrderItemUpdate {
+	_u.mutation.ClearSupplierItemNoSnapshot()
+	return _u
+}
+
+// SetUnitNameSnapshot sets the "unit_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) SetUnitNameSnapshot(v string) *PurchaseOrderItemUpdate {
+	_u.mutation.SetUnitNameSnapshot(v)
+	return _u
+}
+
+// SetNillableUnitNameSnapshot sets the "unit_name_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdate) SetNillableUnitNameSnapshot(v *string) *PurchaseOrderItemUpdate {
+	if v != nil {
+		_u.SetUnitNameSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearUnitNameSnapshot clears the value of the "unit_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) ClearUnitNameSnapshot() *PurchaseOrderItemUpdate {
+	_u.mutation.ClearUnitNameSnapshot()
+	return _u
+}
+
 // SetColorSnapshot sets the "color_snapshot" field.
 func (_u *PurchaseOrderItemUpdate) SetColorSnapshot(v string) *PurchaseOrderItemUpdate {
 	_u.mutation.SetColorSnapshot(v)
@@ -504,6 +564,21 @@ func (_u *PurchaseOrderItemUpdate) check() error {
 			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MaterialSpecSnapshot(); ok {
+		if err := purchaseorderitem.MaterialSpecSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_spec_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.material_spec_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SupplierItemNoSnapshot(); ok {
+		if err := purchaseorderitem.SupplierItemNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_item_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.supplier_item_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UnitNameSnapshot(); ok {
+		if err := purchaseorderitem.UnitNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "unit_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.unit_name_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ColorSnapshot(); ok {
 		if err := purchaseorderitem.ColorSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "color_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.color_snapshot": %w`, err)}
@@ -584,6 +659,24 @@ func (_u *PurchaseOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if _u.mutation.MaterialNameSnapshotCleared() {
 		_spec.ClearField(purchaseorderitem.FieldMaterialNameSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.MaterialSpecSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldMaterialSpecSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.MaterialSpecSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldMaterialSpecSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.SupplierItemNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldSupplierItemNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.SupplierItemNoSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldSupplierItemNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.UnitNameSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldUnitNameSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.UnitNameSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldUnitNameSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ColorSnapshot(); ok {
 		_spec.SetField(purchaseorderitem.FieldColorSnapshot, field.TypeString, value)
@@ -921,6 +1014,66 @@ func (_u *PurchaseOrderItemUpdateOne) SetNillableMaterialNameSnapshot(v *string)
 // ClearMaterialNameSnapshot clears the value of the "material_name_snapshot" field.
 func (_u *PurchaseOrderItemUpdateOne) ClearMaterialNameSnapshot() *PurchaseOrderItemUpdateOne {
 	_u.mutation.ClearMaterialNameSnapshot()
+	return _u
+}
+
+// SetMaterialSpecSnapshot sets the "material_spec_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) SetMaterialSpecSnapshot(v string) *PurchaseOrderItemUpdateOne {
+	_u.mutation.SetMaterialSpecSnapshot(v)
+	return _u
+}
+
+// SetNillableMaterialSpecSnapshot sets the "material_spec_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdateOne) SetNillableMaterialSpecSnapshot(v *string) *PurchaseOrderItemUpdateOne {
+	if v != nil {
+		_u.SetMaterialSpecSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearMaterialSpecSnapshot clears the value of the "material_spec_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) ClearMaterialSpecSnapshot() *PurchaseOrderItemUpdateOne {
+	_u.mutation.ClearMaterialSpecSnapshot()
+	return _u
+}
+
+// SetSupplierItemNoSnapshot sets the "supplier_item_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) SetSupplierItemNoSnapshot(v string) *PurchaseOrderItemUpdateOne {
+	_u.mutation.SetSupplierItemNoSnapshot(v)
+	return _u
+}
+
+// SetNillableSupplierItemNoSnapshot sets the "supplier_item_no_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdateOne) SetNillableSupplierItemNoSnapshot(v *string) *PurchaseOrderItemUpdateOne {
+	if v != nil {
+		_u.SetSupplierItemNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearSupplierItemNoSnapshot clears the value of the "supplier_item_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) ClearSupplierItemNoSnapshot() *PurchaseOrderItemUpdateOne {
+	_u.mutation.ClearSupplierItemNoSnapshot()
+	return _u
+}
+
+// SetUnitNameSnapshot sets the "unit_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) SetUnitNameSnapshot(v string) *PurchaseOrderItemUpdateOne {
+	_u.mutation.SetUnitNameSnapshot(v)
+	return _u
+}
+
+// SetNillableUnitNameSnapshot sets the "unit_name_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdateOne) SetNillableUnitNameSnapshot(v *string) *PurchaseOrderItemUpdateOne {
+	if v != nil {
+		_u.SetUnitNameSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearUnitNameSnapshot clears the value of the "unit_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) ClearUnitNameSnapshot() *PurchaseOrderItemUpdateOne {
+	_u.mutation.ClearUnitNameSnapshot()
 	return _u
 }
 
@@ -1278,6 +1431,21 @@ func (_u *PurchaseOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MaterialSpecSnapshot(); ok {
+		if err := purchaseorderitem.MaterialSpecSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_spec_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.material_spec_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SupplierItemNoSnapshot(); ok {
+		if err := purchaseorderitem.SupplierItemNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_item_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.supplier_item_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UnitNameSnapshot(); ok {
+		if err := purchaseorderitem.UnitNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "unit_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.unit_name_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ColorSnapshot(); ok {
 		if err := purchaseorderitem.ColorSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "color_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.color_snapshot": %w`, err)}
@@ -1375,6 +1543,24 @@ func (_u *PurchaseOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Purch
 	}
 	if _u.mutation.MaterialNameSnapshotCleared() {
 		_spec.ClearField(purchaseorderitem.FieldMaterialNameSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.MaterialSpecSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldMaterialSpecSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.MaterialSpecSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldMaterialSpecSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.SupplierItemNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldSupplierItemNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.SupplierItemNoSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldSupplierItemNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.UnitNameSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldUnitNameSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.UnitNameSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldUnitNameSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ColorSnapshot(); ok {
 		_spec.SetField(purchaseorderitem.FieldColorSnapshot, field.TypeString, value)

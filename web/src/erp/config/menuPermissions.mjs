@@ -114,7 +114,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/print-center',
       ...masterModulePaths,
       ...salesModulePaths,
-      '/erp/warehouse/shipping-release',
       '/erp/warehouse/shipments',
       '/erp/finance/receivables',
       '/erp/finance/invoices',
@@ -219,7 +218,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/warehouse/inbound',
       ...qualityModulePaths,
       '/erp/production/exceptions',
-      '/erp/warehouse/shipping-release',
     ]),
   },
   {

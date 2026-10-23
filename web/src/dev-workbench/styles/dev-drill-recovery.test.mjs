@@ -29,7 +29,7 @@ test('drill recovery page leads with the operational conclusion and evidence bou
   assert.doesNotMatch(page, /recentOperations|最近交付记录/u)
   assert.match(page, /查看交付记录/u)
   assert.match(page, /DEV_VERSION_CENTER_VIEW_HISTORY/u)
-  assert.match(page, /<details className="erp-dev-recovery-emergency">/u)
+  assert.match(page, /<details className="erp-dev-disclosure erp-dev-recovery-emergency">/u)
 })
 
 test('drill recovery page exposes business labels without executable high-risk placeholders', () => {

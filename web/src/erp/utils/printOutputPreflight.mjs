@@ -1,3 +1,4 @@
+import { isBusinessCurrency } from './businessCurrency.mjs'
 import {
   standardUnitForLabel,
   isQuantityTextWithinUnitPrecision,
@@ -48,6 +49,12 @@ const missing = (value) =>
 export function getPrintDraftProblems(template, draft = {}) {
   if (template?.runtime?.family !== 'contract') return []
   const problems = getContractClauseLimitProblems(draft.clauses)
+  if (
+    !missing(draft.currency) &&
+    !isBusinessCurrency(String(draft.currency).trim().toUpperCase())
+  ) {
+    problems.push('币种（CNY、USD 或 HKD）')
+  }
   const lines = Array.isArray(draft.lines) ? draft.lines : []
   lines.forEach((line, index) => {
     const unit = standardUnitForLabel(line.unit)

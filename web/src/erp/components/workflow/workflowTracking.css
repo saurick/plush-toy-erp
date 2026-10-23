@@ -320,3 +320,43 @@
   }
 
 }
+.erp-workflow-source-tracking ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-workflow-source-tracking li button {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid var(--erp-border, #dce5df);
+  border-radius: 8px;
+  color: var(--erp-text, #26352b);
+  background: var(--erp-surface-bg, #fff);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.erp-workflow-source-tracking li button > span:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-workflow-source-tracking li button > span:last-child {
+  color: var(--erp-text-muted, #64748b);
+}
+
+.erp-workflow-source-tracking li button:hover,
+.erp-workflow-source-tracking li button:focus-visible {
+  border-color: var(--erp-primary, #237234);
+  outline: 2px solid var(--erp-primary, #237234);
+  outline-offset: 2px;
+}

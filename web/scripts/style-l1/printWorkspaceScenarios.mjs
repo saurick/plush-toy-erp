@@ -278,10 +278,10 @@ export function createPrintWorkspaceScenarios({
     assert(
       metrics.foundPaper &&
         metrics.foundTable &&
-        metrics.paperPaddingLeft >= 18 &&
-        metrics.paperPaddingLeft <= 22 &&
-        metrics.paperPaddingRight >= 18 &&
-        metrics.paperPaddingRight <= 22 &&
+        metrics.paperPaddingLeft >= 22 &&
+        metrics.paperPaddingLeft <= 24 &&
+        metrics.paperPaddingRight >= 22 &&
+        metrics.paperPaddingRight <= 24 &&
         metrics.tableLeftGap <= metrics.paperPaddingLeft + 1 &&
         metrics.tableRightGap <= metrics.paperPaddingRight + 1 &&
         metrics.tableWidth >=
@@ -291,7 +291,7 @@ export function createPrintWorkspaceScenarios({
             2 &&
         metrics.tableScrollWidth <= metrics.tableClientWidth + 1 &&
         metrics.paperScrollWidth <= metrics.paperClientWidth + 1,
-      `${scenarioLabel} 纸面左右留白应收窄到 5mm 且表格不横向溢出: ${JSON.stringify(metrics)}`
+      `${scenarioLabel} 纸面左右留白应为 6mm 且表格不横向溢出: ${JSON.stringify(metrics)}`
     )
     if (screenshotName) {
       const paperLocator = page.locator(paperSelector).first()
@@ -462,6 +462,7 @@ export function createPrintWorkspaceScenarios({
       expectedLayouts = expectedNames.map(() => 'half'),
       expectedRequestedLayouts = expectedNames.map(() => 'auto'),
       expectedSegmentCounts = expectedNames.map(() => 1),
+      expectedRowGroups,
     }
   ) => {
     await page.waitForFunction(
@@ -557,26 +558,34 @@ export function createPrintWorkspaceScenarios({
           ).length || 0,
       }
     }, paperSelector)
-    const expectedRows = []
+    const expectedRows = expectedRowGroups ? [...expectedRowGroups] : []
     let pendingHalf = []
     const flushHalf = () => {
       if (!pendingHalf.length) return
       expectedRows.push({ layout: 'half', indexes: pendingHalf })
       pendingHalf = []
     }
-    expectedLayouts.forEach((layout, imageIndex) => {
-      if (layout === 'full') {
-        flushHalf()
-        expectedRows.push({ layout: 'full', indexes: [imageIndex] })
-        return
-      }
-      pendingHalf.push(imageIndex)
-      if (pendingHalf.length === 2) flushHalf()
-    })
+    if (!expectedRowGroups) {
+      expectedLayouts.forEach((layout, imageIndex) => {
+        if (layout === 'full') {
+          flushHalf()
+          expectedRows.push({ layout: 'full', indexes: [imageIndex] })
+          return
+        }
+        pendingHalf.push(imageIndex)
+        if (pendingHalf.length === 2) flushHalf()
+      })
+    }
     flushHalf()
     const expectedColumns = expectedRows.flatMap((row) =>
       row.indexes.map((_, columnIndex) =>
-        row.layout === 'full' ? 'full' : columnIndex === 0 ? 'left' : 'right'
+        row.layout === 'full'
+          ? 'full'
+          : columnIndex === 0
+            ? 'left'
+            : row.indexes.length === 3 && columnIndex === 1
+              ? 'middle'
+              : 'right'
       )
     )
 
@@ -618,8 +627,11 @@ export function createPrintWorkspaceScenarios({
     )
     assert(
       metrics.rows.every(
-        (row) =>
-          row.gridColumnCount === (row.layout === 'full' ? 1 : 2) &&
+        (row, index) =>
+          row.gridColumnCount ===
+            (row.layout === 'full'
+              ? 1
+              : Math.max(2, expectedRows[index].indexes.length)) &&
           row.itemTops.every((top) => Math.abs(top - row.top) <= 1) &&
           Math.abs(Math.max(...row.itemBottoms) - row.bottom) <= 1
       ),
@@ -1145,16 +1157,16 @@ export function createPrintWorkspaceScenarios({
         await expectText(page, '打开可编辑打印窗口')
         await expectText(page, '返回打印中心')
         await expectText(page, '受托方签字人')
-        await expectText(page, '加工项目')
+        await expectText(page, '工序名称')
         await expectText(page, '面*1')
-        const totalRow = page.locator('.erp-print-table__total')
+        const totalRow = page.locator('.erp-processing-contract-table__total')
         const totalValues = totalRow.locator('.erp-contract-table__total-value')
         assert.equal(
           (await totalValues.nth(0).innerText()).trim(),
           '',
           '混合“片 / 对”单位时不应伪造数量合计'
         )
-        await totalRow.getByText('45', { exact: true }).waitFor()
+        await totalRow.getByText('45.00', { exact: true }).waitFor()
       },
     },
     {
@@ -1171,7 +1183,7 @@ export function createPrintWorkspaceScenarios({
           signatureValueSelector:
             '.erp-material-contract-signature__name, .erp-material-contract-signature__date-value',
           signatureTextsToClear: ['签字人', '供应商签字人'],
-          signatureTextsToRetain: ['2026/2/28'],
+          signatureTextsToRetain: ['2026 年 2 月 28 日'],
         })
       },
     },
@@ -1189,7 +1201,7 @@ export function createPrintWorkspaceScenarios({
           signatureValueSelector:
             '.erp-processing-contract-signature__name-value, .erp-processing-contract-signature__date-value',
           signatureTextsToClear: ['签字人', '受托方签字人'],
-          signatureTextsToRetain: ['2025-06-08'],
+          signatureTextsToRetain: ['2025 年 06 月 08 日'],
         })
       },
     },
@@ -1287,7 +1299,7 @@ export function createPrintWorkspaceScenarios({
             '产品编号',
             '产品名称',
             '材料品名',
-            '款号',
+            '厂商料号',
             '规格',
             '单位',
             '单价',
@@ -1426,13 +1438,11 @@ export function createPrintWorkspaceScenarios({
         assert.deepEqual(
           {
             fontFamily: processingTitle.fontFamily,
-            fontSize: processingTitle.fontSize,
             fontWeight: processingTitle.fontWeight,
             letterSpacing: processingTitle.letterSpacing,
           },
           {
             fontFamily: materialTitle.fontFamily,
-            fontSize: materialTitle.fontSize,
             fontWeight: materialTitle.fontWeight,
             letterSpacing: materialTitle.letterSpacing,
           },
@@ -1441,8 +1451,11 @@ export function createPrintWorkspaceScenarios({
           )}`
         )
         assert(
-          Math.abs(processingTitle.height - materialTitle.height) <= 1,
-          `加工合同纸面标题高度应和采购合同纸面标题接近: ${JSON.stringify({
+          materialTitle.text === '合同订单' &&
+            processingTitle.text === '合同订单' &&
+            Math.abs(parseFloat(materialTitle.fontSize) - 44 / 3) < 0.1 &&
+            Math.abs(parseFloat(processingTitle.fontSize) - 40 / 3) < 0.1,
+          `两份合同标题文字及字号应符合各自源版式: ${JSON.stringify({
             materialTitle,
             processingTitle,
           })}`
@@ -1487,12 +1500,13 @@ export function createPrintWorkspaceScenarios({
         })
         await assertContractTableHeadersStaySingleLine(page, {
           tableSelector: '.erp-processing-contract-table',
+          maxLines: 2,
           expectedHeaders: [
             '委外加工订单号',
-            '来源订单编号',
-            '产品 / 材料编号',
-            '产品 / 材料名称',
-            '加工项目',
+            '产品订单编号',
+            '产品编号',
+            '产品名称',
+            '工序名称',
             '加工厂商',
             '工序类别',
             '单位',
@@ -1648,6 +1662,13 @@ export function createPrintWorkspaceScenarios({
 
           const firstBatch = createAppendixSVGFiles(template.key, 1, 5)
           const firstBatchNames = firstBatch.map((file) => file.name)
+          const sourceImageRows =
+            template.key === 'processing-contract'
+              ? [
+                  { layout: 'half', indexes: [0, 1, 2] },
+                  { layout: 'half', indexes: [3, 4] },
+                ]
+              : undefined
           await page
             .locator('[data-print-appendix-input]')
             .setInputFiles(firstBatch)
@@ -1659,6 +1680,7 @@ export function createPrintWorkspaceScenarios({
             templateTitle: template.title,
             paperSelector: template.paperSelector,
             expectedNames: firstBatchNames,
+            expectedRowGroups: sourceImageRows,
           })
           const appendix = page
             .locator(`${template.paperSelector} [data-print-appendix-images]`)
@@ -1691,6 +1713,9 @@ export function createPrintWorkspaceScenarios({
             expectedNames: namesWithLongImage,
             expectedLayouts: ['half', 'half', 'half', 'half', 'half', 'full'],
             expectedSegmentCounts: [1, 1, 1, 1, 1, 4],
+            expectedRowGroups: sourceImageRows
+              ? [...sourceImageRows, { layout: 'full', indexes: [5] }]
+              : undefined,
           })
           if (templateIndex !== 0) {
             await page.getByRole('button', { name: '移除末尾图片 6' }).click()

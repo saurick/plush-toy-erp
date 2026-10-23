@@ -69,6 +69,14 @@ type Shipment struct {
 	VolumeM3 *decimal.Decimal `json:"volume_m3,omitempty"`
 	// ShippingMark holds the value of the "shipping_mark" field.
 	ShippingMark *string `json:"shipping_mark,omitempty"`
+	// ReceivableAmountSnapshot holds the value of the "receivable_amount_snapshot" field.
+	ReceivableAmountSnapshot *decimal.Decimal `json:"receivable_amount_snapshot,omitempty"`
+	// QuotedFreightAmountSnapshot holds the value of the "quoted_freight_amount_snapshot" field.
+	QuotedFreightAmountSnapshot *decimal.Decimal `json:"quoted_freight_amount_snapshot,omitempty"`
+	// TaxAmountSnapshot holds the value of the "tax_amount_snapshot" field.
+	TaxAmountSnapshot *decimal.Decimal `json:"tax_amount_snapshot,omitempty"`
+	// TaxModeSnapshot holds the value of the "tax_mode_snapshot" field.
+	TaxModeSnapshot *string `json:"tax_mode_snapshot,omitempty"`
 	// FreightAmount holds the value of the "freight_amount" field.
 	FreightAmount *decimal.Decimal `json:"freight_amount,omitempty"`
 	// FreightCurrency holds the value of the "freight_currency" field.
@@ -138,13 +146,13 @@ func (*Shipment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case shipment.FieldGrossWeightKg, shipment.FieldVolumeM3, shipment.FieldFreightAmount, shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
+		case shipment.FieldGrossWeightKg, shipment.FieldVolumeM3, shipment.FieldReceivableAmountSnapshot, shipment.FieldQuotedFreightAmountSnapshot, shipment.FieldTaxAmountSnapshot, shipment.FieldFreightAmount, shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case shipment.FieldDeliverySnapshot:
 			values[i] = new([]byte)
 		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID, shipment.FieldVersion, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID, shipment.FieldPackageCount:
 			values[i] = new(sql.NullInt64)
-		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldTransportMethod, shipment.FieldCarrierName, shipment.FieldTrackingNo, shipment.FieldShippingMark, shipment.FieldFreightCurrency, shipment.FieldNote:
+		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldTransportMethod, shipment.FieldCarrierName, shipment.FieldTrackingNo, shipment.FieldShippingMark, shipment.FieldTaxModeSnapshot, shipment.FieldFreightCurrency, shipment.FieldNote:
 			values[i] = new(sql.NullString)
 		case shipment.FieldFinanceReleasedAt, shipment.FieldPlannedShipAt, shipment.FieldShippedAt, shipment.FieldCreatedAt, shipment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -331,6 +339,34 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ShippingMark = new(string)
 				*_m.ShippingMark = value.String
+			}
+		case shipment.FieldReceivableAmountSnapshot:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field receivable_amount_snapshot", values[i])
+			} else if value.Valid {
+				_m.ReceivableAmountSnapshot = new(decimal.Decimal)
+				*_m.ReceivableAmountSnapshot = *value.S.(*decimal.Decimal)
+			}
+		case shipment.FieldQuotedFreightAmountSnapshot:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field quoted_freight_amount_snapshot", values[i])
+			} else if value.Valid {
+				_m.QuotedFreightAmountSnapshot = new(decimal.Decimal)
+				*_m.QuotedFreightAmountSnapshot = *value.S.(*decimal.Decimal)
+			}
+		case shipment.FieldTaxAmountSnapshot:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field tax_amount_snapshot", values[i])
+			} else if value.Valid {
+				_m.TaxAmountSnapshot = new(decimal.Decimal)
+				*_m.TaxAmountSnapshot = *value.S.(*decimal.Decimal)
+			}
+		case shipment.FieldTaxModeSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field tax_mode_snapshot", values[i])
+			} else if value.Valid {
+				_m.TaxModeSnapshot = new(string)
+				*_m.TaxModeSnapshot = value.String
 			}
 		case shipment.FieldFreightAmount:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -533,6 +569,26 @@ func (_m *Shipment) String() string {
 	builder.WriteString(", ")
 	if v := _m.ShippingMark; v != nil {
 		builder.WriteString("shipping_mark=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ReceivableAmountSnapshot; v != nil {
+		builder.WriteString("receivable_amount_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.QuotedFreightAmountSnapshot; v != nil {
+		builder.WriteString("quoted_freight_amount_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.TaxAmountSnapshot; v != nil {
+		builder.WriteString("tax_amount_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.TaxModeSnapshot; v != nil {
+		builder.WriteString("tax_mode_snapshot=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

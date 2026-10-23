@@ -26,7 +26,7 @@ export default function DevDatabaseMigrationFlow() {
 
   return (
     <details
-      className="erp-dev-static-guidance erp-dev-database-migration-guide"
+      className="erp-dev-disclosure erp-dev-static-guidance erp-dev-database-migration-guide"
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>

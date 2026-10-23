@@ -1,4 +1,5 @@
 import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
 export function createTaskItemSemanticsScenarios({ assert }) {
   const now = Math.floor(Date.now() / 1000)
@@ -98,7 +99,7 @@ export function createTaskItemSemanticsScenarios({ assert }) {
       const customer = row(97302)
       await color.getByText('确认颜色', { exact: true }).waitFor()
       assert.equal(await color.locator('.erp-task-simulation').count(), 0)
-      const source = mobile ? color.locator('.erp-task-identity__source') : color.locator('td').nth(1)
+      const source = color.locator('.erp-task-identity__source')
       assert.match(await source.innerText(), /未关联业务单据/u)
       assert.doesNotMatch(await source.innerText(), /模拟任务|业务阻塞|样例-业务-01/u)
       assert.equal(await source.getByRole('button', { name: '复制单据编号', exact: true }).count(), 0)
@@ -169,8 +170,10 @@ function createTaskItemLayoutScenarios({ assert }) {
     { mobile: true, width: 320, theme: 'light' },
     { mobile: true, width: 390, theme: 'dark' },
     { mobile: false, width: 1440, theme: 'light' },
+    { mobile: false, width: 1056, theme: 'light' },
+    { mobile: false, width: 1056, theme: 'light', workbench: true },
     { mobile: true, width: 390, theme: 'light', restricted: true },
-  ].map(({ mobile, width, theme, restricted = false }) => {
+  ].map(({ mobile, width, theme, restricted = false, workbench = false }) => {
     const now = Math.floor(Date.now() / 1000)
     const product = { kind: 'product', name: '示例狐狸', code: 'FOX-1', product_id: 1, image_attachment_id: 880001, order_no: 'SO-001' }
     const rabbit = { kind: 'product', name: '示例挂兔', code: 'RABBIT-2', product_id: 2, image_attachment_id: 0 }
@@ -184,14 +187,14 @@ function createTaskItemLayoutScenarios({ assert }) {
       { id: 97404, task_name: '核对包装齐套资料', source_type: 'production_order', display_context: { available: true, source_no: 'PROD-004', items: [product, material] } },
       { id: 97405, task_name: '核对收款说明', source_type: 'finance_payment', display_context: { available: true, source_no: 'PAY-005', items: [] } },
       { id: 97406, task_name: '重新核对关联资料', display_context: { available: false, source_no: 'STALE-SOURCE', items: [{ ...product, name: '不可展示的旧产品', code: 'STALE-CODE' }] } },
-      { id: 97407, task_name: '核对联名周年限定礼盒的包装与海外交付资料', blocked_reason: mobile ? '等待客户确认多语言说明、收货地址及包装资料。'.repeat(3) : '', task_status_key: mobile ? 'blocked' : 'ready', display_context: { available: true, source_no: 'SO-2026-OVERSEAS-LONG-007', items: [{ ...product, name: '森林系列刺绣公仔与可拆卸背包配件套装'.repeat(mobile ? 2 : 5) }] } },
+      { id: 97407, task_name: '核对联名周年限定礼盒的包装与海外交付资料', blocked_reason: mobile ? '等待客户确认多语言说明、收货地址及包装资料。'.repeat(3) : '', task_status_key: mobile ? 'blocked' : 'ready', display_context: { available: true, source_no: 'SO2026OVERSEASLONGCUSTOMERREFERENCE000000000007ANNIVERSARYLIMITEDCOLLECTION000000007', items: [{ ...product, code: 'PRODUCT2026ANNIVERSARYOVERSEAS000000000007', name: '森林系列刺绣公仔与可拆卸背包配件套装'.repeat(mobile ? 2 : 5) }] } },
       { id: 97408, task_name: '核对产品图片', display_context: { available: true, source_no: 'SHIP-008', items: [{ ...product, product_id: 8, image_attachment_id: 880008, name: '失败重试产品' }] } },
     ].map((entry, index) => ({ ...base, ...entry, created_at: now - index, task_code: `STYLE-L1-ITEM-LAYOUT-${entry.id}` }))
     const downloads = new Map()
-    const actions = ['workflow.task.read', 'mobile.sales.access', ...(restricted ? [] : ['product.read'])]
+    const actions = ['workflow.task.read', 'mobile.sales.access', ...(workbench ? ['erp.workbench.read'] : []), ...(restricted ? [] : ['product.read'])]
     return {
-      name: `task-item-layout-${mobile ? 'mobile' : 'desktop'}-${width}-${theme}${restricted ? '-restricted' : ''}`,
-      path: mobile ? '/m/sales/tasks' : '/erp/task-board?mode=todo&lane=actionable',
+      name: `task-item-layout-${mobile ? 'mobile' : workbench ? 'workbench' : 'desktop'}-${width}-${theme}${restricted ? '-restricted' : ''}`,
+      path: mobile ? '/m/sales/tasks' : workbench ? '/erp/dashboard' : '/erp/task-board?mode=todo&lane=actionable',
       auth: 'admin',
       themeMode: theme,
       viewport: { width, height: mobile ? 844 : 1000 },
@@ -224,14 +227,13 @@ function createTaskItemLayoutScenarios({ assert }) {
         await row(97405).getByText('未关联产品／物料', { exact: true }).waitFor()
         assert.equal(await row(97405).locator('.erp-task-identity__code').count(), 0)
         await row(97405).getByText('未设置截止', { exact: true }).waitFor()
-        assert.equal(await row(97405).locator('.erp-task-timing time').count(), 0)
+        assert.equal(await row(97405).locator('.erp-task-timing [data-task-time="due"] time').count(), 0)
         assert.equal(await row(97406).getByText('关联单据已不可用', { exact: true }).count(), 1)
         assert.doesNotMatch(await row(97406).innerText(), /不可展示的旧产品|STALE-/u)
         const boxes = []
         for (const id of [97401, 97402, 97403, 97404, 97405]) {
           boxes.push(await row(id).evaluate((node) => {
             const rect = node.getBoundingClientRect()
-            const relative = (selector) => { const part = node.querySelector(selector)?.getBoundingClientRect(); return part ? part.top - rect.top : null }
             const footer = node.querySelector('.erp-task-card__footer')
             const textBounds = (element) => {
               const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
@@ -248,27 +250,43 @@ function createTaskItemLayoutScenarios({ assert }) {
             const body = node.querySelector('.erp-task-identity__card-body')
             const item = body.querySelector('.erp-task-identity__item').getBoundingClientRect()
             const spacing = footer ? {
-              sourceToDivider: footer.getBoundingClientRect().top - textBounds(node.querySelector('.erp-task-identity__source')).bottom,
+              bodyToDivider: footer.getBoundingClientRect().top - body.getBoundingClientRect().bottom,
               dividerToText: textBounds(footer).top - footer.getBoundingClientRect().top,
               bottomSpace: rect.bottom - textBounds(footer).bottom,
               imageToSummaryCenter: Math.abs(image.top + image.height / 2 - item.top - item.height / 2),
             } : null
-            return { height: rect.height, imageSize: image.width, association: body.getBoundingClientRect().height, source: relative('.erp-task-identity__source'), footer: relative('.erp-task-card__footer'), spacing, overflow: node.scrollWidth > node.clientWidth + 1 }
+            return { height: rect.height, imageSize: image.width, imageHeight: image.height, association: body.getBoundingClientRect().height, spacing, overflow: node.scrollWidth > node.clientWidth + 1 }
           }))
         }
-        const compactTable = !mobile && await page.evaluate(() => document.documentElement.dataset.erpDensity === 'compact')
-        if (compactTable) {
-          assert(boxes.every((box) => box.height >= 76 && box.height <= 80), `紧凑表格保留关联清单触区，普通行维持 76–80px：${JSON.stringify(boxes)}`)
-        } else {
-          assert(Math.max(...boxes.map((box) => box.height)) - Math.min(...boxes.map((box) => box.height)) <= 1, `五类常规条目应等高：${JSON.stringify(boxes)}`)
-        }
-        const imageSize = compactTable ? 48 : 64
-        assert(boxes.every((box) => !box.overflow && box.association >= imageSize && box.imageSize === imageSize))
+        const imageSize = 64
+        assert(boxes.every((box) => !box.overflow && box.association >= imageSize && box.imageSize === imageSize && box.imageHeight === imageSize))
         assert.equal(await page.locator('.erp-task-product-image__zoom').count(), 0)
-        if (mobile) for (const part of ['source', 'footer']) assert(Math.max(...boxes.map((box) => box[part])) - Math.min(...boxes.map((box) => box[part])) <= 1, `${part} 应对齐：${JSON.stringify(boxes)}`)
         if (mobile) {
-          assert(boxes.every((box) => box.spacing.sourceToDivider <= 10.5 && box.spacing.dividerToText <= 10.5 && box.spacing.bottomSpace <= 18), `按文字边界校验留白，窄屏不预留空白第二行：${JSON.stringify(boxes)}`)
+          assert(boxes.every((box) => box.spacing.bodyToDivider >= 0 && box.spacing.bodyToDivider <= 4.5 && box.spacing.dividerToText <= 10.5 && box.spacing.bottomSpace <= 18), `关联区之后直接衔接底栏，换行只由实际内容撑高：${JSON.stringify(boxes)}`)
           assert(boxes.every((box) => box.spacing.imageToSummaryCenter <= 1), `图像与关联摘要在占位区内居中：${JSON.stringify(boxes)}`)
+        }
+        for (const id of [97401, 97403, 97405, 97406, 97407]) {
+          const geometry = await row(id).evaluate((node) => {
+            const box = (element) => element?.getBoundingClientRect().toJSON()
+            const body = node.querySelector('.erp-task-identity__card-body')
+            const metadata = body.querySelector('.erp-task-identity__metadata')
+            const code = metadata.querySelector('.erp-task-identity__code')
+            const source = metadata.querySelector('.erp-task-identity__source')
+            return { image: box(body.querySelector('.erp-task-product-image')), body: box(body), metadata: box(metadata), code: box(code), source: box(source), codeText: code?.textContent, sourceText: source.textContent, lineHeight: parseFloat(getComputedStyle(source).lineHeight) }
+          })
+          assert(geometry.source.left >= geometry.image.right + 9, `来源始终位于图片右侧：${JSON.stringify(geometry)}`)
+          assert(geometry.source.right <= geometry.body.right + 1 && geometry.source.bottom <= geometry.body.bottom + 1, '长单号完整包在关联区内')
+          if (geometry.code) {
+            const sameRow = Math.abs(geometry.code.top - geometry.source.top) <= 4
+            assert(sameRow ? geometry.source.left >= geometry.code.right + 11 : geometry.source.top >= geometry.code.bottom + 1, '编号与来源同行或整组换行，不能重叠')
+            assert(geometry.code.right <= geometry.body.right + 1, '长产品编号不横向溢出')
+            if (!mobile && width === 1440 && id === 97403) assert(sameRow, '空间足够时编号与来源同行')
+            if (id === 97407) {
+              assert.equal(geometry.codeText.replace(/^产品编号\s*/u, ''), 'PRODUCT2026ANNIVERSARYOVERSEAS000000000007')
+              assert.match(geometry.sourceText, /SO2026OVERSEASLONGCUSTOMERREFERENCE000000000007ANNIVERSARYLIMITEDCOLLECTION000000007/u)
+              assert(geometry.source.height > geometry.lineHeight * 1.5, '无分隔符的超长单号也能在字段内换行')
+            }
+          }
         }
         assert((await row(97407).boundingBox()).height > boxes[0].height, '长名称与受阻原因应自然增高')
         assert.equal(await page.locator('button button').count(), 0)
@@ -280,6 +298,10 @@ function createTaskItemLayoutScenarios({ assert }) {
           return
         }
         const trigger = row(97402).getByRole('button', { name: '查看3 款产品', exact: true })
+        if (!mobile) {
+          await assertTaskCopy(page, row(97402).getByRole('button', { name: '复制单据编号', exact: true }), 'SHIP-002')
+          assert.equal(await trigger.getAttribute('aria-expanded'), 'false', '复制来源不会打开关联清单')
+        }
         await trigger.click()
         const list = page.locator('.erp-task-linked-items-modal')
         await list.getByText('示例挂兔', { exact: true }).waitFor()

@@ -154,7 +154,7 @@ export function resolveShipmentActionAvailability({
         applicable: status === ShipmentStatus.DRAFT && releaseStatus === ShipmentFinanceReleaseStatus.PENDING,
         busy,
         unavailableReason: '只有待放行的出货草稿可以核对审批',
-        busyReason: '当前操作完成后可核对出货审批',
+        busyReason: '当前操作完成后可提交出货审批',
       })
     case 'ship':
       return resolveAction({

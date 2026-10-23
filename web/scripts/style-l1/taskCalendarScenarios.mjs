@@ -152,6 +152,23 @@ revision,
         else await page.locator(switcher).waitFor()
         assert.equal(await page.getByRole('region', { name: '待办日历', exact: true }).count(), 0)
         await verifyLayout('list')
+        let listPageTaskIDs = []
+        if (!mobile) {
+          const rows = page.locator('.erp-task-board-lane--all tr[data-task-id]')
+          await rows.first().waitFor()
+          assert.equal(await rows.count(), 20, '待我处理默认显示全部待办的完整分页')
+          const firstTaskID = await rows.first().getAttribute('data-task-id')
+          await page.locator('.erp-task-pagination .ant-pagination-item-2').click()
+          await page.waitForFunction((previousID) => {
+            const first = document.querySelector('.erp-task-board-lane--all tr[data-task-id]')
+            return first && first.dataset.taskId !== previousID
+          }, firstTaskID)
+          listPageTaskIDs = await rows.evaluateAll((nodes) => nodes.map((node) => node.dataset.taskId))
+          assert.equal(listPageTaskIDs.length, 20, '全部待办第二页保持每页条数')
+          await page.locator(switcher).evaluate((node) => {
+            for (let parent = node.parentElement; parent; parent = parent.parentElement) parent.scrollTop = 0
+          })
+        }
         const initial = { started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = initial
         if (mobile) await page.getByRole('button', { name: '切换到日历', exact: true }).click()
@@ -185,6 +202,14 @@ revision,
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
         assert(calls.every((call) => !call.due), 'calendar requests do not retain list deadline conditions')
         if (!mobile) {
+          assert(calls.every((call) => !call.lane_key && !call.sort && call.offset === 0), '日历查询独立于列表分类、排序和分页')
+          await verifyMobileNavigationMotion(page, assert, switcher, 0, true)
+          const rows = page.locator('.erp-task-board-lane--all tr[data-task-id]')
+          await rows.first().waitFor()
+          assert.equal(new URL(page.url()).searchParams.get('page'), '2', '从日历返回保留全部待办页码')
+          assert.deepEqual(await rows.evaluateAll((nodes) => nodes.map((node) => node.dataset.taskId)), listPageTaskIDs, '从日历返回恢复同一页待办')
+          await verifyMobileNavigationMotion(page, assert, switcher, 1, true)
+          await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
           await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
           const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
           assert.equal(await filters.getByText('截止时间', { exact: true }).count(), 0, 'desktop calendar has one date condition')

@@ -10,10 +10,10 @@
 
 | 资源 | 放置 | 原因 | 恢复边界 |
 | --- | --- | --- | --- |
-| GitLab config、PostgreSQL、repositories | GitLab 宿主 SSD：`/srv/gitlab` | 随机 I/O 和数据库延迟敏感 | 由 GitLab backup + config archive 恢复 |
+| GitLab config、PostgreSQL、repositories | GitLab 宿主登记存储：`/srv/gitlab` | 实际设备以宿主挂载预检为准 | 由 GitLab backup + config archive 恢复 |
 | CI artifacts、Package Registry | GitLab 宿主 RAID5：`/srv/raid5/gitlab/artifacts`、`/srv/raid5/gitlab/packages` | 大文件容量优先；正式制品通过原 GitLab URL 读取 | 保留正式 Release、源码、演练与门禁证据，纳入 GitLab backup |
 | GitLab 本地备份生成、临时文件与归档 | GitLab 宿主 RAID5：`/srv/raid5/gitlab/backups/repository` | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive、checksum 与状态回执同属 `backups`；只承担快速恢复输入，RAID 不是异机备份 |
-| GitLab 加密异机副本 | 独立设备的精确挂载点：`/mnt/plush-gitlab-offsite/gitlab` | 本地 backup、config 与 checksum 全部经 `age` 加密后再原子登记 | 私钥不放 GitLab 宿主；异机包校验通过仍不替代同版本完整恢复演练 |
+| GitLab 加密独立副本 | Mac 外盘 PD-SSD：按 UUID 绑定的 `plush-toy-erp-backups/gitlab` | Mac 拉取服务器完整 age 包、校验后原子落盘，保留最近 7 份 | 私钥不放 GitLab 宿主；完整恢复从该实际外盘副本执行 |
 | Runner VM 系统盘与 job cache | GitLab 宿主 SSD 上的独立 KVM qcow2 | 构建 I/O 与 GitLab 数据隔离 | Runner 可重建，不保存业务真源 |
 | 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
 
@@ -21,7 +21,7 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 ### Storage retention
 
-备份保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、异机精确挂载、独立文件系统、固定 marker 与唯一 `age` recipient；任一缺失即阻断，不回退到 SSD 或同机 RAID。只有本地归档和四个加密文件全部完成后才原子登记异机目录并写成功状态。Compose 不自动创建缺失的冷数据目录。
+服务器本地成套归档和加密交接包分别保留最近 7 份，升级前恢复点额外保护，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、登记 export 目录、来源 marker 与唯一 `age` recipient。只有本地归档和四个加密文件全部完成后才原子发布 export 包；外盘复制成功另由 Mac 回执证明。PD-SSD 独立保留最近 7 份及显式保护项，来源删除不传播。清理只处理完整包的载荷，checksum、回执和轮换账本长期保留；配置备份同时包含轮换记录。自动任务与安装步骤见 [统一轮换](../../../scripts/deploy/README.md#制品与备份自动轮换)。Compose 不自动创建缺失的冷数据目录。
 
 已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
 
@@ -126,9 +126,9 @@ CI 冷启动因此不再承担公网下载。运行包合同固定 `playwright 1
 - `runner-vm.sh`：唯一 VM provisioning 入口；显式验证 vCPU、内存、磁盘参数形状，不替工作负载猜测固定内存下限，并从唯一容量参数读取初始槽位和安全上限；默认只读预览，失败只回滚本操作创建的 domain/volume。
 - `runner-capacity.env`：唯一受版本控制的当前槽位参数；VM 创建、live helper 和 CI evidence 只从该参数建立一致性证明。
 - `runner-capacity.sh`：VM 内唯一槽位更新 helper；锁定旧值和 idle 状态，原子更新、服务读回并生成脱敏容量回执。
-- `gitlab-backup.sh`：生成 GitLab 应用备份、config archive、本地 checksum、状态回执和加密异机副本；默认只预览，必须显式给出 execute 与精确确认串。
+- `gitlab-backup.sh`：生成 GitLab 应用备份、config archive、本地 checksum、状态回执和加密交接包；默认只预览，必须显式给出 execute 与精确确认串。
 - `gitlab-backup-verify.sh`：校验本地归档、checksum 与当前 GitLab 自检，不会覆盖在线实例。
-- `gitlab-backup-health.sh`：检查最近成功状态、36 小时新鲜度和对应加密异机包。
+- `gitlab-backup-health.sh`：检查最近成功状态、36 小时新鲜度和对应加密交接包；不冒充外盘复制状态。
 - `gitlab-offsite-backup-verify.sh`：在持有私钥的独立恢复主机解密并校验异机包、归档和身份；不连接或覆盖在线 GitLab。
 - `gitlab-backup-failure-notify.sh`：通过 root-only curl 配置向唯一 HTTPS receiver 发送脱敏失败事件；`--check` 只验证配置，不发送。
 - `systemd/`：版本化每日 timer、备份 service、失败通知 unit 与兼容 drop-in；安装不会由仓库或普通 CI 自动执行。
@@ -239,78 +239,47 @@ GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提�
 
 ## 备份、恢复和升级
 
-Compose 固定 GitLab CE `19.3.5` 的镜像 digest；该版本包含 [GitLab 官方 2026-10-12 紧急安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-4-2-released/)。该补丁包含数据库及部署后迁移，单机升级需要短暂停机；配置版本不替代目标机运行版本与升级后检查。
+Compose 固定 GitLab CE `19.3.6` 的官方镜像 digest；该版本包含 [GitLab 官方 2026-10-21 紧急安全补丁](https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/)。本次沿用 `19.3` 系列，补丁包含常规数据库迁移，单机升级需要短暂停机。升级前须验证完整备份及匹配配置的独立恢复，并在停写后保留同版本数据库备份、secrets、原 Compose 和旧镜像；配置版本不替代目标机运行版本与升级后检查。
 
-### 当前暂缓决策 / Offsite deferment
+### PD-SSD 自动加密副本 / External Backup Replica
 
-项目负责人已于 2026-09-26 明确决定：在真实异机或独立设备尚未提供期间，GitLab 加密异机备份保持未配置、未安装、未启用。这是有意暂缓，不是后续会话需要反复确认的当前阻塞；不得填写占位挂载、占位 `age` recipient 或占位告警地址，也不得用同机 RAID、NVMe 或普通目录冒充异机副本。该决定不阻断与异机备份无关的代码验证、发布和测试环境工作。
+GitLab 的完整备份由 r740xd 每日生成，Mac 经 SSH 拉取加密包到 PD-SSD。PD-SSD 是与 GitLab 宿主分离的设备；服务器的 `export` 目录只负责交接，不能作为已完成外盘复制的证明。此前等待异机设备的暂缓决定已由项目负责人 2026-10-23 的启用授权替代；无需把 Mac 外盘直接挂载到 GitLab 宿主，也不以尚未配置 HTTP 通知端为备份启用前置。
 
-后续 Codex 会话只在以下任一条件出现时重新打开本项：项目负责人明确说明异机或独立设备已提供；项目负责人明确要求启用或重新评审异机备份；正式生产目标即将承载不可重建数据。重新打开后仍须从实时挂载、密钥保管、告警接收端、备份窗口和恢复方案开始核对，不能沿用旧现场结论。
+| 环节 | 合同与状态来源 |
+| --- | --- |
+| GitLab 原生备份 | 数据库、仓库、CI/CD 制品、Package、Release 与部署记录；匹配的 `/etc/gitlab`、secrets、实际 Compose / env、镜像 digest 和 GitLab 版本另存配置归档 |
+| 服务器加密交接 | `GITLAB_BACKUP_EXPORT_DIR=/srv/raid5/gitlab/backups/export`；固定来源标记 `plush.backup-source/v1:gitlab-r740xd`。每包四个 age 文件及密文校验清单，完整后原子发布 |
+| 独立介质 | Mac 私有配置通过 PD-SSD 的 UUID 绑定 `plush-toy-erp-backups/gitlab`；不以卷名判断身份，不覆盖现有 ERP 目录 |
+| 保留与容量 | 外盘保留最近 7 个完整包；转移前检查全部缺失包大小加 64 GiB 余量，每个文件前复查。新包全部验证后才清理索引内的超期整包；空间不足、损坏或未知内容均保留现有副本并报告失败 |
+| 定时 | 服务器每日 03:30 UTC（随机延迟最多 30 分钟）；Mac 每日 14:15 本地时间、登录或挂载时同步。Mac 休眠 / 离线时不保证取得新副本，36 小时新鲜度检查会识别陈旧 |
+| 恢复 | 首次及每 30 天从外盘实际副本解密，向 r740xd 的专属隔离目录上传明文，在相同 digest / 版本的无网络、无宿主端口 GitLab 容器完整恢复；检查仓库 refs / fsck、流水线与部署记录、制品、迁移、secrets 和 readiness，清理成功后才记 passed |
+| 凭据 | age 私钥仅由恢复端保管，文件权限 0600，另按个人密钥保管方式留存；服务器只有 recipient 公钥。私钥不得放在同一外盘明文备份内、仓库或日志中 |
+| 可观测 | 服务器 `latest-status.env` 只证明本地备份和加密交接；Mac `latest-operation.json`、`latest-sync.json`、`latest-restore.json` 分别证明执行、复制和恢复。`latest-restore-attempt.json` 单独记录最近恢复尝试；失败保留原成功回执，并在下次运行重新验证，不会被只同步成功掩盖。HTTP 通知可以额外配置，但不替代这些真实状态 |
 
-现有本地备份 timer 与异机能力分开判断：不得把本地备份写成异机闭环，也不得仅因本项暂缓而自动停用本地 timer。本地 timer 失败、备份陈旧或恢复不可验证时，作为本地备份故障单独报告和处理，不重新追问尚未触发的异机前置。
+首次接入按以下顺序执行；已安装任务更新时先保留原 unit、配置、运行制品及回执：
 
-备份启用前必须先准备独立存储和外部通知接收端；没有真实前置时保持现有服务不变，不能填占位值冒充完成：
-
-1. 把异机或独立设备直接挂载到 `.env` 登记的精确目录，确认它与 `/srv/raid5` 的 filesystem device 不同，并在挂载根写入内容严格为 `plush-gitlab-offsite-v1` 的 `.plush-gitlab-offsite-target`。
-2. 在独立恢复主机生成并保管 `age` 私钥；GitLab 宿主只安装 `age` 和单个公钥 recipient 文件 `/etc/plush-gitlab/backup-age-recipient.txt`，文件必须 root 所有且不可被 group/world 写入。
-3. 把 `backup-alert.curl.example` 复制为 `/etc/plush-gitlab/backup-alert.curl`，替换为真实 HTTPS receiver，并保持 `root:root 0600`。认证 header 只放该文件，不进入 unit 参数、仓库或日志。
-4. 先运行只读预检和通知配置检查；两者都通过后，才在独立备份窗口安装脚本和 unit：
+1. 在恢复端生成 age identity，并把单个 recipient 公钥安装到服务器 `/etc/plush-gitlab/backup-age-recipient.txt`。确认 RAID、export 的精确目录和来源标记；私有 env 取 `.env.example` 的正式键，不回显配置秘密。
+2. 用 `gitlab-backup.sh --env-file <private.env>` 只读预检。在无活动 CI、升级或其他备份的窗口加 `--execute --confirm BACKUP_GITLAB:r740xd:gitlab.saurick.me`，随后运行 `gitlab-backup-verify.sh` 和 `gitlab-backup-health.sh`，三者都通过后才启用更新后的 timer。
+3. 把本目录三个脚本分别安装为 `/usr/local/libexec/plush-gitlab-backup.sh`、`plush-gitlab-backup-verify.sh`、`plush-gitlab-backup-health.sh`；安装 `systemd/plush-gitlab-backup.service` / `.timer`，用 `systemd-analyze verify` 检查并 `daemon-reload`。沿用既有 timer；首次启用需考虑 `Persistent=true` 的补跑。
+4. 在 Mac 从 `backup-replica.example.json` 创建仓库外的私有配置，填写真实 SSH、UUID、目录和 identity。大包复制和恢复优先使用已验证同一主机密钥 / 容器身份的局域网 SSH 入口，并做有界吞吐测试；只调整备份私有配置，不改通用远程入口。该入口不可达时保留已有副本并报告失败。使用统一副本入口：
 
    ```bash
-   sudo bash server/deploy/gitlab/gitlab-backup.sh
-   sudo bash server/deploy/gitlab/gitlab-backup-failure-notify.sh \
-     --unit plush-gitlab-backup.service \
-     --config /etc/plush-gitlab/backup-alert.curl \
-     --check
-
-   sudo install -d -o root -g root -m 0700 /etc/plush-gitlab
-   sudo install -d -o root -g root -m 0755 /usr/local/libexec
-   sudo install -o root -g root -m 0600 server/deploy/gitlab/.env /etc/plush-gitlab/gitlab.env
-   sudo install -o root -g root -m 0755 \
-     server/deploy/gitlab/gitlab-backup.sh \
-     server/deploy/gitlab/gitlab-backup-verify.sh \
-     server/deploy/gitlab/gitlab-backup-health.sh \
-     server/deploy/gitlab/gitlab-backup-failure-notify.sh \
-     /usr/local/libexec/
-   sudo install -d -o root -g root -m 0755 \
-     /etc/systemd/system/plush-gitlab-backup.service.d
-   sudo install -o root -g root -m 0644 \
-     server/deploy/gitlab/systemd/plush-gitlab-backup.service \
-     server/deploy/gitlab/systemd/plush-gitlab-backup.timer \
-     server/deploy/gitlab/systemd/plush-gitlab-backup-failure@.service \
-     /etc/systemd/system/
-   sudo install -o root -g root -m 0644 \
-     server/deploy/gitlab/systemd/plush-gitlab-backup.service.d/20-alert.conf \
-     /etc/systemd/system/plush-gitlab-backup.service.d/20-alert.conf
-   sudo systemd-analyze verify \
-     /etc/systemd/system/plush-gitlab-backup.service \
-     /etc/systemd/system/plush-gitlab-backup.timer \
-     /etc/systemd/system/plush-gitlab-backup-failure@.service
-   sudo systemctl daemon-reload
+   node scripts/deploy/backup-replica/cli.mjs init --config <private-config.json>
+   node scripts/deploy/backup-replica/cli.mjs sync --config <private-config.json>
+   node scripts/deploy/backup-replica/cli.mjs verify --config <private-config.json>
+   node scripts/deploy/backup-replica/cli.mjs install --config <private-config.json>
+   node scripts/deploy/backup-replica/cli.mjs check --config <private-config.json>
    ```
 
-首次受控执行会生成本地归档和加密异机包，属于高 I/O 运维动作，必须放在无活动 CI、升级或其他备份的窗口：
+   `install` 安装已验证内容的不可变快照并记录 SHA-256、基础提交和真实来源状态；Git 提交与备份工具运行部署分别留痕，不要求为了恢复备份先提交共享工作区。`check` 是只读健康检查：介质身份、索引 / 文件大小、最近执行、新鲜度和恢复期限全部通过才返回 0；它不替代 `sync` 的 SHA-256 校验和 `verify` 的完整恢复。安装后必须读回真实 launchd 首跑结果。
 
-```bash
-sudo /usr/local/libexec/plush-gitlab-backup.sh \
-  --env-file /etc/plush-gitlab/gitlab.env \
-  --execute \
-  --confirm BACKUP_GITLAB:r740xd:gitlab.saurick.me
-sudo /usr/local/libexec/plush-gitlab-backup-verify.sh \
-  --env-file /etc/plush-gitlab/gitlab.env
-sudo /usr/local/libexec/plush-gitlab-backup-health.sh \
-  --env-file /etc/plush-gitlab/gitlab.env
-```
+5. 失败时保留最近成功备份和回执，查看 Mac 状态与服务器 journal / 恢复回执中的阶段，再修复并实际重跑；不以刷新状态、删除失败记录或切换内盘伪装恢复。旧 Linux `gitlab-offsite-backup-verify.sh` 只支持独立 Linux 挂载上的归档级解密检查，不是 Mac 主路径，也不能替代完整恢复。
 
-把对应异机目录提供给独立恢复主机后，使用私钥运行 `gitlab-offsite-backup-verify.sh --backup-dir <精确挂载点> --age-identity-file <私钥文件> --report <回执路径>`；报告的边界只是“加密副本和归档完整”。
-
-随后仍需每季度把同一 GitLab backup、config archive 和 checksum 放入一次性同版本 VM，按 GitLab 官方恢复流程演练。只有登录、项目 clone、pipeline artifact 和 Release package 都读回后，恢复证据才算完整。在线 health、归档校验或异机解密都不能替代恢复演练。
-
-首次手工闭环通过后再执行 `systemctl enable plush-gitlab-backup.timer` 和 `systemctl start plush-gitlab-backup.timer`；`Persistent=true` 可能立即补跑错过的日程，因此启动 timer 也必须位于同一备份窗口。
+每次 GitLab 升级前都必须新建匹配当前版本的完整备份，复制到 PD-SSD 并强制执行 `verify`；升级后新建并同步新版本备份，再强制 `verify`，同时检查定时配置和备份工具内容身份。不能沿用旧版本恢复回执或等待 30 天周期。普通 ERP / 工作台发布按[部署备份约定](../../../docs/部署约定.md#部署后的备份闭环--deployment-backup)核对对应数据与回执，不为无关版本切换重复执行全量 GitLab 恢复。
 
 升级前先固定当前 compose digest、GitLab 版本、最新已验证备份和回滚窗口；按 GitLab 支持的逐版本升级路径修改 digest。不得使用浮动 `latest`，不得在失败时删除 `/srv/gitlab` 或 RAID5 备份。
 
-升级已执行数据库迁移时，回滚须在旧版本镜像中恢复同版本的升级前数据库备份，并保留匹配的 secrets 和配置；不能只切回旧镜像。具体步骤遵循 [GitLab Docker 回滚流程](https://docs.gitlab.com/update/package/downgrade/#roll-back-a-docker-instance)，恢复后重新验证迁移、就绪状态、仓库和制品读取。
+升级已执行数据库迁移时，回滚须在旧版本镜像中恢复同版本的升级前数据库备份，并保留匹配的 secrets 和配置；不能只切回旧镜像。旧容器必须完成自动 reconfigure 并通过完整 readiness，再停止 Puma / Sidekiq 后恢复数据库；仅 PostgreSQL 可连接不能证明初始化完成，否则恢复会与启动配置并发。具体步骤遵循 [GitLab Docker 回滚流程](https://docs.gitlab.com/update/package/downgrade/#roll-back-a-docker-instance)，恢复后重新验证迁移、就绪状态、仓库和制品读取。
 
 ## 运行态证据与重建边界
 
@@ -359,4 +328,6 @@ GitLab 宿主的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置�
 | release 身份不一致 | 终止 job，保留 package/release 证据，使用新版本修复 | 覆盖同名 asset/tag 或猜 digest |
 | backup/restore 未通过 | 阻断 GitLab 升级和正式依赖切换 | 把 RAID 健康当恢复证据 |
 
-遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、异机副本或告警 receiver 未就绪、secret 可能落盘/输出、Runner 需要越过 VM、出现未评审的 GitHub 发布写路径、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。
+遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、本次恢复所需独立副本未就绪、secret 可能落盘/输出、Runner 需要越过 VM、出现未评审的 GitHub 发布写路径、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。
+
+GitLab 原生 `backup_keep_time` 固定为 `0`，避免按天数删除绕过当前 / 升级恢复点保护；文件数量由统一轮换器管理。新安装前先按 [轮换部署步骤](../../../scripts/deploy/README.md#制品与备份自动轮换) 安装固定运行时，定时备份完成后调用同一套校验和轮换。

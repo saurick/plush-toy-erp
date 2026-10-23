@@ -196,7 +196,7 @@ test('business page lineage: exactly covers every formal business module once', 
     (definition) => definition.pageKey
   )
 
-  assert.equal(formalModuleKeys.length, 24)
+  assert.equal(formalModuleKeys.length, 23)
   assert.equal(new Set(lineageKeys).size, lineageKeys.length)
   assert.deepEqual([...lineageKeys].sort(), [...formalModuleKeys].sort())
   assert.equal(getBusinessPageLineage('inbound')?.pageRole, 'source_generated')
@@ -536,7 +536,7 @@ test('business page lineage: source-driven producers match domain-generate flows
   const shipment = getBusinessPageLineage('shipments')
   assert.equal(shipment?.pageRole, BUSINESS_PAGE_ROLES.FACT_OWNER)
   assert.equal(shipment?.allowsGenericPageCreate, true)
-  assert.deepEqual(shipment?.producerActions, ['create_shipment_with_items'])
+  assert.deepEqual(shipment?.producerActions, ['create_shipment_with_items', 'start_finished_goods_delivery_process'])
   assert.deepEqual(
     shipment?.incomingFlows
       .filter(
@@ -1096,15 +1096,14 @@ test('business page lineage: source lifecycle actions preserve every workflow pr
       'ship_shipment',
       BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION,
       'shipments',
-      'shipping-release'
+      'shipments'
     ),
     true,
-    'ship_shipment shipping-release projection'
+    'ship_shipment source document state'
   )
   for (const [flowType, toPageKey] of [
     [BUSINESS_FLOW_TYPES.FACT_REVERSAL, 'inventory'],
     [BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION, 'shipments'],
-    [BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION, 'shipping-release'],
   ]) {
     assert.equal(
       hasFlow('cancel_shipment', flowType, 'shipments', toPageKey),
@@ -1346,14 +1345,13 @@ test('business page lineage: workflow inboxes declare exact source task producer
 
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.pageKey),
-    ['production-scheduling', 'production-exceptions', 'shipping-release']
+    ['production-scheduling', 'production-exceptions']
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.taskGroups[0]),
     [
       'production_scheduling',
       'production_exception_decision_approval',
-      'shipment_finance_approval',
     ]
   )
 
@@ -1362,7 +1360,6 @@ test('business page lineage: workflow inboxes declare exact source task producer
     [
       ['production-orders'],
       ['production-orders', 'quality-inspections'],
-      ['shipments'],
     ]
   )
   assert.deepEqual(
@@ -1373,12 +1370,11 @@ test('business page lineage: workflow inboxes declare exact source task producer
         'submit_production_exception',
         'start_production_exception_approval_process',
       ],
-      ['start_finished_goods_delivery_process'],
     ]
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.sourceTypes),
-    [['production-orders'], ['production_exception_decision'], ['shipment']]
+    [['production-orders'], ['production_exception_decision']]
   )
   for (const definition of workflowDefinitions) {
     assert.equal(definition.taskGroups.length, 1)
@@ -1401,7 +1397,6 @@ test('business page registry describes the same source-generated workflow truth'
   const sourceRefs = [
     ['production-scheduling', 'production_orders'],
     ['production-exceptions', 'production_facts'],
-    ['shipping-release', 'shipments'],
   ]
   for (const [pageKey, sourceRef] of sourceRefs) {
     const definition = byKey.get(pageKey)

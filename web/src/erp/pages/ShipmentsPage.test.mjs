@@ -274,7 +274,7 @@ test('draft shipment can generate a source-bound finished-goods inspection', () 
 test('draft shipment starts the versioned finance approval process', () => {
   assert.match(source, /submitShipmentFinanceApprovalProcess\(\{/u)
   assert.match(source, /const canSubmitShipmentRelease = canRead && canCreate/u)
-  assert.match(source, />\s*核对出货审批\s*</u)
+  assert.match(source, />\s*提交出货审批\s*</u)
   assert.match(
     source,
     /action: 'release',[\s\S]{0,120}authorized: canSubmitShipmentRelease/u

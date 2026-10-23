@@ -583,8 +583,8 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
           sourceDocumentCount: 135,
           processRuntimeCount: 5,
           factCount: 500,
-          catalogReadyCount: 41,
-          catalogTargetCount: 51,
+          catalogReadyCount: 40,
+          catalogTargetCount: 50,
           browserChecksPending: 10,
           manualAcceptanceCompleted: false,
           cleanupSupported: false,
@@ -630,7 +630,7 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
     'passed'
   )
   assert.equal(passed.readback.runId, MANUAL_ACCEPTANCE_CORE_CONTRACT.runId)
-  assert.equal(passed.readback.catalogReadyCount, 41)
+  assert.equal(passed.readback.catalogReadyCount, 40)
   assert.equal(passed.readback.browserChecksPending, 10)
   assert.equal(passed.readback.cleanupSupported, false)
   assert.equal(passed.readback.manualAcceptanceCompleted, false)
@@ -674,7 +674,7 @@ test('real volume plans and readbacks pass the workbench while full acceptance r
           source: { 'sales_order.create': 450, 'purchase_order.create': 450, 'outsourcing_order.create': 450 },
           task: { processRuntimeCount: 5 },
           facts: { productionFacts: 45 },
-          readiness: { passedTargetData: 41, totalTargets: 51, notProvenTargetData: 10, queryChecksPassed: true, manualAcceptanceCompleted: false },
+          readiness: { passedTargetData: 40, totalTargets: 50, notProvenTargetData: 10, queryChecksPassed: true, manualAcceptanceCompleted: false },
         }[key] || {},
       })),
     },
@@ -853,8 +853,8 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
         sourceDocumentCount: 135,
         processRuntimeCount: 5,
         factCount: 500,
-        catalogReadyCount: 41,
-        catalogTargetCount: 51,
+        catalogReadyCount: 40,
+        catalogTargetCount: 50,
         browserChecksPending: 10,
         manualAcceptanceCompleted: false,
         cleanupSupported: false,
@@ -1108,8 +1108,8 @@ test('summary keeps legacy scenario receipts on disk but omits them from the cur
       sourceDocumentCount: 16,
       processRuntimeCount: 20,
       factCount: 14,
-      catalogReadyCount: 41,
-      catalogTargetCount: 51,
+      catalogReadyCount: 40,
+      catalogTargetCount: 50,
       browserChecksPending: 10,
       manualAcceptanceCompleted: false,
       cleanupSupported: false,
@@ -1439,7 +1439,7 @@ test('full acceptance receipt binds the latest chain contract and nine stage tim
   )
   assert.equal(readback.datasetDurationMs, 60_000)
   assert.equal(readback.stageTimings.length, 9)
-  assert.equal(readback.catalogTargetCount, 51)
+  assert.equal(readback.catalogTargetCount, 50)
   assert.throws(
     () =>
       validateAcceptanceReceipt(
@@ -1730,8 +1730,8 @@ test('a later authoritative scenario readback releases the resolved unknown outc
       sourceDocumentCount: 135,
       processRuntimeCount: 5,
       factCount: 500,
-      catalogReadyCount: 41,
-      catalogTargetCount: 51,
+      catalogReadyCount: 40,
+      catalogTargetCount: 50,
       browserChecksPending: 10,
       manualAcceptanceCompleted: false,
       cleanupSupported: false,

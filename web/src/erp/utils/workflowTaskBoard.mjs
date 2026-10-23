@@ -116,7 +116,6 @@ export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   pageSize: TASK_BOARD_FOCUS_PAGE_SIZE,
 })
 
-export const TASK_BOARD_OVERVIEW_LIMIT = 2
 export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
   {
     key: 'actionable',
@@ -406,10 +405,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
       : 'all',
     sourceType: normalizeFilterValue(filters.sourceType),
     lane,
-    sort:
-      lane === DEFAULT_TASK_BOARD_FILTERS.lane
-        ? DEFAULT_TASK_BOARD_FILTERS.sort
-        : normalizeKnownFilterValue(filters.sort, SORT_VALUES, 'smart'),
+    sort: normalizeKnownFilterValue(filters.sort, SORT_VALUES, 'smart'),
     mode,
     page: normalizePositiveInteger(filters.page),
     pageSize: normalizeWorkflowTaskPageSize(filters.pageSize),
@@ -499,9 +495,11 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   }
   if (normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane) {
     params.set(FILTER_QUERY_KEYS.lane, normalized.lane)
-    if (normalized.sort !== DEFAULT_TASK_BOARD_FILTERS.sort) {
-      params.set(FILTER_QUERY_KEYS.sort, normalized.sort)
-    }
+  }
+  if (normalized.sort !== DEFAULT_TASK_BOARD_FILTERS.sort) {
+    params.set(FILTER_QUERY_KEYS.sort, normalized.sort)
+  }
+  if (normalized.page > 1 || normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane) {
     params.set(FILTER_QUERY_KEYS.page, String(normalized.page))
   }
   if (normalized.mode !== DEFAULT_TASK_BOARD_FILTERS.mode) {
@@ -514,13 +512,12 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   return params
 }
 
-export function buildWorkflowTaskBoardRequest(filters = {}) {
+export function buildWorkflowTaskBoardRequest(filters = {}, { calendar = false } = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
-  const focused = normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane
   const params = {
     ...taskDiscoveryRequest(normalized, { includeStage: true }),
-    limit: focused ? normalized.pageSize : TASK_BOARD_OVERVIEW_LIMIT,
-    offset: focused ? (normalized.page - 1) * normalized.pageSize : 0,
+    limit: normalized.pageSize,
+    offset: calendar ? 0 : (normalized.page - 1) * normalized.pageSize,
   }
 
   if (normalized.period) params.period = normalized.period
@@ -539,7 +536,7 @@ export function buildWorkflowTaskBoardRequest(filters = {}) {
   if (normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType) {
     params.source_type = normalized.sourceType
   }
-  if (focused) {
+  if (!calendar) {
     params.lane_key = normalized.lane
     params.sort = normalized.sort
   }
@@ -587,22 +584,8 @@ function normalizeNonNegativeInteger(value) {
   return Number.isSafeInteger(number) && number >= 0 ? number : 0
 }
 
-export function buildWorkflowTaskOverviewTasks(lanes = []) {
-  const tasksByLane = new Map(lanes.map((lane) => [lane.key, lane.tasks || []]))
-  const seen = new Set()
-  return ['exception', 'due', 'actionable'].flatMap((key) =>
-    (tasksByLane.get(key) || []).filter((task) => {
-      const identity = String(task?.id || task?.task_code || '')
-      if (identity && seen.has(identity)) return false
-      if (identity) seen.add(identity)
-      return true
-    })
-  )
-}
-
 export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
   const normalizedFilters = normalizeWorkflowTaskBoardFilters(filters)
-  const focused = normalizedFilters.lane !== DEFAULT_TASK_BOARD_FILTERS.lane
   if (response !== null && response !== undefined) {
     requireWorkflowTaskBoardResponse(
       response,
@@ -627,44 +610,27 @@ export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
       return [definition.key, normalizeNonNegativeInteger(countValue)]
     })
   )
-  const displayLimit = focused
-    ? normalizedFilters.pageSize
-    : TASK_BOARD_OVERVIEW_LIMIT
-  const lanes = TASK_BOARD_LANE_DEFINITIONS.map((definition) => {
-    const responseLane = responseLanes.get(definition.key) || {}
-    const tasks = (
-      Array.isArray(responseLane.tasks) ? responseLane.tasks : []
-    ).slice(0, displayLimit)
-    const count = counts[definition.key]
-    return {
-      ...definition,
-      count,
-      tasks,
-      limit: normalizeNonNegativeInteger(responseLane.limit) || displayLimit,
-      offset: normalizeNonNegativeInteger(responseLane.offset),
-      hiddenCount: Math.max(0, count - tasks.length),
-    }
-  })
-  const selectedLane = focused ? normalizedFilters.lane : 'all'
-  const selectedLaneModel =
-    lanes.find((lane) => lane.key === selectedLane) || null
-  const pageCount = selectedLaneModel
-    ? Math.max(
-        1,
-        Math.ceil(selectedLaneModel.count / normalizedFilters.pageSize)
-      )
-    : 1
+  const total = normalizeNonNegativeInteger(normalizedResponse.total)
+  const selectedLane = normalizedFilters.lane
+  const definition = selectedLane === 'all'
+    ? { key: 'all', title: normalizedFilters.mode === 'todo' ? '全部待办' : normalizedFilters.mode === 'approval' ? '全部审批' : '全部任务' }
+    : TASK_BOARD_LANE_DEFINITIONS.find((lane) => lane.key === selectedLane)
+  const responseLane = responseLanes.get(selectedLane)
+  const selectedLaneModel = {
+    ...definition,
+    count: selectedLane === 'all' ? total : counts[selectedLane],
+    tasks: responseLane?.tasks || [],
+    limit: responseLane?.limit || normalizedFilters.pageSize,
+    offset: responseLane?.offset || 0,
+  }
+  const pageCount = Math.max(1, Math.ceil(selectedLaneModel.count / normalizedFilters.pageSize))
 
   return {
     snapshotAt: normalizeNonNegativeInteger(normalizedResponse.snapshot_at),
-    total: normalizeNonNegativeInteger(normalizedResponse.total),
+    total,
     counts,
-    lanes,
-    visibleLanes: selectedLaneModel
-      ? [selectedLaneModel]
-      : lanes.filter((lane) => normalizedFilters.mode !== 'todo' || lane.key !== 'finished'),
+    visibleLanes: [selectedLaneModel],
     selectedLane,
-    focused,
     requestedPage: normalizedFilters.page,
     page: Math.min(normalizedFilters.page, pageCount),
     pageCount,

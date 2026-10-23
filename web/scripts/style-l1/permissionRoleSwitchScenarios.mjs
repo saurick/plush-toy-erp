@@ -2,7 +2,90 @@ import assert from 'node:assert/strict'
 import { styleRpcResult } from './rpcMockResult.mjs'
 
 export function createPermissionRoleSwitchScenarios() {
+  let delayedMethod = ''
+  let pendingRead
+  let releaseRead
   return [
+    {
+      name: 'permission-center-fast-menu-switching',
+      path: '/erp/system/audit-logs',
+      auth: 'admin',
+      viewport: { width: 1440, height: 1000 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/admin', async (route) => {
+          if (route.request().postDataJSON()?.method === delayedMethod) {
+            delayedMethod = ''
+            await new Promise((resolve) => {
+              releaseRead = resolve
+              pendingRead.resolve()
+            })
+          }
+          await route.fallback()
+        })
+      },
+      verify: async (page) => {
+        const permissionMenu = page.getByRole('menuitem', { name: '权限管理', exact: true })
+        const auditMenu = page.getByRole('menuitem', { name: '系统操作记录', exact: true })
+        const assertLeftCleanly = async () => {
+          await page.waitForURL('**/erp/system/audit-logs')
+          assert.equal(await page.getByRole('dialog').count(), 0, '未编辑岗位时快速切换菜单不应出现放弃修改确认框')
+        }
+        await auditMenu.waitFor()
+        let writes = 0
+        page.on('request', (request) => {
+          if (request.url().endsWith('/rpc/admin') &&
+              request.postDataJSON()?.method === 'set_role_settings') writes += 1
+        })
+
+        for (const method of ['me', 'rbac_options', 'effective_role_access']) {
+          delayedMethod = method
+          const currentRead = Promise.withResolvers()
+          pendingRead = currentRead
+          const timeout = setTimeout(() => currentRead.reject(new Error(`未发起 ${method} 读取`)), 10_000)
+          try {
+            await permissionMenu.click()
+            await pendingRead.promise
+            await auditMenu.click()
+            await assertLeftCleanly()
+          } finally {
+            clearTimeout(timeout)
+            releaseRead?.()
+            releaseRead = null
+            delayedMethod = ''
+          }
+        }
+
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          await permissionMenu.click()
+          await auditMenu.click()
+          await assertLeftCleanly()
+        }
+
+        await permissionMenu.click()
+        await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+        assert.equal(await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).isChecked(), true)
+        await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).uncheck()
+        await auditMenu.click()
+        const discard = page.getByRole('dialog').filter({ hasText: '离开前要放弃未保存的修改吗？' })
+        await discard.waitFor()
+        await discard.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await discard.waitFor({ state: 'hidden' })
+        assert.equal(new URL(page.url()).pathname, '/erp/system/permissions')
+        assert.equal(await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).isChecked(), false)
+        await auditMenu.click()
+        await discard.getByRole('button', { name: '放弃修改', exact: true }).click()
+        await discard.waitFor({ state: 'hidden' })
+        await assertLeftCleanly()
+        await permissionMenu.click()
+        await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+        await page.locator('.erp-role-center-save-status').getByText('当前设置已保存', { exact: true }).waitFor()
+        assert.equal(await page.getByRole('button', { name: '保存岗位设置', exact: true }).isDisabled(), true)
+        assert.equal(await page.getByRole('checkbox', { name: '查看销售订单', exact: true }).isChecked(), true)
+        assert.equal(await page.getByRole('dialog').count(), 0)
+        assert.equal(await page.locator('.ant-message-error').count(), 0, '离开后的迟到读取不应弹出错误')
+        assert.equal(writes, 0, '菜单切换和放弃草稿均不得写入岗位权限')
+      },
+    },
     {
       name: 'permission-center-clean-role-switching',
       path: '/erp/system/permissions',

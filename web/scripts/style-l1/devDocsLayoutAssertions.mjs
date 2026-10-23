@@ -60,11 +60,7 @@ export function createDevDocsReadingFixture(keyword) {
     ...Array.from(
       { length: 20 },
       (_, index) =>
-        '#'.repeat(2 + (index % 5)) +
-        ' 阅读章节 ' +
-        (index + 1) +
-        '\n\n' +
-        '示例正文，用于验证滚动定位与章节层级。'.repeat(45)
+        `${'#'.repeat(2 + (index % 5))} 阅读章节 ${index + 1}\n\n${'示例正文，用于验证滚动定位与章节层级。'.repeat(45)}`
     ),
   ].join('\n\n')
 }
@@ -103,8 +99,9 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         ?.getAttribute('aria-current') === 'location'
   )
   const toggle = page.locator('[data-dev-doc-toc-toggle]')
-  if ((await toggle.getAttribute('aria-expanded')) === 'false')
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') {
     await toggle.click()
+  }
   assert((await toc.boundingBox()).height <= 193, '全部章节在有界区域内滚动')
   const lastId = await chapters.last().getAttribute('data-dev-doc-heading-id')
   await chapters.last().click()
@@ -175,15 +172,17 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
       backgroundDistinct:
         activeStyle.backgroundColor !== idleStyle.backgroundColor,
       textDistinct: activeStyle.color !== idleStyle.color,
-      underline: activeStyle.boxShadow.includes('inset'),
+      shadow: activeStyle.boxShadow,
+      weight: activeStyle.fontWeight,
       visible: box.left >= frame.left - 1 && box.right <= frame.right + 1,
     }
   })
   assert.equal(visual.selectedCount, 1)
   assert(
-    visual.backgroundDistinct && visual.textDistinct && visual.underline,
-    '当前章节以主题色、文字和下边标记共同突出'
+    visual.backgroundDistinct && visual.textDistinct && visual.weight === '600',
+    '当前章节以主题浅底和加粗文字突出'
   )
+  assert.equal(visual.shadow, 'none', '章节目录不叠加选中底线')
   assert(visual.visible, '收起后当前章节仍应可见')
 
   await page.goto(
@@ -213,6 +212,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         }
         const toolbarBox = toolbar.getBoundingClientRect()
         const shellBox = shell.getBoundingClientRect()
+        const shellStyle = getComputedStyle(shell)
         return {
           viewport: { width: innerWidth, height: innerHeight },
           documentSize: {
@@ -221,6 +221,8 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
           },
           toolbarHeight: toolbarBox.height,
           tocHeight: shellBox.height,
+          chapterHeight: chapter.getBoundingClientRect().height,
+          tocInsets: ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((sum, key) => sum + parseFloat(shellStyle[key]), 0),
           titlePathCenterDelta: Math.abs(center(name) - center(path)),
           chapterToggleCenterDelta: Math.abs(center(chapter) - center(toggle)),
           titleHint: name.title.startsWith(name.textContent),
@@ -251,7 +253,8 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
       geometry.toolbarHeight <= (width === 1440 ? 50 : 90),
       '标题、路径和操作按可用宽度紧凑排列'
     )
-    assert(geometry.tocHeight <= 46, '章节标签、导航和展开操作共用一行')
+    assert.equal(geometry.chapterHeight, 40, '章节目录保留共享点击高度')
+    assert(geometry.tocHeight <= geometry.chapterHeight + geometry.tocInsets + 1, '章节标签、导航和展开操作共用一行')
     assert(geometry.titlePathCenterDelta <= 1, '标题与路径同行对齐')
     assert(geometry.chapterToggleCenterDelta <= 1, '章节与展开操作同行对齐')
     assert(
@@ -267,6 +270,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   }
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByRole('textbox', { name: '搜索项目文档' }).fill('没有该标题 docs-governance')
+  await page.getByRole('textbox', { name: '搜索项目文档' }).press('Enter')
   await page.getByRole('button', { name: '文档首页', exact: true }).click()
   const home = page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '文档入口与治理 / docs Guide', exact: true })
   await home.waitFor()

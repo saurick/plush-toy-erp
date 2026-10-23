@@ -538,6 +538,7 @@ export default function FinancePaymentsPage() {
               currentPayment?.status === FinancePaymentStatus.POSTED &&
               currentPayment?.kind !== FinancePaymentKind.REFUND ? (
                 <Button
+                  data-business-action-group="lifecycle"
                   disabled={
                     loading ||
                     !isPositiveNumeric20Scale6Units(
@@ -563,6 +564,7 @@ export default function FinancePaymentsPage() {
                   <Button
                     data-business-action-key="payment-approval"
                     data-business-action-role="primary"
+                    data-business-action-group="collaboration"
                     type="primary"
                     disabled={paymentActionAvailability.approval.disabled}
                     onClick={ensurePaymentApprovalProcess}
@@ -642,6 +644,7 @@ export default function FinancePaymentsPage() {
                 <Button
                   data-business-action-key="payment-reload"
                   data-business-action-role="recovery"
+                  data-business-action-group="query"
                   disabled={!currentPayment || loading}
                   onClick={() => recoverPayment(currentPayment?.id)}
                 >

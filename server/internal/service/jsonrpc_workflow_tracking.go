@@ -68,11 +68,11 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 			return id, res, nil
 		}
 		if value != "" {
-			date, err := time.ParseInLocation("2006-01-02", value, time.FixedZone("Asia/Shanghai", 8*3600))
-			if err != nil {
+			date, ok := getOptionalJSONRPCDateFilter(pm, key)
+			if !ok {
 				return id, invalidParamResult(), nil
 			}
-			*target = &date
+			*target = date
 		}
 	}
 	var valid bool

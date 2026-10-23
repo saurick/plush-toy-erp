@@ -10,6 +10,14 @@ import { assertMobileFilterClearControl } from './mobileFilterConsistencyAsserti
 
 export async function chooseMobileFilterOption(control, label) {
   const select = control.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+  if (label === '最近进入') {
+    const clear = select.locator('.ant-select-clear')
+    if (await clear.count()) {
+      await select.hover()
+      await clear.click()
+    }
+    return
+  }
   await select.locator('.ant-select-selector').click()
   await control.page().locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
 }
@@ -95,14 +103,14 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         const filters = page.getByTestId('mobile-role-risk-filters')
         const warning = page.getByTestId('mobile-role-risk-filter-warning')
         const overdue = page.getByTestId('mobile-role-risk-filter-notice')
-        await page.waitForFunction(() => {
-          const counts = document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .mobile-role-task-filter__count')
-          return counts.length === 2 && Array.from(counts).every((item) => /^\d+$/.test(item.textContent.trim()))
-        })
         await page.evaluate(() => document.fonts.ready)
         assert.equal(await filters.getAttribute('role'), 'group')
         assert.equal(await filters.getByRole('tab').count(), 0)
         if (await overdue.getAttribute('aria-pressed') === 'true') await warning.click()
+        await page.waitForFunction(() => {
+          const counts = document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .mobile-role-task-filter__count')
+          return counts.length === 2 && Array.from(counts).every((item) => /^\d+$/.test(item.textContent.trim())) && document.querySelectorAll('.mobile-role-message-card').length > 0
+        })
         const keyword = await page.getByRole('searchbox').inputValue()
         const filterLabel = await filterTrigger.getAttribute('aria-label')
         const counts = await filters.locator('.mobile-role-task-filter__count').allTextContents()
@@ -129,6 +137,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         await page.keyboard.press('Enter')
         assert.equal(await overdue.getAttribute('aria-pressed'), 'true')
         assert.equal(await warning.getAttribute('aria-pressed'), 'false')
+        await page.waitForFunction(() => document.querySelectorAll('.mobile-role-message-card').length > 0)
         const overdueIDs = await page.locator('.mobile-role-message-card').evaluateAll((nodes) => nodes.map((node) => Number(node.dataset.mobileTaskId)))
         assert(overdueIDs.length > 0, '超时筛选需要实际匹配的任务')
         assert(overdueIDs.every((id) => tasks.some((task) => task.id === id && task.due_at && task.due_at < Date.now() / 1000)), '超时结果只含已超过截止时间的风险任务')
@@ -137,6 +146,10 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         await page.keyboard.press('Space')
         assert.equal(await warning.getAttribute('aria-pressed'), 'true')
         assert.equal(await overdue.getAttribute('aria-pressed'), 'false')
+        await page.waitForFunction((expected) => {
+          const counts = Array.from(document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .mobile-role-task-filter__count'), (node) => node.textContent.trim())
+          return counts.length === expected.length && counts.every((count, index) => count === expected[index].trim())
+        }, counts)
         assert.equal(await page.getByRole('searchbox').inputValue(), keyword)
         assert.equal(await filterTrigger.getAttribute('aria-label'), filterLabel)
         assert.deepEqual(await filters.locator('.mobile-role-task-filter__count').allTextContents(), counts)
@@ -179,6 +192,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
           value
         )
       const openFilters = async (contextLabel = '任务') => {
+        if (!(await filterTrigger.isVisible())) await page.getByRole('button', { name: '取消搜索', exact: true }).click()
         await filterTrigger.click()
         const dropdown = page.getByRole('dialog', {
           name: `筛选${contextLabel}`,

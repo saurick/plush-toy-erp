@@ -1359,7 +1359,7 @@ function createReadinessFetch(runtimeOptions = {}) {
   return { fetchImpl, calls };
 }
 
-test("all 51 formal targets are owned by shared generator stages", () => {
+test("all 50 formal targets are owned by shared generator stages", () => {
   const contract = buildManualAcceptancePageDataContract();
   const plan = buildManualAcceptanceReadinessPlan();
   const ownershipByID = new Map(
@@ -1372,7 +1372,7 @@ test("all 51 formal targets are owned by shared generator stages", () => {
     ]),
   );
 
-  assert.equal(contract.targets.length, 51);
+  assert.equal(contract.targets.length, 50);
   assert.deepEqual(
     Object.keys(contract.generatorStages).sort(),
     [...MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS].sort(),
@@ -1444,7 +1444,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   missingPage.targets.pop();
   assert.throws(
     () => assertManualAcceptancePageDataContract(missingPage),
-    /必须恰好覆盖 51 个正式目标/u,
+    /必须恰好覆盖 50 个正式目标/u,
   );
 
   const unknownProbe = structuredClone(contract);
@@ -1471,7 +1471,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   );
 });
 
-test("default plan covers all 51 targets and never connects to a backend", async () => {
+test("default plan covers all 50 targets and never connects to a backend", async () => {
   let fetchCalls = 0;
   const result = await runManualAcceptanceReadinessCli([], {
     fetchImpl: async () => {
@@ -1491,7 +1491,7 @@ test("default plan covers all 51 targets and never connects to a backend", async
       /^demo_/u.test(item.username),
     ),
   );
-  assert.equal(result.plan.targets.length, 51);
+  assert.equal(result.plan.targets.length, 50);
   assert.equal(
     result.plan.targets.filter(
       (item) => item.catalogGroup === "mobileRolePages",
@@ -1531,12 +1531,8 @@ test("default plan covers all 51 targets and never connects to a backend", async
       "workflow-tasks:production_exception_decision_approval",
     ],
   );
-  assert.deepEqual(
-    result.plan.targets.find(
-      (item) => item.id === "desktopPages:shipping-release",
-    ).probeIds,
-    ["workflow-tasks:shipment_finance_approval"],
-  );
+  assert.equal(result.plan.targets.some((item) => item.id === "desktopPages:shipping-release"), false);
+  assert.ok(uatPlan.probes.some((probe) => probe.id === "workflow-tasks:shipment_finance_approval"));
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
   );
@@ -1557,7 +1553,7 @@ test("default plan covers all 51 targets and never connects to a backend", async
   assert.ok(businessDashboard.probeIds.includes("sales-orders"));
   assert.ok(businessDashboard.probeIds.includes("business-progress"));
   assert.equal(businessDashboard.probeIds.includes("product-skus"), false);
-  assert.equal(result.plan.expected.targets, 51);
+  assert.equal(result.plan.expected.targets, 50);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
   const probesByID = new Map(
     result.plan.probes.map((probe) => [probe.id, probe]),
@@ -2190,10 +2186,10 @@ test("explicit verification reports page data, nine role totals, and honest manu
     }),
   );
 
-  assert.equal(report.summary.totalTargets, 51);
+  assert.equal(report.summary.totalTargets, 50);
   assert.equal(
     report.summary.passedTargetData,
-    41,
+    40,
     JSON.stringify(
       report.targets
         .filter((item) => item.dataStatus !== "pass")
@@ -2246,7 +2242,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
     new Set(Object.values(report.summary.mobileActualByRole)),
     new Set([20]),
   );
-  assert.equal(report.targets.length, 51);
+  assert.equal(report.targets.length, 50);
   assert.equal(report.runtimePreflight.environment, "local");
   assert.equal(report.runtimePreflight.customerKey, "yoyoosun");
   assert.equal(
@@ -2974,7 +2970,7 @@ test("customer-facing report uses ordinary business wording", async () => {
   assert.match(markdown, /九个岗位任务合计：180 \/ 180/u);
   assert.match(markdown, /尚未证明/u);
   assert.match(markdown, /人工验收：未完成/u);
-  assert.match(markdown, /页面操作已完成：0 \/ 51/u);
+  assert.match(markdown, /页面操作已完成：0 \/ 50/u);
   assert.doesNotMatch(
     markdown,
     /Workflow|Fact|JSON-RPC|RBAC|schema|raw\s*id|甲方/iu,

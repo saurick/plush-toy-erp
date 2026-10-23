@@ -25,17 +25,21 @@ export function createInventoryPresentationScenarios(deps) {
         await expectHeading(page, '库存台账')
         const command = page.locator('.erp-inventory-ledger-page .erp-business-operation-panel__command')
         await command.getByRole('tab', { name: '库存余额' }).waitFor()
-        for (const width of [1920, 1366, 820, 390]) {
+        for (const width of [1920, 1440, 1366, 820, 390]) {
           await page.setViewportSize({ width, height: 1080 })
           const metrics = await command.evaluate((element) => {
             const bounds = element.getBoundingClientRect()
             const controls = [...element.children].filter((node) => node.getBoundingClientRect().width > 0)
               .map((node) => ({ class: node.className, ...node.getBoundingClientRect().toJSON() }))
-            const search = element.querySelector('.erp-business-operation-panel__search').getBoundingClientRect()
+            const search = element.querySelector('.erp-business-operation-panel__search')
+            const displaySwitch = element.querySelector('.erp-business-visual-switch')
+            const displayDivider = getComputedStyle(displaySwitch, '::before')
             return {
               bounds: bounds.toJSON(),
               controls,
-              searchWidth: search.width,
+              searchWidth: search.getBoundingClientRect().width,
+              searchMaxWidth: getComputedStyle(search).maxWidth,
+              displayDivider: { width: displayDivider.width, height: displayDivider.height, display: displayDivider.display },
               secondaryHeaders: document.querySelectorAll('.erp-inventory-ledger-page .erp-business-page-header-card--secondary').length,
             }
           })
@@ -49,12 +53,17 @@ export function createInventoryPresentationScenarios(deps) {
               assert.ok(overlapX <= 1 || overlapY <= 1, `库存工具栏换行后不能重叠: ${JSON.stringify(metrics)}`)
             }
           }
-          if (width === 1920) {
+          assert.equal(metrics.searchMaxWidth, 'none', '库存搜索应与共享工具栏一样利用剩余宽度')
+          if (width >= 1440) {
             assert.ok(metrics.bounds.height <= 56, `宽屏库存工具栏应保持单行: ${JSON.stringify(metrics)}`)
-            assert.ok(metrics.searchWidth >= 240 && metrics.searchWidth <= 321, `库存搜索框应保留可用宽度且不铺满页面: ${JSON.stringify(metrics)}`)
+            assert.ok(metrics.searchWidth >= 180, `库存搜索框须保持共享的最小可用宽度: ${JSON.stringify(metrics)}`)
             const centers = metrics.controls.map((box) => box.top + box.height / 2)
             assert.ok(Math.max(...centers) - Math.min(...centers) <= 1, '宽屏分类、视图与查询操作应垂直居中对齐')
+            assert.equal(metrics.displayDivider.width, '1px', '内容导航与展示方式须有轻量分隔')
+            assert.equal(metrics.displayDivider.height, '20px')
           }
+          if (width === 1920) assert.ok(metrics.searchWidth > 400, `宽屏库存搜索须利用原先留白: ${JSON.stringify(metrics)}`)
+          if (width === 390) assert.equal(metrics.displayDivider.display, 'none', '窄屏换行后省去导航与展示方式之间的竖线')
           await assertNoHorizontalOverflow(page, `inventory-toolbar-${width}`)
           await page.screenshot({ path: path.join(outputDir, `inventory-toolbar-${width}.png`), fullPage: false })
         }
@@ -62,6 +71,15 @@ export function createInventoryPresentationScenarios(deps) {
         const search = command.locator('.erp-business-operation-panel__search input')
         await search.fill('SKU')
         await search.press('Enter')
+        assert.equal(await command.getByRole('button', { name: '管理', exact: true }).count(), 0)
+        const warehouseSettings = command.getByRole('button', { name: '仓库设置', exact: true })
+        await warehouseSettings.click()
+        const settings = page.getByRole('dialog').filter({ hasText: '仓库设置' })
+        await settings.waitFor()
+        await settings.locator('.ant-modal-close').click()
+        await settings.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => document.activeElement?.textContent === '仓库设置')
+        assert.equal(await search.inputValue(), 'SKU', '关闭仓库设置应保留搜索词并返回原工具栏')
         await command.getByRole('button', { name: /^筛选(?:，已应用 \d+ 项)?$/u }).click()
         await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
         await page.getByRole('dialog', { name: '筛选条件' }).getByRole('button', { name: '完成', exact: true }).click()

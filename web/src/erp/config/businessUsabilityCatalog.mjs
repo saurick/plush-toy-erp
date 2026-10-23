@@ -354,42 +354,6 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
       ),
     ],
   }),
-  'shipping-release': guide({
-    task: '财务核对出货单，确认是否允许发货。',
-    completion: '当前出货单版本已获财务放行；实际发货由业务在出货单确认。',
-    handoff: '放行后交业务确认实际出货；金额或客户条件有差异先找销售核对。',
-    requiredHelpTypes: [
-      BUSINESS_HELP_TYPES.TERM,
-      BUSINESS_HELP_TYPES.SOURCE,
-      BUSINESS_HELP_TYPES.FLOW,
-      BUSINESS_HELP_TYPES.DISABLED,
-    ],
-    flowSteps: [
-      '打开出货单发起的财务审批，核对来源和当前版本。',
-      '核对客户、订单、出货内容与财务条件，不符合时退回并说明原因。',
-      '批准后交业务确认实物发出；再到出货单核对实际结果。',
-    ],
-    items: [
-      helpItem(
-        BUSINESS_HELP_TYPES.TERM,
-        'release-vs-shipped',
-        '放行就是已经出货吗',
-        '不是。放行表示允许继续发货，只有业务确认“已出货”才表示实际出货和库存扣减完成。'
-      ),
-      helpItem(
-        BUSINESS_HELP_TYPES.SOURCE,
-        'release-source',
-        '这次审批针对哪张单',
-        '针对发起审批的出货单及其版本，不是所有出货单的通用放行。'
-      ),
-      helpItem(
-        BUSINESS_HELP_TYPES.DISABLED,
-        'release-blocked',
-        '为什么不能继续放行',
-        '审批已退回、出货单版本不匹配或没有办理权限时，回来源单据核对，不沿用旧审批结果。'
-      ),
-    ],
-  }),
   outbound: guide({
     task: '查看销售订单锁定的库存，必要时释放预留。',
     completion:
@@ -1046,7 +1010,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     flowSteps: [
       '从销售订单准备出货草稿，核对客户、产品、规格、仓库、批次和数量。',
       '需要出货前检验时由品质完成合格或让步接收判定。',
-      '启动财务放行并等待当前出货单版本审批通过。',
+      '提交出货审批后，在任务管理的待我审批中办理；出货单显示财务审批状态，查看审批直达本单流程。',
       '业务确认实际出货后才扣减库存，再由财务生成应收或发票记录。',
     ],
     items: [
@@ -1140,7 +1104,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
 // 岗位优先入口之外的资料维护与交接章节也归入相应岗位，供图解和参考共用。
 const additionalHelpRolesByPath = {
   '/erp/master/materials': ['engineering', 'purchase', 'warehouse'],
-  '/erp/warehouse/shipping-release': ['finance', 'warehouse'],
+  '/erp/warehouse/shipments': ['finance', 'warehouse'],
   '/erp/warehouse/outbound': ['sales', 'warehouse'],
   '/erp/finance/payments': ['finance'],
 }

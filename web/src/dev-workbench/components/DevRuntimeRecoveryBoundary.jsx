@@ -55,7 +55,6 @@ export default function DevRuntimeRecoveryBoundary({ children }) {
               </span>
               <Button
                 href={DEV_DATABASE_MIGRATION_RECOVERY_ROUTE}
-                target="_blank"
                 rel="noopener noreferrer"
               >
                 检查并恢复服务

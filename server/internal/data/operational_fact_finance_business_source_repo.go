@@ -169,7 +169,7 @@ func (r *operationalFactRepo) CreatePayableFromOutsourcingReturn(
 	if err != nil {
 		return nil, err
 	}
-	amount, err := outsourcingReturnPayableAmount(item, fact.Quantity)
+	amount, err := outsourcingReturnAllocatedPayableAmount(ctx, tx.client, item, fact, currency, in.IdempotencyKey)
 	if err != nil {
 		return nil, err
 	}
@@ -626,4 +626,55 @@ func hasActiveFinanceFactForSource(
 		financefact.SourceID(sourceID),
 		financefact.StatusNEQ(biz.OperationalFactStatusCancelled),
 	).Exist(ctx)
+}
+
+// Order and line locks serialize allocations. Only effective payables consume
+// the budget; replay preserves its frozen amount even after later allocations.
+func outsourcingReturnAllocatedPayableAmount(ctx context.Context, client *ent.Client, item *ent.OutsourcingOrderItem, current *ent.OutsourcingFact, currency, replayKey string) (decimal.Decimal, error) {
+	if replayKey != "" {
+		replay, err := client.FinanceFact.Query().Where(financefact.IdempotencyKey(replayKey)).Only(ctx)
+		if err == nil {
+			return replay.Amount, nil
+		}
+		if !ent.IsNotFound(err) {
+			return decimal.Zero, err
+		}
+	}
+	total, err := outsourcingReturnPayableAmount(item, item.OutsourcingQuantity)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	returns, err := client.OutsourcingFact.Query().Where(outsourcingfact.SourceType(biz.OutsourcingOrderSourceType), outsourcingfact.SourceID(item.OutsourcingOrderID), outsourcingfact.SourceLineID(item.ID), outsourcingfact.FactType(biz.OutsourcingFactReturnReceipt), outsourcingfact.Status(biz.OperationalFactStatusPosted)).All(ctx)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	byID := make(map[int]*ent.OutsourcingFact, len(returns))
+	ids := make([]int, 0, len(returns))
+	for _, row := range returns {
+		if row.ID != current.ID {
+			byID[row.ID] = row
+			ids = append(ids, row.ID)
+		}
+	}
+	priorQuantity, priorAmount := decimal.Zero, decimal.Zero
+	if len(ids) > 0 {
+		payables, err := client.FinanceFact.Query().Where(financefact.SourceType(biz.OutsourcingFactSourceType), financefact.SourceIDIn(ids...), financefact.FactType(biz.FinanceFactPayable), financefact.StatusNEQ(biz.OperationalFactStatusCancelled)).All(ctx)
+		if err != nil {
+			return decimal.Zero, err
+		}
+		seen := map[int]bool{}
+		for _, payable := range payables {
+			if payable.SourceID == nil || seen[*payable.SourceID] || payable.Currency != currency || !payable.Amount.IsPositive() {
+				return decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
+			}
+			seen[*payable.SourceID] = true
+			priorQuantity = priorQuantity.Add(byID[*payable.SourceID].Quantity)
+			priorAmount = priorAmount.Add(payable.Amount)
+		}
+	}
+	amount, err := biz.AllocateProportionalAmount(total, item.OutsourcingQuantity, current.Quantity, priorQuantity, priorAmount)
+	if err != nil || !amount.IsPositive() {
+		return decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
+	}
+	return amount, nil
 }

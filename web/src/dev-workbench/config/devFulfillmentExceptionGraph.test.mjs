@@ -88,3 +88,18 @@ test('all exception schemes preserve source steps, reachable outcomes and reentr
     }
   }
 })
+
+test('全局异常图不猜测来源，审批拒绝有独立终止出口', () => {
+  for (const source of catalog.exception_guides) {
+    for (const plan of source.plans) {
+      const graph = buildFulfillmentExceptionGraph(source, { planKey: plan.key, overview: true })
+      assert.equal(graph.origin, null)
+      if (['origin', 'next'].includes(plan.continuation.target)) assert.equal(graph.returnStage, null)
+      if (source.approval) {
+        assert(graph.edges.some((edge) => edge.from === 'approval' && edge.to === 'end:rejected' && edge.label === '未通过'))
+        assert(!graph.edges.some((edge) => edge.from === 'end:rejected'), '拒绝不进入已批准方案')
+        assert.equal(graph.nodes.find((node) => node.key === 'end:rejected').result, source.approval.rejected)
+      }
+    }
+  }
+})

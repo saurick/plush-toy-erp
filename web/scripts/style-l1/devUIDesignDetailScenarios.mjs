@@ -1,10 +1,13 @@
-import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
 import { writeFile } from 'node:fs/promises'
+import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { getContrastRatio } from './colorAssertions.mjs'
 import { createDevWorkCenterDesignScenarios } from './devWorkCenterDesignScenarios.mjs'
 import { createDevSharedComponentScenarios } from './devSharedComponentScenarios.mjs'
 import { createDevUIDesignPreviewScenarios } from './devUIDesignPreviewScenarios.mjs'
+import { createDevUIPageStateScenarios } from './devUIPageStateScenarios.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { createSearchCompositionScenarios } from './searchCompositionScenarios.mjs'
 
 export function createDevUIDesignDetailScenarios({
   assert,
@@ -13,9 +16,164 @@ export function createDevUIDesignDetailScenarios({
   path,
 }) {
   return [
+    ...createSearchCompositionScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
+    ...createDevUIPageStateScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
+    {
+      name: 'dev-ui-design-directory',
+      path: '/__dev/ui-design?view=rationale&topic=spacing&read=guide',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      themeMode: 'light',
+      verify: async (page) => {
+        const directory = page.getByRole('navigation', { name: '设计阅读目录' })
+        const search = page.getByRole('textbox', { name: '搜索设计图解或规范' })
+        const assertHierarchy = async () => {
+          await directory.getByRole('button').first().waitFor()
+          await waitForFiniteAnimations(page, { selector: '.erp-design-document-shell' })
+          const groups = await directory.locator('.erp-design-topic-group').evaluateAll((nodes) => nodes.map((group) => {
+            const heading = group.querySelector('h3')
+            const separator = getComputedStyle(heading, '::after')
+            return {
+              heading: heading.textContent,
+              separatorWidth: parseFloat(separator.width),
+              separatorBorder: parseFloat(separator.borderTopWidth),
+              items: [...group.querySelectorAll('button')].map((button) => {
+                const label = button.querySelector('span')
+                const labelBox = label.getBoundingClientRect()
+                const style = getComputedStyle(button)
+                return {
+                  title: label.textContent,
+                  indent: labelBox.left - heading.getBoundingClientRect().left,
+                  border: parseFloat(style.borderWidth),
+                  shadow: style.boxShadow,
+                  overflow: button.scrollWidth > button.clientWidth + 1,
+                  height: button.getBoundingClientRect().height,
+                }
+              }),
+            }
+          }))
+          assert(groups.length > 0, '目录应有可见分类')
+          for (const group of groups) {
+            assert(group.separatorWidth >= 12 && group.separatorBorder >= 1, `${group.heading}应有分类分隔线`)
+            for (const item of group.items) {
+              assert(item.indent >= 12, `${item.title}应相对分类标题缩进`)
+              assert.equal(item.border, 0, `${item.title}不应单独卡片化`)
+              assert.equal(item.shadow, 'none', `${item.title}不叠加选中底线或阴影`)
+              assert(!item.overflow, `${item.title}的文字不能溢出`)
+              assert(item.height >= 40, `${item.title}应保留可点击高度`)
+            }
+          }
+          assert.equal(await directory.locator('[aria-current="page"]').count(), 1)
+          await assertNoHorizontalOverflow(page)
+        }
+        await assertHierarchy()
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-directory.png') })
+        const target = directory.getByRole('button', { name: '文字与对齐', exact: true })
+        const normal = await target.evaluate((node) => getComputedStyle(node).backgroundColor)
+        await target.hover()
+        assert.notEqual(await target.evaluate((node) => getComputedStyle(node).backgroundColor), normal)
+        await target.click()
+        await directory.locator('[aria-current="page"]').getByText('文字与对齐', { exact: true }).waitFor()
+        assert.equal(await target.getAttribute('aria-current'), 'page')
+        await page.reload()
+        await target.waitFor()
+        assert.equal(await target.getAttribute('aria-current'), 'page', '刷新应保留当前主题')
+        await search.fill('窄屏与动效')
+        await search.press('Enter')
+        await page.waitForFunction(() => document.querySelectorAll('.erp-design-document-toc button').length === 1)
+        assert.equal(await directory.getByRole('button').count(), 1)
+        await directory.getByRole('button', { name: '窄屏与动效', exact: true }).click()
+        await directory.locator('[aria-current="page"]').getByText('窄屏与动效', { exact: true }).waitFor()
+        assert.equal(await search.inputValue(), '', '选择搜索结果后恢复完整目录')
+        await assertHierarchy()
+        await page.getByRole('button', { name: '收起目录', exact: true }).click()
+        assert.equal(await directory.isVisible(), false)
+        await page.getByRole('button', { name: '展开目录', exact: true }).click()
+        await assertHierarchy()
+        await page.setViewportSize({ width: 1280, height: 800 })
+        for (const view of ['设计依据', '设计说明']) {
+          await page.getByRole('tab', { name: view, exact: true }).click()
+          for (const read of ['图解', '规范原文']) {
+            await page.locator('.erp-design-reader-toolbar').getByText(read, { exact: true }).click()
+            await assertHierarchy()
+          }
+        }
+      },
+    },
+    {
+      name: 'dev-workbench-directory-consistency',
+      path: '/__dev/project-skills',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      themeMode: 'light',
+      verify: async (page) => {
+        const cases = [
+          { path: '/__dev/project-skills', selector: '.erp-dev-skills__list > button' },
+          { path: '/__dev/ui-design?page=controls', selector: '.erp-control-library-directory nav > button' },
+          { path: '/__dev/development-resources?view=relationships', selector: '.erp-dev-project-relationships__catalog section > button' },
+        ]
+        const selectedSelector = ':is([aria-current="page"], [aria-pressed="true"])'
+        const assertRows = async (selector) => {
+          await page.mouse.move(0, 0)
+          const rows = await page.locator(selector).evaluateAll((nodes) => nodes.map((node) => {
+            const style = getComputedStyle(node)
+            const label = node.querySelector('strong') || node
+            return {
+              title: label.textContent,
+              shared: node.classList.contains('erp-dev-directory-item'),
+              selected: node.matches('[aria-current="page"], [aria-pressed="true"]'),
+              border: parseFloat(style.borderWidth),
+              shadow: style.boxShadow,
+              background: style.backgroundColor,
+              fontWeight: getComputedStyle(label).fontWeight,
+              height: node.getBoundingClientRect().height,
+              overflow: node.scrollWidth > node.clientWidth + 1,
+            }
+          }))
+          assert(rows.length > 1)
+          assert.equal(rows.filter((row) => row.selected).length, 1)
+          for (const row of rows) {
+            assert(row.shared, `${row.title}应使用共享目录样式`)
+            assert.equal(row.border, 0, `${row.title}不应单独卡片化`)
+            assert.equal(row.shadow, 'none', `${row.title}不叠加选中底线或阴影`)
+            assert.equal(row.fontWeight, row.selected ? '600' : '400')
+            if (!row.selected) assert.equal(row.background, 'rgba(0, 0, 0, 0)')
+            assert(row.height >= 40 && !row.overflow, `${row.title}应保留点击范围且没有文字溢出`)
+          }
+          assert.notEqual(rows.find((row) => row.selected).background, 'rgba(0, 0, 0, 0)')
+          if (selector === '.erp-dev-skills__list > button') {
+            const gap = await page.locator('.erp-dev-skills__list').evaluate((node) => parseFloat(getComputedStyle(node).rowGap))
+            assert(gap <= 4, '目录条目不沿用内容卡片的区块间距')
+            assert(rows.every((row) => row.height === 40), '单行目录采用统一紧凑行高')
+          }
+          await assertNoHorizontalOverflow(page)
+        }
+        for (const [index, entry] of cases.entries()) {
+          if (index) await page.goto(new URL(entry.path, page.url()).href)
+          const items = page.locator(entry.selector)
+          await items.nth(1).waitFor()
+          await assertRows(entry.selector)
+          if (!index) await page.screenshot({ path: path.join(outputDir, 'project-skills-directory.png') })
+          const target = items.nth(1)
+          const label = await target.locator('strong').innerText()
+          await target.click()
+          await page.locator(`${entry.selector}${selectedSelector}`).filter({ hasText: label }).waitFor()
+          await page.reload()
+          await page.locator(`${entry.selector}${selectedSelector}`).filter({ hasText: label }).waitFor()
+          await assertRows(entry.selector)
+          await target.press('Tab')
+          const focused = page.locator(`${entry.selector}:focus-visible`)
+          assert.equal(await focused.count(), 1)
+          assert.equal(await focused.evaluate((node) => getComputedStyle(node).outlineWidth), '2px')
+          await page.setViewportSize({ width: 1280, height: 800 })
+          await assertRows(entry.selector)
+          await page.setViewportSize({ width: 1920, height: 1080 })
+        }
+      },
+    },
     {
       name: 'dev-ui-design-lazy-views',
       path: '/__dev/ui-design?view=specification',
@@ -191,6 +349,7 @@ export function createDevUIDesignDetailScenarios({
         assert.equal(await layout.getAttribute('data-highlight'), 'data')
 
         await search.fill('不存在的图解')
+        await search.press('Enter')
         await page.getByText('没有匹配的主题或章节', { exact: true }).waitFor()
         assert.equal(
           await directory
@@ -201,10 +360,11 @@ export function createDevUIDesignDetailScenarios({
         await page.reload()
         await search.waitFor()
         assert.equal(await search.inputValue(), '不存在的图解')
-        await page
+        await search.locator('xpath=..')
           .getByRole('button', { name: '清除搜索', exact: true })
           .click()
         await search.fill('返回')
+        await search.press('Enter')
         await directory
           .getByRole('button', { name: '查找、下钻与返回', exact: true })
           .waitFor()
@@ -213,6 +373,7 @@ export function createDevUIDesignDetailScenarios({
         await diagram.waitFor()
         const query = page.getByRole('textbox', { name: '示例查询条件' })
         await query.fill('核对刚才的筛选条件')
+        await query.press('Enter')
         await page
           .getByRole('button', { name: '查看样例详情', exact: true })
           .click()
@@ -230,6 +391,9 @@ export function createDevUIDesignDetailScenarios({
         await drawerChoice.click()
         assert.equal(await drawerChoice.getAttribute('aria-pressed'), 'true')
         await page.getByText('侧边展开上下文；复杂编辑仍返回正式入口。', { exact: true }).waitFor()
+        // Use a short viewport so this chapter exercises independent scrolling.
+        await page.setViewportSize({ width: 1440, height: 700 })
+        await waitForFiniteAnimations(page, { selector: '.erp-design-document-shell' })
         const beforePanelScroll = await directory.evaluate(
           (node) => node.scrollTop
         )
@@ -261,6 +425,7 @@ export function createDevUIDesignDetailScenarios({
             .getAttribute('aria-current'),
           'page'
         )
+        await page.setViewportSize({ width: 1440, height: 900 })
         await select('状态与异常恢复')
         await diagram.waitFor()
         const draft = page.getByRole('textbox', {
@@ -376,6 +541,7 @@ export function createDevUIDesignDetailScenarios({
           '跨文档锚点必须显示完整标题'
         )
         await search.fill('留白')
+        await search.press('Enter')
         assert(await heading.isVisible(), '从锚点开始搜索不能丢失当前章节')
         await page.reload()
         await heading.waitFor()

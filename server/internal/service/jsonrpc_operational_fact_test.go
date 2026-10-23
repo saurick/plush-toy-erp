@@ -1722,8 +1722,8 @@ func TestOperationalFactShipmentFilterFromParamsParsesDateRange(t *testing.T) {
 	if filter.Status != "shipped" || filter.DateField != "shipped_at" || filter.Limit != 20 {
 		t.Fatalf("unexpected filter %#v", filter)
 	}
-	expectedFrom := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-	expectedTo := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
+	expectedFrom := time.Date(2026, 5, 31, 16, 0, 0, 0, time.UTC)
+	expectedTo := time.Date(2026, 6, 30, 15, 59, 59, 999999000, time.UTC)
 	if filter.DateFrom == nil || !filter.DateFrom.Equal(expectedFrom) {
 		t.Fatalf("unexpected date_from %#v", filter.DateFrom)
 	}

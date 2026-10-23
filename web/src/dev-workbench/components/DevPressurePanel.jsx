@@ -264,7 +264,7 @@ function PressureReport({ report, reports }) {
             <DevTimestamp value={report.completedAt} action="完成于" />
           </p>
         </div>
-        <details>
+        <details className="erp-dev-disclosure">
           <summary>代码身份与运行环境</summary>
           <dl>
             <dt>完整提交</dt>
@@ -391,7 +391,7 @@ function PressureReport({ report, reports }) {
             </div>
           ))}
         </div>
-        <details>
+        <details className="erp-dev-disclosure">
           <summary>查看数据库对账和资源采样</summary>
           <div className="erp-dev-tool-table-wrap">
             <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="数据库前后对账">
@@ -432,7 +432,7 @@ function PressureReport({ report, reports }) {
           </p>
         </details>
       </section>
-      <details className="erp-dev-pressure-section">
+      <details className="erp-dev-disclosure erp-dev-pressure-section">
         <summary>查询基线与生命周期明细</summary>
         {readMain ? (
           <p>
@@ -731,7 +731,7 @@ export default function DevPressurePanel({
           }
         />
       )}
-      <details className="erp-dev-pressure-guide">
+      <details className="erp-dev-disclosure erp-dev-pressure-guide">
         <summary>档位、指标与维护规则</summary>
         <Button type="link" icon={<FileTextOutlined />} onClick={onOpenDocs}>完整使用说明</Button>
         <Paragraph>用料计算 → 提交 → 老板审批 → 财务审批 → 采购读回。每次新建隔离 PostgreSQL、S3、后端及模拟订单池；切换页面后任务继续执行。</Paragraph>

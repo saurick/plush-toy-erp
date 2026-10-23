@@ -70,7 +70,7 @@ export default function DevTestingStrategyGuide({ source, evidence = false, topi
   }
 
   return (
-    <details className="erp-dev-testing-disclosure erp-dev-testing-strategy-guide">
+    <details className="erp-dev-disclosure erp-dev-testing-disclosure erp-dev-testing-strategy-guide">
       <summary>如何区分证据环境</summary>
       <Typography.Paragraph>
         分类说明不代表执行结果。报告须明确实际环境；未记录的范围保留未证明。

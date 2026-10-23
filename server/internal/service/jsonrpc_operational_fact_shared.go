@@ -43,11 +43,11 @@ func operationalFactMutationFromParams(pm map[string]any) (*biz.OperationalFactM
 }
 
 func operationalFactFilterFromParams(pm map[string]any) (biz.OperationalFactFilter, bool) {
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	dateFrom, ok := getOptionalJSONRPCDateFilter(pm, "date_from")
 	if !ok {
 		return biz.OperationalFactFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	dateTo, ok := getOptionalJSONRPCDateFilter(pm, "date_to")
 	if !ok {
 		return biz.OperationalFactFilter{}, false
 	}

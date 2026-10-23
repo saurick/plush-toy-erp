@@ -297,6 +297,85 @@ test('放得下时完整展示动作，按钮颜色和临时忙碌不改变分�
   assert.equal([...container.querySelectorAll('button')].find((button) => button.textContent.replace(/\s+/gu, '') === '编辑').disabled, true)
 })
 
+test('共享订单动作随状态归类，直接入口与更多菜单保留主次、禁用和调用参数', async (t) => {
+  const resize = installActionSpace(t, 1_200)
+  const [{ SelectionActionBar, BusinessLifecyclePrimaryAction, BusinessLifecycleSecondaryAction }, { Button }] = await Promise.all([
+    import('./BusinessListLayout.jsx'), import('antd'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  const handled = []
+  let action
+  let disabled = false
+  let groupOverride
+  const render = () => act(async () => root.render(createElement(SelectionActionBar,
+    { selectedCount: 1 },
+    createElement(Button, { 'data-business-action-role': 'collaboration' }, '任务协作'),
+    createElement(BusinessLifecyclePrimaryAction, {
+      action,
+      disabled,
+      disabledReason: '请先完成前置办理',
+      'data-business-action-group': groupOverride,
+      onAction: (value) => handled.push(value),
+    }),
+    createElement(BusinessLifecycleSecondaryAction, {
+      action,
+      disabled,
+      disabledReason: '请先完成前置办理',
+      'data-business-action-group': groupOverride,
+      onAction: (value) => handled.push(value),
+    }),
+  )))
+  const settle = () => act(async () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const more = () => container.querySelector('.erp-business-selection-action-bar__compact-more')
+  const cases = [
+    ['submit', '提交订单', '业务办理', false],
+    ['confirm', '确认订单', '业务办理', false],
+    ['normal_close', '正常关闭', '单据处理', false],
+    ['short_close', '提前关闭', '单据处理', true],
+    ['cancel', '取消', '单据处理', true],
+  ]
+  for (const width of [1_200, 180]) {
+    await act(async () => resize(width))
+    for (const [key, label, group, danger] of cases) {
+      action = { key, label, danger }
+      await render()
+      await settle()
+      if (width === 180) await act(async () => more().click())
+      const host = width === 180
+        ? document.querySelector('.erp-business-selection-action-menu')
+        : container.querySelector('.erp-business-selection-action-bar__compact-visible')
+      const primary = host.querySelector('[data-business-action-key="lifecycle-primary"]')
+      const secondary = host.querySelector(`[data-business-action-key="lifecycle-${key}"]`)
+      for (const button of [primary, secondary]) {
+        assert.ok(button, `${key} 在当前入口可见`)
+        assert.equal(button.closest('[aria-label]')?.getAttribute('aria-label'), group)
+        assert.equal(button.classList.contains('ant-btn-dangerous'), danger)
+        assert.equal(button.disabled, false)
+      }
+      assert.equal(primary.classList.contains('ant-btn-primary'), group === '业务办理')
+      assert.equal(secondary.classList.contains('ant-btn-primary'), false)
+      if (width === 180) await act(async () => more().click())
+    }
+  }
+  await act(async () => resize(1_200))
+  groupOverride = 'query'
+  disabled = true
+  await render()
+  await settle()
+  const primary = () => container.querySelector('[data-business-action-key="lifecycle-primary"]')
+  assert.equal(primary().closest('[role="group"]').getAttribute('aria-label'), '查看与关联', '实例分组覆盖共享动态分组')
+  await act(async () => primary().click())
+  assert.deepEqual(handled, [])
+  disabled = false
+  await render()
+  await act(async () => primary().click())
+  assert.equal(handled.length, 1)
+  assert.equal(handled[0], action)
+})
+
 test('内部受权限控制的组件没有入口时，不生成空的更多操作', async (t) => {
   const [{ SelectionActionBar }, { Button }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
   const container = document.createElement('div')

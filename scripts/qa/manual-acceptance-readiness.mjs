@@ -1780,7 +1780,7 @@ function buildDatasetProbes(
       "production_exception_decision_approval",
       ["done"],
     ],
-    ["shipping-release", "finance", "shipment_finance_approval", ["done"]],
+    ["task-board", "finance", "shipment_finance_approval", ["done"]],
   ]) {
     const sourceEvidence = sourceWorkflowTaskEvidence(taskGroup, factReport);
     probes.push({

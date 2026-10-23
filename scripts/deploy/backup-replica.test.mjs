@@ -29,6 +29,8 @@ import { execute, restoreDue, lockArguments } from "./backup-replica/cli.mjs";
 import { requireIdleAgent, agentValue } from "./backup-replica/install.mjs";
 import { verifyRestore } from "./backup-replica/restore.mjs";
 import { command } from "./backup-replica/process.mjs";
+import { requireCompatibleNode } from "./backup-replica/runtime.mjs";
+import { checkHealth } from "./backup-replica/health.mjs";
 
 const stamp = (value) =>
   new Date(value)
@@ -36,6 +38,74 @@ const stamp = (value) =>
     .replaceAll(/[-:]/gu, "")
     .replace(/\.\d{3}Z$/u, "Z");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+test("scheduled backups tolerate supported Node updates but reject a downgrade or a new major", () => {
+  requireCompatibleNode("v24.21.0", "v24.22.1");
+  requireCompatibleNode("24.22.1", "v24.22.2");
+  assert.throws(
+    () => requireCompatibleNode("24.22.1", "v24.21.0"),
+    /runtime_node_version_unsupported/u,
+  );
+  assert.throws(
+    () => requireCompatibleNode("24.22.1", "v25.0.0"),
+    /runtime_node_version_unsupported/u,
+  );
+});
+test("a runtime failure replaces the stale operation status and preserves the last successful backup", (t) => {
+  const f = fixture(t),
+    runtime = path.join(f.root, "runtime");
+  fs.mkdirSync(runtime);
+  const source = path.join(import.meta.dirname, "backup-replica");
+  const files = fs
+    .readdirSync(source)
+    .filter((n) => n.endsWith(".mjs"))
+    .sort();
+  const sum = createHash("sha256");
+  for (const name of files) {
+    const bytes = fs.readFileSync(path.join(source, name));
+    fs.writeFileSync(path.join(runtime, name), bytes);
+    sum.update(name + "\0").update(bytes);
+  }
+  atomicJSON(path.join(runtime, "artifact.json"), {
+    files,
+    sha256: sum.digest("hex"),
+    nodeVersion: "v99.0.0",
+    gitSha: "a".repeat(40),
+  });
+  privateDirectory(f.config.stateDirectory);
+  const successful = { status: "passed", checkedAt: "2026-10-21T14:58:02Z" };
+  atomicJSON(
+    path.join(f.config.stateDirectory, "latest-operation.json"),
+    successful,
+  );
+  atomicJSON(
+    path.join(f.config.stateDirectory, "last-success.json"),
+    successful,
+  );
+  const result = spawnSync(
+    process.execPath,
+    [path.join(runtime, "cli.mjs"), "run", "--config", f.file],
+    { encoding: "utf8", timeout: 5000 },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(
+    JSON.parse(result.stdout).reason,
+    "runtime_node_version_unsupported",
+  );
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(f.config.stateDirectory, "latest-operation.json"),
+      ),
+    ).status,
+    "failed",
+  );
+  assert.deepEqual(
+    JSON.parse(
+      fs.readFileSync(path.join(f.config.stateDirectory, "last-success.json")),
+    ),
+    successful,
+  );
+});
 function fixture(t) {
   const root = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), "backup-replica-test-")),
@@ -68,6 +138,11 @@ function fixture(t) {
     return name;
   };
   const name = add();
+  const space = { availableBytes: config.minimumFreeBytes + 1024 ** 3 };
+  t.mock.method(fs, "statfsSync", () => ({
+    bavail: space.availableBytes,
+    bsize: 1,
+  }));
   const source = {
     async inventory() {
       return [...files].map(([name, bytes]) => ({
@@ -95,15 +170,128 @@ function fixture(t) {
     name,
     add,
     source,
+    space,
     sync: () => synchronize(config, target, source, { clock }),
   };
 }
+
+test("deployment health rejects stale source, failed operations, missing replicas and overdue restores without replacing receipts", async (t) => {
+  const f = fixture(t);
+  privateDirectory(f.config.stateDirectory);
+  const sync = await f.sync();
+  const identity = {
+    status: "passed",
+    checkedAt: new Date(f.clock).toISOString(),
+    sourceId: f.config.source.id,
+    destinationId: f.config.destination.id,
+    volumeUUID: f.config.destination.volumeUUID,
+  };
+  for (const name of ["latest-operation.json", "latest-restore.json"])
+    atomicJSON(path.join(f.config.stateDirectory, name), identity);
+  atomicJSON(path.join(f.config.stateDirectory, "latest-sync.json"), {
+    ...sync,
+    checkedAt: identity.checkedAt,
+  });
+  assert.equal(
+    checkHealth(f.config, f.target, { clock: f.clock }).status,
+    "passed",
+  );
+  atomicJSON(path.join(f.config.stateDirectory, "latest-operation.json"), {
+    ...identity,
+    status: "failed",
+  });
+  assert.throws(
+    () => checkHealth(f.config, f.target, { clock: f.clock }),
+    /backup_last_operation_not_passed/u,
+  );
+  atomicJSON(
+    path.join(f.config.stateDirectory, "latest-operation.json"),
+    identity,
+  );
+  atomicJSON(path.join(f.config.stateDirectory, "latest-restore.json"), {
+    ...identity,
+    checkedAt: new Date(f.clock - 8 * 86400_000).toISOString(),
+  });
+  assert.throws(
+    () => checkHealth(f.config, f.target, { clock: f.clock }),
+    /backup_restore_due/u,
+  );
+  atomicJSON(
+    path.join(f.config.stateDirectory, "latest-restore.json"),
+    identity,
+  );
+  assert.throws(
+    () => checkHealth(f.config, f.target, { clock: f.clock + 37 * 3600_000 }),
+    /backup_operation_stale/u,
+  );
+  fs.rmSync(path.join(f.target, f.name));
+  assert.throws(
+    () => checkHealth(f.config, f.target, { clock: f.clock }),
+    /ENOENT/u,
+  );
+  assert.deepEqual(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(f.config.stateDirectory, "latest-operation.json"),
+      ),
+    ),
+    identity,
+  );
+});
 
 test("private closed configuration rejects unexpected fields", (t) => {
   const f = fixture(t);
   assert.deepEqual(loadConfig(f.file), f.config);
   atomicJSON(f.file, { ...f.config, password: "invalid" });
   assert.throws(() => loadConfig(f.file), /invalid_config_fields/u);
+});
+
+test("a failed forced restore is retried on the next run even when an older successful proof is still fresh", async (t) => {
+  const f = fixture(t);
+  privateDirectory(f.config.stateDirectory);
+  const proof = {
+    status: "passed",
+    checkedAt: new Date().toISOString(),
+    sourceId: f.config.source.id,
+    destinationId: f.config.destination.id,
+    volumeUUID: f.config.destination.volumeUUID,
+  };
+  atomicJSON(path.join(f.config.stateDirectory, "latest-restore.json"), proof);
+  await assert.rejects(
+    execute("verify", f.config, f.file, {
+      volume: () => f.mount,
+      restore: async () => {
+        throw new ReplicaError("restore_failed");
+      },
+    }),
+    /restore_failed/u,
+  );
+  assert.deepEqual(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(f.config.stateDirectory, "latest-restore.json"),
+      ),
+    ),
+    proof,
+  );
+  let restored = false;
+  await execute("run", f.config, f.file, {
+    volume: () => f.mount,
+    source: f.source,
+    restore: async () => {
+      restored = true;
+      return proof;
+    },
+  });
+  assert.equal(restored, true);
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(f.config.stateDirectory, "latest-restore-attempt.json"),
+      ),
+    ).status,
+    "passed",
+  );
 });
 test("external access probe reads without changing the destination", async (t) => {
   const f = fixture(t),
@@ -330,9 +518,11 @@ test("source deletion never propagates to retained history", async (t) => {
   assert.equal((await f.sync()).retainedFiles, 2);
   assert.ok(fs.existsSync(path.join(f.target, old)));
 });
-test("retention expires only owned database copies", async (t) => {
+test("retention keeps seven verified copies and preserves owned cleanup history", async (t) => {
   const f = fixture(t),
     old = f.add(f.clock - 120 * 86400_000, "40");
+  await f.sync();
+  for (let i = 1; i <= 6; i++) f.add(f.clock - i * 86400_000, String(100 + i));
   fs.writeFileSync(path.join(f.target, "personal.txt"), "keep");
   const result = await f.sync();
   assert.equal(result.expiredFiles, 1);
@@ -341,7 +531,34 @@ test("retention expires only owned database copies", async (t) => {
     fs.readFileSync(path.join(f.target, "personal.txt"), "utf8"),
     "keep",
   );
-  assert.equal((await f.sync()).retainedFiles, 1);
+  assert.equal((await f.sync()).retainedFiles, 7);
+  const ledger = JSON.parse(fs.readFileSync(path.join(f.target, "retention-ledger.json")));
+  assert.equal(ledger.records[old].state, "cleaned");
+});
+test("space reserve rejects transfer before changing retained replicas and accepts the exact boundary", async (t) => {
+  const f = fixture(t);
+  await f.sync();
+  const before = new Map(
+    fs.readdirSync(f.target).map((name) => [name, fs.readFileSync(path.join(f.target, name))]),
+  );
+  const added = f.add(f.clock - 1000, "43");
+  let transfers = 0;
+  const download = f.source.download;
+  f.source.download = async (...args) => {
+    transfers++;
+    return download(...args);
+  };
+  f.space.availableBytes = f.config.minimumFreeBytes;
+  await assert.rejects(f.sync(), /destination_space_insufficient/u);
+  assert.equal(transfers, 0);
+  assert.deepEqual(fs.readdirSync(f.target).sort(), [...before.keys()].sort());
+  for (const [name, bytes] of before) {
+    assert.deepEqual(fs.readFileSync(path.join(f.target, name)), bytes);
+  }
+  f.space.availableBytes += f.files.get(added).length;
+  await f.sync();
+  assert.equal(transfers, 1);
+  assert.deepEqual(fs.readFileSync(path.join(f.target, added)), f.files.get(added));
 });
 test("corrupt incoming files cannot become committed replicas", async (t) => {
   const f = fixture(t);

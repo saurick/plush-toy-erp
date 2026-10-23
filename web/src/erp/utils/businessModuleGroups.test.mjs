@@ -59,12 +59,12 @@ test('标准菜单合并出货三页，以出货单为默认入口且财务保�
   assert.equal(workspace.activeKey, 'outbound')
   assert.deepEqual(
     workspace.tabs.map((tab) => tab.label),
-    ['出货单', '放行审批', '库存预留']
+    ['出货单', '库存预留']
   )
 })
 
-test('出货页签只呈现获准页面，保留仅放行或仅预留岗位入口', () => {
-  for (const key of ['shipping-release', 'outbound']) {
+test('出货页签只呈现获准页面，保留仅出货或仅预留岗位入口', () => {
+  for (const key of ['shipments', 'outbound']) {
     const visible = [section(key)]
     const item = getBusinessModule(key)
     const projected = projectBusinessModuleSections(visible)[0].items
@@ -84,19 +84,19 @@ test('出货页签只呈现获准页面，保留仅放行或仅预留岗位入�
   )
 })
 
-test('岗位优先放行时合并后保留该入口，其他入口不重复出货模块', () => {
+test('岗位优先出货时合并后保留该入口，其他入口不重复出货模块', () => {
   const navigation = projectRoleGuidedModuleNavigation({
     dashboardItems: [],
-    primaryItems: section('shipping-release').items,
+    primaryItems: section('shipments').items,
     secondarySections: [
-      section('shipments', 'outbound'),
+      section('outbound'),
       section('receivables'),
     ],
   })
   assert.equal(navigation.primaryItems[0].label, '出货管理')
   assert.equal(
     navigation.primaryItems[0].path,
-    '/erp/warehouse/shipping-release'
+    '/erp/warehouse/shipments'
   )
   assert.deepEqual(
     navigation.secondaryItems.map((item) => item.label),
@@ -369,7 +369,6 @@ test('客户菜单顺序与产品分类一致，默认入口从获准页面按�
   )
   const reordered = projectBusinessModuleSections([
     section(
-      'shipping-release',
       'outbound',
       'shipments',
       'invoices',

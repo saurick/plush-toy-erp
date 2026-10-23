@@ -120,7 +120,7 @@ export function createGlobalDensityOptimizationScenarios(scenarios, { assert, ou
     for (const [key, route] of [
       ['receivables', '/erp/finance/receivables'], ['payables', '/erp/finance/payables'], ['invoices', '/erp/finance/invoices'],
       ['reconciliation', '/erp/finance/reconciliation'], ['payments', '/erp/finance/payments'], ['receipts', '/erp/warehouse/inbound'],
-      ['outbound', '/erp/warehouse/outbound'], ['workflow', '/erp/warehouse/shipping-release'],
+      ['outbound', '/erp/warehouse/outbound'], ['workflow', '/erp/production/scheduling'],
     ]) {
       await goto(page, route)
       const row = page.locator('.ant-table-tbody tr[data-row-key]').first()

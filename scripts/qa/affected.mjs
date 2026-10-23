@@ -11,6 +11,7 @@ import { collectGitChangedFiles } from "./lib/git-range.mjs";
 import { NODE_TEST_GROUPS } from "./node-test-groups.mjs";
 import { MIGRATION_CONTRACT_TESTS } from "./migration-contracts.mjs";
 import { discoverWebUnitTests } from "../../web/scripts/runUnitTests.mjs";
+import { BUSINESS_RULES } from "./lib/business-rule-catalog.mjs";
 import { requiresRPCContractCheck } from "../lib/rpc-contract-review.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -147,7 +148,42 @@ const PHASE_LABEL_TEXT_EXTENSIONS = new Set([
   ".yml",
 ]);
 
+const CONSISTENCY_SOURCES = new Set([
+  ...BUSINESS_RULES.filter((entry) => entry.category === "consistency").flatMap(
+    (entry) =>
+      entry.tests.flatMap((target) => [
+        target.file,
+        target.file.replace(
+          /(?:_test\.go|\.test\.mjs)$/u,
+          target.file.endsWith(".go") ? ".go" : ".mjs",
+        ),
+      ]),
+  ),
+  "web/src/erp/utils/xlsxWorkbook.mjs",
+  "web/src/erp/utils/sourceOrderParams.mjs",
+  "web/src/erp/utils/materialPurchaseContractEditor.mjs",
+  "web/src/erp/data/processingContractTemplate.mjs",
+  "web/src/erp/components/print/MaterialPurchaseContractPaper.jsx",
+  "web/src/erp/components/print/ProcessingContractPaper.jsx",
+  "web/src/erp/components/shipments/ShipmentEditor.jsx",
+  "server/internal/data/purchase_receipt_repo.go",
+  "server/internal/data/purchase_return_repo.go",
+  "server/internal/data/operational_fact_shipment_repo.go",
+  "server/internal/data/engineering_material_request_repo.go",
+  "server/internal/biz/operational_fact.go",
+  "server/internal/biz/purchase_return.go",
+  "server/internal/data/model/schema/purchase_order_item.go",
+  "server/internal/data/model/schema/shipment.go",
+  "scripts/qa/lib/business-consistency-evidence.mjs",
+]);
 const FIXED_COMMANDS = {
+  consistency: command(
+    "business-consistency",
+    "T4",
+    "业务数据一致性专项",
+    "node",
+    ["scripts/qa/business-data-consistency.mjs"],
+  ),
   diff: command("diff-check", "T0", "检查当前 diff 格式", "git", [
     "--no-optional-locks",
     "-c",
@@ -811,32 +847,86 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (
+      CONSISTENCY_SOURCES.has(file) ||
+      file === "scripts/qa/business-data-consistency.mjs" ||
+      file === "scripts/qa/lib/business-rule-catalog.mjs" ||
+      /server\/internal\/(?:biz\/line_amount|data\/(?:shipment_commercial_snapshot|operational_fact_finance.*_repo|purchase_order_repo))\.go$/u.test(
+        file,
+      )
+    ) {
+      addFixed(state, "consistency", file);
+      addFollowUp(
+        state,
+        "browser-regression",
+        "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-business-consistency-evidence,business-consistency-print-purchase,business-consistency-print-processing pnpm --dir web style:l1，核对专项证据与打印币种、快照。",
+        file,
+      );
+      addNodeTests(
+        state,
+        ["scripts/qa/business-data-consistency.test.mjs"],
+        file,
+        "T4",
+      );
+    }
     if (WORK_CENTER_SAMPLE_SOURCES.has(file)) {
-      addNodeTests(state, [
-        "scripts/qa/dev-workbench-boundary.test.mjs",
-        "web/src/dev-workbench/config/devWorkCenterDesign.test.mjs",
-        "web/src/dev-workbench/components/DevWorkCenterDesign.test.mjs",
-      ], file, "T5");
-      addFollowUp(state, "browser-regression", "T5",
-        "运行 STYLE_L1_SCENARIOS=dev-ui-design-work-center-explanations,dev-ui-design-work-center-reading pnpm --dir web style:l1，核对工作中心样例的首次加载、两端切换、关联清单、示例复制与返回恢复均不请求业务数据。", file);
+      addNodeTests(
+        state,
+        [
+          "scripts/qa/dev-workbench-boundary.test.mjs",
+          "web/src/dev-workbench/config/devWorkCenterDesign.test.mjs",
+          "web/src/dev-workbench/components/DevWorkCenterDesign.test.mjs",
+        ],
+        file,
+        "T5",
+      );
+      addFollowUp(
+        state,
+        "browser-regression",
+        "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-ui-design-work-center-explanations,dev-ui-design-work-center-reading pnpm --dir web style:l1，核对工作中心样例的首次加载、两端切换、关联清单、示例复制与返回恢复均不请求业务数据。",
+        file,
+      );
     }
     if (GROWTH_VALIDATION_EVIDENCE_SOURCES.has(file)) {
-      addNodeTests(state, [
-        "scripts/qa/business-rule-catalog.test.mjs",
-        "web/src/dev-workbench/config/devTestingStrategy.test.mjs",
-        "web/src/dev-workbench/config/devBusinessRules.test.mjs",
-        "web/dev-server/devIntegrationEvidence.test.mjs",
-      ], file, "T5");
-      addFollowUp(state, "browser-regression", "T5", devBrowserFollowUpText(file), file);
+      addNodeTests(
+        state,
+        [
+          "scripts/qa/business-rule-catalog.test.mjs",
+          "web/src/dev-workbench/config/devTestingStrategy.test.mjs",
+          "web/src/dev-workbench/config/devBusinessRules.test.mjs",
+          "web/dev-server/devIntegrationEvidence.test.mjs",
+        ],
+        file,
+        "T5",
+      );
+      addFollowUp(
+        state,
+        "browser-regression",
+        "T5",
+        devBrowserFollowUpText(file),
+        file,
+      );
     }
     if (SALES_EXPORT_GROWTH_SOURCES.has(file)) {
-      addNodeTests(state, [
-        "scripts/qa/engineering-pressure.test.mjs",
-        "scripts/qa/pressure-engineering-scenario.test.mjs",
-        "scripts/qa/business-rule-catalog.test.mjs",
-      ], file, "T7");
-      addFollowUp(state, "growth-capacity-validation", "T7",
-        "核对销售导出的总数据量、单次完整范围、准入与超时；真实数据库规则通过后，按资源预算运行 pressure-isolated-lifecycle.mjs --profile quick --data-scale baseline --run。比较增长规模时保持负载和资源一致，未运行的容量范围保留未验证；10 分钟容量档不自动执行。", file);
+      addNodeTests(
+        state,
+        [
+          "scripts/qa/engineering-pressure.test.mjs",
+          "scripts/qa/pressure-engineering-scenario.test.mjs",
+          "scripts/qa/business-rule-catalog.test.mjs",
+        ],
+        file,
+        "T7",
+      );
+      addFollowUp(
+        state,
+        "growth-capacity-validation",
+        "T7",
+        "核对销售导出的总数据量、单次完整范围、准入与超时；真实数据库规则通过后，按资源预算运行 pressure-isolated-lifecycle.mjs --profile quick --data-scale baseline --run。比较增长规模时保持负载和资源一致，未运行的容量范围保留未验证；10 分钟容量档不自动执行。",
+        file,
+      );
     }
     if (
       PUBLIC_CONTRACT_SOURCE.test(file) ||

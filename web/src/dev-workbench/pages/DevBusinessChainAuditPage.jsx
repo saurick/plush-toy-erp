@@ -130,7 +130,7 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
           <strong>终点：</strong>
           {report.scope.terminal}
         </p>
-        <details>
+        <details className="erp-dev-disclosure">
           <summary>同一来源到财务结清的读回样本</summary>
           <Table
             size="small"
@@ -165,7 +165,7 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
             description="重新启动前端开发服务后刷新；历史报告仍按原样显示。"
           />
         ) : null}
-        <details>
+        <details className="erp-dev-disclosure">
           <summary>查看逐链变化与本批次未记录步骤</summary>
           <Table
             size="small"
@@ -307,7 +307,7 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
             allowClear
             placeholder="搜索环节、岗位或实际读回"
             value={keyword}
-            onChange={(event) => updateQuery({ q: event.target.value || null })}
+            onSearch={(value) => updateQuery({ q: value || null })}
           />
           <Text type="secondary">{rows.length} 个步骤</Text>
         </div>
@@ -371,7 +371,7 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
           <ChainAuditEvidenceLinks data={data} items={selectedChain.evidence} />
         ) : null}
       </section>
-      <details>
+      <details className="erp-dev-disclosure">
         <summary>登记场景与实际覆盖 · 保留部分覆盖和未证明项</summary>
         <Table
           size="small"
@@ -654,7 +654,7 @@ export default function DevBusinessChainAuditPage() {
             ) : null}
             {view === 'evidence' ? <DevChainAuditEvidence data={data} /> : null}
           </main>
-          <details className="erp-dev-chain-audit__limits">
+          <details className="erp-dev-disclosure erp-dev-chain-audit__limits">
             <summary>
               覆盖范围与未证明项（{report.scope.registeredScenarioCount} 个登记场景）
             </summary>

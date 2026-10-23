@@ -6,7 +6,14 @@ import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { COVERAGE_REPORT_SCHEMA, validateCoverageReport } from "./lib/coverage-report-contract.mjs";
+import {
+  BUSINESS_CONSISTENCY_SCHEMA,
+  validateBusinessConsistencyEvidence,
+} from "./lib/business-consistency-evidence.mjs";
+import {
+  COVERAGE_REPORT_SCHEMA,
+  validateCoverageReport,
+} from "./lib/coverage-report-contract.mjs";
 
 import {
   buildRepositoryFingerprint,
@@ -1143,6 +1150,7 @@ export function assembleCoverageReport({
   const gateCandidates = new Map(GATE_LEVELS.map((level) => [level, []]));
   const acceptanceCandidates = new Map(ACCEPTANCE_KEYS.map((key) => [key, []]));
   const artifactCodeCandidates = { go: [], web: [] };
+  const consistencyCandidates = [];
 
   for (const source of artifacts) {
     const { artifact, evidence, freshness } = source;
@@ -1154,6 +1162,21 @@ export function assembleCoverageReport({
       generatedAt: generatedAtValue,
       evidence,
     };
+    if (artifact.schemaVersion === BUSINESS_CONSISTENCY_SCHEMA) {
+      try {
+        validateBusinessConsistencyEvidence(artifact);
+        consistencyCandidates.push({
+          schemaVersion: artifact.schemaVersion,
+          tests: artifact.tests,
+          status: artifact.status,
+          generatedAt: generatedAtValue,
+          current,
+          evidence,
+        });
+      } catch {
+        /* Incomplete or mismatched evidence cannot prove a registered rule. */
+      }
+    }
 
     const domainSection =
       artifact.businessCoverage?.domains || artifact.domains;
@@ -1281,6 +1304,15 @@ export function assembleCoverageReport({
     gates,
     acceptance,
     inputArtifacts,
+    ...(consistencyCandidates.length
+      ? {
+          businessConsistency: consistencyCandidates.sort(
+            (a, b) =>
+              Number(b.current) - Number(a.current) ||
+              b.generatedAt.localeCompare(a.generatedAt),
+          )[0],
+        }
+      : {}),
   };
 }
 

@@ -2,6 +2,7 @@ import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { clickERPThemeOption } from './themeAssertions.mjs'
 import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../../src/erp/utils/mobileTaskQueries.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { chooseMobileFilterOption } from './mobileTaskListOptionsScenario.mjs'
 
 export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
   const permissions = [
@@ -79,9 +80,13 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         await dropdown.waitFor({ state: 'visible' })
         return dropdown
       }
-      const chooseTaskFilter = async (label) => {
+      const chooseTaskFilter = async (label, sort = false) => {
         const dropdown = await openTaskFilters()
-        await dropdown.getByText(label, { exact: true }).click()
+        if (sort) {
+          await chooseMobileFilterOption(dropdown.getByRole('combobox', { name: '任务排序', exact: true }), label)
+        } else {
+          await dropdown.getByText(label, { exact: true }).click()
+        }
         assert(await dropdown.isVisible())
         await dropdown
           .getByRole('button', { name: '关闭筛选', exact: true })
@@ -89,7 +94,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         await dropdown.waitFor({ state: 'hidden' })
       }
       const applyTaskFilters = async ({ sort, status }) => {
-        if (sort) await chooseTaskFilter(sort)
+        if (sort) await chooseTaskFilter(sort, true)
         if (status) await chooseTaskFilter(status)
       }
       const client = await page.context().newCDPSession(page)
@@ -347,9 +352,11 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
                   const start = performance.now()
                   const tick = () => {
                     samples.push(node.getBoundingClientRect().height)
-                    if (performance.now() - start < 400)
+                    if (performance.now() - start < 400) {
                       requestAnimationFrame(tick)
-                    else resolve(samples)
+                    } else {
+                      resolve(samples)
+                    }
                   }
                   requestAnimationFrame(tick)
                 })
@@ -554,9 +561,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       const persistedFilterDropdown = await openTaskFilters()
       assert.equal(
         await persistedFilterDropdown
-          .getByRole('radio', { name: '等待最久', exact: true })
-          .isChecked(),
-        true
+          .locator('.ant-select-selection-item')
+          .innerText(),
+        '等待最久'
       )
       assert.equal(
         await persistedFilterDropdown

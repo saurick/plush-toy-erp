@@ -277,6 +277,7 @@ export function readIntegrationGuide(source) {
   return {
     source: markdown,
     selectionSource: table ? lines.slice(0, table.lines[1]).join('\n') : markdown,
+    choiceTableSource: table ? lines.slice(...table.lines).join('\n') : '',
     boundarySource: note ? lines.slice(...note.lines).join('\n') : '',
     detailsSource: note ? lines.slice(note.lines[1]).join('\n').trim() : '',
     location: buildDevDocsLocation({

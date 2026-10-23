@@ -80,10 +80,10 @@ export default function DevIntegrationPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const inventorySurface = useRef(null)
-  const guideSurface = useRef(null)
   const detailOpener = useRef(null)
   const closeButton = useRef(null)
   const query = parseIntegrationSearch(params)
+  const guideSurface = useRef(null)
   const pendingParams = useRef(params)
   const [permissionState, setPermissionState] = useState({
     loading: true,
@@ -137,7 +137,7 @@ export default function DevIntegrationPage() {
   }, [permissionReload, query.view])
 
   useEffect(() => {
-    if (!gateReload || query.view !== 'inventory') return undefined
+    if (!gateReload) return undefined
     const controller = new AbortController()
     setGateState({ loading: true, data: null, error: false })
     gateClient
@@ -153,14 +153,14 @@ export default function DevIntegrationPage() {
         }
       })
     return () => controller.abort()
-  }, [gateClient, gateReload, query.view])
+  }, [gateClient, gateReload])
 
   useEffect(() => {
     if (query.node) setGraphOpen(true)
   }, [query.node])
 
   useEffect(() => {
-    if (!evidenceReload || query.view !== 'inventory') return undefined
+    if (!evidenceReload) return undefined
     const controller = new AbortController()
     setEvidenceState({ loading: true, data: null, error: false })
     readIntegrationEvidence({ signal: controller.signal })
@@ -175,7 +175,7 @@ export default function DevIntegrationPage() {
         }
       })
     return () => controller.abort()
-  }, [evidenceReload, query.view])
+  }, [evidenceReload])
 
   useEffect(() => {
     const container = guideSurface.current
@@ -395,8 +395,8 @@ export default function DevIntegrationPage() {
                       placeholder="搜索接口名称、方法名或用途"
                       allowClear
                       value={query.q}
-                      onChange={(event) =>
-                        updateFilters({ q: event.target.value }, true)
+                      onSearch={(value) =>
+                        updateFilters({ q: value }, true)
                       }
                     />
                   </div>
@@ -544,7 +544,8 @@ export default function DevIntegrationPage() {
                             <section data-integration-section="access" tabIndex={-1} className={query.section === 'access' ? 'erp-dev-integration__section--target' : ''}>
                               <DevIntegrationAccess
                                 boundary={integrationBoundary}
-                                onGuide={() => updateQuery({ view: 'guide', rpc: '', detail: '', section: '' })}
+                                method
+                                guide={integrationGuide}
                               />
                             </section>
                             <section data-integration-section="permissions" tabIndex={-1} className={query.section === 'permissions' ? 'erp-dev-integration__section--target' : ''}>
@@ -563,7 +564,7 @@ export default function DevIntegrationPage() {
                                 </div>
                     ) : null}
                               {selectedPermissions.some((permission) => permission.conditions.length) ? (
-                                <details className="erp-dev-integration__permission-conditions">
+                                <details className="erp-dev-disclosure erp-dev-integration__permission-conditions">
                                   <summary>权限登记的补充条件</summary>
                                   {selectedPermissions.filter((permission) => permission.conditions.length).map((permission) => (
                                     <div key={permission.key}>
@@ -691,7 +692,7 @@ export default function DevIntegrationPage() {
                   <>
                     <Markdown source={integrationGuide.selectionSource} />
                     {integrationGuide.boundarySource ? <div className="erp-dev-integration__note"><Markdown source={integrationGuide.boundarySource} /></div> : null}
-                    <details className="erp-dev-integration__guide-notes">
+                    <details className="erp-dev-disclosure erp-dev-integration__guide-notes">
                       <summary>登记与验收说明</summary>
                       <Markdown source={integrationGuide.detailsSource} />
                       <Link to={integrationGuide.location}>查看正式接入规范</Link>
@@ -704,12 +705,11 @@ export default function DevIntegrationPage() {
               <section className="erp-dev-integration__table erp-dev-integration__relationships">
                 <DevIntegrationAccess
                   boundary={integrationBoundary}
-                  onInventory={() => updateQuery({ view: 'inventory' })}
                 />
               </section>
               <DevIntegrationRelationshipExamples examples={relationshipExamples} value={query.example} onChange={(example) => updateQuery({ example })} />
               <details
-                className="erp-dev-integration__graph"
+                className="erp-dev-disclosure erp-dev-integration__graph"
                 open={graphOpen}
                 onToggle={(event) => setGraphOpen(event.currentTarget.open)}
               >
@@ -728,7 +728,7 @@ export default function DevIntegrationPage() {
           )}
         </div>
         <details
-          className="erp-dev-integration__table erp-dev-integration__evidence-disclosure"
+          className="erp-dev-disclosure erp-dev-integration__table erp-dev-integration__evidence-disclosure"
           open={evidenceOpen}
           onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}
         >
@@ -742,95 +742,93 @@ export default function DevIntegrationPage() {
             <p className="erp-dev-integration__note">
               权限登记供核对，回归来源与整体门禁不能证明逐接口验证通过。
             </p>
-            {query.view === 'inventory' ? (
-              <>
-                <section
-                  className="erp-dev-integration__source"
-                  aria-label="门禁整体证据"
-                >
-                  <strong>门禁整体证据</strong>
-                  {!gateState.data && !gateState.error ? (
-                    <span>{gateState.loading ? '正在读取' : '尚未读取'}</span>
+            <section
+              className="erp-dev-integration__source"
+              aria-label="门禁整体证据"
+            >
+              <strong>门禁整体证据</strong>
+              {!gateState.data && !gateState.error ? (
+                <span>{gateState.loading ? '正在读取' : '尚未读取'}</span>
                 ) : null}
-                  {gateState.error ? (
-                    <span role="alert">门禁证据读取失败，结果未验证。</span>
+              {gateState.error ? (
+                <span role="alert">门禁证据读取失败，结果未验证。</span>
                 ) : null}
-                  {gateStatus ? (
-                    <span>
-                      {gateStatus.title} ·{' '}
-                      {gateState.data.serverEvidence.gitSha
+              {gateStatus ? (
+                <span>
+                  {gateStatus.title} ·{' '}
+                  {gateState.data.serverEvidence.gitSha
                       ? `证据提交 ${gateState.data.serverEvidence.gitSha.slice(0, 12)}`
                       : '缺少证据提交'}
-                      {!gateState.data.serverEvidence.current
+                  {!gateState.data.serverEvidence.current
                       ? ' · 未匹配当前提交'
                       : ''}
-                      {!gateState.data.serverEvidence.coversWorkingTree
+                  {!gateState.data.serverEvidence.coversWorkingTree
                       ? ' · 未覆盖当前工作区'
                       : ''}
-                      {gateState.data.repository.dirty ? ' · 工作区有未提交改动' : ''}
-                    </span>
+                  {gateState.data.repository.dirty ? ' · 工作区有未提交改动' : ''}
+                </span>
                 ) : null}
-                  {gateState.data ? (
-                    <DevTimestamp value={gateState.data.generatedAt} action="读取于" />
+              {gateState.data ? (
+                <DevTimestamp value={gateState.data.generatedAt} action="读取于" />
                 ) : null}
-                  <Button
-                    size="small"
-                    loading={gateState.loading}
-                    onClick={() => setGateReload((value) => value + 1)}
-                  >
-                    {gateReload ? '刷新门禁证据' : '读取门禁证据'}
-                  </Button>
-                  <Link to={DEV_QUALITY_GATES_ROUTE}>到质量门禁核对</Link>
-                </section>
-                <section
-                  className="erp-dev-integration__table"
-                  aria-label="模拟接入运行证据"
+              <Button
+                size="small"
+                loading={gateState.loading}
+                onClick={() => setGateReload((value) => value + 1)}
+              >
+                {gateReload ? '刷新门禁证据' : '读取门禁证据'}
+              </Button>
+              <Link to={DEV_QUALITY_GATES_ROUTE}>到质量门禁核对</Link>
+            </section>
+            <section
+              className="erp-dev-integration__table"
+              aria-label="模拟接入运行证据"
+            >
+              <div className="erp-dev-integration__source">
+                <h2>模拟接入运行证据</h2>
+                <Button
+                  size="small"
+                  loading={evidenceState.loading}
+                  onClick={() => setEvidenceReload((value) => value + 1)}
                 >
-                  <div className="erp-dev-integration__source">
-                    <h2>模拟接入运行证据</h2>
-                    <Button
-                      size="small"
-                      loading={evidenceState.loading}
-                      onClick={() => setEvidenceReload((value) => value + 1)}
-                    >
-                      {evidenceReload ? '刷新场景证据' : '读取场景运行证据'}
-                    </Button>
-                  </div>
-                  {evidenceState.error ? (
-                    <p role="alert">场景运行证据读取失败，请核对原始报告后重试。</p>
+                  {evidenceReload ? '刷新场景证据' : '读取场景运行证据'}
+                </Button>
+              </div>
+              {evidenceState.error ? (
+                <p role="alert">场景运行证据读取失败，请核对原始报告后重试。</p>
                 ) : null}
-                  {!evidenceReload ? (
-                    <p>按需读取现有隔离数据库门禁的原始用例结果。</p>
+              {!evidenceReload ? (
+                <p>按需读取现有隔离数据库门禁的原始用例结果。</p>
                 ) : null}
-                  {evidenceState.data ? (
-                    <>
-                      <p>
-                        {evidenceState.data.run ? (
-                          <>
-                            {evidenceState.data.current
+              {evidenceState.data ? (
+                <>
+                  <p>
+                    {evidenceState.data.run ? (
+                      <>
+                        {evidenceState.data.current
                             ? '源码身份与当前工作区一致'
                             : '历史证据，未覆盖当前工作区'}
-                            {evidenceState.data.run.repository
+                        {evidenceState.data.run.repository
                             ? ` · 提交 ${evidenceState.data.run.repository.commit.slice(0, 12)} · 指纹 ${evidenceState.data.run.repository.fingerprint.slice(0, 12)}`
                             : ' · 缺少源码身份'}
-                            {` · 门禁${evidenceState.data.run.status === 'passed' ? '通过' : '未通过'} · 清理${evidenceState.data.run.cleanupComplete ? '完成' : '未证明完成'}`}
-                          </>
+                        {` · 门禁${evidenceState.data.run.status === 'passed' ? '通过' : '未通过'} · 清理${evidenceState.data.run.cleanupComplete ? '完成' : '未证明完成'}`}
+                      </>
                       ) : (
                         '尚无可关联的隔离数据库运行回执。'
                       )}
-                      </p>
-                      {evidenceState.data.run?.finishedAt ? (
-                        <DevTimestamp
-                          value={evidenceState.data.run.finishedAt}
-                          action="运行完成于"
-                        />
+                  </p>
+                  {evidenceState.data.run?.finishedAt ? (
+                    <DevTimestamp
+                      value={evidenceState.data.run.finishedAt}
+                      action="运行完成于"
+                    />
                     ) : null}
-                      <Table
-                        rowKey="test"
-                        size="small"
-                        pagination={false}
-                        dataSource={evidenceState.data.scenarios}
-                        columns={[
+                  <Table
+                    rowKey="test"
+                    size="small"
+                    pagination={false}
+                    dataSource={evidenceState.data.scenarios}
+                    columns={[
                         { title: '模拟场景', dataIndex: 'label' },
                         {
                           title: '执行结果',
@@ -843,22 +841,18 @@ export default function DevIntegrationPage() {
                           render: (test) => <code>{test}</code>,
                         },
                       ]}
-                      />
-                      {evidenceState.data.run ? (
-                        <p>
-                          原始回执：<code>{evidenceState.data.run.receipt}</code>
-                        </p>
+                  />
+                  {evidenceState.data.run ? (
+                    <p>
+                      原始回执：<code>{evidenceState.data.run.receipt}</code>
+                    </p>
                     ) : null}
-                      <p className="erp-dev-integration__note">
-                        结果只证明对应模拟场景；不代表全部接口、外部合作方授权或真实第三方验收通过。
-                      </p>
-                    </>
+                  <p className="erp-dev-integration__note">
+                    结果只证明对应模拟场景；不代表全部接口、外部合作方授权或真实第三方验收通过。
+                  </p>
+                </>
                 ) : null}
-                </section>
-              </>
-            ) : (
-              <Button onClick={() => updateQuery({ view: 'inventory' })}>查看运行证据</Button>
-            )}
+            </section>
           </div>
         </details>
       </main>

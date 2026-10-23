@@ -63,6 +63,14 @@ const (
 	FieldVolumeM3 = "volume_m3"
 	// FieldShippingMark holds the string denoting the shipping_mark field in the database.
 	FieldShippingMark = "shipping_mark"
+	// FieldReceivableAmountSnapshot holds the string denoting the receivable_amount_snapshot field in the database.
+	FieldReceivableAmountSnapshot = "receivable_amount_snapshot"
+	// FieldQuotedFreightAmountSnapshot holds the string denoting the quoted_freight_amount_snapshot field in the database.
+	FieldQuotedFreightAmountSnapshot = "quoted_freight_amount_snapshot"
+	// FieldTaxAmountSnapshot holds the string denoting the tax_amount_snapshot field in the database.
+	FieldTaxAmountSnapshot = "tax_amount_snapshot"
+	// FieldTaxModeSnapshot holds the string denoting the tax_mode_snapshot field in the database.
+	FieldTaxModeSnapshot = "tax_mode_snapshot"
 	// FieldFreightAmount holds the string denoting the freight_amount field in the database.
 	FieldFreightAmount = "freight_amount"
 	// FieldFreightCurrency holds the string denoting the freight_currency field in the database.
@@ -135,6 +143,10 @@ var Columns = []string{
 	FieldGrossWeightKg,
 	FieldVolumeM3,
 	FieldShippingMark,
+	FieldReceivableAmountSnapshot,
+	FieldQuotedFreightAmountSnapshot,
+	FieldTaxAmountSnapshot,
+	FieldTaxModeSnapshot,
 	FieldFreightAmount,
 	FieldFreightCurrency,
 	FieldTotalNetWeightG,
@@ -205,6 +217,8 @@ var (
 	PackageCountValidator func(int) error
 	// ShippingMarkValidator is a validator for the "shipping_mark" field. It is called by the builders before save.
 	ShippingMarkValidator func(string) error
+	// TaxModeSnapshotValidator is a validator for the "tax_mode_snapshot" field. It is called by the builders before save.
+	TaxModeSnapshotValidator func(string) error
 	// FreightCurrencyValidator is a validator for the "freight_currency" field. It is called by the builders before save.
 	FreightCurrencyValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
@@ -338,6 +352,26 @@ func ByVolumeM3(opts ...sql.OrderTermOption) OrderOption {
 // ByShippingMark orders the results by the shipping_mark field.
 func ByShippingMark(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldShippingMark, opts...).ToFunc()
+}
+
+// ByReceivableAmountSnapshot orders the results by the receivable_amount_snapshot field.
+func ByReceivableAmountSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReceivableAmountSnapshot, opts...).ToFunc()
+}
+
+// ByQuotedFreightAmountSnapshot orders the results by the quoted_freight_amount_snapshot field.
+func ByQuotedFreightAmountSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldQuotedFreightAmountSnapshot, opts...).ToFunc()
+}
+
+// ByTaxAmountSnapshot orders the results by the tax_amount_snapshot field.
+func ByTaxAmountSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaxAmountSnapshot, opts...).ToFunc()
+}
+
+// ByTaxModeSnapshot orders the results by the tax_mode_snapshot field.
+func ByTaxModeSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaxModeSnapshot, opts...).ToFunc()
 }
 
 // ByFreightAmount orders the results by the freight_amount field.

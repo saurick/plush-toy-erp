@@ -239,7 +239,7 @@ func (r *workflowRepo) ResolveWorkflowTaskMutation(
 	return workflowTaskMutationReceiptResult(event, intentHash, commandKey, actorID)
 }
 
-func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
+func (r *workflowRepo) workflowTaskListQuery(filter biz.WorkflowTaskFilter) *ent.WorkflowTaskQuery {
 	query := r.data.postgres.WorkflowTask.Query()
 	if filter.VisibilityScope != nil {
 		query = query.Where(workflowTaskRevisionVisibilityPredicate(filter.VisibilityScope, filter.OwnerRoleKey))
@@ -270,6 +270,11 @@ func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.Workflo
 		query = query.Where(workflowtask.DueAtLTE(*filter.DueTo))
 	}
 
+	return query
+}
+
+func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
+	query := r.workflowTaskListQuery(filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -1835,4 +1840,9 @@ func workflowEscalationTarget(action string) string {
 	default:
 		return ""
 	}
+}
+
+func (r *workflowRepo) CountWorkflowTasksByStatus(ctx context.Context, filter biz.WorkflowTaskFilter) (map[string]int, error) {
+	filter.TaskStatusKey = ""
+	return scanBusinessStatusCounts(ctx, r.workflowTaskListQuery(filter).GroupBy(workflowtask.FieldTaskStatusKey).Aggregate(ent.Count()).Scan)
 }

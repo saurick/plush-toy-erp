@@ -937,7 +937,7 @@ test('devTesting: 主视图与命令筛选由 canonical query 驱动', () => {
     testingPageSource,
     /aria-pressed=\{option\.value === documentRole\}/u
   )
-  assert.match(testingPageSource, /setCommandKeyword\(event\.target\.value\)/u)
+  assert.match(testingPageSource, /onSearch=\{\(value\) => setCommandKeyword\(value\)\}/u)
   assert.match(testingPageSource, /selectDocumentRole\(option\.value\)/u)
   assert.match(testingPageSource, /nextParams\.delete\('doc'\)/u)
   assert.doesNotMatch(testingPageSource, /VIEW_DOCS|SelectedDocDetail/u)

@@ -41,12 +41,12 @@ export function TaskBoardProgressRail({
   return (
     <nav className="erp-task-progress-rail" aria-label="任务分类">
       <FilterChip
-        className={`erp-task-progress-rail__item erp-task-progress-rail__item--overview${activeLane === 'all' ? ' is-active' : ''}`}
+        className={`erp-task-progress-rail__item erp-task-progress-rail__item--all${activeLane === 'all' ? ' is-active' : ''}`}
         selected={activeLane === 'all'}
-        aria-label="任务概览"
+        aria-label={mode === 'todo' ? '全部待办' : mode === 'approval' ? '全部审批' : '全部分类'}
         onClick={() => onSelectLane('all')}
       >
-        <span className="erp-task-progress-rail__label">概览</span>
+        <span className="erp-task-progress-rail__label">{mode === 'todo' ? '全部待办' : mode === 'approval' ? '全部审批' : '全部分类'}</span>
       </FilterChip>
       {TASK_BOARD_LANE_DEFINITIONS.filter(
         (lane) => mode !== 'todo' || lane.key !== 'finished'
@@ -238,14 +238,14 @@ export function openTaskTableRow(event, task, onOpenTask) {
   openWorkflowTaskRow(event, () => onOpenTask(task))
 }
 
-export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenTask }) {
+export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
   const tableRef = React.useRef(null)
   const sticky = useBusinessListStickyHeader(tableRef, true)
   return (
     <section
       ref={tableRef}
-      className={`erp-task-board-lane erp-task-board-lane--${lane.key}${focused ? ' erp-task-board-lane--focused' : ''}`}
-      aria-label={focused ? lane.title : '待处理预览'}
+      className={`erp-task-board-lane erp-task-board-lane--${lane.key} erp-task-board-lane--focused`}
+      aria-label={lane.title}
       aria-busy={loading}
     >
       <Table
@@ -263,7 +263,7 @@ export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenT
             align: 'left',
             title: '任务与关联内容',
             key: 'identity',
-            width: '36%',
+            width: '45%',
             render: (_, task) => (
               <div className="erp-workbench-task-cell">
                 {task.returnedToPosition ? <Tag color="green">刚办理，保留原位置</Tag> : null}
@@ -273,6 +273,7 @@ export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenT
                   compact
                   layout="table"
                   showTaskName
+                  source={<WorkflowTaskSource task={task} showUnavailable={false} />}
                   renderCompactTitle={() => (
                     <TaskTitleEntry task={task} onOpenTask={onOpenTask} compact />
                   )}
@@ -282,12 +283,11 @@ export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenT
           },
           {
             align: 'left',
-            title: '关联单据 / 时间',
-            key: 'source',
-            width: '27%',
+            title: '任务时间',
+            key: 'time',
+            width: '18%',
             render: (_, task) => (
               <div className="erp-workbench-task-cell">
-                <WorkflowTaskSource task={task} showUnavailable={false} />
                 <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} showDueRisk={!getWorkflowTaskStatusRiskTags(task).some((tag) => tag.key === 'overdue' || tag.key === 'due_soon')} />
               </div>
             ),
@@ -349,8 +349,8 @@ export function TaskLane({ lane, keyword = '', loading = false, focused, onOpenT
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
-                lane.key === 'overview'
-                  ? '当前范围暂无待处理任务'
+                lane.key === 'all'
+                  ? '当前范围暂无匹配任务'
                   : '当前分类暂无匹配任务'
               }
             />

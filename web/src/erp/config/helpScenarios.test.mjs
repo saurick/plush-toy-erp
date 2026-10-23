@@ -1,20 +1,33 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getBusinessUsabilityEntry } from './businessUsabilityCatalog.mjs'
+import { BUSINESS_USABILITY_CATALOG, getBusinessUsabilityEntry } from './businessUsabilityCatalog.mjs'
 import {
   GENERIC_HELP_GUIDE,
   ROLE_HELP_GUIDES,
   getRoleHelpGuide,
   getRoleHelpGuidesForProfile,
 } from './roleHelpContent.mjs'
-import { getRoleHelpScenarios, resolveHelpScenario } from './helpScenarios.mjs'
+import { getBusinessPageHelpScenario, getRoleHelpScenarios, resolveHelpScenario } from './helpScenarios.mjs'
+
+test('页内图解复用既有场景且不为无图页面补造流程', () => {
+  for (const entry of BUSINESS_USABILITY_CATALOG) {
+    const scenario = getBusinessPageHelpScenario(entry.key)
+    if (!scenario) continue
+    assert.equal(scenario.pageKey, entry.key)
+    assert.deepEqual(scenario.steps.map((step) => step.description), entry.flowSteps)
+    assert.equal(scenario.completion, entry.completion)
+    assert.equal(scenario.handoff, entry.handoff)
+  }
+  assert.equal(getBusinessPageHelpScenario('missing-page'), null)
+  assert.equal(getBusinessPageHelpScenario('inventory'), null)
+})
 
 test('每个现有岗位按独立场景提供责任、步骤、结果与异常恢复', () => {
   const extraPages = {
     engineering: ['materials'],
     purchase: ['materials'],
-    warehouse: ['materials', 'shipping-release', 'outbound'],
-    finance: ['shipping-release'],
+    warehouse: ['materials', 'shipments', 'outbound'],
+    finance: ['shipments'],
     sales: ['outbound'],
   }
   for (const role of ROLE_HELP_GUIDES) {
@@ -92,7 +105,7 @@ test('仓库的材料入库、成品入库、库存查询和出货互相独立',
   const scenes = getRoleHelpScenarios(getRoleHelpGuide('warehouse'))
   assert.deepEqual(
     scenes.map((scene) => scene.key),
-    ['inbound', 'finished-goods', 'inventory-query', 'production-orders', 'materials', 'shipping-release', 'outbound']
+    ['inbound', 'finished-goods', 'inventory-query', 'production-orders', 'materials', 'shipments', 'outbound']
   )
   const finished = scenes.find((scene) => scene.key === 'finished-goods')
   assert.deepEqual(

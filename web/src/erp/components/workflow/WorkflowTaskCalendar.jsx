@@ -17,10 +17,12 @@ import {
 import { WORKFLOW_TASKS_CHANGED } from '../../utils/workflowTaskChanges.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import { getWorkflowTaskReason } from '../../utils/workflowTaskBoard.mjs'
+import { getWorkflowTaskReasonMeta } from '../../utils/workflowTaskReason.mjs'
 import { buildWorkflowTaskResponsibilityItems } from '../../utils/workflowTaskEventPresentation.mjs'
 import WorkflowTaskCard from './WorkflowTaskCard.jsx'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
+import WorkflowTaskReason from './WorkflowTaskReason.jsx'
 import { WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import { usePageLoadFeedback } from '../PageLoadFeedback.jsx'
 import './workflowTaskCalendar.css'
@@ -339,11 +341,12 @@ export default function WorkflowTaskCalendar({
                     status={<span>{task.task_status_key === WorkflowTaskStatus.BLOCKED ? '受阻' : '待处理'}</span>}
                     source={<WorkflowTaskSource task={task} copyable={false} showUnavailable={false} />}
                   />
-                  {getWorkflowTaskReason(task) ? <div className="workflow-task-calendar__reason">{getWorkflowTaskReason(task)}</div> : null}
+                  {!mobile && getWorkflowTaskReason(task) ? <div className="workflow-task-calendar__reason">{getWorkflowTaskReason(task)}</div> : null}
                   <div className="erp-task-card__footer">
                     <span>{buildWorkflowTaskResponsibilityItems(task).slice(0, 2).map((item) => item.value).join(' · ')}</span>
                     <WorkflowTaskTiming task={task} includeKeys={['due', 'ended']} />
                   </div>
+                  {mobile ? <WorkflowTaskReason meta={getWorkflowTaskReasonMeta(task)} /> : null}
                 </WorkflowTaskCard>
               ))}
             </div>

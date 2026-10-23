@@ -8,7 +8,7 @@ import './dev-ci-workflow.css'
 export default function DevCiJobTimeline({ jobs }) {
   const timeline = buildCiJobTimeline(jobs)
   return (
-    <details className="erp-dev-ci-timeline">
+    <details className="erp-dev-disclosure erp-dev-ci-timeline">
       <summary>本次 Job 运行时间轴</summary>
       {!timeline.rows.length ? (
         <Empty description="本次尚无已结束且包含完整起止时间的 Job，时间轴等待实际记录" />
@@ -39,7 +39,7 @@ export default function DevCiJobTimeline({ jobs }) {
                 {timeline.rows.map((row) => (
                   <tr key={row.id}>
                     <th scope="row">
-                      <a href={row.url} target="_blank" rel="noreferrer">
+                      <a href={row.url} rel="noreferrer">
                         {row.name}
                       </a>
                     </th>

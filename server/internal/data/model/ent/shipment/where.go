@@ -171,6 +171,26 @@ func ShippingMark(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldShippingMark, v))
 }
 
+// ReceivableAmountSnapshot applies equality check predicate on the "receivable_amount_snapshot" field. It's identical to ReceivableAmountSnapshotEQ.
+func ReceivableAmountSnapshot(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldReceivableAmountSnapshot, v))
+}
+
+// QuotedFreightAmountSnapshot applies equality check predicate on the "quoted_freight_amount_snapshot" field. It's identical to QuotedFreightAmountSnapshotEQ.
+func QuotedFreightAmountSnapshot(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldQuotedFreightAmountSnapshot, v))
+}
+
+// TaxAmountSnapshot applies equality check predicate on the "tax_amount_snapshot" field. It's identical to TaxAmountSnapshotEQ.
+func TaxAmountSnapshot(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTaxAmountSnapshot, v))
+}
+
+// TaxModeSnapshot applies equality check predicate on the "tax_mode_snapshot" field. It's identical to TaxModeSnapshotEQ.
+func TaxModeSnapshot(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTaxModeSnapshot, v))
+}
+
 // FreightAmount applies equality check predicate on the "freight_amount" field. It's identical to FreightAmountEQ.
 func FreightAmount(v decimal.Decimal) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldFreightAmount, v))
@@ -1514,6 +1534,231 @@ func ShippingMarkEqualFold(v string) predicate.Shipment {
 // ShippingMarkContainsFold applies the ContainsFold predicate on the "shipping_mark" field.
 func ShippingMarkContainsFold(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldContainsFold(FieldShippingMark, v))
+}
+
+// ReceivableAmountSnapshotEQ applies the EQ predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldReceivableAmountSnapshot, v))
+}
+
+// ReceivableAmountSnapshotNEQ applies the NEQ predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotNEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldReceivableAmountSnapshot, v))
+}
+
+// ReceivableAmountSnapshotIn applies the In predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldReceivableAmountSnapshot, vs...))
+}
+
+// ReceivableAmountSnapshotNotIn applies the NotIn predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotNotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldReceivableAmountSnapshot, vs...))
+}
+
+// ReceivableAmountSnapshotGT applies the GT predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotGT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldReceivableAmountSnapshot, v))
+}
+
+// ReceivableAmountSnapshotGTE applies the GTE predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotGTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldReceivableAmountSnapshot, v))
+}
+
+// ReceivableAmountSnapshotLT applies the LT predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotLT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldReceivableAmountSnapshot, v))
+}
+
+// ReceivableAmountSnapshotLTE applies the LTE predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotLTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldReceivableAmountSnapshot, v))
+}
+
+// ReceivableAmountSnapshotIsNil applies the IsNil predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldReceivableAmountSnapshot))
+}
+
+// ReceivableAmountSnapshotNotNil applies the NotNil predicate on the "receivable_amount_snapshot" field.
+func ReceivableAmountSnapshotNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldReceivableAmountSnapshot))
+}
+
+// QuotedFreightAmountSnapshotEQ applies the EQ predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldQuotedFreightAmountSnapshot, v))
+}
+
+// QuotedFreightAmountSnapshotNEQ applies the NEQ predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotNEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldQuotedFreightAmountSnapshot, v))
+}
+
+// QuotedFreightAmountSnapshotIn applies the In predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldQuotedFreightAmountSnapshot, vs...))
+}
+
+// QuotedFreightAmountSnapshotNotIn applies the NotIn predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotNotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldQuotedFreightAmountSnapshot, vs...))
+}
+
+// QuotedFreightAmountSnapshotGT applies the GT predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotGT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldQuotedFreightAmountSnapshot, v))
+}
+
+// QuotedFreightAmountSnapshotGTE applies the GTE predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotGTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldQuotedFreightAmountSnapshot, v))
+}
+
+// QuotedFreightAmountSnapshotLT applies the LT predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotLT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldQuotedFreightAmountSnapshot, v))
+}
+
+// QuotedFreightAmountSnapshotLTE applies the LTE predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotLTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldQuotedFreightAmountSnapshot, v))
+}
+
+// QuotedFreightAmountSnapshotIsNil applies the IsNil predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldQuotedFreightAmountSnapshot))
+}
+
+// QuotedFreightAmountSnapshotNotNil applies the NotNil predicate on the "quoted_freight_amount_snapshot" field.
+func QuotedFreightAmountSnapshotNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldQuotedFreightAmountSnapshot))
+}
+
+// TaxAmountSnapshotEQ applies the EQ predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTaxAmountSnapshot, v))
+}
+
+// TaxAmountSnapshotNEQ applies the NEQ predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotNEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldTaxAmountSnapshot, v))
+}
+
+// TaxAmountSnapshotIn applies the In predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldTaxAmountSnapshot, vs...))
+}
+
+// TaxAmountSnapshotNotIn applies the NotIn predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotNotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldTaxAmountSnapshot, vs...))
+}
+
+// TaxAmountSnapshotGT applies the GT predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotGT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldTaxAmountSnapshot, v))
+}
+
+// TaxAmountSnapshotGTE applies the GTE predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotGTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldTaxAmountSnapshot, v))
+}
+
+// TaxAmountSnapshotLT applies the LT predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotLT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldTaxAmountSnapshot, v))
+}
+
+// TaxAmountSnapshotLTE applies the LTE predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotLTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldTaxAmountSnapshot, v))
+}
+
+// TaxAmountSnapshotIsNil applies the IsNil predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldTaxAmountSnapshot))
+}
+
+// TaxAmountSnapshotNotNil applies the NotNil predicate on the "tax_amount_snapshot" field.
+func TaxAmountSnapshotNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldTaxAmountSnapshot))
+}
+
+// TaxModeSnapshotEQ applies the EQ predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotNEQ applies the NEQ predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotIn applies the In predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldTaxModeSnapshot, vs...))
+}
+
+// TaxModeSnapshotNotIn applies the NotIn predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldTaxModeSnapshot, vs...))
+}
+
+// TaxModeSnapshotGT applies the GT predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotGTE applies the GTE predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotLT applies the LT predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotLTE applies the LTE predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotContains applies the Contains predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotHasPrefix applies the HasPrefix predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotHasSuffix applies the HasSuffix predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotIsNil applies the IsNil predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldTaxModeSnapshot))
+}
+
+// TaxModeSnapshotNotNil applies the NotNil predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldTaxModeSnapshot))
+}
+
+// TaxModeSnapshotEqualFold applies the EqualFold predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldTaxModeSnapshot, v))
+}
+
+// TaxModeSnapshotContainsFold applies the ContainsFold predicate on the "tax_mode_snapshot" field.
+func TaxModeSnapshotContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldTaxModeSnapshot, v))
 }
 
 // FreightAmountEQ applies the EQ predicate on the "freight_amount" field.

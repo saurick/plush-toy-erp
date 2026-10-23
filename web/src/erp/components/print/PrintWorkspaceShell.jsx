@@ -305,7 +305,7 @@ export default function PrintWorkspaceShell({
   }, [prepareSignature])
   useEffect(() => bindPrintEditableCaret(stageRef.current), [])
 
-  const scale = zoomMode === 'fit' ? fitScale : Number(zoomMode)
+  const scale = zoomMode == null || zoomMode === 'fit' ? fitScale : Number(zoomMode)
   const outputFeedback = useMemo(
     () =>
       statusText
@@ -465,16 +465,14 @@ export default function PrintWorkspaceShell({
                 if (button) outputTriggerRef.current = button
               }}
             >
-              <label className="erp-print-shell__zoom-control print-zoom-control">
-                显示比例
+              <div className="erp-print-shell__zoom-control print-zoom-control">
                 <span className="print-zoom-select">
                   <Select
-                    allowClear={false /* 不可清空：纸面缩放必须是有效比例，空值无法确定预览尺寸。 */}
                     label="显示比例"
                     placeholder="显示比例"
                     aria-label="显示比例"
                     virtual={false}
-                    data-value={zoomMode}
+                    data-value={zoomMode ?? ''}
                     value={zoomMode}
                     onChange={setZoomMode}
                     options={[
@@ -490,7 +488,7 @@ export default function PrintWorkspaceShell({
                     }))}
                   />
                 </span>
-              </label>
+              </div>
               {toolbarActions}
             </div>
           </header>

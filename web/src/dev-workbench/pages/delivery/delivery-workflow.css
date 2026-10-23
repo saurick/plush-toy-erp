@@ -107,11 +107,6 @@
   flex: 1;
   min-width: 0;
 }
-.erp-dev-delivery-inline-details > summary {
-  width: fit-content;
-  cursor: pointer;
-  color: var(--erp-text-muted);
-}
 .erp-dev-delivery-inline-details > :not(summary) {
   display: block;
   margin-block: 6px;

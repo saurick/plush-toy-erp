@@ -705,6 +705,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       appendixActions={
         <PrintAppendixImageManager
+          autoColumns={3}
           images={contract.appendixImages}
           onImagesChange={handleAppendixImagesChange}
           onStatusChange={(text, tone) =>

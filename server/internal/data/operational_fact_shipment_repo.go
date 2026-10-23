@@ -1040,14 +1040,14 @@ func applyShipmentDateRange(query *ent.ShipmentQuery, filter biz.OperationalFact
 			query = query.Where(shipment.ShippedAtGTE(*filter.DateFrom))
 		}
 		if filter.DateTo != nil {
-			query = query.Where(shipment.ShippedAtLTE(endOfDateFilter(*filter.DateTo)))
+			query = query.Where(shipment.ShippedAtLTE(*filter.DateTo))
 		}
 	default:
 		if filter.DateFrom != nil {
 			query = query.Where(shipment.PlannedShipAtGTE(*filter.DateFrom))
 		}
 		if filter.DateTo != nil {
-			query = query.Where(shipment.PlannedShipAtLTE(endOfDateFilter(*filter.DateTo)))
+			query = query.Where(shipment.PlannedShipAtLTE(*filter.DateTo))
 		}
 	}
 	return query
@@ -1392,6 +1392,17 @@ func freezeShipmentNetWeights(ctx context.Context, tx *inventoryDBTx, items []*e
 	if err != nil {
 		return err
 	}
+	parent, err := tx.client.Shipment.Get(ctx, items[0].ShipmentID)
+	if err != nil {
+		return err
+	}
+	effectiveNetWeight := parent.TotalNetWeightG
+	if complete {
+		effectiveNetWeight = totalNetWeightG
+	}
+	if err := biz.ValidateShipmentWeights(effectiveNetWeight, parent.GrossWeightKg); err != nil {
+		return err
+	}
 	for _, item := range resolved {
 		if item.unitNetWeightG == nil {
 			continue
@@ -1489,6 +1500,7 @@ type shipmentSourceQuantityState struct {
 	currentByLine     map[int]decimal.Decimal
 	sourceItemsByLine map[int]*ent.SalesOrderItem
 	sourceCurrency    string
+	sourceOrder       *ent.SalesOrder
 }
 
 func newShipmentSourceQuantityState() *shipmentSourceQuantityState {
@@ -1534,6 +1546,7 @@ func validateShipmentSourceAndQuantity(ctx context.Context, tx *inventoryDBTx, p
 		return nil, err
 	}
 	state.sourceCurrency = sourceCurrency
+	state.sourceOrder = order
 
 	quantityBySourceLine := make(map[int]decimal.Decimal, len(items))
 	for _, item := range items {
@@ -1677,7 +1690,7 @@ func freezeShipmentFinanceSnapshots(
 			}
 		}
 	}
-	return nil
+	return freezeShipmentCommercialSnapshot(ctx, tx, parent, sourceQuantity.sourceOrder)
 }
 
 func salesOrderItemFinanceAmount(item *ent.SalesOrderItem) *decimal.Decimal {
@@ -2141,6 +2154,10 @@ func entShipmentToBiz(row *ent.Shipment, itemRows []*ent.ShipmentItem) *biz.Ship
 		GrossWeightKg:                   row.GrossWeightKg,
 		VolumeM3:                        row.VolumeM3,
 		ShippingMark:                    row.ShippingMark,
+		ReceivableAmountSnapshot:        row.ReceivableAmountSnapshot,
+		QuotedFreightAmountSnapshot:     row.QuotedFreightAmountSnapshot,
+		TaxAmountSnapshot:               row.TaxAmountSnapshot,
+		TaxModeSnapshot:                 row.TaxModeSnapshot,
 		FreightAmount:                   row.FreightAmount,
 		FreightCurrency:                 row.FreightCurrency,
 		TotalNetWeightG:                 row.TotalNetWeightG,

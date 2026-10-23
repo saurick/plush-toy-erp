@@ -74,6 +74,9 @@ type PurchaseOrderItem struct {
 	LineNo                 int
 	MaterialID             int
 	UnitID                 int
+	MaterialSpecSnapshot   *string
+	SupplierItemNoSnapshot *string
+	UnitNameSnapshot       *string
 	MaterialCodeSnapshot   *string
 	MaterialNameSnapshot   *string
 	ColorSnapshot          *string
@@ -114,6 +117,9 @@ type PurchaseOrderItemMutation struct {
 	LineNo                 int
 	MaterialID             int
 	UnitID                 int
+	MaterialSpecSnapshot   *string
+	SupplierItemNoSnapshot *string
+	UnitNameSnapshot       *string
 	MaterialCodeSnapshot   *string
 	MaterialNameSnapshot   *string
 	ColorSnapshot          *string

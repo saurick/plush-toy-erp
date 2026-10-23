@@ -134,7 +134,10 @@
 
 .erp-print-appendix-images__row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(
+    var(--erp-print-appendix-columns, 2),
+    minmax(0, 1fr)
+  );
   column-gap: 7mm;
   align-items: start;
   margin: 0 0 7mm;
@@ -193,7 +196,10 @@
   }
 
   .erp-print-appendix-images__row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(
+      var(--erp-print-appendix-columns, 2),
+      minmax(0, 1fr)
+    );
   }
 
   .erp-print-appendix-images__row--full {

@@ -161,11 +161,12 @@ export default function DevProjectSkillsPage() {
               aria-label="项目 Skill 目录"
             >
               <SearchInput
+                allowClear
                 aria-label="搜索任务或 Skill"
                 placeholder="搜索任务或 Skill"
                 value={keyword}
-                onChange={(event) =>
-                  updateQuery({ q: event.target.value, skill: '' })
+                onSearch={(value) =>
+                  updateQuery({ q: value, skill: '' })
                 }
               />
               <Text type="secondary">
@@ -176,7 +177,7 @@ export default function DevProjectSkillsPage() {
                   <button
                     key={skill.name}
                     type="button"
-                    className="erp-dev-skills__item"
+                    className="erp-dev-directory-item erp-dev-skills__item"
                     title={skill.summary || skill.scope}
                     aria-pressed={selected?.name === skill.name}
                     onClick={() => updateQuery({ skill: skill.name })}
@@ -228,7 +229,7 @@ export default function DevProjectSkillsPage() {
                   </div>
                   <p>{selected.scope || '适用范围尚未登记，请查看原文。'}</p>
                   <details
-                    className="erp-dev-skills__disclosure"
+                    className="erp-dev-disclosure erp-dev-skills__disclosure"
                     open={graphOpen}
                     onToggle={(event) => setGraphOpen(event.currentTarget.open)}
                   >

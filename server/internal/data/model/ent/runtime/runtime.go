@@ -5565,24 +5565,36 @@ func init() {
 	purchaseorderitemDescMaterialNameSnapshot := purchaseorderitemFields[6].Descriptor()
 	// purchaseorderitem.MaterialNameSnapshotValidator is a validator for the "material_name_snapshot" field. It is called by the builders before save.
 	purchaseorderitem.MaterialNameSnapshotValidator = purchaseorderitemDescMaterialNameSnapshot.Validators[0].(func(string) error)
+	// purchaseorderitemDescMaterialSpecSnapshot is the schema descriptor for material_spec_snapshot field.
+	purchaseorderitemDescMaterialSpecSnapshot := purchaseorderitemFields[7].Descriptor()
+	// purchaseorderitem.MaterialSpecSnapshotValidator is a validator for the "material_spec_snapshot" field. It is called by the builders before save.
+	purchaseorderitem.MaterialSpecSnapshotValidator = purchaseorderitemDescMaterialSpecSnapshot.Validators[0].(func(string) error)
+	// purchaseorderitemDescSupplierItemNoSnapshot is the schema descriptor for supplier_item_no_snapshot field.
+	purchaseorderitemDescSupplierItemNoSnapshot := purchaseorderitemFields[8].Descriptor()
+	// purchaseorderitem.SupplierItemNoSnapshotValidator is a validator for the "supplier_item_no_snapshot" field. It is called by the builders before save.
+	purchaseorderitem.SupplierItemNoSnapshotValidator = purchaseorderitemDescSupplierItemNoSnapshot.Validators[0].(func(string) error)
+	// purchaseorderitemDescUnitNameSnapshot is the schema descriptor for unit_name_snapshot field.
+	purchaseorderitemDescUnitNameSnapshot := purchaseorderitemFields[9].Descriptor()
+	// purchaseorderitem.UnitNameSnapshotValidator is a validator for the "unit_name_snapshot" field. It is called by the builders before save.
+	purchaseorderitem.UnitNameSnapshotValidator = purchaseorderitemDescUnitNameSnapshot.Validators[0].(func(string) error)
 	// purchaseorderitemDescColorSnapshot is the schema descriptor for color_snapshot field.
-	purchaseorderitemDescColorSnapshot := purchaseorderitemFields[7].Descriptor()
+	purchaseorderitemDescColorSnapshot := purchaseorderitemFields[10].Descriptor()
 	// purchaseorderitem.ColorSnapshotValidator is a validator for the "color_snapshot" field. It is called by the builders before save.
 	purchaseorderitem.ColorSnapshotValidator = purchaseorderitemDescColorSnapshot.Validators[0].(func(string) error)
 	// purchaseorderitemDescProductOrderNoSnapshot is the schema descriptor for product_order_no_snapshot field.
-	purchaseorderitemDescProductOrderNoSnapshot := purchaseorderitemFields[8].Descriptor()
+	purchaseorderitemDescProductOrderNoSnapshot := purchaseorderitemFields[11].Descriptor()
 	// purchaseorderitem.ProductOrderNoSnapshotValidator is a validator for the "product_order_no_snapshot" field. It is called by the builders before save.
 	purchaseorderitem.ProductOrderNoSnapshotValidator = purchaseorderitemDescProductOrderNoSnapshot.Validators[0].(func(string) error)
 	// purchaseorderitemDescProductNoSnapshot is the schema descriptor for product_no_snapshot field.
-	purchaseorderitemDescProductNoSnapshot := purchaseorderitemFields[9].Descriptor()
+	purchaseorderitemDescProductNoSnapshot := purchaseorderitemFields[12].Descriptor()
 	// purchaseorderitem.ProductNoSnapshotValidator is a validator for the "product_no_snapshot" field. It is called by the builders before save.
 	purchaseorderitem.ProductNoSnapshotValidator = purchaseorderitemDescProductNoSnapshot.Validators[0].(func(string) error)
 	// purchaseorderitemDescProductNameSnapshot is the schema descriptor for product_name_snapshot field.
-	purchaseorderitemDescProductNameSnapshot := purchaseorderitemFields[10].Descriptor()
+	purchaseorderitemDescProductNameSnapshot := purchaseorderitemFields[13].Descriptor()
 	// purchaseorderitem.ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
 	purchaseorderitem.ProductNameSnapshotValidator = purchaseorderitemDescProductNameSnapshot.Validators[0].(func(string) error)
 	// purchaseorderitemDescLineStatus is the schema descriptor for line_status field.
-	purchaseorderitemDescLineStatus := purchaseorderitemFields[15].Descriptor()
+	purchaseorderitemDescLineStatus := purchaseorderitemFields[18].Descriptor()
 	// purchaseorderitem.DefaultLineStatus holds the default value on creation for the line_status field.
 	purchaseorderitem.DefaultLineStatus = purchaseorderitemDescLineStatus.Default.(string)
 	// purchaseorderitem.LineStatusValidator is a validator for the "line_status" field. It is called by the builders before save.
@@ -5602,15 +5614,15 @@ func init() {
 		}
 	}()
 	// purchaseorderitemDescNote is the schema descriptor for note field.
-	purchaseorderitemDescNote := purchaseorderitemFields[16].Descriptor()
+	purchaseorderitemDescNote := purchaseorderitemFields[19].Descriptor()
 	// purchaseorderitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	purchaseorderitem.NoteValidator = purchaseorderitemDescNote.Validators[0].(func(string) error)
 	// purchaseorderitemDescCreatedAt is the schema descriptor for created_at field.
-	purchaseorderitemDescCreatedAt := purchaseorderitemFields[17].Descriptor()
+	purchaseorderitemDescCreatedAt := purchaseorderitemFields[20].Descriptor()
 	// purchaseorderitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	purchaseorderitem.DefaultCreatedAt = purchaseorderitemDescCreatedAt.Default.(func() time.Time)
 	// purchaseorderitemDescUpdatedAt is the schema descriptor for updated_at field.
-	purchaseorderitemDescUpdatedAt := purchaseorderitemFields[18].Descriptor()
+	purchaseorderitemDescUpdatedAt := purchaseorderitemFields[21].Descriptor()
 	// purchaseorderitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	purchaseorderitem.DefaultUpdatedAt = purchaseorderitemDescUpdatedAt.Default.(func() time.Time)
 	// purchaseorderitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -7076,20 +7088,24 @@ func init() {
 	shipmentDescShippingMark := shipmentFields[23].Descriptor()
 	// shipment.ShippingMarkValidator is a validator for the "shipping_mark" field. It is called by the builders before save.
 	shipment.ShippingMarkValidator = shipmentDescShippingMark.Validators[0].(func(string) error)
+	// shipmentDescTaxModeSnapshot is the schema descriptor for tax_mode_snapshot field.
+	shipmentDescTaxModeSnapshot := shipmentFields[27].Descriptor()
+	// shipment.TaxModeSnapshotValidator is a validator for the "tax_mode_snapshot" field. It is called by the builders before save.
+	shipment.TaxModeSnapshotValidator = shipmentDescTaxModeSnapshot.Validators[0].(func(string) error)
 	// shipmentDescFreightCurrency is the schema descriptor for freight_currency field.
-	shipmentDescFreightCurrency := shipmentFields[25].Descriptor()
+	shipmentDescFreightCurrency := shipmentFields[29].Descriptor()
 	// shipment.FreightCurrencyValidator is a validator for the "freight_currency" field. It is called by the builders before save.
 	shipment.FreightCurrencyValidator = shipmentDescFreightCurrency.Validators[0].(func(string) error)
 	// shipmentDescNote is the schema descriptor for note field.
-	shipmentDescNote := shipmentFields[28].Descriptor()
+	shipmentDescNote := shipmentFields[32].Descriptor()
 	// shipment.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	shipment.NoteValidator = shipmentDescNote.Validators[0].(func(string) error)
 	// shipmentDescCreatedAt is the schema descriptor for created_at field.
-	shipmentDescCreatedAt := shipmentFields[29].Descriptor()
+	shipmentDescCreatedAt := shipmentFields[33].Descriptor()
 	// shipment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shipment.DefaultCreatedAt = shipmentDescCreatedAt.Default.(func() time.Time)
 	// shipmentDescUpdatedAt is the schema descriptor for updated_at field.
-	shipmentDescUpdatedAt := shipmentFields[30].Descriptor()
+	shipmentDescUpdatedAt := shipmentFields[34].Descriptor()
 	// shipment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	shipment.DefaultUpdatedAt = shipmentDescUpdatedAt.Default.(func() time.Time)
 	// shipment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -30,19 +30,19 @@ test('printTemplateRendererModel: 加工合同静态预览复用正式字段真�
 
   assert.equal(
     columns.find((column) => column.key === 'productOrderNo')?.label,
-    '来源订单编号'
+    '产品订单编号'
   )
   assert.equal(
     columns.find((column) => column.key === 'productNo')?.label,
-    '产品 / 材料编号'
+    '产品编号'
   )
   assert.equal(
     columns.find((column) => column.key === 'productName')?.label,
-    '产品 / 材料名称'
+    '产品名称'
   )
   assert.equal(
     columns.find((column) => column.key === 'processingItem')?.label,
-    '加工项目'
+    '工序名称'
   )
   assert.equal(
     cells.find((cell) => cell.key === 'processingItem')?.value,

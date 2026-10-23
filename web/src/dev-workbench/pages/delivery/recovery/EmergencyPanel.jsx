@@ -57,7 +57,7 @@ export function EmergencyPanel({
         </div>
       </section>
 
-      <details className="erp-dev-recovery-emergency">
+      <details className="erp-dev-disclosure erp-dev-recovery-emergency">
         <summary>
           <SafetyCertificateOutlined aria-hidden="true" /> AI 不可用时的应急接管
         </summary>

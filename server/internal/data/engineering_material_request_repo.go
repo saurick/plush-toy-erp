@@ -444,7 +444,11 @@ func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, cli
 			return err
 		}
 		for i, item := range lines {
-			_, err := client.PurchaseOrderItem.Create().SetPurchaseOrderID(po.ID).SetLineNo(i + 1).SetDisplayOrder(i + 1).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetMaterialCodeSnapshot(item.MaterialCode).SetMaterialNameSnapshot(item.MaterialName).SetNillableColorSnapshot(item.Color).SetProductOrderNoSnapshot(request.OrderNo).SetPurchasedQuantity(item.RequiredQuantity).Save(ctx)
+			printSnapshot := &biz.PurchaseOrderItemMutation{MaterialID: item.MaterialID, UnitID: item.UnitID}
+			if err := preparePurchaseItemPrintSnapshots(ctx, client, printSnapshot, nil); err != nil {
+				return err
+			}
+			_, err := client.PurchaseOrderItem.Create().SetNillableMaterialSpecSnapshot(printSnapshot.MaterialSpecSnapshot).SetNillableSupplierItemNoSnapshot(printSnapshot.SupplierItemNoSnapshot).SetNillableUnitNameSnapshot(printSnapshot.UnitNameSnapshot).SetPurchaseOrderID(po.ID).SetLineNo(i + 1).SetDisplayOrder(i + 1).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetMaterialCodeSnapshot(item.MaterialCode).SetMaterialNameSnapshot(item.MaterialName).SetNillableColorSnapshot(item.Color).SetProductOrderNoSnapshot(request.OrderNo).SetPurchasedQuantity(item.RequiredQuantity).Save(ctx)
 			if err != nil {
 				return err
 			}

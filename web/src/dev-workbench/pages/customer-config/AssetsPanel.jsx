@@ -70,7 +70,7 @@ export function AssetsPanel({
         <div className="erp-dev-customer-menu-groups">
           {menuSummary.sections.map((section) => (
             <details
-              className="erp-dev-customer-menu-group"
+              className="erp-dev-disclosure erp-dev-customer-menu-group"
               key={section.title}
             >
               <summary className="erp-dev-customer-menu-group__title">
@@ -97,7 +97,7 @@ export function AssetsPanel({
         </div>
       </section>
       <details
-        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
+        className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
         name="customer-assets"
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
@@ -123,7 +123,7 @@ export function AssetsPanel({
         </div>
       </details>
       <details
-        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
+        className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
         name="customer-assets"
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
@@ -158,7 +158,7 @@ export function AssetsPanel({
         </div>
       </details>
       <details
-        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
+        className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
         name="customer-assets"
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
@@ -187,7 +187,7 @@ export function AssetsPanel({
         </div>
       </details>
       <details
-        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-templates erp-dev-customer-disclosure"
+        className="erp-dev-disclosure erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-templates erp-dev-customer-disclosure"
         name="customer-assets"
       >
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">

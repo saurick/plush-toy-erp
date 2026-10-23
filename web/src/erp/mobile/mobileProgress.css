@@ -186,9 +186,6 @@
   flex: 0 0 auto;
   color: var(--erp-primary-strong);
 }
-.mobile-progress-task-entry .erp-task-blocked-reason {
-  color: var(--erp-visual-danger-text);
-}
 .mobile-progress-card .erp-progress-delivery {
   min-height: 36px;
   align-content: center;
@@ -227,8 +224,12 @@
   border-bottom: 0;
 }
 .erp-progress-drawer--mobile .ant-drawer-body.mobile-detail-content {
-  padding: 12px;
-  background: var(--erp-page-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--erp-surface-bg);
 }
 .erp-progress-drawer--mobile .ant-drawer-footer {
   padding: 0;
@@ -243,57 +244,6 @@
   outline-offset: 2px;
 }
 
-.mobile-progress-overview h2 {
-  font-weight: 700;
-}
-
-.mobile-progress-overview-product {
-  display: grid;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.mobile-progress-overview-product > .mobile-detail-identity {
-  margin: 0 0 0 68px;
-}
-
-
-.mobile-progress-stage-list {
-  display: grid;
-  gap: 7px;
-  margin-top: 8px;
-}
-
-.mobile-progress-stage-row {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) 38px;
-  align-items: center;
-  gap: 8px;
-  min-height: 18px;
-  font-size: var(--erp-font-caption);
-  line-height: 1.5;
-}
-
-.mobile-progress-stage-row > strong {
-  font-weight: 600;
-  text-align: right;
-}
-
-.mobile-progress-stage-track {
-  height: 7px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: var(--erp-surface-bg-soft);
-}
-
-.mobile-progress-stage-track > i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--erp-primary);
-}
-
-.mobile-progress-stage-note,
 .mobile-detail-muted {
   margin: 0;
   color: var(--erp-text-subtle);
@@ -314,7 +264,6 @@
   background: transparent;
 }
 
-.mobile-progress-detail-toggle,
 .mobile-progress-recent-error > button {
   min-height: 44px;
   padding: 9px 11px;
@@ -326,7 +275,6 @@
   cursor: pointer;
 }
 
-.mobile-progress-detail-toggle:focus-visible,
 .mobile-progress-recent-error > button:focus-visible {
   outline: 2px solid var(--erp-primary);
   outline-offset: 2px;
@@ -432,78 +380,27 @@
   border-top: 1px solid var(--erp-border);
 }
 
-.mobile-progress-detail-subsection {
-  padding: 12px 0;
-}
+/* 标题、关注事项和四类导航留在固定区，列表独立滚动。 */
+.erp-progress-drawer--mobile .erp-progress-detail-header { padding: 4px 16px 10px; }
+.erp-progress-drawer--mobile .erp-progress-overview-identity { gap: 5px; }
+.erp-progress-drawer--mobile .erp-progress-overview-product .erp-task-product-image { width: 40px; height: 40px; flex-basis: 40px; }
+.erp-progress-drawer--mobile .erp-progress-header-meta { font-size: var(--erp-font-caption); }
+.erp-progress-drawer--mobile .erp-progress-overview-attention { margin-top: 8px; padding: 6px 8px; gap: 8px; }
+.erp-progress-drawer--mobile .erp-progress-overview-attention > button { min-height: 44px; }
+.erp-progress-drawer--mobile .erp-progress-detail-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; padding-inline: 12px; }
+.erp-progress-drawer--mobile .erp-progress-detail-tabs > [role='tab'] { min-width: 0; min-height: 48px; padding-inline: 6px; }
+.erp-progress-drawer--mobile .erp-progress-detail-scroll { padding: 16px 24px 20px 16px; }
+.erp-progress-drawer--mobile .erp-progress-overview-facts { gap: 12px; }
+.erp-progress-drawer--mobile .erp-progress-overview-stage { gap: 4px; grid-template-columns: 32px minmax(0, 1fr) 44px; }
+.erp-progress-drawer--mobile .erp-progress-overview-stage-content { gap: 4px; }
+.erp-progress-drawer--mobile .mobile-progress-recent { margin-top: 16px; }
+.erp-progress-drawer--mobile .erp-progress-record { gap: 10px; padding-block: 12px; }
+.erp-progress-drawer--mobile .erp-progress-record-actions { max-width: 100px; }
 
-.mobile-progress-detail-subsection + .mobile-progress-detail-subsection {
-  border-top: 1px solid var(--erp-border);
-}
-
-.mobile-progress-detail-subsection > h3 {
-  margin-bottom: 8px;
-  color: var(--erp-text-subtle);
-  font-size: var(--erp-font-caption);
-  font-weight: 650;
-}
-
-.mobile-progress-detail-records .erp-progress-record {
-  gap: 10px;
-  padding-block: 12px;
-}
-
-.mobile-progress-detail-records .erp-progress-record:last-child {
-  border-bottom: 0;
-}
-
-[data-erp-theme='dark'] .mobile-progress-panel {
-  --mobile-progress-bg: var(--erp-page-bg);
-  --mobile-progress-card: var(--erp-surface-bg);
-  --mobile-progress-text: var(--erp-text);
-  --mobile-progress-muted: var(--erp-text-muted);
-  --mobile-progress-line: var(--erp-border);
-  --mobile-progress-accent: var(--erp-primary);
-  --mobile-progress-soft: var(--erp-primary-soft);
-  --mobile-progress-danger: #fda4af;
-  --mobile-progress-warning: #edc479;
-}
-
-.mobile-progress-panel button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-.mobile-progress-panel button:focus-visible {
-  outline: 2px solid var(--mobile-progress-accent);
-  outline-offset: 2px;
-}
-
-.mobile-progress-state {
-  border: 1px solid var(--mobile-progress-line);
-  border-radius: 999px;
-  padding: 2px 7px;
-  background: var(--erp-surface-bg-soft);
-}
-.mobile-progress-state.mobile-progress-danger {
-  background: color-mix(
-    in srgb,
-    var(--mobile-progress-danger) 7%,
-    var(--mobile-progress-card)
-  );
-  border-color: color-mix(
-    in srgb,
-    var(--mobile-progress-danger) 25%,
-    var(--mobile-progress-line)
-  );
-}
-.mobile-progress-state.mobile-progress-warning {
-  background: color-mix(
-    in srgb,
-    var(--mobile-progress-warning) 7%,
-    var(--mobile-progress-card)
-  );
-}
-
-.mobile-progress-task-entry--empty .erp-progress-attention > strong {
-  color: var(--mobile-progress-muted);
-  font-size: var(--erp-font-caption);
+/* 短屏保留受阻原因和操作尺寸，摘要次要信息点按可看全文。 */
+@media (max-height: 650px) {
+  .erp-progress-drawer--mobile .erp-progress-product-copy > span,
+  .erp-progress-drawer--mobile .erp-progress-attention-summary .erp-progress-attention > span:not(.erp-progress-attention-reason) {
+    -webkit-line-clamp: 1;
+  }
 }

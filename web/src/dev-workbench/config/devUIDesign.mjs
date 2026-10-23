@@ -10,6 +10,27 @@ export const UI_DESIGN_ASSET = Object.freeze({
 
 export const UI_DESIGN_PREVIEW_TIMEOUT_MS = 12000
 
+export const UI_DESIGN_MOBILE_STATES = Object.freeze([
+  { key: 'loading', label: '首次加载' },
+  { key: 'switching', label: '切换栏目' },
+  { key: 'refreshing', label: '刷新已有内容' },
+  { key: 'data', label: '正常' },
+  { key: 'empty', label: '尚无记录' },
+  { key: 'filtered', label: '筛选无结果' },
+  { key: 'error', label: '首次读取失败' },
+  { key: 'refresh-error', label: '刷新失败' },
+])
+
+export function getUIDesignStateOptions(page) {
+  if (page === 'mobile-tasks') return UI_DESIGN_MOBILE_STATES
+  if (page !== 'workspace') return []
+  return [
+    ['data', '正常'], ['route-loading', '切页等待'], ['loading', '加载中'],
+    ['empty', '空结果'], ['error', '读取失败'],
+    ['forbidden', '无权限'], ['stress', '边界压力'],
+  ].map(([key, label]) => ({ key, label }))
+}
+
 export const UI_DESIGN_PREVIEW_PAGES = Object.freeze([
   { value: 'workspace', label: '业务界面' },
   { value: 'production-hub', label: '生产管理' },

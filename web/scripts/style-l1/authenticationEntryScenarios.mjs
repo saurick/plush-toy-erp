@@ -3,7 +3,7 @@ import {
   assertVisibleInputFocusRingNotClipped,
 } from './inputControlAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
-import { createMockAdminToken } from './adminRpcMocks.mjs'
+import { createMockAdminToken, installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { createMobileAdminReviewScenarios } from './mobileAdminReviewScenarios.mjs'
 import { expectAdminLoginHeading } from './loginAssertions.mjs'
 import { readStyleL1BuildExpectation } from './systemRpcMocks.mjs'
@@ -148,6 +148,41 @@ export function createAuthenticationEntryScenarios({
         },
       }
     }),
+    {
+      name: 'legal-notice-read-and-return',
+      path: '/erp/business-dashboard?return=notice#overview',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installAdminRpcMocks(page, {
+          legalNoticeAcknowledged: false,
+          effectiveSessionOverride: customerRuntimeEffectiveSession,
+        })
+      },
+      verify: async (page) => {
+        const sourceURL = page.url()
+        const pageCount = page.context().pages().length
+        let acknowledgements = 0
+        page.on('request', (request) => {
+          if (request.url().endsWith('/rpc/admin') && request.postDataJSON()?.method === 'acknowledge_legal_notice') acknowledgements += 1
+        })
+        const acknowledge = page.getByTestId('legal-notice-acknowledge')
+        for (const title of ['个人信息处理规则', '系统使用规则']) {
+          await acknowledge.waitFor()
+          await page.getByRole('link', { name: `打开《${title}》`, exact: true }).click()
+          await page.getByRole('heading', { name: title, exact: true }).waitFor()
+          assert.equal(page.context().pages().length, pageCount, '规则阅读留在当前标签页')
+          await page.getByRole('button', { name: '返回系统' }).click()
+          await page.waitForURL(sourceURL)
+          await acknowledge.waitFor()
+          assert.equal(acknowledgements, 0, '阅读与返回不代替用户知悉')
+        }
+        await acknowledge.click()
+        await acknowledge.waitFor({ state: 'hidden' })
+        assert.equal(acknowledgements, 1, '仅明确知悉后记录一次')
+      },
+    },
     {
       name: 'legal-document-direct-visit',
       path: '/legal/privacy',

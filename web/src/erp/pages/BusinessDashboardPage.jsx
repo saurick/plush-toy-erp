@@ -18,6 +18,7 @@ import { listBusinessProgress } from '../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { canOpenRelatedDocumentPath } from '../utils/relatedDocumentNavigation.mjs'
 import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
+import { openWorkflowTaskRow } from '../utils/workflowTaskEntry.mjs'
 import {
   progressQueryFromURL,
   progressAttention,
@@ -39,7 +40,6 @@ import {
   ProgressAttention,
 } from '../components/business-visualizations/ProgressCompactContent.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
-import WorkflowTaskCard from '../components/workflow/WorkflowTaskCard.jsx'
 import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
 import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
 import '../styles/app/progress-board.css'
@@ -167,7 +167,7 @@ export default function BusinessDashboardPage() {
     viewQueries.current = {}
   }, [adminProfile])
   const openDetail = useCallback(
-    (row, section = 'lines') => {
+    (row, section = null) => {
       setParams(
         (previous) => {
           const next = new URLSearchParams(previous)
@@ -470,11 +470,6 @@ export default function BusinessDashboardPage() {
                             : '有效完工 / 计划'}
                         </th>
                         <th scope="col">当前关注 / 处理人</th>
-                        <th scope="col">
-                          <span className="erp-progress-action-heading">
-                            查看
-                          </span>
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -488,15 +483,12 @@ export default function BusinessDashboardPage() {
                             key={`${row.view}:${row.id}`}
                             className={`erp-progress-row${selected ? ' is-selected' : ''}`}
                             data-progress-order-id={row.id}
+                            onClick={(event) =>
+                              openWorkflowTaskRow(event, () => openDetail(row))
+                            }
                           >
                             <td className="erp-progress-identity-cell">
-                              <WorkflowTaskCard
-                                openButtonProps={{ className: 'erp-progress-row-open' }}
-                                label={`查看 ${row.order_no} 完整进度`}
-                                onOpen={() => openDetail(row)}
-                              >
-                                <ProgressIdentity row={row} />
-                              </WorkflowTaskCard>
+                              <ProgressIdentity row={row} onOpen={() => openDetail(row)} />
                             </td>
                             <td className="erp-progress-due-cell">
                               <ProgressDue
@@ -508,37 +500,30 @@ export default function BusinessDashboardPage() {
                               <ProgressDelivery
                                 row={row}
                                 showProgress
-                                onOpenDetails={() => openDetail(row)}
+                                onOpenDetails={() => openDetail(row, 'lines')}
                               />
                             </td>
                             <td className="erp-progress-attention-cell">
-                              <ProgressAttention row={row} access={access} />
-                            </td>
-                            <td className="erp-progress-action-cell">
-                              {attention.taskCount > 0 &&
-                              canOpen('/erp/task-board') ? (
-                                <Button
-                                  type="link"
-                                  aria-label={`查看 ${row.order_no} 的关联任务`}
-                                  onClick={() =>
-                                    attention.taskID
-                                      ? navigate(
-                                          `/erp/task-board?link_task=${attention.taskID}`
-                                        )
-                                      : openDetail(row, 'tasks')
-                                  }
-                                >
-                                  任务 <ArrowRightOutlined />
-                                </Button>
-                              ) : (
-                                <Button
-                                  type="link"
-                                  onClick={() => openDetail(row)}
-                                  aria-label={`查看 ${row.order_no} 详情`}
-                                >
-                                  详情 <ArrowRightOutlined />
-                                </Button>
-                              )}
+                              <div className="erp-progress-attention-content">
+                                <ProgressAttention row={row} access={access} />
+                                {attention.taskCount > 0 &&
+                                canOpen('/erp/task-board') && (
+                                  <Button
+                                    type="link"
+                                    className="erp-progress-task-entry"
+                                    aria-label={`查看 ${row.order_no} 的关联任务`}
+                                    onClick={() =>
+                                      attention.taskID
+                                        ? navigate(
+                                            `/erp/task-board?link_task=${attention.taskID}`
+                                          )
+                                        : openDetail(row, 'tasks')
+                                    }
+                                  >
+                                    查看任务 <ArrowRightOutlined />
+                                  </Button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )

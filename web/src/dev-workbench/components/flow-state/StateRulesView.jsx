@@ -243,7 +243,7 @@ function StateTransitionCard({
           </span>
         </p>
       ) : null}
-      <details>
+      <details className="erp-dev-disclosure">
         <summary>查看内部规则</summary>
         <dl>
           <div>
@@ -518,7 +518,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView }) {
                 <li key={item.key}>
                   <button
                     type="button"
-                    className={selected ? 'is-selected' : ''}
+                    className="erp-dev-directory-item erp-dev-directory-item--stacked"
                     aria-pressed={selected}
                     aria-label={`${item.label}，${itemSummary.positionLabel}，${itemSummary.incoming.length} 条进入，${itemSummary.outgoing.length} 条离开；${selected ? '取消聚焦' : '查看相关转换'}`}
                     data-state-position={

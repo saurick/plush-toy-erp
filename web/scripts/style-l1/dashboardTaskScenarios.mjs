@@ -80,7 +80,7 @@ export function createDashboardTaskScenarios({
       verify: async (page) => {
         for (const [status, label] of [['done', '已完成'], ['rejected', '已驳回'], ['withdrawn', '已撤回']]) {
           if (status !== 'done') {
-            await page.getByRole('button', { name: '任务概览', exact: true }).click()
+            await page.getByRole('button', { name: /^(全部待办|全部分类)$/u, exact: true }).click()
             await page.waitForFunction(() => !new URLSearchParams(location.search).has('status'))
             await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
             const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
@@ -97,10 +97,10 @@ export function createDashboardTaskScenarios({
           assert.equal(await rows.count(), 1, '刷新恢复分类、状态与匹配记录')
           await page.screenshot({ path: path.resolve(outputDir, `task-board-terminal-${status}.png`) })
         }
-        await page.getByRole('button', { name: '任务概览', exact: true }).click()
-        await page.getByRole('button', { name: '任务概览', exact: true, pressed: true }).waitFor()
+        await page.getByRole('button', { name: /^(全部待办|全部分类)$/u, exact: true }).click()
+        await page.getByRole('button', { name: /^(全部待办|全部分类)$/u, exact: true, pressed: true }).waitFor()
         await page.waitForFunction(() => !new URLSearchParams(location.search).has('status'))
-        assert.equal(await page.locator('.erp-task-board-lane--overview').count(), 1)
+        assert.equal(await page.locator('.erp-task-board-lane--all').count(), 1)
         await assertNoHorizontalOverflow(page)
       },
     },
@@ -112,7 +112,7 @@ export function createDashboardTaskScenarios({
         configRevision: 'style-l1-task-board-customer-runtime',
         configHash: 'style-l1-task-board-customer-runtime-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
-        pages: ['global-dashboard', 'task-board', 'shipping-release'],
+        pages: ['global-dashboard', 'task-board'],
         actions: [
           'workflow.task.create',
           'workflow.task.read',
@@ -344,11 +344,11 @@ export function createDashboardTaskScenarios({
         await layoutSearch.fill('')
         await layoutSearch.press('Enter')
         await page
-          .getByRole('button', { name: '任务概览', exact: true })
+          .getByRole('button', { name: /^(全部待办|全部分类)$/u, exact: true })
           .click()
         await page
           .locator(
-            '.erp-task-board-lanes:not(.erp-task-board-lanes--focused)[aria-busy="false"]'
+            '.erp-task-board-lanes--focused[aria-busy="false"]'
           )
           .waitFor()
         await assertShellRefreshButton(page, {
@@ -1011,16 +1011,29 @@ export function createDashboardTaskScenarios({
           })}`
         )
         await page.getByRole('button', { name: '刷新当前页' }).click()
-        const actionableOverviewLane = page.locator('.erp-task-board-lane--overview')
+        const actionableOverviewLane = page.locator('.erp-task-board-lane--all')
         await page
           .locator('.erp-task-progress-rail__item[data-lane="actionable"] .erp-task-progress-rail__value')
           .filter({ hasText: /^38$/ })
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await actionableOverviewLane.locator('.erp-task-table-row').filter({ hasText: /看板分页测试任务|看板跳转测试任务/ }).count(),
-          2,
-          '常规待办保留两条预览，完整数量由分类入口提供'
+          20,
+          '全部列表按二十条分页，分类入口保留完整数量'
         )
+        const allFirstPage = await page.locator('.erp-task-board-lane--all tr[data-task-id]').evaluateAll((rows) => rows.map((row) => row.dataset.taskId))
+        await page.locator('.erp-task-pagination .ant-pagination-item-2').click()
+        await page.waitForFunction(() => new URLSearchParams(location.search).get('page') === '2' && document.querySelector('.erp-task-board-lanes')?.getAttribute('aria-busy') === 'false')
+        await page.locator('.erp-task-board-lane--all tr[data-task-id]').first().filter({ hasText: expectedSecondPageFirstTask.task_name }).waitFor()
+        const allSecondPage = await page.locator('.erp-task-board-lane--all tr[data-task-id]').evaluateAll((rows) => rows.map((row) => row.dataset.taskId))
+        assert(allSecondPage.length > 0 && allSecondPage.length <= 20, '全部任务的第二页有完整服务端分页结果')
+        assert(allSecondPage.every((id) => !allFirstPage.includes(id)), '全部任务跨页不重复')
+        await page.reload()
+        await page.locator('.erp-task-board-lane--all tr[data-task-id]').first().waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('page'), '2', '刷新保留全部列表页码')
+        assert.deepEqual(await page.locator('.erp-task-board-lane--all tr[data-task-id]').evaluateAll((rows) => rows.map((row) => row.dataset.taskId)), allSecondPage, '刷新恢复全部列表同一页')
+        await page.getByRole('button', { name: '全部分类', exact: true }).click()
+        await page.waitForFunction(() => !new URLSearchParams(location.search).has('page') && document.querySelector('.erp-task-board-lanes')?.getAttribute('aria-busy') === 'false')
         await page.setViewportSize({ width: 1920, height: 1080 })
         await assertDashboardTaskBoardLayout(page, {
           scenarioName: 'erp-task-board-populated-preview',
@@ -1214,13 +1227,12 @@ export function createDashboardTaskScenarios({
           await page
             .locator('.erp-task-board-lane--focused .ant-table-thead th')
             .allTextContents(),
-          ['任务与关联内容', '关联单据 / 时间', '状态与说明', '负责岗位 / 处理人'],
+          ['任务与关联内容', '任务时间', '状态与说明', '负责岗位 / 处理人'],
           '分类列表应独立展示负责岗位与处理人，无重复操作列'
         )
         await assertTaskTitleFocusInteractions(page, focusedListRow)
         const sourceText = focusedListRow
-          .locator('td')
-          .nth(1)
+          .locator('.erp-task-identity__source')
           .locator('.erp-task-copy-field__value')
           .first()
         const sourceTextBox = await sourceText.boundingBox()
@@ -1524,14 +1536,14 @@ export function createDashboardTaskScenarios({
         }
         await page.setViewportSize({ width: 1440, height: 900 })
         await page
-          .getByRole('button', { name: '任务概览', exact: true })
+          .getByRole('button', { name: /^(全部待办|全部分类)$/u, exact: true })
           .click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(window.location.search)
           return (
             !params.has('lane') &&
             !params.has('page') &&
-            document.querySelectorAll('.erp-task-board-lane--overview').length === 1
+            document.querySelectorAll('.erp-task-board-lane--all').length === 1
           )
         })
         const taskBoardSearch =

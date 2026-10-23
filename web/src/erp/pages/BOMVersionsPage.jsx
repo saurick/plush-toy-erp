@@ -15,6 +15,8 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
 import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
@@ -60,7 +62,6 @@ import {
   BusinessPageLayout,
   PageHeaderCard,
   SearchInput,
-  SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
   ToolbarButton,
@@ -294,6 +295,7 @@ export default function BOMVersionsPage() {
       return Number.isSafeInteger(value) && value > 0 ? value : undefined
     }
   )
+  const [statusCounts, setStatusCounts] = useState(null)
   const [versions, setVersions] = useState([])
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useBusinessPageState('pagination', {
@@ -457,6 +459,7 @@ export default function BOMVersionsPage() {
 
   const loadVersions = useCallback(async () => {
     const request = beginLatestRequest('versions')
+    setStatusCounts(null)
     if (!canRead) {
       setVersions([])
       setSelectedVersion(null)
@@ -472,6 +475,7 @@ export default function BOMVersionsPage() {
       const result = await listBOMVersions(
         {
           ...bomListParams,
+          include_status_counts: true,
           ...getBusinessPaginationParams(pagination),
         },
         { signal: request.signal }
@@ -479,6 +483,7 @@ export default function BOMVersionsPage() {
       if (!request.isCurrent()) {
         return false
       }
+      setStatusCounts(resolveBusinessStatusCounts(result))
       const nextVersions = Array.isArray(result?.bom_versions)
         ? result.bom_versions
         : []
@@ -1173,19 +1178,18 @@ export default function BOMVersionsPage() {
   const activeFilterCount = [
     productID,
     lifecycleScope !== LIFECYCLE_SCOPE.CURRENT,
-    status,
   ].filter(Boolean).length
   const clearFilters = useCallback(() => {
     setProductID(undefined)
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
-    setStatus('')
+    if (!lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, status, ['ARCHIVED'])) setStatus('')
     setSearchParams((current) => {
       const next = withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT)
       next.delete('product_id')
       return next
     }, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [setProductID, setLifecycleScope, setStatus, setSearchParams, setPagination])
+  }, [setProductID, setLifecycleScope, setStatus, setSearchParams, setPagination, status])
 
   const preparationLoadError =
     preparationError ||
@@ -1281,7 +1285,10 @@ export default function BOMVersionsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <BusinessStatusFilter
+              inline
+              counts={statusCounts}
+              loading={loading}
               aria-label="BOM 状态"
               value={status}
               options={lifecycleStatusOptions}

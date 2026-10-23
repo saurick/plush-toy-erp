@@ -9,6 +9,8 @@ import {
   requireProgressDetail,
   progressQueryFromURL,
   progressDelivery,
+  progressMetricDetails,
+  progressDeliveryDetails,
   progressStatusLabel,
   progressSourcePath,
   progressStages,
@@ -336,4 +338,19 @@ test('stage summaries preserve independent facts, missing values and permission 
     noBatch.find((stage) => stage.key === 'production').section,
     'production'
   )
+})
+
+test('chart details keep exact units, denominators, zero, missing values and permission boundaries', () => {
+  const row = progressFixtureRow()
+  const access = { production: true, wip: true }
+  assert.equal(progressMetricDetails(row, 'shipment', access).value, '400 / 800 只')
+  assert.equal(progressMetricDetails({ ...row, shipped_quantity: '0' }, 'shipment', access).percent, 0)
+  assert.equal(Math.round(progressDeliveryDetails({ ...row, shipped_quantity: '880' }).percent), 110)
+  assert.equal(progressMetricDetails(progressFixtureRow(2), 'shipment', access).percent, undefined)
+  assert.equal(progressDeliveryDetails({ ...row, delivery_known: false, shipped_quantity: null }).value, '关联待核对')
+  assert.equal(progressMetricDetails({ ...row, material_total: 5, material_pending: 2 }, 'materials', access).value, '3 / 5 项已领齐')
+  assert.equal(progressMetricDetails({ ...row, material_total: 0 }, 'materials', access).percent, undefined)
+  for (const key of ['materials', 'production', 'quality']) assert.equal(progressMetricDetails(row, key, {}), null)
+  assert.equal(progressMetricDetails(progressFixtureRow(0, 'production'), 'production', access).value, '560 / 800 只')
+  assert.equal(progressMetricDetails(row, 'quality', access).percent, undefined)
 })

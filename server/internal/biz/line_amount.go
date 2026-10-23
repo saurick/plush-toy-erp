@@ -16,6 +16,9 @@ func normalizeCalculatedLineAmount(quantity decimal.Decimal, unitPrice, amount *
 		return nil, nil
 	}
 	calculated := quantity.Mul(*unitPrice).Round(lineAmountScale)
+	if calculated.IsNegative() || calculated.GreaterThan(maxPositiveNumeric20Scale6) {
+		return nil, domainerrors.ErrInvalidMoney
+	}
 	if amount != nil && !amount.Equal(calculated) {
 		return nil, domainerrors.ErrInvalidMoney
 	}

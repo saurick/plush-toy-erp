@@ -7,8 +7,14 @@ import {
   normalizeBusinessRuleEvidence,
   parseBusinessRuleSearch,
 } from './devBusinessRules.mjs'
+import {
+  BUSINESS_CONSISTENCY_SCHEMA,
+  businessConsistencyFastTests,
+} from '../../../../scripts/qa/lib/business-consistency-evidence.mjs'
+import { businessTestKey } from '../../../../scripts/qa/lib/business-rule-catalog.mjs'
 
-const unit = BUSINESS_RULES.find((entry) => entry.id === 'unit-quantity').tests[0]
+const unit = BUSINESS_RULES.find((entry) => entry.id === 'unit-quantity')
+  .tests[0]
 const database = BUSINESS_RULES.find(
   (entry) => entry.id === 'inventory-atomicity'
 ).tests[0]
@@ -32,6 +38,38 @@ const pgEvidence = (status = 'passed') => ({
 })
 const status = (rows, id, index = 0) =>
   rows.find((entry) => entry.id === id).tests[index].status
+
+test('consistency evidence keeps frontend, backend and PostgreSQL execution distinct', () => {
+  const report = {
+    businessConsistency: {
+      schemaVersion: BUSINESS_CONSISTENCY_SCHEMA,
+      status: 'passed',
+      current: true,
+      tests: businessConsistencyFastTests().map((entry) => ({
+        id: businessTestKey(entry),
+        status: 'passed',
+        counts: { executed: 1, passed: 1, failed: 0, skipped: 0 },
+      })),
+    },
+  }
+  const fast = (value, current = true) => buildBusinessRuleRows({ report: value, reportCurrent: current })
+    .filter((entry) => entry.category === 'consistency')
+    .flatMap((entry) => entry.tests)
+    .filter((entry) => entry.gate !== 'postgres')
+  assert(fast(report).every((entry) => entry.status === 'passed'))
+  assert(buildBusinessRuleRows({ report, reportCurrent: true }).flatMap((entry) => entry.tests)
+    .filter((entry) => entry.gate === 'postgres').every((entry) => entry.status === 'missing'))
+  assert(fast(report, false).every((entry) => entry.status === 'stale'))
+  const stale = structuredClone(report)
+  stale.businessConsistency.current = false
+  assert(fast(stale).every((entry) => entry.status === 'stale'))
+  const failed = structuredClone(report)
+  failed.businessConsistency.status = 'failed'
+  assert(fast(failed).every((entry) => entry.status === 'blocked'))
+  const invalid = structuredClone(report)
+  invalid.businessConsistency.tests[0].counts.executed = 0
+  assert(fast(invalid).every((entry) => entry.status === 'missing'))
+})
 
 test('static associations never imply execution and unit evidence needs exact names and current identity', () => {
   assert(buildBusinessRuleRows().every((entry) => entry.status === 'missing'))

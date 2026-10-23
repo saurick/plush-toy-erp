@@ -240,6 +240,29 @@ test('logout invalidates the server session, expired sessions fail closed and re
   assert.equal((await request('/__dev/api/test', { headers: { cookie: expiring } })).status, 401)
 })
 
+test('default session expires after one absolute hour without extending on activity', async (t) => {
+  const startedAt = Date.parse('2026-10-24T00:00:00.000Z')
+  let time = startedAt
+  const { request, login, calls } = await fixture(t, { now: () => time })
+  const initial = await login()
+  const rawCookie = initial.headers.get('set-cookie')
+  assert.match(rawCookie, /(?:^|; )Max-Age=3600(?:;|$)/u)
+  const cookie = rawCookie.split(';')[0]
+  time += 30 * 60 * 1000
+  const active = await request('/__dev/api/test', { headers: { cookie } })
+  assert.equal(active.status, 200)
+  assert.equal(active.headers.get('set-cookie'), null)
+  const session = await request('/__dev/auth/session', { headers: { cookie } })
+  assert.equal((await session.json()).expiresAt, new Date(startedAt + 60 * 60 * 1000).toISOString())
+  time = startedAt + 60 * 60 * 1000 - 1
+  assert.equal((await request('/__dev/api/test', { headers: { cookie } })).status, 200)
+  time++
+  const expired = await request('/__dev/api/test', { headers: { cookie } })
+  assert.equal(expired.status, 401)
+  assert.match(expired.headers.get('set-cookie'), /Max-Age=0/u)
+  assert.equal(calls(), 2)
+})
+
 test('return paths cannot navigate outside workbench pages or reenter auth/API endpoints', () => {
   for (const value of ['https://evil.test', '//evil.test', '/erp', '/__dev/api/action', '/__dev/auth/login', '/__dev/login', '/__dev/%61pi/action', '/__dev/../erp', '/__dev\\evil', '/__dev%0d%0aLocation:evil']) {
     assert.equal(safeWorkbenchReturnTo(value), '/__dev', value)

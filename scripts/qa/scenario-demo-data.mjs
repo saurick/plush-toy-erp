@@ -56,8 +56,8 @@ const LOCAL_STABLE_ADMIN_PASSWORD = "adminadmin";
 const CUSTOMER_KEY = "yoyoosun";
 const ADMIN_USERNAME = "admin";
 const DATASET_CONFIRM_PREFIX = "APPLY_SCENARIO_DEMO";
-const QUERY_READY_COUNT = 41;
-const CATALOG_TARGET_COUNT = 51;
+const QUERY_READY_COUNT = 40;
+const CATALOG_TARGET_COUNT = 50;
 const BROWSER_ONLY_GAP_COUNT = 10;
 const FACT_COUNT_KEYS = Object.freeze([
   "productionFacts",

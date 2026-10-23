@@ -150,7 +150,10 @@ export function getPrintAppendixImagePreviewDataURL(image = {}) {
   return getPrintAppendixImageSegments(image)[0]?.dataURL || ''
 }
 
-export function resolvePrintAppendixImageLayout(image = {}) {
+export function resolvePrintAppendixImageLayout(
+  image = {},
+  { autoColumns = 2 } = {}
+) {
   const normalized = normalizePrintAppendixImage(image)
   if (!normalized) {
     return PRINT_APPENDIX_IMAGE_LAYOUT_HALF
@@ -167,28 +170,38 @@ export function resolvePrintAppendixImageLayout(image = {}) {
 
   const portraitRatio = height / width
   const landscapeRatio = width / height
-  return portraitRatio > PRINT_APPENDIX_IMAGE_AUTO_FULL_PORTRAIT_RATIO ||
+  return portraitRatio >
+    (autoColumns === 3 ? 2 : PRINT_APPENDIX_IMAGE_AUTO_FULL_PORTRAIT_RATIO) ||
     landscapeRatio > PRINT_APPENDIX_IMAGE_AUTO_FULL_LANDSCAPE_RATIO
     ? PRINT_APPENDIX_IMAGE_LAYOUT_FULL
     : PRINT_APPENDIX_IMAGE_LAYOUT_HALF
 }
 
-export function groupPrintAppendixImageRows(images = []) {
+export function groupPrintAppendixImageRows(
+  images = [],
+  { autoColumns = 2 } = {}
+) {
   const normalized = normalizePrintAppendixImages(images)
   const rows = []
   let pendingHalfImages = []
+  let pendingColumns = 2
 
   const flushHalfImages = () => {
     if (!pendingHalfImages.length) return
     rows.push({
       layout: PRINT_APPENDIX_IMAGE_LAYOUT_HALF,
       images: pendingHalfImages,
+      ...(pendingColumns === 3
+        ? { columns: Math.max(2, pendingHalfImages.length) }
+        : {}),
     })
     pendingHalfImages = []
   }
 
   for (const image of normalized) {
-    const resolvedLayout = resolvePrintAppendixImageLayout(image)
+    const resolvedLayout = resolvePrintAppendixImageLayout(image, {
+      autoColumns,
+    })
     if (resolvedLayout === PRINT_APPENDIX_IMAGE_LAYOUT_FULL) {
       flushHalfImages()
       rows.push({
@@ -198,8 +211,14 @@ export function groupPrintAppendixImageRows(images = []) {
       continue
     }
 
+    const columns =
+      autoColumns === 3 && image.layoutMode === PRINT_APPENDIX_IMAGE_LAYOUT_AUTO
+        ? 3
+        : 2
+    if (columns !== pendingColumns) flushHalfImages()
+    pendingColumns = columns
     pendingHalfImages.push(image)
-    if (pendingHalfImages.length === 2) {
+    if (pendingHalfImages.length === pendingColumns) {
       flushHalfImages()
     }
   }

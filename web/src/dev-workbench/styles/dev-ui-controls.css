@@ -17,37 +17,8 @@
 
 .erp-control-library-directory nav {
   display: grid;
-  gap: 6px;
+  gap: 2px;
   margin-top: 16px;
-}
-
-.erp-control-library-directory nav button {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--erp-text);
-  text-align: left;
-}
-
-.erp-control-library-directory nav button:hover {
-  background: var(--erp-primary-softer);
-}
-
-.erp-control-library-directory nav button[aria-current='page'] {
-  border-color: var(--erp-border-strong);
-  background: var(--erp-primary-soft);
-  color: var(--erp-primary-strong);
-}
-
-.erp-control-library-directory nav button:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
 }
 
 .erp-control-library-directory :is(strong, small) {
@@ -232,11 +203,6 @@
   margin-top: 18px;
 }
 
-.erp-control-library-source summary {
-  width: fit-content;
-  padding-block: 6px;
-}
-
 .erp-control-library-catalog {
   max-width: 100%;
   line-height: 1.8;
@@ -382,16 +348,7 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-control-empty-stage {
-  min-height: 150px;
-  padding-block: 12px;
-}
-
 @media (max-width: 1280px) {
-  .erp-control-library {
-    grid-template-columns: 190px minmax(0, 1fr);
-  }
-
   .erp-control-library-layout {
     grid-template-columns: minmax(0, 1fr);
   }

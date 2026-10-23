@@ -659,7 +659,7 @@ async function scenarioBrowserEvidenceFixture() {
   return { ...fixture, dataset: datasetReport, components, componentDigests };
 }
 
-test("shared scenario browser is explicit, keeps 51 targets, and rejects other origins", () => {
+test("shared scenario browser is explicit, keeps 50 targets, and rejects other origins", () => {
   const options = parseManualAcceptanceBrowserArgs([
     "--plan",
     "--scenario-demo-shared-local",
@@ -671,7 +671,7 @@ test("shared scenario browser is explicit, keeps 51 targets, and rejects other o
   const plan = buildManualAcceptanceBrowserPlan(options);
   assert.equal(options.scenarioDemoSharedLocal, true);
   assert.equal(plan.target, "scenario-demo");
-  assert.equal(plan.targets.length, 51);
+  assert.equal(plan.targets.length, 50);
   assert.equal(plan.writesBusinessData, false);
   assert.equal(plan.recordsLegalNoticeAcknowledgement, true);
   for (const backendURL of [
@@ -1000,7 +1000,7 @@ test("shared authenticated identity uses the permitted session read and rejects 
   );
 });
 
-test("manual acceptance browser plan covers all 51 catalog targets and ten formal accounts", () => {
+test("manual acceptance browser plan covers all 50 catalog targets and ten formal accounts", () => {
   const plan = buildManualAcceptanceBrowserPlan({
     baseURL: "http://127.0.0.1:15200",
     backendURL: "http://localhost:8300",
@@ -1011,16 +1011,16 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
   assert.equal(plan.writesBusinessData, false);
   assert.equal(plan.recordsLegalNoticeAcknowledgement, true);
   assert.equal(plan.clicksBusinessWriteActions, false);
-  assert.equal(plan.summary.totalTargets, 51);
+  assert.equal(plan.summary.totalTargets, 50);
   assert.deepEqual(plan.summary, {
     entryPages: 2,
-    desktopPages: 30,
+    desktopPages: 29,
     mobileRolePages: 9,
     printPreviewPages: 5,
     printWorkspacePages: 5,
-    totalTargets: 51,
+    totalTargets: 50,
   });
-  assert.equal(plan.targets.length, 51);
+  assert.equal(plan.targets.length, 50);
   assert.equal(plan.formalAccounts.length, 10);
   assert.equal(FORMAL_BROWSER_ACCOUNTS.length, 10);
   assert.equal(EXCEPTION_BROWSER_ACCOUNTS.length, 3);
@@ -1030,7 +1030,7 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
   );
   assert.equal(
     plan.targets.filter((item) => item.group === "desktop").length,
-    30,
+    29,
   );
   const productionOrders = plan.targets.find(
     (item) => item.group === "desktop" && item.key === "production-orders",
@@ -1072,8 +1072,8 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
     "demo_boss",
   );
   assert.equal(
-    plan.targets.find((item) => item.key === "shipping-release")?.username,
-    "demo_finance",
+    plan.targets.find((item) => item.key === "shipping-release"),
+    undefined,
   );
   assert.equal(
     plan.targets
@@ -1476,7 +1476,7 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     runtimeAttestation,
   };
   const targets = [
-    ...Array.from({ length: 41 }, (_, index) => ({
+    ...Array.from({ length: 40 }, (_, index) => ({
       id: `desktopPages:query-${index}`,
       catalogGroup: "desktopPages",
       dataStatus: "pass",
@@ -1550,8 +1550,8 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
       },
     },
     summary: {
-      totalTargets: 51,
-      passedTargetData: 41,
+      totalTargets: 50,
+      passedTargetData: 40,
       failedTargetData: 0,
       notProvenTargetData: 10,
       queryChecksPassed: true,
@@ -2894,7 +2894,7 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
 
   const requirements = [
     { key: "customers", label: "客户", minimumRecords: 60 },
-    { key: "shipping-release", label: "出货放行", minimumRecords: 45 },
+    { key: "shipments", label: "出货单", minimumRecords: 45 },
   ];
   assert.equal(
     evaluateBusinessDashboardEvidence({ total: 60, ids: [1] }, requirements)
@@ -3680,7 +3680,7 @@ test("plan mode needs no password and starts no browser", () => {
   );
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.summary.totalTargets, 51);
+  assert.equal(plan.summary.totalTargets, 50);
   assert.equal(plan.writesDatabase, true);
   assert.equal(plan.formalAccounts.length, 10);
 });
@@ -4169,7 +4169,7 @@ test("shipping approval task matching reads its standalone copy value and exact 
         ],
       },
     },
-  })["shipping-release"];
+  })["task-board"];
   assert.deepEqual(record, [{ key: "1735", identifier: code }]);
   const row = {
     textContent: `${code}shipment_finance_approval`,
@@ -4239,7 +4239,7 @@ test("shipping approval task matching reads its standalone copy value and exact 
             ],
           },
         },
-      })["shipping-release"],
+      })["task-board"],
       record,
     );
   } finally {

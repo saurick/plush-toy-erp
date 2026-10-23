@@ -8,6 +8,7 @@ import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 import { hasFinalShipmentWeight } from '../../utils/shipmentWeight.mjs'
+import { shipmentApprovalState } from '../../utils/shipmentApproval.mjs'
 
 export const SHIPMENTS_MODULE_KEY = 'shipments'
 
@@ -127,6 +128,18 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       sortValue: (record) => shipmentStatusText(record.status),
       render: shipmentStatusTag,
       exportValue: (record) => shipmentStatusText(record?.status, { emptyText: '' }),
+    },
+    {
+      defaultPriority: 25,
+      title: '财务审批',
+      dataIndex: 'finance_release_status',
+      width: 110,
+      sortValue: (record) => shipmentApprovalState(record).label,
+      render: (_, record) => {
+        const state = shipmentApprovalState(record)
+        return <Tag color={state.color}>{state.label}</Tag>
+      },
+      exportValue: (record) => shipmentApprovalState(record).label,
     },
     {
       align: 'left',

@@ -254,6 +254,7 @@ approval_form: null,
         await page.screenshot({ path: path.resolve(outputDir, `erp-task-tracking-${themeMode}-initiator-4k.png`) })
         const drawer = page.locator('.erp-workflow-tracking-drawer')
         const copy = row.getByRole('button', { name: '复制单据编号', exact: true })
+        assert.equal(await row.locator('.erp-task-identity__card-body .erp-task-identity__source .erp-task-source__number').innerText(), 'SO-TRACK-001', '流程跟踪的来源与编号同在图片右侧')
         await assertTaskCopy(page, copy, 'SO-TRACK-001', { keyboard: true })
         await assertTaskCopy(page, copy, 'SO-TRACK-001', { fallback: true })
         await assertTaskCopy(page, copy, '', { failure: true })

@@ -27,6 +27,7 @@ import { createMobileScrollScenarios } from './mobileScrollScenarios.mjs'
 import { createFilterConflictScenarios } from './filterConflictScenarios.mjs'
 import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
 import { createLoadFeedbackScenarios } from './loadFeedbackScenarios.mjs'
+import { createPageLoadingScenarios } from './pageLoadingScenarios.mjs'
 import { createDesktopNavigationBadgeScenarios } from './desktopNavigationBadgeScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
@@ -103,6 +104,7 @@ import { createDevWorkbenchSwitchScenarios } from './devWorkbenchSwitchScenarios
 import { createAccountIdentityScenarios } from './accountIdentityScenarios.mjs'
 import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
 import { createSalesOrderExportScenarios } from './salesOrderExportScenarios.mjs'
+import { createBusinessConsistencyScenarios } from './businessConsistencyScenarios.mjs'
 import { createGrowthValidationScenarios } from './growthValidationScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
@@ -430,6 +432,7 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createSalesOrderExportScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createGrowthValidationScenarios(deps),
+    ...createBusinessConsistencyScenarios(deps),
     ...createBusinessQuickCountsScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createBusinessStatusCountsScenarios({
       ...deps,
@@ -685,6 +688,7 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
     ...createLoadFeedbackScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createPageLoadingScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDesktopNavigationBadgeScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileTaskScenarios({
       expectText,

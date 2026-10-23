@@ -104,7 +104,7 @@ export function ChainAuditFindings({ data }) {
             </dl>
             <ChainAuditEvidenceLinks data={data} items={finding.evidence} />
             {Array.isArray(finding.source) ? (
-              <details>
+              <details className="erp-dev-disclosure">
                 <summary>报告对应的源码位置</summary>
                 <ul>
                   {finding.source.map((item) => (
@@ -344,7 +344,7 @@ export default function DevChainAuditEvidence({ data }) {
         <h2>主要执行回执</h2>
         <ChainAuditEvidenceLinks data={data} items={report.evidence} />
       </section>
-      <details>
+      <details className="erp-dev-disclosure">
         <summary>可下载证据清单 · {data.files.length} 个文件</summary>
         <ReportTable
           rows={data.files}

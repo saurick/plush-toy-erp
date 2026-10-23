@@ -1,11 +1,8 @@
-import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
-
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
 
 export async function verifyBusinessCoreProduction(page, deps) {
   const {
     assert,
-    assertAntdModalCentered,
     assertNoHorizontalOverflow,
     assertTextAbsent,
     closeBusinessFormModal,
@@ -21,13 +18,7 @@ export async function verifyBusinessCoreProduction(page, deps) {
     findSelectionActionButton,
     assertBusinessCollaborationPanelAbsent,
     assertUnifiedListToolbarShell,
-    assertWorkflowDueDateRangeFilterLayout,
   } = createBusinessFormalAssertions(deps)
-  const { assertPageAttachmentModalEntrypoint } =
-    createBusinessAttachmentAssertions({
-      assert,
-      assertAntdModalCentered,
-    })
   const verifyWorkflowPage = async ({
     path,
     heading,
@@ -181,210 +172,6 @@ export async function verifyBusinessCoreProduction(page, deps) {
   await expectText(page, '异常处理申请已刷新')
   await expectNoButton(page, '删除')
   await assertNoHorizontalOverflow(page, 'business-production-exceptions-return')
-
-  await page.evaluate(async () => {
-    const response = await fetch('/rpc/workflow', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 'formal-shipping-release-other-source-task',
-        method: 'create_task',
-        params: {
-          task_code: 'style-l1-formal-shipping-release-other',
-          task_group: 'customer_followup',
-          task_name: '同来源非放行任务',
-          source_type: 'shipping-release',
-          source_id: 9102,
-          source_no: 'SHIP-REL-OTHER',
-          business_status_key: 'shipment_pending',
-          task_status_key: 'ready',
-          owner_role_key: 'sales',
-          payload: {
-            shipment_release_page_scope: 'not_for_release_page',
-          },
-        },
-      }),
-    })
-    return response.json()
-  })
-
-  await verifyWorkflowPage({
-    path: '/erp/warehouse/shipping-release',
-    heading: '放行审批',
-    absentTexts: ['发起放行协同', '新建放行单', '生成出货放行', '确认放行'],
-    scenarioName: 'business-workflow-shipping-release',
-    refreshMessage: '出货放行任务已刷新',
-    afterPageReady: async () => {
-      await assertWorkflowDueDateRangeFilterLayout(page, {
-        scenarioName: 'business-workflow-shipping-release',
-      })
-      const shippingReleaseTaskRow = page
-        .locator(
-          '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
-        )
-        .filter({ hasText: 'SHIP-REL-L1' })
-        .first()
-      await shippingReleaseTaskRow.waitFor({ state: 'visible' })
-      await shippingReleaseTaskRow
-        .getByText('可执行', { exact: true })
-        .waitFor({ state: 'visible' })
-      await expectText(page, '出货财务审批确认')
-      await expectText(page, 'SHIP-REL-L1')
-      await assertTextAbsent(page, '同来源非放行任务')
-      await assertTextAbsent(page, 'SHIP-REL-OTHER')
-      await shippingReleaseTaskRow.click()
-      await assertPageAttachmentModalEntrypoint(page, {
-        scenarioName: 'business-workflow-shipping-release-attachment-modal',
-        modalTitle: '任务附件',
-        panelTitle: '任务附件',
-      })
-
-      let failedListTasksOnce = false
-      await page.route('**/rpc/workflow', async (route) => {
-        const body = route.request().postDataJSON() || {}
-        if (!failedListTasksOnce && body.method === 'list_tasks') {
-          failedListTasksOnce = true
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: body.id || 'formal-shipping-release-list-failed',
-              result: {
-                code: 500123,
-                message: 'shipping release list failed',
-                data: null,
-              },
-            }),
-          })
-          return
-        }
-        await route.fallback()
-      })
-      await page.getByRole('button', { name: '刷新当前页' }).click()
-      await expectText(page, '加载出货放行任务失败')
-      await expectText(page, '暂无出货财务审批任务。')
-      await assertTextAbsent(page, '出货财务审批确认')
-
-      await page.getByRole('button', { name: '刷新当前页' }).click()
-      await expectText(page, '出货财务审批刷新后确认')
-      await expectText(page, 'SHIP-REL-STALE')
-
-      const refreshedTaskRow = page
-        .locator(
-          '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
-        )
-        .filter({ hasText: '出货财务审批刷新后确认' })
-        .first()
-      await refreshedTaskRow.click()
-      const viewTaskButton = await findSelectionActionButton(page, '查看任务')
-      assert.equal(
-        await viewTaskButton.isDisabled(),
-        false,
-        '选中主任务表记录后应允许查看当前任务'
-      )
-      const actionMenu = page.locator(
-        '.erp-business-selection-action-menu:visible'
-      )
-      if (await actionMenu.count()) {
-        await page.keyboard.press('Escape')
-        await actionMenu.waitFor({ state: 'hidden' })
-      }
-      await expectNoButton(page, '处理')
-
-      let emptiedListTasksOnce = false
-      await page.route('**/rpc/workflow', async (route) => {
-        const body = route.request().postDataJSON() || {}
-        if (!emptiedListTasksOnce && body.method === 'list_tasks') {
-          emptiedListTasksOnce = true
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: body.id || 'formal-shipping-release-list-empty',
-              result: {
-                code: 0,
-                message: 'OK',
-                data: {
-                  tasks: [],
-                  total: 0,
-                  limit: 100,
-                  offset: 0,
-                },
-              },
-            }),
-          })
-          return
-        }
-        await route.fallback()
-      })
-      await page.getByRole('button', { name: '刷新当前页' }).click()
-      await expectText(page, '出货放行任务已刷新')
-      await page.waitForFunction(() => {
-        const isVisible = (node) => {
-          if (!(node instanceof HTMLElement)) return false
-          const rect = node.getBoundingClientRect()
-          const style = window.getComputedStyle(node)
-          return (
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            rect.width > 0 &&
-            rect.height > 0
-          )
-        }
-        return Array.from(
-          document.querySelectorAll(
-            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
-          )
-        )
-          .filter(isVisible)
-          .every(
-            (node) =>
-              !String(node.textContent || '').includes('出货财务审批刷新后确认')
-          )
-      })
-      const staleTaskMetrics = await page.evaluate(() => {
-        const isVisible = (node) => {
-          if (!(node instanceof HTMLElement)) return false
-          const rect = node.getBoundingClientRect()
-          const style = window.getComputedStyle(node)
-          return (
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            rect.width > 0 &&
-            rect.height > 0
-          )
-        }
-        const visibleTaskTexts = Array.from(
-          document.querySelectorAll(
-            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
-          )
-        )
-          .filter(isVisible)
-          .map((node) =>
-            String(node.textContent || '')
-              .replace(/\s+/gu, ' ')
-              .trim()
-          )
-        return {
-          visibleTaskTexts,
-          staleTaskVisible: visibleTaskTexts.some((text) =>
-            text.includes('出货财务审批刷新后确认')
-          ),
-        }
-      })
-      assert.equal(
-        staleTaskMetrics.staleTaskVisible,
-        false,
-        `刷新后不应继续显示已消失的协同任务: ${JSON.stringify(staleTaskMetrics)}`
-      )
-    },
-  })
 
   await gotoScenarioPath(page, '/erp/production/progress', {
     waitUntil: 'domcontentloaded',

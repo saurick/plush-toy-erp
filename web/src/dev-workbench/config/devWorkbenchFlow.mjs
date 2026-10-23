@@ -28,7 +28,7 @@ export const DEV_WORKBENCH_GUIDE = Object.freeze(
       label: '验证改动',
       completion: '影响范围内的检查有结果、有来源；发布前再核对固定版本 CI。',
       action: '开始本轮验证',
-      route: DEV_TESTING_ROUTE,
+      route: `${DEV_TESTING_ROUTE}?view=tiers`,
     },
     {
       value: '4',

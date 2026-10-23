@@ -11,10 +11,15 @@ function joinClassNames(...items) {
   return items.filter(Boolean).join(' ')
 }
 
+function isComposing(event) {
+  return event?.nativeEvent?.isComposing || event?.nativeEvent?.keyCode === 229
+}
+
 const SearchInput = forwardRef(
   (
     {
       allowClear = false,
+      defaultValue,
       className = '',
       placeholder = '搜索关键词',
       searchHint,
@@ -28,9 +33,8 @@ const SearchInput = forwardRef(
     },
     ref
   ) => {
-    const explicit = typeof onSearch === 'function'
     const search = useSubmittedSearch({
-      value: restProps.value,
+      value: restProps.value ?? defaultValue,
       onSearch,
       resetKey,
     })
@@ -42,16 +46,17 @@ const SearchInput = forwardRef(
       showSearchScope && searchHint && focused && !restProps.disabled
     )
     const cancel = () => {
-      search.cancel()
+      const changed = search.cancel()
       setFocused(false)
       onCancel?.()
+      return changed
     }
     const submit = (event) => {
       event?.stopPropagation()
       if (!search.submit(search.value, event)) return
       if (event?.key === 'Enter') event.preventDefault()
       setFocused(false)
-      onSubmitted?.()
+      onSubmitted?.(search.value.trim())
     }
 
     return (
@@ -73,45 +78,47 @@ const SearchInput = forwardRef(
       >
         <Input
           {...restProps}
-          {...(explicit
-            ? {
-                value: search.value,
-                onChange: search.onChange,
-                onCompositionStart: search.onCompositionStart,
-                onCompositionEnd: search.onCompositionEnd,
-                onPressEnter: submit,
-                suffix: (
-                  <>
-                    {allowClear && (search.value || restProps.value) ? (
-                      <button
-                        type="button"
-                        className="ant-input-clear-icon erp-search-clear"
-                        aria-label="清除搜索"
-                        disabled={restProps.disabled}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={search.clear}
-                      >
-                        <CloseCircleFilled aria-hidden="true" />
-                      </button>
-                    ) : null}
-                    <Button
-                      className="erp-search-submit"
-                      type="primary"
-                      disabled={restProps.disabled}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={submit}
-                    >
-                      搜索
-                    </Button>
-                  </>
-                ),
-              }
-            : {})}
+          value={search.value}
+          onChange={search.onChange}
+          onPressEnter={submit}
+          suffix={
+            <>
+              {allowClear && (search.value || restProps.value) ? (
+                <button
+                  type="button"
+                  className="ant-input-clear-icon erp-search-clear"
+                  aria-label="清除搜索"
+                  disabled={restProps.disabled}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={search.clear}
+                >
+                  <CloseCircleFilled aria-hidden="true" />
+                </button>
+              ) : null}
+              <Button
+                className="erp-search-submit"
+                type="primary"
+                disabled={restProps.disabled}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={submit}
+              >
+                搜索
+              </Button>
+            </>
+          }
+          onCompositionStart={(event) => {
+            search.onCompositionStart()
+            restProps.onCompositionStart?.(event)
+          }}
+          onCompositionEnd={(event) => {
+            search.onCompositionEnd(event)
+            restProps.onCompositionEnd?.(event)
+          }}
           ref={ref}
-          allowClear={explicit ? false : allowClear}
+          allowClear={false}
           className={joinClassNames(
             'erp-search-input',
-            explicit && 'erp-search-input--submitted',
+            'erp-search-input--submitted',
             className
           )}
           prefix={
@@ -151,9 +158,13 @@ const SearchInput = forwardRef(
             restProps.onBlur?.(event)
           }}
           onKeyDown={(event) => {
+            if (search.composing.current || isComposing(event)) {
+              if (event.key === 'Escape' || event.key === 'Enter') event.stopPropagation()
+              return
+            }
             if (event.key === 'Escape') {
-              if (explicit) cancel()
-              else setFocused(false)
+              event.preventDefault()
+              if (cancel()) event.stopPropagation()
             }
             restProps.onKeyDown?.(event)
           }}

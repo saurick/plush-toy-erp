@@ -38,60 +38,14 @@
   width: 100%;
 }
 
-.erp-dev-project-relationships__catalog h2,
 .erp-dev-project-relationships__node h3 {
   margin: 0 0 6px;
   font-size: 14px;
   font-weight: 500;
 }
 
-.erp-dev-project-relationships__catalog h2,
 .erp-dev-project-relationships__breadcrumb {
   color: var(--erp-text-muted);
-}
-
-.erp-dev-project-relationships__catalog button {
-  display: block;
-  width: 100%;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--erp-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.erp-dev-project-relationships__catalog button strong,
-.erp-dev-project-relationships__catalog button span {
-  display: block;
-  font-weight: 400;
-  line-height: 1.6;
-}
-
-.erp-dev-project-relationships__catalog button span {
-  margin-top: 2px;
-  color: var(--erp-text-muted);
-}
-
-.erp-dev-project-relationships__catalog button[aria-pressed='true'] {
-  border-color: var(--erp-primary);
-  background: var(--erp-primary-soft);
-}
-
-.erp-dev-project-relationships__catalog button[aria-pressed='true'] strong {
-  color: var(--erp-primary-strong);
-  font-weight: 500;
-}
-
-.erp-dev-project-relationships__catalog button:where(:not([aria-pressed='true'])):hover {
-  background: var(--erp-interactive-bg-hover);
-}
-
-.erp-dev-project-relationships__catalog button:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
 }
 
 .erp-dev-project-relationships__detail {
@@ -136,11 +90,6 @@
   margin: 4px 0 0;
   color: var(--erp-text-muted);
   overflow-wrap: anywhere;
-}
-
-.erp-dev-project-relationships__evidence summary {
-  width: fit-content;
-  cursor: pointer;
 }
 
 .erp-dev-project-relationships__links {

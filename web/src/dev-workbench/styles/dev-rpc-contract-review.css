@@ -59,24 +59,11 @@
   font-size: 12px;
   color: var(--erp-text-muted);
 }
-.erp-dev-rpc-review__method {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  border: 0;
-  border-top: 1px solid var(--erp-border);
-  background: transparent;
-  padding: 12px;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-}
-.erp-dev-rpc-review__method[aria-pressed='true'] {
-  background: var(--erp-primary-soft);
-  border-color: var(--erp-primary-strong);
+.erp-dev-rpc-review__methods {
+  padding: 4px;
 }
 .erp-dev-rpc-review__method code {
-  color: var(--erp-primary-strong);
+  color: var(--erp-text-muted);
 }
 .erp-dev-rpc-review__method > span {
   color: var(--erp-text-muted);
@@ -122,11 +109,6 @@
 .erp-dev-rpc-review details > span {
   display: block;
   margin-top: 8px;
-}
-.erp-dev-rpc-review summary {
-  cursor: pointer;
-  color: var(--erp-text-muted);
-  font-size: 12px;
 }
 .erp-dev-rpc-review__checks {
   display: grid;
@@ -184,10 +166,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
-}
-.erp-dev-rpc-review__files summary {
-  font-size: 14px;
-  padding: 0 0 10px;
 }
 @media (width <= 1100px) {
   .erp-dev-rpc-review__workspace {
