@@ -541,8 +541,12 @@ export default function MobileProgressPanel({
                         } else open(row, 'tasks')
                       }}
                     >
-                      <ProgressAttention row={row} access={data.access} />
-                      <RightOutlined aria-hidden="true" />
+                      <ProgressAttention
+                        row={row}
+                        access={data.access}
+                        compact
+                        suffix={<RightOutlined aria-hidden="true" />}
+                      />
                     </button>
                   ) : (
                     <div className="mobile-progress-task-entry mobile-progress-task-entry--empty">

@@ -1,0 +1,25 @@
+.erp-task-blocked-tag.ant-tag {
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, var(--erp-visual-danger-text) 25%, var(--erp-border));
+  background: color-mix(in srgb, var(--erp-visual-danger-text) 7%, var(--erp-surface-bg));
+  color: var(--erp-visual-danger-text);
+  font-size: var(--erp-font-micro);
+  font-weight: 500;
+}
+
+.erp-task-blocked-reason {
+  display: block;
+  min-width: 0;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--erp-visual-danger-text) 7%, var(--erp-surface-bg));
+  color: var(--erp-visual-danger-text);
+  font-size: var(--erp-font-caption);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

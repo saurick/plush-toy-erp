@@ -776,7 +776,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         assert.equal(await emptyEntry.locator('button, svg').count(), 0)
         assert.equal(await emptyEntry.evaluate((node) => node.tagName), 'DIV')
         const single = frame.locator('[data-action="mobile-progress-tasks"][data-id="MP02"]')
-        assert.match(await single.innerText(), /任务：跟进客供包装到仓/)
+        assert.match(await single.innerText(), /跟进客供包装到仓/)
         await frame.locator('#mobile-progress-search').fill('品牌吉祥物')
         await single.click()
         await frame.getByRole('heading', { name: '跟进客供包装到仓', exact: true }).waitFor()

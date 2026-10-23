@@ -83,7 +83,7 @@
   overflow-wrap: anywhere;
 }
 
-.mobile-task-list-row__reason {
+.mobile-task-list-row__reason:not(.erp-task-blocked-reason) {
   padding: 6px 8px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--erp-visual-danger-text) 7%, var(--erp-surface-bg));

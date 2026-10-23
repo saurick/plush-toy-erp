@@ -15,6 +15,7 @@ import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAssertions.mjs'
 import { createMobileFilterScrollScenarios } from './mobileFilterScrollScenarios.mjs'
 import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
+import { createMobileTaskBlockerScenarios } from './mobileTaskBlockerScenarios.mjs'
 
 async function assertMobileDetailSurface(root, assert) {
   await root.locator('.mobile-task-flow-back').click({ trial: true })
@@ -508,7 +509,8 @@ export function createMobileProgressScenarios({
           return {
             height: card.getBoundingClientRect().height,
             main: card.querySelector('.mobile-progress-card-main').getBoundingClientRect().height,
-            reason: card.querySelector('.erp-progress-attention-reason')?.getBoundingClientRect().height || 0,
+            reason: card.querySelector('.erp-task-blocked-reason')?.getBoundingClientRect().height || 0,
+            taskHeading: card.querySelector('.erp-progress-attention-heading')?.getBoundingClientRect().height || 0,
             imageSize: card.querySelector('.erp-task-product-image').getBoundingClientRect().width,
             deliveryGap: footer.top - delivery.getBoundingClientRect().bottom,
             textGap: footer.top - Math.max(...textBottoms),
@@ -523,7 +525,7 @@ export function createMobileProgressScenarios({
         assert(cardGeometry.every((card) => (card.touchHeight === null || card.touchHeight >= 44) && !card.touchOverlapsAdjacent), `紧凑数量行保留独立且不侵入相邻区域的触区：${JSON.stringify(cardGeometry)}`)
         await writeFile(path.join(outputDir, `progress-quantity-spacing-${role}.json`), JSON.stringify(cardGeometry, null, 2))
         assert(Math.max(...cardGeometry.map((card) => card.main)) - Math.min(...cardGeometry.map((card) => card.main)) <= 1, `进度身份和数量分区应对齐：${JSON.stringify(cardGeometry)}`)
-        assert(cardGeometry[0].height <= cardGeometry[1].height + cardGeometry[0].reason + 4, `异常只按真实原因增高：${JSON.stringify(cardGeometry)}`)
+        assert(cardGeometry[0].height <= cardGeometry[1].height + cardGeometry[0].reason + Math.max(0, cardGeometry[0].taskHeading - cardGeometry[1].taskHeading) + 4, `受阻原因和长责任摘要按内容撑高，不额外保留空白：${JSON.stringify(cardGeometry)}`)
         await assertNoHorizontalOverflow(page, role)
         await assertContentTabAffordance(panel.locator('.mobile-progress-view-switch'))
         await assertFilterAffordance(
@@ -589,8 +591,9 @@ export function createMobileProgressScenarios({
         const taskEntries = panel.locator('.mobile-progress-task-entry')
         assert.equal(
           await taskEntries.nth(0).locator('strong').textContent(),
-          '受阻 · 确认面料交期'
+          '确认面料交期'
         )
+        assert.equal(await taskEntries.nth(0).locator('.erp-task-blocked-tag').innerText(), '受阻')
         assert(
           (await taskEntries.nth(0).innerText()).includes(
             '采购 · 办理人未提供 · 共 2 项待办'
@@ -1691,7 +1694,7 @@ export function createMobileProgressScenarios({
       },
     }
   })
-  return [...scenarios, ...['light', 'dark'].map((themeMode) => ({
+  return [...scenarios, ...createMobileTaskBlockerScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...['light', 'dark'].map((themeMode) => ({
     ...scenarios.find((scenario) => scenario.name === 'mobile-progress-boss'),
     name: `mobile-primary-tab-geometry-${themeMode}`,
     themeMode,

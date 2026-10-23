@@ -2,6 +2,7 @@ import React from 'react'
 import { Tag } from 'antd'
 import { FileTextOutlined } from '@ant-design/icons'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { WorkflowTaskBlockedTag, WorkflowTaskBlockedReason } from '../workflow/WorkflowTaskBlocker.jsx'
 import {
   progressAttention,
   progressDelivery,
@@ -90,8 +91,24 @@ export function ProgressDelivery({
   )
 }
 
-export function ProgressAttention({ row, access }) {
+export function ProgressAttention({ row, access, compact = false, suffix }) {
   const attention = progressAttention(row, access)
+  const detail = attention.detail ? `${attention.detail}${attention.taskCount > 1 ? ` · 共 ${attention.taskCount} 项待办` : ''}` : ''
+  if (compact) {
+    return (
+      <span className="erp-progress-attention erp-progress-attention--compact">
+        <span className="erp-progress-attention-heading">
+          <span className="erp-progress-attention-title">
+            <strong>{attention.title}</strong>
+            {attention.blocked ? <WorkflowTaskBlockedTag /> : null}
+          </span>
+          {detail ? <span className="erp-progress-attention-owner">{detail}</span> : <span />}
+          {suffix}
+        </span>
+        <WorkflowTaskBlockedReason reason={attention.reason} />
+      </span>
+    )
+  }
   return (
     <span
       className={`erp-progress-attention${attention.blocked ? ' is-blocked' : ''}`}
@@ -106,10 +123,7 @@ export function ProgressAttention({ row, access }) {
         </span>
       )}
       {attention.detail && (
-        <span>
-          {attention.detail}
-          {attention.taskCount > 1 ? ` · 共 ${attention.taskCount} 项待办` : ''}
-        </span>
+        <span>{detail}</span>
       )}
     </span>
   )

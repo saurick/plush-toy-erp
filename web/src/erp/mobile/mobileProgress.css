@@ -146,8 +146,39 @@
   color: var(--erp-primary-strong);
   text-align: left;
 }
-.mobile-progress-task-entry > .anticon {
+.mobile-progress-task-entry .erp-progress-attention--compact {
+  width: 100%;
+  gap: 4px;
+}
+.mobile-progress-task-entry .erp-progress-attention-heading {
+  display: grid;
+  grid-template-columns: fit-content(50%) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+}
+.mobile-progress-task-entry .erp-progress-attention-title {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: var(--erp-text);
+}
+.erp-progress-attention-title > strong {
+  min-width: 0;
+  font-size: var(--erp-font-small);
+  font-weight: 500;
+}
+.mobile-progress-task-entry .erp-progress-attention-owner {
+  min-width: 0;
+  text-align: right;
+}
+.erp-progress-attention-heading > .anticon {
   flex: 0 0 auto;
+  color: var(--erp-primary-strong);
+}
+.mobile-progress-task-entry .erp-task-blocked-reason {
+  color: var(--erp-visual-danger-text);
 }
 .mobile-progress-task-entry--empty .erp-progress-attention {
   display: flex;

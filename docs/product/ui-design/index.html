@@ -1343,6 +1343,7 @@
     .rm-card-source svg { width: 15px; height: 15px; margin-top: 2px; color: var(--text-3); }
     .rm-card-object { margin-top: 5px; color: var(--text-3); font-size: 12px; line-height: 1.45; }
     .rm-card-reason { padding: 6px 8px; border-radius: 8px; color: var(--danger); background: var(--danger-soft); font-size: 13px; line-height: 1.5; }
+    .rm-blocked-reason { display: block; min-width: 0; padding: 2px 8px; border-radius: 8px; color: var(--danger); background: var(--danger-soft); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
     .rm-card-foot { padding-top: 4px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; border-top: 1px solid var(--line); color: var(--text-3); font-size: 13px; }
     .rm-more {
       min-height: 43px;
@@ -1524,6 +1525,11 @@
     .rm-progress-task strong { font-size: 13px; font-weight: 600; }
     .rm-progress-task small, .rm-progress-card .rm-progress-task.empty { color: var(--text-3); }
     .rm-progress-task svg { flex-shrink: 0; }
+    .rm-progress-task .rm-progress-attention { gap: 4px; }
+    .rm-progress-attention-head { display: grid; grid-template-columns: fit-content(50%) minmax(0,1fr) auto; align-items: baseline; gap: 8px; }
+    .rm-progress-attention-title { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--text); }
+    .rm-progress-attention-title strong { font-size: 15px; font-weight: 500; }
+    .rm-progress-attention-head .rm-progress-attention-owner { min-width: 0; color: var(--text-3); font-size: 14px; text-align: right; }
     .rm-stage-track { margin-top: 12px; display: grid; gap: 10px; }
     .rm-stage-track-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 38px; gap: 8px; align-items: center; font-size: 12px; }
     .rm-stage-track-row .progress-bar { margin: 0; }
@@ -16444,11 +16450,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<article class="rm-task-card ${task.badge}" data-id="${task.id}">
         <button class="rm-task-open" data-action="mobile-open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}${task.status === 'done' ? '处理结果' : ''}"></button>
         <div class="rm-task-card-content">
-          <div class="rm-card-head"><strong>${escapeHTML(task.title)}</strong><span class="rm-card-badges"><span class="badge ${task.badge}">${escapeHTML(taskListStatusLabel(task))}</span></span></div>
+          <div class="rm-card-head"><strong>${escapeHTML(task.title)}</strong><span class="rm-card-badges"><span class="badge ${task.badge}">${escapeHTML(task.state === '阻塞' ? '受阻' : taskListStatusLabel(task))}</span></span></div>
           ${renderTaskAssociation(task)}
           <span class="rm-card-source"><span class="rm-card-source-value">${escapeHTML(task.source || '未关联业务单据')}</span></span>
-          ${task.reason ? `<div class="rm-card-reason">${task.state === '阻塞' ? '受阻原因：' : ''}${escapeHTML(task.reason)}</div>` : ''}
+          ${task.reason && task.state !== '阻塞' ? `<div class="rm-card-reason">${escapeHTML(task.reason)}</div>` : ''}
           <div class="rm-card-foot"><span>${escapeHTML(task.role)} · <span class="rm-card-assignee">${escapeHTML(demoAssignee(task))}</span></span><span>${escapeHTML(demoTaskTime(task))}</span></div>
+          ${task.state === '阻塞' ? renderMobileBlockedReason(task.reason, true) : ''}
         </div>
       </article>`;
     }
@@ -16764,12 +16771,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return (row.taskIds || []).map(id => mobileTasks.find(task => task.id === id)).filter(task => task && task.status !== 'done');
     }
 
+    function renderMobileBlockedReason(reason, showLabel=false) {
+      return reason ? `<span class="rm-blocked-reason">${showLabel?'受阻原因：':''}${escapeHTML(reason)}</span>` : '';
+    }
+
     function renderMobileProgressTaskEntry(row) {
       const tasks = getMobileProgressTasks(row);
       if (!tasks.length) return '<div class="rm-progress-task empty">暂无待处理任务</div>';
-      const title = tasks.length === 1 ? `任务：${tasks[0].title}` : `${tasks.length} 项待处理`;
-      const detail = tasks.length === 1 ? `${tasks[0].role} · 待领取` : `首要：${tasks[0].title} · ${tasks[0].role} · 待领取`;
-      return `<button class="rm-progress-task" data-action="mobile-progress-tasks" data-id="${row.id}"><span><strong>${escapeHTML(title)}</strong><small>${escapeHTML(detail)}</small></span>${icon('chevron')}</button>`;
+      const task = tasks[0], blocked = row.stage.includes('阻塞');
+      const detail = `${task.role} · ${task.assignee || '待领取'}${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}`;
+      return `<button class="rm-progress-task" data-action="mobile-progress-tasks" data-id="${row.id}"><span class="rm-progress-attention"><span class="rm-progress-attention-head"><span class="rm-progress-attention-title"><strong>${escapeHTML(task.title)}</strong>${blocked?'<span class="badge danger">受阻</span>':''}</span><span class="rm-progress-attention-owner">${escapeHTML(detail)}</span>${icon('chevron')}</span>${blocked?renderMobileBlockedReason(task.reason || row.stage):''}</span></button>`;
     }
 
     function renderProgressProductImage(row) {
@@ -16777,7 +16788,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
     function renderMobileProgressCard(row) {
       const image = renderProgressProductImage(row);
-      return `<article class="rm-progress-card"><div class="rm-progress-selection"><button class="rm-task-open" data-action="mobile-progress-open" data-id="${row.id}" aria-label="查看${escapeHTML(row.product)}进度"></button><div class="rm-progress-content"><div class="rm-progress-product">${image}<div class="rm-progress-identity"><div class="rm-progress-head"><strong>${escapeHTML(row.product)}</strong><span class="badge ${row.badge}">${escapeHTML(row.status)}</span>${icon('chevron')}</div><div class="rm-progress-copy">${escapeHTML(row.no)}<br>${escapeHTML(row.customer)} · ${escapeHTML(row.due)}</div></div></div><div class="rm-progress-stage"><span>${state.mobileProgressView==='orders'?'已出货 / 订购':'有效完工 / 计划'}</span><strong>${escapeHTML(row.quantity)}</strong></div>${row.stage.includes('阻塞')?`<span class="text-danger">受阻：${escapeHTML(row.stage)}</span>`:''}</div></div>${renderMobileProgressTaskEntry(row)}</article>`;
+      return `<article class="rm-progress-card"><div class="rm-progress-selection"><button class="rm-task-open" data-action="mobile-progress-open" data-id="${row.id}" aria-label="查看${escapeHTML(row.product)}进度"></button><div class="rm-progress-content"><div class="rm-progress-product">${image}<div class="rm-progress-identity"><div class="rm-progress-head"><strong>${escapeHTML(row.product)}</strong><span class="badge ${row.badge}">${escapeHTML(row.status)}</span>${icon('chevron')}</div><div class="rm-progress-copy">${escapeHTML(row.no)}<br>${escapeHTML(row.customer)} · ${escapeHTML(row.due)}</div></div></div><div class="rm-progress-stage"><span>${state.mobileProgressView==='orders'?'已出货 / 订购':'有效完工 / 计划'}</span><strong>${escapeHTML(row.quantity)}</strong></div></div></div>${renderMobileProgressTaskEntry(row)}</article>`;
     }
 
     function renderMobileProgress() {
