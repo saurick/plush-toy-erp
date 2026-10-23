@@ -14,6 +14,9 @@ import {
   DEV_TESTING_CURRENT_DOC_PATHS,
   DEV_TESTING_ROUTE,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
+  DEV_TESTING_PRIMARY_VIEWS,
+  buildDevTestingViewSearch,
+  resolveDevTestingReturnView,
   buildDevTestingCopyText,
   buildDevTestingDocs,
   buildDevTestingSummary,
@@ -1338,11 +1341,33 @@ test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', 
   )
 })
 
-test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界', () => {
+test('devTesting: 主视图与专项命令往返保留查询上下文并拒绝非法返回目标', () => {
+  for (const start of [
+    'view=coverage&coverage=business&reportSource=snapshot&coverageDomain=sales&customer=yoyoosun',
+    'view=pressure&scale=high&load=capacity&report=sample',
+  ]) {
+    const original = new URLSearchParams(start)
+    const guide = buildDevTestingViewSearch(original, 'guide')
+    assert.equal(guide.has('returnView'), false)
+    const commands = buildDevTestingViewSearch(guide, 'commands')
+    assert.equal(resolveDevTestingReturnView(commands), 'guide')
+    const backGuide = buildDevTestingViewSearch(commands, resolveDevTestingReturnView(commands))
+    assert.equal(backGuide.toString(), guide.toString())
+    const restored = buildDevTestingViewSearch(backGuide, original.get('view'))
+    assert.equal(restored.toString(), original.toString())
+    assert.equal(original.toString(), start)
+  }
+  for (const query of ['view=guide', 'returnView=closeout', 'returnView=coverage&returnView=pressure', 'returnView=https://invalid.example']) {
+    assert.equal(resolveDevTestingReturnView(query), 'overview')
+  }
+  assert.equal(buildDevTestingViewSearch('view=guide&returnView=pressure', 'invalid').get('view'), 'overview')
+})
+
+test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () => {
   assert.match(testingPageSource, /const VIEW_CLOSEOUT = 'closeout'/)
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
   assert.match(testingPageSource, /DEV_PAGE_TITLE_BY_ROUTE\[DEV_TESTING_ROUTE\]/)
-  assert.match(testingPageSource, /\{ label: '本轮验证', value: VIEW_TIERS \}/)
+  assert.deepEqual(DEV_TESTING_PRIMARY_VIEWS.map(({ label }) => label), ['测试总览', '本轮验证', '测试报告', '压力测试', '测试指引'])
   assert.doesNotMatch(
     testingPageSource,
     /\{ label: '(?:专项检查库|Git 收口)', value: VIEW_(?:COMMANDS|CLOSEOUT) \}/
@@ -1351,7 +1376,7 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /页面说明检查/)
   assert.match(
     testingPageSource,
-    /\{ label: '证据与覆盖', value: VIEW_COVERAGE \}/
+    /const VIEW_OPTIONS = DEV_TESTING_PRIMARY_VIEWS/
   )
   assert.match(
     testingPageSource,
@@ -1376,7 +1401,7 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /复制不会执行检查/)
   assert.match(testingPageSource, /erp-dev-testing-command-matrix__head/)
   assert.match(testingPageSource, /查看固定命令/)
-  assert.match(testingPageSource, /value: VIEW_GUIDE/)
+  assert.match(testingPageSource, /selectView\(returnView\)/)
   assert.match(testingPageSource, /DEV_TESTING_GIT_CLOSEOUT_STAGES\.map/)
   assert.match(testingPageSource, /getGitStageWiring/)
   assert.match(testingPageSource, /查看边界与来源/)

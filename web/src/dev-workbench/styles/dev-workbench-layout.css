@@ -380,6 +380,8 @@
 
 .erp-dev-tool-page .erp-dev-docs-header__copy {
   display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 20px;
@@ -387,10 +389,7 @@
 
 .erp-dev-tool-page .erp-dev-docs-boundary-details {
   margin-top: 0;
-}
-
-.erp-dev-tool-page .erp-dev-docs-boundary-details[open] {
-  flex-basis: 100%;
+  flex-basis: auto;
 }
 
 .erp-dev-tool-page .erp-dev-business-usability-summary {

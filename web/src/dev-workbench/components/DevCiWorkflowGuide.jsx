@@ -118,7 +118,7 @@ export default function DevCiWorkflowGuide({
           打开 QA 命令与证据合同
         </Link>
         {' · '}
-        <Link to="/__dev/quality-gates?view=gaps">查看当前改动的覆盖缺口</Link>
+        <Link to="/__dev/quality-gates?view=gaps">查看当前改动缺口</Link>
       </Typography.Paragraph>
       {documentMode ? (
         <div className="erp-dev-ci-guide__chapters">

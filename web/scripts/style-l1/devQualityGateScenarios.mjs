@@ -995,7 +995,7 @@ export function createDevQualityGateScenarios({
         await nodePhase.locator('summary').click()
         assert.equal(await nodePhase.evaluate((node) => node.open), true)
 
-        const viewSwitch = serverPanel.locator('[aria-label="服务器门禁详情"]')
+        const viewSwitch = serverPanel.locator('[aria-label="CI 结果详情"]')
         await viewSwitch.getByText('Job 性能', { exact: true }).click()
         await page.waitForFunction(
           () =>

@@ -4,6 +4,7 @@ import {
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
+import { installDatabaseMigrationFixture } from './devDeliveryWorkspaceScenarios.mjs'
 import { assertFulfillmentChainGeometry } from './fulfillmentChainAssertions.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 
@@ -110,7 +111,13 @@ export function createDevWorkbenchDensityScenarios({
       path: '/__dev',
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 2,
-      beforeNavigate: installPermissionRelationshipMock,
+      beforeNavigate: async (page) => {
+        await installPermissionRelationshipMock(page)
+        await installDatabaseMigrationFixture(page)
+        await page.route('**/__dev/api/qa/coverage{,/snapshot}', (route) => route.fulfill({ json: {
+          status: 'missing', message: '当前布局样例没有覆盖报告',
+        } }))
+      },
       verify: async (page) => {
         const routes = [...DEV_WORKSPACE_NAV_ITEMS, ...DEV_SECONDARY_NAV_ITEMS]
         const measurements = []

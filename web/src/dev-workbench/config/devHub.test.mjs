@@ -217,7 +217,11 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
   )
   assert.equal(getDevSecondaryNavItems('product-engineering').length, 4)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'development-resources')
-  assert.equal(getDevSecondaryNavItems('quality').length, 4)
+  assert.deepEqual(
+    getDevSecondaryNavItems('quality').map((item) => item.key),
+    ['testing', 'quality-gates', 'data-preparation'],
+    '链路实测报告保留登记和深链，从测试执行的报告视图按需进入'
+  )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/business-chain-audit'), 'quality')
   assert.equal(resolveDevPageTitle('/__dev/business-chain-audit', 'ERP'), '链路实测报告 · ERP')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')

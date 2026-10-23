@@ -6,13 +6,14 @@ import {
   DEV_PROJECT_GRAPH_EXAMPLES,
   DEV_PROJECT_GRAPH_GROUPS,
   DEV_PROJECT_GRAPH_MODELS,
+  DEV_PROJECT_GRAPH_TOPIC_GROUPS,
 } from './devRelationshipPerspectives.mjs'
 import { DEV_SECONDARY_NAV_ITEMS } from './devRoutes.mjs'
 
 test('project graph catalogue distinguishes direction and hierarchy and assigns every example once', () => {
   assert.deepEqual(DEV_DEVELOPMENT_RESOURCES_VIEWS, [
     { value: 'tools', label: '工具清单' },
-    { value: 'relationships', label: '项目图视角' },
+    { value: 'relationships', label: '项目关系图' },
   ])
   assert.deepEqual(DEV_PROJECT_GRAPH_GROUPS.map(({ label, models }) => [label, models]), [
     ['有向图', ['dag', 'cycle']], ['无向图', ['undirected']], ['层级结构', ['tree']],
@@ -20,6 +21,9 @@ test('project graph catalogue distinguishes direction and hierarchy and assigns 
   const examples = Object.values(DEV_PROJECT_GRAPH_MODELS).flatMap((model) => model.examples)
   assert.equal(new Set(examples).size, examples.length)
   assert.deepEqual(examples.toSorted(), Object.keys(DEV_PROJECT_GRAPH_EXAMPLES).toSorted())
+  const topics = DEV_PROJECT_GRAPH_TOPIC_GROUPS.flatMap((group) => group.examples)
+  assert.equal(new Set(topics).size, topics.length)
+  assert.deepEqual(topics.toSorted(), examples.toSorted(), '主题目录覆盖全部既有图例，名称与内容仍读取同一登记')
   assert.match(DEV_PROJECT_GRAPH_MODELS.tree.definition, /DAG 的特例/u)
 })
 
@@ -68,12 +72,13 @@ test('project graph design preview uses the same catalogue, examples and registe
   assert.deepEqual(snapshot('devProjectGraphModels'), DEV_PROJECT_GRAPH_MODELS)
   assert.deepEqual(snapshot('devProjectGraphExamples'), DEV_PROJECT_GRAPH_EXAMPLES)
   assert.deepEqual(snapshot('devProjectGraphGroups'), DEV_PROJECT_GRAPH_GROUPS)
+  assert.deepEqual(snapshot('devProjectGraphTopicGroups'), DEV_PROJECT_GRAPH_TOPIC_GROUPS)
   const positions = snapshot('devProjectGraphPositions')
   for (const [key, example] of Object.entries(DEV_PROJECT_GRAPH_EXAMPLES)) {
     assert.deepEqual(Object.keys(positions[key]).toSorted(), example.nodes.map(({ id }) => id).toSorted())
     assert(Object.values(positions[key]).every((point) => point.length === 4 && point.every((coordinate) => coordinate >= 0 && coordinate <= 1)))
   }
-  assert.match(source, /aria-label="图模型分类"/u)
+  assert.match(source, /项目关系主题/u)
   assert.match(source, /data-dev-project-example/u)
   assert.match(source, /data-action="dev-project-graph-node"/u)
   assert.match(source, /\.dev-project-models \{ display:grid; grid-template-columns:200px minmax\(0,1fr\)/u)

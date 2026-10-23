@@ -55,7 +55,9 @@ test('ordinary DEV routes each expose one generated desktop smoke', () => {
         scenario.viewport.width === 1440 &&
         scenario.viewport.height === 900 &&
         typeof scenario.verify === 'function' &&
-        !Object.hasOwn(scenario, 'themeMode')
+        !Object.hasOwn(scenario, 'themeMode') &&
+        !Object.hasOwn(scenario, 'isMobile') &&
+        !Object.hasOwn(scenario, 'hasTouch')
     )
   )
 })
@@ -66,7 +68,7 @@ test('ordinary DEV desktop smokes have no visual-shape or mobile contract', () =
     'utf8'
   )
 
-  assert.doesNotMatch(source, /mobile|themeMode|\.screenshot\s*\(/u)
+  assert.doesNotMatch(source, /themeMode|\.screenshot\s*\(/u)
   assert.doesNotMatch(
     source,
     /keyboard\.press|cardCount|documentHeight|scrollHeight/u

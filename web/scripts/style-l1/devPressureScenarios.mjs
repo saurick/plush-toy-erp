@@ -2,7 +2,7 @@ import {
   DEV_PRESSURE_CHECKS,
   DEV_PRESSURE_FINGERPRINTS,
 } from '../../src/dev-workbench/config/devPressure.mjs'
-import { DEV_TESTING_GIT_HOOK_CHECKS } from '../../src/dev-workbench/config/devTestingOperation.mjs'
+import { DEV_TESTING_FIXED_ACTIONS, DEV_TESTING_GIT_HOOK_CHECKS } from '../../src/dev-workbench/config/devTestingOperation.mjs'
 
 const ID = '123e4567-e89b-42d3-a456-426614174000'
 function pressureFixture() {
@@ -244,10 +244,7 @@ export function createDevPressureScenarios({
               })),
             },
             operations: {
-              fast: null,
-              'role-access': null,
-              'field-linkage': null,
-              'rpc-examples': null,
+              ...Object.fromEntries(DEV_TESTING_FIXED_ACTIONS.map(({ key }) => [key, null])),
               'pressure-quick': operation,
               'pressure-capacity': null,
             },
@@ -398,6 +395,15 @@ export function createDevPressureScenarios({
         await panel.getByRole('button', { name: '运行 10 分钟容量', exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.get('load'), 'capacity')
         assert.equal(actionRequests.length, 0, '切换档位与刷新只恢复选择，不启动测试')
+        const pressureContext = new URL(page.url()).searchParams.toString()
+        const primaryTabs = page.getByRole('tablist', { name: '测试验证工作区主视图' })
+        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true }).click()
+        await page.reload()
+        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
+        await primaryTabs.getByRole('tab', { name: '压力测试', exact: true }).click()
+        await panel.getByRole('button', { name: '运行 10 分钟容量', exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.toString(), pressureContext)
+        assert.equal(actionRequests.length, 0, '查看指引再返回只恢复压力档位，不发起运行')
         await loadPicker.press('ArrowDown')
         await page.locator('.ant-select-dropdown:visible').getByText('短档回归', { exact: true }).click()
         mode = 'history'
@@ -436,7 +442,9 @@ export function createDevPressureScenarios({
               .m41
           const initial = read()
           const samples = []
-          group.querySelector('[role="tab"]').click()
+          const target = [...group.querySelectorAll('[role="tab"]')]
+            .find((tab) => tab.textContent.trim() === '本轮验证')
+          target.click()
           for (let index = 0; index < 30; index++) {
             await new Promise((resolve) => requestAnimationFrame(resolve))
             samples.push(read())

@@ -121,7 +121,7 @@ test('version decisions and target evidence remain source-backed', () => {
   assert.match(versionPage, /CI\/CD 证据分两处查看/u)
   assert.match(
     versionPage,
-    /流水线耗时看 GitLab 的 CI[\s\S]*检查、构建和制品发布耗时/u
+    /发布与部署耗时汇总 GitLab 的 CI[\s\S]*检查、构建和制品发布耗时/u
   )
   assert.match(
     versionPage,

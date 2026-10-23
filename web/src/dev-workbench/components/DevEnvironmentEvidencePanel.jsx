@@ -215,7 +215,7 @@ function DeliveryOperationOverview({ summary, error, loading }) {
         <Text type="secondary">
           仅记录工作台发起的制品发布、部署、数据重建与回滚。
           GitLab Pipeline、Package 与 Release
-          在“流水线耗时”中查看。
+          在“发布与部署耗时”中查看。
         </Text>
       </details>
     </section>

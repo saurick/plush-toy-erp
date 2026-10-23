@@ -84,7 +84,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     truthSource: '公共契约生成物、正式 API 文档及既有质量门禁证据',
     status: '只读合同与边界 / Read-only contracts and boundaries',
     guardrails: Object.freeze([
-      '图与项目图视角同源 / Shared boundary graph',
+      '图与项目关系图同源 / Shared boundary graph',
       '验证结果回到既有门禁 / Existing quality evidence only',
       '外部协作身份尚未开放 / External collaboration identities are not open',
       '不进生产构建 / No prod build',
@@ -156,7 +156,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不索引历史参考 / No reference commands',
       '不进生产构建 / No prod build',
     ]),
-    description: '生成验证计划，核对检查结果',
+    description: '查看各类测试、执行入口与已有报告',
   }),
   Object.freeze({
     key: 'business-chain-audit',

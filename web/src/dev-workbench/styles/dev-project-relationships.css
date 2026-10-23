@@ -30,8 +30,12 @@
   background: var(--erp-surface-bg);
 }
 
-.erp-dev-project-relationships__catalog section + section {
+.erp-dev-project-relationships__catalog section {
   margin-top: 12px;
+}
+
+.erp-dev-project-relationships__catalog > .ant-select {
+  width: 100%;
 }
 
 .erp-dev-project-relationships__catalog h2,

@@ -138,11 +138,11 @@ export function buildVersionWorkspace({
     },
     {
       key: DEV_VERSION_CENTER_VIEW_PIPELINE,
-      label: '流水线耗时',
+      label: '发布与部署耗时',
       children: (
         <section
           className="erp-dev-version-tab erp-dev-version-tab--pipeline"
-          aria-label="流水线耗时"
+          aria-label="发布与部署耗时"
         >
           <DevPipelineStatusStrip
             timings={summary?.timings}

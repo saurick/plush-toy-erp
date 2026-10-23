@@ -129,6 +129,7 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
     label: '链路实测报告',
+    showInNavigation: false,
   }),
   Object.freeze({
     key: 'quality-gates',

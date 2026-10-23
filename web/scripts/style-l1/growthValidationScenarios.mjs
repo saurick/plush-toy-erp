@@ -7,6 +7,9 @@ export function createGrowthValidationScenarios({ assert, path, outputDir }) {
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
     beforeNavigate: async (page) => {
+      await page.route('**/__dev/api/qa/coverage{,/snapshot}', (route) => route.fulfill({ json: {
+        status: 'missing', message: '当前样例没有覆盖报告',
+      } }))
       await page.route('**/__dev/api/qa/quality-gates/integration-evidence', (route) => route.fulfill({ json: {
         kind: 'plush.integration-evidence',
         current: false,
@@ -16,7 +19,7 @@ export function createGrowthValidationScenarios({ assert, path, outputDir }) {
       } }))
     },
     verify: async (page) => {
-      await page.getByRole('tab', { name: '使用指引', exact: true }).click()
+      await page.getByRole('tablist', { name: '测试验证工作区主视图' }).getByRole('tab', { name: '测试指引', exact: true }).click()
       await page.getByRole('tab', { name: '增长验证', exact: true }).click()
       const table = page.getByRole('table', { name: '增长、并发与事务验证', exact: true })
       await table.waitFor()

@@ -22,7 +22,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import Pagination from '@/common/components/pagination/AppPagination'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
@@ -36,6 +36,7 @@ import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
 import DevTestingStrategyGuide from '../components/DevTestingStrategyGuide.jsx'
+import DevTestingOverview from '../components/DevTestingOverview.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COMMAND_PAGE_QUERY_KEY,
@@ -46,6 +47,9 @@ import {
   DEV_TESTING_COVERAGE_COLLECT_COMMAND,
   DEV_TESTING_COVERAGE_SECTION_QUERY_KEY,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
+  DEV_TESTING_PRIMARY_VIEWS,
+  buildDevTestingViewSearch,
+  resolveDevTestingReturnView,
   buildDevTestingDocs,
   buildDevTestingCommandPage,
   buildDevTestingSummary,
@@ -61,6 +65,7 @@ import {
   parseDevTestingCoverageSection,
 } from '../config/devTesting.mjs'
 import {
+  DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_DELIVERY_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
@@ -89,6 +94,7 @@ import useDevTestingOperations, { EMPTY_TESTING_OPERATIONS } from '../hooks/useD
 
 const { Paragraph, Text, Title } = Typography
 
+const VIEW_OVERVIEW = 'overview'
 const VIEW_TIERS = 'tiers'
 const VIEW_COMMANDS = 'commands'
 const VIEW_CLOSEOUT = 'closeout'
@@ -99,12 +105,7 @@ const VIEW_QUERY_KEY = 'view'
 const DOCUMENT_ROLE_QUERY_KEY = 'role'
 const COMMAND_QUERY_KEY = 'q'
 
-const VIEW_OPTIONS = [
-  { label: '本轮验证', value: VIEW_TIERS },
-  { label: '证据与覆盖', value: VIEW_COVERAGE },
-  { label: '压力测试', value: VIEW_PRESSURE },
-  { label: '使用指引', value: VIEW_GUIDE },
-]
+const VIEW_OPTIONS = DEV_TESTING_PRIMARY_VIEWS
 const GUIDE_OPTIONS = [
   { label: '测试方式', value: 'methods' },
   { label: '真机回归', value: 'devices' },
@@ -1112,8 +1113,24 @@ function CoverageReportView({
   onCollect,
   onReload,
 }) {
-  const [source, setSource] = useState('workspace')
-  const [requestedDomain, setRequestedDomain] = useState('')
+  const { search: reportSearch } = useLocation()
+  const [reportParams, setReportParams] = useSearchParams()
+  const source = reportParams.getAll('reportSource').length === 1 && reportParams.get('reportSource') === 'snapshot'
+    ? 'snapshot' : 'workspace'
+  const requestedDomain = reportParams.getAll('coverageDomain').length === 1 ? reportParams.get('coverageDomain') : ''
+  const setSource = (nextSource) => {
+    const next = new URLSearchParams(reportParams)
+    if (nextSource === 'snapshot') next.set('reportSource', nextSource)
+    else next.delete('reportSource')
+    next.delete('coverageDomain')
+    setReportParams(next)
+  }
+  const setRequestedDomain = (domain) => {
+    const next = new URLSearchParams(reportParams)
+    if (domain) next.set('coverageDomain', domain)
+    else next.delete('coverageDomain')
+    setReportParams(next)
+  }
   const activeState = source === 'snapshot' ? snapshotState : state
   const alert = coverageReportAlert(activeState, source)
   const report = activeState?.report || null
@@ -1145,6 +1162,7 @@ function CoverageReportView({
             ]}
           />
           <div className="erp-dev-testing-coverage-actions">
+            <Link to={DEV_BUSINESS_CHAIN_AUDIT_ROUTE} state={{ testingReturnSearch: reportSearch }}>链路实测报告</Link>
             <Button
               type="primary"
               icon={<PlayCircleOutlined aria-hidden="true" />}
@@ -1337,7 +1355,7 @@ function CoverageReportView({
 
             {section === 'gates' ? (
               <CoverageSection
-                title="验证门禁"
+                title="门禁结果"
                 description="只对报告声明的本轮 required gates 判断执行结果；没有回执就是未采集。"
               >
                 {report.gates.length > 0 ? (
@@ -1474,7 +1492,7 @@ export default function DevTestingPage() {
     [documentRoleOptions]
   )
   const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
-  const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_TIERS
+  const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_OVERVIEW
   const coverageSection = parseDevTestingCoverageSection(searchParams)
   const guideTopic = GUIDE_OPTIONS.find((item) => item.value === searchParams.get('guide'))?.value || 'methods'
   const customerScope = useDevCustomerScope({
@@ -1485,7 +1503,10 @@ export default function DevTestingPage() {
   const customerReady = customerScope.status === 'ready'
   const isCloseoutView = view === VIEW_CLOSEOUT
   const isCoverageView = view === VIEW_COVERAGE
+  const readsCoverage = isCoverageView || view === VIEW_OVERVIEW
   const isAuxiliaryView = AUXILIARY_VIEW_VALUES.has(view)
+  const returnView = resolveDevTestingReturnView(searchParams)
+  const returnViewLabel = DEV_TESTING_PRIMARY_VIEWS.find(({ value }) => value === returnView).label
   const requestedDocumentRole =
     searchParams.get(DOCUMENT_ROLE_QUERY_KEY) || 'all'
   const documentRole = documentRoleValues.has(requestedDocumentRole)
@@ -1518,7 +1539,7 @@ export default function DevTestingPage() {
   const coverageOperationIsActive =
     isDevCoverageOperationActive(coverageOperation)
   React.useEffect(() => {
-    if (!isCoverageView) return undefined
+    if (!readsCoverage) return undefined
 
     const controller = new AbortController()
     const requestSequence = coverageRequestSequence.current + 1
@@ -1608,7 +1629,7 @@ export default function DevTestingPage() {
 
     loadCoverage()
     return () => controller.abort()
-  }, [coverageReloadKey, isCoverageView])
+  }, [coverageReloadKey, readsCoverage, view])
 
   const handleCoverageTerminal = React.useCallback((operation) => {
     if (!operation || isDevCoverageOperationActive(operation)) return
@@ -1682,6 +1703,8 @@ export default function DevTestingPage() {
       requestedDocumentRole !== documentRole ||
       (documentRole === 'all' && searchParams.has(DOCUMENT_ROLE_QUERY_KEY))
     const hasEmptyKeyword = searchParams.has(COMMAND_QUERY_KEY) && !keyword
+    const hasNonCanonicalReturnView = searchParams.has('returnView') &&
+      (view !== VIEW_COMMANDS || searchParams.getAll('returnView').length !== 1 || searchParams.get('returnView') !== returnView)
     const hasNonCanonicalCoverage =
       searchParams.has(DEV_TESTING_COVERAGE_SECTION_QUERY_KEY) &&
       coverageSection === 'code'
@@ -1697,7 +1720,8 @@ export default function DevTestingPage() {
       !hasNonCanonicalRole &&
       !hasEmptyKeyword &&
       !hasNonCanonicalCoverage &&
-      !hasNonCanonicalCommandPage
+      !hasNonCanonicalCommandPage &&
+      !hasNonCanonicalReturnView
     ) {
       return
     }
@@ -1705,6 +1729,7 @@ export default function DevTestingPage() {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set(VIEW_QUERY_KEY, view)
     nextParams.delete('doc')
+    if (hasNonCanonicalReturnView) nextParams.delete('returnView')
     if (documentRole === 'all') {
       nextParams.delete(DOCUMENT_ROLE_QUERY_KEY)
     } else {
@@ -1733,19 +1758,14 @@ export default function DevTestingPage() {
     obsoleteDocKey,
     requestedDocumentRole,
     requestedView,
+    returnView,
     searchParams,
     setSearchParams,
     view,
   ])
 
   const selectView = (nextView) => {
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.set(
-      VIEW_QUERY_KEY,
-      VIEW_VALUES.has(nextView) ? nextView : VIEW_TIERS
-    )
-    nextParams.delete('doc')
-    setSearchParams(nextParams)
+    if (nextView !== view) setSearchParams(buildDevTestingViewSearch(searchParams, nextView))
   }
 
   const selectCoverageSection = (nextSection) => {
@@ -1892,7 +1912,7 @@ export default function DevTestingPage() {
           <SlidingTabList
             aria-label="测试验证工作区主视图"
             options={VIEW_OPTIONS}
-            value={isAuxiliaryView ? VIEW_TIERS : view}
+            value={isAuxiliaryView ? returnView : view}
             onChange={selectView}
           />
         </div>
@@ -1908,9 +1928,9 @@ export default function DevTestingPage() {
             <Button
               type="link"
               icon={<LeftOutlined aria-hidden="true" />}
-              onClick={() => selectView(VIEW_GUIDE)}
+              onClick={() => selectView(returnView)}
             >
-              返回使用指引
+              返回{returnViewLabel}
             </Button>
           )}
           <Text type="secondary">
@@ -1923,6 +1943,15 @@ export default function DevTestingPage() {
 
       <main className="erp-dev-testing-shell">
         <section className="erp-dev-testing-reader">
+          {view === VIEW_OVERVIEW ? (
+            <DevTestingOverview
+              source={strategySource}
+              state={coverageState}
+              snapshotState={coverageSnapshotState}
+              loading={coverageLoading}
+              onReload={() => setCoverageReloadKey((value) => value + 1)}
+            />
+          ) : null}
           {view === VIEW_TIERS ? (
             <div className="erp-dev-testing-tier-view">
               <ValidationWorkspace
@@ -1942,7 +1971,7 @@ export default function DevTestingPage() {
           ) : null}
 
           {view === VIEW_GUIDE ? (
-            <section className="erp-dev-testing-guide" aria-label="测试使用指引">
+            <section className="erp-dev-testing-guide" aria-label="测试指引">
               <DevTaskNav
                 compact
                 idPrefix="dev-testing-guide"
@@ -1980,7 +2009,7 @@ export default function DevTestingPage() {
               </div>
               <footer className="erp-dev-testing-related">
                 <Text type="secondary">{summary.tierCount} 个验证范围 · {summary.docCount} 个来源 · {summary.commandBlockCount} 个命令块</Text>
-                <Link to={DEV_BUSINESS_USABILITY_ROUTE}>页面说明检查</Link>
+                <Link to={DEV_BUSINESS_USABILITY_ROUTE} state={{ testingReturnSearch: searchParams.toString() }}>页面说明检查</Link>
               </footer>
             </section>
           ) : null}

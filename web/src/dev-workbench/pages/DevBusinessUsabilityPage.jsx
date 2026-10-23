@@ -4,7 +4,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import {
@@ -42,6 +42,9 @@ const STATUS_COLOR = Object.freeze({
 })
 
 export default function DevBusinessUsabilityPage() {
+  const location = useLocation()
+  const testingReturnParams = new URLSearchParams(typeof location.state?.testingReturnSearch === 'string' ? location.state.testingReturnSearch : '')
+  testingReturnParams.set('view', 'guide')
   const [searchParams, setSearchParams] = useSearchParams()
   const parsedSearch = useMemo(
     () => parseDevBusinessUsabilitySearch(searchParams),
@@ -64,8 +67,9 @@ export default function DevBusinessUsabilityPage() {
     const nextSearch = buildDevBusinessUsabilitySearch(parsedSearch)
     setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
       replace: true,
+      state: location.state,
     })
-  }, [parsedSearch, setSearchParams])
+  }, [location.state, parsedSearch, setSearchParams])
 
   const updateQuery = (patch) => {
     const nextSearch = buildDevBusinessUsabilitySearch({
@@ -76,6 +80,7 @@ export default function DevBusinessUsabilityPage() {
     })
     setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
       replace: true,
+      state: location.state,
     })
   }
 
@@ -188,7 +193,7 @@ export default function DevBusinessUsabilityPage() {
           <Title level={1}>
             {DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_USABILITY_ROUTE]}
           </Title>
-          <Link to={DEV_TESTING_ROUTE}>返回测试执行</Link>
+          <Link to={`${DEV_TESTING_ROUTE}?${testingReturnParams}`}>返回测试指引</Link>
         </div>
       </header>
 

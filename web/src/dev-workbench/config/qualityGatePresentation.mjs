@@ -464,7 +464,7 @@ export function qualityGateViewStatus(summary, view, summaryError) {
   return {
     tone: status.alert,
     title: `GitLab ${status.label}`,
-    description: evidence?.message || '正在读取当前提交的服务器门禁证据。',
+    description: evidence?.message || '正在读取当前提交的 CI 证据。',
     recommendation:
       evidence?.status === 'passed'
         ? '未提交改动请使用“本机诊断”。'

@@ -1362,7 +1362,7 @@ test('version center keeps critical state visible and uses stable tab pagination
 
   assert.match(versionCenterPageSource, /useSearchParams/u)
   assert.match(versionCenterPageSource, /label: '版本与部署'/u)
-  assert.match(versionCenterPageSource, /label: '流水线耗时'/u)
+  assert.match(versionCenterPageSource, /label: '发布与部署耗时'/u)
   assert.match(versionCenterPageSource, /label: '操作记录'/u)
   assert.match(versionCenterPageSource, /筛选发布与部署记录/u)
   assert.match(versionCenterPageSource, /搜索版本、SHA 或操作 ID/u)

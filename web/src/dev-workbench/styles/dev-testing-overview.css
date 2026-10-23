@@ -1,0 +1,99 @@
+.erp-dev-testing-overview {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-dev-testing-overview > section {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-testing-overview__heading,
+.erp-dev-testing-overview__links,
+.erp-dev-testing-overview__report-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.erp-dev-testing-overview__heading {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.erp-dev-testing-overview__heading h2 {
+  margin: 0;
+  color: var(--erp-text);
+  font-size: 16px;
+}
+
+.erp-dev-testing-overview a {
+  color: var(--erp-primary-strong);
+}
+
+.erp-dev-testing-overview__report-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-dev-testing-overview__report-grid > a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-testing-overview__report-grid .ant-tag {
+  margin: 0;
+}
+
+.erp-dev-testing-overview__links a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.erp-dev-testing-overview__report-context {
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.erp-dev-testing-overview__report-context,
+.erp-dev-testing-overview__note {
+  color: var(--erp-text-muted);
+  font-size: 14px;
+}
+
+.erp-dev-testing-overview__note {
+  display: block;
+  margin-top: 4px;
+}
+
+.erp-dev-testing-overview .erp-dev-tool-table {
+  table-layout: fixed;
+}
+
+.erp-dev-testing-overview .erp-dev-tool-table th:first-child {
+  width: 18%;
+}
+
+.erp-dev-testing-overview .erp-dev-tool-table th:nth-child(2) {
+  width: 34%;
+}
+
+@media (max-width: 1100px) {
+  .erp-dev-testing-overview__report-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

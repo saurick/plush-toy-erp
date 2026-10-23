@@ -628,7 +628,14 @@ export async function verifyProjectGraphDirectory(page, { assert, assertNoHorizo
     assert.equal((await classification.textContent()).trim(), graph.classification.label)
     await assertMermaidFits(diagram, assert)
   }
+  const showModelCatalog = async () => {
+    if (await catalog.isVisible()) return
+    await page.getByRole('combobox', { name: '关系图目录方式', exact: true }).click()
+    await page.locator('.ant-select-dropdown:visible').getByText('按图模型', { exact: true }).click()
+    await catalog.waitFor()
+  }
   const selectModel = async (name, exampleKey, options = {}) => {
+    await showModelCatalog()
     const previous = await svgId()
     await catalog.getByRole('button', { name }).click()
     await waitGraph(exampleKey, previous, options)
@@ -640,6 +647,15 @@ export async function verifyProjectGraphDirectory(page, { assert, assertNoHorizo
     await waitGraph(key, previous)
   }
   await waitGraph('overview')
+  const topics = page.getByRole('navigation', { name: '项目关系主题', exact: true })
+  assert.equal(await topics.getByRole('button').count(), Object.keys(DEV_PROJECT_GRAPH_EXAMPLES).length)
+  const initialTopicGraph = await svgId()
+  await topics.getByRole('button', { name: '状态流转与退回', exact: true }).click()
+  await waitGraph('workflow', initialTopicGraph)
+  assert.equal(new URL(page.url()).searchParams.get('model'), 'cycle')
+  await page.goBack()
+  await waitGraph('overview')
+  await showModelCatalog()
   assert.equal(await catalog.getByRole('button').count(), 4)
   const exampleSelect = page.locator('.erp-dev-project-relationships__controls .ant-select')
   await exampleSelect.locator('.ant-select-clear').click()
@@ -735,7 +751,10 @@ export async function verifyProjectGraphDirectory(page, { assert, assertNoHorizo
   await page.goto(new URL('/__dev/ui-design?page=workbench', page.url()).href)
   const preview = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
   await preview.locator('#sidebar').getByRole('button', { name: '开发资源', exact: true }).click()
-  await preview.getByRole('tab', { name: '项目图视角', exact: true }).click()
+  await preview.getByRole('tab', { name: '项目关系图', exact: true }).click()
+  assert.equal(await preview.getByRole('navigation', { name: '项目关系主题' }).getByRole('button').count(), Object.keys(DEV_PROJECT_GRAPH_EXAMPLES).length)
+  await preview.getByRole('combobox', { name: '关系图目录方式', exact: true }).click()
+  await preview.getByRole('option', { name: '按图模型', exact: true }).click()
   const previewCatalog = preview.getByRole('navigation', { name: '图模型分类' })
   assert.equal(await previewCatalog.locator('.dev-project-model-button').count(), 4)
   await preview.locator('[data-dev-project-example] .design-select-clear').click()

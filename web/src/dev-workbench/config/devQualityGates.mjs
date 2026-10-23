@@ -27,7 +27,7 @@ export const QUERY_KEYS = Object.freeze({
 export const VIEW_ITEMS = Object.freeze([
   Object.freeze({
     value: 'server',
-    label: '服务器门禁',
+    label: 'CI 结果',
     description:
       '查看当前 committed SHA 的 GitLab CI、逐 Job 运行等待与历史退化；不混入本机诊断记录。',
   }),
@@ -39,12 +39,12 @@ export const VIEW_ITEMS = Object.freeze([
   }),
   Object.freeze({
     value: 'governance',
-    label: '门禁治理',
+    label: '门禁目录',
     description: '判断门禁是否必要、重复、可靠以及成本是否合理。',
   }),
   Object.freeze({
     value: 'gaps',
-    label: '覆盖缺口',
+    label: '改动缺口',
     description: '检查当前改动还有哪些高风险证据没有补齐。',
   }),
 ])
@@ -1128,7 +1128,7 @@ export function parseQualityGateSearch(search, { operationIds = null } = {}) {
   if (view === 'server') {
     const serverView = params.get(QUERY_KEYS.serverView) || DEFAULT_SERVER_VIEW
     if (!DEV_QUALITY_GATE_SERVER_VIEWS.includes(serverView)) {
-      issues.push('服务器门禁视图不存在或已经过期')
+      issues.push('CI 结果视图不存在或已经过期')
     }
     values.serverView = serverView
   } else if (view === 'run') {

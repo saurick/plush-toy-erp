@@ -126,7 +126,7 @@ export function ServerCiEvidencePanel({
       <div className="erp-dev-quality-server-evidence__view-switch">
         <div hidden={availableViews.length < 2}>
           <SlidingTabList
-            aria-label="服务器门禁详情"
+            aria-label="CI 结果详情"
             options={availableViews}
             value={selectedServerView}
             onChange={(nextView) => {

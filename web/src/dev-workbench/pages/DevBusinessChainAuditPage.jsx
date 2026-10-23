@@ -8,8 +8,9 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
-import { DEV_PAGE_TITLE_BY_ROUTE, DEV_BUSINESS_CHAIN_AUDIT_ROUTE } from '../config/devRoutes.mjs'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { DEV_PAGE_TITLE_BY_ROUTE, DEV_BUSINESS_CHAIN_AUDIT_ROUTE, DEV_TESTING_ROUTE } from '../config/devRoutes.mjs'
+import { DEV_TESTING_PRIMARY_VIEWS } from '../config/devTesting.mjs'
 import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
@@ -395,7 +396,12 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
 }
 
 export default function DevBusinessChainAuditPage() {
+  const { state: navigationState } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+  const testingReturnParams = new URLSearchParams(navigationState?.testingReturnSearch)
+  const testingReturnView = testingReturnParams.get('view') === 'overview' ? 'overview' : 'coverage'
+  testingReturnParams.set('view', testingReturnView)
+  const testingReturnLabel = DEV_TESTING_PRIMARY_VIEWS.find(({ value }) => value === testingReturnView).label
   const [revision, setRevision] = useState(0)
   const [catalog, setCatalog] = useState({
     loading: true,
@@ -431,7 +437,7 @@ export default function DevBusinessChainAuditPage() {
       value == null ? next.delete(key) : next.set(key, value)
     )
     if (next.toString() !== searchParams.toString()) {
-      setSearchParams(next, { replace: true })
+      setSearchParams(next, { replace: true, state: navigationState })
     }
   }
 
@@ -512,6 +518,7 @@ export default function DevBusinessChainAuditPage() {
           />
         </div>
         <Space wrap>
+          <Link to={`${DEV_TESTING_ROUTE}?${testingReturnParams}`}>返回{testingReturnLabel}</Link>
           <Link to={chainDefinitionURL(chain)}>业务链路</Link>
           <Button
             onClick={() => setRevision((value) => value + 1)}
@@ -522,34 +529,36 @@ export default function DevBusinessChainAuditPage() {
         </Space>
 
       </header>
-      <div className="erp-dev-chain-audit__toolbar">
-        {catalog.batches.length > 1 || !batch || !catalog.batches.some((item) => item.id === batch) ? (
-          <>
-            <label htmlFor="chain-audit-batch">实跑批次</label>
-            <Select
-              label="实跑批次"
-              id="chain-audit-batch"
-              aria-label="实跑批次"
-              value={batch || undefined}
-              loading={catalog.loading}
-              placeholder="选择实跑批次"
-              className="erp-dev-chain-audit__batch-select"
-              options={catalog.batches.map((item) => ({
-                value: item.id,
-                label: `${item.id}${item.status === 'invalid' ? ' · 报告不完整' : ''}`,
-              }))}
-              onChange={(value) => updateQuery({ batch: value ?? '', chain: null, q: null, status: null })}
-            />
-          </>
-        ) : catalog.batches.length === 1 ? <Text>实跑批次 {catalog.batches[0].id}</Text> : null}
-        {report ? (
-          <>
-            <Text type="secondary">生成于 {formatTime(report.generatedAt)}</Text>
-            <Tag>{report.scope.customer}</Tag>
-            <Text>{report.scope.data}</Text>
-          </>
-        ) : null}
-      </div>
+      {catalog.batches.length > 0 || batch || report ? (
+        <div className="erp-dev-chain-audit__toolbar">
+          {catalog.batches.length > 1 || !batch || !catalog.batches.some((item) => item.id === batch) ? (
+            <>
+              <label htmlFor="chain-audit-batch">实跑批次</label>
+              <Select
+                label="实跑批次"
+                id="chain-audit-batch"
+                aria-label="实跑批次"
+                value={batch || undefined}
+                loading={catalog.loading}
+                placeholder="选择实跑批次"
+                className="erp-dev-chain-audit__batch-select"
+                options={catalog.batches.map((item) => ({
+                  value: item.id,
+                  label: `${item.id}${item.status === 'invalid' ? ' · 报告不完整' : ''}`,
+                }))}
+                onChange={(value) => updateQuery({ batch: value ?? '', chain: null, q: null, status: null })}
+              />
+            </>
+          ) : catalog.batches.length === 1 ? <Text>实跑批次 {catalog.batches[0].id}</Text> : null}
+          {report ? (
+            <>
+              <Text type="secondary">生成于 {formatTime(report.generatedAt)}</Text>
+              <Tag>{report.scope.customer}</Tag>
+              <Text>{report.scope.data}</Text>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       {catalog.error ? (
         <Alert
@@ -568,7 +577,9 @@ export default function DevBusinessChainAuditPage() {
         />
       ) : null}
       {!catalog.error && !batch && !catalog.loading ? (
-        <Empty description={catalog.batches.length ? '请选择实跑批次' : '尚无链路实跑报告。将完整批次及证据清单放入本地报告目录后重新读取。'} />
+        <Empty description={catalog.batches.length ? '请选择实跑批次' : '尚未采集链路实测报告。'}>
+          <Link to={`${DEV_TESTING_ROUTE}?view=tiers`}>前往本轮验证</Link>
+        </Empty>
       ) : null}
       {!catalog.error &&
       !error &&

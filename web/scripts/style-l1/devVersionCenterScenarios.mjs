@@ -517,7 +517,7 @@ async function waitForView(page, view) {
   await page.waitForURL((url) => url.searchParams.get('view') === view, {
     timeout: 10_000,
   })
-  const label = { versions: '版本与部署', overview: '发布检查', pipeline: '流水线耗时', history: '操作记录' }[view]
+  const label = { versions: '版本与部署', overview: '发布检查', pipeline: '发布与部署耗时', history: '操作记录' }[view]
   await page.locator('[role="tab"][aria-selected="true"]').filter({ hasText: label }).waitFor({ state: 'visible', timeout: 10_000 })
 }
 
@@ -653,7 +653,6 @@ async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOv
         await page.getByRole('dialog').getByText('已登记 GitLab', { exact: true }).waitFor()
         await page.getByRole('dialog').getByText(/历史补录：本页保留实际执行时间/u).waitFor()
         await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
-
 }
 
 export function createDevVersionCenterScenarios({
@@ -782,7 +781,7 @@ export function createDevVersionCenterScenarios({
         await page.getByRole('button', { name: '清空筛选', exact: true }).click()
         await historyView.getByText('共 12 条记录', { exact: true }).waitFor()
 
-        await page.getByRole('tab', { name: '流水线耗时' }).click()
+        await page.getByRole('tab', { name: '发布与部署耗时' }).click()
         await waitForView(page, 'pipeline')
         assert.equal(await page.locator('.erp-dev-version-current-operation').isVisible(), true)
         const timingDetails = page.locator('.erp-dev-pipeline-timing__details')
@@ -1048,7 +1047,7 @@ export function createDevVersionCenterScenarios({
         await waitForView(page, 'versions')
         assert.equal(new URL(page.url()).searchParams.get('customer'), 'yoyoosun')
         assert.equal(page.context().pages().length, initialPageCount)
-        await page.getByRole('tab', { name: '流水线耗时' }).click()
+        await page.getByRole('tab', { name: '发布与部署耗时' }).click()
         await waitForView(page, 'pipeline')
         await page
           .locator('.erp-dev-pipeline-timing')

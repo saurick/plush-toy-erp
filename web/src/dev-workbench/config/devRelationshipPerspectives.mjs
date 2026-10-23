@@ -13,7 +13,13 @@ import { RpcTransport } from '../../common/consts/rpcMethods.generated.mjs'
 
 export const DEV_DEVELOPMENT_RESOURCES_VIEWS = Object.freeze([
   { value: 'tools', label: '工具清单' },
-  { value: 'relationships', label: '项目图视角' },
+  { value: 'relationships', label: '项目关系图' },
+])
+
+export const DEV_PROJECT_GRAPH_TOPIC_GROUPS = Object.freeze([
+  { label: '项目与目录', examples: ['overview', 'tree', 'forest'] },
+  { label: '开发与交付', examples: ['ci', 'delivery', 'integration'] },
+  { label: '权限与业务', examples: ['access', 'business', 'workflow', 'association'] },
 ])
 
 export const DEV_PROJECT_GRAPH_GROUPS = Object.freeze([

@@ -295,7 +295,7 @@ test('quality gates config: route, four views and per-view query contracts stay 
   assert.deepEqual(VIEW_KEYS, ['server', 'run', 'governance', 'gaps'])
   assert.deepEqual(
     VIEW_ITEMS.map((item) => item.label),
-    ['服务器门禁', '本机诊断', '门禁治理', '覆盖缺口']
+    ['CI 结果', '本机诊断', '门禁目录', '改动缺口']
   )
   assert.deepEqual(QUERY_KEYS, {
     view: 'view',
@@ -1270,7 +1270,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
     /状态与耗时来自实际\s+Pipeline/u
   )
   assert.match(sources.pipeline, /依赖不可读时不绘制推测连线/u)
-  assert.match(sources.server, /aria-label="服务器门禁详情"/u)
+  assert.match(sources.server, /aria-label="CI 结果详情"/u)
   assert.match(sources.guide, /<Drawer/u)
   assert.match(sources.server, />\s*流程与原理\s*</u)
   assert.match(sources.pipeline, /aria-label=\{`查看 \$\{job\.name\} 说明`\}/u)
@@ -1291,7 +1291,9 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.presentation, /连接正常 · 当前提交无 CI/u)
   assert.match(sources.presentation, /GitLab CI 正在读取服务器证据/u)
   assert.match(sources.history, /最近 CI/u)
-  assert.match(sources.history, /历史结果不代表当前提交已通过/u)
+  assert.match(sources.history, /历史通过不代表当前提交已通过/u)
+  assert.match(sources.history, /href=\{run\.url\}/u)
+  assert.match(sources.history, /GitLab 任务与日志/u)
   assert.match(sources.history, /最近 GitLab CI 历史/u)
   assert.match(sources.presentation, /serverHistoryFailureLabel/u)
   assertNoSourceMatches(/missing: '暂无当前 CI'/u)

@@ -282,7 +282,7 @@ export default function DevVersionCenterPage() {
         <DevStaticGuidance title="证据与运行边界" hint="发布职责与安全限制">
           <Paragraph>
             <strong>CI/CD 证据分两处查看：</strong>
-            流水线耗时看 GitLab 的 CI
+            发布与部署耗时汇总 GitLab 的 CI
             检查、构建和制品发布耗时；操作记录看工作台发起的发布、目标部署、回滚和数据重建结果。
           </Paragraph>
           GitLab 负责代码真源、CI 与不可变制品；GitHub 仅接收单向审查镜像；本地

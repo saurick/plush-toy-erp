@@ -184,7 +184,7 @@ export function GovernanceView({
         <Alert
           type="error"
           showIcon
-          message="门禁治理读取失败"
+          message="门禁目录读取失败"
           description={error}
         />
       ) : null}
@@ -266,7 +266,7 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
         <Alert
           type="error"
           showIcon
-          message="覆盖缺口读取失败"
+          message="改动缺口读取失败"
           description={error}
         />
       ) : null}
@@ -281,7 +281,7 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
           description="未知改动不能据此视为安全；请回到测试执行核对 affected 计划，必要时运行完整门禁。"
         />
       ) : null}
-      <div className="erp-dev-quality-gap-flow" aria-label="覆盖缺口判断路径">
+      <div className="erp-dev-quality-gap-flow" aria-label="改动缺口判断路径">
         <span>当前改动</span>
         <span aria-hidden="true">→</span>
         <span>涉及风险</span>

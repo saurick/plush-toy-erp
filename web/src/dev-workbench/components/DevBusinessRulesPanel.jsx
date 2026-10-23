@@ -212,7 +212,7 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
           <Space wrap>
             <RuleStatus status={selected.status} />
             <Link to={`${DEV_QUALITY_GATES_ROUTE}?view=server`}>
-              核对当前提交的服务器门禁
+              核对当前提交的 CI 结果
             </Link>
             <Link to={DEV_VERSION_CENTER_ROUTE}>查看版本发布</Link>
           </Space>

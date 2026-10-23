@@ -9,11 +9,43 @@ export const DEV_TESTING_COVERAGE_COLLECT_COMMAND =
 export const DEV_TESTING_COVERAGE_SECTION_QUERY_KEY = 'coverage'
 export const DEV_TESTING_COMMAND_PAGE_QUERY_KEY = 'commandsPage'
 export const DEV_TESTING_COMMAND_PAGE_SIZE = 10
+export const DEV_TESTING_PRIMARY_VIEWS = Object.freeze([
+  Object.freeze({ value: 'overview', label: '测试总览' }),
+  Object.freeze({ value: 'tiers', label: '本轮验证' }),
+  Object.freeze({ value: 'coverage', label: '测试报告' }),
+  Object.freeze({ value: 'pressure', label: '压力测试' }),
+  Object.freeze({ value: 'guide', label: '测试指引' }),
+])
+
+export function resolveDevTestingReturnView(search) {
+  const params = new URLSearchParams(search)
+  const values = params.getAll('returnView')
+  return values.length === 1 && DEV_TESTING_PRIMARY_VIEWS.some(({ value }) => value === values[0])
+    ? values[0]
+    : 'overview'
+}
+
+// 主视图切换保留查询条件；专项命令额外记录返回目标。
+export function buildDevTestingViewSearch(search, nextView) {
+  const params = new URLSearchParams(search)
+  const primary = DEV_TESTING_PRIMARY_VIEWS.map(({ value }) => value)
+  const next = [...primary, 'commands', 'closeout'].includes(nextView) ? nextView : 'overview'
+  const current = params.getAll('view').length === 1 ? params.get('view') : 'overview'
+  if (next === 'commands') {
+    params.set('returnView', primary.includes(current) ? current : resolveDevTestingReturnView(params))
+  } else {
+    params.delete('returnView')
+  }
+  params.set('view', next)
+  params.delete('doc')
+  return params
+}
+
 export const DEV_TESTING_COVERAGE_SECTIONS = Object.freeze([
   Object.freeze({ value: 'code', label: '代码覆盖' }),
   Object.freeze({ value: 'business', label: '业务场景' }),
   Object.freeze({ value: 'rules', label: '关键规则' }),
-  Object.freeze({ value: 'gates', label: '验证门禁' }),
+  Object.freeze({ value: 'gates', label: '门禁结果' }),
   Object.freeze({ value: 'acceptance', label: '运行与验收' }),
 ])
 // 保留既有导出名；该命令只聚合采集器已经生成的证据。
