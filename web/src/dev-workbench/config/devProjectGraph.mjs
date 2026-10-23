@@ -13,15 +13,15 @@ export function resolveProjectGraphSelection(search) {
   const modelKey = owns(DEV_PROJECT_GRAPH_MODELS, requestedModel) ? requestedModel : 'dag'
   const model = DEV_PROJECT_GRAPH_MODELS[modelKey]
   const requestedExample = singleValue(params, 'example')
-  const exampleKey = model.examples.includes(requestedExample) ? requestedExample : model.examples[0]
+  const exampleKey = params.getAll('example').length === 1 && requestedExample === '' ? '' : model.examples.includes(requestedExample) ? requestedExample : model.examples[0]
   const example = DEV_PROJECT_GRAPH_EXAMPLES[exampleKey]
   const requestedNode = singleValue(params, 'node')
   return {
     modelKey,
     exampleKey,
-    nodeId: example.nodes.some((node) => node.id === requestedNode) ? requestedNode : '',
-    references: Boolean(example.referenceEdge && singleValue(params, 'references') === '1'),
-    highlightReturns: !example.edges.some((edge) => edge.kind === 'return') || singleValue(params, 'loops') !== '0',
+    nodeId: example?.nodes.some((node) => node.id === requestedNode) ? requestedNode : '',
+    references: Boolean(example?.referenceEdge && singleValue(params, 'references') === '1'),
+    highlightReturns: !example?.edges.some((edge) => edge.kind === 'return') || singleValue(params, 'loops') !== '0',
   }
 }
 
@@ -32,7 +32,7 @@ export function updateProjectGraphSearch(search, changes) {
     if (!owns(changes, 'nodeId')) requested.nodeId = ''
     if (!owns(changes, 'references')) requested.references = false
     if (!owns(changes, 'highlightReturns')) requested.highlightReturns = true
-    if (requested.modelKey !== previous.modelKey && !owns(changes, 'exampleKey')) requested.exampleKey = ''
+    if (requested.modelKey !== previous.modelKey && !owns(changes, 'exampleKey')) requested.exampleKey = DEV_PROJECT_GRAPH_MODELS[requested.modelKey]?.examples[0]
   }
   const selected = resolveProjectGraphSelection(new URLSearchParams({
     model: requested.modelKey,

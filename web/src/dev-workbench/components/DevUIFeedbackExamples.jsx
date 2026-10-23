@@ -139,7 +139,7 @@ function EditorExample({ size = 'localAction' }) {
       <Space wrap>
         <label htmlFor={`scenario-${key}`}>保存结果</label>
         <Select
-          allowClear={false}
+          allowClear={false /* 不可清空：保存演示必须明确模拟结果，空值会混淆成功和失败分支。 */}
           placeholder="样例保存结果"
           id={`scenario-${key}`}
           aria-label="样例保存结果"

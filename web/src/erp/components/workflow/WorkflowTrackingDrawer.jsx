@@ -163,7 +163,6 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
           {taskError ? <p role="alert" className="erp-workflow-tracking-task-error">{taskError}</p> : null}
           {availableTasks.length > 1 ? (
             <Select
-              allowClear={false}
               label="选择当前任务"
               className="erp-workflow-tracking-task-select"
               aria-label="选择当前任务"

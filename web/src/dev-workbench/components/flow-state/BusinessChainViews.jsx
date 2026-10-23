@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
-import Select from '@/common/components/select/AppSelect'
+import Select from '@/common/components/select/FilterSelect'
 import TaskFulfillmentGuide from './TaskFulfillmentGuide.jsx'
 import BusinessChainTopics from './BusinessChainTopics.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
@@ -220,7 +220,7 @@ function BusinessChainSelector({ catalog, value, onChange }) {
     <div className="erp-dev-flow-chain-selector">
       <label htmlFor="dev-flow-chain-select">切换业务流程</label>
       <Select
-        allowClear={false}
+        emptyValue={ALL_BUSINESS_CHAINS_KEY}
         placeholder="切换业务流程"
         id="dev-flow-chain-select"
         aria-label="切换业务流程"

@@ -64,15 +64,31 @@ test('必填输入可暂时清空但仍阻止保存，禁用与固定模式不�
   let form
   function Example() {
     [form] = Form.useForm()
-    return h(Form, { form, initialValues: { unit: 'piece' } }, h(Form.Item, { name: 'unit', label: '单位', rules: [{ required: true, message: '请选择单位' }] }, h(AppSelect, { placeholder: '请选择单位', options: [{ value: 'piece', label: '个' }] })), h(AppSelect, { label: '排序方式', allowClear: false, value: 'new', options: [{ value: 'new', label: '最新优先' }] }), h(AppSelect, { label: '冻结字段', disabled: true, value: 'piece', options: [{ value: 'piece', label: '个' }] }))
+    return h(Form, { form, initialValues: { unit: 'piece' } }, h(Form.Item, { name: 'unit', label: '单位', rules: [{ required: true, message: '请选择单位' }] }, h(AppSelect, { placeholder: '请选择单位', options: [{ value: 'piece', label: '个' }] })), h(AppSelect, { label: '权限模式', allowClear: false, value: 'assigned', options: [{ value: 'assigned', label: '指定范围' }] }), h(AppSelect, { label: '冻结字段', disabled: true, value: 'piece', options: [{ value: 'piece', label: '个' }] }))
   }
   await harness.render(h(Example))
   const selects = document.querySelectorAll('.app-select')
   assert.equal(selects[1].querySelector('.ant-select-clear'), null)
-  assert.equal(selects[1].querySelector('.app-select__label').textContent, '排序方式')
+  assert.equal(selects[1].querySelector('.app-select__label').textContent, '权限模式')
   assert.equal(selects[2].querySelector('.ant-select-clear'), null)
   await act(() => selects[0].querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
   await harness.flush()
   assert.equal(form.getFieldValue('unit'), undefined)
   await act(async () => { await assert.rejects(form.validateFields(), (error) => error.errorFields[0].errors.includes('请选择单位')) })
+})
+
+test('排序清空恢复声明的默认排序，界面显示用途提示', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: FilterSelect } = await import('./FilterSelect.jsx')
+  let query
+  function Example() {
+    const [value, setValue] = React.useState('order_date:asc')
+    query = value
+    return h(FilterSelect, { label: '排序方式', value, emptyValue: 'updated_at:desc', options: [{ value: 'updated_at:desc', label: '最近更新' }, { value: 'order_date:asc', label: '最早订单' }], onChange: setValue })
+  }
+  await harness.render(h(Example))
+  await act(() => document.querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  assert.equal(query, 'updated_at:desc')
+  assert.equal(document.querySelector('.ant-select-selection-placeholder').textContent, '排序方式')
 })

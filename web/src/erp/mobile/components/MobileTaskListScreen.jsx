@@ -730,7 +730,7 @@ export default function MobileTaskListScreen({
               <Select
                 placeholder="查看岗位"
                 aria-label="查看岗位"
-                allowClear={false}
+                allowClear={false /* 不可清空：当前手机入口按岗位路由和权限加载任务，切换必须指定有效岗位。 */}
                 aria-labelledby={`${navigationId}-review-role`}
                 value={activeRoleKey}
                 onChange={handleSwitchMobileRole}

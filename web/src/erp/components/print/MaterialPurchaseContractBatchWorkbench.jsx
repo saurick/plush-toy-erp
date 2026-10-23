@@ -518,7 +518,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
             <label className="erp-material-contract-batch-pages">
               输出批次
               <Select
-                allowClear={false}
+                allowClear={false /* 不可清空：此处切换当前打印批页，编辑与导出必须绑定有效批页。 */}
                 placeholder="输出批次"
                 aria-label="输出批次"
                 virtual={false}

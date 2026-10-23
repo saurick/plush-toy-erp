@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Alert, Button, Tag } from 'antd'
+import { Alert, Button, Empty, Tag } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessChainProjectionContext } from './FlowTaskContext.jsx'
 import {
@@ -62,7 +62,6 @@ function FactsView({
       <section className="erp-dev-flow-definition-selector">
         <label htmlFor="dev-flow-fact-select">选择事实定义</label>
         <Select
-          allowClear={false}
           placeholder="选择事实定义"
           id="dev-flow-fact-select"
           aria-label="选择事实定义"
@@ -72,7 +71,7 @@ function FactsView({
           classNames={DEFINITION_SELECT_CLASS_NAMES}
           filterOption={optionFilter}
           notFoundContent="没有匹配的事实定义"
-          value={fact.factKey}
+          value={fact?.factKey}
           options={options}
           optionRender={renderDefinitionSelectOption}
           onChange={onSelectFact}
@@ -81,53 +80,55 @@ function FactsView({
           只展示当前代码核实的定义；不提供 mock 运行凭证或伪造凭证搜索。
         </Text>
       </section>
-      <section
-        className="erp-dev-flow-fact-detail"
-        data-selected-fact={fact.factKey}
-      >
-        <div className="erp-dev-flow-section-heading">
-          <div>
-            <Text className="erp-dev-flow-eyebrow">Fact / Ledger 定义</Text>
-            <Title level={2}>{fact.label}</Title>
-            <KeyValue value={fact.factKey} />
+      {fact ? (
+        <section
+          className="erp-dev-flow-fact-detail"
+          data-selected-fact={fact.factKey}
+        >
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text className="erp-dev-flow-eyebrow">Fact / Ledger 定义</Text>
+              <Title level={2}>{fact.label}</Title>
+              <KeyValue value={fact.factKey} />
+            </div>
+            <Tag color="red">定义证据</Tag>
           </div>
-          <Tag color="red">定义证据</Tag>
-        </div>
-        <dl>
-          <div>
-            <dt>正式发生条件</dt>
-            <dd>{fact.occurrenceCondition}</dd>
-          </div>
-          <div>
-            <dt>来源单据</dt>
-            <dd>{fact.sourceDocument}</dd>
-          </div>
-          <div>
-            <dt>权威真源</dt>
-            <dd>{fact.authority}</dd>
-          </div>
-          <div>
-            <dt>业务影响</dt>
-            <dd>{fact.businessImpact}</dd>
-          </div>
-          <div>
-            <dt>事实凭证</dt>
-            <dd>{fact.voucher}</dd>
-          </div>
-          <div>
-            <dt>幂等规则</dt>
-            <dd>{fact.idempotencyRule}</dd>
-          </div>
-          <div>
-            <dt>纠正方式</dt>
-            <dd>{fact.correction}</dd>
-          </div>
-        </dl>
-        <Button onClick={() => onOpenState(fact.machineKey)}>
-          查看对应状态规则
-        </Button>
-        <EvidenceDisclosure value={fact} />
-      </section>
+          <dl>
+            <div>
+              <dt>正式发生条件</dt>
+              <dd>{fact.occurrenceCondition}</dd>
+            </div>
+            <div>
+              <dt>来源单据</dt>
+              <dd>{fact.sourceDocument}</dd>
+            </div>
+            <div>
+              <dt>权威真源</dt>
+              <dd>{fact.authority}</dd>
+            </div>
+            <div>
+              <dt>业务影响</dt>
+              <dd>{fact.businessImpact}</dd>
+            </div>
+            <div>
+              <dt>事实凭证</dt>
+              <dd>{fact.voucher}</dd>
+            </div>
+            <div>
+              <dt>幂等规则</dt>
+              <dd>{fact.idempotencyRule}</dd>
+            </div>
+            <div>
+              <dt>纠正方式</dt>
+              <dd>{fact.correction}</dd>
+            </div>
+          </dl>
+          <Button onClick={() => onOpenState(fact.machineKey)}>
+            查看对应状态规则
+          </Button>
+          <EvidenceDisclosure value={fact} />
+        </section>
+      ) : <Empty description="请选择事实定义" />}
     </div>
   )
 }

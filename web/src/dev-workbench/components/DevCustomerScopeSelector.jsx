@@ -63,7 +63,7 @@ export default function DevCustomerScopeSelector({
           </Text>
         ) : (
           <Select
-            allowClear={false}
+            allowClear={false /* 不可清空：工作台读取与操作必须绑定已登记客户包，不能形成无归属上下文。 */}
             aria-label={`${label}选择`}
             value={ready ? scope.customerKey : undefined}
             placeholder={compact ? '选择已登记客户' : '选择已登记甲方'}

@@ -416,7 +416,7 @@ export default function useBusinessStatistics({
       <div className="erp-statistics-filter-field">
         <label htmlFor="statistics-report">统计内容</label>
         <Select
-          allowClear={false}
+          allowClear={false /* 不可清空：交付与应收使用不同统计合同，必须明确当前统计内容。 */}
           placeholder="统计内容"
           id="statistics-report"
           aria-label="统计内容"
@@ -512,7 +512,7 @@ export default function useBusinessStatistics({
         onPressEnter={search.onPressEnter}
       />
       <Select
-        allowClear={false}
+        allowClear={false /* 不可清空：金额统计必须明确单一币种，不能混加不同币种。 */}
         label="统计币种"
         placeholder="统计币种"
         aria-label="统计币种"
@@ -878,7 +878,7 @@ export default function useBusinessStatistics({
             <>
               {!ages && (
                 <Select
-                  allowClear={false}
+                  allowClear={false /* 不可清空：统计聚合必须明确客户或产品维度，空值没有可执行的汇总口径。 */}
                   label="汇总维度"
                   placeholder="汇总维度"
                   aria-label="汇总维度"
@@ -890,8 +890,8 @@ export default function useBusinessStatistics({
                   onChange={(group) => update({ group, sq: '', ...clearGroup })}
                 />
               )}
-              <Select
-                allowClear={false}
+              <FilterSelect
+                emptyValue="count:desc"
                 label="统计排序"
                 placeholder="统计排序"
                 aria-label="统计排序"

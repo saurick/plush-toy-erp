@@ -134,7 +134,7 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
           <label className="erp-business-form-page__section-picker">
             跳转到
             <Select
-              allowClear={false}
+              allowClear={false /* 不可清空：此值反映当前滚动位置，文档分区始终存在，清空不会改变当前位置。 */}
               placeholder="跳转到"
               aria-label="跳转到"
               disabled={busy}

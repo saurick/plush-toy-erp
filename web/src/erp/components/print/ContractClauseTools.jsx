@@ -23,13 +23,13 @@ export default function ContractClauseTools({
   feedback,
   reportFeedback,
 }) {
-  const group =
+  const group = selection.groupKey === null ? null :
     clauses.find(({ key }) => key === selection.groupKey) || clauses[0]
   const groupKey = group?.key || ''
   const items = group?.items || []
   const groupIndex = clauses.indexOf(group)
   const nameInputRef = useRef(null)
-  const index = items.length
+  const index = items.length && selection.index !== null
     ? Math.min(Math.max(0, selection.index ?? 0), items.length - 1)
     : null
   const focusFrameRef = useRef(null)
@@ -128,16 +128,15 @@ export default function ContractClauseTools({
       <label className="erp-print-clause-tools__field">
         <span>条款分组</span>
         <Select
-          allowClear={false}
           aria-label="条款分组"
           virtual={false}
           data-value={groupKey || undefined}
           value={groupKey || undefined}
-          disabled={disabled || !group}
-          placeholder="暂无分组"
+          disabled={disabled || clauses.length === 0}
+          placeholder={clauses.length ? '选择条款分组' : '暂无分组'}
           onChange={(value) => {
             cancelAnimationFrame(focusFrameRef.current)
-            onSelect({ groupKey: value, index: 0 })
+            onSelect({ groupKey: value ?? null, index: value === undefined ? null : 0 })
           }}
           options={clauses.map(({ key, label, items: groupItems }) => ({
             value: key,
@@ -207,16 +206,16 @@ export default function ContractClauseTools({
       <label className="erp-print-clause-tools__field">
         <span>当前条目</span>
         <Select
-          allowClear={false}
           aria-label="当前条目"
           virtual={false}
           data-value={index ?? undefined}
           value={index ?? undefined}
-          disabled={disabled || index === null}
-          placeholder="本组暂无条目"
+          disabled={disabled || items.length === 0}
+          placeholder={items.length ? '选择当前条目' : '本组暂无条目'}
           onChange={(nextIndex) => {
-            onSelect({ groupKey, index: nextIndex })
-            locate(nextIndex)
+            cancelAnimationFrame(focusFrameRef.current)
+            onSelect({ groupKey, index: nextIndex ?? null })
+            if (nextIndex !== undefined) locate(nextIndex)
           }}
           options={items.map((item, itemIndex) => ({
             value: itemIndex,

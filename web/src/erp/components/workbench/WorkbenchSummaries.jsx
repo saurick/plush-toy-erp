@@ -1,4 +1,5 @@
 import React from 'react'
+import { Empty } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import Select from '@/common/components/select/AppSelect'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
@@ -9,9 +10,8 @@ import './workbenchSummaries.css'
 function SummaryTypeControl({ options, selected, onChange }) {
   return (
     <div className="erp-workbench-summaries__heading">
-      {options.length > 1 ? (
+      {options.length > 1 || !selected ? (
         <Select
-          allowClear={false}
           label="汇总类型"
           placeholder="汇总类型"
           aria-label="汇总类型"
@@ -29,10 +29,10 @@ function SummaryTypeControl({ options, selected, onChange }) {
 export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
   const [params, setParams] = useSearchParams()
   const { adminProfile } = useOutletContext() || {}
-  const selected =
+  const selected = params.get('summary') === '' ? undefined :
     options.find(({ value }) => value === params.get('summary'))?.value ||
     options[0]?.value
-  if (!selected) return null
+  if (!options.length) return null
   const accessKey = workflowTaskAdminAccessRequestIdentity(adminProfile)
   const summaryTypeControl = (
     <SummaryTypeControl
@@ -41,7 +41,7 @@ export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
       selected={selected}
       onChange={(value) => {
         const next = new URLSearchParams(params)
-        next.set('summary', value)
+        next.set('summary', value ?? '')
         setParams(next, { replace: true })
       }}
     />
@@ -52,7 +52,7 @@ export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
       aria-label="工作台汇总"
       data-table-scroll-scope
     >
-      {selected === 'sales-orders' ? (
+      {!selected ? <>{summaryTypeControl}<Empty description="请选择汇总类型" /></> : selected === 'sales-orders' ? (
         <SalesOrderSummaryPanel
           key={`sales:${accessKey}`}
           refreshRevision={refreshRevision}

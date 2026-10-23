@@ -255,7 +255,7 @@ export function DateRangeFilter({
     >
       {hasMultipleDateTypes ? (
         <Select
-          allowClear={false}
+          allowClear={false /* 不可清空：起止日期必须绑定明确的日期字段，清除日期范围使用日期输入框。 */}
           label="日期类型"
           placeholder="日期类型"
           className="erp-business-date-range-filter__type"

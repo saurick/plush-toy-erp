@@ -56,4 +56,33 @@ test('downloadable prototype uses one dropdown implementation including help', (
     source,
     /byId\(id\)\.setOptions\(pickerOptions\(id\), pickerValue\(id\)\)/u
   )
+  for (const tag of source.matchAll(/<ui-select\b[^>]*>/gu)) {
+    if (/history-source|data-mobile-sort|data-dev-project-example|data-dev-project-catalog|id="rh-/u.test(tag[0])) {
+      assert.doesNotMatch(tag[0], /data-required-selection/u, tag[0])
+    }
+  }
+})
+
+test('关闭清空须就地说明操作参数为什么没有合法空态', async () => {
+  for (const [props, errors] of [
+    ['allowClear={false}', 1],
+    ['allowClear={false /* 不可清空：金额统计必须明确单一币种，不能混加不同币种。 */}', 0],
+    ['allowClear={loading ? false : true}', 0],
+  ]) {
+    const [result] = await lint.lintText(
+      `import Select from '@/common/components/select/AppSelect'\nexport default function Fixture({ loading }) { return <Select label="统计币种" ${props} /> }\n`,
+      { filePath: 'src/erp/pages/SelectGuardFixture.jsx' }
+    )
+    assert.equal(result.messages.filter(({ ruleId }) => ruleId === 'select-controls/clear-exception').length, errors)
+  }
+  const [result] = await lint.lintText('export const props = { allowClear: false }\n', { filePath: 'src/erp/utils/selectProps.mjs' })
+  assert.equal(result.messages.filter(({ ruleId }) => ruleId === 'select-controls/clear-exception').length, 1)
+})
+
+test('下拉清空规则不干预普通输入框的清空配置', async () => {
+  const [result] = await lint.lintText(
+    'import { Input } from \'antd\'\nexport default function Fixture() { return <Input allowClear={false} /> }\n',
+    { filePath: 'src/erp/pages/InputGuardFixture.jsx' }
+  )
+  assert.equal(result.messages.filter(({ ruleId }) => ruleId === 'select-controls/clear-exception').length, 0)
 })

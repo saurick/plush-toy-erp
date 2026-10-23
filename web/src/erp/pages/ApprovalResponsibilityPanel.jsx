@@ -1280,7 +1280,7 @@ export default function ApprovalResponsibilityPanel({
                 initialValue="role"
               >
                 <Select
-                  allowClear={false}
+                  allowClear={false /* 不可清空：承接规则必须明确按岗位或指定员工，空模式不能生成有效责任规则。 */}
                   placeholder="请选择由谁承接"
                   options={[
                     { value: 'role', label: '岗位内任一员工' },

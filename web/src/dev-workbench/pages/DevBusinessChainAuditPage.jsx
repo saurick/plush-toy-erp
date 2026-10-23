@@ -409,7 +409,7 @@ export default function DevBusinessChainAuditPage() {
     error: '',
   })
   const requestedBatch = searchParams.get('batch') || ''
-  const batch =
+  const batch = searchParams.get('batch') === '' ? '' :
     requestedBatch ||
     catalog.batches.find((item) => item.status === 'ready')?.id ||
     catalog.batches[0]?.id ||
@@ -523,23 +523,22 @@ export default function DevBusinessChainAuditPage() {
 
       </header>
       <div className="erp-dev-chain-audit__toolbar">
-        {catalog.batches.length > 1 || (batch && !catalog.batches.some((item) => item.id === batch)) ? (
+        {catalog.batches.length > 1 || !batch || !catalog.batches.some((item) => item.id === batch) ? (
           <>
             <label htmlFor="chain-audit-batch">实跑批次</label>
             <Select
-              allowClear={false}
               label="实跑批次"
               id="chain-audit-batch"
               aria-label="实跑批次"
               value={batch || undefined}
               loading={catalog.loading}
-              placeholder="暂无报告"
+              placeholder="选择实跑批次"
               className="erp-dev-chain-audit__batch-select"
               options={catalog.batches.map((item) => ({
                 value: item.id,
                 label: `${item.id}${item.status === 'invalid' ? ' · 报告不完整' : ''}`,
               }))}
-              onChange={(value) => updateQuery({ batch: value, q: null, status: null })}
+              onChange={(value) => updateQuery({ batch: value ?? '', chain: null, q: null, status: null })}
             />
           </>
         ) : catalog.batches.length === 1 ? <Text>实跑批次 {catalog.batches[0].id}</Text> : null}
@@ -569,7 +568,7 @@ export default function DevBusinessChainAuditPage() {
         />
       ) : null}
       {!catalog.error && !batch && !catalog.loading ? (
-        <Empty description="尚无链路实跑报告。将完整批次及证据清单放入本地报告目录后重新读取。" />
+        <Empty description={catalog.batches.length ? '请选择实跑批次' : '尚无链路实跑报告。将完整批次及证据清单放入本地报告目录后重新读取。'} />
       ) : null}
       {!catalog.error &&
       !error &&

@@ -317,7 +317,7 @@ export default function SalesOrderBatchImportEditor({
           上一单
         </Button>
         <Select
-          allowClear={false}
+          allowClear={false /* 不可清空：当前编辑表单必须绑定一张导入草稿，切换前保存该单的编辑值。 */}
           label="切换导入订单"
           placeholder="切换导入订单"
           aria-label="切换导入订单"

@@ -170,7 +170,7 @@ export default function MobileTaskFactLayout() {
         <>
           {mode !== 'source' ? <Button onClick={() => changeMode('source')}>返回任务办理</Button> : null}
           {related.error || resultError ? <Alert type="warning" showIcon message={related.error || resultError} action={<Button onClick={() => setRetry((value) => value + 1)}>重新读取</Button>} /> : null}
-          {mode === 'inventory' && related.source ? <label>核对本次入库批次<Select allowClear={false} placeholder="核对本次入库批次" aria-label="核对本次入库批次" value={lineID} options={related.source.items.map((item) => ({ value: item.id, label: item.lot_no || item.material_name_snapshot || `收货第 ${item.line_no} 行` }))} onChange={async (id) => { if (await confirmLeave()) { setResult(null); setLineID(id) } }} /></label> : null}
+          {mode === 'inventory' && related.source ? <label>核对本次入库批次<Select placeholder="核对本次入库批次" aria-label="核对本次入库批次" value={lineID} options={related.source.items.map((item) => ({ value: item.id, label: item.lot_no || item.material_name_snapshot || `收货第 ${item.line_no} 行` }))} onChange={async (id) => { if (await confirmLeave()) { setResult(null); setLineID(id ?? null) } }} /></label> : null}
           {related.loading ? <Spin /> : relatedReady ? <Outlet key={scope} context={context} /> : null}
           {relatedActions}
         </>

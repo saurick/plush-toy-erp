@@ -12,7 +12,7 @@ import {
   DownloadOutlined,
   DownOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Space, Spin, Typography } from 'antd'
+import { Button, Dropdown, Empty, Space, Spin, Typography } from 'antd'
 import {
   useLocation,
   useNavigationType,
@@ -97,7 +97,7 @@ export default function HelpCenterPage() {
     () => getRoleHelpGuidesForProfile(adminProfile || {}),
     [adminProfile]
   )
-  const selectedGuide = resolveHelpGuide(
+  const selectedGuide = searchParams.get('role') === '' ? null : resolveHelpGuide(
     guides,
     String(searchParams.get('role') || '').trim(),
     searchParams.get('page') ||
@@ -373,7 +373,7 @@ export default function HelpCenterPage() {
   }
   const handleRoleChange = (roleKey) => {
     const next = readHelpLocation()
-    next.set('role', roleKey)
+    next.set('role', roleKey ?? '')
     if (view !== 'reference') {
       next.set('view', 'home')
       next.delete('scene')
@@ -492,22 +492,19 @@ export default function HelpCenterPage() {
       setDownloadError('手册下载未完成，请重试或使用浏览器打印当前章节。')
     }
   }
-  if (!selectedGuide) return null
-
   const rolePicker = (
     <div className="erp-help-role-picker">
-      {guides.length > 1 ? (
+      {guides.length > 1 || !selectedGuide ? (
         <label htmlFor="erp-help-center-role-select">推荐岗位</label>
       ) : (
         <span>推荐岗位</span>
       )}
-      {guides.length > 1 ? (
+      {guides.length > 1 || !selectedGuide ? (
         <Select
           placeholder="岗位指南"
           aria-label="岗位指南"
-          allowClear={false}
           id="erp-help-center-role-select"
-          value={selectedGuide.key}
+          value={selectedGuide?.key}
           options={guides.map((guide) => ({
             value: guide.key,
             label: guide.label,
@@ -520,6 +517,15 @@ export default function HelpCenterPage() {
       )}
     </div>
   )
+  if (!selectedGuide) {
+    return (
+      <div className="erp-help-center-page" ref={pageRef} data-help-shell={mobileShell ? 'mobile' : 'desktop'}>
+        <Typography.Title level={1}>帮助中心</Typography.Title>
+        {rolePicker}
+        <Empty description="请选择岗位指南" />
+      </div>
+    )
+  }
   const directory =
     view === 'reference' ? (
       <HelpManualDirectory

@@ -73,6 +73,11 @@ test('project graph switches clear node/reference residue and preserve peer view
   assert.equal(resolveProjectGraphSelection(node).nodeId, 'gate')
   const nextExample = updateProjectGraphSearch(node, { exampleKey: 'access' })
   assert.equal(nextExample.has('node'), false)
+  const cleared = updateProjectGraphSearch(start, { exampleKey: '' })
+  assert.equal(cleared.get('example'), '')
+  assert.deepEqual(resolveProjectGraphSelection(cleared), { modelKey: 'tree', exampleKey: '', nodeId: '', references: false, highlightReturns: true })
+  const restored = updateProjectGraphSearch(cleared, { exampleKey: 'tree' })
+  assert.equal(resolveProjectGraphSelection(restored).exampleKey, 'tree')
 })
 
 test('project graph return highlighting changes presentation without removing edges or outcomes', () => {

@@ -1648,7 +1648,7 @@ export default function SalesOrdersPage() {
               }}
             />
             <SelectFilter
-              allowClear={false}
+              emptyValue="updated_at:desc"
               aria-label="排序方式"
               className="erp-business-filter-control--sort"
               options={SALES_ORDER_SORT_FILTER_OPTIONS}

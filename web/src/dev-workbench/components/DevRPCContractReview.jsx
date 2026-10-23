@@ -220,7 +220,7 @@ export default function DevRPCContractReview() {
         <label>
           比较范围{' '}
           <Select
-            allowClear={false}
+            allowClear={false /* 不可清空：差异比较必须明确工作区或暂存快照，不能展示无比较对象的结果。 */}
             placeholder="接口合同比较范围"
             aria-label="接口合同比较范围"
             value={query.range}

@@ -107,7 +107,7 @@ export default function HistoryRecordsPage() {
       }),
     [adminProfile, visibleMenuPaths]
   )
-  const sourceKey = searchParams.get('source') || ''
+  const sourceKey = searchParams.get('source')
   const keyword = searchParams.get('keyword') || ''
   const status = searchParams.get('status') || ''
   const pageValue = Number(searchParams.get('page'))
@@ -124,7 +124,7 @@ export default function HistoryRecordsPage() {
   const selectedRecord =
     records.find((record) => record.key === selectedKey) || null
   const activeSource = useMemo(
-    () =>
+    () => sourceKey === '' ? null :
       availableSources.find((source) => source.key === sourceKey) ||
       availableSources[0] ||
       null,
@@ -138,7 +138,8 @@ export default function HistoryRecordsPage() {
         (previous) => {
           const next = new URLSearchParams(previous)
           Object.entries(values).forEach(([key, value]) => {
-            if (value === '' || value === null) next.delete(key)
+            if (key === 'source') next.set(key, value ?? '')
+            else if (value === '' || value == null) next.delete(key)
             else next.set(key, String(value))
           })
           return next
@@ -311,7 +312,6 @@ export default function HistoryRecordsPage() {
           <>
             <HistoryQueryFilters inline>
               <SelectFilter
-                allowClear={false}
                 aria-label="历史记录类型"
                 prefix="记录类型"
                 value={activeSource?.key}
@@ -426,6 +426,7 @@ export default function HistoryRecordsPage() {
         emptyDescription={
           !availableSources.length
             ? '当前账号没有可查询的历史记录类型'
+            : !activeSource ? '请选择记录类型'
             : loadError
               ? '历史记录读取失败，请重新加载'
               : '当前筛选没有匹配的历史记录'

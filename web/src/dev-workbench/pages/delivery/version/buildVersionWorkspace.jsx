@@ -250,7 +250,7 @@ export function buildVersionWorkspace({
                 <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
                   <Text type="secondary">记录归属</Text>
                   <AppSelect
-                    allowClear={false}
+                    allowClear={false /* 不可清空：记录归属绑定具体环境的读取入口，未选择时不能查询跨目标记录。 */}
                     aria-label="记录归属"
                     value={operationHistoryFilters.target}
                     options={OPERATION_HISTORY_TARGET_OPTIONS}

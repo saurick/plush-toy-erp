@@ -444,7 +444,7 @@ function DataScopeOverview({
       >
         <Text strong>仓库范围</Text>
         <Select
-          allowClear={false}
+          allowClear={false /* 不可清空：授权必须明确全部、指定或禁止仓库，空值不能代表任何权限范围。 */}
           label="仓库范围模式"
           placeholder="仓库范围模式"
           aria-label="仓库范围模式"

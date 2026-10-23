@@ -33,7 +33,7 @@ export default function BOMTaskPanel({ context, onContextChange, adminProfile })
   const current = result?.key === key ? result : null
   const orders = current?.orders || []
   const total = current?.total || 0
-  const selected = orders.find((order) => order.id === context?.orderID)
+  const selected = context?.orderID === null ? null : orders.find((order) => order.id === context?.orderID)
     || (total === 1 ? orders[0] : null)
   const renderOrderMenu = useCallback((menu) => <>{menu}{total > PAGE_SIZE ? <div className="business-task-panel__order-pagination"><Pagination current={page} pageSize={PAGE_SIZE} total={total} showSizeChanger={false} onChange={(nextPage) => onContextChange({ bomID, page: nextPage })} /></div> : null}</>, [total, page, bomID, onContextChange])
 
@@ -89,7 +89,6 @@ export default function BOMTaskPanel({ context, onContextChange, adminProfile })
             <div className="business-task-panel__order">
               <label htmlFor={selectID}>关联销售订单</label>
               <Select
-                allowClear={false}
                 id={selectID}
                 aria-label="关联销售订单"
                 value={selected?.id}
@@ -97,7 +96,7 @@ export default function BOMTaskPanel({ context, onContextChange, adminProfile })
                 loading={loading}
                 disabled={loading || orders.length === 0}
                 options={orders.map((order) => ({ value: order.id, label: order.order_no }))}
-                onChange={(orderID) => onContextChange({ bomID, page, orderID })}
+                onChange={(orderID) => onContextChange({ bomID, page, orderID: orderID ?? null })}
                 popupRender={renderOrderMenu}
               />
               {selected ? <Tag color={SALES_ORDER_STATUS_COLORS[selected.lifecycle_status]}>{SALES_ORDER_STATUS_LABELS[selected.lifecycle_status] || '订单状态'}</Tag> : null}

@@ -113,6 +113,8 @@ function installTestDOM() {
     window: runtimeWindow,
     document: runtimeWindow.document,
     HTMLElement: runtimeWindow.HTMLElement,
+    HTMLBodyElement: runtimeWindow.HTMLBodyElement,
+    HTMLHtmlElement: runtimeWindow.HTMLHtmlElement,
     Element: runtimeWindow.Element,
     Node: runtimeWindow.Node,
     Event: runtimeWindow.Event,

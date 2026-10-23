@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react'
-import Select from '@/common/components/select/AppSelect'
+import Select from '@/common/components/select/FilterSelect'
 import MobileTaskExtraFilters from './MobileTaskExtraFilters.jsx'
 import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
 import MobileFilterChoices from './MobileFilterChoices.jsx'
@@ -68,7 +68,7 @@ export default function MobileTaskListOptions({
         <div className="mobile-filter-select-field mobile-filter-sort-field">
           <label htmlFor={sortID}>任务排序</label>
           <Select
-            allowClear={false}
+            emptyValue="newest"
             placeholder="任务排序"
             id={sortID}
             aria-label="任务排序"

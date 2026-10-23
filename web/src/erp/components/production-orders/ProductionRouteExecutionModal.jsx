@@ -428,6 +428,7 @@ export default function ProductionRouteExecutionModal({
   )
 
   useEffect(() => {
+    if (selectedBatchID === undefined) return
     if (displayedBatches.length === 0) {
       setSelectedBatchID(null)
       return
@@ -1529,7 +1530,6 @@ onCancel: () => resolve(false),
             <Title level={5}>{assignmentOnly ? '返工批次' : '在制批次'}</Title>
             {assignmentOnly || focusedEntry ? (
               <Select
-                allowClear={false}
                 aria-label={assignmentOnly ? '返工批次' : '在制批次'}
                 value={selectedBatch?.id}
                 style={{ width: '100%' }}

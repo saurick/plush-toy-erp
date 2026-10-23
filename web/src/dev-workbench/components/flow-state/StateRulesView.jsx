@@ -282,9 +282,6 @@ function StateRulesView({
 }) {
   const flows = projection ? projection.flows : catalog.flows
   const scopedCatalog = useMemo(() => ({ ...catalog, flows }), [catalog, flows])
-  const [transitionFilter, setTransitionFilter] = useState(
-    DEV_FLOW_STATE_TRANSITION_FILTERS.standard
-  )
   const searchProps = useDefinitionSelectSearch()
   const options = useMemo(
     () => buildStateDefinitionSelectOptions(scopedCatalog),
@@ -293,6 +290,46 @@ function StateRulesView({
   const optionFilter = useMemo(
     () => createDevFlowDefinitionOptionFilter(scopedCatalog, 'stateOptions'),
     [scopedCatalog]
+  )
+  return (
+    <div className="erp-dev-flow-view-stack">
+      <GuidanceDisclosure
+        guidanceKey="states"
+        title="状态机管“规则”"
+        summary="规则视图不是运行实例或事实凭证"
+        description="它回答当前所选对象有哪些状态、允许怎样转换，以及取消、退回、冲正或返工后到哪里。这里只展示这个对象自己的合法转换，不把另一个对象的异常结果补造成它的状态；实际发生了什么仍回到任务、运行路径或已生效结果核对。"
+      />
+      <BusinessChainProjectionContext
+        projection={projection}
+        onBackToChain={onBackToChain}
+        onClearChainContext={onClearChainContext}
+      />
+      <section className="erp-dev-flow-definition-selector">
+        <label htmlFor="dev-flow-state-select">选择状态对象</label>
+        <Select
+          placeholder="选择状态对象"
+          id="dev-flow-state-select"
+          aria-label="选择状态对象"
+          showSearch
+          virtual={false}
+          {...searchProps}
+          classNames={DEFINITION_SELECT_CLASS_NAMES}
+          filterOption={optionFilter}
+          notFoundContent="没有匹配的状态对象"
+          value={flow?.key}
+          options={options}
+          optionRender={renderDefinitionSelectOption}
+          onChange={onSelectFlow}
+        />
+      </section>
+      {flow ? <StateRuleDetail catalog={catalog} flow={flow} state={state} onSelectState={onSelectState} onOpenView={onOpenView} /> : <Empty description="请选择状态对象" />}
+    </div>
+  )
+}
+
+function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView }) {
+  const [transitionFilter, setTransitionFilter] = useState(
+    DEV_FLOW_STATE_TRANSITION_FILTERS.standard
   )
   const stateByKey = useMemo(
     () => new Map(flow.states.map((item) => [item.key, item])),
@@ -378,236 +415,204 @@ function StateRulesView({
   }, [flow.key, state])
 
   return (
-    <div className="erp-dev-flow-view-stack">
-      <GuidanceDisclosure
-        guidanceKey="states"
-        title="状态机管“规则”"
-        summary="规则视图不是运行实例或事实凭证"
-        description="它回答当前所选对象有哪些状态、允许怎样转换，以及取消、退回、冲正或返工后到哪里。这里只展示这个对象自己的合法转换，不把另一个对象的异常结果补造成它的状态；实际发生了什么仍回到任务、运行路径或已生效结果核对。"
-      />
-      <BusinessChainProjectionContext
-        projection={projection}
-        onBackToChain={onBackToChain}
-        onClearChainContext={onClearChainContext}
-      />
-      <section className="erp-dev-flow-definition-selector">
-        <label htmlFor="dev-flow-state-select">选择状态对象</label>
-        <Select
-          allowClear={false}
-          placeholder="选择状态对象"
-          id="dev-flow-state-select"
-          aria-label="选择状态对象"
-          showSearch
-          virtual={false}
-          {...searchProps}
-          classNames={DEFINITION_SELECT_CLASS_NAMES}
-          filterOption={optionFilter}
-          notFoundContent="没有匹配的状态对象"
-          value={flow.key}
-          options={options}
-          optionRender={renderDefinitionSelectOption}
-          onChange={onSelectFlow}
-        />
-      </section>
-      <section
-        className="erp-dev-flow-state-rule"
-        data-selected-flow={flow.key}
+    <section
+      className="erp-dev-flow-state-rule"
+      data-selected-flow={flow.key}
+    >
+      <div className="erp-dev-flow-section-heading">
+        <div>
+          <Text className="erp-dev-flow-eyebrow">状态规则定义</Text>
+          <Title level={2}>{flow.label}</Title>
+          <KeyValue value={flow.key} />
+        </div>
+        <Tag color="green">只读规则</Tag>
+      </div>
+      <Paragraph>{flow.summary}</Paragraph>
+      <div
+        className="erp-dev-flow-state-overview"
+        role="list"
+        aria-label={`${flow.label}状态规则概览`}
       >
-        <div className="erp-dev-flow-section-heading">
-          <div>
-            <Text className="erp-dev-flow-eyebrow">状态规则定义</Text>
-            <Title level={2}>{flow.label}</Title>
-            <KeyValue value={flow.key} />
-          </div>
-          <Tag color="green">只读规则</Tag>
+        <article role="listitem">
+          <strong>{summary.stateCount}</strong>
+          <span>个状态</span>
+        </article>
+        <article role="listitem">
+          <strong>{summary.transitionCount}</strong>
+          <span>条合法转换</span>
+        </article>
+        <article role="listitem">
+          <strong>{summary.exceptionalTransitionCount}</strong>
+          <span>条异常或纠正路径</span>
+        </article>
+        <article role="listitem">
+          <strong>{summary.terminalCount}</strong>
+          <span>{summary.terminalPolicyLabel}</span>
+        </article>
+      </div>
+      <section className="erp-dev-flow-state-boundary">
+        <SafetyCertificateOutlined />
+        <div>
+          <strong>{scope?.label || '当前对象'}的规则边界</strong>
+          <p>{flow.guard}</p>
+          {scope?.guardrail ? <small>{scope.guardrail}</small> : null}
         </div>
-        <Paragraph>{flow.summary}</Paragraph>
-        <div
-          className="erp-dev-flow-state-overview"
-          role="list"
-          aria-label={`${flow.label}状态规则概览`}
-        >
-          <article role="listitem">
-            <strong>{summary.stateCount}</strong>
-            <span>个状态</span>
-          </article>
-          <article role="listitem">
-            <strong>{summary.transitionCount}</strong>
-            <span>条合法转换</span>
-          </article>
-          <article role="listitem">
-            <strong>{summary.exceptionalTransitionCount}</strong>
-            <span>条异常或纠正路径</span>
-          </article>
-          <article role="listitem">
-            <strong>{summary.terminalCount}</strong>
-            <span>{summary.terminalPolicyLabel}</span>
-          </article>
-        </div>
-        <section className="erp-dev-flow-state-boundary">
-          <SafetyCertificateOutlined />
-          <div>
-            <strong>{scope?.label || '当前对象'}的规则边界</strong>
-            <p>{flow.guard}</p>
-            {scope?.guardrail ? <small>{scope.guardrail}</small> : null}
-          </div>
-        </section>
-        <div className="erp-dev-flow-transition-toolbar">
-          <div>
-            <Text strong>允许的状态转换</Text>
-            <Text type="secondary">
-              图与清单使用同一筛选；条件、结果和内部证据在图下核对。
-            </Text>
-          </div>
-          <div
-            className="erp-dev-flow-transition-filters"
-            role="group"
-            aria-label="状态转换筛选"
-          >
-            {filterOptions.map((option) => (
-              <Button
-                key={option.key}
-                size="small"
-                type={transitionFilter === option.key ? 'primary' : 'default'}
-                aria-pressed={transitionFilter === option.key}
-                onClick={() => setTransitionFilter(option.key)}
-              >
-                {option.label} {option.count}
-              </Button>
-            ))}
-          </div>
-          <Text
-            className="erp-dev-flow-transition-result-count"
-            type="secondary"
-            role="status"
-            aria-live="polite"
-          >
-            当前显示 {visibleTransitions.length} / {summary.transitionCount}{' '}
-            条
+      </section>
+      <div className="erp-dev-flow-transition-toolbar">
+        <div>
+          <Text strong>允许的状态转换</Text>
+          <Text type="secondary">
+            图与清单使用同一筛选；条件、结果和内部证据在图下核对。
           </Text>
         </div>
-        <StatePathLegend groups={pathGroups} />
-        <div className="erp-dev-flow-state-layout">
-          <div
-            className="erp-dev-flow-state-graph erp-dev-docs-markdown"
-            role="region"
-            aria-label={`${flow.label}状态转换图`}
-          >
-            {visibleTransitions.length > 0 || state ? (
-              <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
-            ) : (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />
-            )}
-          </div>
-          <div className="erp-dev-flow-state-list">
-            <div className="erp-dev-flow-state-list__heading">
-              <h3>选择状态</h3>
-              <small>点击后聚焦相关转换，再次点击可取消聚焦。</small>
-            </div>
-            <ul>
-              {flow.states.map((item) => {
-                const itemSummary = stateSummaries.get(item.key)
-                const selected = item.key === state?.key
-                return (
-                  <li key={item.key}>
-                    <button
-                      type="button"
-                      className={selected ? 'is-selected' : ''}
-                      aria-pressed={selected}
-                      aria-label={`${item.label}，${itemSummary.positionLabel}，${itemSummary.incoming.length} 条进入，${itemSummary.outgoing.length} 条离开；${selected ? '取消聚焦' : '查看相关转换'}`}
-                      data-state-position={
-                        itemSummary.initial
-                          ? 'initial'
-                          : itemSummary.terminal
-                            ? 'terminal'
-                            : 'middle'
-                      }
-                      onClick={() => onSelectState(selected ? null : item.key)}
-                    >
-                      <strong>{item.label}</strong>
-                      <KeyValue value={item.key} copyable={false} />
-                      <span>
-                        {itemSummary.positionLabel} ·{' '}
-                        {itemSummary.incoming.length} 条进入 ·{' '}
-                        {itemSummary.outgoing.length} 条离开
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
+        <div
+          className="erp-dev-flow-transition-filters"
+          role="group"
+          aria-label="状态转换筛选"
+        >
+          {filterOptions.map((option) => (
+            <Button
+              key={option.key}
+              size="small"
+              type={transitionFilter === option.key ? 'primary' : 'default'}
+              aria-pressed={transitionFilter === option.key}
+              onClick={() => setTransitionFilter(option.key)}
+            >
+              {option.label} {option.count}
+            </Button>
+          ))}
         </div>
-        {state ? (
-          <section className="erp-dev-flow-selected-state">
-            <div>
-              <Text className="erp-dev-flow-eyebrow">当前选择</Text>
-              <h3>{state.label}</h3>
-              <KeyValue value={state.key} />
-            </div>
-            <div className="erp-dev-flow-selected-state__meaning">
-              <p>
-                {state.summary ||
-                  '目录未提供额外说明，请结合允许进入和离开的转换理解。'}
-              </p>
-              <dl>
-                <div>
-                  <dt>状态位置</dt>
-                  <dd>{selectedStateSummary?.positionLabel}</dd>
-                </div>
-                <div>
-                  <dt>如何进入</dt>
-                  <dd>
-                    {selectedStateSummary?.incoming.length || 0} 条登记路径
-                    {selectedStateSummary?.incomingExceptionalCount
-                      ? `，其中 ${selectedStateSummary.incomingExceptionalCount} 条属于异常或纠正`
-                      : ''}
-                  </dd>
-                </div>
-                <div>
-                  <dt>怎样离开</dt>
-                  <dd>
-                    {selectedStateSummary?.outgoing.length || 0} 条登记路径
-                    {selectedStateSummary?.outgoingExceptionalCount
-                      ? `，其中 ${selectedStateSummary.outgoingExceptionalCount} 条属于异常或纠正`
-                      : ''}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-            <EvidenceDisclosure value={state} />
-          </section>
-        ) : null}
-        <StateRuleRelatedViews
-          relatedViews={relatedViews}
-          onOpenView={onOpenView}
-        />
-        <section className="erp-dev-flow-transitions">
-          <h3>转换条件与影响</h3>
-          {visibleTransitions.length > 0 ? (
-            <ol>
-              {visibleTransitions.map((transition) => (
-                <StateTransitionCard
-                  key={transition.key}
-                  flow={flow}
-                  index={transitionOrder.get(transition.key) || 0}
-                  scope={scope}
-                  selectedStateKey={state?.key || ''}
-                  stateByKey={stateByKey}
-                  transition={transition}
-                />
-              ))}
-            </ol>
+        <Text
+          className="erp-dev-flow-transition-result-count"
+          type="secondary"
+          role="status"
+          aria-live="polite"
+        >
+          当前显示 {visibleTransitions.length} / {summary.transitionCount}{' '}
+          条
+        </Text>
+      </div>
+      <StatePathLegend groups={pathGroups} />
+      <div className="erp-dev-flow-state-layout">
+        <div
+          className="erp-dev-flow-state-graph erp-dev-docs-markdown"
+          role="region"
+          aria-label={`${flow.label}状态转换图`}
+        >
+          {visibleTransitions.length > 0 || state ? (
+            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
           ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="当前筛选下没有登记的转换；这不表示可以任意改状态。"
-            />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />
           )}
+        </div>
+        <div className="erp-dev-flow-state-list">
+          <div className="erp-dev-flow-state-list__heading">
+            <h3>选择状态</h3>
+            <small>点击后聚焦相关转换，再次点击可取消聚焦。</small>
+          </div>
+          <ul>
+            {flow.states.map((item) => {
+              const itemSummary = stateSummaries.get(item.key)
+              const selected = item.key === state?.key
+              return (
+                <li key={item.key}>
+                  <button
+                    type="button"
+                    className={selected ? 'is-selected' : ''}
+                    aria-pressed={selected}
+                    aria-label={`${item.label}，${itemSummary.positionLabel}，${itemSummary.incoming.length} 条进入，${itemSummary.outgoing.length} 条离开；${selected ? '取消聚焦' : '查看相关转换'}`}
+                    data-state-position={
+                      itemSummary.initial
+                        ? 'initial'
+                        : itemSummary.terminal
+                          ? 'terminal'
+                          : 'middle'
+                    }
+                    onClick={() => onSelectState(selected ? null : item.key)}
+                  >
+                    <strong>{item.label}</strong>
+                    <KeyValue value={item.key} copyable={false} />
+                    <span>
+                      {itemSummary.positionLabel} ·{' '}
+                      {itemSummary.incoming.length} 条进入 ·{' '}
+                      {itemSummary.outgoing.length} 条离开
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      </div>
+      {state ? (
+        <section className="erp-dev-flow-selected-state">
+          <div>
+            <Text className="erp-dev-flow-eyebrow">当前选择</Text>
+            <h3>{state.label}</h3>
+            <KeyValue value={state.key} />
+          </div>
+          <div className="erp-dev-flow-selected-state__meaning">
+            <p>
+              {state.summary ||
+                '目录未提供额外说明，请结合允许进入和离开的转换理解。'}
+            </p>
+            <dl>
+              <div>
+                <dt>状态位置</dt>
+                <dd>{selectedStateSummary?.positionLabel}</dd>
+              </div>
+              <div>
+                <dt>如何进入</dt>
+                <dd>
+                  {selectedStateSummary?.incoming.length || 0} 条登记路径
+                  {selectedStateSummary?.incomingExceptionalCount
+                    ? `，其中 ${selectedStateSummary.incomingExceptionalCount} 条属于异常或纠正`
+                    : ''}
+                </dd>
+              </div>
+              <div>
+                <dt>怎样离开</dt>
+                <dd>
+                  {selectedStateSummary?.outgoing.length || 0} 条登记路径
+                  {selectedStateSummary?.outgoingExceptionalCount
+                    ? `，其中 ${selectedStateSummary.outgoingExceptionalCount} 条属于异常或纠正`
+                    : ''}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <EvidenceDisclosure value={state} />
         </section>
-        <EvidenceDisclosure value={flow} label="查看状态机证据" />
+      ) : null}
+      <StateRuleRelatedViews
+        relatedViews={relatedViews}
+        onOpenView={onOpenView}
+      />
+      <section className="erp-dev-flow-transitions">
+        <h3>转换条件与影响</h3>
+        {visibleTransitions.length > 0 ? (
+          <ol>
+            {visibleTransitions.map((transition) => (
+              <StateTransitionCard
+                key={transition.key}
+                flow={flow}
+                index={transitionOrder.get(transition.key) || 0}
+                scope={scope}
+                selectedStateKey={state?.key || ''}
+                stateByKey={stateByKey}
+                transition={transition}
+              />
+            ))}
+          </ol>
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="当前筛选下没有登记的转换；这不表示可以任意改状态。"
+          />
+        )}
       </section>
-    </div>
+      <EvidenceDisclosure value={flow} label="查看状态机证据" />
+    </section>
   )
 }
 

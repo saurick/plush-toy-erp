@@ -440,7 +440,7 @@ export default function TaskFulfillmentGuide({
                   onSelectTopic: (key) =>
                     update((next) => {
                       detailKeys.forEach((item) => next.delete(item))
-                      next.set(queryKeys.roleTopic, key)
+                      next.set(queryKeys.roleTopic, key ?? '')
                     }, true),
                 })
               ) : (

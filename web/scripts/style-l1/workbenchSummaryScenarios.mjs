@@ -178,6 +178,17 @@ export function createWorkbenchSummaryScenarios({
           .click()
         const region = page.getByRole('region', { name: '工作台汇总' })
         await region.locator('.erp-workbench-summaries__heading > *').waitFor()
+        if (mode === 'both') {
+          await region.locator('.erp-workbench-summaries__heading .ant-select-clear').click()
+          await region.getByText('请选择汇总类型', { exact: true }).waitFor()
+          assert.equal(new URL(page.url()).searchParams.get('summary'), '')
+          assert.equal(await region.locator('table').count(), 0)
+          await page.reload()
+          await region.getByText('请选择汇总类型', { exact: true }).waitFor()
+          await region.getByRole('combobox', { name: '汇总类型' }).click()
+          await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
+          await region.locator('.ant-table-tbody').waitFor()
+        }
         const headingInset = await region.evaluate((node) => {
           const surface = node.getBoundingClientRect()
           const heading = node

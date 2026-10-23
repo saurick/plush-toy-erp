@@ -27,6 +27,28 @@ export function createDevFlowStateObservatoryScenarios({
   outputDir,
   path,
 }) {
+  const verifySelectionRecovery = async (page) => {
+      for (const [view, id, key, detail, placeholder] of [
+        ['states', 'dev-flow-state-select', 'flow', '[data-selected-flow]', '选择状态对象'],
+        ['runtime', 'dev-flow-process-select', 'process', '.erp-dev-flow-process-definition', '选择流程定义'],
+        ['facts', 'dev-flow-fact-select', 'fact', '[data-selected-fact]', '选择事实定义'],
+      ]) {
+        await page.goto(new URL(`/__dev/status-flows?view=${view}`, page.url()).href)
+        const control = page.locator('.ant-select').filter({ has: page.locator(`#${id}`) })
+        await control.locator('.ant-select-clear').click()
+        await expect(control.locator('.ant-select-selection-placeholder')).toHaveText(placeholder)
+        assert.equal(new URL(page.url()).searchParams.get(key), '')
+        assert.equal(await page.locator(detail).count(), 0)
+        await page.reload()
+        await expect(control.locator('.ant-select-selection-placeholder')).toHaveText(placeholder)
+        await control.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
+        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        await control.locator('.ant-select-selection-item').waitFor()
+        assert.notEqual(new URL(page.url()).searchParams.get(key), '')
+      }
+      await assertNoHorizontalOverflow(page)
+  }
   const writeRequestsByPage = new WeakMap()
 
   return [
@@ -44,6 +66,8 @@ export function createDevFlowStateObservatoryScenarios({
         })
       },
       verify: async (page) => {
+        await verifySelectionRecovery(page)
+        await page.goto(new URL(DEV_FLOW_STATE_OBSERVATORY_PATH, page.url()).href)
         await expectText(page, '业务链路')
         const root = page.locator('[data-dev-flow-state-observatory]')
         await root.waitFor({ state: 'visible', timeout: 10_000 })

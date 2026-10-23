@@ -44,7 +44,7 @@ function Anatomy({ rationale, size, onSize }) {
         <Select
           placeholder="弹窗宽度"
           aria-label="弹窗宽度"
-          allowClear={false}
+          allowClear={false /* 不可清空：尺寸演示必须使用有效宽度规格，空值无法确定弹窗布局。 */}
           id="feedback-modal-size"
           value={size}
           onChange={onSize}

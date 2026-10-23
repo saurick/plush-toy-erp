@@ -62,6 +62,25 @@ export function createPermissionRelationshipScenarios({
   let readCount = 0
   return [
     {
+      name: 'permission-relationship-target-clear',
+      path: '/__dev/permission-relationships?target=sales',
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: installPermissionRelationshipMock,
+      verify: async (page) => {
+        const control = page.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '选择要查看的岗位', exact: true }) })
+        await control.locator('.ant-select-clear').click()
+        await page.getByText('请选择要查看的岗位或员工', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('target'), '')
+        await page.reload()
+        await page.getByText('请选择要查看的岗位或员工', { exact: true }).waitFor()
+        await control.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
+        await control.locator('.ant-select-selection-item').waitFor()
+        assert.notEqual(new URL(page.url()).searchParams.get('target'), '')
+        await assertNoHorizontalOverflow(page)
+      },
+    },
+    {
       name: 'permission-relationship-current-navigation-desktop',
       path: '/__dev/permission-relationships?target=sales&tab=menu',
       viewport: { width: 1920, height: 1080 },

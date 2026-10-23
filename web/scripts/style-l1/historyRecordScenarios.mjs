@@ -105,6 +105,17 @@ export function createHistoryRecordScenarios(deps) {
       await assertQueryLayout(page)
       const table = page.locator('.ant-table-tbody')
       await table.getByText('HISTORY-001', { exact: true }).waitFor()
+      const source = page.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '历史记录类型', exact: true }) })
+      const sourceLabel = await source.locator('.ant-select-selection-item').innerText()
+      await source.locator('.ant-select-clear').click()
+      await page.getByText('请选择记录类型', { exact: true }).waitFor()
+      assert.equal(new URL(page.url()).searchParams.get('source'), '')
+      assert.equal(await table.getByText('HISTORY-001', { exact: true }).count(), 0)
+      await page.reload()
+      await page.getByText('请选择记录类型', { exact: true }).waitFor()
+      await source.locator('.ant-select-selector').click()
+      await page.locator('.ant-select-dropdown:visible').getByText(sourceLabel, { exact: true }).click()
+      await table.getByText('HISTORY-001', { exact: true }).waitFor()
       await assertUnselectedActions(page)
       assert(
         page.historyRequests.every(

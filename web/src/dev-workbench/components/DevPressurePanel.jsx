@@ -488,7 +488,7 @@ export default function DevPressurePanel({
       setSearchParams((current) => {
         const next = new URLSearchParams(current)
         if (isDevPressureReportID(id)) next.set('report', id)
-        else next.delete('report')
+        else next.set('report', '')
         return next
       })
     },
@@ -513,16 +513,17 @@ export default function DevPressurePanel({
     .sort()
     .join(',')
   const presentation = getDevTestingOperationPresentation(latest)
-  const requested = selected || activeReportID
+  const reportCleared = searchParams.get('report') === ''
+  const requested = reportCleared ? '' : selected || activeReportID
   const progress = requested === activeReportID ? state?.progress : null
 
   useEffect(() => {
-    if (activeReportID && selectedActiveID.current !== activeReportID) {
+    if (!reportCleared && activeReportID && selectedActiveID.current !== activeReportID) {
       selectedActiveID.current = activeReportID
       selectReport(activeReportID)
     }
     if (!activeReportID) selectedActiveID.current = ''
-  }, [activeReportID, selectReport])
+  }, [activeReportID, reportCleared, selectReport])
   useEffect(() => {
     const controller = new AbortController()
     const requestSequence = ++sequence.current
@@ -561,7 +562,7 @@ export default function DevPressurePanel({
     }
   }, [activeID, reload, requested, terminal])
 
-  const report =
+  const report = reportCleared ? null :
     state?.report?.id === requested || !requested ? state?.report : null
   const ready = Boolean(summary) && !summaryError
   const disabled = !ready || summary.busy?.active || Boolean(actionStarting)
@@ -589,7 +590,7 @@ export default function DevPressurePanel({
         <Space wrap>
           <label htmlFor="dev-pressure-scale">数据规模</label>
           <Select
-            allowClear={false}
+            allowClear={false /* 不可清空：执行压测必须指定数据规模，不能用空值隐式扩大运行成本。 */}
             placeholder="数据规模"
             id="dev-pressure-scale"
             aria-label="数据规模"
@@ -601,7 +602,7 @@ export default function DevPressurePanel({
           />
           <label htmlFor="dev-pressure-load">负载档位</label>
           <Select
-            allowClear={false}
+            allowClear={false /* 不可清空：执行压测必须明确短档或容量档位，空值无法确定运行合同。 */}
             placeholder="负载档位"
             id="dev-pressure-load"
             aria-label="负载档位"
@@ -615,7 +616,14 @@ export default function DevPressurePanel({
             icon={<PlayCircleOutlined aria-hidden="true" />}
             disabled={disabled}
             loading={Boolean(actionStarting || active)}
-            onClick={() => onRun(selectedAction.key, dataScale)}
+            onClick={() => {
+              setSearchParams((current) => {
+                const next = new URLSearchParams(current)
+                next.delete('report')
+                return next
+              })
+              onRun(selectedAction.key, dataScale)
+            }}
           >
             {selectedAction.label}
           </Button>
@@ -694,13 +702,12 @@ export default function DevPressurePanel({
         <div className="erp-dev-pressure-report-select">
           <label htmlFor="dev-pressure-report">选择运行报告</label>
           <Select
-            allowClear={false}
             id="dev-pressure-report"
             aria-label="选择运行报告"
-            value={requested || state?.report?.id || undefined}
+            value={reportCleared ? undefined : requested || state?.report?.id || undefined}
             options={options}
             onChange={selectReport}
-            placeholder="尚无已完成报告"
+            placeholder="选择运行报告"
           />
         </div>
       ) : null}
@@ -718,7 +725,7 @@ export default function DevPressurePanel({
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
-            active
+            reportCleared && options.length ? '请选择运行报告' : active
               ? '本次压测正在执行，完成并清理后发布报告。'
               : '暂无报告，可先运行短档回归。'
           }

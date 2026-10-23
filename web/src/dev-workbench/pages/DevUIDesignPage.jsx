@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
-import { Button, Typography } from 'antd'
+import { Button, Empty, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_UI_DESIGN_ROUTE } from '../config/devRoutes.mjs'
 import Select from '@/common/components/select/AppSelect'
@@ -29,7 +29,7 @@ const VIEWS = [
 export default function DevUIDesignPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedPage = searchParams.get('page')
-  const previewPage = requestedPage === 'controls'
+  const previewPage = requestedPage === '' ? undefined : requestedPage === 'controls'
     ? requestedPage
     : resolveUIDesignPreviewPage(requestedPage)
   const requestedView = searchParams.get('view') || 'preview'
@@ -37,10 +37,10 @@ export default function DevUIDesignPage() {
     ? requestedView
     : 'preview'
   const controlsVisible = previewPage === 'controls'
-  const showHTMLPreview = view === 'preview' && !controlsVisible
+  const showHTMLPreview = view === 'preview' && Boolean(previewPage) && !controlsVisible
   const [previewOpened, setPreviewOpened] = useState(showHTMLPreview)
   const [controlRevision, setControlRevision] = useState(0)
-  const lastHTMLPage = useRef(controlsVisible ? 'workspace' : previewPage)
+  const lastHTMLPage = useRef(controlsVisible || !previewPage ? 'workspace' : previewPage)
   const htmlPage = showHTMLPreview ? previewPage : lastHTMLPage.current
 
   useEffect(() => {
@@ -60,7 +60,8 @@ export default function DevUIDesignPage() {
 
   const updateQuery = (key, value) => {
     const next = new URLSearchParams(window.location.search)
-    if (value) next.set(key, value)
+    if (key === 'page') next.set(key, value ?? '')
+    else if (value) next.set(key, value)
     else next.delete(key)
     if (key === 'page') {
       next.delete('point')
@@ -70,7 +71,6 @@ export default function DevUIDesignPage() {
 
   const pageSelector = (
     <Select
-      allowClear={false}
       label="设计预览入口"
       placeholder="设计预览入口"
       className="erp-dev-ui-design-page-select"
@@ -80,7 +80,7 @@ export default function DevUIDesignPage() {
         ...UI_DESIGN_PREVIEW_PAGES,
         { value: 'controls', label: '控件设计' },
       ]}
-      onChange={(value) => updateQuery('page', value === 'workspace' ? '' : value)}
+      onChange={(value) => updateQuery('page', value)}
     />
   )
 
@@ -100,6 +100,12 @@ export default function DevUIDesignPage() {
           <DevUIDesignPreview active={showHTMLPreview} page={htmlPage} pageSelector={pageSelector} />
         ) : null}
       </Suspense>
+      {view === 'preview' && !previewPage ? (
+        <section className="erp-dev-ui-design-reader" aria-label="最新可交互设计">
+          <div className="erp-dev-ui-design-toolbar">{pageSelector}</div>
+          <Empty description="请选择设计预览入口" />
+        </section>
+      ) : null}
       {view === 'preview' && controlsVisible ? (
         <section className="erp-dev-ui-design-reader" aria-label="最新可交互设计">
           <div className="erp-dev-ui-design-toolbar">

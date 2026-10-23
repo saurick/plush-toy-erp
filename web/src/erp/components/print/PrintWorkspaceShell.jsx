@@ -469,7 +469,7 @@ export default function PrintWorkspaceShell({
                 显示比例
                 <span className="print-zoom-select">
                   <Select
-                    allowClear={false}
+                    allowClear={false /* 不可清空：纸面缩放必须是有效比例，空值无法确定预览尺寸。 */}
                     label="显示比例"
                     placeholder="显示比例"
                     aria-label="显示比例"

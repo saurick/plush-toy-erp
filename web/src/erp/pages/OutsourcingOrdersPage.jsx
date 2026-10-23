@@ -784,7 +784,7 @@ export default function OutsourcingOrdersPage() {
                   }}
                 />
                 <SelectFilter
-                  allowClear={false}
+                  emptyValue="updated_at:desc"
                   aria-label="排序方式"
                   className="erp-business-filter-control--sort"
                   value={sortValue}

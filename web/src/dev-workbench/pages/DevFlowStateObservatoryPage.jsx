@@ -253,7 +253,8 @@ function patchParams(searchParams, patch) {
   const next = new URLSearchParams(searchParams)
   for (const [key, value] of Object.entries(patch)) {
     const normalized = cleanText(value)
-    if (!normalized) next.delete(key)
+    if (value === '' && [QUERY_KEYS.flow, QUERY_KEYS.process, QUERY_KEYS.fact].includes(key)) next.set(key, '')
+    else if (!normalized) next.delete(key)
     else next.set(key, normalized)
   }
   return next
@@ -684,7 +685,7 @@ export default function DevFlowStateObservatoryPage() {
     chainProjection?.processDefinitions || catalog?.processDefinitions || []
   const availableFactDefinitions =
     chainProjection?.factDefinitions || catalog?.factDefinitions || []
-  const flow =
+  const flow = activeSearchParams.get(QUERY_KEYS.flow) === '' ? null :
     availableFlows.find((item) => item.key === requestedFlowKey) ||
     availableFlows[0] ||
     null
@@ -692,13 +693,13 @@ export default function DevFlowStateObservatoryPage() {
     flow && requestedStateKey
       ? flow.states.find((item) => item.key === requestedStateKey)
       : null
-  const definition =
+  const definition = activeSearchParams.get(QUERY_KEYS.process) === '' ? null :
     availableProcessDefinitions.find(
       (item) => item.key === requestedProcessKey
     ) ||
     availableProcessDefinitions[0] ||
     null
-  const fact =
+  const fact = activeSearchParams.get(QUERY_KEYS.fact) === '' ? null :
     availableFactDefinitions.find(
       (item) => item.factKey === requestedFactKey
     ) ||
@@ -994,7 +995,7 @@ export default function DevFlowStateObservatoryPage() {
           taskId={taskId}
           selectedTask={selectedTask}
           onSelectDefinition={(key) =>
-            updateParams({ [QUERY_KEYS.process]: key })
+            updateParams({ [QUERY_KEYS.process]: key ?? '' })
           }
           onBackToChain={() => openView('chain')}
           onClearChainContext={clearChainContext}
@@ -1007,7 +1008,7 @@ export default function DevFlowStateObservatoryPage() {
           catalog={catalog}
           projection={chainProjection}
           fact={fact}
-          onSelectFact={(key) => updateParams({ [QUERY_KEYS.fact]: key })}
+          onSelectFact={(key) => updateParams({ [QUERY_KEYS.fact]: key ?? '' })}
           onOpenState={(key) =>
             openView('states', {
               [QUERY_KEYS.flow]: key,
@@ -1026,7 +1027,7 @@ export default function DevFlowStateObservatoryPage() {
         flow={flow}
         state={state}
         onSelectFlow={(key) =>
-          updateParams({ [QUERY_KEYS.flow]: key, [QUERY_KEYS.state]: null })
+          updateParams({ [QUERY_KEYS.flow]: key ?? '', [QUERY_KEYS.state]: null })
         }
         onSelectState={(key) => updateParams({ [QUERY_KEYS.state]: key })}
         onOpenView={openView}

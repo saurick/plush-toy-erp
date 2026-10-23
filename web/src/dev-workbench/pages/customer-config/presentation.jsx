@@ -258,7 +258,7 @@ export function CustomerPackageSelector({
         <Text strong>{options[0].label}</Text>
       ) : (
         <Select
-          allowClear={false}
+          allowClear={false /* 不可清空：配置检查与保存必须绑定一个已登记客户包，不能写入无归属配置。 */}
           label="客户包选择"
           aria-label="客户包选择"
           value={matched ? overview.customerKey : undefined}

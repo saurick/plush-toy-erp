@@ -20,7 +20,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     return frame
   }
   const select = async (page, value) => {
-    const label = { login: '登录页', help: '岗位帮助', controls: '控件设计', workbench: '效能工作台', 'production-hub': '生产管理' }[value]
+    const label = { workspace: '业务界面', login: '登录页', help: '岗位帮助', controls: '控件设计', workbench: '效能工作台', 'production-hub': '生产管理' }[value]
     const control = page.locator('.erp-dev-ui-design-page-select:visible')
     await control.click()
     const listId = await control.getByRole('combobox').getAttribute('aria-controls')
@@ -29,6 +29,50 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     await popup.waitFor({ state: 'hidden' })
   }
   return [
+    {
+      name: 'dev-ui-design-help-role-clear',
+      path: '/__dev/ui-design?page=help',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        const picker = frame.locator('ui-select[aria-label="推荐岗位"]')
+        await picker.locator('.design-select-clear').click()
+        await frame.getByText('请选择岗位指南', { exact: true }).waitFor()
+        assert.equal(await picker.evaluate((node) => node.value), '')
+        assert.equal(await frame.locator('#rh-viewBody').isVisible(), false)
+        await chooseSelectOption(picker, 'engineering')
+        await frame.getByRole('region', { name: '帮助首页', exact: true }).waitFor()
+        assert.equal(await picker.evaluate((node) => node.value), 'engineering')
+        await assertNoHorizontalOverflow(page)
+      },
+    },
+    {
+      name: 'dev-ui-design-entry-clear',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await waitReady(page)
+        const control = page.locator('.erp-dev-ui-design-page-select:visible')
+        await control.locator('.ant-select-clear').click()
+        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('page'), '')
+        assert.equal(await control.locator('.ant-select-selection-placeholder').innerText(), '设计预览入口')
+        assert.equal(await page.locator(`${frameSelector}:visible`).count(), 0)
+        await page.reload()
+        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
+        await select(page, 'controls')
+        await page.locator('.erp-dev-ui-design-reader .erp-dev-ui-design-page-select .ant-select-clear').click()
+        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
+        await select(page, 'workspace')
+        await waitReady(page)
+        assert.equal(await control.locator('.ant-select-clear').evaluate((node) => getComputedStyle(node).opacity), '1')
+        await assertNoHorizontalOverflow(page)
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-entry-clear-4k.png') })
+        await page.goBack()
+        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
+      },
+    },
     {
       name: 'dev-ui-design-production-entry',
       path: '/__dev/ui-design?page=production-hub',

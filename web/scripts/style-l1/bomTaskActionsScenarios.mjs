@@ -434,6 +434,13 @@ export function createBOMTaskActionsScenarios({
       await panel.getByRole('button', { name: '核对色卡与 BOM', exact: true }).waitFor()
       assert.equal(await panel.locator('.business-task-panel__order .ant-select-selection-item').innerText(), relatedOrder.order_no)
       assert.equal(await panel.locator('[data-business-action-key="create-followup"]').isEnabled(), true)
+      await panel.locator('.business-task-panel__order .ant-select-clear').click()
+      await panel.getByText('请选择关联销售订单，查看该订单的任务', { exact: true }).waitFor()
+      assert.equal(await panel.locator('.business-task-panel__order .ant-select-selection-placeholder').innerText(), '请选择关联销售订单')
+      assert.equal(await panel.getByRole('button', { name: '核对色卡与 BOM', exact: true }).count(), 0)
+      await panel.getByRole('combobox', { name: '关联销售订单' }).click()
+      await page.locator('.ant-select-dropdown:visible').getByText(relatedOrder.order_no, { exact: true }).click()
+      await panel.getByRole('button', { name: '核对色卡与 BOM', exact: true }).waitFor()
       assert.equal(await page.locator('.ant-modal:visible').count(), 1)
     },
   })

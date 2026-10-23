@@ -2,6 +2,7 @@ import { act, createElement } from 'react'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { installTestDOM, registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs'
+import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 
 const now = 1791367200
 const task = { task_id: 30, task_name: '订单审批', node_instance_id: 20, owner_role_key: 'boss', required_capability_key: 'workflow.task.approve', assignee_name: '', status: 'ready', created_at: now, completed_at: null, due_at: null }
@@ -14,6 +15,29 @@ const detail = {
   events_truncated: false,
   next_event_id: 0,
 }
+
+test('多任务选择清空后保留入口，禁用办理且不读取或打开旧任务', async (t) => {
+  const tasks = [task, { ...task, task_id: 31, task_name: '核对订单' }]
+  const calls = []
+  const harness = await businessFormHarness(t, { rpc: async (method) => {
+    calls.push(method)
+    return { data: { tracking: { ...detail, summary: { ...detail.summary, current_tasks: tasks }, tasks, current_task_access: tasks.map(({ task_id }) => ({ task_id, can_read: true, can_handle: true })) } } }
+  } })
+  const { default: Drawer } = await import('./WorkflowTrackingDrawer.jsx')
+  await harness.render(createElement(Drawer, { trackingRef: { kind: 'process', id: 10 }, onClose() {}, onOpenTask() { assert.fail('清空不得打开任务') } }))
+  const input = document.querySelector('.erp-workflow-tracking-footer [role="combobox"]')
+  await act(() => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  await harness.click(document.querySelector('.ant-select-item-option'))
+  const button = () => document.querySelector('.erp-workflow-tracking-open-task')
+  assert.equal(button().disabled, false)
+  await act(() => input.closest('.ant-select').querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await harness.flush()
+  assert.equal(button().disabled, true)
+  assert.match(button().textContent, /选择任务后继续/u)
+  assert.ok(input.closest('.ant-select').querySelector('.ant-select-selection-placeholder'))
+  assert.deepEqual(calls, ['get_tracking'])
+})
 
 test('tracking hides unauthorized entries, keeps footer actions separate and cancels stale opens', async (t) => {
   const dom = installTestDOM()

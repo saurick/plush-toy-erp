@@ -1629,7 +1629,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       actions={
                         !calendarView && taskBoardModel.focused ? (
                           <SelectFilter
-                            allowClear={false}
+                            emptyValue="smart"
                             aria-label="任务排序"
                             value={filters.sort}
                             options={TASK_BOARD_SORT_OPTIONS}

@@ -56,6 +56,33 @@ function sharedImportRestrictions(owner, business = false) {
 
 const sharedSyntaxRestrictions = [nativeSelectRestriction, nativeDialogRestriction, tabListRestriction, nativeTableRestriction]
 
+const selectClearExceptionRule = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: { reason: '下拉框默认可清空；仅无合法空态的操作参数可关闭，并在 false 后说明“不可清空：具体原因”。' },
+  },
+  create(context) {
+    const source = context.sourceCode
+    const check = (node, value) => {
+      if (value?.value !== false) return
+      const reason = source.getAllComments().some((comment) =>
+        comment.range[0] >= value.range[1] &&
+        comment.loc.start.line === value.loc.end.line &&
+        /^\s*不可清空：\S.{7,}/u.test(comment.value)
+      )
+      if (!reason) context.report({ node, messageId: 'reason' })
+    }
+    return {
+      'JSXAttribute[name.name="allowClear"]': (node) => {
+        const name = node.parent.name?.name || node.parent.name?.property?.name || ''
+        if (/(?:Select|SelectFilter)$/u.test(name)) check(node, node.value?.expression)
+      },
+      'Property[key.name="allowClear"], Property[key.value="allowClear"]': (node) => check(node, node.value),
+    }
+  },
+}
+
 export default [
   ...compat.config({
     env: {
@@ -161,7 +188,9 @@ export default [
   {
     files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],
     ignores: ['src/**/*.test.{js,jsx,mjs,ts,tsx}'],
+    plugins: { 'select-controls': { rules: { 'clear-exception': selectClearExceptionRule } } },
     rules: {
+      'select-controls/clear-exception': 'error',
       'no-restricted-imports': sharedImportRestrictions(),
       'no-restricted-syntax': ['error', ...sharedSyntaxRestrictions],
     },

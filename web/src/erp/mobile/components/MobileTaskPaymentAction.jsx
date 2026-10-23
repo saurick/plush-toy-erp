@@ -87,7 +87,7 @@ sourceContext: context,
             <label className="mobile-task-payment-kind">
               本次收付款用途
               <Select
-                allowClear={false}
+                allowClear={false /* 不可清空：收付用途决定登记单据合同，必须明确预收预付或结算。 */}
                 placeholder="本次收付款用途"
                 aria-label="本次收付款用途"
                 value={kind}

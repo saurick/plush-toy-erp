@@ -1125,7 +1125,7 @@ export default function WorkInstructionImageAnnotationEditor({
               <label>
                 线条颜色
                 <Select
-                  allowClear={false}
+                  allowClear={false /* 不可清空：绘制工具必须有实际笔画颜色，清空不能代表透明或删除标注。 */}
                   placeholder="线条颜色"
                   aria-label="线条颜色"
                   virtual={false}
@@ -1155,7 +1155,7 @@ export default function WorkInstructionImageAnnotationEditor({
                   <label>
                     说明框样式
                     <Select
-                      allowClear={false}
+                      allowClear={false /* 不可清空：色调决定标注工具的实际绘制颜色，必须使用有效色调。 */}
                       placeholder="说明框样式"
                       aria-label="说明框样式"
                       virtual={false}

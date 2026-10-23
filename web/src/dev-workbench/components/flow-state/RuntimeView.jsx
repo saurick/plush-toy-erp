@@ -320,9 +320,8 @@ function RuntimeView({
       />
       <section className="erp-dev-flow-definition-selector">
         <label htmlFor="dev-flow-process-select">选择流程定义</label>
-        {definition ? (
+        {definitions.length > 0 ? (
           <Select
-            allowClear={false}
             placeholder="选择流程定义"
             id="dev-flow-process-select"
             aria-label="选择流程定义"
@@ -332,7 +331,7 @@ function RuntimeView({
             {...searchProps}
             filterOption={optionFilter}
             notFoundContent="没有匹配的流程定义"
-            value={definition.key}
+            value={definition?.key}
             options={definitionOptions}
             optionRender={renderDefinitionSelectOption}
             onChange={onSelectDefinition}
@@ -349,7 +348,7 @@ function RuntimeView({
           key、{definitions.length} 个 variant；客户预览只代表设计选择。
         </Text>
       </section>
-      {definition ? <ProcessDefinitionCard definition={definition} /> : null}
+      {definition ? <ProcessDefinitionCard definition={definition} /> : definitions.length > 0 ? <Empty description="请选择流程定义" /> : null}
       {!taskId ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}

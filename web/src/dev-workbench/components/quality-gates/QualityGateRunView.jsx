@@ -44,7 +44,7 @@ export function LocalDiagnosticsActions({
       <div className="erp-dev-quality-actions__buttons">
         <label htmlFor="quality-diagnostic-profile">诊断范围</label>
         <Select
-          allowClear={false}
+          allowClear={false /* 不可清空：诊断执行必须明确严格或完整范围，不能用空值隐式选择执行任务。 */}
           placeholder="诊断范围"
           id="quality-diagnostic-profile"
           aria-label="诊断范围"

@@ -157,7 +157,7 @@ export default function DevPermissionRelationshipsPage() {
     () => buildPermissionRelationshipModuleOptions(baseState.permissions),
     [baseState.permissions]
   )
-  const targetKey = targetOptions.some(
+  const targetKey = searchParams.get('target') === '' ? '' : targetOptions.some(
     (option) => option.value === requestedTargetKey
   )
     ? requestedTargetKey
@@ -172,7 +172,7 @@ export default function DevPermissionRelationshipsPage() {
       const next = new URLSearchParams(searchParams)
       Object.entries(patch).forEach(([key, value]) => {
         const normalized = normalizedQueryValue(value)
-        if (normalized) next.set(key, normalized)
+        if (key === 'target' || normalized) next.set(key, normalized)
         else next.delete(key)
       })
       setSearchParams(next, { replace })
@@ -257,7 +257,7 @@ export default function DevPermissionRelationshipsPage() {
     } else {
       next.set('mode', viewMode)
     }
-    if (targetKey) next.set('target', targetKey)
+    if (targetKey || searchParams.has('target')) next.set('target', targetKey)
     else next.delete('target')
     if (
       tabKey === PERMISSION_RELATIONSHIP_TAB.MENU ||
@@ -574,7 +574,6 @@ export default function DevPermissionRelationshipsPage() {
                       : '选择员工'}
                   </Text>
                   <Select
-                    allowClear={false}
                     showSearch
                     aria-label={
                       viewMode === PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE
@@ -744,10 +743,10 @@ export default function DevPermissionRelationshipsPage() {
                           aria-label="权限生效关系图"
                           aria-busy={accessLoading}
                         >
-                          {targetOptions.length === 0 ? (
+                          {!targetKey ? (
                             <Empty
                               image={<ApartmentOutlined />}
-                              description="当前没有可查看的岗位或账号"
+                              description={targetOptions.length ? '请选择要查看的岗位或员工' : '当前没有可查看的岗位或账号'}
                             />
                           ) : (
                             <MermaidDiagram
