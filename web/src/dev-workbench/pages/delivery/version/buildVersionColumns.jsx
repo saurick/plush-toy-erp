@@ -38,7 +38,7 @@ export function buildVersionColumns({
             <Text strong>{value}</Text>
             <Text type="secondary" code>{shortGitSha(record.gitSha)}</Text>
           </Space>
-          <details className="erp-dev-delivery-inline-details">
+          <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
             <summary>制品信息</summary>
             <DevTimestamp
               value={record.publishedAt}
@@ -89,7 +89,9 @@ export function buildVersionColumns({
       title: selectedTargetDefinition.shortLabel,
       key: 'target',
       render: (_value, record) =>
-        record.gitSha === currentTargetSha ? (
+        !currentTargetSha && !initializationReady ? (
+          <Text type="secondary">运行版本未确认</Text>
+        ) : record.gitSha === currentTargetSha ? (
           <Tag color="success">当前运行</Tag>
         ) : (
           <Text type="secondary">未部署</Text>

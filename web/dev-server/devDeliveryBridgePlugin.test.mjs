@@ -2566,12 +2566,17 @@ test('GitLab record repair is terminal-only and cannot spawn a deployment or mut
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const store = resolveDeliveryOperationStore(root)
   const { operation } = createOrReuseDeliveryOperation(store, {
-    action: 'promote', target: 'demo-133', gitSha: SHA,
-    version: '2026.10.22-1', idempotencyKey: IDEMPOTENCY_KEY,
+    action: 'promote',
+target: 'demo-133',
+gitSha: SHA,
+    version: '2026.10.22-1',
+idempotencyKey: IDEMPOTENCY_KEY,
   })
   let recordings = 0
   const service = createDevDeliveryService({
-    projectRoot: root, operationStore: store, provider: { provider: 'gitlab' },
+    projectRoot: root,
+operationStore: store,
+provider: { provider: 'gitlab' },
     spawnProcess: () => { throw new Error('recording must never spawn target execution') },
     syncDeploymentRecord: async ({ operationId, store: source }) => {
       assert.equal(operationId, operation.id)
@@ -2589,4 +2594,113 @@ test('GitLab record repair is terminal-only and cannot spawn a deployment or mut
   assert.equal(result.operation.status, 'blocked')
   assert.equal(recordings, 1)
   assert.deepEqual(readDeliveryOperation(store, operation.id), before)
+})
+
+test('overlapping refreshes share probes, keep history readable and age successful evidence from completion', async (t) => {
+  const { root, store } = createProject(t)
+  let clock = 0
+  t.mock.method(Date, 'now', () => clock)
+  let resolveProbe
+  const pending = new Promise((resolve) => { resolveProbe = resolve })
+  const reads = []
+  let versions = 0
+  const service = createDevDeliveryService({
+    projectRoot: root,
+operationStore: store,
+preflightTtlMs: 30,
+    provider: { provider: 'gitlab', listVersions: () => { versions++; return [] }, getReleaseStatus: () => ({ status: 'missing' }) },
+    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
+    runPreflight: async (target) => { reads.push(target); await pending; return { target, status: 'passed' } },
+    readRecoveryEvidence: () => null,
+  })
+  const loads = Array.from({ length: 4 }, () => service.summary())
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(reads.length, 3)
+  assert.equal(versions, 1)
+  assert.equal(service.history({ target: 'customer-test-133' }).total, 0)
+  clock = 100
+  resolveProbe()
+  const results = await Promise.all(loads)
+  assert(results.every((result) => result === results[0] && result.status === 'success'))
+  clock = 101
+  await service.summary()
+  assert.equal(reads.length, 3, 'probe duration must not consume the evidence TTL')
+  assert.equal(versions, 2, 'completed summaries are never retained as fresh refresh results')
+  clock = 131
+  await service.summary()
+  assert.equal(reads.length, 6)
+})
+
+test('failed target refreshes retain isolated history, report safe diagnostics and never infer a pristine deployment', async (t) => {
+  const { root, store } = createProject(t)
+  const diagnostics = []
+  let broken = true
+  let targetReads = 0
+  let initializationReads = 0
+  const service = createDevDeliveryService({
+    projectRoot: root,
+operationStore: store,
+    provider: { provider: 'gitlab', listVersions: () => [{ gitSha: SHA, version: '2026.10.23-1' }], getReleaseStatus: () => ({ status: 'missing' }) },
+    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
+    runPreflight: (target) => {
+      if (target === 'customer-test-133') {
+        targetReads++
+        if (broken) { throw Object.assign(new Error('private-token-must-not-leak'), {
+          preflightDiagnostic: { code: 'target_preflight_timeout', stage: 'retention', elapsedMs: 30000, exitCode: null, transport: 'local' },
+        }) }
+      }
+      return { target, status: 'passed', remote: { runtime: { serverSha: SHA, webSha: SHA } } }
+    },
+    runInitializationPreflight: () => { initializationReads++; throw new Error('failed transport is not an empty target') },
+    readRecoveryEvidence: () => null,
+    classifyRelation: () => ({ actionClass: 'current', actionReason: 'exact_sha_current' }),
+    onDiagnostic: (event) => diagnostics.push(event),
+  })
+  const first = await service.summary({ requestId: 'safe-request-id' })
+  assert.equal(first.status, 'partial')
+  assert.equal(first.targets[1].preflight, null)
+  assert.equal(first.targets[1].initializationPreflight, null)
+  assert.equal(first.versions[0].actionsByTarget['customer-test-133'].actionClass, 'blocked')
+  assert.match(first.issues[0].message, /只读预检超时/u)
+  assert.equal(initializationReads, 0)
+  assert.equal(service.history({ target: 'customer-test-133' }).integrity.unreadableOperations, 0)
+  assert.equal(diagnostics.length, 1)
+  assert.equal(diagnostics[0].requestId, 'safe-request-id')
+  assert.equal(diagnostics[0].stage, 'retention')
+  assert.doesNotMatch(JSON.stringify({ first, diagnostics }), /private-token/u)
+  broken = false
+  const second = await service.summary()
+  assert.equal(second.status, 'success')
+  assert.equal(second.targets[1].preflight.status, 'passed')
+  assert.equal(targetReads, 2, 'failed promises must be evicted immediately')
+})
+
+test('a write invalidates pending read evidence without letting an older completion repopulate it', async (t) => {
+  const { root, store } = createProject(t)
+  const { operation } = createOrReuseDeliveryOperation(store, { action: 'promote', target: 'demo-133', gitSha: SHA, version: '2026.10.23-1', idempotencyKey: IDEMPOTENCY_KEY })
+  transitionDeliveryOperation(store, operation.id, { status: 'running', message: 'started' })
+  transitionDeliveryOperation(store, operation.id, { status: 'passed', message: 'finished' })
+  let finishOld
+  const old = new Promise((resolve) => { finishOld = resolve })
+  let generation = 0
+  let reads = 0
+  const service = createDevDeliveryService({
+    projectRoot: root,
+operationStore: store,
+    provider: { provider: 'gitlab', listVersions: () => [], getReleaseStatus: () => ({ status: 'missing' }) },
+    readRepositoryState: () => ({ commit: SHA, dirty: false, fingerprint: 'd'.repeat(64) }),
+    runPreflight: async (target) => { const captured = generation; reads++; if (!captured) await old; return { status: 'passed', target, generation: captured } },
+    readRecoveryEvidence: () => null,
+    syncDeploymentRecord: () => { generation++ },
+  })
+  const stale = service.summary()
+  await new Promise((resolve) => setImmediate(resolve))
+  await service.act({ action: 'sync-gitlab-record', payload: { operationId: operation.id } })
+  const current = await service.summary()
+  assert.equal(current.targets[0].preflight.generation, 1)
+  finishOld()
+  await stale
+  const reread = await service.summary()
+  assert.equal(reread.targets[0].preflight.generation, 1)
+  assert.equal(reads, 6)
 })

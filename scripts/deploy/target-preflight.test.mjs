@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import {
   chmodSync,
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -673,4 +674,68 @@ test("production runtime readback uses the non-trial config and exact public ide
     ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
   );
   assert.equal(report.publicEntry.gitSha, SHA);
+});
+
+test("async preflight preserves a bounded stage and failure reason without stderr contents", async () => {
+  for (const mode of ["timeout", "exit", "invalid", "stderr-limit"]) {
+    let killed = false;
+    const promise = runTargetPreflightAsync("customer-test-133", {
+      timeoutMs: 20,
+      localIdentity: LOCAL_IDENTITY,
+      spawnCommand: () => {
+        const child = new EventEmitter();
+        child.stdout = new PassThrough();
+        child.stderr = new PassThrough();
+        child.stdin = new EventEmitter();
+        child.kill = () => { killed = true; };
+        child.stdin.end = () => queueMicrotask(() => {
+          child.stderr.write("PLUSH_PREFLIGHT_STA");
+          child.stderr.write("GE=retention\nsecret=do-not-log\nPLUSH_PREFLIGHT_STAGE=secret_value\n");
+          if (mode === "stderr-limit") child.stderr.write("x".repeat(1024 * 1024));
+          if (mode === "exit") child.emit("close", 141);
+          if (mode === "invalid") { child.stdout.write("private invalid report"); child.emit("close", 0); }
+        });
+        return child;
+      },
+    });
+    await assert.rejects(promise, (error) => {
+      assert.equal(error.preflightDiagnostic.stage, "retention");
+      assert.equal(error.preflightDiagnostic.transport, "local");
+      assert(error.preflightDiagnostic.elapsedMs >= 0);
+      const codes = { timeout: "timeout", exit: "process_failed", invalid: "invalid_report", "stderr-limit": "output_limit" };
+      assert.equal(error.preflightDiagnostic.code, `target_preflight_${codes[mode]}`);
+      assert.doesNotMatch(JSON.stringify(error) + error.message, /secret|do-not-log|private/u);
+      return true;
+    });
+    assert.equal(killed, ["timeout", "stderr-limit"].includes(mode));
+  }
+});
+
+
+test("timed-out local preflight terminates its child process group", async (t) => {
+  if (process.platform === "win32") return;
+  const root = mkdtempSync(path.join(tmpdir(), "plush-preflight-children-"));
+  const heartbeat = path.join(root, "heartbeat");
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let closed;
+  const leaf = `const fs=require('node:fs');setInterval(()=>fs.appendFileSync(${JSON.stringify(heartbeat)},'.'),10)`;
+  await assert.rejects(runTargetPreflightAsync("demo-133", {
+    localIdentity: LOCAL_IDENTITY,
+    timeoutMs: 500,
+    spawnCommand: (_command, _args, options) => {
+      const child = spawn(process.execPath, ["-e", `
+        process.stdin.resume();
+        process.stderr.write('PLUSH_PREFLIGHT_STAGE=database\\n');
+        require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(leaf)}],{stdio:'ignore'});
+        setInterval(()=>{},1000);
+      `], options);
+      closed = new Promise((resolve) => child.once("close", resolve));
+      return child;
+    },
+  }), /timed out/u);
+  await closed;
+  const stopped = readFileSync(heartbeat, "utf8");
+  assert(stopped.length > 0);
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(readFileSync(heartbeat, "utf8"), stopped);
 });
