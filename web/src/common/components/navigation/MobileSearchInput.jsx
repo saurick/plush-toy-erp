@@ -1,45 +1,66 @@
-import React, { useRef } from 'react'
-import { CloseOutlined } from '@ant-design/icons'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import SearchInput from '@/common/components/SearchInput'
 
-// Consumers keep their own query lifecycle; this component owns the touch control.
 export default function MobileSearchInput({
-  value,
-  onClear,
-  clearVisible = Boolean(value),
   className = '',
-  disabled = false,
+  resetKey,
   ...props
 }) {
   const root = useRef(null)
+  const input = useRef(null)
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => {
+    setExpanded(false)
+  }, [resetKey])
+  useLayoutEffect(() => {
+    const element = root.current
+    const row = element?.closest('.erp-mobile-search-row') || element
+    if (!row) return undefined
+    const measure = () => {
+      const width = Math.max(
+        element.clientWidth,
+        row.getBoundingClientRect().right - element.getBoundingClientRect().left
+      )
+      const nextWidth = `${width}px`
+      if (
+        element.style.getPropertyValue('--mobile-search-expanded-width') !==
+        nextWidth
+      ) {
+        element.style.setProperty('--mobile-search-expanded-width', nextWidth)
+      }
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(row)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  const collapse = () => {
+    setExpanded(false)
+    input.current?.blur()
+  }
   return (
-    <div ref={root} className={`erp-mobile-search ${className}`.trim()}>
+    <div
+      ref={root}
+      className={`erp-mobile-search${expanded ? ' erp-mobile-search--expanded' : ''} ${className}`.trim()}
+    >
       <SearchInput
         type="search"
         enterKeyHint="search"
         autoComplete="off"
         maxLength={100}
         {...props}
-        value={value}
-        disabled={disabled}
-        allowClear={false}
-        suffix={
-          clearVisible ? (
-            <button
-              type="button"
-              className="erp-mobile-search__clear"
-              aria-label="清除搜索"
-              disabled={disabled}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                onClear()
-                root.current?.querySelector('input')?.focus()
-              }}
-            >
-              <CloseOutlined aria-hidden="true" />
-            </button>
-          ) : null
-        }
+        ref={input}
+        resetKey={resetKey}
+        className="erp-mobile-search__control"
+        allowClear
+        showCancel={expanded}
+        onFocus={(event) => {
+          setExpanded(true)
+          props.onFocus?.(event)
+        }}
+        onSubmitted={collapse}
+        onCancel={collapse}
       />
     </div>
   )

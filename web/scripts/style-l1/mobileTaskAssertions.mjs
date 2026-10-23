@@ -1799,6 +1799,7 @@ export function createMobileTaskAssertions(deps) {
     })
     const riskSearch = page.getByRole('searchbox').first()
     await riskSearch.fill('暗色任务验证')
+    await riskSearch.press('Enter')
     await expectText(page, '暗色任务验证')
     await page
       .getByRole('button', { name: /暗色任务验证/ })

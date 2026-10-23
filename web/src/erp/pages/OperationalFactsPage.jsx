@@ -904,6 +904,7 @@ export function OperationalFactWorkspace({
         filters={
           <>
             <SearchInput
+              resetKey={currentActiveKey}
               value={resolvedRouteKeyword || linkedKeyword || keyword}
               {...BUSINESS_SEARCH_SCOPES[
                 {
@@ -912,7 +913,7 @@ export function OperationalFactWorkspace({
                   finance: 'finance',
                 }[currentActiveKey]
               ]}
-              onChange={(event) => {
+              onSearch={(value) => {
                 if (
                   resolvedRouteKeyword ||
                   linkedKeyword ||
@@ -922,10 +923,9 @@ export function OperationalFactWorkspace({
                 ) {
                   clearRouteContext()
                 }
-                setKeyword(event.target.value)
+                setKeyword(value)
                 resetPaginationForKey()
               }}
-              onPressEnter={() => loadRows(currentActiveKey)}
             />
             {currentActiveKey === 'finance' ? (
               <BusinessStatusFilter

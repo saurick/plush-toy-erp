@@ -1390,9 +1390,10 @@ export default function InventoryLedgerPage() {
         filters={
           <>
             <SearchInput
+              resetKey={activeView}
               value={linkedKeyword || keyword}
               {...BUSINESS_SEARCH_SCOPES[activeView]}
-              onChange={(event) => {
+              onSearch={(value) => {
                 if (
                   linkedKeyword ||
                   routeLotID ||
@@ -1400,10 +1401,9 @@ export default function InventoryLedgerPage() {
                 ) {
                   clearRouteContext()
                 }
-                setKeyword(event.target.value)
+                setKeyword(value)
                 resetCurrentPage()
               }}
-              onPressEnter={loadRows}
             />
             <SelectFilter
               className="erp-business-filter-control--status"

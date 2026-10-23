@@ -36,6 +36,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
     },
     verify: async (page) => {
       const panel = page.locator('.erp-workflow-tracking-panel')
+      const controls = page.locator('.erp-workflow-tracking-controls')
       await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
       const navigation = page.locator('.erp-task-management-scope')
       assert.deepEqual((await navigation.locator('[role="tab"]').allTextContents()).map((text) => text.trim()), ['待我处理', '待我审批', '全部任务', '流程跟踪'])
@@ -43,10 +44,10 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       assert.deepEqual((await trackingNavigation.locator('[role="tab"]').allTextContents()).map((text) => text.trim()), ['流程进度', '异常跟踪'])
       assert.equal(await page.getByRole('combobox', { name: '跟踪范围', exact: true }).count(), 0)
       const scopeBox = await trackingNavigation.boundingBox()
-      const controlsBox = await panel.locator('.erp-workflow-tracking-controls').boundingBox()
-      assert.ok(scopeBox.y + scopeBox.height <= controlsBox.y, 'tracking tabs sit above the search toolbar')
+      const controlsBox = await controls.boundingBox()
+      assert.ok(scopeBox.x + scopeBox.width <= controlsBox.x && Math.abs(scopeBox.y - controlsBox.y) <= 1, 'tracking tabs and search toolbar share the desktop row')
       await page.screenshot({ path: path.join(outputDir, `task-tracking-tabs-${themeMode}-4k.png`) })
-      const filterTrigger = panel.getByRole('button', { name: /^筛选/ })
+      const filterTrigger = controls.getByRole('button', { name: /^筛选/ })
       const filterDialog = page.getByRole('dialog', { name: '筛选条件', exact: true })
       const openFilters = async () => {
         await waitForFiniteAnimations(page)
@@ -60,7 +61,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
           await filterDialog.waitFor({ state: 'hidden' })
         }
       }
-      const states = panel.getByRole('group', { name: '流转状态', exact: true })
+      const states = controls.getByRole('group', { name: '流转状态', exact: true })
       await states.getByRole('button', { name: '全部状态，共 2 条', exact: true }).waitFor()
       assert.deepEqual(await states.locator('.erp-filter-chip__count').allTextContents(), ['2', '1', '1'])
       const list = panel.locator('.ant-table-wrapper')
@@ -85,7 +86,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       const choose = async (label, option) => {
         if (label === '流转状态') {
           await closeFilters()
-          await panel.getByRole('group', { name: label }).getByRole('button', { name: new RegExp(`^${option}，`) }).click()
+          await controls.getByRole('group', { name: label }).getByRole('button', { name: new RegExp(`^${option}，`) }).click()
           return
         }
         await openFilters()
@@ -105,9 +106,9 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       assert.ok(Math.abs(restoredScopeBox.y - scopeBox.y) < 1, '切换范围保持追踪视图导航位置')
       await change(() => choose('流转状态', '进行中'), (p) => p.status === 'active')
       await change(() => choose('当前岗位', '工程'), (p) => p.owner_role_key === 'engineering' && p.status === 'active')
-      const search = panel.getByPlaceholder('单号 / 任务 / 产品 / 款号')
+      const search = controls.getByPlaceholder('单号 / 任务 / 产品 / 款号')
       await closeFilters()
-      await change(() => search.fill('小熊'), (p) => p.keyword === '小熊')
+      await change(async () => { await search.fill('小熊'); await search.press('Enter') }, (p) => p.keyword === '小熊')
       await change(() => choose('跟踪范围', '我参与的'), (p) => p.scope === 'participated' && !p.status && !p.owner_role_key && !p.keyword)
       await change(() => choose('流转状态', '已结束'), (p) => p.scope === 'participated' && p.status === 'completed')
       await states.getByRole('button', { name: '全部状态，共 2 条', exact: true }).waitFor()
@@ -117,7 +118,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       await change(() => choose('跟踪范围', '我发起的'), (p) => p.scope === 'started' && p.status === 'active' && p.owner_role_key === 'engineering' && p.keyword === '小熊' && !p.source_type)
       assert.equal(await search.inputValue(), '小熊')
       await closeFilters()
-      const directClear = panel.getByRole('button', { name: '清空筛选', exact: true })
+      const directClear = controls.getByRole('button', { name: '清空筛选', exact: true })
       assert.equal(await directClear.count(), 1, '已有筛选时提供直接清空入口')
       await change(() => directClear.click(), (p) => !p.status && !p.owner_role_key && !p.keyword)
       await waitForFiniteAnimations(page)
@@ -150,9 +151,9 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       for (const width of [390, 320]) {
         await page.setViewportSize({ width, height: 844 })
         await waitForFiniteAnimations(page)
-        const geometry = await panel.locator('.erp-workflow-tracking-controls').evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth, boxes: [...element.querySelectorAll('input, .ant-btn, .ant-select')].filter((node) => node.getBoundingClientRect().width).map((node) => ({ left: node.getBoundingClientRect().left, right: node.getBoundingClientRect().right })) }))
+        const geometry = await controls.evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth, boxes: [...element.querySelectorAll('input, .ant-btn, .ant-select')].filter((node) => node.getBoundingClientRect().width).map((node) => ({ left: node.getBoundingClientRect().left, right: node.getBoundingClientRect().right })) }))
         assert.ok(geometry.scroll <= geometry.client + 1 && geometry.boxes.every((box) => box.left >= 0 && box.right <= width + 1), JSON.stringify(geometry))
-        const filterButtons = await panel.getByRole('group', { name: '筛选操作', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.map((button) => {
+        const filterButtons = await controls.getByRole('group', { name: '筛选操作', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.map((button) => {
           const box = button.getBoundingClientRect()
           return { left: box.left, right: box.right, top: box.top, height: box.height, width: box.width }
         }))
@@ -258,7 +259,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       assert.ok(sourceScopeBox.x >= 0 && sourceScopeBox.x + sourceScopeBox.width <= 320, JSON.stringify(sourceScopeBox))
       await change(() => choose('跟踪范围', '我发起的'), (p) => p.scope === 'started' && p.source_id === 1)
       await change(() => choose('跟踪范围', '相关流程'), (p) => p.scope === 'visible' && p.source_id === 1)
-      await change(() => panel.getByRole('button', { name: '清除单据范围', exact: true }).click(), (p) => p.scope === 'visible' && !p.source_id && !p.source_type)
+      await change(() => controls.getByRole('button', { name: '清除单据范围', exact: true }).click(), (p) => p.scope === 'visible' && !p.source_id && !p.source_type)
       await change(() => choose('跟踪范围', '我参与的'), (p) => p.scope === 'participated' && !p.source_id)
       assert.equal(await trackingNavigation.getByText('相关流程', { exact: true }).count(), 0)
       await assertNoHorizontalOverflow(page)

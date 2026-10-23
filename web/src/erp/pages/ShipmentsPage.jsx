@@ -1595,14 +1595,13 @@ export default function ShipmentsPage() {
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
               {...BUSINESS_SEARCH_SCOPES.shipment}
-              onChange={(event) => {
+              onSearch={(value) => {
                 if (linkedKeyword || routeSalesOrderID || routeShipmentID) {
                   clearRouteContext()
                 }
-                setKeyword(event.target.value)
+                setKeyword(value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              onPressEnter={loadRows}
             />
             <BusinessStatusFilter
               inline

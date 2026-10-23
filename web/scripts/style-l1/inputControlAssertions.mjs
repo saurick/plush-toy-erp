@@ -548,6 +548,7 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
     const describeNode = (node, owner) => {
       const ownerRect = owner.getBoundingClientRect()
       const container =
+        (owner.closest('.erp-mobile-search--expanded') && owner.closest('.erp-mobile-search-row')) ||
         owner.closest(
           '.ant-form-item-control-input-content, .ant-form-item-control, .ant-form-item'
         ) || owner.parentElement

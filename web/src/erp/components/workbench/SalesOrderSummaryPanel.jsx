@@ -8,7 +8,6 @@ import {
 } from 'react-router-dom'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import {
   listSalesOrderSummary,
   listAllSalesOrderSummary,
@@ -48,7 +47,7 @@ const statusLabel = (row) => {
 }
 
 function SearchFilter({ label, placeholder = label, value, onSearch }) {
-  const search = useLiveSearch({ value, onSearch })
+  const search = { value, onSearch }
   return (
     <SearchInput
       type="search"
@@ -56,11 +55,7 @@ function SearchFilter({ label, placeholder = label, value, onSearch }) {
       placeholder={placeholder}
       allowClear
       maxLength={100}
-      value={search.value}
-      onChange={search.onChange}
-      onCompositionStart={search.onCompositionStart}
-      onCompositionEnd={search.onCompositionEnd}
-      onPressEnter={search.onPressEnter}
+      {...search}
     />
   )
 }

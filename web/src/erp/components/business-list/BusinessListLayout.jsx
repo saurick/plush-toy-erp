@@ -851,8 +851,7 @@ export function BusinessFilterPanel({
 
 export function SearchInput({
   value,
-  onChange,
-  onPressEnter,
+  onSearch,
   placeholder = '搜索关键词',
   searchHint,
   className = '',
@@ -868,8 +867,7 @@ export function SearchInput({
       placeholder={placeholder}
       searchHint={searchHint}
       value={value}
-      onChange={onChange}
-      onPressEnter={onPressEnter}
+      onSearch={onSearch}
       {...restProps}
     />
   )

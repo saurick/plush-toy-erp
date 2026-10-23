@@ -6,7 +6,6 @@ import { buildWorkflowTaskResponsibilityItems } from '../../utils/workflowTaskEv
 import Table from '@/common/components/table/AppTable'
 import useBusinessListStickyHeader from '../business-list/useBusinessListStickyHeader.js'
 import FilterChip from '@/common/components/navigation/FilterChip'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import { WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
@@ -21,17 +20,13 @@ import {
 const { Paragraph, Text, Title } = Typography
 
 export function TaskBoardSearch({ value, onSearch }) {
-  const search = useLiveSearch({ value, onSearch })
+  const search = { value, onSearch }
   return (
     <SearchInput
       placeholder="订单 / 产品 / 物料 / 款号"
       searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
       showSearchScope
-      value={search.value}
-      onChange={search.onChange}
-      onCompositionStart={search.onCompositionStart}
-      onCompositionEnd={search.onCompositionEnd}
-      onPressEnter={search.onPressEnter}
+      {...search}
     />
   )
 }

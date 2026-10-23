@@ -162,6 +162,9 @@ export async function verifyBusinessCoreQuality(page, deps) {
     .getByPlaceholder('搜单号、产品、材料、批次')
     .first()
     .fill(qualityEmptySearchKeyword)
+  await page
+    .getByPlaceholder('搜单号、产品、材料、批次')
+    .first().press('Enter')
 
   await page.keyboard.press('Enter')
 
@@ -174,6 +177,7 @@ export async function verifyBusinessCoreQuality(page, deps) {
   forceEmptyQualityInspections = false
 
   await page.getByPlaceholder('搜单号、产品、材料、批次').first().fill('')
+  await page.getByPlaceholder('搜单号、产品、材料、批次').first().press('Enter')
 
   await page.keyboard.press('Enter')
 

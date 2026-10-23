@@ -72,7 +72,6 @@ export default function MobileProgressPanel({
   ).current
   const [values, setValues] = useState(initial.query)
   const queriesRef = useRef(initial.queries)
-  const [keyword, setKeyword] = useState(initial.query.q)
   const [selection, setSelection] = useState(initial.selection)
   const [suppressDetailOpenMotion, setSuppressDetailOpenMotion] = useState(
     Boolean(initial.selection)
@@ -89,9 +88,7 @@ export default function MobileProgressPanel({
   const loadMoreRef = useRef(null)
   const loadMorePending = useRef(false)
   const restoreScroll = useRef(initial.scrollTop)
-  const timer = useRef(null)
   const scrollHistoryTimer = useRef(null)
-  const composing = useRef(false)
   const begin = useLatestRequestCoordinator()
   const query = useMemo(
     () => progressQueryFromURL(new URLSearchParams(values)),
@@ -131,7 +128,6 @@ export default function MobileProgressPanel({
     if (active) remember()
   }, [active, remember, values, selection])
   useEffect(() => () => {
-    clearTimeout(timer.current)
     clearTimeout(scrollHistoryTimer.current)
   }, [])
   useEffect(() => {
@@ -156,7 +152,6 @@ export default function MobileProgressPanel({
       setSelection(restored.selection)
       queriesRef.current = restored.queries
       setValues(restored.query)
-      setKeyword(restored.query.q)
       restoreScroll.current = restored.scrollTop
     }
     window.addEventListener('popstate', pop)
@@ -164,7 +159,6 @@ export default function MobileProgressPanel({
   }, [access, roleKey, scopeKey])
 
   const update = (changes) => {
-    clearTimeout(timer.current)
     const current = latest.current.values
     queriesRef.current[current.view] = current
     const switching = changes.view && changes.view !== current.view
@@ -175,7 +169,6 @@ export default function MobileProgressPanel({
     queriesRef.current[next.view] = next
     latest.current = { ...latest.current, values: next }
     setValues(next)
-    if (switching) setKeyword(next.q)
     restoreScroll.current = 0
     scrollRef.current?.scrollTo({ top: 0 })
   }
@@ -396,48 +389,15 @@ export default function MobileProgressPanel({
             value={query.view}
             onChange={(view) => update({ view })}
           />
-          <div className="mobile-progress-search">
+          <div className="mobile-progress-search erp-mobile-search-row">
             <MobileSearchInput
               aria-label="搜索进度"
               placeholder="单号/名称"
               title="搜索单号、名称或负责人"
-              value={keyword}
-              maxLength={100}
-              onCompositionStart={() => {
-                composing.current = true
-                clearTimeout(timer.current)
-              }}
-              onCompositionEnd={(event) => {
-                composing.current = false
-                setKeyword(event.currentTarget.value)
-                update({ q: event.currentTarget.value.trim() })
-              }}
-              onChange={(event) => {
-                const { value } = event.target
-                setKeyword(value)
-                clearTimeout(timer.current)
-                if (!composing.current && !event.nativeEvent.isComposing) {
-                  timer.current = setTimeout(
-                    () => update({ q: value.trim() }),
-                    300
-                  )
-                }
-              }}
-              onPressEnter={(event) => {
-                if (
-                  composing.current ||
-                  event.nativeEvent.isComposing ||
-                  event.nativeEvent.keyCode === 229
-                ) {
-                  return
-                }
-                update({ q: keyword.trim() })
-              }}
-              onClear={() => {
-                composing.current = false
-                setKeyword('')
-                update({ q: '' })
-              }}
+              value={values.q}
+              resetKey={`${scopeKey}:${query.view}:${active}`}
+              onFocus={() => setFiltersOpen(false)}
+              onSearch={(q) => update({ q })}
             />
             <MobileFilterPopover
               contextLabel="进度"

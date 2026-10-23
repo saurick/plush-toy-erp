@@ -284,7 +284,7 @@ export function createMobileTaskScenarios({
         await assertSearchFocus('mobile-task-search-focused')
         assert.equal(
           await page.getByRole('button', { name: '搜索', exact: true }).count(),
-          0
+          1
         )
         const searchedKeywords = () => page.__taskSearchReads.filter(Boolean)
 
@@ -295,11 +295,14 @@ export function createMobileTaskScenarios({
           keyCode: 229,
           isComposing: true,
         })
-        // 等待超过防抖窗口，确认中文候选阶段不会发出查询。
+        // 输入和中文候选确认都不查询，显式提交后才读取列表。
         await page.waitForTimeout(400)
         assert.deepEqual(searchedKeywords(), [])
         await search.fill('唯一')
         await search.dispatchEvent('compositionend', { data: '唯一' })
+        await search.dispatchEvent('keyup', { key: 'Enter' })
+        assert.deepEqual(searchedKeywords(), [])
+        await search.press('Enter')
         await page
           .getByText('确认兔子样品', { exact: true })
           .waitFor({ state: 'visible' })
@@ -322,13 +325,14 @@ export function createMobileTaskScenarios({
 
         await search.pressSequentially('唯一款号-RB018', { delay: 30 })
         assert.deepEqual(searchedKeywords(), ['唯一'])
+        await search.press('Enter')
         await page
           .getByText('确认兔子样品', { exact: true })
           .waitFor({ state: 'visible' })
         assert.deepEqual(searchedKeywords(), ['唯一', '唯一款号-RB018'])
         assert.equal(
           await search.evaluate((input) => input === document.activeElement),
-          true
+          false
         )
         assert.equal(await rows.count(), 1)
         const taskTime = rows.first().locator('.erp-task-timing')
@@ -348,6 +352,7 @@ export function createMobileTaskScenarios({
         await page.setViewportSize({ width: 390, height: 844 })
         await search.press('Enter')
         await search.fill('  唯一款号-RB018  ')
+        await search.press('Enter')
         await page.waitForTimeout(400)
         assert.deepEqual(
           searchedKeywords(),
@@ -402,6 +407,7 @@ export function createMobileTaskScenarios({
               '唯一款号-RB018'
         )
         await search.fill('唯一款号-RB018')
+        await search.press('Enter')
         await latestResponse
         assert.equal(oldResponseReturned, false, '新查询先于旧查询返回')
         await oldResponse
@@ -536,6 +542,7 @@ export function createMobileTaskScenarios({
         ]) {
           const readsBefore = page.__imageReads.length
           await search.fill(keyword)
+          await search.press('Enter')
           const placeholderRow = page
             .locator('.mobile-task-list-row')
             .filter({ hasText: `检查${keyword}` })
@@ -547,8 +554,9 @@ export function createMobileTaskScenarios({
           assert.equal(await frame.locator('img').count(), 0)
           assert.equal(await frame.getByRole('button', { name: '重试占位加载失败图片', exact: true }).count(), state === 'failed' ? 1 : 0)
           const geometry = await frame.boundingBox()
-          assert.equal(geometry.width, 48)
-          assert.equal(geometry.height, 48)
+          const imageSize = await frame.evaluate((node) => parseFloat(getComputedStyle(node).getPropertyValue('--erp-work-item-image-size')))
+          assert.equal(geometry.width, imageSize)
+          assert.equal(geometry.height, imageSize)
           if (state === 'empty') {
             assert.equal(
               page.__imageReads.length,
@@ -575,6 +583,7 @@ export function createMobileTaskScenarios({
           assert.equal(await search.inputValue(), keyword)
         }
         await search.fill('AB-001#-02#')
+        await search.press('Enter')
         const materialCard = rows.filter({ hasText: '检查占位物料' })
         await materialCard.waitFor({ state: 'visible' })
         assert.equal(await rows.count(), 1)
@@ -611,6 +620,7 @@ export function createMobileTaskScenarios({
         await page.goBack()
         assert.equal(await search.inputValue(), 'AB-001#-02#')
         await search.fill('占位加载失败')
+        await search.press('Enter')
         await page
           .locator('.erp-task-product-image[data-image-state="failed"]')
           .waitFor({ state: 'visible' })

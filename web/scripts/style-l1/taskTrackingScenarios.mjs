@@ -364,6 +364,7 @@ approval_form: null,
         await waitForFiniteAnimations(page)
         const search = page.getByPlaceholder('单号 / 任务 / 产品 / 款号')
         await search.fill('不存在的单号')
+        await search.press('Enter')
         await page.getByText('当前筛选下没有匹配记录', { exact: true }).waitFor()
         await chooseScope('相关流程')
         await page.getByText('SO-TRACK-001', { exact: true }).waitFor()

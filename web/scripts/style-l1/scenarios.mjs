@@ -1,4 +1,5 @@
 import { createPerformanceReferenceScenarios } from './performanceReferenceScenarios.mjs'
+import { createSearchSubmissionScenarios } from './searchSubmissionScenarios.mjs'
 import { createDensityCompletionScenarios } from './densityCompletionScenarios.mjs'
 import { createMobileTaskConsistencyScenarios } from './mobileTaskConsistencyScenarios.mjs'
 import { createGlobalDensityOptimizationScenarios } from './globalDensityOptimizationScenarios.mjs'
@@ -383,6 +384,7 @@ export function createStyleL1Scenarios(deps) {
   }
 
   const scenarios = [
+    ...createSearchSubmissionScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createBusinessFollowupScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

@@ -367,8 +367,8 @@ export default function FinancePaymentsPage() {
                 <SearchInput
                   {...BUSINESS_SEARCH_SCOPES.payment}
                   value={paymentKeyword}
-                  onChange={(event) => {
-                    setPaymentKeyword(event.target.value)
+                  onSearch={(value) => {
+                    setPaymentKeyword(value)
                     setPaymentPagination((current) => ({
                       ...current,
                       current: 1,
@@ -692,8 +692,8 @@ export default function FinancePaymentsPage() {
                 <SearchInput
                   {...BUSINESS_SEARCH_SCOPES.credit}
                   value={creditKeyword}
-                  onChange={(event) => {
-                    setCreditKeyword(event.target.value)
+                  onSearch={(value) => {
+                    setCreditKeyword(value)
                     setCreditPagination((current) => ({
                       ...current,
                       current: 1,

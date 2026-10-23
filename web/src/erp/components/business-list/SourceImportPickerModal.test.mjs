@@ -14,8 +14,9 @@ test('source import picker keeps client mode and adds opt-in remote pagination',
     /serverPagination \? serverTotal : filteredRows\.length/u
   )
   assert.match(source, /onPageChange\?\.\(page, pageSize, keyword\)/u)
-  assert.match(source, /onSearchChange\(keyword\)/u)
-  assert.match(source, /searchDebounceMs = 250/u)
+  assert.match(source, /onSearchChange\?\.\(nextKeyword\)/u)
+  assert.match(source, /onSearch=\{handleKeywordChange\}/u)
+  assert.doesNotMatch(source, /searchDebounceMs|window\.setTimeout/u)
   assert.match(source, /\[\.\.\.rawKeyword\]\.slice\(0, searchMaxLength\)/u)
 })
 
@@ -35,7 +36,7 @@ test('source import picker fails closed while a remote page is loading or invali
 test('source import picker resets filters and selections independently', () => {
   assert.match(
     source,
-    /const clearFilters = \(\) => \{\s*setKeyword\(''\)\s*setCurrentPage\(1\)\s*\}/u
+    /const clearFilters = \(\) => handleKeywordChange\(''\)/u
   )
   assert.match(
     source,

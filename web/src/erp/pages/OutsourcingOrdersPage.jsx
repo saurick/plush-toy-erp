@@ -694,7 +694,7 @@ export default function OutsourcingOrdersPage() {
                 <SearchInput
                   value={resolvedLinkedKeyword || linkedKeyword || keyword}
                   {...BUSINESS_SEARCH_SCOPES.outsourcing}
-                  onChange={(event) => {
+                  onSearch={(value) => {
                     if (
                       linkedKeyword ||
                       routeOutsourcingOrderID ||
@@ -703,11 +703,7 @@ export default function OutsourcingOrdersPage() {
                       clearRouteContext()
                     }
                     setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                    setKeyword(event.target.value)
-                  }}
-                  onPressEnter={() => {
-                    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                    loadOrders()
+                    setKeyword(value)
                   }}
                 />
                 <LifecycleScopeFilter

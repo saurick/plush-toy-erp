@@ -254,6 +254,7 @@ result: 'REJECT',
           .locator('.ant-select-selection-item')
           .innerText()
         await search.fill('不存在的生产订单')
+        await search.press('Enter')
         await page
           .locator('.ant-select-dropdown:visible .ant-empty-description')
           .waitFor()
@@ -300,6 +301,7 @@ result: 'REJECT',
           '刷新不自动选回生产订单'
         )
         await search.fill('仅搜索，未选订单')
+        await search.press('Enter')
         await picker.hover()
         await picker.locator('.ant-select-clear').click()
         assert.equal(
@@ -309,6 +311,7 @@ result: 'REJECT',
         )
         await empty.waitFor()
         await search.fill('MO-STYLE')
+        await search.press('Enter')
         await page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
           .filter({ hasText: selected })
@@ -438,6 +441,8 @@ result: 'REJECT',
         await panel
           .getByRole('textbox', { name: '搜索生产产品或规格' })
           .fill('SKU-STYLE-L1-LONG')
+        await panel
+          .getByRole('textbox', { name: '搜索生产产品或规格' }).press('Enter')
         await row.getByRole('button', { name: '安排生产', exact: true }).click()
         await page.waitForURL(
           (url) =>

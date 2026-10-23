@@ -174,6 +174,7 @@ export function createHistoryRecordScenarios(deps) {
       )
       const search = page.getByPlaceholder('搜索历史记录', { exact: true })
       await search.fill('读取失败')
+      await search.press('Enter')
       await page.getByText('历史记录加载失败', { exact: true }).waitFor()
       assert.equal(
         await page.locator('.ant-table-tbody tr[data-row-key]').count(),
@@ -201,6 +202,7 @@ export function createHistoryRecordScenarios(deps) {
       await page.getByRole('button', { name: '清空已选', exact: true }).click()
       await assertUnselectedActions(page)
       await search.fill('没有匹配的历史记录')
+      await search.press('Enter')
       await page.getByText('当前筛选没有匹配的历史记录', { exact: true }).waitFor()
       await page.locator('.erp-business-selection-action-bar').waitFor({ state: 'hidden' })
       assert.equal(await table.locator('tr[data-row-key]').count(), 0)
@@ -210,8 +212,10 @@ export function createHistoryRecordScenarios(deps) {
         request.postDataJSON()?.params?.keyword === '慢查询'
       )
       await search.fill('慢查询')
+      await search.press('Enter')
       await slowRequest
       await search.fill('HISTORY-201')
+      await search.press('Enter')
       await table.getByText('HISTORY-201', { exact: true }).waitFor()
       await delay(550)
       assert.equal(
@@ -224,6 +228,7 @@ export function createHistoryRecordScenarios(deps) {
       await page.getByRole('dialog').getByText('HISTORY-201', { exact: true }).waitFor()
       await page.getByRole('button', { name: '关闭', exact: true }).click()
       await search.fill('')
+      await search.press('Enter')
       await table.getByText('HISTORY-001', { exact: true }).waitFor()
       await assertUnselectedActions(page)
       await assertNoHorizontalOverflow(page, 'history-records-list-recovery')
@@ -265,12 +270,15 @@ export function createHistoryRecordScenarios(deps) {
       }
       const search = page.getByPlaceholder('搜索历史记录')
       await search.fill('没有结果')
+      await search.press('Enter')
       await states.getByRole('button', { name: '全部历史状态，共 0 条', exact: true }).waitFor()
       assert.deepEqual(await counts(), ['0', '0', '0'])
       await search.fill('失败')
+      await search.press('Enter')
       await page.getByText('历史记录加载失败', { exact: true }).waitFor()
       assert.deepEqual(await counts(), ['—', '—', '—'])
       await search.fill('')
+      await search.press('Enter')
       await states.getByRole('button', { name: '全部历史状态，共 43 条', exact: true }).waitFor()
       assert.deepEqual(await counts(), ['43', '40', '3'])
     },

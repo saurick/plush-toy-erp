@@ -587,7 +587,7 @@ export function createTabMotionScenarios({ outputDir }) {
           const initialPreview = await openPreview()
           assert.deepEqual(
             await initialPreview.locator('.ant-select-item-option').allTextContents(),
-            ['业务界面', '任务处理', '手机版任务', '效能工作台', '登录页', '岗位帮助', '控件设计']
+            ['业务界面', '生产管理', '任务处理', '手机版任务', '效能工作台', '登录页', '岗位帮助', '控件设计']
           )
           await initialPreview.getByText('控件设计', { exact: true }).click()
           await initialPreview.waitFor({ state: 'hidden' })
@@ -604,7 +604,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await directory.getByRole('button', { name: /弹窗与反馈/ }).waitFor({ state: 'hidden' })
           await directory.getByRole('button', { name: /页签与视图/ }).waitFor()
           await directory.getByRole('button', { name: /筛选与搜索/ }).waitFor()
-          assert.equal(await directory.getByRole('button').count(), 2)
+          assert.deepEqual(await directory.getByRole('button').locator('strong').allTextContents(), ['组件选用', '基础输入', '页签与视图', '筛选与搜索'])
           await choose('筛选与搜索')
           assert.equal(await search.inputValue(), '')
           assert.equal(new URL(page.url()).searchParams.get('control'), 'filters')
@@ -628,11 +628,15 @@ export function createTabMotionScenarios({ outputDir }) {
           assert.equal(await sampleRows.count(), 1)
           await sampleRows.getByText('SO-DEMO-01', { exact: true }).waitFor()
           await sampleSearch.fill('查不到的订单')
+          assert.equal(await sampleRows.count(), 1, '示例输入期间保留已提交结果')
+          await sampleSearch.press('Enter')
           await controls.getByText('没有符合条件的记录', { exact: true }).waitFor()
           await controls.getByRole('button', { name: '清除条件', exact: true }).click()
+          await page.waitForFunction(() => document.querySelector('input[aria-label="演示搜索"]')?.value === '')
           assert.equal(await sampleSearch.inputValue(), '')
           assert.equal(await sampleRows.count(), 3)
           await sampleSearch.fill('布偶熊')
+          await sampleSearch.press('Enter')
           await controls.getByRole('button', { name: '筛选', exact: true }).click()
           const range = page.getByLabel('演示记录范围', { exact: true })
           await range.getByText('全部记录', { exact: true }).click()
@@ -642,6 +646,7 @@ export function createTabMotionScenarios({ outputDir }) {
           assert.equal(await sampleRows.count(), 1)
           await controls.getByRole('heading', { name: '筛选与搜索', exact: true }).click()
           await sampleSearch.fill('')
+          await sampleSearch.press('Enter')
           await chooseTheme('深色')
           await assertFilterAffordance(controls.locator('.erp-filter-chip'))
           await assertFits()

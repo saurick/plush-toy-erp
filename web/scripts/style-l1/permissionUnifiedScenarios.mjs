@@ -360,6 +360,7 @@ export function createPermissionUnifiedScenarios({
 
         // Filters and group expansion survive both directions without remounting.
         await search.fill('对账')
+        await search.press('Enter')
         await page.getByRole('switch', { name: '只看已选' }).click()
         await page
           .getByRole('button', { name: '全部收起', exact: true })
@@ -391,6 +392,7 @@ export function createPermissionUnifiedScenarios({
           collapsed
         )
         await search.fill('')
+        await search.press('Enter')
         await page.getByRole('switch', { name: '只看已选' }).click()
         await enter.click()
         await page
@@ -721,6 +723,7 @@ export function createPermissionUnifiedScenarios({
         const before = await readSelection(page)
         const search = page.getByRole('textbox', { name: '搜索功能或页面' })
         await search.fill('处理对账')
+        await search.press('Enter')
         assert.equal(
           await page.locator('.erp-permission-matrix__row > th').innerText(),
           '对账'
@@ -752,6 +755,7 @@ export function createPermissionUnifiedScenarios({
           .getByRole('button', { name: '新增 0 项 · 撤销 1 项', exact: true })
           .click()
         await search.fill('')
+        await search.press('Enter')
         assert.deepEqual(
           await readSelection(page),
           changed,
@@ -992,6 +996,7 @@ export function createPermissionUnifiedScenarios({
         await closeScope()
         await saveScope('ALL', [])
         await search.fill('财务')
+        await search.press('Enter')
         const geometry = await matrix.evaluate((table) => {
           const rows = [
             ...table.querySelectorAll('.erp-permission-matrix__row'),
@@ -1113,12 +1118,14 @@ export function createPermissionUnifiedScenarios({
         }
         const before = await readSelection(page)
         await search.fill('没有这样的功能')
+        await search.press('Enter')
         await page
           .getByText('没有匹配的功能，请调整搜索或关闭只看已选', {
             exact: true,
           })
           .waitFor()
         await search.fill('处理对账')
+        await search.press('Enter')
         const matchingKeys = await page
           .locator('.erp-permission-row [data-permission-key]')
           .evaluateAll((rows) => rows.map((row) => row.dataset.permissionKey))
@@ -1129,6 +1136,7 @@ export function createPermissionUnifiedScenarios({
         assert.equal(await clear.isEnabled(), true)
         await clear.click()
         await search.fill('')
+        await search.press('Enter')
         const expected = before.filter((key) => !matchingKeys.includes(key))
         await page.waitForFunction((expected) => {
           const selected = [...document.querySelectorAll('.erp-permission-row')]
@@ -1462,6 +1470,7 @@ export function createPermissionUnifiedScenarios({
           true
         )
         await frame.getByPlaceholder('搜索功能名称或页面').fill('查看应付')
+        await frame.getByPlaceholder('搜索功能名称或页面').press('Enter')
         const checkbox = frame.getByRole('checkbox', {
           name: '查看应付',
           exact: true,
@@ -1567,6 +1576,7 @@ export function createPermissionUnifiedScenarios({
         assert(overflow <= 1)
         await tabs.getByRole('tab', { name: /岗位设置/ }).click()
         await frame.getByPlaceholder('搜索功能名称或页面').fill('')
+        await frame.getByPlaceholder('搜索功能名称或页面').press('Enter')
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-unified-design.png',
         })

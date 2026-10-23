@@ -267,6 +267,7 @@ export function createBusinessListAssertions({ outputDir }) {
 
     const searchInput = page.getByPlaceholder(searchPlaceholder).first()
     await searchInput.fill(`NO-MATCH-${scenarioName}`)
+    await searchInput.press('Enter')
     await page.keyboard.press('Enter')
     await page
       .waitForFunction(
@@ -371,6 +372,7 @@ export function createBusinessListAssertions({ outputDir }) {
     )
 
     await searchInput.fill('')
+    await searchInput.press('Enter')
     await page.keyboard.press('Enter')
     await expectText(page, staleText)
   }
@@ -1092,6 +1094,7 @@ export function createBusinessListAssertions({ outputDir }) {
       )
       const searchInput = picker.locator('.ant-input').first()
       await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
+      await searchInput.press('Enter')
       let pickerTextAfterEmptySearch = ''
       for (let attempt = 0; attempt < 40; attempt += 1) {
         pickerTextAfterEmptySearch = await picker.evaluate((node) =>
@@ -1137,6 +1140,7 @@ export function createBusinessListAssertions({ outputDir }) {
         )}`
       )
       await searchInput.fill('')
+      await searchInput.press('Enter')
       const sourceRowAfterEmptySearch = await findSourceRow(selectText)
       const selectorControlAfterEmptySearch = sourceRowAfterEmptySearch
         .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')

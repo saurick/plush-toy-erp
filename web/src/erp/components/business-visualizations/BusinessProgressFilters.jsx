@@ -1,9 +1,9 @@
 import React from 'react'
-import { Button, Input } from 'antd'
+import { Button } from 'antd'
+import SearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import MobileFilterChoices from '../../mobile/components/MobileFilterChoices.jsx'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import {
   PROGRESS_SCOPE_OPTIONS,
   progressDueOptions,
@@ -69,7 +69,7 @@ export default function BusinessProgressFilterFields({
   compact = false,
   resetKey,
 }) {
-  const owner = useLiveSearch({ value: query.owner, resetKey, onSearch: (value) => onChange({ owner: value }) })
+  const owner = { value: query.owner, resetKey, onSearch: (value) => onChange({ owner: value }) }
   return (
     <div className={`erp-progress-filter-fields${compact ? ' erp-progress-filter-fields--compact' : ''}`}>
       <fieldset role={compact ? 'presentation' : undefined}>
@@ -113,16 +113,12 @@ export default function BusinessProgressFilterFields({
       {!compact && (
         <fieldset>
           <legend>处理人或业务负责人</legend>
-          <Input
+          <SearchInput
             aria-label="处理人或业务负责人"
             placeholder="输入姓名"
             maxLength={100}
             allowClear
-            value={owner.value}
-            onChange={owner.onChange}
-            onCompositionStart={owner.onCompositionStart}
-            onCompositionEnd={owner.onCompositionEnd}
-            onPressEnter={owner.onPressEnter}
+            {...owner}
           />
         </fieldset>
       )}

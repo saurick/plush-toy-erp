@@ -86,6 +86,7 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       else await frame.locator('[data-action="board-status"][data-value="all"]').click()
       if (!mobile) {
         await frame.locator('#board-search').fill('审批工程用料申请')
+        await frame.locator('#board-search').press('Enter')
         await frame.locator('.task-handling-table button[data-id="T01"]').click()
         const task = frame.locator('.drawer')
         const materials = task.getByRole('button', { name: '查看材料汇总', exact: true })
@@ -105,9 +106,11 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       const open = async (id, title) => {
         if (mobile) {
           await frame.locator('#mobile-task-search').fill(title)
+          await frame.locator('#mobile-task-search').press('Enter')
           await frame.locator(`[data-action="mobile-open-task"][data-id="${id}"]`).click()
         } else {
           await frame.locator('#board-search').fill(title)
+          await frame.locator('#board-search').press('Enter')
           await frame.locator(`.task-handling-table button[data-id="${id}"]`).click()
         }
         await frame.getByRole('heading', { name: '本任务处理进度', exact: true }).waitFor()

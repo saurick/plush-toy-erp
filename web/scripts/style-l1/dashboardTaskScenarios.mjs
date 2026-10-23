@@ -332,6 +332,7 @@ export function createDashboardTaskScenarios({
         await moreFilters.click()
         const layoutSearch = page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
         await layoutSearch.fill('布局验证无匹配任务')
+        await layoutSearch.press('Enter')
         await expectText(page, '当前分类暂无匹配任务')
         await moreFilters.click()
         assert.equal(await extraFilters.getByRole('button', { name: /清空筛选/ }).isDisabled(), true, '只有搜索词时没有可清空的筛选条件')
@@ -341,6 +342,7 @@ export function createDashboardTaskScenarios({
           return params.get('lane') === 'exception' && params.get('q') === '布局验证无匹配任务'
         })
         await layoutSearch.fill('')
+        await layoutSearch.press('Enter')
         await page
           .getByRole('button', { name: '任务概览', exact: true })
           .click()
@@ -1535,6 +1537,7 @@ export function createDashboardTaskScenarios({
         const taskBoardSearch =
           page.getByPlaceholder('订单 / 产品 / 物料 / 款号')
         await taskBoardSearch.fill('RB-018')
+        await taskBoardSearch.press('Enter')
         await page.waitForFunction(
           () =>
             new URLSearchParams(window.location.search).get('q') === 'RB-018'
@@ -1562,6 +1565,7 @@ export function createDashboardTaskScenarios({
           'OUT-DASH-NAV'
         )
         await taskBoardSearch.fill('OUT-DASH-NAV')
+        await taskBoardSearch.press('Enter')
         await page.waitForFunction(
           () =>
             new URLSearchParams(window.location.search).get('q') ===
@@ -1934,6 +1938,7 @@ export function createDashboardTaskScenarios({
         )
         await page.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '完成', exact: true }).click()
         await taskBoardSearch.fill('')
+        await taskBoardSearch.press('Enter')
         await page.waitForFunction(() => !new URLSearchParams(location.search).has('q'))
         await taskBoardSearch.focus()
         const taskBoardSearchControl = page.locator(
@@ -1983,7 +1988,7 @@ export function createDashboardTaskScenarios({
                 input.closest('.ant-input-search')
               ),
               searchButtonCount:
-                filters?.querySelectorAll('.ant-input-search-button').length ||
+                filters?.querySelectorAll('.erp-search-submit').length ||
                 0,
               prefixCount: prefix ? 1 : 0,
               placeholder: input.getAttribute('placeholder') || '',
@@ -2045,7 +2050,7 @@ export function createDashboardTaskScenarios({
             emptySearchFocusMetrics.focusWithin &&
             emptySearchFocusMetrics.sharedWrapper &&
             !emptySearchFocusMetrics.hasInputSearchAncestor &&
-            emptySearchFocusMetrics.searchButtonCount === 0 &&
+            emptySearchFocusMetrics.searchButtonCount === 1 &&
             emptySearchFocusMetrics.prefixCount === 1 &&
             emptySearchFocusMetrics.placeholder ===
               '订单 / 产品 / 物料 / 款号' &&
@@ -2099,6 +2104,7 @@ export function createDashboardTaskScenarios({
           )}`
         )
         await taskBoardSearch.fill('OUT-DASH-NAV')
+        await taskBoardSearch.press('Enter')
         assert.equal(
           await taskBoardSearchControl.locator('.ant-input-clear-icon').count(),
           1,

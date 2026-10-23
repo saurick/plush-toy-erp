@@ -134,10 +134,12 @@ export function createBusinessModuleNavigationScenarios({
         const moduleName = { master: '基础资料', engineering: '产品工程', warehouse: '库存管理' }[key]
         assert.equal(await page.locator('.erp-business-module-header').getByRole('heading', { name: moduleName, exact: true }).count(), 1)
         await search().fill(`${key}第一页面查询`)
+        await search().press('Enter')
         await switchTab(page, labels[1])
         await moduleTabs(page).getByRole('tab', { name: secondHeading, exact: true, selected: true }).waitFor()
         assert.equal(await search().inputValue(), '')
         await search().fill(`${key}第二页面查询`)
+        await search().press('Enter')
         await switchTab(page, labels[0])
         await moduleTabs(page).getByRole('tab', { name: firstHeading, exact: true, selected: true }).waitFor()
         assert.equal(await search().inputValue(), `${key}第一页面查询`)
@@ -544,6 +546,7 @@ export function createBusinessModuleNavigationScenarios({
           { exact: true }
         )
         await search.fill('出货导航查询')
+        await search.press('Enter')
         await switchTab(page, '库存预留')
         await moduleTabs(page)
           .getByRole('tab', { name: '库存预留', exact: true, selected: true })
@@ -562,6 +565,7 @@ export function createBusinessModuleNavigationScenarios({
           name: '搜索待办任务', exact: true,
         })
         await approvalSearch.fill('放行导航查询')
+        await approvalSearch.press('Enter')
         await verifyModuleMotion(page, '库存预留')
         await verifyModuleMotion(page, '出货单', true)
         await search.waitFor()
@@ -668,10 +672,12 @@ export function createBusinessModuleNavigationScenarios({
           { exact: true }
         )
         await search.fill('模块应收查询')
+        await search.press('Enter')
         await switchTab(page, '应付')
         await search.waitFor()
         assert.equal(await search.inputValue(), '')
         await search.fill('模块应付查询')
+        await search.press('Enter')
         await switchTab(page, '应收')
         await search.waitFor()
         assert.equal(await search.inputValue(), '模块应收查询')
@@ -681,6 +687,7 @@ export function createBusinessModuleNavigationScenarios({
         await switchTab(page, '收付款')
         await search.waitFor()
         await search.fill('模块收付款查询')
+        await search.press('Enter')
         await switchTab(page, '发票')
         await search.waitFor()
         await switchTab(page, '收付款')
@@ -760,6 +767,7 @@ export function createBusinessModuleNavigationScenarios({
           { exact: true }
         )
         await search.fill('模块生产查询')
+        await search.press('Enter')
         const queryURL = page.url()
         await switchTab(page, '生产记录')
         await page

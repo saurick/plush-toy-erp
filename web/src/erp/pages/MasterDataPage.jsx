@@ -996,14 +996,14 @@ export default function MasterDataPage({ type }) {
         filters={
           <>
             <SearchInput
+              resetKey={effectiveType}
               placeholder={getRecordSearchPlaceholder(effectiveType)}
               searchHint={getRecordSearchHint(effectiveType)}
               value={keyword}
-              onChange={(event) => {
-                setKeyword(event.target.value)
+              onSearch={(value) => {
+                setKeyword(value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              onPressEnter={loadRecords}
             />
             <LifecycleScopeFilter
               value={lifecycleScope}

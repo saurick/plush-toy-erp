@@ -8,7 +8,6 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   getBusinessStatistics,
@@ -356,10 +355,11 @@ export default function useBusinessStatistics({
     sourceOffset,
     update,
   ])
-  const search = useLiveSearch({
+  const search = {
+    resetKey: query.group_by,
     value: query.keyword,
     onSearch: (keyword) => update({ sq: keyword, ...clearGroup }),
-  })
+  }
   const drill = (group, status = 'all') => {
     outlet?.pageUIState?.values?.set(
       'business-statistics:summary-scroll',
@@ -505,11 +505,7 @@ export default function useBusinessStatistics({
         placeholder={query.group_by === 'product' ? '搜索产品' : '搜索客户'}
         allowClear
         maxLength={100}
-        value={search.value}
-        onChange={search.onChange}
-        onCompositionStart={search.onCompositionStart}
-        onCompositionEnd={search.onCompositionEnd}
-        onPressEnter={search.onPressEnter}
+        {...search}
       />
       <Select
         allowClear={false /* 不可清空：金额统计必须明确单一币种，不能混加不同币种。 */}

@@ -13,7 +13,6 @@ import {
 } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listBusinessProgress } from '../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
@@ -117,10 +116,11 @@ export default function BusinessDashboardPage() {
     setParams(withProgressFilters(previous, {}))
     setSelection(null)
   }
-  const progressSearch = useLiveSearch({
+  const progressSearch = {
+    resetKey: query.view,
     value: query.keyword,
     onSearch: (keyword) => update({ q: keyword }),
-  })
+  }
   const load = useCallback(async () => {
     const request = begin('business-progress')
     if (statisticsActive || !adminProfile?.id) {
@@ -315,13 +315,9 @@ export default function BusinessDashboardPage() {
                 className="erp-progress-search"
                 aria-label="搜索订单、客户或产品"
                 placeholder="搜单号、客户、产品"
-                value={progressSearch.value}
+                {...progressSearch}
                 allowClear
                 maxLength={100}
-                onChange={progressSearch.onChange}
-                onCompositionStart={progressSearch.onCompositionStart}
-                onCompositionEnd={progressSearch.onCompositionEnd}
-                onPressEnter={progressSearch.onPressEnter}
               />
               <Popover
                 trigger="click"

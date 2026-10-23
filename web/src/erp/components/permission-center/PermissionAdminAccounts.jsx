@@ -934,8 +934,8 @@ export default function PermissionAdminAccounts({
           aria-label="搜索员工账号"
           value={adminSearchKeyword}
           placeholder="搜索姓名、员工账号、手机号或岗位"
-          onChange={(event) => {
-            setAdminSearchKeyword(event.target.value)
+          onSearch={(value) => {
+            setAdminSearchKeyword(value)
             setTablePagination((prev) => ({ ...prev, current: 1 }))
           }}
         />

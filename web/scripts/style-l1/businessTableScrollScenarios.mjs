@@ -233,6 +233,7 @@ export function createBusinessTableScrollScenarios({
 
       const search = page.locator('.erp-business-operation-panel').getByRole('textbox')
       await search.fill('NO-SCROLL-MATCH')
+      await search.press('Enter')
       await page.getByText('暂无出货单', { exact: true }).waitFor()
       const empty = await measureScroll(page)
       assert.equal(empty.pageOverflow, false)
@@ -244,6 +245,7 @@ export function createBusinessTableScrollScenarios({
         '空结果不显示横向控件'
       )
       await search.fill('')
+      await search.press('Enter')
       await page.locator(`tr[data-row-key="${DEFAULT_BUSINESS_PAGE_SIZE}"]`).waitFor()
       const restored = await scrollToTableEnd(page)
 

@@ -104,7 +104,7 @@ test('workflow business page resets page filters and recovers an emptied tail pa
   )
   assert.match(
     source,
-    /setKeyword\(event\.target\.value\)[\s\S]{0,120}resetBusinessPaginationCurrent\(setPagination\)/u
+    /setKeyword\(value\)[\s\S]{0,120}resetBusinessPaginationCurrent\(setPagination\)/u
   )
   assert.match(
     source,

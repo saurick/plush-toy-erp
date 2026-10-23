@@ -356,6 +356,7 @@ export function createContactEditorScenarios({
       await frame.getByRole('button', { name: '保存资料', exact: true }).click()
       await frame.getByRole('button', { name: '返回列表', exact: true }).click()
       await frame.locator('#list-search').fill('紧凑联系人试用客户')
+      await frame.locator('#list-search').press('Enter')
       await frame
         .getByRole('row')
         .filter({ hasText: '紧凑联系人试用客户' })

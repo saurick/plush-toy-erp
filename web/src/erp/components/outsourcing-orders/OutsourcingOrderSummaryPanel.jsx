@@ -13,7 +13,6 @@ import useBusinessSearchParams from '../../hooks/useBusinessSearchParams.js'
 
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import {
   listOutsourcingOrderSummary,
   listAllOutsourcingOrderSummary,
@@ -59,10 +58,10 @@ export default forwardRef((
   const requestRef = useRef(null)
   const update = (values) =>
     setParams(updateOutsourcingSummarySearch(params, values), { replace: true })
-  const search = useLiveSearch({
+  const search = {
     value: filters.keyword,
     onSearch: (keyword) => update({ q: keyword }),
-  })
+  }
 
   const loadRows = useCallback(async () => {
     requestRef.current?.abort()
@@ -291,11 +290,7 @@ export default forwardRef((
               placeholder="合同、产品订单、产品或加工项目"
               allowClear
               maxLength={100}
-              value={search.value}
-              onChange={search.onChange}
-              onCompositionStart={search.onCompositionStart}
-              onCompositionEnd={search.onCompositionEnd}
-              onPressEnter={search.onPressEnter}
+              {...search}
             />
             <SelectFilter
               aria-label="明细加工厂"

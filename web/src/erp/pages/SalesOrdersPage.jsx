@@ -300,6 +300,7 @@ export default function SalesOrdersPage() {
     {}
   )
   const [orders, setOrders] = useState([])
+  const [referenceRefreshKey, setReferenceRefreshKey] = useState(0)
   const [customers, , mergeCustomers] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
   const [total, setTotal] = useState(0)
@@ -793,11 +794,15 @@ export default function SalesOrdersPage() {
 
   useEffect(() => {
     loadCustomers()
+  }, [loadCustomers])
+
+  useEffect(() => {
     loadOrders()
-  }, [loadCustomers, loadOrders])
+  }, [loadOrders])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(() => {
+      setReferenceRefreshKey((key) => key + 1)
       if (contentView === 'delivery') reloadDeliveryData()
       return loadOrders()
     })
@@ -1549,7 +1554,7 @@ export default function SalesOrdersPage() {
 
   useReferenceHydration({
     customers: { ids: [...orders.map((row) => row.customer_id), editingOrder?.customer_id, customerFilter], records: customers, onRecords: mergeCustomers, enabled: canReadReference(adminProfile, 'customers') },
-  }, adminProfile, orders)
+  }, adminProfile, referenceRefreshKey)
 
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ customers: mergeCustomers, product_skus: mergeProductSKUs }} className="erp-sales-orders-page">
@@ -1570,14 +1575,13 @@ export default function SalesOrdersPage() {
             <SearchInput
               {...BUSINESS_SEARCH_SCOPES.sales}
               value={resolvedRouteKeyword || linkedKeyword || keyword}
-              onChange={(event) => {
+              onSearch={(value) => {
                 if (linkedKeyword || routeSalesOrderID) {
                   clearRouteContext()
                 }
-                setKeyword(event.target.value)
+                setKeyword(value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              onPressEnter={loadOrders}
             />
             <LifecycleScopeFilter
               value={lifecycleScope}

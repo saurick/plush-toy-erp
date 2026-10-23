@@ -1626,8 +1626,8 @@ export default function ProductionOrdersPage() {
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || query.keyword}
               {...BUSINESS_SEARCH_SCOPES.production}
-              onChange={(event) =>
-                writeQuery({ keyword: event.target.value, page: 1 })
+              onSearch={(value) =>
+                writeQuery({ keyword: value, page: 1 })
               }
             />
             <LifecycleScopeFilter

@@ -119,6 +119,8 @@ export function createEmptyStateScenarios({
           .getByRole('searchbox', { name: '搜索订单、产品、物料或款号' })
           .fill('错误恢复样例')
         await page
+          .getByRole('searchbox', { name: '搜索订单、产品、物料或款号' }).press('Enter')
+        await page
           .getByRole('alert')
           .filter({ hasText: '任务加载失败' })
           .waitFor()

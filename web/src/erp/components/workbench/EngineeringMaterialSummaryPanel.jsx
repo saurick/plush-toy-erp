@@ -4,7 +4,6 @@ import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { MaterialRequestStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { listEngineeringMaterialRequests } from '../../api/masterDataOrderApi.mjs'
 import {
   BusinessDataTable,
@@ -103,10 +102,10 @@ export default function EngineeringMaterialSummaryPanel({
       replace: true,
     })
   }
-  const search = useLiveSearch({
+  const search = {
     value: keyword,
     onSearch: (value) => updateFilter('q', value),
-  })
+  }
 
   const filters = (
     <>
@@ -115,13 +114,9 @@ export default function EngineeringMaterialSummaryPanel({
         type="search"
         aria-label={BUSINESS_SEARCH_SCOPES.engineering.searchHint}
         {...BUSINESS_SEARCH_SCOPES.engineering}
-        value={search.value}
+        {...search}
         allowClear
         maxLength={100}
-        onChange={search.onChange}
-        onCompositionStart={search.onCompositionStart}
-        onCompositionEnd={search.onCompositionEnd}
-        onPressEnter={search.onPressEnter}
       />
       <SelectFilter
         aria-label="审批状态"

@@ -712,11 +712,10 @@ export default function AuditLogsPage() {
               value={keyword}
               placeholder="搜索操作记录"
               searchHint="按操作账号、业务对象或记录内容搜索"
-              onChange={(event) => {
-                setKeyword(event.target.value)
+              onSearch={(value) => {
+                setKeyword(value)
                 resetPage()
               }}
-              onPressEnter={loadData}
             />
             <SelectFilter
               aria-label="操作类型"

@@ -343,13 +343,13 @@ export default function HistoryRecordsPage() {
               ) : null}
             </HistoryQueryFilters>
             <SearchInput
+              resetKey={sourceKey}
               value={keyword}
               placeholder="搜索历史记录"
               searchHint="按当前记录类型支持的编号、名称或业务摘要搜索"
-              onChange={(event) =>
-                updateQuery({ keyword: event.target.value, page: '' })
+              onSearch={(value) =>
+                updateQuery({ keyword: value, page: '' })
               }
-              onPressEnter={loadRecords}
             />
           </>
         }

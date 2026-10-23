@@ -1086,7 +1086,7 @@ export default function PurchaseReceiptsPage() {
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
               {...BUSINESS_SEARCH_SCOPES.receipt}
-              onChange={(event) => {
+              onSearch={(value) => {
                 if (
                   resolvedRouteKeyword ||
                   linkedKeyword ||
@@ -1095,10 +1095,9 @@ export default function PurchaseReceiptsPage() {
                 ) {
                   clearRouteContext()
                 }
-                setKeyword(event.target.value)
+                setKeyword(value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              onPressEnter={loadRows}
             />
             <SelectFilter
               aria-label="单据状态"

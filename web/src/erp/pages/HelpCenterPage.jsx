@@ -45,6 +45,7 @@ import {
 } from '../config/projectManuals.mjs'
 import SlidingTabList from '../../common/components/navigation/SlidingTabList'
 import SearchInput from '../../common/components/SearchInput'
+import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import ERPPageActions from '../components/ERPPageActions.jsx'
 import {
   getHelpDocumentKindLabel,
@@ -71,6 +72,7 @@ export default function HelpCenterPage() {
   )
   const location = useLocation()
   const mobileShell = Boolean(mobileBusinessRole(location.pathname))
+  const SearchControl = mobileShell ? MobileSearchInput : SearchInput
   const navigationType = useNavigationType()
   const pageRef = useRef(null)
   const headerRef = useRef(null)
@@ -597,8 +599,8 @@ export default function HelpCenterPage() {
             </Dropdown>
             ) : null}
         </div>
-        <div className="erp-help-search-tools">
-          <SearchInput
+        <div className="erp-help-search-tools erp-mobile-search-row">
+          <SearchControl
             className="erp-help-center-search"
             type="search"
             aria-label="搜索操作图解和参考手册"
@@ -606,7 +608,7 @@ export default function HelpCenterPage() {
             value={query}
             maxLength={200}
             allowClear
-            onChange={(event) => handleQueryChange(event.target.value)}
+            onSearch={(value) => handleQueryChange(value)}
           />
           <Button
             ref={directoryTriggerRef}

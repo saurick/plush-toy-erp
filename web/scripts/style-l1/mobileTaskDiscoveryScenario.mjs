@@ -168,6 +168,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       const search = exceptions.getByLabel('搜索异常单号、订单、批次或原因')
       const liveSearch = page.waitForResponse((response) => response.url().endsWith('/rpc/workflow') && response.request().postDataJSON()?.params?.keyword === '裁片')
       await search.fill('裁片')
+      await search.press('Enter')
       await liveSearch
       await exceptions.getByText('未处理完', { exact: true }).click()
       await exceptions.getByRole('button', { name: /^关联待办/ }).click()

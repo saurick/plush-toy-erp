@@ -7,7 +7,8 @@ export async function assertMobileSearchAffordance(locator, action) {
   const metrics = await locator.evaluate((root) => {
     const wrapper = root.querySelector('.ant-input-affix-wrapper')
     const input = root.querySelector('input')
-    const clear = root.querySelector('button')
+    const clear = root.querySelector('[aria-label="清除搜索"]')
+    const bounds = root.classList.contains('erp-mobile-search--expanded') ? root.closest('.erp-mobile-search-row') || root : root
     const style = getComputedStyle(wrapper)
     return {
       height: wrapper.getBoundingClientRect().height,
@@ -28,7 +29,7 @@ export async function assertMobileSearchAffordance(locator, action) {
       clear: clear
         ? { width: clear.offsetWidth, height: clear.offsetHeight }
         : null,
-      width: root.clientWidth,
+      width: bounds.clientWidth,
       scrollWidth: root.scrollWidth,
     }
   })

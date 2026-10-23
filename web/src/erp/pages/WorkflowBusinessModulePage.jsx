@@ -1082,8 +1082,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               placeholder="搜索任务"
               searchHint="可搜索：任务、来源号、原因"
               value={keyword}
-              onChange={(event) => {
-                setKeyword(event.target.value)
+              onSearch={(value) => {
+                setKeyword(value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />

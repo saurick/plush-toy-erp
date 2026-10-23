@@ -317,6 +317,8 @@ export function createMobileNavigationBadgeScenarios({
         await page
           .getByLabel('搜索订单、产品、物料或款号')
           .fill('没有匹配的任务')
+        await page
+          .getByLabel('搜索订单、产品、物料或款号').press('Enter')
         await searchResponse
         await page.waitForFunction(
           () => document.querySelectorAll('.erp-mobile-list-item').length === 0

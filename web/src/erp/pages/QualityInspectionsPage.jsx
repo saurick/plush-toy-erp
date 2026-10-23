@@ -1299,7 +1299,7 @@ export default function QualityInspectionsPage() {
             <SearchInput
               value={resolvedRouteKeyword || linkedKeyword || keyword}
               {...BUSINESS_SEARCH_SCOPES.quality}
-              onChange={(event) => {
+              onSearch={(value) => {
                 if (
                   resolvedRouteKeyword ||
                   linkedKeyword ||
@@ -1310,10 +1310,9 @@ export default function QualityInspectionsPage() {
                 ) {
                   clearRouteContext()
                 }
-                setKeyword(event.target.value)
+                setKeyword(value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              onPressEnter={loadRows}
             />
             <BusinessStatusFilter
               inline

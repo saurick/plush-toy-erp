@@ -62,7 +62,6 @@ export default function PurchaseOrderOperationPanel({
   lifecycleActionStates = {},
   onLifecycleScopeChange,
   showLifecyclePrimary = false,
-  loadOrders,
   openCreateModal,
   openEditModal,
   openTermsModal,
@@ -150,11 +149,10 @@ export default function PurchaseOrderOperationPanel({
           <SearchInput
             value={keyword}
             {...BUSINESS_SEARCH_SCOPES.purchase}
-            onChange={(event) => {
+            onSearch={(value) => {
               resetPagination()
-              setKeyword(event.target.value)
+              setKeyword(value)
             }}
-            onPressEnter={loadOrders}
           />
           <LifecycleScopeFilter
             value={lifecycleScope}

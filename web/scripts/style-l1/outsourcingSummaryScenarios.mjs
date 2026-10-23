@@ -211,6 +211,7 @@ export function createOutsourcingSummaryScenarios({
         assert.equal(fullCSV.includes('020-00000000'), !readOnly)
         const search = region.getByRole('textbox', { name: '搜索加工明细' })
         await search.fill('耳*2')
+        await search.press('Enter')
         await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         assert.equal(calls.at(-1).offset, 0)
         await region.locator('.ant-pagination-total-text').filter({ hasText: /共 1 条/u }).waitFor()

@@ -18,9 +18,6 @@
   min-width: 0;
 }
 
-.mobile-workflow-tracking-search > .erp-mobile-search:has(input:placeholder-shown) .ant-input-suffix {
-  display: none;
-}
 
 .mobile-workflow-tracking-controls {
   position: sticky;

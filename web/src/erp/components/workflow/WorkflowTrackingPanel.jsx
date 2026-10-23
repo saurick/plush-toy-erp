@@ -4,7 +4,6 @@ import { Alert, Button, Tag } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { BusinessOperationPanel, SearchInput, SelectFilter } from '../business-list/BusinessListLayout.jsx'
 import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import { clearTrackingFilters, readTrackingFilters, writeTrackingFilters, readTrackingPagination, writeTrackingPagination, TRACKING_STATUS_OPTIONS, TRACKING_SCOPE_OPTIONS, TRACKING_ROLE_OPTIONS, TRACKING_ATTENTION_OPTIONS, TRACKING_SOURCE_OPTIONS } from '../../utils/workflowTrackingFilters.mjs'
@@ -52,10 +51,11 @@ export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, o
   const listKey = JSON.stringify([filtersKey, sessionKey])
   const paramsKey = JSON.stringify({ ...JSON.parse(filtersKey), offset: (pageNumber - 1) * pageSize })
   const key = JSON.stringify([paramsKey, sessionKey, refreshKey, reload])
-  const search = useLiveSearch({
+  const search = {
+    resetKey: scope,
     value: keyword,
     onSearch: (value) => changeFilters({ search: value }),
-  })
+  }
   useEffect(() => {
     const refresh = () => setReload((value) => value + 1)
     window.addEventListener(WORKFLOW_TASKS_CHANGED, refresh)
@@ -154,7 +154,7 @@ render: (_, entry) => (
           <>
             <BusinessStatusFilter inline aria-label="流转状态" allLabel="全部状态" value={filters.status} options={TRACKING_STATUS_OPTIONS} counts={resolveBusinessStatusCounts(page)} loading={!current} onChange={(status) => changeFilters({ status })} />
             {onScopeChange ? <SelectFilter allowClear={false /* 不可清空：跟踪查询必须选择明确范围，相关流程也是独立范围。 */} aria-label="跟踪范围" value={scope} options={TRACKING_SCOPE_OPTIONS} onChange={onScopeChange} /> : null}
-            <SearchInput placeholder="单号 / 任务 / 产品 / 款号" value={search.value} onChange={search.onChange} onCompositionStart={search.onCompositionStart} onCompositionEnd={search.onCompositionEnd} onPressEnter={search.onPressEnter} />
+            <SearchInput placeholder="单号 / 任务 / 产品 / 款号" {...search} />
             <SelectFilter aria-label="当前岗位" value={filters.owner_role_key} disabled={filters.status === 'completed'} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => changeFilters({ owner_role_key })} />
             {!source.source_id ? <SelectFilter aria-label="单据类型" value={filters.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => changeFilters({ source_type })} /> : null}
             <SelectFilter aria-label="关注事项" value={filters.attention} disabled={filters.status === 'completed'} options={TRACKING_ATTENTION_OPTIONS} onChange={(attention) => changeFilters({ attention })} />

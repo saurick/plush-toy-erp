@@ -1244,11 +1244,10 @@ export default function BOMVersionsPage() {
             <SearchInput
               value={keyword}
               {...BUSINESS_SEARCH_SCOPES.bom}
-              onChange={(event) => {
-                setKeyword(event.target.value)
+              onSearch={(value) => {
+                setKeyword(value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              onPressEnter={loadVersions}
             />
             <RemoteReferenceSelect
               referenceType="products"

@@ -100,7 +100,6 @@ export default function SourceImportPickerModal({
   current: serverCurrentPage,
   onPageChange,
   onSearchChange,
-  searchDebounceMs = 250,
   allowSelectAll = false,
   expandable,
 }) {
@@ -220,30 +219,17 @@ export default function SourceImportPickerModal({
     return filteredRows.slice(start, start + pageSize)
   }, [effectiveCurrentPage, filteredRows, pageSize, serverPagination])
 
-  const handleKeywordChange = (event) => {
-    const rawKeyword = event.target.value
+  const handleKeywordChange = (rawKeyword) => {
     const nextKeyword = Number.isSafeInteger(searchMaxLength)
       ? [...rawKeyword].slice(0, searchMaxLength).join('')
       : rawKeyword
     setKeyword(nextKeyword)
     setCurrentPage(1)
+    if (serverPagination) onSearchChange?.(nextKeyword)
   }
 
-  const clearFilters = () => {
-    setKeyword('')
-    setCurrentPage(1)
-  }
+  const clearFilters = () => handleKeywordChange('')
 
-  useEffect(() => {
-    if (!open || !serverPagination || typeof onSearchChange !== 'function') {
-      return undefined
-    }
-    const timeoutID = window.setTimeout(
-      () => onSearchChange(keyword),
-      searchDebounceMs
-    )
-    return () => window.clearTimeout(timeoutID)
-  }, [keyword, onSearchChange, open, searchDebounceMs, serverPagination])
   const handlePageChange = (page) => {
     setCurrentPage(page)
     onPageChange?.(page, pageSize, keyword)
@@ -345,7 +331,8 @@ export default function SourceImportPickerModal({
             allowClear
             className="erp-source-import-picker__search"
             value={keyword}
-            onChange={handleKeywordChange}
+            onSearch={handleKeywordChange}
+            resetKey={open}
             placeholder={searchPlaceholder}
             aria-label={searchAccessibleLabel}
             title={searchAccessibleLabel}

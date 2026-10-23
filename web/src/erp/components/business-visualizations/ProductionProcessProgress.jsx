@@ -197,7 +197,7 @@ export default function ProductionProcessProgress({
             placeholder="搜索产品、编码或规格"
             allowClear
             value={viewState.query || ''}
-            onChange={(event) => change({ query: event.target.value, page: 1 })}
+            onSearch={(value) => change({ query: value, page: 1 })}
           />
           <div className="erp-business-visual-switch erp-production-process__layout">
             <Segmented

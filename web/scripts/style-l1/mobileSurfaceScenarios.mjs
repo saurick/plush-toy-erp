@@ -212,6 +212,7 @@ export function createMobileSurfaceScenarios({
         await card.waitFor()
 
         await page.getByRole('searchbox').fill('未匹配背景回归检查')
+        await page.getByRole('searchbox').press('Enter')
         await page.getByText('当前筛选下暂无任务', { exact: true }).waitFor()
         await canvas()
         await assertSurface(
@@ -220,6 +221,7 @@ export function createMobileSurfaceScenarios({
           '无结果数据区'
         )
         await page.getByRole('searchbox').fill('')
+        await page.getByRole('searchbox').press('Enter')
         await card.waitFor()
         await page
           .getByLabel('任务状态', { exact: true })

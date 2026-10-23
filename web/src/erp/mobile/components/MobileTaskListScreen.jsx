@@ -1,5 +1,5 @@
 import '../mobileMine.css'
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useId, useRef, useState } from 'react'
 import { Button, Empty, Tag } from 'antd'
 import {
   BarChartOutlined,
@@ -223,39 +223,7 @@ export default function MobileTaskListScreen({
       ]
     : MOBILE_MAIN_TAB_ITEMS
   const activeNavigationKey = isTasks ? 'tasks' : activeMainTabKey
-  const [keywordDraft, setKeywordDraft] = useState(taskKeyword || '')
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
-  const searchTimerRef = useRef(null)
-  const composingSearchRef = useRef(false)
-  const submittedKeywordRef = useRef(taskKeyword || '')
-
-  useEffect(() => {
-    const keyword = taskKeyword || ''
-    if (keyword === submittedKeywordRef.current) return
-    clearTimeout(searchTimerRef.current)
-    submittedKeywordRef.current = keyword
-    setKeywordDraft(keyword)
-  }, [taskKeyword])
-
-  useEffect(() => () => clearTimeout(searchTimerRef.current), [])
-
-  useEffect(() => {
-    clearTimeout(searchTimerRef.current)
-    composingSearchRef.current = false
-    setKeywordDraft(taskKeyword || '')
-  }, [activeMainTabKey, taskKeyword])
-
-  const searchTasks = (value, immediate = false) => {
-    clearTimeout(searchTimerRef.current)
-    const keyword = value.trim()
-    if (keyword === submittedKeywordRef.current) return
-    const submit = () => {
-      submittedKeywordRef.current = keyword
-      onSearchTasks(keyword)
-    }
-    if (immediate || !keyword) submit()
-    else searchTimerRef.current = setTimeout(submit, 300)
-  }
 
   const activeTodoListKey =
     activeFilterKey === MOBILE_TASK_FILTER_KEYS.APPROVAL
@@ -1036,7 +1004,7 @@ export default function MobileTaskListScreen({
 
         <MobileTaskListToolbar scrollContainerRef={scrollContainerRef} hidden={isTracking || isExceptions || activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MINE}>
           {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE && !isTracking && !isExceptions ? (
-            <div className={`mobile-role-task-query${activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO ? ' mobile-role-task-query--with-layout' : ''}`}>
+            <div className={`mobile-role-task-query erp-mobile-search-row${activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO ? ' mobile-role-task-query--with-layout' : ''}`}>
               <form
                 className="mobile-role-task-search"
                 role="search"
@@ -1051,44 +1019,9 @@ export default function MobileTaskListScreen({
                   placeholder="订单/产品"
                   title="搜索订单、产品、物料或款号"
                   maxLength={100}
-                  value={keywordDraft}
-                  onCompositionStart={() => {
-                  composingSearchRef.current = true
-                  clearTimeout(searchTimerRef.current)
-                }}
-                  onCompositionEnd={(event) => {
-                  composingSearchRef.current = false
-                  setKeywordDraft(event.currentTarget.value)
-                  searchTasks(event.currentTarget.value)
-                }}
-                  onChange={(event) => {
-                  const { value } = event.target
-                  setKeywordDraft(value)
-                  if (
-                    !composingSearchRef.current &&
-                    !event.nativeEvent.isComposing
-                  ) {
-                    searchTasks(value)
-                  }
-                }}
-                  onKeyDown={(event) => {
-                  if (
-                    event.key !== 'Enter' ||
-                    composingSearchRef.current ||
-                    event.nativeEvent.isComposing ||
-                    event.nativeEvent.keyCode === 229
-                  ) {
-                    return
-                  }
-                  event.preventDefault()
-                  searchTasks(event.currentTarget.value, true)
-                }}
-                  clearVisible={Boolean(keywordDraft || taskKeyword)}
-                  onClear={() => {
-                  composingSearchRef.current = false
-                  setKeywordDraft('')
-                  searchTasks('', true)
-                }}
+                  value={taskKeyword || ''}
+                  resetKey={activeMainTabKey}
+                  onSearch={onSearchTasks}
                 />
               </form>
               {activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE ? (

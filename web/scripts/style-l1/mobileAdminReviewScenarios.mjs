@@ -150,6 +150,7 @@ export function createMobileAdminReviewScenarios({
         name: '搜索订单、产品、物料或款号',
       })
       await search.fill('仓库全局查看')
+      await search.press('Enter')
       await page.waitForFunction(
         () => document.querySelectorAll('.erp-mobile-list-item').length === 1
       )
@@ -383,6 +384,7 @@ export function createMobileAdminReviewScenarios({
         await chooseSelectOption(role, '仓库')
         assert.equal(await phone.getByRole('heading', { name: '任务信息', exact: true }).count(), 0)
         await phone.locator('#mobile-task-search').fill('无匹配的预览任务')
+        await phone.locator('#mobile-task-search').press('Enter')
         assert.equal(await phone.locator('.rm-task-card').count(), 0)
 
         await chooseSelectOption(identity, 'admin')

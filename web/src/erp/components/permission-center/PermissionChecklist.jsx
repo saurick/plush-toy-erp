@@ -288,7 +288,7 @@ function PermissionChecklist({
           placeholder="搜索功能名称或页面"
           allowClear
           value={searchKeyword}
-          onChange={(event) => onSearchChange(event.target.value)}
+          onSearch={(value) => onSearchChange(value)}
         />
         <label className="erp-permission-checklist-filter">
           <Switch

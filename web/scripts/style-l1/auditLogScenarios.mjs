@@ -231,6 +231,7 @@ export function createAuditLogScenarios({
       await page.emulateMedia({ reducedMotion: 'no-preference' })
       const search = page.getByPlaceholder('搜索操作记录', { exact: true })
       await search.fill('读取失败')
+      await search.press('Enter')
       await page.getByText('操作记录加载失败', { exact: true }).waitFor()
       assert.equal(
         await page.locator('.ant-table-tbody tr[data-row-key]').count(),
@@ -243,7 +244,9 @@ export function createAuditLogScenarios({
             .length === 50
       )
       await search.fill('慢查询')
+      await search.press('Enter')
       await search.fill('历史员工201')
+      await search.press('Enter')
       await page
         .locator('.ant-table-tbody')
         .getByText(/历史员工201/u)
@@ -254,6 +257,7 @@ export function createAuditLogScenarios({
         1
       )
       await search.fill('')
+      await search.press('Enter')
       await page.waitForFunction(
         () =>
           document.querySelectorAll('.ant-table-tbody tr[data-row-key]')

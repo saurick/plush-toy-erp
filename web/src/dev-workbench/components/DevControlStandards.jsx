@@ -139,7 +139,7 @@ const TOPICS = [
     title: '筛选与搜索',
     summary: '缩小同一份结果',
     guide: 'navigation',
-    description: '点状态、输入关键词或改变范围，观察同一份虚构记录如何变化。',
+    description: '点状态、提交关键词或改变范围，观察同一份虚构记录如何变化。',
     rules: [
       [
         '常用条件',
@@ -149,7 +149,7 @@ const TOPICS = [
       [
         '单号 / 产品 / 负责人',
         '一个主搜索',
-        '减少猜测入口，清除后仍可继续输入。',
+        '点击搜索或按 Enter 提交；手机聚焦展开，提交后立即收起，清除后仍可继续输入。',
       ],
       [
         '少量次级条件',
@@ -160,7 +160,7 @@ const TOPICS = [
     ],
     checks: [
       '选择逾期：结果与数量一起变化。',
-      '输入不存在的关键词：出现无结果与清除入口。',
+      '输入期间结果不变；提交不存在的关键词后，出现无结果与清除入口。',
       '改变范围再重置：搜索词保持，其他页面条件不变。',
     ],
     source: 'FilterChip · MobileSearchInput · Popover',
@@ -468,13 +468,13 @@ function FiltersExample() {
         ))}
         <FilterChip disabled>暂不可用</FilterChip>
       </div>
-      <div className="erp-control-example-search erp-mobile-controls">
+      <div className="erp-control-example-search erp-mobile-controls erp-mobile-search-row">
         <MobileSearchInput
           aria-label="演示搜索"
           placeholder="单号、产品、负责人"
           value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          onClear={() => setKeyword('')}
+          onSearch={setKeyword}
+          onFocus={() => setOpen(false)}
         />
         <Popover
           trigger="click"

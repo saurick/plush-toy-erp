@@ -641,6 +641,7 @@ export function createMobileProgressScenarios({
         }
         await page.setViewportSize({ width: 390, height: 844 })
         await panel.getByLabel('搜索进度').fill('模拟客户')
+        await panel.getByLabel('搜索进度').press('Enter')
         await page.waitForFunction(
           () => window.history.state?.mobileProgress?.query.q === '模拟客户'
         )
@@ -1316,6 +1317,7 @@ export function createMobileProgressScenarios({
           ),
         })
         await panel.getByLabel('搜索进度').fill('查找目标客户')
+        await panel.getByLabel('搜索进度').press('Enter')
         await page.waitForTimeout(380)
         await assertMobileSearchAffordance(
           panel.locator('.erp-mobile-search'),
@@ -1361,6 +1363,8 @@ export function createMobileProgressScenarios({
           exact: true,
         })
         await panel.getByLabel('搜索进度').focus()
+        await panel.getByLabel('搜索进度').press('Escape')
+        await panel.getByRole('button', { name: '筛选进度', exact: true }).waitFor({ state: 'visible' })
         await assertMobileFilterOutsideDismissal({
           page,
           assert,
@@ -1470,6 +1474,7 @@ export function createMobileProgressScenarios({
           '恢复默认记录范围后不应保留隐藏条件'
         )
         await panel.getByLabel('搜索进度').fill('模拟业务员')
+        await panel.getByLabel('搜索进度').press('Enter')
         await page.waitForTimeout(380)
         await panel
           .getByRole('button', {
@@ -1510,6 +1515,7 @@ export function createMobileProgressScenarios({
           '刷新失败保留同一筛选下已加载的进度'
         )
         await panel.getByLabel('搜索进度').fill('查找目标客户')
+        await panel.getByLabel('搜索进度').press('Enter')
         await page.waitForTimeout(380)
         await panel.getByRole('button', { name: '重试', exact: true }).waitFor()
         assert.equal(
@@ -1580,8 +1586,10 @@ export function createMobileProgressScenarios({
           )
         })
         await panel.getByLabel('搜索进度').fill('迟到响应')
+        await panel.getByLabel('搜索进度').press('Enter')
         await page.waitForTimeout(330)
         await panel.getByLabel('搜索进度').fill('查找目标客户')
+        await panel.getByLabel('搜索进度').press('Enter')
         await panel
           .getByRole('button', {
             name: `查看 ${prefix}-0025 进度`,
@@ -1626,6 +1634,7 @@ export function createMobileProgressScenarios({
           )
           await page.getByTestId('mobile-role-nav-progress').click()
           await panel.getByLabel('搜索进度').fill('未匹配的模拟订单')
+          await panel.getByLabel('搜索进度').press('Enter')
           await panel.getByText('没有符合条件的记录', { exact: true }).waitFor()
           for (const width of [320, 430]) {
             await page.setViewportSize({ width, height: 844 })
@@ -1757,6 +1766,8 @@ export function createMobileProgressScenarios({
       await blocked.click()
       await panel.getByRole('button', { name: '查看 MO-0001 进度', exact: true }).waitFor()
       await panel.getByRole('button', { name: '清除搜索', exact: true }).click()
+      const cancelSearch = panel.getByRole('button', { name: '取消搜索', exact: true })
+      if (await cancelSearch.count()) await cancelSearch.click()
       await panel.getByRole('button', { name: '筛选进度', exact: true }).click()
       assert.equal(await filters.locator('input, select, textarea').count(), 0)
       assert.equal(await filters.getByRole('button', { name: '自定义交期日期', exact: true }).count(), 0)

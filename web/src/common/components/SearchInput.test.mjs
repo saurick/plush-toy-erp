@@ -28,12 +28,12 @@ function collectJsxFiles(directory) {
 test('shared search input owns prefix, accessibility and control rhythm', () => {
   assert.match(
     componentSource,
-    /className=\{joinClassNames\('erp-search-input'/u
+    /className=\{joinClassNames\(\s*'erp-search-input'/u
   )
   assert.match(componentSource, /allowClear = false/u)
   assert.match(
     componentSource,
-    /prefix=\{<SearchOutlined aria-hidden="true" \/>\}/u
+    /<SearchOutlined aria-hidden="true" \/>/u
   )
   assert.match(componentSource, /searchHint \|\| placeholder/u)
   assert.match(componentSource, /aria-label=\{accessibleLabel\}/u)
@@ -59,7 +59,7 @@ test('search icons and connected search inputs only come from the shared compone
       .sort()
   const directPrefixSources = toRelativePaths(
     jsxSources.filter(({ source }) =>
-      /prefix=\{\s*<SearchOutlined\b/u.test(source)
+      /<SearchOutlined aria-hidden="true"/u.test(source)
     )
   )
   const connectedSearchSources = toRelativePaths(
@@ -105,4 +105,51 @@ test('search scope is discoverable on focus, dismisses on Escape and blur, and p
   await act(async () => input.blur())
   assert.equal(input.getAttribute('aria-describedby'), initialDescription)
   assert.deepEqual(calls, ['focus', 'enter', 'blur', 'focus', 'blur'])
+})
+
+test('desktop and mobile search submit once, support clear and cancel, and collapse on submission', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { Simulate }, { default: SearchInput }, { default: MobileSearchInput }] = await Promise.all([
+    import('react-dom/client'), import('react-dom/test-utils'), import('./SearchInput.jsx'), import('./navigation/MobileSearchInput.jsx'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); dom.restore() })
+  for (const Component of [SearchInput, MobileSearchInput]) {
+    const queries = []
+    await act(async () => root.render(createElement(Component, { allowClear: true, value: '', onSearch: (value) => queries.push(value) })))
+    const input = container.querySelector('input')
+    const type = (value) => act(async () => { input.value = value; Simulate.change(input) })
+    await act(async () => input.focus())
+    await type(' 草稿 ')
+    assert.deepEqual(queries, [])
+    const imeConfirm = new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    await act(async () => { Simulate.compositionStart(input); input.dispatchEvent(imeConfirm); Simulate.keyUp(input, { key: 'Enter' }) })
+    assert.equal(imeConfirm.defaultPrevented, false, 'confirming an IME candidate must not be cancelled')
+    assert.deepEqual(queries, [])
+    await act(async () => Simulate.compositionEnd(input))
+    assert.deepEqual(queries, [])
+    await act(async () => container.querySelector('.erp-search-submit').click())
+    assert.deepEqual(queries, ['草稿'])
+    assert.equal(input.value, '草稿')
+    if (Component === MobileSearchInput) {
+      assert.equal(container.querySelector('.erp-mobile-search--expanded'), null)
+      assert.notEqual(document.activeElement, input, 'submission dismisses the soft keyboard without waiting for a response')
+    }
+    await act(async () => input.focus())
+    await type('放弃草稿')
+    await act(async () => Simulate.keyDown(input, { key: 'Escape' }))
+    assert.equal(input.value, '草稿')
+    assert.deepEqual(queries, ['草稿'])
+    await act(async () => input.focus())
+    await type('回车提交')
+    await act(async () => Simulate.keyDown(input, { key: 'Enter' }))
+    assert.deepEqual(queries, ['草稿', '回车提交'])
+    await act(async () => container.querySelector('.erp-search-submit').click())
+    assert.deepEqual(queries, ['草稿', '回车提交'])
+    await act(async () => container.querySelector('[aria-label="清除搜索"]').click())
+    assert.deepEqual(queries, ['草稿', '回车提交', ''])
+  }
 })

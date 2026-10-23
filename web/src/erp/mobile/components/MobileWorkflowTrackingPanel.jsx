@@ -5,7 +5,6 @@ import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
 import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
 import { listWorkflowTracking } from '../../api/workflowApi.mjs'
@@ -47,20 +46,14 @@ import { usePageLoadFeedback } from '../../components/PageLoadFeedback.jsx'
 import '../mobileWorkflowTracking.css'
 
 function TrackingSearch({ value, onSearch }) {
-  const search = useLiveSearch({ value, onSearch })
+  const search = { value, onSearch }
   return (
     <MobileSearchInput
       aria-label="搜索流转记录"
       placeholder="单号/任务"
       title="搜索单号、任务、产品或款号"
       maxLength={100}
-      value={search.value}
-      onChange={search.onChange}
-      onCompositionStart={search.onCompositionStart}
-      onCompositionEnd={search.onCompositionEnd}
-      onPressEnter={search.onPressEnter}
-      clearVisible={Boolean(search.value)}
-      onClear={() => search.onChange({ currentTarget: { value: '' } })}
+      {...search}
     />
   )
 }
@@ -388,7 +381,7 @@ function MobileTrackingContent({
             </Button>
           </>
         ) : null}
-        <div className="mobile-workflow-tracking-search">
+        <div className="mobile-workflow-tracking-search erp-mobile-search-row">
           <TrackingSearch
             key={scope}
             value={query.keyword}

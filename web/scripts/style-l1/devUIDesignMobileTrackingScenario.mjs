@@ -211,11 +211,13 @@ export function createDevUIDesignMobileTrackingScenario({
       const search =
         exceptionTracking.getByLabel('搜索异常单号、订单、批次或原因')
       await search.fill('无匹配')
+      await search.press('Enter')
       await exceptionTracking
         .getByText('当前条件下没有匹配记录', { exact: true })
         .waitFor()
       assert.deepEqual(await counts(), ['0', '0', '0'])
       await search.fill('')
+      await search.press('Enter')
       await exceptionTracking
         .getByRole('button', { name: '查看异常关联任务', exact: true })
         .waitFor()

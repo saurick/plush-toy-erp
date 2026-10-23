@@ -3473,6 +3473,17 @@
     ui-select .design-select-clear[hidden] { display: none; }
 .role-help-preview.help-role-empty .help-sidebar,.role-help-preview.help-role-empty .help-main > :not(.manual-role-tools):not(.empty-state){display:none}
 .role-help-preview.help-role-empty .layout{grid-template-columns:1fr}
+    .search[data-submitted-search], .rm-search[data-submitted-search] { padding-right:1px; }
+    .demo-search-submit { flex-shrink:0; min-height:calc(var(--control-h) - 4px); padding-inline:12px; }
+    .demo-search-clear, .demo-search-cancel { flex-shrink:0; border:0; background:transparent; color:var(--text-2); cursor:pointer; }
+    .rm-search[data-submitted-search] { width:100%; position:relative; transition:width 180ms ease; }
+    .rm-search.search-expanded { width:var(--search-expanded-width,100%); z-index:2; }
+    .rm-query:has(.search-expanded) > :not(.search-expanded) { visibility:hidden; }
+    .rm-search .demo-search-submit, .rm-search .demo-search-clear, .rm-search .demo-search-cancel { min-width:44px; height:44px; }
+    .rm-search .demo-search-cancel { display:none; margin-left:-10px; }
+    .rm-search.search-expanded .demo-search-cancel { display:block; }
+    .rm-search.search-expanded > svg { display:none; }
+    @media (prefers-reduced-motion:reduce) { .rm-search[data-submitted-search] { transition:none; } }
 </style>
 </head>
 <body data-mode="light" data-density="standard">
@@ -4785,6 +4796,61 @@
       if (['ready','quality','pending','partial','frozen','concession','returned','credit'].includes(row.status) || row.risk === '临近交付') return 'warning';
       if (['engineering','approved','receiving','production','confirmed','released','running','issued','returning','inspecting','reserved'].includes(row.status)) return 'info';
       return '';
+    }
+
+    function bindSubmittedSearch(input) {
+      if (!input || input.dataset.submittedSearch) return;
+      input.dataset.submittedSearch = 'true';
+      const wrapper = input.closest('.search, .rm-search') || input.parentElement;
+      wrapper.dataset.submittedSearch = 'true';
+      const mobile = wrapper.classList.contains('rm-search');
+      const initial = input.value;
+      let composing = false;
+      const collapse = () => { wrapper.classList.remove('search-expanded'); input.blur(); };
+      const button = (label, className, action) => {
+        const node = document.createElement('button'); node.type='button'; node.className=className;
+        node.textContent=label; node.setAttribute('aria-label', label);
+        node.addEventListener('mousedown', event=>event.preventDefault());
+        node.addEventListener('click', event=>{event.preventDefault();event.stopPropagation();action();});
+        return node;
+      };
+      const submit = (clear = false) => {
+        if (composing && !clear) return;
+        const next = clear ? '' : input.value.trim();
+        const expandedWidth = mobile ? wrapper.getBoundingClientRect().width : 0;
+        input.value=next;
+        if (mobile) collapse();
+        if (next !== initial) {
+          input.value=next; input.dispatchEvent(new Event('search-submit'));
+        }
+        const restored = document.getElementById(input.id);
+        if (mobile && !clear && restored && restored !== input) {
+          const nextWrapper=restored.closest('.rm-search');
+          nextWrapper.style.setProperty('--search-expanded-width',`${expandedWidth}px`);
+          nextWrapper.classList.add('search-expanded');nextWrapper.getBoundingClientRect();
+          requestAnimationFrame(()=>nextWrapper.classList.remove('search-expanded'));
+        }
+        if (clear) restored?.focus();
+      };
+      const clear = button('清除搜索','demo-search-clear',()=>submit(true)); clear.textContent='×';
+      const refreshClear = () => {clear.hidden=!(input.value || initial);}; refreshClear();
+      wrapper.append(clear,button('搜索','btn primary demo-search-submit',()=>submit()));
+      if (mobile) {
+        const cancel = button('取消搜索','demo-search-cancel',()=>{input.value=initial;refreshClear();collapse();}); cancel.textContent='←';wrapper.prepend(cancel);
+        input.enterKeyHint='search';
+        input.addEventListener('focus',()=>{
+          const row=wrapper.closest('.rm-query');
+          if(row)wrapper.style.setProperty('--search-expanded-width',`${row.getBoundingClientRect().right-parseFloat(getComputedStyle(row).paddingRight)-wrapper.getBoundingClientRect().left}px`);
+          wrapper.classList.add('search-expanded');
+        });
+      }
+      input.addEventListener('input',refreshClear);
+      input.addEventListener('compositionstart',()=>{composing=true;});
+      input.addEventListener('compositionend',()=>{composing=false;});
+      input.addEventListener('keydown',event=>{
+        if(event.key==='Enter'&&!composing&&!event.isComposing&&event.keyCode!==229){event.preventDefault();submit();}
+        if(event.key==='Escape'){input.value=initial;refreshClear();collapse();}
+      });
     }
 
     function renderProductArt(seed = 0, label = '产品') {
@@ -17454,34 +17520,35 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
           renderView(); document.getElementById(id)?.focus();
         });
       }
-      document.querySelector('#list-search')?.addEventListener('input', e => { state.search = e.target.value; state.pageNo = 1; renderView(); document.querySelector('#list-search')?.focus(); setCaretEnd(document.querySelector('#list-search')); });
+      document.querySelector('#list-search')?.addEventListener('search-submit', e => { state.search = e.target.value; state.pageNo = 1; renderView(); document.querySelector('#list-search')?.focus(); setCaretEnd(document.querySelector('#list-search')); });
       document.querySelector('#business-page-size')?.addEventListener('change', e => { state.businessPageSize = Number(e.target.value); state.pageNo = 1; renderView(); });
       document.querySelector('#history-source')?.addEventListener('change', e => { state.historySource = e.target.value; state.search = ''; state.status = 'all'; state.pageNo = 1; state.selected.clear(); renderView(); document.querySelector('#history-source')?.focus(); });
-      document.querySelector('#board-search')?.addEventListener('input', e => { state.boardSearch = e.target.value; renderView(); document.querySelector('#board-search')?.focus(); setCaretEnd(document.querySelector('#board-search')); });
+      document.querySelector('#board-search')?.addEventListener('search-submit', e => { state.boardSearch = e.target.value; renderView(); document.querySelector('#board-search')?.focus(); setCaretEnd(document.querySelector('#board-search')); });
       document.querySelector('[data-tracking-page-size]')?.addEventListener('change',event=>{state.trackingPageSizes[state.boardMode]=Number(event.target.value);renderView();});
       document.querySelector('[data-mobile-tracking-scope]')?.addEventListener('change',event=>{saveMobileTrackingScroll();state.mobileTrackingScope=event.target.value;state.mobileOptionsOpen=false;renderView();});
       document.querySelector('[data-mobile-sort]')?.addEventListener('change',event=>{state.mobileSort=event.target.value;state.mobileVisibleCount=4;renderView();});
-      document.querySelectorAll('#view [data-tracking-filter]').forEach(input=>input.addEventListener(input.dataset.trackingFilter==='keyword'?'input':'change',event=>{
+      document.querySelectorAll('#view [data-tracking-filter]').forEach(input=>input.addEventListener(input.dataset.trackingFilter==='keyword'?'search-submit':'change',event=>{
         const key=input.dataset.trackingFilter;
         state.trackingFilters[state.boardMode]=normalizeTrackingDemoFilters({...state.trackingFilters[state.boardMode],[key]:event.target.value});
         renderView();const next=document.querySelector(`[data-tracking-filter="${key}"]`);next?.focus();if(key==='keyword')setCaretEnd(next);
       }));
-      document.querySelector('#progress-search')?.addEventListener('input', e => { state.progressSearch = e.target.value; renderView(); document.querySelector('#progress-search')?.focus(); setCaretEnd(document.querySelector('#progress-search')); });
+      document.querySelector('#progress-search')?.addEventListener('search-submit', e => { state.progressSearch = e.target.value; renderView(); document.querySelector('#progress-search')?.focus(); setCaretEnd(document.querySelector('#progress-search')); });
       document.querySelector('#production-route-order')?.addEventListener('change', e => { state.productionRouteOrder = e.target.value; refreshVisual(); });
-      document.querySelector('#production-route-search')?.addEventListener('input', e => { state.productionRouteSearch = e.target.value; renderView(); document.querySelector('#production-route-search')?.focus(); setCaretEnd(document.querySelector('#production-route-search')); });
-      document.querySelector('#delivery-search')?.addEventListener('input', e => { state.deliverySearch = e.target.value; renderView(); document.querySelector('#delivery-search')?.focus(); setCaretEnd(document.querySelector('#delivery-search')); });
-      document.querySelector('#finance-due-search')?.addEventListener('input', e => { state.financeDueSearch = e.target.value; renderView(); document.querySelector('#finance-due-search')?.focus(); setCaretEnd(document.querySelector('#finance-due-search')); });
-      document.querySelector('#dashboard-summary-search')?.addEventListener('input', e => { state.dashboardSummarySearch = e.target.value; renderView(); document.querySelector('#dashboard-summary-search')?.focus(); setCaretEnd(document.querySelector('#dashboard-summary-search')); });
-      document.querySelector('#audit-search')?.addEventListener('input', e => { state.auditSearch = e.target.value; renderView(); document.querySelector('#audit-search')?.focus(); setCaretEnd(document.querySelector('#audit-search')); });
+      document.querySelector('#production-route-search')?.addEventListener('search-submit', e => { state.productionRouteSearch = e.target.value; renderView(); document.querySelector('#production-route-search')?.focus(); setCaretEnd(document.querySelector('#production-route-search')); });
+      document.querySelector('#delivery-search')?.addEventListener('search-submit', e => { state.deliverySearch = e.target.value; renderView(); document.querySelector('#delivery-search')?.focus(); setCaretEnd(document.querySelector('#delivery-search')); });
+      document.querySelector('#finance-due-search')?.addEventListener('search-submit', e => { state.financeDueSearch = e.target.value; renderView(); document.querySelector('#finance-due-search')?.focus(); setCaretEnd(document.querySelector('#finance-due-search')); });
+      document.querySelector('#dashboard-summary-search')?.addEventListener('search-submit', e => { state.dashboardSummarySearch = e.target.value; renderView(); document.querySelector('#dashboard-summary-search')?.focus(); setCaretEnd(document.querySelector('#dashboard-summary-search')); });
+      document.querySelector('#audit-search')?.addEventListener('search-submit', e => { state.auditSearch = e.target.value; renderView(); document.querySelector('#audit-search')?.focus(); setCaretEnd(document.querySelector('#audit-search')); });
       document.querySelector('#audit-result')?.addEventListener('change', e => { state.auditResult = e.target.value; renderView(); });
       document.querySelector('#audit-date')?.addEventListener('change', e => { state.auditDate = e.target.value; renderView(); });
-      document.querySelector('#mobile-tracking-search')?.addEventListener('input', event=>{changeMobileTrackingQuery({keyword:event.target.value});const input=document.querySelector('#mobile-tracking-search');input?.focus();setCaretEnd(input);});
+      document.querySelector('#mobile-tracking-search')?.addEventListener('search-submit', event=>{changeMobileTrackingQuery({keyword:event.target.value});});
       document.querySelectorAll('[data-mobile-tracking-field]').forEach(input=>input.addEventListener('change',()=>changeMobileTrackingQuery({[input.dataset.mobileTrackingField]:input.value})));
-      document.querySelector('#mobile-exception-search')?.addEventListener('input',e=>{state.mobileExceptionSearch=e.target.value;renderView();document.querySelector('#mobile-exception-search')?.focus();setCaretEnd(document.querySelector('#mobile-exception-search'));});
-      document.querySelector('#mobile-task-search')?.addEventListener('input', e => { if(state.mobileMain==='tasks'&&state.mobileTab==='done') state.mobileHistorySearch=e.target.value; else state.mobileSearch = e.target.value; state.mobileVisibleCount = 4; renderView(); document.querySelector('#mobile-task-search')?.focus(); setCaretEnd(document.querySelector('#mobile-task-search')); });
-      document.querySelector('#mobile-progress-search')?.addEventListener('input', e => { state.mobileProgressSearch = e.target.value; renderView(); document.querySelector('#mobile-progress-search')?.focus(); setCaretEnd(document.querySelector('#mobile-progress-search')); });
-      document.querySelector('#permission-search')?.addEventListener('input', e => { state.permissionSearch = e.target.value; state.permissionOpenGroups=new Set(permissionGroupsData.map(([key])=>key)); renderView(); document.querySelector('#permission-search')?.focus(); setCaretEnd(document.querySelector('#permission-search')); });
-      document.querySelector('#permission-account-search')?.addEventListener('input',e=>{state.permissionAccountSearch=e.target.value;renderView();const input=document.querySelector('#permission-account-search');input?.focus();setCaretEnd(input);});
+      document.querySelector('#mobile-exception-search')?.addEventListener('search-submit',e=>{state.mobileExceptionSearch=e.target.value;renderView();});
+      document.querySelector('#mobile-task-search')?.addEventListener('search-submit', e => { if(state.mobileMain==='tasks'&&state.mobileTab==='done') state.mobileHistorySearch=e.target.value; else state.mobileSearch = e.target.value; state.mobileVisibleCount = 4; renderView();  });
+      document.querySelector('#mobile-progress-search')?.addEventListener('search-submit', e => { state.mobileProgressSearch = e.target.value; renderView();  });
+      document.querySelector('#permission-search')?.addEventListener('search-submit', e => { state.permissionSearch = e.target.value; state.permissionOpenGroups=new Set(permissionGroupsData.map(([key])=>key)); renderView(); document.querySelector('#permission-search')?.focus(); setCaretEnd(document.querySelector('#permission-search')); });
+      document.querySelector('#permission-account-search')?.addEventListener('search-submit',e=>{state.permissionAccountSearch=e.target.value;renderView();const input=document.querySelector('#permission-account-search');input?.focus();setCaretEnd(input);});
+      document.querySelectorAll('#list-search, #board-search, #progress-search, #production-route-search, #delivery-search, #finance-due-search, #dashboard-summary-search, #audit-search, #mobile-tracking-search, #mobile-exception-search, #mobile-task-search, #mobile-progress-search, #permission-search, #permission-account-search, [data-tracking-filter="keyword"]').forEach(bindSubmittedSearch);
       document.querySelector('#permission-account-status')?.addEventListener('change',e=>{state.permissionAccountStatus=e.target.value;renderView();});
       document.querySelector('#permission-account-form')?.addEventListener('input',()=>{state.permissionAccountDirty=true;});
       document.querySelector('#permission-access-module')?.addEventListener('change',e=>{state.permissionAccessModule=e.target.value;renderView();});

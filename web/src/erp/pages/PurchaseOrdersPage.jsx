@@ -1429,7 +1429,6 @@ export default function PurchaseOrdersPage() {
           setPagination((current) => ({ ...current, current: 1 }))
         }}
         showLifecyclePrimary={showLifecyclePrimary}
-        loadOrders={loadOrders}
         openCreateModal={openCreateModal}
         openEditModal={openEditModal}
         openDetails={openPurchaseOrderDetails}

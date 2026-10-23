@@ -18,7 +18,7 @@ test('共享筛选只在存在可清空的条件时显示直接清空入口', as
   assert.ok(clear())
   assert.equal(document.querySelector('button button'), null, '打开和清空使用两个独立按钮')
   await harness.render(createElement(BusinessOperationPanel, {
-    filters: createElement(SearchInput, { value: '', onChange() {} }),
+    filters: createElement(SearchInput, { value: '', onSearch() {} }),
     onClearFilters() {},
     activeFilterCount: 1,
   }))
@@ -36,7 +36,7 @@ test('直接清空只调用一次原回调、恢复结果与焦点，重新筛�
       onClearFilters() { cleared += 1; setStatus('') },
       activeFilterCount: Number(Boolean(status)),
       onFiltersOpenChange(open) { opens.push(open) },
-      filters: createElement(React.Fragment, null, createElement(SearchInput, { value: '小熊', onChange() {} }), createElement(SelectFilter, {
+      filters: createElement(React.Fragment, null, createElement(SearchInput, { value: '小熊', onSearch() {} }), createElement(SelectFilter, {
           'aria-label': '任务状态',
 value: status,
 onChange: setStatus,

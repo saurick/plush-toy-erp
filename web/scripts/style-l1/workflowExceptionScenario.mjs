@@ -85,6 +85,7 @@ export function workflowExceptionScenario(deps) {
       await panel.getByText('当前条件下没有可跟踪的异常', { exact: true }).waitFor()
       assert.deepEqual(await counts(), ['0', '0', '0'])
       await search.fill('')
+      await search.press('Enter')
       await panel.getByText('EX-DESKTOP-001', { exact: true }).waitFor()
       assert.equal(await panel.getByRole('heading', { name: '异常跟踪', exact: true }).count(), 0)
       assert.equal(await panel.getByText('查看明细', { exact: true }).count(), 0)

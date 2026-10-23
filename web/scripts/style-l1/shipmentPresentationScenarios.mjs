@@ -63,7 +63,11 @@ export function createShipmentSourceCandidateAssertions(deps) {
       .last()
     await failedPicker.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '加载销售订单来源失败')
+    const initialSourceRequests = shipmentSourceCandidateParams.length
     await failedPicker.locator('.ant-input').first().fill('SO-STYLE-L1')
+    await page.waitForTimeout(400)
+    assert.equal(shipmentSourceCandidateParams.length, initialSourceRequests, '来源搜索输入不触发请求')
+    await failedPicker.locator('.ant-input').first().press('Enter')
     await failedPicker
       .getByText('SO-STYLE-L1', { exact: true })
       .first()
@@ -99,10 +103,12 @@ export function createShipmentSourceCandidateAssertions(deps) {
       .waitFor({ state: 'visible' })
     const searchInput = failedPicker.locator('.ant-input').first()
     await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
+    await searchInput.press('Enter')
     await failedPicker
       .getByText('暂无可导入销售订单行', { exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
     await searchInput.fill('')
+    await searchInput.press('Enter')
     const firstPageSourceRow = failedPicker
       .locator('.ant-table-row')
       .filter({ hasText: 'PROD-STYLE-L1-01' })

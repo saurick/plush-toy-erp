@@ -14,7 +14,6 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import SearchInput from '@/common/components/SearchInput'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
 import {
@@ -206,7 +205,7 @@ export default function WorkflowExceptionPanel({
     setLoadedCount(listPosition?.loadedCount || 20)
     setView('')
   }
-  const search = useLiveSearch({ value: keyword, onSearch: (value) => { setKeyword(value); resetPosition() } })
+  const search = { value: keyword, onSearch: (value) => { setKeyword(value); resetPosition() } }
   const openTask = async (id) => {
     if (taskRead.current && !taskRead.current.signal.aborted) return
     const controller = new AbortController()
@@ -272,27 +271,18 @@ export default function WorkflowExceptionPanel({
     <div className="workflow-exceptions__controls">
       {!compact && stateFilters}
       {!compact && filterControls}
-      <div className="workflow-exceptions__query">
+      <div className="workflow-exceptions__query erp-mobile-search-row">
         {compact ? <MobileSearchInput
           aria-label="搜索异常单号、订单、批次或原因"
           placeholder="单号/原因"
           title="搜索异常单号、订单、批次或原因"
-          value={search.value}
-          onChange={search.onChange}
-          onCompositionStart={search.onCompositionStart}
-          onCompositionEnd={search.onCompositionEnd}
-          onPressEnter={search.onPressEnter}
-          onClear={() => search.onChange({ currentTarget: { value: '' } })}
+          {...search}
         /> : <SearchInput
-          value={search.value}
+          {...search}
           aria-label="搜索异常单号、订单、批次或原因"
           placeholder="异常单号 / 订单 / 批次 / 原因"
           maxLength={100}
           allowClear
-          onChange={search.onChange}
-          onCompositionStart={search.onCompositionStart}
-          onCompositionEnd={search.onCompositionEnd}
-          onPressEnter={search.onPressEnter}
         />}
 
       </div>
