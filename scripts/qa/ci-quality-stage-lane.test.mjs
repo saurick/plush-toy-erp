@@ -220,6 +220,10 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
   for (const scenario of [
     "sales-order-demand-and-material-approval-desktop",
     "material-summary-task-light",
+    "work-center-table-tasks-light",
+    "work-center-table-tasks-dark",
+    "task-calendar-desktop-light",
+    "task-calendar-desktop-dark",
   ]) {
     assert(CI_BROWSER_QUALITY_SCENARIOS.includes(scenario), scenario);
   }

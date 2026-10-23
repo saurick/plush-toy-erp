@@ -6,6 +6,76 @@ import { createBusinessListStickyScenarios } from './businessListStickyScenarios
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
+async function verifyTaskViewKeyboardRecovery(page, assert) {
+  const tabs = page.getByRole('tablist', { name: '待办显示方式', exact: true })
+  const list = tabs.getByRole('tab', { name: '列表', exact: true })
+  const calendarTab = tabs.getByRole('tab', { name: '日历', exact: true })
+  const calendar = page.getByRole('region', { name: '待办日历', exact: true })
+  const pager = page.locator('.erp-task-pagination')
+  const rows = page.locator('.erp-work-center-table tr[data-row-key]')
+  const waitForList = async () => {
+    await pager.getByText('第 51-100 条 / 共 105 条', { exact: true }).waitFor()
+    await page.waitForFunction(() => document.querySelectorAll('.erp-work-center-table tr[data-row-key]').length === 50)
+    await page.locator('.erp-task-board-lanes[aria-busy="false"]').waitFor()
+  }
+  const search = page.getByPlaceholder('订单 / 产品 / 物料 / 款号', { exact: true })
+  await search.fill('核对')
+  await search.press('Enter')
+  await page.waitForURL((url) => url.searchParams.get('q') === '核对')
+  await page.locator('.erp-task-board-lanes[aria-busy="false"]').waitFor()
+  await pager.locator('.ant-select-selector').click()
+  await page.locator('.ant-select-dropdown:visible').getByText('50 条/页', { exact: true }).click()
+  await pager.getByText('第 1-50 条 / 共 105 条', { exact: true }).waitFor()
+  await pager.getByRole('button', { name: '下一页', exact: true }).click()
+  await waitForList()
+  const originalRows = await rows.evaluateAll((nodes) => nodes.map((node) => node.dataset.rowKey))
+  const originalQuery = Object.fromEntries(new URL(page.url()).searchParams)
+  const originalTabs = await tabs.elementHandle()
+  const verifyQuery = () => {
+    for (const [key, value] of Object.entries(originalQuery)) assert.equal(new URL(page.url()).searchParams.get(key), value, `切换视图保留查询条件 ${key}`)
+  }
+  await list.focus()
+  for (const [key, layout] of [['ArrowRight', 'calendar'], ['ArrowLeft', 'list'], ['End', 'calendar'], ['Home', 'list']]) {
+    await page.keyboard.press(key)
+    if (layout === 'calendar') await calendar.waitFor()
+    else await waitForList()
+    const selected = layout === 'calendar' ? calendarTab : list
+    const other = layout === 'calendar' ? list : calendarTab
+    assert.equal(await selected.getAttribute('aria-selected'), 'true', `${key} 选中对应视图`)
+    assert.equal(await selected.getAttribute('tabindex'), '0')
+    assert.equal(await other.getAttribute('tabindex'), '-1')
+    assert(await selected.evaluate((node) => node === document.activeElement), `${key} 将焦点移到选中页签`)
+    assert(await originalTabs.evaluate((node) => node.isConnected), '键盘切换保留同一个页签条')
+    assert.equal(new URL(page.url()).searchParams.get('layout'), layout === 'calendar' ? 'calendar' : null)
+    verifyQuery()
+  }
+  await originalTabs.dispose()
+  await page.keyboard.press('Tab')
+  assert.equal(await tabs.evaluate((node) => node.contains(document.activeElement)), false, 'Tab 键离开页签组，不重复停在未选中项')
+  await list.focus()
+  const focus = await list.evaluate((node) => ({ visible: node.matches(':focus-visible'), style: getComputedStyle(node).outlineStyle, width: parseFloat(getComputedStyle(node).outlineWidth) }))
+  assert(focus.visible && focus.style !== 'none' && focus.width > 0, `键盘焦点可见：${JSON.stringify(focus)}`)
+  await calendarTab.click()
+  await calendar.waitFor()
+  const calendarURL = page.url()
+  await page.reload()
+  await calendar.waitFor()
+  assert.equal(page.url(), calendarURL, '刷新保留日历视图与列表查询条件')
+  assert.equal(await calendarTab.getAttribute('aria-selected'), 'true')
+  assert.equal(await search.inputValue(), '核对')
+  await list.click()
+  await waitForList()
+  assert.deepEqual(await rows.evaluateAll((nodes) => nodes.map((node) => node.dataset.rowKey)), originalRows, '日历返回后恢复原页记录')
+  const listURL = page.url()
+  await page.reload()
+  await waitForList()
+  assert.equal(page.url(), listURL, '刷新保留列表页码、每页条数和搜索条件')
+  assert.equal(await list.getAttribute('aria-selected'), 'true')
+  assert.equal(new URL(page.url()).searchParams.get('layout'), null)
+  assert.equal(await search.inputValue(), '核对')
+  assert.deepEqual(await rows.evaluateAll((nodes) => nodes.map((node) => node.dataset.rowKey)), originalRows, '列表刷新后恢复同一页记录')
+}
+
 async function verifyStickyTable(page, assert) {
   await page.locator('.erp-work-center-table .ant-table-sticky-holder').waitFor()
   await page.locator('.erp-admin-content').evaluate((node) => { node.scrollTop = 260 })
@@ -187,6 +257,7 @@ export function createWorkCenterTableScenarios(deps) {
         await page.locator('.workflow-task-calendar').waitFor()
         await verifyMobileNavigationMotion(page, assert, switchSelector, 0, true)
         await verifyStickyTable(page, assert)
+        await verifyTaskViewKeyboardRecovery(page, assert)
       }
     },
   }))

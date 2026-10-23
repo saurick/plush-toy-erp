@@ -6,6 +6,7 @@ import { currentBusinessDate, unixSecondsToBusinessDate } from '../../src/erp/ut
 import { shiftCalendarMonth } from '../../src/erp/utils/workflowTaskCalendar.mjs'
 import { WORKFLOW_TASKS_CHANGED } from '../../src/erp/utils/workflowTaskChanges.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
+import { assertContentTabAffordance } from './controlAffordanceAssertions.mjs'
 
 async function verifyCalendarAlignment(calendar, assert) {
   const geometry = await calendar.evaluate((root) => {
@@ -48,6 +49,7 @@ export function createTaskCalendarScenarios(deps) {
   const desktopBase = createDashboardTaskScenarios(deps).find((scenario) => scenario.name === 'erp-task-board-desktop')
   return [
     { mobile: false, themeMode: 'light', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
+    { mobile: false, themeMode: 'dark', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 },
     { mobile: true, themeMode: 'light', viewport: { width: 390, height: 844 }, deviceScaleFactor: 3 },
     { mobile: true, themeMode: 'dark', viewport: { width: 320, height: 844 }, deviceScaleFactor: 3 },
   ].map(({ mobile, themeMode, viewport, deviceScaleFactor }) => {
@@ -130,11 +132,19 @@ revision,
       verify: async (page) => {
         const switcher = '[aria-label="待办显示方式"]'
         const verifyLayout = async (layout) => {
-          if (!mobile) return
-          const button = page.getByRole('button', { name: layout === 'calendar' ? '切换到列表' : '切换到日历', exact: true })
-          await button.waitFor()
-          assert.equal(await button.getAttribute('aria-pressed'), String(layout === 'calendar'), '日历按钮的选中状态与当前内容一致')
-          assert.equal(await button.locator('svg').getAttribute('data-icon'), layout === 'calendar' ? 'calendar' : 'unordered-list', '图标表示当前视图')
+          if (mobile) {
+            const button = page.getByRole('button', { name: layout === 'calendar' ? '切换到列表' : '切换到日历', exact: true })
+            await button.waitFor()
+            assert.equal(await button.getAttribute('aria-pressed'), String(layout === 'calendar'), '日历按钮的选中状态与当前内容一致')
+            assert.equal(await button.locator('svg').getAttribute('data-icon'), layout === 'calendar' ? 'calendar' : 'unordered-list', '图标表示当前视图')
+          } else {
+            const tabs = page.getByRole('tablist', { name: '待办显示方式', exact: true })
+            const selected = tabs.getByRole('tab', { name: layout === 'calendar' ? '日历' : '列表', selected: true, exact: true })
+            await selected.waitFor()
+            assert.equal(await selected.getAttribute('tabindex'), '0')
+            await assertContentTabAffordance(tabs)
+          }
+          assert.equal(await page.locator('html').getAttribute('data-erp-theme'), themeMode, '场景使用指定的浅色或深色主题')
           assert.equal(await page.getByRole('region', { name: '待办日历', exact: true }).count(), layout === 'calendar' ? 1 : 0)
           assert.equal(new URL(page.url()).searchParams.get('layout'), layout === 'calendar' ? 'calendar' : null)
         }
@@ -300,16 +310,19 @@ revision,
           const filters = page.getByRole('dialog', { name: '筛选任务', exact: true })
           assert.equal(await filters.getByText('任务排序', { exact: true }).count(), 0)
           await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-          await page.getByRole('searchbox').fill('未设置截止的跟进')
-          await page.getByRole('searchbox').press('Enter')
-          await selectBucket('undated')
-          await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
-          await page.reload()
-          await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
-          assert.equal(await page.getByRole('searchbox').inputValue(), '未设置截止的跟进', 'changing the calendar date preserves mobile search on reload')
-          await page.getByRole('searchbox').fill('')
-          await page.getByRole('searchbox').press('Enter')
         }
+        await search.fill('未设置截止的跟进')
+        await search.press('Enter')
+        await selectBucket('undated')
+        await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
+        const filteredCalendarURL = page.url()
+        await page.reload()
+        await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
+        await verifyLayout('calendar')
+        assert.equal(page.url(), filteredCalendarURL, '刷新保留日历视图、选定范围与搜索条件')
+        assert.equal(await search.inputValue(), '未设置截止的跟进', '刷新后搜索框与当前日历结果一致')
+        await search.fill('')
+        await search.press('Enter')
         await selectBucket('undated')
         await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
         await calendar.locator('.erp-task-timing').getByText('未设置截止', { exact: true }).waitFor()

@@ -151,6 +151,10 @@ export const CI_BROWSER_QUALITY_SCENARIOS = Object.freeze([
   "print-center-engineering-preview-tablet",
   "sales-order-demand-and-material-approval-desktop",
   "material-summary-task-light",
+  "work-center-table-tasks-light",
+  "work-center-table-tasks-dark",
+  "task-calendar-desktop-light",
+  "task-calendar-desktop-dark",
 ]);
 
 export const CI_BROWSER_QUALITY_LANES = Object.freeze({
@@ -175,6 +179,10 @@ export const CI_BROWSER_QUALITY_LANES = Object.freeze({
       "print-center-engineering-preview-tablet",
       "sales-order-demand-and-material-approval-desktop",
       "material-summary-task-light",
+      "work-center-table-tasks-light",
+      "work-center-table-tasks-dark",
+      "task-calendar-desktop-light",
+      "task-calendar-desktop-dark",
     ]),
   }),
 });
