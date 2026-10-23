@@ -6,7 +6,7 @@
 
 部署 / 回滚复用 GitLab 环境与回执包，工作台保留汇总、项目检查和操作。[协议](scripts/deploy/README.md#gitlab-部署登记与回执归档)。183 条历史操作、22 份回执已归档，789 个原始文件摘要不变。
 
-`2026.10.23-1` / `013a540846fa` 通过 CI #397（28/28）、发布 #407、三环境 promotion、备份恢复及生产只读 smoke；数据库和配置不变，失败记录保留。发布身份见[客户交付矩阵](docs/customers/yoyoosun/客户交付矩阵.md#当前环境基线)。
+`2026.10.23-1` / `013a540846fa` 通过 CI #397（28/28）、发布 #407、三环境 promotion、备份恢复及生产只读 smoke；数据库和配置不变，失败记录保留。发布身份另见完整仓库的 `docs/customers/yoyoosun/客户交付矩阵.md`；客户文档不随源码包分发。
 
 独立工作台同 SHA 制品 `013a5408-fd2e6e0c45e3` 已上线，189 条终态、25 份回执及 GitLab 引用共 909 个文件校验一致。实际页面核验三环境隔离、分页筛选、项目检查和 GitLab 入口；旧版本与配置保留。证据在 ignored `output/qa/gitlab-deployment-integration/standalone-workbench/`。其他工作区改动未带入，不代表客户 UAT。
 
