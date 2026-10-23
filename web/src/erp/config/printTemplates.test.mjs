@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import { createElement } from 'react'
+import { createReactTestHarness } from '../../../scripts/test/reactRuntime.mjs'
 
 import {
   getPrintTemplateByKey,
@@ -179,23 +181,45 @@ test('printTemplates: 预览 renderer 只保留正式目录登记的模板分支
   assert.doesNotMatch(renderer, /function ProductionReportTemplate/u)
 })
 
-test('FL_print_templates_processing_preview__uses_processing_signature_and_totals printTemplates: 加工合同静态预览读取加工合同草稿字段', () => {
+test('FL_print_templates_processing_preview__uses_processing_signature_and_totals printTemplates: 加工合同静态预览读取加工合同草稿字段', async (t) => {
   const renderer = read(
     'web/src/erp/components/print/PrintTemplateRenderer.jsx'
   )
   const previewPage = read('web/src/erp/pages/PrintTemplatePreviewPage.jsx')
 
   assert.match(renderer, /resolvePrintTemplateTotals/u)
-  assert.match(renderer, /buildPrintTemplateLineCells/u)
-  assert.match(renderer, /totals\.quantityText/u)
-  assert.match(renderer, /totals\.amountText/u)
+  assert.match(renderer, /<ProcessingContractPaper contract=\{data\} readOnly preview \/>/u)
   assert.doesNotMatch(renderer, /data\.totalQuantity/u)
   assert.doesNotMatch(renderer, /data\.totalAmount/u)
   assert.doesNotMatch(renderer, /function resolveLineTotals/u)
-  assert.match(renderer, /coalescePrintValues\(data\.buyerSigner/u)
-  assert.match(renderer, /data\.buyerSignDateText/u)
-  assert.match(renderer, /renderPrintValue\(data\.supplierSigner\)/u)
   assert.match(previewPage, /<PrintTemplateRenderer template=\{template\} \/>/u)
+
+  const view = await createReactTestHarness(t)
+  const { default: PrintTemplateRenderer } = await import('../components/print/PrintTemplateRenderer.jsx')
+  const template = getPrintTemplateByKey('processing-contract')
+  await view.render(createElement(PrintTemplateRenderer, { template: {
+    ...template,
+    sample: {
+      ...template.sample,
+      buyerSigner: '预览甲方签字',
+      supplierSigner: '预览乙方签字',
+      buyerSignDateText: '2026-10-23',
+      supplierSignDateText: '2026-10-24',
+      lines: [{ quantity: '2', unitPrice: '3', amount: '6' }],
+      merges: [],
+      totalQuantity: '99999',
+      totalAmount: '99999',
+    },
+  } }))
+  const paper = view.container.querySelector('.erp-processing-contract-paper--preview')
+  assert.ok(paper)
+  const signatures = paper.querySelector('.erp-processing-contract-signature').textContent
+  for (const text of ['预览甲方签字', '预览乙方签字', '2026 年 10 月 23 日', '2026 年 10 月 24 日']) {
+    assert.ok(signatures.includes(text), text)
+  }
+  assert.deepEqual([...paper.querySelectorAll('.erp-processing-contract-table__total .erp-contract-table__total-value')].map((cell) => cell.textContent), ['2', '6.00'])
+  assert.equal(paper.textContent.includes('99999'), false)
+  assert.equal(paper.querySelector('[contenteditable="true"]'), null)
 })
 
 test('printTemplates: 打印中心模板选择以 URL 为单一真源', () => {

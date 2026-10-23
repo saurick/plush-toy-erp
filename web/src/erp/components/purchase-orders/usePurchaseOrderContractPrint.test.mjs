@@ -4,7 +4,7 @@ import test from 'node:test'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { installRpcCallHarness } from '../../../../scripts/test/rpcApiTestHarness.mjs'
 
-test('contract printing reads only source reference IDs and preserves frozen names while filling historical gaps', async (t) => {
+test('contract printing reads only source reference IDs and preserves frozen values and historical blanks', async (t) => {
   const view = await createReactTestHarness(t)
   const setHandler = installRpcCallHarness((cleanup) => t.after(cleanup))
   const calls = []
@@ -59,7 +59,8 @@ test('contract printing reads only source reference IDs and preserves frozen nam
   assert.equal(draft.contractNo, 'PO-HISTORY')
   assert.equal(draft.supplierName, '冻结供应商')
   assert.equal(draft.supplierAddress, '补全地址')
-  assert.deepEqual(draft.lines.map((line) => line.materialName), ['冻结材料', '历史停用材料'])
+  assert.deepEqual(draft.lines.map((line) => line.materialName), ['冻结材料', ''])
+  assert.deepEqual(draft.lines.map((line) => line.unit), ['', ''])
   assert.deepEqual(draft.lines.map((line) => line.quantity), ['5', '6'])
   assert.equal(print.printingContract, false)
 })

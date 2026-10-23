@@ -254,6 +254,15 @@ const allowedERPImports = new Set([
 ]);
 const allowedERPImportsByFile = new Map([
   [
+    "web/src/dev-workbench/components/DevUIPageStateExamples.jsx",
+    new Set([
+      "mobile/components/MobileTaskListContent.jsx",
+      "components/workflow/WorkflowTaskCard.jsx",
+      "components/workflow/WorkflowTaskIdentity.jsx",
+      "mobile/mobileRoleTasks.css",
+    ]),
+  ],
+  [
     "web/src/dev-workbench/components/DevUIDesignIllustrations.jsx",
     new Set(["components/business-list/BusinessCellStack.jsx"]),
   ],
@@ -460,6 +469,30 @@ test("feedback sample modal dependencies remain presentation-only", () => {
     ),
     false,
   );
+});
+
+test("page state samples reuse only the presentation task list and cannot import business pages", () => {
+  const allowed = new Set([
+    "react", "antd", "@ant-design/icons", "./MobileTaskListSkeleton.jsx",
+    "./workflowTaskCopy.css", "../../components/workflow/workflowTaskCopy.css",
+    "../../components/workflow/workflowTaskIdentity.css",
+  ]);
+  for (const file of [
+    "web/src/erp/mobile/components/MobileTaskListContent.jsx",
+    "web/src/erp/mobile/components/MobileTaskListSkeleton.jsx",
+    "web/src/erp/components/workflow/WorkflowTaskCard.jsx",
+  ]) {
+    const source = read(file);
+    for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
+      assert(allowed.has(match[1]), `${file} imports a non-presentation dependency`);
+    }
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
+  }
+  const sample = "web/src/dev-workbench/components/DevUIPageStateExamples.jsx";
+  assert.equal(isAllowedERPImport(sample, "@/erp/mobile/components/MobileTaskListContent.jsx"), true);
+  assert.equal(isAllowedERPImport(sample, "@/erp/mobile/pages/MobileRoleTasksPage.jsx"), false);
+  assert.equal(isAllowedERPImport(sample, "@/erp/api/masterDataOrderApi.mjs"), false);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/mobile/components/MobileTaskListContent.jsx"), false);
 });
 
 test("typography samples only reuse the presentation-only cell stack", () => {
