@@ -592,6 +592,9 @@ test('devDocs: workbench name changes preserve bookmarked section anchors', () =
     ['web/src/dev-workbench/pages/delivery/README.md', [
       ['交付运行页面', '交付运维页面'],
     ]],
+    ['docs/product/移动端岗位任务页改版.md', [
+      ['ui-交互设计', '交互设计'],
+    ]],
   ]
   for (const [source, bookmarks] of sources) {
     const headings = extractMarkdownHeadings(readFileSync(path.join(repoRoot, source), 'utf8'), [1, 2, 3, 4, 5, 6])

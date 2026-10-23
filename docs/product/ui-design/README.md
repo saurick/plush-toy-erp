@@ -43,7 +43,7 @@
 | 任务处理 | `/__dev/ui-design?page=task-handling` | 任务中心与业务页就地办理、工程整页编制、审批退回、入库确认与结果；BOM 版本操作、三种打印及主要业务动作共用同一份稿 |
 | 工作中心界面说明 | `/__dev/ui-design?view=specification&topic=task-cards` | 电脑与手机共用内容，按需切换；值的含义、条件差异与布局原因一次解释一处 |
 | 手机版任务 | `/__dev/ui-design?page=mobile-tasks` | 任务管理内的待办、已办、流程跟踪；流转详情、当前任务办理与返回 |
-| 效能工作台 | `/__dev/ui-design?page=workbench` | 总览、产品工程、测试验证、交付运维、证据详情与操作确认 |
+| 效能工作台 | `/__dev/ui-design?page=workbench` | 总览、产品与业务、开发资源、测试验证、交付运维、证据详情与操作确认 |
 | 登录页 | `/__dev/ui-design?page=login` | 身份、工作方式、验证与失败修正 |
 | 岗位帮助 | `/__dev/ui-design?page=help` | 办理概览、图解和参考手册；也可从稿内“系统与帮助 → 帮助中心”进入 |
 

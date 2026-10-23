@@ -171,7 +171,7 @@ export function createAccountAppearanceScenarios({
           }
           const initial = { theme_mode: 'system', accent: 'blue', density: 'compact', tableLines: 'grid' }
           const chosen = { theme_mode: 'light', accent: 'teal', density: 'standard', tableLines: 'simple' }
-          await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
+          await page.getByRole('heading', { name: '产品与业务', exact: true }).waitFor()
           await expectAppearance(initial)
           const accountBefore = await page.evaluate(() => localStorage.getItem('admin_erp_preferences'))
           await openERPAppearance(page)
@@ -192,7 +192,7 @@ export function createAccountAppearanceScenarios({
           await page.getByRole('heading', { name: '测试验证', exact: true }).waitFor()
           await expectAppearance(chosen)
           await page.goBack()
-          await page.getByRole('heading', { name: '产品工程', exact: true }).waitFor()
+          await page.getByRole('heading', { name: '产品与业务', exact: true }).waitFor()
           await expectAppearance(chosen)
 
           await page.goto(new URL('/erp/system/permissions', page.url()).href)
@@ -222,7 +222,7 @@ export function createAccountAppearanceScenarios({
           }))
           assert.equal(geometry.width, 206)
           assert(geometry.overflow <= 1, '独立偏好不得引入页面横向溢出')
-          assert.equal(geometry.expandedGroups, 3, '保持三个侧栏分组展开')
+          assert.equal(geometry.expandedGroups, 4, '保持四个侧栏分组展开')
         },
       }
     }),

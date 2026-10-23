@@ -294,4 +294,35 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   }))
   assert(prose.font >= 14 && prose.width <= prose.font * 50 + 1 && prose.line >= prose.font * 1.8, `正文保持字号、适当行宽与行距：${JSON.stringify(prose)}`)
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '4K 下正文与目录不造成页面横向溢出')
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const bookmarkPath = 'docs/product/移动端岗位任务页改版.md'
+  const bookmark = new URL('/__dev/docs', page.url())
+  bookmark.searchParams.set('path', bookmarkPath)
+  bookmark.hash = 'ui-交互设计'
+  const expectBookmarkedSection = async (anchor) => {
+    await page.waitForFunction(() => {
+      const reader = document.querySelector('.erp-dev-docs-markdown')
+      const heading = document.getElementById('交互设计')
+      if (!reader || !heading || !document.getElementById('ui-交互设计')) return false
+      const frame = reader.getBoundingClientRect()
+      const section = heading.getBoundingClientRect()
+      return reader.scrollTop > 0 && section.top >= frame.top - 1 && section.bottom <= frame.bottom + 1
+    })
+    const url = new URL(page.url())
+    assert.equal(url.searchParams.get('path'), bookmarkPath)
+    assert.equal(decodeURIComponent(url.hash.slice(1)), anchor)
+  }
+  await page.goto(bookmark.href)
+  await expectBookmarkedSection('ui-交互设计')
+  await page.reload()
+  await expectBookmarkedSection('ui-交互设计')
+  await page.getByRole('button', { name: '文档首页', exact: true }).click()
+  await home.waitFor()
+  await page.goBack()
+  await expectBookmarkedSection('ui-交互设计')
+  await page.locator('.erp-dev-docs-toc').getByRole('button', { name: '交互设计', exact: true }).click()
+  await expectBookmarkedSection('交互设计')
+  await page.reload()
+  await expectBookmarkedSection('交互设计')
 }
