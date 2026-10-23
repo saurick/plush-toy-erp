@@ -82,14 +82,14 @@ GITLAB_CONFIG_DIR="$(read_env_value GITLAB_CONFIG_DIR)"
 GITLAB_RAID_BACKUP_DIR="$(read_env_value GITLAB_RAID_BACKUP_DIR)"
 GITLAB_BACKUP_EXPORT_DIR="$(read_env_value GITLAB_BACKUP_EXPORT_DIR)"
 GITLAB_BACKUP_AGE_RECIPIENT_FILE="$(read_env_value GITLAB_BACKUP_AGE_RECIPIENT_FILE)"
-GITLAB_BACKUP_RETENTION_DAYS="$(read_env_value GITLAB_BACKUP_RETENTION_DAYS)"
+GITLAB_BACKUP_RETENTION_COUNT="$(read_env_value GITLAB_BACKUP_RETENTION_COUNT)"
 
 [[ "$GITLAB_DATA_DIR" == "/srv/gitlab/data" ]]
 [[ "$GITLAB_CONFIG_DIR" == "/srv/gitlab/config" ]]
 [[ "$GITLAB_RAID_BACKUP_DIR" == "/srv/raid5/gitlab/backups" ]]
-[[ "$GITLAB_BACKUP_RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]]
-((GITLAB_BACKUP_RETENTION_DAYS >= 7 && GITLAB_BACKUP_RETENTION_DAYS <= 366)) || {
-  echo "[gitlab-backup] retention days must be between 7 and 366" >&2
+[[ "$GITLAB_BACKUP_RETENTION_COUNT" =~ ^[1-9][0-9]*$ ]]
+((GITLAB_BACKUP_RETENTION_COUNT == 7)) || {
+  echo "[gitlab-backup] retention count must be 7" >&2
   exit 2
 }
 if [[ "$(hostname -s)" != "$EXPECTED_CONTROL_HOSTNAME" ]]; then
@@ -144,7 +144,7 @@ backup_source="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination 
   echo "[gitlab-backup] backup mount mismatch; refusing a fallback location" >&2
   exit 2
 }
-echo "[gitlab-backup] local_target=$GITLAB_RAID_BACKUP_DIR export_target=$GITLAB_BACKUP_EXPORT_DIR retention_days=$GITLAB_BACKUP_RETENTION_DAYS"
+echo "[gitlab-backup] local_target=$GITLAB_RAID_BACKUP_DIR export_target=$GITLAB_BACKUP_EXPORT_DIR retention_count=$GITLAB_BACKUP_RETENTION_COUNT"
 
 if [[ "$EXECUTE" != "true" ]]; then
   echo "[gitlab-backup] preview_only=true"
@@ -258,6 +258,15 @@ require_plain_file "$control_env" "runtime environment"
 mkdir -m 0700 "$config_temp/plush-control"
 cp -- "$control_compose" "$config_temp/plush-control/compose.yml"
 cp -- "$control_env" "$config_temp/plush-control/control.env"
+# Rotation records travel with the encrypted configuration recovery set.
+if [[ -d /var/lib/plush-retention && ! -L /var/lib/plush-retention ]]; then
+  cp -a /var/lib/plush-retention "$config_temp/plush-retention"
+fi
+mkdir -m 0700 "$config_temp/plush-backup-records"
+for record in "$GITLAB_RAID_BACKUP_DIR"/backup-*.sha256 "$GITLAB_RAID_BACKUP_DIR"/retention-ledger.json; do
+  [[ -f "$record" && ! -L "$record" ]] || continue
+  cp -- "$record" "$config_temp/plush-backup-records/"
+done
 runtime_image="$(docker inspect --format '{{.Config.Image}}' plush-gitlab)"
 runtime_version="$(docker exec plush-gitlab cat /opt/gitlab/embedded/service/gitlab-rails/VERSION)"
 [[ "$runtime_image" =~ ^gitlab/gitlab-ce@sha256:[0-9a-f]{64}$ && "$runtime_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
@@ -302,15 +311,16 @@ mv -- "$export_temp" "$export_final"
 export_prepared=true
 export_encrypted=true
 
-find "$GITLAB_RAID_BACKUP_DIR/repository" -maxdepth 1 -type f -name '*_gitlab_backup.tar' -mtime "+$GITLAB_BACKUP_RETENTION_DAYS" -delete
-find "$GITLAB_RAID_BACKUP_DIR/config" -maxdepth 1 -type f -name 'gitlab-config-*.tar.gz' -mtime "+$GITLAB_BACKUP_RETENTION_DAYS" -delete
-find "$GITLAB_RAID_BACKUP_DIR" -maxdepth 1 -type f -name 'backup-*.sha256' -mtime "+$GITLAB_BACKUP_RETENTION_DAYS" -delete
-while IFS= read -r -d '' expired_backup; do
-  [[ "$(basename -- "$expired_backup")" =~ ^backup-[0-9]{8}T[0-9]{6}Z$ ]] || continue
-  find "$expired_backup" -xdev -depth -delete
-done < <(find "$GITLAB_BACKUP_EXPORT_DIR" -mindepth 1 -maxdepth 1 -type d -name 'backup-*' -mtime "+$GITLAB_BACKUP_RETENTION_DAYS" -print0)
+retention_tool="${PLUSH_RETENTION_RUNTIME:-/opt/plush-retention/current}/scripts/deploy/retention-files.mjs"
+[[ -f "$retention_tool" && ! -L "$retention_tool" ]] || {
+  echo "[gitlab-backup] retention runtime missing" >&2
+  exit 1
+}
+node "$retention_tool" gitlab "$GITLAB_RAID_BACKUP_DIR" --execute
 
 rm -f -- "$portable_checksum" "$portable_manifest" "$generation_marker"
 write_status passed 0
+install -d -m 0700 "$GITLAB_RAID_BACKUP_DIR/receipts"
+cp -- "$status_file" "$GITLAB_RAID_BACKUP_DIR/receipts/$backup_id.env"
 trap - EXIT
 echo "[gitlab-backup] status=passed backupId=$backup_id repositorySizeBytes=$repository_size configSizeBytes=$config_size exportPrepared=true exportEncrypted=true offsiteCopied=false"

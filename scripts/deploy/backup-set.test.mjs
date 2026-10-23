@@ -156,11 +156,11 @@ test("cipher checksum, offsite marker and distinct filesystem fail closed", (t) 
   assert.throws(() => latestSet(offsite, 36), /checksum_mismatch/u);
 });
 
-test("retention keeps two recovery points and never removes legacy or unmanaged files", (t) => {
+test("retention keeps seven recovery points and never removes legacy or unmanaged files", (t) => {
   const root = fixture(t),
     source = privateDirectory(path.join(root, "source")),
     dest = privateDirectory(path.join(root, "dest"));
-  for (let n = 1; n <= 4; n++) {
+  for (let n = 1; n <= 9; n++) {
     const name = `plush-set-2026090${n}T000000Z-${randomUUID()}.tar.age`,
       file = path.join(source, name);
     fs.writeFileSync(file, String(n));
@@ -169,10 +169,20 @@ test("retention keeps two recovery points and never removes legacy or unmanaged 
   }
   fs.writeFileSync(path.join(dest, "plush_erp-old.dump.age"), "legacy PG only");
   fs.writeFileSync(path.join(dest, ".incomplete.tmp"), "incomplete");
-  pruneSets(dest, 35);
+  const preview = pruneSets(dest, 7, { execute: false });
+  assert.equal(
+    preview.records.filter((row) => row.state === "eligible").length,
+    2,
+  );
   assert.equal(
     fs.readdirSync(dest).filter((f) => f.endsWith(".tar.age")).length,
-    2,
+    9,
+  );
+  assert.equal(fs.existsSync(path.join(dest, "retention-ledger.json")), false);
+  pruneSets(dest, 7);
+  assert.equal(
+    fs.readdirSync(dest).filter((f) => f.endsWith(".tar.age")).length,
+    7,
   );
   assert.equal(fs.existsSync(path.join(dest, "plush_erp-old.dump.age")), true);
   assert.equal(fs.existsSync(path.join(dest, ".incomplete.tmp")), true);

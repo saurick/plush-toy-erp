@@ -171,6 +171,7 @@ export default function DevDrillRecoveryPage() {
           activeView={activeView}
           drillTriggerRef={drillTriggerRef}
           overview={overview}
+          retention={summary?.retention}
           setSelectedDrillKey={setSelectedDrillKey}
         />
         <EmergencyPanel

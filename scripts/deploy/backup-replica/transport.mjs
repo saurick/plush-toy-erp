@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { command } from "./process.mjs";
 import { requireValue } from "./config.mjs";
+import { validateProtection } from "./retention.mjs";
 
 export const databaseFile =
   /^plush_erp-([0-9]{8}T[0-9]{6}Z)-[0-9]+\.dump\.age$/u;
@@ -124,6 +125,38 @@ export class SSHSource {
       timeout: this.config.transferTimeoutSeconds * 1000,
     });
     return parseInventory(value.toString(), this.config.source.id);
+  }
+  async protection() {
+    const value = await command(this.args(), {
+      input:
+        prelude(this.config) +
+        `file="$root/retention-protection.json"
+if [ -e "$file" ]; then
+  [ -f "$file" ] && [ ! -L "$file" ] && [ "$(stat -c %s "$file")" -le 65536 ]
+  cat "$file"
+else printf '%s' '{"schemaVersion":"plush.retention-protection/v1","protected":{}}'; fi\n`,
+      signal: this.signal,
+      timeout: 15000,
+    });
+    return validateProtection(JSON.parse(value.toString()));
+  }
+  async publishRetention(report) {
+    const payload = Buffer.from(JSON.stringify(report)).toString("base64");
+    await command(this.args(), {
+      input:
+        prelude(this.config) +
+        `umask 077
+file="$root/retention-replica-report.json"
+[ ! -L "$file" ]
+temp="$(mktemp "$root/.replica-report.XXXXXXXX")"
+trap 'rm -f -- "$temp"' EXIT
+printf '%s' '${payload}' | base64 --decode > "$temp"
+chmod 600 "$temp"
+chown --reference="$root" "$temp"
+mv -- "$temp" "$file"\n`,
+      signal: this.signal,
+      timeout: 15000,
+    });
   }
   async download(item, output) {
     const script =

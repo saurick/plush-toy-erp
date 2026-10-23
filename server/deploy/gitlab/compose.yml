@@ -14,7 +14,7 @@ services:
         nginx['listen_port'] = 8929
         gitlab_rails['gitlab_shell_ssh_port'] = ${GITLAB_SSH_PUBLIC_PORT:-2224}
         gitlab_rails['registry_enabled'] = false
-        gitlab_rails['backup_keep_time'] = ${GITLAB_BACKUP_KEEP_SECONDS:-1209600}
+        gitlab_rails['backup_keep_time'] = ${GITLAB_BACKUP_KEEP_SECONDS:-0}
         gitlab_rails['backup_path'] = '/var/opt/gitlab/backups'
         gitlab_rails['manage_backup_path'] = true
         gitlab_rails['backup_archive_permissions'] = 0600

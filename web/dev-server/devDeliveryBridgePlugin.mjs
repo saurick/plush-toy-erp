@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import path from 'node:path'
 import process from 'node:process'
 import { setImmediate as yieldReadRequests } from 'node:timers/promises'
+import { readRetentionSummary } from './devRetentionSummary.mjs'
 import { readGitlabDeploymentRecord, syncGitlabDeploymentRecord } from '../../scripts/deploy/gitlab-deployment-records.mjs'
 
 import {
@@ -730,6 +731,7 @@ export function createDevDeliveryService({
   operationStore,
   operationStoreRepoRoot,
   readRepositoryState = readRepositoryIdentity,
+  readRetention = async () => null,
   runPreflight = runTargetPreflightAsync,
   runInitializationPreflight = runTargetInitializationPreflightAsync,
   classifyRelation = classifyGitAncestryRelation,
@@ -1069,6 +1071,7 @@ level: 'warning',
 
   async function getSummary({ forcePreflight = false, requestId = randomUUID() } = {}) {
     await reconcileWaitingOperations()
+    const retentionPromise = Promise.resolve().then(() => readRetention()).catch(() => null)
     const [repositoryResult, versionsResult, timingsResult, ...targetResults] =
       await Promise.allSettled([
         readRepositoryState(root),
@@ -1208,6 +1211,7 @@ transport: diagnostic.transport } : {}),
       kind: 'plush.dev-delivery-summary',
       status: issues.length === 0 ? 'success' : 'partial',
       generatedAt,
+      retention: await retentionPromise,
       repository:
         repositoryResult.status === 'fulfilled' ? repositoryResult.value : null,
       versions:
@@ -2377,6 +2381,7 @@ export function createDevDeliveryMiddleware({
       (credential) => {
         deliveryService = createService({
           projectRoot,
+          readRetention: readRetentionSummary,
           env: { ...environment, PLUSH_GITLAB_READ_TOKEN: credential.token },
         })
         return deliveryService

@@ -4,6 +4,13 @@ import { randomUUID } from "node:crypto";
 import { requireValue } from "./config.mjs";
 import { atomicBytes, atomicJSON, digest, now } from "./storage.mjs";
 import {
+  planRetention,
+  readProtection,
+  readRetentionLedger,
+  recordCleanup,
+  saveRetentionLedger,
+} from "./retention.mjs";
+import {
   databaseFile,
   encryptedFile,
   validateInventory,
@@ -54,7 +61,7 @@ export async function synchronize(
   c,
   root,
   source,
-  { clock = Date.now(), signal } = {},
+  { clock = Date.now(), signal, ensureTarget = () => {} } = {},
 ) {
   const files = await source.inventory();
   validateInventory(files);
@@ -69,17 +76,66 @@ export async function synchronize(
     "source_backup_stale",
   );
   const records = readIndex(root, c.source.id);
-  const required = files
+  const ledger = readRetentionLedger(root, c.source.id);
+  const protection = {
+    ...readProtection(root),
+    ...((await source.protection?.()) ?? {}),
+  };
+  for (const name of Object.keys(records)) {
+    if (
+      ["cleaned", "cleaning"].includes(ledger.records[name]?.state) &&
+      !fs.existsSync(path.join(root, name))
+    ) {
+      requireValue(
+        !protection[name]?.length,
+        "pending_cleanup_protection_changed",
+      );
+      const checksum = path.join(root, name.replace(".dump.age", ".sha256"));
+      if (fs.existsSync(checksum)) {
+        requireValue(
+          fs.lstatSync(checksum).isFile() &&
+            fs.realpathSync(checksum) === checksum,
+          "unsafe_replica_file",
+        );
+        fs.unlinkSync(checksum);
+      }
+      ledger.records[name].state = "cleaned";
+      ledger.records[name].cleanedAt ??= now();
+      delete records[name];
+    }
+  }
+  const databaseItems = new Map(
+    [...Object.values(records), ...databases]
+      .filter((x) => databaseFile.test(x.name))
+      .map((x) => [x.name, x]),
+  );
+  const plan = planRetention(
+    [...databaseItems.values()].map((x) => ({
+      id: x.name,
+      createdAt: new Date(backupTime(x.name)).toISOString(),
+      valid: true,
+      reasons: protection[x.name] ?? [],
+    })),
+    { count: c.retentionCount },
+  );
+  const selected = new Set(
+    plan.filter((x) => x.state !== "eligible").map((x) => x.id),
+  );
+  const selectedFiles = files.filter(
+    (x) => !databaseFile.test(x.name) || selected.has(x.name),
+  );
+  const required = selectedFiles
     .filter((item) => !fs.existsSync(path.join(root, item.name)))
     .reduce((n, x) => n + x.sizeBytes, 0);
   const space = fs.statfsSync(root);
   requireValue(
-    space.bavail * space.bsize >= required + 64 * 1024 ** 2,
+    space.bavail * space.bsize >= required + c.minimumFreeBytes,
     "destination_space_insufficient",
   );
   let copied = 0;
-  for (const item of files) {
+  for (const item of selectedFiles) {
     signal?.throwIfAborted();
+    ensureTarget();
     const file = path.join(root, item.name);
     try {
       requireValue(!fs.lstatSync(file).isSymbolicLink(), "unsafe_replica_file");
@@ -114,13 +170,27 @@ export async function synchronize(
       copiedAt: records[item.name]?.copiedAt ?? now(),
     };
   }
-  const expired = Object.keys(records).filter(
-    (name) =>
-      databaseFile.test(name) &&
-      name !== latest.name &&
-      backupTime(name) < clock - c.retentionDays * 86400_000,
-  );
-  for (const name of expired) {
+  // Verify every retained local-only copy before allowing any old copy to go.
+  for (const name of selected)
+    if (records[name]) await verifiedFile(root, records[name], signal);
+  for (const item of plan)
+    if (records[item.id])
+      ledger.records[item.id] = { ...records[item.id], ...item };
+  for (const item of Object.values(records).filter(
+    (x) => !databaseFile.test(x.name),
+  ))
+    ledger.records[item.name] = {
+      ...item,
+      id: item.name,
+      createdAt: item.copiedAt,
+      state: "protected",
+      reasons: ["初始配置或附件清单"],
+    };
+  saveRetentionLedger(root, ledger);
+  const expired = plan.filter((x) => x.state === "eligible" && records[x.id]);
+  for (const item of expired) {
+    ensureTarget();
+    const name = item.id;
     const file = path.join(root, name),
       checksum = path.join(root, name.replace(".dump.age", ".sha256"));
     for (const target of [file, checksum]) {
@@ -133,11 +203,11 @@ export async function synchronize(
         if (error.code !== "ENOENT") throw error;
       }
     }
-    if (fs.existsSync(file)) {
-      await verifiedFile(root, records[name], signal);
+    await verifiedFile(root, records[name], signal);
+    recordCleanup(root, ledger, ledger.records[name], () => {
       fs.unlinkSync(file);
-    }
-    fs.rmSync(checksum, { force: true });
+      fs.rmSync(checksum, { force: true });
+    });
     delete records[name];
   }
   atomicJSON(path.join(root, "replica-index.json"), {
@@ -153,9 +223,11 @@ export async function synchronize(
     destinationId: c.destination.id,
     volumeUUID: c.destination.volumeUUID,
     copiedFiles: copied,
-    verifiedSourceFiles: files.length,
+    verifiedSourceFiles: selectedFiles.length,
     retainedFiles: Object.keys(records).length,
     expiredFiles: expired.length,
+    retentionCount: c.retentionCount,
+    protectedBackups: plan.filter((x) => x.state === "protected").length,
     latestBackup: latest.name,
     sourceBackupAgeSeconds: Math.floor(age),
     encryption: "age",

@@ -21,7 +21,7 @@
 - 发布前：必须备份。
 - migration apply 前：必须备份。
 - 真实导入 apply 前：必须备份；当前 yoyoosun 真实导入未开放。
-- 日常目标：每日在维护窗口生成一个 PG＋附件成套备份，本地和异地均只保留加密包及 checksum，保留 35 天且至少保护最近两套；每周从异地副本恢复到新建临时 PG / S3，验证后精确删除临时资源。
+- 日常目标：每日在维护窗口生成一个 PG＋附件成套备份，本地和异地均只保留加密包及 checksum，保留最近 7 套并额外保护当前、必要回滚和升级前恢复点；每周从异地副本恢复到新建临时 PG / S3，验证后精确删除临时资源。
 
 [`systemd` 模板](../systemd/README.md) 已指向成套入口；模板变化不修改已安装任务。升级时须同时核对固定工具版本、Node 路径、独占维护窗口、工作盘空间、异地挂载和恢复端镜像。只有首跑成功、异地同名包 / checksum 读回、恢复报告为 `passed` 且绑定同一 backupId，才可宣称该目标已启用成套日常备份。
 
@@ -127,7 +127,7 @@ node scripts/deploy/backup-set/cli.mjs restore-check \
 
 ## Mac 外接盘副本 / Mac Backup Replica
 
-额外副本复用服务器已经生成的加密备份，不替换服务器本地及香港备份。Mac 主动经 SSH 拉取，按外盘 UUID 和专属目录标记确认介质，校验 SHA-256 后才原子落盘。来源主机及目录、外盘 UUID、保留期和时间表分别配置；SSH 使用已有主机密钥与登录配置，不关闭主机身份检查。
+额外副本复用服务器已经生成的加密备份，不替换服务器本地及香港备份。Mac 主动经 SSH 拉取，按外盘 UUID 和专属目录标记确认介质，校验 SHA-256 后才原子落盘。来源主机及目录、外盘 UUID、空间余量和时间表分别配置；SSH 使用已有主机密钥与登录配置，不关闭主机身份检查。
 
 Mac 使用不低于项目最低版本的同一主版本 Node（允许兼容的 minor / patch 更新）与内置 `lockf / plutil`，SSH 来源使用 POSIX Shell 和 GNU `stat / realpath / sha256sum`；Mac 恢复检查另需 `age`、Docker 和已加载的 `postgres:18.6` 镜像。
 
@@ -136,7 +136,7 @@ Mac 使用不低于项目最低版本的同一主版本 Node（允许兼容的 m
 | `env/backup-replica.example.json` | 私有目标配置的样例；实际配置由当前用户持有，权限为 0600，不入 Git |
 | `source.id / host / directory` | 固定数据来源身份及 SSH 目录；来源目录须有 `.plush-backup-source`，内容为 `plush.backup-source/v1:<source.id>` |
 | `destination.volumeUUID / relativeDirectory` | 已挂载且可写的外部卷及专属子目录；不自动挂载、不格式化、不创建替代的内盘目录 |
-| `retentionDays` | 副本独立保留期，样例为 90 天；来源删除不会传播，仅清理本工具索引内已过期的数据库副本，初始配置 / 附件清单保留 |
+| `retentionCount / minimumFreeBytes` | 固定保留最近 7 份，样例预留 64 GiB；新副本校验通过后才轮换，来源删除不传播。升级保护项及初始配置 / 附件清单额外保留，清理记录长期保留 |
 | `restore` | 本机受保护的 age identity、固定 PostgreSQL 镜像、恢复检查间隔与单次时限，样例为 7 天 / 2700 秒 |
 | `schedule` | macOS 本地时区的日常时间；安装后还会在用户登录和文件系统挂载时运行，不主动唤醒电脑 |
 

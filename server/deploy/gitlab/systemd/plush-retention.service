@@ -1,0 +1,16 @@
+[Unit]
+Description=Plush release artifacts and environment backup rotation
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/bin/node /opt/plush-retention/current/scripts/deploy/retention-server.mjs --execute
+Environment=GIT_OPTIONAL_LOCKS=0
+TimeoutStartSec=60min
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+UMask=0077
+NoNewPrivileges=true

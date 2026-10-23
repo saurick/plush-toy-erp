@@ -2,6 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
+  readProtection,
+  readRetentionLedger,
+  recordCleanup,
+  saveRetentionLedger,
+} from "../backup-replica/retention.mjs";
+import {
   command,
   hashFile,
   plainPath,
@@ -247,18 +253,75 @@ export function publishCipher(source, directory) {
   return final;
 }
 
-export function pruneSets(directory, retentionDays) {
+export function pruneSets(
+  directory,
+  retentionCount = 7,
+  { execute = true } = {},
+) {
+  requireValue(retentionCount === 7, "invalid_retention_count");
+  plainPath(directory, { directory: true });
+  const protection = readProtection(directory);
+  const ledger = readRetentionLedger(directory, "paired-backup-set");
+  const pending = Object.values(ledger.records).filter(
+    (x) => x.state === "cleaning",
+  );
   const names = fs
     .readdirSync(directory)
-    .filter((n) => SET_NAME.test(n))
+    .filter((n) => SET_NAME.test(n) && !pending.some((x) => x.id === n))
     .sort()
     .reverse();
-  for (const name of names.slice(2)) {
-    const file = path.join(directory, name);
-    if (Date.now() - fs.lstatSync(file).mtimeMs <= retentionDays * 86400_000)
-      continue;
-    verifyCipher(file);
-    fs.unlinkSync(file);
-    fs.unlinkSync(`${file}.sha256`);
+  for (const name of names) verifyCipher(path.join(directory, name));
+  for (const item of pending) {
+    requireValue(
+      SET_NAME.test(item.id) &&
+        !protection[item.id]?.length &&
+        names.length >= retentionCount,
+      "pending_cleanup_protection_changed",
+    );
+    const file = path.join(directory, item.id);
+    if (fs.existsSync(file))
+      requireValue(
+        hashFile(plainPath(file)) === item.sha256,
+        "cipher_copy_mismatch",
+      );
+    if (fs.existsSync(`${file}.sha256`))
+      requireValue(
+        fs.readFileSync(plainPath(`${file}.sha256`), "utf8").trim() ===
+          `${item.sha256}  ${item.id}`,
+        "cipher_copy_mismatch",
+      );
+    if (execute)
+      recordCleanup(directory, ledger, { ...item, state: "eligible" }, () => {
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+        if (fs.existsSync(`${file}.sha256`)) fs.unlinkSync(`${file}.sha256`);
+      });
   }
+  for (const [index, name] of names.entries()) {
+    const file = path.join(directory, name);
+    const reasons = protection[name] ?? [];
+    const item = {
+      id: name,
+      createdAt: fs.statSync(file).mtime.toISOString(),
+      sizeBytes: fs.statSync(file).size,
+      sha256: verifyCipher(file),
+      reasons,
+      state: reasons.length
+        ? "protected"
+        : index < retentionCount
+          ? "retained"
+          : "eligible",
+    };
+    ledger.records[name] = item;
+    if (execute) saveRetentionLedger(directory, ledger);
+    if (execute && item.state === "eligible")
+      recordCleanup(directory, ledger, item, () => {
+        fs.unlinkSync(file);
+        fs.unlinkSync(`${file}.sha256`);
+      });
+  }
+  return {
+    sourceId: "paired-backup-set",
+    retentionCount,
+    records: Object.values(ledger.records),
+  };
 }

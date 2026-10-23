@@ -12,7 +12,7 @@ const HELP = `用法（只在执行主机操作，不使用 SSH）：
     --database <database> --compose-file <absolute-compose> --env-file <private-env>
     --backup-dir <private-local> --offsite-dir <mounted-offsite>
     --recipient-file <age-recipient> --confirm BACKUP_SET:<project>:<database>
-    [--retention-days 35]
+    [--retention-count 7]
   node scripts/deploy/backup-set/cli.mjs restore-check --offsite-dir <mounted-offsite>
     --identity-file <private-age-identity> --work-dir <private-local> --report <private-json>
     [--max-age-hours 36] [--business-smoke]
@@ -43,7 +43,7 @@ async function main() {
         "offsite-dir",
         "recipient-file",
         "confirm",
-        "retention-days",
+        "retention-count",
         "identity-file",
         "work-dir",
         "report",

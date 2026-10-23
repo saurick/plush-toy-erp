@@ -2,6 +2,7 @@ import { CloudDownloadOutlined, RollbackOutlined } from '@ant-design/icons'
 import { Button, Space, Tag, Tooltip, Typography } from 'antd'
 import { StatusTag } from './shared.jsx'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
+import { RETENTION_STATES } from '../../../config/devRetention.mjs'
 import {
   createDeliveryIdempotencyKey,
   deliveryVersionActionKind,
@@ -35,7 +36,7 @@ export function buildVersionColumns({
       render: (value, record) => (
         <div className="erp-dev-version-identity">
           <Space wrap size={6}>
-            <Text strong>{value}</Text>
+            <Typography.Link href={record.url} target="_blank" rel="noopener noreferrer" strong>{value}</Typography.Link>
             <Text type="secondary" code>{shortGitSha(record.gitSha)}</Text>
           </Space>
           <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
@@ -58,12 +59,14 @@ export function buildVersionColumns({
                 : '命中率未证明'}
             </Text>
             <Text type="secondary">
-              {record.completeAssets
+              {record.retention?.state === 'cleaned' ? '制品文件已清理，版本和部署记录保留' : record.completeAssets
                 ? record.assets.includes('release-rehearsal.json')
                   ? 'v2 · 7 项制品'
                   : 'v1 · 6 项制品'
                 : '制品不完整'}
             </Text>
+            {record.retention?.reasons?.map((reason) => <Text key={reason}>{reason}</Text>)}
+            {record.retention?.cleanedAt ? <DevTimestamp value={record.retention.cleanedAt} action="清理于" /> : null}
           </details>
         </div>
       ),
@@ -72,11 +75,13 @@ export function buildVersionColumns({
       title: '制品状态',
       dataIndex: 'status',
       key: 'status',
-      render: (value, record) => value !== 'published' ? <StatusTag status={value} /> : (
+      render: (value, record) => record.retention && ['cleaned', 'cleaning', 'protected'].includes(record.retention.state) ? (
+        <Tag color={RETENTION_STATES[record.retention.state].color}>{RETENTION_STATES[record.retention.state].label}</Tag>
+      ) : value !== 'published' ? <StatusTag status={value} /> : (
         <Tag color={record.promotionEligible ? 'success' : 'warning'}>
           {record.completeAssets
             ? record.promotionEligible
-              ? '制品齐全'
+              ? '保留中 · 制品齐全'
               : record.assets.includes('release-rehearsal.json')
                 ? '演练证据待补齐'
                 : '仅可回滚'
@@ -102,6 +107,7 @@ export function buildVersionColumns({
       key: 'actions',
       align: 'center',
       render: (_value, record) => {
+        if (['cleaned', 'cleaning'].includes(record.retention?.state)) return <Text type="secondary">文件已清理，记录可查</Text>
         const actionKind = deliveryVersionActionKind(record)
         if (record.gitSha === currentTargetSha) return null
         const initialCustomerConfigActivationReady =

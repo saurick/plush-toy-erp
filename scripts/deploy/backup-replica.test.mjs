@@ -512,9 +512,11 @@ test("source deletion never propagates to retained history", async (t) => {
   assert.equal((await f.sync()).retainedFiles, 2);
   assert.ok(fs.existsSync(path.join(f.target, old)));
 });
-test("retention expires only owned database copies", async (t) => {
+test("retention keeps seven verified copies and preserves owned cleanup history", async (t) => {
   const f = fixture(t),
     old = f.add(f.clock - 120 * 86400_000, "40");
+  await f.sync();
+  for (let i = 1; i <= 6; i++) f.add(f.clock - i * 86400_000, String(100 + i));
   fs.writeFileSync(path.join(f.target, "personal.txt"), "keep");
   const result = await f.sync();
   assert.equal(result.expiredFiles, 1);
@@ -523,7 +525,9 @@ test("retention expires only owned database copies", async (t) => {
     fs.readFileSync(path.join(f.target, "personal.txt"), "utf8"),
     "keep",
   );
-  assert.equal((await f.sync()).retainedFiles, 1);
+  assert.equal((await f.sync()).retainedFiles, 7);
+  const ledger = JSON.parse(fs.readFileSync(path.join(f.target, "retention-ledger.json")));
+  assert.equal(ledger.records[old].state, "cleaned");
 });
 test("corrupt incoming files cannot become committed replicas", async (t) => {
   const f = fixture(t);

@@ -53,6 +53,12 @@ const installer = readFileSync(
   new URL("../../server/deploy/gitlab/install-gitlab.sh", import.meta.url),
   "utf8",
 );
+test("GitLab native age pruning cannot bypass the verified seven-copy policy", () => {
+  assert.match(compose, /backup_keep_time'\] = \$\{GITLAB_BACKUP_KEEP_SECONDS:-0\}/u);
+  assert.match(installer, /GITLAB_BACKUP_KEEP_SECONDS" == "0"/u);
+  assert.match(installer, /GITLAB_BACKUP_RETENTION_COUNT" == "7"/u);
+  assert.doesNotMatch(installer, /GITLAB_BACKUP_RETENTION_DAYS/u);
+});
 const backup = readFileSync(
   new URL("../../server/deploy/gitlab/gitlab-backup.sh", import.meta.url),
   "utf8",

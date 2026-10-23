@@ -18,7 +18,7 @@ preview_target_release_retention() {
   local protected_shas successful_history="" rollback_shas="" candidate_shas="" operation_dir file document
   local operation_id terminal_passed operation_documents cache_root cache_dir cache_sha
   local release_dir release_sha release_bytes container_name container_sha running
-  local public_containers stopped_containers="" cache_inventory="" selected=0 stamp sha
+  local public_containers stopped_containers="" cache_inventory="" selected=0 stamp sha recent_shas=""
   retention_protection_status=complete
   rollback_release_shas=none
   cache_candidate_count=0
@@ -120,6 +120,15 @@ preview_target_release_retention() {
   if [[ -n "$rollback_shas" ]]; then
     rollback_release_shas="$(printf '%s\n' "$rollback_shas" | sed '/^$/d' | paste -sd, -)"
   fi
+  selected=0
+  while read -r stamp sha; do
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || continue
+    if printf '%s\n' "$recent_shas" | grep -Fxq "$sha"; then continue; fi
+    recent_shas+=$'\n'"$sha"
+    protected_shas+=$'\n'"$sha"
+    selected=$((selected + 1))
+    [[ "$selected" -lt 7 ]] || break
+  done < <(printf '%s\n' "$successful_history" | sort -k1,1nr -k2,2)
 
   for cache_root in "${cache_roots[@]}"; do
     if [[ -e "$cache_root" || -L "$cache_root" ]] && ! plain_directory "$cache_root"; then

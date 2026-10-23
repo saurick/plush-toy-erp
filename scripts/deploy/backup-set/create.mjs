@@ -18,7 +18,7 @@ export async function createSet(
   { run = command, sourceFactory = openSource, signal } = {},
 ) {
   privateDirectory(options.backupDir);
-  const retention = Number(options.retentionDays ?? 35);
+  const retention = Number(options.retentionCount ?? 7);
   const id = `plush-set-${now()
     .replace(/[-:]/gu, "")
     .replace(/\.\d{3}/u, "")}-${randomUUID()}`;
@@ -43,10 +43,7 @@ export async function createSet(
       /^age1[0-9a-z]{20,200}$/u.test(recipient),
       "invalid_age_recipient",
     );
-    requireValue(
-      Number.isInteger(retention) && retention >= 7 && retention <= 366,
-      "invalid_retention_days",
-    );
+    requireValue(retention === 7, "invalid_retention_count");
     fs.mkdirSync(work, { mode: 0o700 });
     const set = path.join(work, "set");
     fs.mkdirSync(set, { mode: 0o700 });
@@ -142,6 +139,8 @@ export async function createSet(
       applicationResumed: true,
     };
     atomicJSON(status, report);
+    privateDirectory(path.join(options.backupDir, "receipts"));
+    atomicJSON(path.join(options.backupDir, "receipts", `${id}.json`), report);
     completed = true;
     return report;
   } finally {

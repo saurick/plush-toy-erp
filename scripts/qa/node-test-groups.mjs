@@ -228,6 +228,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/rollback-rehearsal-report.test.mjs",
     "scripts/deploy/rotate-credentials-133-script.test.mjs",
     "scripts/deploy/run-smoke-script.test.mjs",
+    "scripts/deploy/retention.test.mjs",
     "scripts/deploy/scheduled-backup-script.test.mjs",
     "scripts/deploy/source-archive-release-check.test.mjs",
     "scripts/deploy/target-compose-override.test.mjs",

@@ -26,6 +26,7 @@ import {
 } from '../../../config/devDelivery.mjs'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import AppSelect from '@/common/components/select/AppSelect'
+import { versionRetention } from '../../../config/devRetention.mjs'
 
 const { Text, Link } = Typography
 
@@ -74,14 +75,14 @@ export function buildVersionWorkspace({
           aria-label="版本与部署"
         >
           <Card
-            title="可部署版本"
+            title="版本与制品"
             className="erp-dev-version-table-card"
-            extra={<Text type="secondary">最近 {versions.length} 个版本</Text>}
+            extra={<Text type="secondary">制品保留最近 7 份 · 历史记录保留</Text>}
           >
             <Table
               rowKey="gitSha"
               columns={versionColumns}
-              dataSource={versions}
+              dataSource={versions.map((version) => ({ ...version, retention: versionRetention(version, summary) }))}
               loading={initialLoading}
               pagination={{
                 ...DEV_PAGINATION,

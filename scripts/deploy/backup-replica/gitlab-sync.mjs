@@ -5,6 +5,13 @@ import { requireValue } from "./config.mjs";
 import { atomicJSON, digest, now, privateDirectory } from "./storage.mjs";
 import { command } from "./process.mjs";
 import { SSHSource, prelude } from "./transport.mjs";
+import {
+  planRetention,
+  readProtection,
+  readRetentionLedger,
+  recordCleanup,
+  saveRetentionLedger,
+} from "./retention.mjs";
 
 export const bundlePattern = /^backup-([0-9]{8}T[0-9]{6}Z)$/u;
 export const bundleFiles = [
@@ -187,6 +194,21 @@ export async function synchronizeGitlab(
 ) {
   const inventory = validateGitlabInventory(await source.inventory());
   const records = gitlabIndex(root, c.source.id);
+  const ledger = readRetentionLedger(root, c.source.id);
+  const interrupted = new Set(
+    Object.entries(ledger.records)
+      .filter(([, x]) => x.state === "cleaning")
+      .map(([name]) => name),
+  );
+  for (const name of Object.keys(records))
+    if (
+      ["cleaned", "cleaning"].includes(ledger.records[name]?.state) &&
+      !fs.existsSync(path.join(root, name))
+    ) {
+      ledger.records[name].state = "cleaned";
+      ledger.records[name].cleanedAt ??= now();
+      delete records[name];
+    }
   const names = [
     ...new Set([...inventory.keys(), ...Object.keys(records)]),
   ].sort((a, b) => bundleTime(b) - bundleTime(a));
@@ -202,7 +224,20 @@ export async function synchronizeGitlab(
     age >= 0 && age <= c.maxSourceAgeHours * 3600,
     "source_backup_stale",
   );
-  const selected = names.slice(0, c.retentionCount),
+  const protection = {
+    ...readProtection(root),
+    ...((await source.protection?.()) ?? {}),
+  };
+  const plan = planRetention(
+    names.map((name) => ({
+      id: name,
+      createdAt: new Date(bundleTime(name)).toISOString(),
+      valid: true,
+      reasons: protection[name] ?? [],
+    })),
+    { count: c.retentionCount },
+  );
+  const selected = plan.filter((x) => x.state !== "eligible").map((x) => x.id),
     incoming = selected.filter((n) => !records[n]);
   const required = incoming.flatMap((n) => inventory.get(n) ?? []);
   requireValue(
@@ -269,12 +304,34 @@ export async function synchronizeGitlab(
       bundles: records,
     });
   save();
+  for (const item of plan)
+    if (records[item.id])
+      ledger.records[item.id] = { ...records[item.id], ...item };
+  saveRetentionLedger(root, ledger);
   const expired = Object.keys(records).filter((n) => !selected.includes(n));
   for (const name of expired) {
     ensureTarget();
     if (fs.existsSync(path.join(root, name))) {
-      await checkBundle(root, name, records[name].files, signal);
-      fs.rmSync(path.join(root, name), { recursive: true });
+      if (interrupted.has(name)) {
+        const directory = path.join(root, name);
+        requireValue(
+          fs.realpathSync(directory) === directory &&
+            fs.readdirSync(directory).every((n) => bundleFiles.includes(n)),
+          "unsafe_gitlab_bundle",
+        );
+        for (const file of records[name].files) {
+          const target = path.join(root, file.name);
+          if (fs.existsSync(target))
+            requireValue(
+              fs.lstatSync(target).isFile() &&
+                (await digest(target, signal)) === file.sha256,
+              "replica_checksum_mismatch",
+            );
+        }
+      } else await checkBundle(root, name, records[name].files, signal);
+      recordCleanup(root, ledger, ledger.records[name], () =>
+        fs.rmSync(path.join(root, name), { recursive: true }),
+      );
     }
     delete records[name];
     save();

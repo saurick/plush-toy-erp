@@ -25,6 +25,7 @@ import { GitlabSource, synchronizeGitlab } from "./gitlab-sync.mjs";
 import { verifyGitlab } from "./gitlab-restore.mjs";
 import { prepareInstallation, finishInstallation } from "./install.mjs";
 import { checkHealth } from "./health.mjs";
+import { readRetentionLedger } from "./retention.mjs";
 
 export function restoreDue(c, previous, clock = Date.now()) {
   return (
@@ -75,6 +76,7 @@ export async function execute(
   if (action === "prepare-install")
     return prepareInstallation(c, configFile, state, { signal });
   const attemptFile = path.join(state, "latest-restore-attempt.json");
+  const history = privateDirectory(path.join(state, "receipts"));
   const performRestore = async () => {
     const identity = {
       sourceId: c.source.id,
@@ -93,6 +95,13 @@ export async function execute(
         status: "passed",
         checkedAt: result.checkedAt ?? now(),
       });
+      atomicJSON(
+        path.join(
+          history,
+          `restore-${(result.checkedAt ?? now()).replaceAll(":", "-")}.json`,
+        ),
+        result,
+      );
       return result;
     } catch (error) {
       atomicJSON(attemptFile, {
@@ -102,6 +111,10 @@ export async function execute(
         reason: error.code ?? error.name,
         stage: error.stage,
       });
+      atomicJSON(
+        path.join(history, `restore-failed-${now().replaceAll(":", "-")}.json`),
+        JSON.parse(fs.readFileSync(attemptFile)),
+      );
       throw error;
     }
   };
@@ -119,6 +132,34 @@ export async function execute(
     },
   );
   atomicJSON(path.join(state, "latest-sync.json"), result);
+  atomicJSON(
+    path.join(history, `sync-${result.checkedAt.replaceAll(":", "-")}.json`),
+    result,
+  );
+  if (source.publishRetention) {
+    const ledger = readRetentionLedger(root, c.source.id);
+    await source.publishRetention({
+      schemaVersion: "plush.replica-retention-report/v1",
+      sourceId: c.source.id,
+      retentionCount: 7,
+      generatedAt: result.checkedAt,
+      records: Object.values(ledger.records).map(
+        ({ id, createdAt, state, reasons, cleanedAt, files, sizeBytes }) => ({
+          id,
+          createdAt,
+          state,
+          reasons,
+          cleanedAt: cleanedAt ?? null,
+          files: [
+            {
+              sizeBytes:
+                sizeBytes ?? (files ?? []).reduce((n, f) => n + f.sizeBytes, 0),
+            },
+          ],
+        }),
+      ),
+    });
+  }
   if (action === "run") {
     const file = path.join(state, "latest-restore.json"),
       previous = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : null;

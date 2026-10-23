@@ -167,13 +167,23 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 文件身份检查仍是 O(n)，冷启动需读取全部记录，分页只约束响应体。容量评估同时量测冷读、热读、记录数和真实接口延迟；若热读 p95 连续超过 100 毫秒或冷读超过 1 秒，应评审持久索引并验证历史完整性。不能通过截断、删除旧记录或延长不可见缓存时效提速；本机模拟数据测试不代表目标机长期容量。
 
-## 制品保留预览
+## 制品与备份自动轮换
 
-`target-preflight.mjs` 将 `target-release-retention.sh` 嵌入同一固定目标只读脚本，目标宿主无需安装 Node.js。预览保护当前前后端与公网运行版本、仍在运行的入口容器、按成功回执完成时间选出的最近两个不同恢复版本，以及失败、运行中或结果尚未收敛的操作所引用的版本。恢复版本表示已有运行证据，代码回滚仍需通过迁移和客户配置兼容性校验。
+`target-preflight.mjs` 将 `target-release-retention.sh` 嵌入同一固定目标只读脚本，目标宿主无需安装 Node.js。预览保留最近 7 个成功版本，并保护当前前后端与公网运行版本、仍在运行的入口容器、按成功回执完成时间选出的最近两个不同恢复版本，以及失败、运行中或结果尚未收敛的操作所引用的版本。恢复版本表示已有运行证据，代码回滚仍需通过迁移和客户配置兼容性校验。
 
 历史成功操作、旧缓存和已停止入口容器不再永久锁住其全部历史版本；operation、备份、数据库、附件、env 和审计记录不进入清理候选。`retention` 分别返回源码目录候选数量 / 字节、`cacheCandidateCount / cacheCandidateBytes` 和 `stoppedPublicContainerCandidateCount`，字节是逻辑大小，不能直接当作实际可释放磁盘。`rollbackReleaseShas` 给出本次保护的恢复版本。
 
 无法识别的源码目录与符号链接单独保留；保护信息不明、未知操作合同、损坏 / 多份 JSON、目标不符、缓存符号链接或盘点失败时，`protectionStatus=manual_review`，不输出可清理候选。预览不执行删除；实际清理前仍须逐项核对当前版本、恢复输入、容器 / 镜像引用与容量，并在授权范围内操作。
+
+统一保留合同见 [部署约定](../../docs/部署约定.md#retention-policy)。`retention-server.mjs --preview` 生成固定三环境、GitLab Release / Package 与备份的候选清单；校验摘要缓存记录文件的 device、inode、大小、mtime 和 ctime，任一变化都重新计算 SHA-256。`--execute` 使用相同计划，在所有固定目标 promotion 锁和备份锁空闲时执行。预览只保存完整性校验缓存，不删除文件。
+
+`plush-retention.timer` 每小时运行一次；主机和路径固定，不接受浏览器输入命令。GitLab 有运行中或排队 CI 时暂停本轮；操作、保护信息或文件身份不明时保留现场。只通过 GitLab Package File API 删除 `server-image.tar`、`web-image.tar` 和 `source.tar`，Release、tag、manifest、checksum、SBOM、演练、CI 及部署记录继续保留。目标制品只清理预检确认的过期源码、缓存和停止的入口容器；镜像还须无容器引用，不使用全局 prune。
+
+`retention-files.mjs` 供生成任务调用，ERP PG、成套 PG＋附件、GitLab 原生备份和加密交接包各自按完整恢复输入计数；不同环境、来源及备份类型不互相挤占。`retention-protection.json` 使用 `plush.retention-protection/v1` 与 `protected: {"精确备份标识": ["保护原因"]}` 显式保护升级恢复点，修改须沿对应目标的操作锁核对。部署恢复点自动绑定当前 / 回滚版本及最近成功升级；未闭环引用、历史不完整或归属未确认的输入保留核对。源与副本分别保留最近 7 份，复制和校验通过后才轮换。
+
+原始回执不删除；各来源 `retention-ledger.json` 长期保存已清理文件的标识、大小、SHA-256、原因和时间。私有汇总位于 `/var/lib/plush-retention/summary.json`，工作台仅展示脱敏状态。轮换账本和摘要随下一次 GitLab 配置加密备份进入 PD-SSD；`runs/` 保留每次轮换结果。失败不能宣称文件仍可恢复，已清理版本只保留记录入口。
+
+安装时先在 `/opt/plush-retention/releases/<内容摘要>/` 核对固定源码快照及 `artifact.json`，运行预览和专项回归，再切换 `current` 与安装 [service](../../server/deploy/gitlab/systemd/plush-retention.service) / [timer](../../server/deploy/gitlab/systemd/plush-retention.timer)。保留上一运行目录和 systemd / 配置前态；回滚工具只停止后续轮换，不能恢复已清理的字节，需使用受保护的备份或可重建源。更新已安装 PG 或 GitLab 备份入口时同步迁移 `retentionDays / *_RETENTION_DAYS` 到 `retentionCount / *_RETENTION_COUNT=7`；不自动切换 PG 与成套备份类型。
 
 ## Promotion 与传输
 

@@ -21,7 +21,7 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 ### Storage retention
 
-服务器本地归档和加密交接包保留 14 天，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、登记 export 目录、来源 marker 与唯一 `age` recipient。只有本地归档和四个加密文件全部完成后才原子发布 export 包；外盘复制成功另由 Mac 回执证明。PD-SSD 独立保留最近 7 份，来源删除不传播。Compose 不自动创建缺失的冷数据目录。
+服务器本地成套归档和加密交接包分别保留最近 7 份，升级前恢复点额外保护，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、登记 export 目录、来源 marker 与唯一 `age` recipient。只有本地归档和四个加密文件全部完成后才原子发布 export 包；外盘复制成功另由 Mac 回执证明。PD-SSD 独立保留最近 7 份及显式保护项，来源删除不传播。清理只处理完整包的载荷，checksum、回执和轮换账本长期保留；配置备份同时包含轮换记录。自动任务与安装步骤见 [统一轮换](../../../scripts/deploy/README.md#制品与备份自动轮换)。Compose 不自动创建缺失的冷数据目录。
 
 已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
 
@@ -329,3 +329,5 @@ GitLab 宿主的 UFW bridge 规则和 canonical TLS proxy 属于宿主机前置�
 | backup/restore 未通过 | 阻断 GitLab 升级和正式依赖切换 | 把 RAID 健康当恢复证据 |
 
 遇到以下任一条件立即停止：目标身份/挂载漂移、活动 writer/部署、端口重叠、备份不可验证、本次恢复所需独立副本未就绪、secret 可能落盘/输出、Runner 需要越过 VM、出现未评审的 GitHub 发布写路径、release SHA 与 main 不一致、目标结果 `not_proven`、或需要数据库/域名破坏性动作但没有独立授权。
+
+GitLab 原生 `backup_keep_time` 固定为 `0`，避免按天数删除绕过当前 / 升级恢复点保护；文件数量由统一轮换器管理。新安装前先按 [轮换部署步骤](../../../scripts/deploy/README.md#制品与备份自动轮换) 安装固定运行时，定时备份完成后调用同一套校验和轮换。

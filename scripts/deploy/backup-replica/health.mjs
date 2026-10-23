@@ -3,6 +3,8 @@ import path from "node:path";
 import { requireValue } from "./config.mjs";
 import { backupTime, readIndex } from "./sync.mjs";
 import { bundleTime, gitlabIndex } from "./gitlab-sync.mjs";
+import { readRetentionLedger } from "./retention.mjs";
+import { databaseFile } from "./transport.mjs";
 
 export function checkHealth(c, root, { clock = Date.now() } = {}) {
   const receipt = (name) => {
@@ -67,9 +69,19 @@ export function checkHealth(c, root, { clock = Date.now() } = {}) {
   }
   const space = fs.statfsSync(root),
     availableBytes = space.bavail * space.bsize;
-  if (gitlab) {
+  {
+    const ledger = readRetentionLedger(root, c.source.id);
+    const rolling = Object.values(ledger.records).filter(
+      (x) => x.state === "retained",
+    );
+    const indexed = Object.keys(index).filter(
+      (name) => gitlab || databaseFile.test(name),
+    );
     requireValue(
-      Object.keys(index).length <= c.retentionCount,
+      rolling.length <= c.retentionCount &&
+        indexed.every((name) =>
+          ["retained", "protected"].includes(ledger.records[name]?.state),
+        ),
       "backup_retention_incomplete",
     );
     requireValue(

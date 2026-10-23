@@ -60,7 +60,8 @@ export function loadConfig(file) {
       "source",
       "destination",
       "stateDirectory",
-      ...(gitlab ? ["retentionCount", "minimumFreeBytes"] : ["retentionDays"]),
+      "retentionCount",
+      "minimumFreeBytes",
       "maxSourceAgeHours",
       "transferTimeoutSeconds",
       "restore",
@@ -109,12 +110,8 @@ export function loadConfig(file) {
     );
   absolute(c.stateDirectory);
   for (const [name, min, max] of [
-    ...(gitlab
-      ? [
-          ["retentionCount", 2, 31],
-          ["minimumFreeBytes", 1024 ** 3, 1024 ** 4],
-        ]
-      : [["retentionDays", 35, 366]]),
+    ["retentionCount", 7, 7],
+    ["minimumFreeBytes", 1024 ** 3, 1024 ** 4],
     ["maxSourceAgeHours", 1, 168],
     ["transferTimeoutSeconds", 30, 14400],
   ]) {
