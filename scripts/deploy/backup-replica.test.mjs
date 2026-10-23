@@ -138,6 +138,11 @@ function fixture(t) {
     return name;
   };
   const name = add();
+  const space = { availableBytes: config.minimumFreeBytes + 1024 ** 3 };
+  t.mock.method(fs, "statfsSync", () => ({
+    bavail: space.availableBytes,
+    bsize: 1,
+  }));
   const source = {
     async inventory() {
       return [...files].map(([name, bytes]) => ({
@@ -165,6 +170,7 @@ function fixture(t) {
     name,
     add,
     source,
+    space,
     sync: () => synchronize(config, target, source, { clock }),
   };
 }
@@ -528,6 +534,31 @@ test("retention keeps seven verified copies and preserves owned cleanup history"
   assert.equal((await f.sync()).retainedFiles, 7);
   const ledger = JSON.parse(fs.readFileSync(path.join(f.target, "retention-ledger.json")));
   assert.equal(ledger.records[old].state, "cleaned");
+});
+test("space reserve rejects transfer before changing retained replicas and accepts the exact boundary", async (t) => {
+  const f = fixture(t);
+  await f.sync();
+  const before = new Map(
+    fs.readdirSync(f.target).map((name) => [name, fs.readFileSync(path.join(f.target, name))]),
+  );
+  const added = f.add(f.clock - 1000, "43");
+  let transfers = 0;
+  const download = f.source.download;
+  f.source.download = async (...args) => {
+    transfers++;
+    return download(...args);
+  };
+  f.space.availableBytes = f.config.minimumFreeBytes;
+  await assert.rejects(f.sync(), /destination_space_insufficient/u);
+  assert.equal(transfers, 0);
+  assert.deepEqual(fs.readdirSync(f.target).sort(), [...before.keys()].sort());
+  for (const [name, bytes] of before) {
+    assert.deepEqual(fs.readFileSync(path.join(f.target, name)), bytes);
+  }
+  f.space.availableBytes += f.files.get(added).length;
+  await f.sync();
+  assert.equal(transfers, 1);
+  assert.deepEqual(fs.readFileSync(path.join(f.target, added)), f.files.get(added));
 });
 test("corrupt incoming files cannot become committed replicas", async (t) => {
   const f = fixture(t);
