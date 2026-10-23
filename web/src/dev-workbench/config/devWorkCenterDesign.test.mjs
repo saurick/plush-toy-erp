@@ -56,9 +56,9 @@ test('任务标题固定表达办理事项，五类常规关联各有明确计�
     assert.equal(value.count, '')
   }
 })
-test('办理责任区分待领取与已指定人员，姓名缺失不改变指派事实', () => {
+test('办理责任区分未指定与已指定人员，姓名缺失不改变指派事实', () => {
   assert.equal(designTaskPresentation(taskByID('product')).responsibility, '业务 · 示例业务员')
-  assert.equal(designTaskPresentation(taskByID('task')).responsibility, '财务 · 待领取')
+  assert.equal(designTaskPresentation(taskByID('task')).responsibility, '财务 · 未指定办理人')
   assert.equal(designTaskPresentation(taskByID('customer')).responsibility, '业务 · 已指定办理人')
 })
 test('进度示意区分交付、生产与多单位，不制造统一比例', () => {

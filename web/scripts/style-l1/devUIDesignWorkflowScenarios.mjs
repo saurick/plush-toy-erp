@@ -828,7 +828,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         assert.equal(await card.locator('.rm-card-head > strong').innerText(), '确认采购到货差异')
         assert.match(await card.locator('.rm-card-product').innerText(), /塑料眼/u)
         assert.equal(await card.locator('.rm-card-head .badge').innerText(), '受阻')
-        assert.match(await card.locator('.rm-card-foot').innerText(), /仓库 · 待领取/u)
+        assert.match(await card.locator('.rm-card-foot').innerText(), /仓库 · 未指定办理人/u)
         for (const width of [320, 390]) {
           await page.setViewportSize({ width, height: 844 })
           const geometry = await card.evaluate((node) => {

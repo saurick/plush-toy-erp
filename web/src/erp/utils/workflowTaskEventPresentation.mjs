@@ -1,6 +1,5 @@
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from './roleKeys.mjs'
-import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 
 const TASK_STATUS_LABELS = Object.freeze({
   [WorkflowTaskStatus.READY]: '待处理',
@@ -222,7 +221,7 @@ export function presentWorkflowTaskEvent(
 export function getWorkflowTaskAssigneeLabel(task = {}) {
   return positiveInteger(task.assignee_id)
     ? normalizedText(task.discovery?.assignee_name) || '已指定办理人'
-    : isTerminalWorkflowTask(task) ? '未指定办理人' : '待领取'
+    : '未指定办理人'
 }
 
 export function buildWorkflowTaskResponsibilityItems(task = {}) {

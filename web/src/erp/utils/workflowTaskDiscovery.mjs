@@ -35,6 +35,6 @@ export function taskDiscoveryFilterLabels(filters = {}, people = []) {
   const value = normalizeTaskDiscoveryFilters(filters)
   return Object.entries(value).map(([key, selected]) => ({ key,
 label: {
-    assignee: `办理人：${selected === 'unassigned' ? '岗位待领取' : people.find((person) => String(person.id) === selected)?.name || '已指定人员'}`,
+    assignee: `办理人：${selected === 'unassigned' ? '未指定办理人' : people.find((person) => String(person.id) === selected)?.name || '已指定人员'}`,
   }[key] }))
 }

@@ -2,6 +2,7 @@ import { act, createElement } from 'react'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { installTestDOM, registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs'
+import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 
 test('tracking tab and session changes cancel older reads and never restore stale rows', async (t) => {
   const dom = installTestDOM()
@@ -112,4 +113,80 @@ test('tracking pagination cancels stale pages, retries the requested page and co
   await respond(calls[8], 0, '无记录')
   assert.equal(new URLSearchParams(location.search).get('track_page_started'), '1')
   assert.match(node.textContent, /暂无你发起的流程或跟进任务/)
+})
+
+test('tracking scopes keep their names and clearing a source reloads the current filters from the first page', async (t) => {
+  const calls = []
+  const harness = await businessFormHarness(t, { rpc: (method, params, options) => {
+    assert.equal(method, 'list_tracking')
+    calls.push({ params, signal: options.signal })
+    return { data: {
+      total: 100,
+      status_counts: { completed: 100 },
+      limit: params.limit,
+      offset: params.offset,
+      items: Array.from({ length: params.limit }, (_, index) => ({
+        kind: 'task',
+        id: params.offset + index + 1,
+        process_key: '',
+        title: params.source_id ? '单据范围内记录' : '全部范围记录',
+        source_type: 'sales_order',
+        source_id: 12,
+        source_no: 'SO-TRACK',
+        display_context: null,
+        status: 'done',
+        resolution_kind: null,
+        started_at: 1791367200,
+        updated_at: 1791367200,
+        completed_at: 1791367200,
+        initiator_name: '业务',
+        initiator_role_key: 'sales',
+        current_tasks: [],
+      })),
+    } }
+  } })
+  const [{ MemoryRouter, useSearchParams }, { default: Panel }] = await Promise.all([
+    import('react-router-dom'), import('./WorkflowTrackingPanel.jsx'),
+  ])
+  let search
+  function Probe() {
+    const [params, setParams] = useSearchParams()
+    search = params
+    return createElement(Panel, {
+      scope: params.get('tracking'),
+      sessionKey: 'session',
+      refreshKey: 0,
+      onScopeChange: (scope) => setParams((current) => {
+        const next = new URLSearchParams(current)
+        next.set('tracking', scope)
+        return next
+      }),
+    })
+  }
+  const initial = '/?tracking=visible&track_source_type=sales_order&track_source_id=12&track_page_visible=2&track_page_started=3&track_page_participated=4&track_search_visible=小熊&track_owner_role_key_visible=engineering&track_search_started=保留其他范围'
+  await harness.render(createElement(MemoryRouter, { initialEntries: [initial], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Probe)))
+  assert.equal(calls.at(-1).params.offset, 20)
+  await harness.click([...document.querySelectorAll('button')].find((button) => button.textContent.startsWith('筛选')))
+  const scopes = () => document.querySelector('[role="group"][aria-label="跟踪范围"]')
+  assert.deepEqual([...scopes().querySelectorAll('button')].map((button) => button.textContent), ['相关流程', '我发起的', '我参与的'])
+  const choose = (label) => harness.click([...scopes().querySelectorAll('button')].find((button) => button.textContent === label))
+  await choose('我发起的')
+  assert.equal(calls.at(-1).params.scope, 'started')
+  assert.equal(calls.at(-1).params.source_id, 12)
+  assert.equal(calls.at(-1).params.offset, 40)
+  await choose('相关流程')
+  assert.equal(calls.at(-1).params.scope, 'visible')
+  assert.equal(calls.at(-1).params.source_id, 12)
+  assert.equal(calls.at(-1).params.offset, 20)
+  await harness.click(harness.button('完成'))
+  const scopedRequest = calls.at(-1)
+  await harness.click(harness.button('清除单据范围'))
+  assert.equal(scopedRequest.signal.aborted, true)
+  assert.deepEqual(calls.at(-1).params, { scope: 'visible', keyword: '小熊', owner_role_key: 'engineering', limit: 20, offset: 0 })
+  assert.equal(search.has('track_source_type'), false)
+  assert.equal(search.has('track_source_id'), false)
+  for (const scope of ['visible', 'started', 'participated']) assert.equal(search.has(`track_page_${scope}`), false)
+  assert.equal(search.get('track_search_started'), '保留其他范围')
+  assert.equal(harness.button('清除单据范围'), undefined)
+  assert.match(document.querySelector('.erp-workflow-tracking-panel').textContent, /全部范围记录/u)
 })

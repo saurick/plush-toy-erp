@@ -159,11 +159,11 @@ test('workflow task event time makes missing or invalid timestamps explicit', ()
 })
 
 test('assignee display follows assignment state even when the name is missing or stale', () => {
-  assert.equal(getWorkflowTaskAssigneeLabel({}), '待领取')
-  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: 0, discovery: { assignee_name: '旧办理人' } }), '待领取')
+  assert.equal(getWorkflowTaskAssigneeLabel({}), '未指定办理人')
+  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: 0, discovery: { assignee_name: '旧办理人' } }), '未指定办理人')
   assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: 31, discovery: { assignee_name: '  小林  ' } }), '小林')
   assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: 31, discovery: { assignee_name: '  ' } }), '已指定办理人')
-  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: -1, discovery: { assignee_name: '旧办理人' } }), '待领取')
+  assert.equal(getWorkflowTaskAssigneeLabel({ assignee_id: -1, discovery: { assignee_name: '旧办理人' } }), '未指定办理人')
   for (const task_status_key of ['done', 'rejected', 'withdrawn']) {
     assert.equal(getWorkflowTaskAssigneeLabel({ task_status_key, assignee_id: 0, discovery: { assignee_name: '旧办理人' } }), '未指定办理人')
   }

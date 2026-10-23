@@ -51,7 +51,7 @@ export function createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalO
               assert.deepEqual(await guide.locator('.erp-wc-task-title').allTextContents(), common.map((task) => task.task_name))
               const noObject = guide.locator('[data-design-task-case="task"]')
               await noObject.getByText('未关联产品／物料', { exact: true }).waitFor()
-              assert.match(await noObject.locator('.erp-wc-card-footer').innerText(), /财务 · 待领取/u)
+              assert.match(await noObject.locator('.erp-wc-card-footer').innerText(), /财务 · 未指定办理人/u)
               await noObject.getByText('未设置截止', { exact: true }).waitFor()
               assert.equal(await noObject.locator('.erp-task-identity__code').count(), 0)
               const boxes = await guide.locator('.erp-wc-task-card').evaluateAll((cards) => cards.map((card) => {

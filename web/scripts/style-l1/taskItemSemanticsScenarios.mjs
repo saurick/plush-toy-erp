@@ -102,8 +102,8 @@ export function createTaskItemSemanticsScenarios({ assert }) {
       assert.match(await source.innerText(), /未关联业务单据/u)
       assert.doesNotMatch(await source.innerText(), /模拟任务|业务阻塞|样例-业务-01/u)
       assert.equal(await source.getByRole('button', { name: '复制单据编号', exact: true }).count(), 0)
-      assert.match(await color.innerText(), /待领取/u)
-      assert.doesNotMatch(await color.innerText(), /岗位待领取|不应显示的旧姓名/u)
+      assert.match(await color.innerText(), /未指定办理人/u)
+      assert.doesNotMatch(await color.innerText(), /待领取|不应显示的旧姓名/u)
       assert.match(await customer.innerText(), /已指定办理人/u)
       assert.equal(await customer.locator('.erp-task-source__number').innerText(), 'SO-DEMO-0431')
       assert.equal(await customer.locator('.erp-task-simulation').count(), 0)
@@ -113,13 +113,6 @@ export function createTaskItemSemanticsScenarios({ assert }) {
       assert.doesNotMatch(await row(97303).innerText(), /不应显示的旧产品|STALE-SOURCE|STALE-CODE/u)
       if (mobile) {
         assert.equal(await color.locator('.mobile-task-list-row__business').innerText(), '所属业务：业务阻塞')
-        const footer = await color.locator('.erp-task-card__footer').evaluate((node) => {
-          const assignee = node.querySelector('[aria-label^="办理人"]')
-          const time = node.querySelector('.erp-task-timing')
-          const box = (element) => element.getBoundingClientRect()
-          return { assigneeTop: box(assignee).top, timeTop: box(time).top, width: box(node).width }
-        })
-        assert(Math.abs(footer.assigneeTop - footer.timeTop) <= 4, `390px 常规责任与截止应同排：${JSON.stringify(footer)}`)
       }
       const field = await color.locator('.erp-task-identity__card-body').evaluate((node) => {
         const label = getComputedStyle(node.querySelector('.erp-task-identity__field-label'))
@@ -134,6 +127,24 @@ export function createTaskItemSemanticsScenarios({ assert }) {
         await assertNoHorizontalOverflow(page)
         assert.equal(await color.evaluate((node) => node.tagName), mobile ? 'DIV' : 'TR')
         assert.match(await color.innerText(), /客户尚未确认产品颜色/u)
+        if (mobile) {
+          const footer = await color.locator('.erp-task-card__footer').evaluate((node) => {
+            const box = (element) => element.getBoundingClientRect().toJSON()
+            const style = getComputedStyle(node)
+            return {
+              assignee: box(node.querySelector('[aria-label^="办理人"]')),
+              time: box(node.querySelector('.erp-task-timing')),
+              container: box(node),
+              columnGap: parseFloat(style.columnGap),
+              rowGap: parseFloat(style.rowGap),
+            }
+          })
+          const fits = footer.assignee.width + footer.time.width + footer.columnGap <= footer.container.width + 1
+          const sameRow = Math.abs(footer.assignee.top - footer.time.top) <= 4
+          assert.equal(sameRow, fits, `责任与截止在空间足够时同排，否则自然换行：${JSON.stringify(footer)}`)
+          if (!sameRow) assert(footer.time.top >= footer.assignee.bottom + footer.rowGap - 1, '换行后责任与截止不重叠')
+          assert(footer.assignee.right <= footer.container.right + 1 && footer.time.right <= footer.container.right + 1, '责任与截止完整保留在卡片内')
+        }
       }
       if (mobile) {
         const tabs = page.getByRole('tablist', { name: '任务状态', exact: true })

@@ -238,7 +238,7 @@ export default function WorkflowExceptionPanel({
       ) : <strong>{getWorkflowTaskDisplayName(task)}</strong>}
       <span>
         {getWorkflowTaskOwnerRoleLabel(task)} ·{' '}
-        {task.discovery?.assignee_name ? `${task.discovery.assignee_name} · ` : [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key) ? '岗位待领取 · ' : ''}
+        {task.discovery?.assignee_name ? `${task.discovery.assignee_name} · ` : [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key) ? '未指定办理人 · ' : ''}
         {getWorkflowTaskStatusMeta(task).label}
       </span>
       {showPath && task.discovery?.path ? <small>{task.discovery.path}</small> : null}

@@ -153,7 +153,7 @@ render: (_, entry) => (
         filters={(
           <>
             <BusinessStatusFilter inline aria-label="流转状态" allLabel="全部状态" value={filters.status} options={TRACKING_STATUS_OPTIONS} counts={resolveBusinessStatusCounts(page)} loading={!current} onChange={(status) => changeFilters({ status })} />
-            {onScopeChange ? <SelectFilter emptyValue="visible" aria-label="跟踪范围" value={scope} options={TRACKING_SCOPE_OPTIONS} onChange={onScopeChange} /> : null}
+            {onScopeChange ? <SelectFilter allowClear={false /* 不可清空：跟踪查询必须选择明确范围，相关流程也是独立范围。 */} aria-label="跟踪范围" value={scope} options={TRACKING_SCOPE_OPTIONS} onChange={onScopeChange} /> : null}
             <SearchInput placeholder="单号 / 任务 / 产品 / 款号" value={search.value} onChange={search.onChange} onCompositionStart={search.onCompositionStart} onCompositionEnd={search.onCompositionEnd} onPressEnter={search.onPressEnter} />
             <SelectFilter aria-label="当前岗位" value={filters.owner_role_key} disabled={filters.status === 'completed'} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => changeFilters({ owner_role_key })} />
             {!source.source_id ? <SelectFilter aria-label="单据类型" value={filters.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => changeFilters({ source_type })} /> : null}

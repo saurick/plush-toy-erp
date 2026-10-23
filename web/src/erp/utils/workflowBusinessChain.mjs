@@ -22,7 +22,7 @@ function taskPresentation(task) {
   const assigned = task.assignee_id > 0 || Boolean(personLabel)
   const statusLabel = getWorkflowTaskStatusMeta(task).label
   const responsibilityLabel = task.task_status_key === WorkflowTaskStatus.READY
-    ? assigned ? [roleLabel, personLabel || '已分配', '待办理'].join(' · ') : `待${roleLabel}领取`
+    ? assigned ? [roleLabel, personLabel || '已分配', '待办理'].join(' · ') : `${roleLabel} · 未指定办理人 · 待办理`
     : [roleLabel, personLabel, statusLabel].filter(Boolean).join(' · ')
   const seen = new Set()
   const references = [

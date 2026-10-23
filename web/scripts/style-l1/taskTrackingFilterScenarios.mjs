@@ -4,7 +4,7 @@ import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }) {
-  return ['light', 'dark'].map((themeMode) => ({
+  const scenarios = ['light', 'dark'].map((themeMode) => ({
     name: `task-tracking-filters-${themeMode}`,
     path: '/erp/task-board?tracking=started',
     auth: 'admin',
@@ -67,6 +67,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       const before = await list.boundingBox()
       await openFilters()
       await waitForFiniteAnimations(page)
+      assert.deepEqual(await filterDialog.getByRole('group', { name: '跟踪范围', exact: true }).getByRole('button').allTextContents(), ['相关流程', '我发起的', '我参与的'], '跟踪范围保留具名选项，不将相关流程改写为不限')
       const after = await list.boundingBox()
       assert.ok(Math.abs(before.y - after.y) < 1, 'opening filters must not push the tracking list down')
       await page.keyboard.press('Escape')
@@ -217,7 +218,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       for (const label of ['业务模块', '业务流程', '业务环节']) assert.equal(await filterDialog.getByText(label, { exact: true }).count(), 0)
       await filterDialog.getByRole('combobox', { name: '办理人', exact: true }).waitFor()
       await filterDialog.getByRole('combobox', { name: '办理人', exact: true }).press('ArrowDown')
-      await page.locator('.ant-select-dropdown:visible').getByText('岗位待领取', { exact: true }).click()
+      await page.locator('.ant-select-dropdown:visible').getByText('未指定办理人', { exact: true }).click()
       await page.waitForFunction(() => new URLSearchParams(location.search).get('assignee') === 'unassigned')
       await filterDialog.getByRole('button', { name: /清空筛选/ }).click()
       await waitForFiniteAnimations(page)
@@ -228,7 +229,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       const taskKeyword = await taskSearch.inputValue()
       await taskFilters.click()
       await filterDialog.getByRole('combobox', { name: '办理人', exact: true }).press('ArrowDown')
-      await page.locator('.ant-select-dropdown:visible').getByText('岗位待领取', { exact: true }).click()
+      await page.locator('.ant-select-dropdown:visible').getByText('未指定办理人', { exact: true }).click()
       await page.waitForFunction(() => new URLSearchParams(location.search).get('assignee') === 'unassigned')
       await page.locator('.erp-task-board-filters').getByRole('button', { name: '清空筛选', exact: true }).click()
       await page.waitForFunction(() => !new URLSearchParams(location.search).has('assignee'))
@@ -263,4 +264,48 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       await assertNoHorizontalOverflow(page)
     },
   }))
+
+  return scenarios.flatMap((scenario) => [scenario, {
+    ...scenario,
+    name: `task-tracking-source-clear-${scenario.themeMode}`,
+    path: '/erp/task-board?tracking=visible&track_source_type=sales_order&track_source_id=1',
+    verify: async (page) => {
+      const panel = page.locator('.erp-workflow-tracking-panel')
+      const controls = page.locator('.erp-workflow-tracking-controls')
+      const dialog = page.getByRole('dialog', { name: '筛选条件', exact: true })
+      const change = async (action, predicate) => {
+        const request = page.waitForRequest((candidate) => {
+          if (!candidate.url().endsWith('/rpc/workflow') || candidate.method() !== 'POST') return false
+          const body = candidate.postDataJSON()
+          return body.method === 'list_tracking' && predicate(body.params)
+        })
+        const [captured] = await Promise.all([request, action()])
+        return captured.postDataJSON().params
+      }
+      const chooseScope = async (label) => {
+        await waitForFiniteAnimations(page)
+        await controls.getByRole('button', { name: /^筛选/ }).click()
+        await dialog.waitFor()
+        await waitForFiniteAnimations(page)
+        const choices = dialog.getByRole('group', { name: '跟踪范围', exact: true })
+        assert.deepEqual(await choices.getByRole('button').allTextContents(), ['相关流程', '我发起的', '我参与的'])
+        await choices.getByRole('button', { name: label, exact: true }).click()
+      }
+      await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
+      await change(() => chooseScope('我发起的'), (params) => params.scope === 'started' && params.source_type === 'sales_order' && params.source_id === 1)
+      await change(() => chooseScope('相关流程'), (params) => params.scope === 'visible' && params.source_type === 'sales_order' && params.source_id === 1)
+      await page.setViewportSize({ width: 320, height: 844 })
+      await waitForFiniteAnimations(page)
+      const clear = controls.getByRole('button', { name: '清除单据范围', exact: true })
+      const request = await change(() => clear.click(), (params) => params.scope === 'visible' && !params.source_id && !params.source_type)
+      assert.equal(request.offset, 0, '清除单据范围后从第一页查询')
+      const params = new URL(page.url()).searchParams
+      assert.equal(params.get('tracking'), 'visible')
+      assert.equal(params.has('track_source_type'), false)
+      assert.equal(params.has('track_source_id'), false)
+      await clear.waitFor({ state: 'detached' })
+      await panel.getByText('PO-FILTER-802', { exact: true }).waitFor()
+      await assertNoHorizontalOverflow(page)
+    },
+  }])
 }

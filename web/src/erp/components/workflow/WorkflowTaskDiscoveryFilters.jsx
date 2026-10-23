@@ -17,7 +17,7 @@ export default function WorkflowTaskDiscoveryFilters({
   const result = useWorkflowTaskAssignees(profile, roleKey, !people)
   const assignees = people || result.people
   const options = [
-    { value: 'unassigned', label: '岗位待领取' },
+    { value: 'unassigned', label: '未指定办理人' },
     ...assignees.map((person) => ({ value: String(person.id), label: person.name })),
     ...(value.assignee && value.assignee !== 'unassigned' && !assignees.some((person) => String(person.id) === value.assignee)
       ? [{ value: value.assignee, label: '已选办理人（名单中未找到）' }]

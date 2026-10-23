@@ -51,7 +51,7 @@ taskCount: 1,
 reason: row.attention_reason,
   })
   assert.equal(progressAttention({ ...row, open_tasks: 2 }, { tasks: true }).taskID, null)
-  assert.equal(progressAttention({ ...row, attention_owner: '' }, { tasks: true }, () => '工程').detail, '工程 · 待领取')
+  assert.equal(progressAttention({ ...row, attention_owner: '' }, { tasks: true }, () => '工程').detail, '工程 · 未指定办理人')
   assert.equal(progressAttention({ ...row, attention_owner: '', unassigned_tasks: 0 }, { tasks: true }, () => '工程').detail, '工程 · 办理人未提供')
   assert.equal(progressAttention({ ...row, attention_owner: '', open_tasks: 2, unassigned_tasks: 1 }, { tasks: true }, () => '工程').detail, '工程 · 办理人未提供')
   assert.equal(progressAttention({ ...row, open_tasks: 0, sales_owner: '' }, { tasks: true }).detail, '业务负责人未提供')

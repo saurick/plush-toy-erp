@@ -52,7 +52,7 @@ test('payment categories shared by advances and settlement never guess the actua
   assert.equal(result.overview.find((group) => group.key === 'settlement').groups[0].key, 'financial_settlement')
 })
 
-test('chain responsibility distinguishes unclaimed, assigned, blocked and ended tasks', () => {
+test('chain responsibility distinguishes unassigned, assigned, blocked and ended tasks', () => {
   const base = { owner_role_key: 'production', task_name: '安排返工' }
   const result = buildWorkflowBusinessChain({ items: [
     { ...base, id: 1, task_status_key: 'ready' },
@@ -64,7 +64,7 @@ test('chain responsibility distinguishes unclaimed, assigned, blocked and ended 
   ],
   truncated: false }, 1)
   assert.deepEqual(result.tasks.map((item) => item.responsibilityLabel), [
-    '待生产经理领取', '生产经理 · 张三 · 待办理', '生产经理 · 已分配 · 待办理',
+    '生产经理 · 未指定办理人 · 待办理', '生产经理 · 张三 · 待办理', '生产经理 · 已分配 · 待办理',
     '生产经理 · 阻塞', '生产经理 · 已完成', '生产经理 · 已撤回',
   ])
 })

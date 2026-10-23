@@ -346,7 +346,7 @@ export function progressAttention(row, access, roleLabel = (key) => getWorkflowT
   const role = row.attention_role ? roleLabel(row.attention_role) : ''
   const detail = row.attention_owner
     ? [role, row.attention_owner].filter(Boolean).join(' · ')
-    : role ? `${role} · ${row.unassigned_tasks === row.open_tasks ? '待领取' : '办理人未提供'}` : '负责岗位未提供'
+    : role ? `${role} · ${row.unassigned_tasks === row.open_tasks ? '未指定办理人' : '办理人未提供'}` : '负责岗位未提供'
   return {
     title: getWorkflowTaskDisplayName({ task_name: row.attention_task }),
     detail,

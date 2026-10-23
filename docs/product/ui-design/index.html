@@ -6733,7 +6733,7 @@ return {orders,financeCustomers};})();
       const tasks=getMobileProgressTasks(row);
       if(!tasks.length)return '<span class="data-note">暂无可见待办</span>';
       const task=tasks[0],blocked=row.stage.includes('阻塞');
-      return `<strong>${blocked?'受阻 · ':''}${escapeHTML(task.title)}</strong>${blocked?`<small class="text-danger">${escapeHTML(row.stage)}</small>`:''}<small>${escapeHTML(task.role)}待领取${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}</small>`;
+      return `<strong>${blocked?'受阻 · ':''}${escapeHTML(task.title)}</strong>${blocked?`<small class="text-danger">${escapeHTML(row.stage)}</small>`:''}<small>${escapeHTML(task.role)} · 未指定办理人${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}</small>`;
     }
     function getPrintProfile(template) {
       const profiles = {
@@ -15974,7 +15974,7 @@ return {orders,financeCustomers};})();
     const mobileTaskDiscoveryByView = {todo:{},done:{},risk:{},exceptions:{}};
     function mobileTaskDiscoveryDemo() {return mobileTaskDiscoveryByView[state.mobileMain==='risk'?'risk':state.mobileTab] || mobileTaskDiscoveryByView.todo;}
     const demoAssignees = {H07:'业务小李',H09:'IQC 小陈',H05:'仓管小王',M01:'仓管小王'};
-    function demoAssignee(task) { return demoAssignees[task.id] || (task.status === 'done' || task.lane === 'done' ? '办理人未记录' : '待领取'); }
+    function demoAssignee(task) { return demoAssignees[task.id] || (task.status === 'done' || task.lane === 'done' ? '办理人未记录' : '未指定办理人'); }
     function demoTaskTime(task) {
       if (task.status !== 'done' && task.lane !== 'done') return task.deadline || task.time || '未设置截止';
       if (!task.completedAt) return '结束时间未记录';
@@ -16779,7 +16779,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const tasks = getMobileProgressTasks(row);
       if (!tasks.length) return '<div class="rm-progress-task empty">暂无待处理任务</div>';
       const task = tasks[0], blocked = row.stage.includes('阻塞');
-      const detail = `${task.role} · ${task.assignee || '待领取'}${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}`;
+      const detail = `${task.role} · ${task.assignee || '未指定办理人'}${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}`;
       return `<button class="rm-progress-task" data-action="mobile-progress-tasks" data-id="${row.id}"><span class="rm-progress-attention"><span class="rm-progress-attention-head"><span class="rm-progress-attention-title"><strong>${escapeHTML(task.title)}</strong>${blocked?'<span class="badge danger">受阻</span>':''}</span><span class="rm-progress-attention-owner">${escapeHTML(detail)}</span>${icon('chevron')}</span>${blocked?renderMobileBlockedReason(task.reason || row.stage):''}</span></button>`;
     }
 
@@ -17722,7 +17722,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         primary:[`批量${state.businessActionLabel}`,'仅当所选记录处于同一状态、拥有同一可执行动作时才允许提交。']
       };
       const [title,description] = map[state.batchAction] || ['批量操作','核对所选范围后继续。'];
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(620px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><span class="badge info">${selectedRows.length} 条</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p style="margin:0 0 12px;color:var(--text-2);line-height:1.65">${description}</p><div class="batch-dialog-list">${selectedRows.map(row=>`<div class="batch-dialog-row"><input class="checkbox" type="checkbox" checked aria-label="包含 ${row.no}"/><strong>${row.no}</strong><span>${rowParty(row,config)} · ${row.statusText}</span></div>`).join('')}</div>${state.batchAction==='assign'?'<div class="field" style="margin-top:12px"><label>新的负责人</label><ui-select id="batch-assignee"><option>何敏</option><option>林晓</option><option>王宁</option><option>按岗位领取</option></ui-select></div>':''}${state.batchAction==='primary'?'<div class="rm-callout warning" style="margin-top:12px">这是受控状态动作，提交前将再次校验权限、状态和依赖条件。</div>':''}</div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-batch-action">确认${title}</button></footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(620px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><span class="badge info">${selectedRows.length} 条</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p style="margin:0 0 12px;color:var(--text-2);line-height:1.65">${description}</p><div class="batch-dialog-list">${selectedRows.map(row=>`<div class="batch-dialog-row"><input class="checkbox" type="checkbox" checked aria-label="包含 ${row.no}"/><strong>${row.no}</strong><span>${rowParty(row,config)} · ${row.statusText}</span></div>`).join('')}</div>${state.batchAction==='assign'?'<div class="field" style="margin-top:12px"><label>新的负责人</label><ui-select id="batch-assignee"><option>何敏</option><option>林晓</option><option>王宁</option><option>未指定办理人</option></ui-select></div>':''}${state.batchAction==='primary'?'<div class="rm-callout warning" style="margin-top:12px">这是受控状态动作，提交前将再次校验权限、状态和依赖条件。</div>':''}</div><footer class="modal-foot"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-batch-action">确认${title}</button></footer></section></div>`;
     }
 
     function renderAttachmentModal() {
@@ -18286,7 +18286,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         state.infoModal = { title: `${row.no} · 完整进度`, html: `<section class="detail-section"><h3>${row.product}</h3><p style="color:var(--text-2)">${row.customer} · ${row.due} 交付 · ${row.quantity}</p><div class="stage-list">${row.stages.map(([label,value])=>`<div class="stage-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div></section>` };
         if(target.dataset.section==='tasks') {
           const tasks=getMobileProgressTasks(row);
-          state.infoModal.html='<section class="detail-section"><h3>关联任务</h3>'+tasks.map(task=>'<article class="detail-section"><strong>'+escapeHTML(task.title)+'</strong><p>'+escapeHTML(task.role)+'待领取</p></article>').join('')+'</section>';
+          state.infoModal.html='<section class="detail-section"><h3>关联任务</h3>'+tasks.map(task=>'<article class="detail-section"><strong>'+escapeHTML(task.title)+'</strong><p>'+escapeHTML(task.role)+' · 未指定办理人</p></article>').join('')+'</section>';
         }
         state.overlay = 'info'; renderFloating();
       }
