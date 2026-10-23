@@ -213,6 +213,80 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
       },
     },
     {
+      name: 'dev-ui-design-viewport-fill',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const assertViewportFilled = async (selector) => {
+          const geometry = await page.locator(selector).evaluate((node) => {
+            const box = node.getBoundingClientRect()
+            const workspace = document.querySelector('.erp-dev-ui-design-page')
+            const header = workspace.querySelector('header')
+            const style = getComputedStyle(workspace)
+            return {
+              height: box.height,
+              bottomGap: innerHeight - box.bottom,
+              expectedGap: parseFloat(style.paddingBottom),
+              headerBottom: header.getBoundingClientRect().bottom,
+              top: box.top,
+              pageOverflow: document.documentElement.scrollHeight - innerHeight,
+            }
+          })
+          assert(geometry.height > 0, `${selector}: 内容区可见`)
+          assert(Math.abs(geometry.bottomGap - geometry.expectedGap) <= 1,
+            `${selector}: 内容区延伸到页面底部边距 ${JSON.stringify(geometry)}`)
+          assert(geometry.top >= geometry.headerBottom, `${selector}: 内容不覆盖页签`)
+          assert(geometry.pageOverflow <= 1, `${selector}: 由内容区独立滚动 ${JSON.stringify(geometry)}`)
+          await assertNoHorizontalOverflow(page)
+        }
+        const reader = '.erp-dev-ui-design-reader:visible'
+        const documentShell = '.erp-design-document-shell'
+        for (const viewport of [
+          { width: 1920, height: 1080 },
+          { width: 1920, height: 813 },
+          { width: 1440, height: 900 },
+          { width: 980, height: 900 },
+          { width: 1024, height: 600 },
+        ]) {
+          await page.setViewportSize(viewport)
+          await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+          await waitReady(page)
+          await assertViewportFilled(reader)
+          for (const name of ['设计说明', '设计依据']) {
+            await page.getByRole('tab', { name, exact: true }).click()
+            await page.locator(documentShell).waitFor()
+            await assertViewportFilled(documentShell)
+            await page.getByRole('button', { name: '收起目录', exact: true }).click()
+            await assertViewportFilled(documentShell)
+            await page.getByRole('button', { name: '展开目录', exact: true }).click()
+          }
+        }
+        await page.locator('.erp-design-reader-toolbar').getByText('规范原文', { exact: true }).click()
+        await page.locator('.erp-design-prose').waitFor()
+        await assertViewportFilled(documentShell)
+        const scroll = await page.locator('.erp-design-document-content').evaluate((node) => {
+          node.scrollTop = node.scrollHeight
+          return { top: node.scrollTop, height: node.clientHeight, scrollHeight: node.scrollHeight }
+        })
+        assert(scroll.scrollHeight > scroll.height && scroll.top > 0, '长文仍在阅读区内滚动')
+        await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+        await waitReady(page)
+        await select(page, 'controls')
+        await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
+        await assertViewportFilled(reader)
+        await page.locator(`${reader} .erp-dev-ui-design-page-select .ant-select-clear`).click()
+        await page.getByText('请选择设计预览入口', { exact: true }).waitFor()
+        await assertViewportFilled(reader)
+        await select(page, 'workspace')
+        await waitReady(page)
+        await assertViewportFilled(reader)
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await assertViewportFilled(reader)
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-viewport-fill-4k.png') })
+      },
+    },
+    {
       name: 'dev-ui-design-preview-lifecycle',
       path: '/__dev/ui-design?page=help&control=feedback',
       viewport: { width: 1920, height: 1080 },
