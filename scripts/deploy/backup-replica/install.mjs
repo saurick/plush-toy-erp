@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { command } from "./process.mjs";
 import { privateFile, requireValue } from "./config.mjs";
 import { atomicBytes, atomicJSON, now, privateDirectory } from "./storage.mjs";
+import { requireCompatibleNode } from "./runtime.mjs";
 
 export function requireIdleAgent(status) {
   requireValue(
@@ -50,37 +51,45 @@ export async function prepareInstallation(
   const directory = path.dirname(fileURLToPath(import.meta.url)),
     repository = path.resolve(directory, "../../..");
   const sha = (
-    await command(["git", "-C", repository, "rev-parse", "HEAD"], { signal })
+    await command(["git", "-C", repository, "rev-parse", "HEAD"], {
+      signal,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    })
   )
     .toString()
     .trim();
-  requireValue(
-    process.version ===
-      `v${fs.readFileSync(path.join(repository, ".n-node-version"), "utf8").trim()}`,
-    "node_version_mismatch",
-  );
+  const nodeMinimum = fs
+    .readFileSync(path.join(repository, ".n-node-version"), "utf8")
+    .trim();
+  requireCompatibleNode(nodeMinimum);
   const files = fs
     .readdirSync(directory)
-    .filter((name) => name.endsWith(".mjs"))
+    .filter((name) => /\.(?:mjs|sh|rb)$/u.test(name))
     .sort();
   const hash = createHash("sha256");
+  const contents = new Map();
+  let committedSource = true;
   for (const name of files) {
-    const committed = await command(
-      [
-        "git",
-        "-C",
-        repository,
-        "show",
-        `${sha}:${path.relative(repository, path.join(directory, name))}`,
-      ],
-      { signal },
-    );
-    requireValue(
-      committed.equals(fs.readFileSync(path.join(directory, name))),
-      "install_requires_committed_modules",
-    );
+    const content = fs.readFileSync(path.join(directory, name));
+    contents.set(name, content);
+    try {
+      const committed = await command(
+        [
+          "git",
+          "-C",
+          repository,
+          "show",
+          `${sha}:${path.relative(repository, path.join(directory, name))}`,
+        ],
+        { signal, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } },
+      );
+      if (!committed.equals(content)) committedSource = false;
+    } catch (error) {
+      if (error.code !== "command_failed") throw error;
+      committedSource = false;
+    }
     hash.update(name + "\0");
-    hash.update(committed);
+    hash.update(content);
   }
   const identity = hash.digest("hex"),
     releases = privateDirectory(
@@ -90,22 +99,18 @@ export async function prepareInstallation(
   if (!fs.existsSync(release)) {
     privateDirectory(release);
     for (const name of files)
-      atomicBytes(
-        path.join(release, name),
-        fs.readFileSync(path.join(directory, name)),
-      );
+      atomicBytes(path.join(release, name), contents.get(name));
     atomicJSON(path.join(release, "artifact.json"), {
       gitSha: sha,
       sha256: identity,
-      nodeVersion: process.version,
+      nodeVersion: `v${nodeMinimum}`,
+      sourceState: committedSource ? "committed" : "content-snapshot",
       files,
     });
   }
   for (const name of files)
     requireValue(
-      fs
-        .readFileSync(path.join(release, name))
-        .equals(fs.readFileSync(path.join(directory, name))),
+      fs.readFileSync(path.join(release, name)).equals(contents.get(name)),
       "runtime_artifact_drift",
     );
   const agents = path.join(os.homedir(), "Library/LaunchAgents");
@@ -167,7 +172,9 @@ export async function prepareInstallation(
     receipt: {
       status: "passed",
       installedAt: now(),
-      sourceCommit: sha,
+      sourceCommit: committedSource ? sha : undefined,
+      baseCommit: sha,
+      sourceState: committedSource ? "committed" : "content-snapshot",
       runtimeSha256: identity,
       runtimeDirectory: release,
       nodeVersion: process.version,

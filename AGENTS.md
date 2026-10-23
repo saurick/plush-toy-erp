@@ -127,6 +127,7 @@
 ## 部署、迁移与收口
 
 - 当前 Compose 真源是 `server/deploy/compose/prod`；低配目标机不构建，只 load 制品、migration、启动和检查。
+- 后续部署按 `docs/部署约定.md` 的备份闭环核对当前副本与恢复回执；备份工具 / 配置修改须同轮安装并验证实际定时执行，沿用已授权的 PD-SSD 加密备份，不恢复历史暂缓条件。
 - 发布前确认 commit/image、migration、config、rollback；线上 Atlas 使用项目文档指定的宿主机工具和串行锁。
 - 镜像清理先保留当前及项目要求的回滚版本，再按 `$plush-operations-governance` 和发布文档执行。
 - 修改 `server/internal/data/model/schema/**` 后，本轮收口前必须在 `server/` 执行 `make data`，审查并纳入由此产生的 Ent 生成物、新 Atlas migration 与 `atlas.sum`，再运行 `bash scripts/qa/db-guard.sh`；结构变更缺 migration 或生成零漂移证据时只能报告 `incomplete`。Git hook 只做 check-only，不自动生成或改写 migration。

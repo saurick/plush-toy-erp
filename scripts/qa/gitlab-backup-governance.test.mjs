@@ -120,7 +120,7 @@ esac
   assert.match(check.stdout, /status=passed mode=check/u);
 });
 
-test("backup health requires a fresh passed status and the matching offsite package", (t) => {
+test("backup health requires a fresh passed status and the matching encrypted export", (t) => {
   const { root, bin } = fixture(t);
   const local = path.join(root, "local");
   const offsite = path.join(root, "offsite");
@@ -136,8 +136,8 @@ test("backup health requires a fresh passed status and the matching offsite pack
       "status=passed",
       "backupId=gitlab-20260925T110000Z",
       "completedAt=2026-09-25T11:00:00Z",
-      "offsiteCopied=true",
-      "offsiteEncrypted=true",
+      "exportPrepared=true",
+      "exportEncrypted=true",
       "",
     ].join("\n"),
   );
@@ -146,7 +146,7 @@ test("backup health requires a fresh passed status and the matching offsite pack
     envFile,
     [
       `GITLAB_RAID_BACKUP_DIR=${local}`,
-      `GITLAB_OFFSITE_BACKUP_DIR=${offsite}`,
+      `GITLAB_BACKUP_EXPORT_DIR=${offsite}`,
       "GITLAB_BACKUP_MAX_AGE_HOURS=36",
       "",
     ].join("\n"),
@@ -202,9 +202,11 @@ test("offsite verification is explicitly archive-level and never overwrites GitL
     path.join(ROOT, "server/deploy/gitlab/gitlab-offsite-backup-verify.sh"),
     "utf8",
   );
-  assert.match(backupSource, /offsite backup must use a different filesystem/u);
+  assert.match(backupSource, /encrypted export must use the registered local spool/u);
+  assert.match(backupSource, /offsiteCopied=false/u);
+  assert.match(backupSource, /local backup space insufficient/u);
   assert.equal(backupSource.match(/age --recipient/gu)?.length, 4);
-  assert.ok(backupSource.includes('mv -- "$offsite_temp" "$offsite_final"'));
+  assert.ok(backupSource.includes('mv -- "$export_temp" "$export_final"'));
   assert.match(backupSource, /write_status passed 0/u);
   assert.doesNotMatch(backupSource, /rm\s+-rf/u);
   assert.match(source, /age --decrypt/u);
@@ -424,7 +426,7 @@ test("systemd routes backup failures to the bounded notifier", () => {
   assert.match(service, /BACKUP_GITLAB:r740xd:gitlab[.]saurick[.]me/u);
   assert.match(
     service,
-    /ReadWritePaths=\/srv\/raid5\/gitlab\/backups \/mnt\/plush-gitlab-offsite\/gitlab/u,
+    /ReadWritePaths=\/srv\/raid5\/gitlab\/backups\n/u,
   );
   assert.match(service, /gitlab-backup-health[.]sh --env-file/u);
   assert.match(timer, /OnCalendar=[*]-[*]-[*] 03:30:00/u);

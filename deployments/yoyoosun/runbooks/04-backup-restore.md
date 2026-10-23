@@ -129,7 +129,7 @@ node scripts/deploy/backup-set/cli.mjs restore-check \
 
 额外副本复用服务器已经生成的加密备份，不替换服务器本地及香港备份。Mac 主动经 SSH 拉取，按外盘 UUID 和专属目录标记确认介质，校验 SHA-256 后才原子落盘。来源主机及目录、外盘 UUID、保留期和时间表分别配置；SSH 使用已有主机密钥与登录配置，不关闭主机身份检查。
 
-Mac 复用项目 Node 版本与内置 `lockf / plutil`，SSH 来源使用 POSIX Shell 和 GNU `stat / realpath / sha256sum`；Mac 恢复检查另需 `age`、Docker 和已加载的 `postgres:18.6` 镜像。
+Mac 使用不低于项目最低版本的同一主版本 Node（允许兼容的 minor / patch 更新）与内置 `lockf / plutil`，SSH 来源使用 POSIX Shell 和 GNU `stat / realpath / sha256sum`；Mac 恢复检查另需 `age`、Docker 和已加载的 `postgres:18.6` 镜像。
 
 | 配置 / 模块 | 职责 |
 | --- | --- |
@@ -146,17 +146,19 @@ Mac 复用项目 Node 版本与内置 `lockf / plutil`，SSH 来源使用 POSIX 
 2. 运行 `node scripts/deploy/backup-replica/cli.mjs init --config <private-config.json>`。只初始化专属空目录；已有非空目录而缺少匹配标记时拒绝接管。
 3. 运行同一入口的 `sync --config <private-config.json>`，核对 copied / retained / latest backup 与来源身份。受管文件仅包括加密 `.age`；数据库文件必须有有效同名 checksum，未完成的传输不会成为最终文件。
 4. 运行 `verify --config <private-config.json>`。它从外盘实际副本解密，恢复到无网络、无宿主端口的一次性 PostgreSQL，核对业务表与 Atlas migration；精确清理临时容器、其新建匿名卷及临时明文成功后才保存 passed 回执。首次镜像启动须等待 PID 1 已进入最终 PostgreSQL 进程，避免误用 initdb 的临时服务。
-5. 相关模块提交并验证后运行 `install --config <private-config.json>`。安装器核对每个模块与提交内容一致，生成固定内容 hash 的独立运行目录及当前用户 launchd 任务；共享工作区后续变化不影响已安装版本。安装后读回 launchd 最后退出码和 `status --config <private-config.json>`，不能只凭安装成功宣称定时首跑通过。
+5. 相关模块验证后运行 `install --config <private-config.json>`。安装器生成固定内容 SHA-256 的独立运行目录及当前用户 launchd 任务，并记录基础提交及真实来源状态；未提交内容记为 `content-snapshot`，不冒充提交版本，也不要求先提交共享工作区。每次运行重新校验制品完整性；共享工作区后续变化不影响已安装版本。安装后读回 launchd 最后退出码，再运行 `check --config <private-config.json>` 核验当前介质、最近同步 / 恢复及新鲜度，不能只凭安装成功或历史 `status` 宣称定时首跑通过。
 
-`run` 执行同步及到期的恢复检查。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。外盘读取先在独立进程执行 15 秒限时预检；无法读取时记录 `destination_access_unavailable`，不开始传输或解密。
+`run` 执行同步及到期的恢复检查。`check` 只读核对当前介质、已复制文件和回执时效，失败不覆盖同步或恢复记录；`sync` 和 `verify` 才分别执行密码学完整性与真实恢复验证。运行版本不兼容等启动失败也会更新最近操作状态，保留最近成功回执。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。外盘读取先在独立进程执行 15 秒限时预检；无法读取时记录 `destination_access_unavailable`，不开始传输或解密。
 
-首次后台访问外盘可能需要在 macOS 提示中允许 Node 访问可移动宗卷；前台运行继承终端 / App 权限，不能证明后台已获准。遇到预检失败须核对介质与系统授权，不能改为内盘目录或关闭系统保护。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；副本索引在外盘专属目录。SIGTERM / SIGINT 进入同一清理路径；安装器拒绝中断仍在运行的旧备份任务。
+首次后台访问外盘可能需要在 macOS 提示中允许 Node 访问可移动宗卷；前台运行继承终端 / App 权限，不能证明后台已获准。遇到预检失败须核对介质与系统授权，不能改为内盘目录或关闭系统保护。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；最近恢复尝试单独记录，失败或中断后下次运行重新验证，历史成功回执保留。副本索引在外盘专属目录。SIGTERM / SIGINT 进入同一清理路径；安装器拒绝中断仍在运行的旧备份任务。
 
 Mac 休眠 / 离线期间不会保证取得最新副本，服务器原有自动备份继续独立运行。
 
 切换同一数据来源到另一台 SSH 主机时，先复制历史加密文件、checksum 和来源身份标记，修改私有配置的 host / directory，再依次执行 sync、verify 和定时首跑读回。更换外盘时填写新 UUID 并初始化 / 核验专属目录；恢复回执绑定卷 UUID，新介质会重新验证。新链路通过且保留窗口结束后再处理旧目标；不同业务来源使用新的 id 与目录。对象存储等新协议应扩展传输模块，不混入同步及恢复逻辑。
 
-现有 Mac 副本模块仍只识别旧 PG 备份及既有初始化附件清单 / 加密配置，不会自动同步新的 `plush-set-*.tar.age`。其恢复检查只证明 PostgreSQL；接入新备份集须单独扩展传输、保留与成套恢复合同，不能因旧副本健康而宣称新的完整备份已到 Mac。
+ERP 来源的 Mac 副本分支识别旧 PG 备份及既有初始化附件清单 / 加密配置，不会自动同步新的 `plush-set-*.tar.age`。其恢复检查只证明 PostgreSQL；接入新备份集须单独扩展传输、保留与成套恢复合同，不能因旧副本健康而宣称新的完整备份已到 Mac。
+
+GitLab 使用同一运行器的独立来源、目录、状态和定时任务，按完整包保留最近 7 份；配置样例、64 GiB 空间余量、加密及完整隔离恢复见 [GitLab PD-SSD 自动副本](../../../server/deploy/gitlab/README.md#pd-ssd-自动加密副本--external-backup-replica)。两个来源的保留规则和恢复结论分别判断。
 
 ## 禁止
 

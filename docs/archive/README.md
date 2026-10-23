@@ -8,6 +8,7 @@
 
 | 路径                                                                                    | 用途                                                                                            |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `docs/archive/progress-2026-10-23-external-backup-history.md` | 2026-10-16 GitLab 升级恢复及 10-17 外接盘副本接入原文；新备份合同更新时归档 |
 | `docs/archive/architecture-history/`                                                    | 已退出活跃 `docs/architecture/` 的旧阶段实现评审文档                                            |
 | `docs/archive/customer-evidence/`                                                       | 客户历史发布、验收和内部模拟闭环 evidence 归档                                                  |
 | `docs/archive/progress-2026-10-22-release-history.md` | 2026-10-17 发布逐次修订原文，体积治理时从活跃 progress 移出 |

@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily Plush GitLab verified local and encrypted offsite backup
+Description=Daily Plush GitLab verified local backup and encrypted export
 
 [Timer]
 OnCalendar=*-*-* 03:30:00

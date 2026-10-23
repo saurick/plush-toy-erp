@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
-  copyFileSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -17,8 +16,8 @@ function preview(
   {
     hostname = "r740xd",
     mount = "/srv/raid5",
-    offsiteMount = "expected",
-    sameFilesystem = false,
+    exportSuffix = "export",
+    marker = "plush.backup-source/v1:gitlab-r740xd",
     backupSource = "/srv/raid5/gitlab/backups/repository",
   } = {},
 ) {
@@ -26,25 +25,27 @@ function preview(
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const bin = path.join(root, "bin");
   mkdirSync(bin);
-  copyFileSync(
-    new URL("../../server/deploy/gitlab/gitlab-backup.sh", import.meta.url),
-    path.join(root, "gitlab-backup.sh"),
-  );
-  const offsite = path.join(root, "offsite");
-  const recipient = path.join(root, "recipient.txt");
-  mkdirSync(offsite);
+  const local = path.join(root, "backups");
   writeFileSync(
-    path.join(offsite, ".plush-gitlab-offsite-target"),
-    "plush-gitlab-offsite-v1\n",
+    path.join(root, "gitlab-backup.sh"),
+    readFileSync(
+      new URL("../../server/deploy/gitlab/gitlab-backup.sh", import.meta.url),
+      "utf8",
+    ).replaceAll("/srv/raid5/gitlab/backups", local),
   );
+  const offsite = path.join(local, exportSuffix);
+  const recipient = path.join(root, "recipient.txt");
+  mkdirSync(offsite, { recursive: true });
+  writeFileSync(path.join(offsite, ".plush-backup-source"), marker + "\n");
   writeFileSync(recipient, `age1${"q".repeat(58)}\n`, { mode: 0o600 });
   const envSource = readFileSync(
     new URL("../../server/deploy/gitlab/.env.example", import.meta.url),
     "utf8",
   )
+    .replaceAll("/srv/raid5/gitlab/backups", local)
     .replace(
-      /^GITLAB_OFFSITE_BACKUP_DIR=.*$/mu,
-      `GITLAB_OFFSITE_BACKUP_DIR=${offsite}`,
+      /^GITLAB_BACKUP_EXPORT_DIR=.*$/mu,
+      `GITLAB_BACKUP_EXPORT_DIR=${offsite}`,
     )
     .replace(
       /^GITLAB_BACKUP_AGE_RECIPIENT_FILE=.*$/mu,
@@ -59,12 +60,8 @@ function preview(
   writeFileSync(
     path.join(bin, "findmnt"),
     `#!/bin/sh
-case "$*" in
-  *"$FAKE_OFFSITE"*)
-    if [ "$FAKE_OFFSITE_MOUNT" = expected ]; then printf '%s\\n' "$FAKE_OFFSITE"; else printf '%s\\n' "$FAKE_OFFSITE_MOUNT"; fi
-    ;;
-  *) printf '%s\\n' "$FAKE_MOUNT" ;;
-esac
+printf '%s\\n' "$FAKE_MOUNT"
+
 `,
     { mode: 0o755 },
   );
@@ -72,8 +69,6 @@ esac
     path.join(bin, "stat"),
     `#!/bin/sh
 case "$*" in
-  *"-c %d /srv/raid5"*) printf '100\\n' ;;
-  *"-c %d $FAKE_OFFSITE"*) if [ "$FAKE_SAME_FILESYSTEM" = true ]; then printf '100\\n'; else printf '200\\n'; fi ;;
   *"-c %a $FAKE_RECIPIENT"*) printf '600\\n' ;;
   *"-c %u $FAKE_RECIPIENT"*) printf '%s\\n' "$FAKE_UID" ;;
   *) exit 99 ;;
@@ -114,12 +109,12 @@ esac
       PATH: `${bin}:${process.env.PATH}`,
       FAKE_HOSTNAME: hostname,
       FAKE_MOUNT: mount,
-      FAKE_OFFSITE: offsite,
-      FAKE_OFFSITE_MOUNT: offsiteMount,
-      FAKE_SAME_FILESYSTEM: String(sameFilesystem),
       FAKE_RECIPIENT: recipient,
       FAKE_UID: String(process.getuid()),
-      FAKE_BACKUP_SOURCE: backupSource,
+      FAKE_BACKUP_SOURCE: backupSource.replace(
+        "/srv/raid5/gitlab/backups",
+        local,
+      ),
       FAKE_CALLS: callsFile,
     },
   });
@@ -157,14 +152,14 @@ test("the expected RAID and container mount permit a read-only preview", (t) => 
   assert.match(result.stdout, /preview_only=true/u);
 });
 
-test("an offsite path that is not an exact mount point fails closed", (t) => {
-  const result = preview(t, { offsiteMount: "/" });
+test("encrypted export cannot silently use another directory", (t) => {
+  const result = preview(t, { exportSuffix: "unregistered" });
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /exact mount point/u);
+  assert.match(result.stderr, /registered local spool/u);
 });
 
-test("an offsite path on the RAID filesystem fails closed", (t) => {
-  const result = preview(t, { sameFilesystem: true });
+test("an export directory with the wrong source marker fails closed", (t) => {
+  const result = preview(t, { marker: "foreign-source" });
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /different filesystem/u);
+  assert.match(result.stderr, /export marker is invalid/u);
 });

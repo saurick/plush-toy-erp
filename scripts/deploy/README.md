@@ -61,7 +61,7 @@
 | `run-backup-restore-rehearsal.sh` | 在开发机或 CI 执行 dump、隔离 PostgreSQL restore、升级审计、migration 和恢复检查 | 使用明确的只读备份源与隔离恢复目标；默认输出到 `output/`，仅向 evidence 复制脱敏 artifact |
 | `backup-set/cli.mjs` | 在同一停写窗口成套备份 PG 与全部登记附件，封装加密；从配套制品恢复到新建隔离 PG / S3 | `create` 要求精确 project / database 确认并恢复原应用；`restore-check` 验证后精确清理，`restore --keep` 仅保留新隔离资源，不覆盖生产或切流 |
 | `verify-backup-restore.sh` | 检查备份恢复 evidence 的必要字段和脱敏边界 | 不读取、复制或恢复真实备份文件，不证明恢复成功 |
-| `backup-replica/cli.mjs` | 将既有加密备份拉取到按 UUID 核对的 Mac 外盘，独立保留历史并在一次性 PostgreSQL 验证恢复 | 私有 JSON 配置选择来源与介质；不写生产库、不传播来源删除；定时安装只接受已提交模块 |
+| `backup-replica/cli.mjs` | 将 ERP / GitLab 加密备份拉取到按 UUID 核对的 Mac 外盘，独立保留历史、检查健康并隔离恢复 | 私有配置选择来源与介质；不写生产库、不传播来源删除；定时安装固定内容快照并记录真实来源 |
 
 参数以各脚本 `--help` 为准，目标与证据要求见[备份恢复](../../deployments/yoyoosun/runbooks/04-backup-restore.md)和[发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。
 
@@ -73,7 +73,7 @@
 
 额外副本的接入、目标迁移、Mac 定时任务和恢复范围见[备份恢复中的 Mac 外接盘副本](../../deployments/yoyoosun/runbooks/04-backup-restore.md#mac-外接盘副本--mac-backup-replica)。
 
-配置样例为 `deployments/yoyoosun/env/backup-replica.example.json`；SSH 来源、介质校验、同步保留、恢复与安装各由独立 Node 标准库模块负责，来源地址和本机 UUID 不写入代码。
+ERP 配置样例为 `deployments/yoyoosun/env/backup-replica.example.json`，GitLab 配置见 [GitLab 自动副本](../../server/deploy/gitlab/README.md#pd-ssd-自动加密副本--external-backup-replica)；SSH 来源、介质校验、同步保留、恢复与安装各由独立 Node 标准库模块负责，来源地址和本机 UUID 不写入代码。
 
 该工具复用项目 Node 版本及 macOS 内置 `lockf / plutil`；恢复另需 `age`、Docker 和本机已有的 `postgres:18.6` 镜像。
 
