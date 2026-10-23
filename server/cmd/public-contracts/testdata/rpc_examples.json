@@ -16099,13 +16099,20 @@
     "basis": "handler-fixture",
     "data": {
       "production_exceptions": [],
-      "total": 0
+      "total": 0,
+      "status_counts": {}
     },
     "message": "OK",
     "params": {
-      "limit": 20
+      "include_status_counts": true,
+      "limit": 20,
+      "handling_status": "APPROVED:PENDING"
     },
-    "test": "TestProductionExceptionReadsMatchPageAnyPermissionContract"
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "test": "TestRPCDocumentedBusinessQuickCounts",
+      "case": "operational_fact.list_production_exceptions"
+    }
   },
   "operational_fact.list_production_facts": {
     "basis": "handler-fixture",

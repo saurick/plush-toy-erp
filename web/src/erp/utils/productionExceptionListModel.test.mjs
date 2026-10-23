@@ -6,7 +6,31 @@ import {
   reconcileProductionExceptionPage,
   requireProductionExceptionPage,
   requireProductionExceptionRecord,
+  productionExceptionHandlingKey,
+  PRODUCTION_EXCEPTION_HANDLING_OPTIONS,
 } from './productionExceptionListModel.mjs'
+
+test('exception quick filters keep approval and execution distinct and preserve detailed filters', () => {
+  const expected = ['SUBMITTED', 'APPROVED:PENDING', 'APPROVED:APPLIED', 'APPROVED:REVERSED', 'REJECTED', 'CANCELLED']
+  assert.deepEqual(PRODUCTION_EXCEPTION_HANDLING_OPTIONS.map(({ value }) => value), expected)
+  for (const key of expected) {
+    const [status, execution_status = 'PENDING'] = key.split(':')
+    assert.equal(productionExceptionHandlingKey({ status, execution_status }), key)
+  }
+  assert.deepEqual(buildProductionExceptionListQuery({
+    handlingStatus: 'APPROVED:PENDING',
+    status: 'APPROVED',
+    executionStatus: 'PENDING',
+    decisionType: 'OVER_ISSUE',
+    productionOrderID: 42,
+    pagination: { current: 2, pageSize: 50 },
+  }), { handling_status: 'APPROVED:PENDING', status: 'APPROVED', execution_status: 'PENDING', decision_type: 'OVER_ISSUE', production_order_id: 42, limit: 50, offset: 50 })
+  const cleared = buildProductionExceptionListQuery({ handlingStatus: '', status: 'APPROVED', productionOrderID: 42 })
+  assert.equal(Object.hasOwn(cleared, 'handling_status'), false)
+  assert.equal(cleared.status, 'APPROVED')
+  assert.equal(cleared.production_order_id, 42)
+  assert.equal(productionExceptionHandlingKey(null), '')
+})
 
 test('production exception query sends filters, order context and page offset', () => {
   assert.deepEqual(

@@ -1,3 +1,4 @@
+import { createBusinessQuickCountsScenarios } from './businessQuickCountsScenarios.mjs'
 import { createPerformanceReferenceScenarios } from './performanceReferenceScenarios.mjs'
 import { createSearchSubmissionScenarios } from './searchSubmissionScenarios.mjs'
 import { createDensityCompletionScenarios } from './densityCompletionScenarios.mjs'
@@ -427,6 +428,7 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createSalesOrderExportScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createGrowthValidationScenarios(deps),
+    ...createBusinessQuickCountsScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createBusinessStatusCountsScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

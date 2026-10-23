@@ -1,3 +1,4 @@
+import { ProductionExceptionStatus, ProductionExceptionExecutionStatus } from '../../common/consts/statuses.generated.mjs'
 import { getBusinessPaginationParams, normalizeBusinessPageSize } from './businessPagination.mjs'
 
 function invalidProductionExceptionResponse() {
@@ -12,6 +13,7 @@ function positiveInteger(value) {
 }
 
 export function buildProductionExceptionListQuery({
+  handlingStatus = '',
   decisionType = '',
   status = '',
   executionStatus = '',
@@ -20,6 +22,7 @@ export function buildProductionExceptionListQuery({
 } = {}) {
   const { limit, offset } = getBusinessPaginationParams(pagination)
   const query = { limit, offset }
+  if (handlingStatus) query.handling_status = handlingStatus
   const normalizedDecisionType = String(decisionType || '').trim()
   const normalizedStatus = String(status || '').trim()
   const normalizedExecutionStatus = String(executionStatus || '').trim()
@@ -113,3 +116,17 @@ export function reconcileProductionExceptionPage({
       : null,
   }
 }
+
+export function productionExceptionHandlingKey(record) {
+  return record?.status === ProductionExceptionStatus.APPROVED
+    ? `${record.status}:${record.execution_status}`
+    : record?.status || ''
+}
+export const PRODUCTION_EXCEPTION_HANDLING_OPTIONS = [
+  { value: ProductionExceptionStatus.SUBMITTED, label: '待审批' },
+  { value: `${ProductionExceptionStatus.APPROVED}:${ProductionExceptionExecutionStatus.PENDING}`, label: '待办理／额度生效' },
+  { value: `${ProductionExceptionStatus.APPROVED}:${ProductionExceptionExecutionStatus.APPLIED}`, label: '业务已执行' },
+  { value: `${ProductionExceptionStatus.APPROVED}:${ProductionExceptionExecutionStatus.REVERSED}`, label: '业务已冲正' },
+  { value: ProductionExceptionStatus.REJECTED, label: '已拒绝' },
+  { value: ProductionExceptionStatus.CANCELLED, label: '已取消' },
+]

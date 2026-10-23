@@ -75,6 +75,7 @@ type ProductionExceptionMutation struct {
 	Reason                       string
 }
 type ProductionExceptionFilter struct {
+	HandlingStatus                        string
 	Status, ExecutionStatus, DecisionType string
 	ProductionOrderID                     int
 	Limit, Offset                         int
@@ -137,9 +138,11 @@ func (uc *OperationalFactUsecase) ListProductionExceptions(ctx context.Context, 
 	if !ok {
 		return nil, 0, ErrBadParam
 	}
-	filter.Status, filter.ExecutionStatus, filter.DecisionType = strings.ToUpper(strings.TrimSpace(filter.Status)), strings.ToUpper(strings.TrimSpace(filter.ExecutionStatus)), strings.ToUpper(strings.TrimSpace(filter.DecisionType))
-	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
-	return repo.ListProductionExceptions(ctx, filter)
+	normalized, err := normalizeProductionExceptionFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return repo.ListProductionExceptions(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context, in *ProductionExceptionSubmit) (*ProductionExceptionDecision, error) {
@@ -256,4 +259,35 @@ func validProductionExceptionMutation(in *ProductionExceptionMutation, approval 
 		return false
 	}
 	return !approval || in.ApprovedQuantity == nil || in.ApprovedQuantity.IsPositive()
+}
+
+func normalizeProductionExceptionFilter(filter ProductionExceptionFilter) (ProductionExceptionFilter, error) {
+	if filter.ProductionOrderID < 0 || filter.Offset < 0 {
+		return ProductionExceptionFilter{}, ErrBadParam
+	}
+	filter.HandlingStatus = strings.ToUpper(strings.TrimSpace(filter.HandlingStatus))
+	if _, _, err := ProductionExceptionHandlingFilter(filter.HandlingStatus); err != nil {
+		return ProductionExceptionFilter{}, err
+	}
+
+	filter.Status, filter.ExecutionStatus, filter.DecisionType = strings.ToUpper(strings.TrimSpace(filter.Status)), strings.ToUpper(strings.TrimSpace(filter.ExecutionStatus)), strings.ToUpper(strings.TrimSpace(filter.DecisionType))
+	filter.Limit = NormalizeBusinessListLimit(filter.Limit)
+	return filter, nil
+}
+
+// Handling keys combine existing approval and execution values for read-only filtering.
+func ProductionExceptionHandlingFilter(value string) (string, string, error) {
+	if value == "" {
+		return "", "", nil
+	}
+	switch value {
+	case ProductionExceptionSubmitted, ProductionExceptionRejected, ProductionExceptionCancelled:
+		return value, "", nil
+	}
+	for _, execution := range []string{ProductionExceptionExecutionPending, ProductionExceptionExecutionApplied, ProductionExceptionExecutionReversed} {
+		if value == ProductionExceptionApproved+":"+execution {
+			return ProductionExceptionApproved, execution, nil
+		}
+	}
+	return "", "", ErrBadParam
 }

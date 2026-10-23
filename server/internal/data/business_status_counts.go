@@ -42,3 +42,5 @@ var (
 )
 
 var _ biz.FinanceFactsStatusCounter = (*operationalFactRepo)(nil)
+
+var _ biz.ProductionExceptionsStatusCounter = (*operationalFactRepo)(nil)

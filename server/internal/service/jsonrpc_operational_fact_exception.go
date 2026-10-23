@@ -110,10 +110,17 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		}
 		item, err = d.operationalFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
 	case "list_production_exceptions":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "status", "execution_status", "decision_type", "production_order_id", "limit", "offset") {
+		if !productionCompletionAllowsOnly(pm, "include_status_counts", "handling_status", "customer_key", "status", "execution_status", "decision_type", "production_order_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
-		items, total, listErr := d.operationalFactUC.ListProductionExceptions(ctx, biz.ProductionExceptionFilter{Status: getString(pm, "status"), ExecutionStatus: getString(pm, "execution_status"), DecisionType: getString(pm, "decision_type"), ProductionOrderID: getInt(pm, "production_order_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
+		filter := biz.ProductionExceptionFilter{HandlingStatus: getString(pm, "handling_status"), Status: getString(pm, "status"), ExecutionStatus: getString(pm, "execution_status"), DecisionType: getString(pm, "decision_type"), ProductionOrderID: getInt(pm, "production_order_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
+		statusCounts, countErr := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.operationalFactUC.CountProductionExceptionsByStatus(ctx, filter)
+		})
+		if countErr != nil {
+			return id, d.mapOperationalFactError(ctx, countErr), nil
+		}
+		items, total, listErr := d.operationalFactUC.ListProductionExceptions(ctx, filter)
 		if listErr != nil {
 			return id, d.mapOperationalFactError(ctx, listErr), nil
 		}
@@ -121,7 +128,7 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		for _, current := range items {
 			out = append(out, productionExceptionToAny(current))
 		}
-		return id, okData(map[string]any{"production_exceptions": out, "total": total}), nil
+		return id, okData(withBusinessStatusCounts(map[string]any{"production_exceptions": out, "total": total}, statusCounts)), nil
 	}
 	if err != nil {
 		return id, d.mapOperationalFactError(ctx, err), nil

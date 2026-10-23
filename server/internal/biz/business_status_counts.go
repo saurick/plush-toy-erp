@@ -225,3 +225,22 @@ func (uc *OperationalFactUsecase) CountFinanceFactsByStatusForAccess(ctx context
 	}
 	return repo.CountFinanceFactsByStatusForAccess(ctx, normalized, scope)
 }
+
+type ProductionExceptionsStatusCounter interface {
+	CountProductionExceptionsByStatus(context.Context, ProductionExceptionFilter) (map[string]int, error)
+}
+
+func (uc *OperationalFactUsecase) CountProductionExceptionsByStatus(ctx context.Context, filter ProductionExceptionFilter) (map[string]int, error) {
+	if uc == nil {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(ProductionExceptionsStatusCounter)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductionExceptionFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	return repo.CountProductionExceptionsByStatus(ctx, normalized)
+}

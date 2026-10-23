@@ -736,8 +736,15 @@ func (r *operationalFactRepo) GetProductionException(ctx context.Context, id int
 	}
 	return hydrateProductionException(ctx, r.data.postgres, row)
 }
-func (r *operationalFactRepo) ListProductionExceptions(ctx context.Context, filter biz.ProductionExceptionFilter) ([]*biz.ProductionExceptionDecision, int, error) {
+func (r *operationalFactRepo) productionExceptionListQuery(filter biz.ProductionExceptionFilter) *ent.ProductionExceptionDecisionQuery {
 	query := r.data.postgres.ProductionExceptionDecision.Query()
+	if filter.HandlingStatus != "" {
+		status, execution, _ := biz.ProductionExceptionHandlingFilter(filter.HandlingStatus)
+		query.Where(productionexceptiondecision.Status(status))
+		if execution != "" {
+			query.Where(productionexceptiondecision.ExecutionStatus(execution))
+		}
+	}
 	if filter.Status != "" {
 		query = query.Where(productionexceptiondecision.Status(filter.Status))
 	}
@@ -750,6 +757,11 @@ func (r *operationalFactRepo) ListProductionExceptions(ctx context.Context, filt
 	if filter.ProductionOrderID > 0 {
 		query = query.Where(productionexceptiondecision.ProductionOrderID(filter.ProductionOrderID))
 	}
+	return query
+}
+
+func (r *operationalFactRepo) ListProductionExceptions(ctx context.Context, filter biz.ProductionExceptionFilter) ([]*biz.ProductionExceptionDecision, int, error) {
+	query := r.productionExceptionListQuery(filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -809,4 +821,27 @@ func entProductionExceptionToBiz(row *ent.ProductionExceptionDecision) *biz.Prod
 		return nil
 	}
 	return &biz.ProductionExceptionDecision{ID: row.ID, DecisionNo: row.DecisionNo, DecisionType: row.DecisionType, Status: row.Status, ExecutionStatus: row.ExecutionStatus, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID, ProductionMaterialRequirementID: row.ProductionMaterialRequirementID, ProductionWIPBatchID: row.ProductionWipBatchID, QualityInspectionID: row.QualityInspectionID, TargetSupplierID: row.TargetSupplierID, TargetOperationID: row.TargetOperationID, RequestedQuantity: row.RequestedQuantity, ApprovedQuantity: row.ApprovedQuantity, Reason: row.Reason, Version: row.Version, RequestedBy: row.RequestedBy, RequestedAt: row.RequestedAt, DecidedBy: row.DecidedBy, DecidedAt: row.DecidedAt, DecisionReason: row.DecisionReason, ExecutedBy: row.ExecutedBy, ExecutedAt: row.ExecutedAt, ExecutionReason: row.ExecutionReason, ReversedBy: row.ReversedBy, ReversedAt: row.ReversedAt, ReverseReason: row.ReverseReason}
+}
+
+// Approval and execution form one disjoint handling projection; neither field is rewritten.
+func (r *operationalFactRepo) CountProductionExceptionsByStatus(ctx context.Context, filter biz.ProductionExceptionFilter) (map[string]int, error) {
+	filter.HandlingStatus = ""
+	var rows []struct {
+		Status          string `json:"status"`
+		ExecutionStatus string `json:"execution_status"`
+		Count           int    `json:"count"`
+	}
+	err := r.productionExceptionListQuery(filter).GroupBy(productionexceptiondecision.FieldStatus, productionexceptiondecision.FieldExecutionStatus).Aggregate(ent.Count()).Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]int{}
+	for _, row := range rows {
+		key := row.Status
+		if row.Status == biz.ProductionExceptionApproved {
+			key += ":" + row.ExecutionStatus
+		}
+		counts[key] += row.Count
+	}
+	return counts, nil
 }

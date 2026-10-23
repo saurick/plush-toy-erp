@@ -2,6 +2,8 @@ import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
+import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import { ProcessStatus, ProductionExceptionExecutionStatus, ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
@@ -52,6 +54,8 @@ import {
 } from '../../utils/businessPagination.mjs'
 import {
   buildProductionExceptionListQuery,
+  productionExceptionHandlingKey,
+  PRODUCTION_EXCEPTION_HANDLING_OPTIONS,
   reconcileProductionExceptionPage,
   requireProductionExceptionPage,
   requireProductionExceptionRecord,
@@ -144,6 +148,8 @@ export default function ProductionExceptionDecisionPanel({
   const linkedDetailOpenedRef = useRef(0)
   const [reason, setReason] = useState('')
   const [decisionTypeFilter, setDecisionTypeFilter] = useBusinessPageState('exceptionType', '')
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [handlingStatus, setHandlingStatus] = useBusinessPageState('exceptionHandlingStatus', '')
   const [statusFilter, setStatusFilter] = useBusinessPageState('exceptionStatus', '')
   const [executionStatusFilter, setExecutionStatusFilter] = useBusinessPageState('exceptionExecutionStatus', '')
   const canRead = canReadProductionExceptionDecisions(adminProfile)
@@ -173,7 +179,7 @@ export default function ProductionExceptionDecisionPanel({
     Number.isSafeInteger(routeProductionOrderID) && routeProductionOrderID > 0
   )
   const hasListFilters = Boolean(
-    decisionTypeFilter || statusFilter || executionStatusFilter
+    handlingStatus || decisionTypeFilter || statusFilter || executionStatusFilter
   )
   const hasExactContext = Boolean(
     !hasListFilters &&
@@ -193,14 +199,16 @@ export default function ProductionExceptionDecisionPanel({
       linkedDetailOpenedRef.current = 0
       return
     }
+    setHandlingStatus('')
     setDecisionTypeFilter('')
     setStatusFilter('')
     setExecutionStatusFilter('')
     resetBusinessPaginationCurrent(setPagination)
-  }, [linkedProductionExceptionID, setDecisionTypeFilter, setStatusFilter, setExecutionStatusFilter, setPagination])
+  }, [linkedProductionExceptionID, setHandlingStatus, setDecisionTypeFilter, setStatusFilter, setExecutionStatusFilter, setPagination])
 
   const load = useCallback(async () => {
     const request = beginLatestRequest('production-exception-decisions')
+    setStatusCounts(null)
     if (!canRead) {
       if (request.isCurrent()) {
         setRows([])
@@ -225,6 +233,7 @@ export default function ProductionExceptionDecisionPanel({
             ? routeProductionOrderID
             : 0,
         })
+        setStatusCounts(resolveBusinessStatusCounts(null, { hasExactContext: true, exactRecord: { status: productionExceptionHandlingKey(exactRecord) } }))
         setRows([exactRecord])
         setTotal(1)
         setSelectedID(exactRecord.id)
@@ -236,6 +245,7 @@ export default function ProductionExceptionDecisionPanel({
       }
 
       const query = buildProductionExceptionListQuery({
+        handlingStatus,
         decisionType: decisionTypeFilter,
         status: statusFilter,
         executionStatus: executionStatusFilter,
@@ -244,7 +254,7 @@ export default function ProductionExceptionDecisionPanel({
           : 0,
         pagination,
       })
-      const data = await listProductionExceptions(query, {
+      const data = await listProductionExceptions({ ...query, include_status_counts: true }, {
         signal: request.signal,
       })
       if (!request.isCurrent()) return null
@@ -259,6 +269,7 @@ export default function ProductionExceptionDecisionPanel({
         total: page.total,
         pagination,
       })
+      setStatusCounts(resolveBusinessStatusCounts(data))
       setRows(pageState.records)
       setTotal(page.total)
       setSelectedID((current) =>
@@ -290,6 +301,7 @@ export default function ProductionExceptionDecisionPanel({
       }
     }
   }, [
+    handlingStatus,
     beginLatestRequest,
     canRead,
     decisionTypeFilter,
@@ -599,6 +611,20 @@ export default function ProductionExceptionDecisionPanel({
         compact
         filters={
           <>
+            <BusinessStatusFilter
+              inline
+              aria-label="异常办理状态"
+              value={handlingStatus}
+              counts={statusCounts}
+              loading={loading}
+              exact={hasExactContext}
+              options={PRODUCTION_EXCEPTION_HANDLING_OPTIONS}
+              onChange={(value) => {
+                setHandlingStatus(value)
+                setSelectedID(null)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
             <SelectFilter
               aria-label="异常类型"
               value={decisionTypeFilter}
