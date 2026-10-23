@@ -61,7 +61,7 @@
   },
   "pnpm": {
     "overrides": {
-      "dompurify": "3.4.16",
+      "dompurify": "3.4.17",
       "uuid": "13.0.1"
     }
   },
