@@ -263,3 +263,38 @@ export function buildDevBusinessChainTopics(catalog, role = 'all') {
       .filter((topic) => role === 'all' || topic.matchingSteps.length > 0),
   })).filter((lane) => lane.topics.length > 0)
 }
+
+export function buildChainMermaid(chain, currentRuntimeNodeKey, { compact = false } = {}) {
+  if (!chain) return ''
+  const ids = new Map(chain.nodes.map((node, index) => [node.key, `N${index}`]))
+  const label = (value) => {
+    const text = String(value)
+    const width = Math.max(1, Math.ceil(text.length / Math.ceil(text.length / 10)))
+    return compact ? (text.match(new RegExp(`.{1,${width}}`, 'gu')) || []).map(escapeGraphLabel).join('<br/>') : escapeGraphLabel(text)
+  }
+  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 24', '    padding: 12', '---', 'flowchart LR']
+  for (const node of chain.nodes) {
+    lines.push(`  ${ids.get(node.key)}["${label(node.label)}"]`)
+  }
+  for (const edge of chain.edges) {
+    const condition = compact ? edge.condition || (['posts_fact', 'returns', 'reverses', 'requires', 'reworks'].includes(edge.kind) ? edge.label : '') : edge.label
+    lines.push(`  ${ids.get(edge.from)} -->${condition ? `|"${label(condition)}"|` : ''} ${ids.get(edge.to)}`)
+  }
+  lines.push(
+    '  classDef source_document fill:#e6f4ff,stroke:#1677ff,color:#102a43',
+    '  classDef masterdata_lifecycle fill:#f9f0ff,stroke:#722ed1,color:#2d1648',
+    '  classDef process_runtime fill:#fff7e6,stroke:#d46b08,color:#452500',
+    '  classDef workflow_task fill:#f6ffed,stroke:#389e0d,color:#163300',
+    '  classDef fact_ledger fill:#fff1f0,stroke:#cf1322,color:#3d0b0b',
+    '  classDef derived_result fill:#f0f5ff,stroke:#2f54eb,color:#061b57',
+    '  classDef runtime_current fill:#fffbe6,stroke:#fa8c16,stroke-width:4px,color:#422006'
+  )
+  for (const node of chain.nodes) {
+    const classes = [node.layer]
+    if (node.key === currentRuntimeNodeKey) classes.push('runtime_current')
+    lines.push(`  class ${ids.get(node.key)} ${classes.join(',')}`)
+  }
+  return lines.join('\n')
+}
+
+const escapeGraphLabel = (value) => String(value).replaceAll('"', '#quot;').replaceAll('<', '#lt;').replaceAll('>', '#gt;')

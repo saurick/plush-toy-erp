@@ -3,6 +3,7 @@
 .erp-dev-fulfillment-guide h2 { margin: 0; font-size: 18px; }
 .erp-dev-fulfillment-guide p { margin: 0; line-height: 1.7; }
 .erp-dev-fulfillment-guide__workspace { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+.erp-dev-fulfillment-guide__workspace[data-guide-view="topics"] { grid-template-columns: minmax(0, 1fr); }
 .erp-dev-fulfillment-guide__overview, .erp-dev-fulfillment-guide__panel { min-width: 0; }
 .erp-dev-fulfillment-guide__panel { position: sticky; top: 16px; padding: 18px; border: 1px solid var(--erp-border); border-radius: 8px; background: var(--erp-surface-bg-soft); scroll-margin-top: 16px; }
 .erp-dev-fulfillment-guide__empty { color: var(--erp-text-muted); padding-block: 24px; }

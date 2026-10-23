@@ -9,8 +9,24 @@ import {
   describeDevBusinessChainResponsibility,
   buildDevBusinessChainRoleGuide,
   buildDevBusinessChainTopics,
+  buildChainMermaid,
 } from './devBusinessChainProjection.mjs'
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
+
+test('compact topic diagrams keep all paths, branch conditions and fact-posting gates', () => {
+  for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
+    const compact = buildChainMermaid(chain, null, { compact: true }).replaceAll('<br/>', '')
+    assert.equal((compact.match(/ -->/gu) || []).length, chain.edges.length, chain.key)
+    for (const edge of chain.edges) {
+      if (edge.condition) assert(compact.includes(edge.condition), `${chain.key}: ${edge.condition}`)
+      else if (edge.kind === 'posts_fact') assert(compact.includes(edge.label), `${chain.key}: ${edge.label}`)
+    }
+  }
+  const delivery = DEV_FLOW_STATE_CATALOG.businessChains.find((chain) => chain.key === 'delivery_to_settlement')
+  const chart = buildChainMermaid(delivery, null, { compact: true }).replaceAll('<br/>', '')
+  assert(chart.includes('放行后执行出货'))
+  assert(chart.includes('审批决定为拒绝'))
+})
 
 test('business topics follow registered role duties and preserve complete handoffs', () => {
   const all = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG).flatMap((lane) => lane.topics)

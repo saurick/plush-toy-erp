@@ -25,6 +25,7 @@ import {
   getProcessLabel,
 } from '@/erp/utils/processRuntimePresentation.mjs'
 import {
+  buildChainMermaid,
   buildDevBusinessChainProjection,
   buildDevBusinessChainRoleGuide,
   describeDevBusinessChainNode,
@@ -116,35 +117,6 @@ const CHAIN_EDGE_PRESENTATION = Object.freeze({
 
 function uniqueStrings(values) {
   return [...new Set(asArray(values).filter(Boolean))]
-}
-
-function buildChainMermaid(chain, currentRuntimeNodeKey) {
-  if (!chain) return ''
-  const ids = new Map(chain.nodes.map((node, index) => [node.key, `N${index}`]))
-  const lines = ['flowchart LR']
-  for (const node of chain.nodes) {
-    lines.push(`  ${ids.get(node.key)}["${escapeMermaid(node.label)}"]`)
-  }
-  for (const edge of chain.edges) {
-    lines.push(
-      `  ${ids.get(edge.from)} -->|"${escapeMermaid(edge.label)}"| ${ids.get(edge.to)}`
-    )
-  }
-  lines.push(
-    '  classDef source_document fill:#e6f4ff,stroke:#1677ff,color:#102a43',
-    '  classDef masterdata_lifecycle fill:#f9f0ff,stroke:#722ed1,color:#2d1648',
-    '  classDef process_runtime fill:#fff7e6,stroke:#d46b08,color:#452500',
-    '  classDef workflow_task fill:#f6ffed,stroke:#389e0d,color:#163300',
-    '  classDef fact_ledger fill:#fff1f0,stroke:#cf1322,color:#3d0b0b',
-    '  classDef derived_result fill:#f0f5ff,stroke:#2f54eb,color:#061b57',
-    '  classDef runtime_current fill:#fffbe6,stroke:#fa8c16,stroke-width:4px,color:#422006'
-  )
-  for (const node of chain.nodes) {
-    const classes = [node.layer]
-    if (node.key === currentRuntimeNodeKey) classes.push('runtime_current')
-    lines.push(`  class ${ids.get(node.key)} ${classes.join(',')}`)
-  }
-  return lines.join('\n')
 }
 
 function buildBusinessChainOverviewMermaid(overview, chains, currentChainKey) {
@@ -273,8 +245,7 @@ function BusinessChainOverviewView({
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
       <TaskFulfillmentGuide
         onExploreStage={onSelectChain}
-        businessChains={catalog.businessChains}
-        renderTopics={({ onSelectTopic, selectedTopicKey }) => <BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} selectedTopicKey={selectedTopicKey} onSelectChain={onSelectTopic} />}
+        renderTopics={({ onSelectTopic, selectedTopicKey }) => <BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} selectedTopicKey={selectedTopicKey} onSelectChain={onSelectTopic} onExploreChain={onSelectChain} />}
       />
       {taskId ? (
         <section

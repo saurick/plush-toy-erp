@@ -193,7 +193,6 @@ export default function TaskFulfillmentGuide({
   steps = catalog.fulfillment_flow,
   scoped = false,
   renderTopics,
-  businessChains = [],
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
@@ -212,9 +211,6 @@ export default function TaskFulfillmentGuide({
     ['topics', 'exceptions'].includes(searchParams.get(queryKeys.roleTab))
       ? searchParams.get(queryKeys.roleTab)
       : 'main'
-  const topic = businessChains.find(
-    (item) => item.key === searchParams.get(queryKeys.roleTopic)
-  )
   const guideKey = searchParams.get(queryKeys.exception)
   const selection = guideKey
     ? selectFulfillmentException({
@@ -243,7 +239,7 @@ export default function TaskFulfillmentGuide({
   const context =
     current && !scoped ? getFulfillmentStageContext(steps, current.stage) : null
   const supplement = current ? getFulfillmentSupplement(current) : null
-  const detailOpen = Boolean(current || selection || topic)
+  const detailOpen = Boolean(current || selection)
   const links = [
     ...new Map(
       [
@@ -340,7 +336,6 @@ export default function TaskFulfillmentGuide({
     )
   const stageNumber = current ? steps.indexOf(current) + 1 : null
   const title =
-    topic?.label ||
     (selection?.invalid
       ? '异常链接不可用'
       : current
@@ -386,7 +381,7 @@ export default function TaskFulfillmentGuide({
           ) : null}
         </div>
       </div>
-      <div className="erp-dev-fulfillment-guide__workspace">
+      <div className="erp-dev-fulfillment-guide__workspace" data-guide-view={view}>
         <div className="erp-dev-fulfillment-guide__overview">
           {view === 'main' ? (
             <>
@@ -436,7 +431,7 @@ export default function TaskFulfillmentGuide({
               />
               {view === 'topics' ? (
                 renderTopics({
-                  selectedTopicKey: topic?.key,
+                  selectedTopicKey: searchParams.get(queryKeys.roleTopic),
                   onSelectTopic: (key) =>
                     update((next) => {
                       detailKeys.forEach((item) => next.delete(item))
@@ -455,6 +450,7 @@ export default function TaskFulfillmentGuide({
             </div>
           )}
         </div>
+        {view !== 'topics' && (
         <aside
           className="erp-dev-fulfillment-guide__panel"
           aria-label="流程详情"
@@ -474,7 +470,7 @@ export default function TaskFulfillmentGuide({
             >
               <div className="erp-dev-fulfillment-guide__detail-heading">
                 <div className="erp-dev-fulfillment-guide__detail-title">
-                  {current && !topic ? (
+                  {current ? (
                     <span>
                       {stageNumber} / {steps.length}
                     </span>
@@ -494,31 +490,6 @@ export default function TaskFulfillmentGuide({
                 <p role="alert">
                   {selection.invalid}，请重新选择环节或异常类型。
                 </p>
-              ) : topic ? (
-                <>
-                  <p>{topic.summary}</p>
-                  <ul className="erp-dev-fulfillment-guide__topic-nodes">
-                    {topic.nodes.map((node) => (
-                      <li key={node.key}>{node.label}</li>
-                    ))}
-                  </ul>
-                  <div className="erp-dev-fulfillment-guide__involved">
-                    {catalog.fulfillment_flow
-                      .filter((step) => step.business_chain === topic.key)
-                      .map((step) => (
-                        <Button
-                          type="link"
-                          key={step.stage}
-                          onClick={() => selectStage(step.stage)}
-                        >
-                          {getFulfillmentStageCopy(step).label}
-                        </Button>
-                      ))}
-                  </div>
-                  <Button onClick={() => onExploreStage(topic.key)}>
-                    单据与规则
-                  </Button>
-                </>
               ) : (
                 <>
                   {handling ? (
@@ -714,6 +685,7 @@ export default function TaskFulfillmentGuide({
             </div>
           )}
         </aside>
+        )}
       </div>
       <p className="erp-dev-fulfillment-guide__boundary">
         流程示意，非实际进度；任务完成不代替正式业务结果。

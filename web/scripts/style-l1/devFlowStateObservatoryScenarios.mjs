@@ -47,6 +47,20 @@ export function createDevFlowStateObservatoryScenarios({
         await control.locator('.ant-select-selection-item').waitFor()
         assert.notEqual(new URL(page.url()).searchParams.get(key), '')
       }
+      await page.goto(new URL('/__dev/status-flows?view=chain&chain=all&flow_tab=topics', page.url()).href)
+      const topics = page.locator('[data-business-chain-topics]')
+      await topics.locator('[data-topic-diagram]').waitFor()
+      assert.equal(new URL(page.url()).searchParams.has('flow_topic'), false)
+      await topics.locator('.ant-select-clear').click()
+      assert.equal(new URL(page.url()).searchParams.get('flow_topic'), '')
+      await topics.getByText('请选择业务专题', { exact: true }).waitFor()
+      assert.equal(await topics.locator('[data-topic-diagram]').count(), 0)
+      await page.reload()
+      await topics.getByText('请选择业务专题', { exact: true }).waitFor()
+      assert.equal(new URL(page.url()).searchParams.get('flow_topic'), '')
+      await topics.getByRole('combobox', { name: '选择业务专题' }).click()
+      await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
+      await topics.locator('[data-topic-diagram]').waitFor()
       await assertNoHorizontalOverflow(page)
   }
   const writeRequestsByPage = new WeakMap()
@@ -116,48 +130,39 @@ export function createDevFlowStateObservatoryScenarios({
         await root.getByRole('button', { name: '按业务查阅', exact: true }).click()
         const topics = root.locator('[data-business-chain-topics]')
         await topics.waitFor({ state: 'visible' })
-        assert.equal(await topics.locator('[data-overview-chain]').count(), 11)
-        assert.equal(
-          await topics.locator('details').count(),
-          0,
-          'business entries must not require nested disclosures'
-        )
-        await page
-          .locator('.erp-dev-fulfillment-guide__role .ant-select-selector')
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible')
-          .getByText('工程', { exact: true })
-          .click()
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '工程参与 1 条业务流程' })
-          .waitFor()
-        assert.equal(await topics.locator('[data-overview-chain]').count(), 1)
-        await topics
-          .getByRole('button', { name: '查看业务链：销售受理到生产准备' })
-          .click()
-        await guide.locator('.erp-dev-fulfillment-guide__topic-nodes').waitFor()
-        await guide.getByRole('button', { name: '单据与规则', exact: true }).click()
+        const topicSelect = topics.locator('.ant-select')
+        const expectTopicOptions = async (count) => {
+          await topicSelect.locator('.ant-select-selector').click()
+          const options = page.locator('.ant-select-dropdown:visible .ant-select-item-option')
+          await expect(options).toHaveCount(count)
+          await topicSelect.getByRole('combobox').press('Escape')
+          await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        }
+        await expectTopicOptions(11)
+        assert.equal(await topics.locator('details').count(), 0, 'business entries must not require nested disclosures')
+        await chooseRole('工程')
+        await expectTopicOptions(1)
+        await topics.locator('[data-topic-diagram="sales_to_production"] [data-mermaid-status="rendered"]').waitFor()
+        assert.equal(await guide.locator('[aria-label="流程详情"]').count(), 0, '专题图在原地显示，不再叠加文字详情栏')
+        await guide.getByRole('button', { name: '查看单据状态与规则', exact: true }).click()
         await guide.getByRole('heading', { name: '办理环节', exact: true }).waitFor()
-        await page
-          .getByRole('button', { name: '返回业务目录', exact: true })
-          .click()
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '工程参与 1 条业务流程' })
-          .waitFor()
+        await page.getByRole('button', { name: '返回业务目录', exact: true }).click()
+        await topics.locator('[data-topic-diagram="sales_to_production"]').waitFor()
         await page.reload()
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '工程参与 1 条业务流程' })
-          .waitFor()
+        await topics.locator('[data-topic-diagram="sales_to_production"] [data-mermaid-status="rendered"]').waitFor()
+        await expectTopicOptions(1)
         await chooseRole('全部岗位')
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '全部 11 条业务流程' })
-          .waitFor()
-        assert.equal(await topics.locator('[data-overview-chain]').count(), 11)
+        await expectTopicOptions(11)
+        await topicSelect.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: '成品出货到应收建立', exact: true }).click()
+        await topics.locator('[data-topic-diagram="delivery_to_settlement"] [data-mermaid-status="rendered"]').waitFor()
+        await topics.getByRole('button', { name: '真实出货事实', exact: true }).click()
+        assert((await topics.locator('.erp-dev-fulfillment-guide__focus').innerText()).includes('取消出货'))
+        await topicSelect.locator('.ant-select-clear').click()
+        await topics.getByText('请选择业务专题', { exact: true }).waitFor()
+        await topicSelect.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible').getByRole('option', { name: '成品出货到应收建立', exact: true }).click()
+        await expect(topics.locator('.erp-dev-fulfillment-guide__focus > strong')).toHaveText('出货单')
         await topics
           .getByRole('button', { name: '系统衔接图', exact: true })
           .click()
@@ -431,22 +436,22 @@ export function createDevFlowStateObservatoryScenarios({
             page.url()
           ).href
         )
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '仓库参与 8 条业务流程' })
-          .waitFor()
+        await expectTopicOptions(8)
+        const selectedTopic = topics.locator('[data-topic-diagram]')
+        await selectedTopic.locator('[data-mermaid-status="rendered"]').waitFor()
+        const printedTopicKey = await selectedTopic.getAttribute('data-topic-diagram')
+        const printedTopicTitle = await topicSelect.locator('.ant-select-selection-item').innerText()
         await exportButton.hover()
         await page
           .getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' })
           .click()
         await page.waitForFunction(() => window.__flowPrintCount === 1)
         await page.emulateMedia({ media: 'print' })
-        const printedTopics = topics.locator('[data-overview-chain]:visible')
-        assert.equal(
-          await printedTopics.count(),
-          8,
-          '打印专题时必须保留当前岗位的全部专题内容'
-        )
+        await expect(topics.locator('[data-topic-diagram]:visible')).toHaveCount(1)
+        await expect(topics.locator('[data-topic-diagram]:visible')).toHaveAttribute('data-topic-diagram', printedTopicKey)
+        await expect(topics.locator('.erp-dev-chain-topics__print-title')).toHaveText(printedTopicTitle)
+        await expect(topics.locator('.erp-dev-chain-topics__print-title')).toBeVisible()
+        await expect(selectedTopic.locator('.erp-markdown-mermaid__canvas svg')).toBeVisible()
         assert.equal(
           await topics
             .getByRole('button', { name: '系统衔接图', exact: true })
