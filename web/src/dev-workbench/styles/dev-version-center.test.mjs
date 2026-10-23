@@ -117,7 +117,13 @@ test('version decisions and target evidence remain source-backed', () => {
   assert.match(component, /构建缓存与制品/u)
   assert.match(versionPage, /v2 · 7 项制品/u)
   assert.match(versionPage, /v1 · 6 项制品/u)
-  assert.match(versionPage, /record\.completeAssets\s*\? record\.promotionEligible\s*\? '制品齐全'\s*: record\.assets\.includes\('release-rehearsal\.json'\)\s*\? '演练证据待补齐'\s*: '仅可回滚'/u)
+  assert.match(versionPage, /record\.completeAssets\s*\? record\.promotionEligible\s*\? '保留中 · 制品齐全'\s*: record\.assets\.includes\('release-rehearsal\.json'\)\s*\? '演练证据待补齐'\s*: '仅可回滚'/u)
+  assert.match(versionPage, /RETENTION_STATES\[record\.retention\.state\]\.label/u)
+  assert.match(versionPage, /制品文件已清理，版本和部署记录保留/u)
+  assert.match(
+    versionPage,
+    /if \(\['cleaned', 'cleaning'\]\.includes\(record\.retention\?\.state\)\) return <Text type="secondary">文件已清理，记录可查<\/Text>\s*const actionKind = deliveryVersionActionKind\(record\)/u
+  )
   assert.match(versionPage, /CI\/CD 证据分两处查看/u)
   assert.match(
     versionPage,
