@@ -855,7 +855,8 @@
 
   .erp-print-shell .erp-contract-clause-title__value {
     --erp-print-focus-outset: 3px;
-    min-width: var(--erp-print-clause-title-min-width);
+    /* 四字提示按最高 10px 字号保留宽度及两侧留白，避免字体取整后换行。 */
+    min-width: max(var(--erp-print-clause-title-min-width), 44px);
     max-width: calc(100% - 3em - 2 * (var(--erp-print-focus-outset) + 1px));
     margin-inline: calc(var(--erp-print-focus-outset) + 1px);
   }
