@@ -104,11 +104,6 @@
 }
 
 .erp-sliding-segmented.ant-segmented
-  .erp-segmented-item-selected .ant-segmented-item-label {
-  font-weight: 650;
-}
-
-.erp-sliding-segmented.ant-segmented
   .ant-segmented-item:not(.ant-segmented-item-disabled, .erp-segmented-item-selected):hover::after {
   background: var(--erp-control-hover);
 }
@@ -153,7 +148,6 @@
   .ant-tabs-tab-active
   .ant-tabs-tab-btn {
   color: var(--erp-control-selected-text);
-  font-weight: 650;
 }
 
 .erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list::before {
@@ -219,7 +213,6 @@
 
 .erp-sliding-tab-list.erp-navigation-tabs > [role='tab'][aria-selected='true'] {
   color: var(--erp-control-selected-text);
-  font-weight: 650;
 }
 
 .erp-sliding-tab-list.erp-navigation-tabs

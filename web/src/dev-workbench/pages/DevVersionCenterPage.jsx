@@ -80,9 +80,110 @@ export default function DevVersionCenterPage() {
     submitRelease,
     summary,
     summaryFresh,
-    workspaceItems,
+    buildWorkspaceItems,
     workspaceRef,
   } = useVersionCenter()
+
+  const notices = (
+    <div className="erp-dev-version-notices">
+      {loadError ? (
+        <Alert
+          className="erp-dev-version-evidence-alert"
+          type={summary ? 'warning' : 'error'}
+          showIcon
+          message={summary ? '最新状态核对失败' : '版本中心不可用'}
+          description={
+            summary
+              ? `${loadError}；当前保留上次结果，写操作已停用。`
+              : loadError
+          }
+        />
+      ) : null}
+      {summary?.issues?.length > 0 ? (
+        <Alert
+          className="erp-dev-version-evidence-alert"
+          type="warning"
+          showIcon
+          message="状态核对不完整，相关写操作按已证明范围停用"
+          description={issueDescription(summary.issues)}
+        />
+      ) : null}
+      {operationPollError ? (
+        <Alert
+          className="erp-dev-version-evidence-alert"
+          type="warning"
+          showIcon
+          message="操作状态刷新暂时中断"
+          description={`${operationPollError}；页面会继续有界重试，也可手动刷新状态。`}
+        />
+      ) : null}
+      {openOperations.length > 0 ? (
+        <Card
+          title="当前操作"
+          className="erp-dev-version-table-card erp-dev-version-current-operation"
+        >
+          <div className="erp-dev-version-current-operation__list">
+            {openOperations.map((operation) => {
+              const statusMessage = deliveryOperationMessagePresentation(
+                operation.events.at(-1)?.message
+              )
+              return (
+                <article
+                  key={operation.id}
+                  className="erp-dev-version-current-operation__item"
+                  aria-label={`当前操作 ${operation.version}`}
+                >
+                  <div className="erp-dev-version-current-operation__detail">
+                    <Text strong>
+                      {operationActionLabel(
+                        operation.action,
+                        operation.promotionMode,
+                        operation.target
+                      )}
+                    </Text>
+                    <DevTimestamp
+                      value={operation.createdAt}
+                      action="开始于"
+                      missing="开始时间未证明"
+                      className="erp-dev-current-operation-time"
+                    />
+                  </div>
+                  <div className="erp-dev-version-current-operation__detail">
+                    <Text>{operation.version}</Text>
+                    <Text type="secondary" code>
+                      {shortGitSha(operation.gitSha)}
+                    </Text>
+                  </div>
+                  <div className="erp-dev-version-current-operation__detail">
+                    <Space size={6} wrap>
+                      <StatusTag status={operation.status} />
+                      <Text>
+                        {formatDeliveryDuration(operation.durationMs)}
+                      </Text>
+                    </Space>
+                    <Text type="secondary" title={statusMessage.title}>
+                      {statusMessage.label}
+                    </Text>
+                    <DevTimestamp
+                      value={operation.updatedAt}
+                      action={operationUpdateAction(operation)}
+                      missing="更新时间未证明"
+                      className="erp-dev-current-operation-time"
+                    />
+                  </div>
+                  <div className="erp-dev-version-current-operation__actions">
+                    {renderOperationActions(operation)}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </Card>
+      ) : null}
+
+    </div>
+  )
+  const workspaceItems = buildWorkspaceItems(notices)
 
   return (
     <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-version-page erp-dev-delivery-workspace">
@@ -173,100 +274,6 @@ export default function DevVersionCenterPage() {
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-version-shell">
-        {loadError ? (
-          <Alert
-            className="erp-dev-version-evidence-alert"
-            type={summary ? 'warning' : 'error'}
-            showIcon
-            message={summary ? '最新状态核对失败' : '版本中心不可用'}
-            description={
-              summary
-                ? `${loadError}；当前保留上次结果，写操作已停用。`
-                : loadError
-            }
-          />
-        ) : null}
-        {summary?.issues?.length > 0 ? (
-          <Alert
-            className="erp-dev-version-evidence-alert"
-            type="warning"
-            showIcon
-            message="状态核对不完整，相关写操作按已证明范围停用"
-            description={issueDescription(summary.issues)}
-          />
-        ) : null}
-        {operationPollError ? (
-          <Alert
-            className="erp-dev-version-evidence-alert"
-            type="warning"
-            showIcon
-            message="操作状态刷新暂时中断"
-            description={`${operationPollError}；页面会继续有界重试，也可手动刷新状态。`}
-          />
-        ) : null}
-        {openOperations.length > 0 ? (
-          <Card
-            title="当前操作"
-            className="erp-dev-version-table-card erp-dev-version-current-operation"
-          >
-            <div className="erp-dev-version-current-operation__list">
-              {openOperations.map((operation) => {
-                const statusMessage = deliveryOperationMessagePresentation(
-                  operation.events.at(-1)?.message
-                )
-                return (
-                  <article
-                    key={operation.id}
-                    className="erp-dev-version-current-operation__item"
-                    aria-label={`当前操作 ${operation.version}`}
-                  >
-                    <div className="erp-dev-version-current-operation__detail">
-                      <Text strong>
-                        {operationActionLabel(
-                          operation.action,
-                          operation.promotionMode,
-                          operation.target
-                        )}
-                      </Text>
-                      <DevTimestamp
-                        value={operation.createdAt}
-                        action="开始于"
-                        missing="开始时间未证明"
-                        className="erp-dev-current-operation-time"
-                      />
-                    </div>
-                    <div className="erp-dev-version-current-operation__detail">
-                      <Text>{operation.version}</Text>
-                      <Text type="secondary" code>
-                        {shortGitSha(operation.gitSha)}
-                      </Text>
-                    </div>
-                    <div className="erp-dev-version-current-operation__detail">
-                      <Space size={6} wrap>
-                        <StatusTag status={operation.status} />
-                        <Text>
-                          {formatDeliveryDuration(operation.durationMs)}
-                        </Text>
-                      </Space>
-                      <Text type="secondary" title={statusMessage.title}>
-                        {statusMessage.label}
-                      </Text>
-                      <DevTimestamp
-                        value={operation.updatedAt}
-                        action={operationUpdateAction(operation)}
-                        missing="更新时间未证明"
-                        className="erp-dev-current-operation-time"
-                      />
-                    </div>
-                    <div className="erp-dev-version-current-operation__actions">
-                      {renderOperationActions(operation)}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </Card>
-        ) : null}
 
         <section
           ref={workspaceRef}

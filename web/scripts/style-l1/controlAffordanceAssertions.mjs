@@ -130,7 +130,7 @@ async function readSelectionAffordance(locator) {
 }
 
 function assertSelectionText(metric, selectedBackground = metric.background, otherBackground = metric.background) {
-  assert.equal(metric.selected.weight, 650, JSON.stringify(metric))
+  assert.equal(metric.selected.weight, 500, '选中态沿用常态字重，避免文字宽度改变挤动相邻页签')
   if (metric.other) assert.equal(metric.other.weight, 500, JSON.stringify(metric))
   assert.deepEqual(parseRgb(metric.selected.color), parseRgb(metric.expectedSelectedText))
   for (const [item, background] of [[metric.selected, selectedBackground], [metric.other, otherBackground]]) {

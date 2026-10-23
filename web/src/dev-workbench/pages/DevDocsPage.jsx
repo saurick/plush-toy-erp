@@ -985,39 +985,6 @@ export default function DevDocsPage() {
               onChange={setSearchScope}
             />
           </div>
-
-          {keyword.trim() &&
-          searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
-          lifecycleDocs.some(
-            (item) =>
-              item.loadSource &&
-              !item.source &&
-              sourceLoadState[item.path]?.status !== 'error'
-          ) ? (
-            <Space role="status">
-              <Spin size="small" />
-              <Text type="secondary">正在检索完整正文</Text>
-            </Space>
-          ) : null}
-          {keyword.trim() &&
-          searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
-          lifecycleDocs.some(
-            (item) => sourceLoadState[item.path]?.status === 'error'
-          ) ? (
-            <Button
-              size="small"
-              onClick={() => {
-                for (const item of lifecycleDocs) {
-                  if (sourceLoadState[item.path]?.status === 'error') {
-                    sourceLoadRequestedRef.current.delete(item.path)
-                  }
-                }
-                setSourceReloadToken((value) => value + 1)
-              }}
-            >
-              部分正文加载失败，重新检索
-            </Button>
-          ) : null}
         </div>
       </header>
 
@@ -1083,6 +1050,38 @@ export default function DevDocsPage() {
                   {visibleDocs.length} / {lifecycleDocs.length}
                 </Text>
               </div>
+              {keyword.trim() &&
+              searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
+              lifecycleDocs.some(
+                (item) =>
+                  item.loadSource &&
+                  !item.source &&
+                  sourceLoadState[item.path]?.status !== 'error'
+              ) ? (
+                <Space role="status">
+                  <Spin size="small" />
+                  <Text type="secondary">正在检索完整正文</Text>
+                </Space>
+              ) : null}
+              {keyword.trim() &&
+              searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
+              lifecycleDocs.some(
+                (item) => sourceLoadState[item.path]?.status === 'error'
+              ) ? (
+                <Button
+                  size="small"
+                  onClick={() => {
+                    for (const item of lifecycleDocs) {
+                      if (sourceLoadState[item.path]?.status === 'error') {
+                        sourceLoadRequestedRef.current.delete(item.path)
+                      }
+                    }
+                    setSourceReloadToken((value) => value + 1)
+                  }}
+                >
+                  部分正文加载失败，重新检索
+                </Button>
+              ) : null}
               <div className="erp-dev-docs-list">
                 {visibleDocs.length > 0 ? (
                   visibleDocs.map((item) => (

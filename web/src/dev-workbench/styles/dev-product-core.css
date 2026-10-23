@@ -1,14 +1,7 @@
 .erp-dev-product-core-header,
-.erp-dev-product-core-shell {
-  width: min(1480px, 100%);
-  margin-inline: auto;
-}
-
-.erp-dev-product-core-header,
 .erp-dev-product-core-header__copy,
 .erp-dev-product-core-toolbar,
-.erp-dev-product-core-filters,
-.erp-dev-product-core-toolbar__actions {
+.erp-dev-product-core-filters {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -34,34 +27,41 @@
 }
 
 .erp-dev-product-core-toolbar__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5ch auto;
+  align-items: center;
+  gap: 12px;
+  width: min(440px, 100%);
+  flex: 0 0 auto;
   margin-inline-start: auto;
 }
 
 .erp-dev-product-core-toolbar__actions .erp-search-input {
-  width: min(280px, 100%);
-}
-
-.erp-dev-product-core-groups {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  align-items: start;
-}
-
-.erp-dev-product-core-group {
+  width: 100%;
   min-width: 0;
-  padding: 20px;
+}
+
+.erp-dev-product-core-result-count {
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.erp-dev-product-core-inventory {
+  min-width: 0;
   border: 1px solid var(--erp-border);
   border-radius: 8px;
   background: var(--erp-surface-bg);
 }
 
-.erp-dev-product-core-groups:has(> :only-child) {
+.erp-dev-product-core-groups {
+  display: grid;
   grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
 }
 
-.erp-dev-product-core-group:where(:only-child) ul {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.erp-dev-product-core-group {
+  min-width: 0;
 }
 
 .erp-dev-product-core-group h2.ant-typography {
@@ -71,7 +71,8 @@
 
 .erp-dev-product-core-group ul {
   display: grid;
-  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px 16px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -152,29 +153,13 @@
   padding: 28px 16px;
 }
 
-@media (min-width: 1600px) {
-  .erp-dev-product-core-group:first-child ul {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px 16px;
-  }
-}
-
-@media (max-width: 1100px) {
-  .erp-dev-product-core-groups {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+@media (max-width: 1399px) {
   .erp-dev-product-core-group ul {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .erp-dev-product-core-toolbar__actions {
-    flex-wrap: wrap;
-    margin-inline-start: 0;
-  }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .erp-dev-product-core-group ul {
     grid-template-columns: minmax(0, 1fr);
   }

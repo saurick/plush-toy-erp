@@ -128,9 +128,7 @@ export default function DevHubPage() {
             options={GROUP_OPTIONS}
             onChange={(value) => selectParam('group', value, true)}
           />
-          {keyword || group !== 'all' ? (
-            <Button onClick={resetFilters}>清除筛选</Button>
-          ) : null}
+          <Button disabled={!keyword && group === 'all'} onClick={resetFilters}>清除筛选</Button>
           <Text
             type="secondary"
             className="erp-dev-overview-library__count"

@@ -341,7 +341,9 @@ export function useVersionCenter() {
     />
   )
 
-  const workspaceItems = buildVersionWorkspace({
+  const buildWorkspaceItems = (notices) => buildVersionWorkspace({
+    activeView,
+    notices,
     loadError,
     changeTablePage,
     clearOperationHistoryFilters,
@@ -416,7 +418,7 @@ export function useVersionCenter() {
     submitRelease,
     summary,
     summaryFresh,
-    workspaceItems,
+    buildWorkspaceItems,
     workspaceRef,
   }
 }

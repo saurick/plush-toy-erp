@@ -26,6 +26,7 @@ import {
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { assertDevDocsDirectorySpace, createDevDocsReadingFixture, verifyDevDocsReadingNavigation } from './devDocsLayoutAssertions.mjs'
 import { verifyTestingOverview } from './devTestingOverviewAssertions.mjs'
+import { verifyProductCoreLayout } from './devProductCoreAssertions.mjs'
 
 const SPECIALIZED_ROUTES = new Set([
   DEV_BUSINESS_USABILITY_ROUTE,
@@ -974,6 +975,7 @@ export function createDevWorkbenchDesktopScenarios({
         )
       }
       if (item.route === DEV_PRODUCT_CORE_ROUTE) {
+        await verifyProductCoreLayout(page, { assertNoHorizontalOverflow })
         const filters = page.locator('.erp-dev-product-core-filters .erp-filter-chip')
         await filters.nth(1).click()
         await page.waitForFunction(() => document.querySelectorAll('.erp-dev-product-core-filters .erp-filter-chip')[1]?.getAttribute('aria-pressed') === 'true')

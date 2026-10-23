@@ -76,7 +76,7 @@ function OptionTabs() {
 function ActionBarMountFixture() {
   const [generation, setGeneration] = useState(0)
   return (
-    <section id="action-remount">
+    <section id="action-remount" style={{ width: 320, maxWidth: '100%' }}>
       <button
         id="remount-action-bar"
         type="button"

@@ -19,6 +19,17 @@
   min-width: 0;
 }
 
+.erp-dev-version-notices {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.erp-dev-version-notices:empty {
+  display: none;
+}
+
 .erp-dev-version-header-actions {
   display: flex;
   flex-wrap: wrap;

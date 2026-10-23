@@ -99,6 +99,7 @@ import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
 import { createAccountAppearanceScenarios } from './accountAppearanceScenarios.mjs'
 import { createDevWorkbenchThemeScenarios } from './devWorkbenchThemeScenarios.mjs'
 import { createDevWorkbenchThemeAuditScenarios } from './devWorkbenchThemeAuditScenarios.mjs'
+import { createDevWorkbenchSwitchScenarios } from './devWorkbenchSwitchScenarios.mjs'
 import { createAccountIdentityScenarios } from './accountIdentityScenarios.mjs'
 import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
 import { createSalesOrderExportScenarios } from './salesOrderExportScenarios.mjs'
@@ -411,6 +412,7 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createDevWorkbenchThemeScenarios({ assertNoHorizontalOverflow, outputDir }),
     ...createDevWorkbenchThemeAuditScenarios({ assertNoHorizontalOverflow, outputDir }),
+    ...createDevWorkbenchSwitchScenarios(deps),
     ...createAccountIdentityScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

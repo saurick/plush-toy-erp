@@ -201,12 +201,8 @@ export default function DevProductCorePage() {
               value={keyword}
               onChange={handleKeywordChange}
             />
-            {hasActiveFilter ? (
-              <>
-                <Text type="secondary" aria-live="polite">{filteredCapabilities.length} 项</Text>
-                <Button onClick={handleReset}>清除筛选</Button>
-              </>
-            ) : null}
+            <Text className="erp-dev-product-core-result-count" type="secondary" aria-live="polite">{filteredCapabilities.length} 项</Text>
+            <Button disabled={!hasActiveFilter} onClick={handleReset}>清除筛选</Button>
           </div>
         </div>
 

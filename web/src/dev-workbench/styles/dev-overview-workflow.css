@@ -17,15 +17,15 @@
   padding: 10px 12px 0;
 }
 .erp-dev-overview-library__toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(180px, 340px) 136px max-content 7em;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-  flex: 1 1 480px;
+  flex: 1 1 600px;
 }
 .erp-dev-overview-library__toolbar .erp-search-input {
-  width: min(340px, 100%);
+  width: 100%;
 }
 .erp-dev-overview-library__toolbar .ant-select {
   min-width: 136px;

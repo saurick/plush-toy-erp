@@ -122,13 +122,6 @@ async function sampleMotion(
         }
         requestAnimationFrame(frame)
       })
-      // The selected font weight can change glyph widths. Verify alignment
-      // against the rendered selected item, not its former unselected box.
-      if (!config.reverse) {
-        target.x = targetItem.offsetLeft
-        target.y = targetItem.offsetTop
-        target.width = targetItem.offsetWidth
-      }
       return { first, target, samples }
     },
     { reverse, targetIndex }
@@ -247,7 +240,7 @@ function assertActionBarRemountStable(samples, label) {
   const rowHeights = samples.map((sample) => sample.rowHeight)
   assert(
     Math.max(...buttonHeights) - Math.min(...buttonHeights) <= 0.5 &&
-      buttonHeights.every((height) => Math.abs(height - 30) <= 0.5),
+      buttonHeights.every((height) => Math.abs(height - 32) <= 0.5),
     `${label}: more action button changed height ${JSON.stringify(samples)}`
   )
   assert(
@@ -255,7 +248,7 @@ function assertActionBarRemountStable(samples, label) {
     `${label}: action row changed height ${JSON.stringify(samples)}`
   )
   assert(
-    samples.every((sample) => sample.actionClass.includes('actions--overflow')),
+    samples.every((sample) => sample.actionClass.includes('actions--responsive')),
     `${label}: desktop remount flashed compact actions ${JSON.stringify(samples)}`
   )
 }
@@ -432,7 +425,7 @@ export function createTabMotionScenarios({ outputDir }) {
             return {
               stripWidth: strip.getBoundingClientRect().width,
               viewportWidth: viewport.getBoundingClientRect().width,
-              lastRight: items.at(-1).offsetLeft + items.at(-1).offsetWidth,
+              lastRight: items.at(-1).getBoundingClientRect().right - strip.getBoundingClientRect().left,
               pageOverflow: document.documentElement.scrollWidth - innerWidth,
             }
           })

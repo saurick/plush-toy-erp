@@ -30,6 +30,8 @@ import AppSelect from '@/common/components/select/AppSelect'
 const { Text, Link } = Typography
 
 export function buildVersionWorkspace({
+  activeView,
+  notices,
   changeTablePage,
   clearOperationHistoryFilters,
   databaseRebuildPanel,
@@ -73,6 +75,7 @@ export function buildVersionWorkspace({
           className="erp-dev-version-tab erp-dev-version-tab--versions"
           aria-label="版本与部署"
         >
+          {activeView === DEV_VERSION_CENTER_VIEW_VERSIONS ? notices : null}
           <Card
             title="可部署版本"
             className="erp-dev-version-table-card"
@@ -131,6 +134,7 @@ export function buildVersionWorkspace({
           className="erp-dev-version-tab erp-dev-version-tab--overview"
           aria-label="发布检查"
         >
+          {activeView === DEV_VERSION_CENTER_VIEW_OVERVIEW ? notices : null}
           {versionOverview}
           {databaseRebuildPanel}
         </section>
@@ -144,6 +148,7 @@ export function buildVersionWorkspace({
           className="erp-dev-version-tab erp-dev-version-tab--pipeline"
           aria-label="发布与部署耗时"
         >
+          {activeView === DEV_VERSION_CENTER_VIEW_PIPELINE ? notices : null}
           <DevPipelineStatusStrip
             timings={summary?.timings}
             versions={versions}
@@ -180,36 +185,6 @@ export function buildVersionWorkspace({
               <Link href="https://gitlab.saurick.me/saurick/plush-toy-erp/-/packages" rel="noreferrer">回执归档</Link>
               <Text type="secondary">此处保留项目检查、原始时间和恢复操作。</Text>
             </Space>
-            {operationHistoryFilters.target === 'test-133' ? (
-              <Alert type="info" showIcon message="原始目标已退役；此处仅保留当时的部署记录，不计入当前 demo、test 或 erp，也不能再次执行。" />
-            ) : null}
-            {sharedReleaseHistory ? (
-              <Alert type="info" showIcon message="制品供各环境部署使用；各环境的部署结果在各自记录中查看。" />
-            ) : null}
-            {historyResult && (historyResult.integrity.unreadableOperations > 0 || historyResult.integrity.unreadableRequests > 0) ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="部分记录未通过完整性校验"
-                description={`操作记录 ${historyResult.integrity.unreadableOperations} 条、请求索引 ${historyResult.integrity.unreadableRequests} 条暂不可读；当前列表或统计可能不完整。修复原始记录后可重新读取。`}
-              />
-            ) : null}
-            {operationHistoryState === 'stale' ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="当前显示上次成功读回的操作记录"
-                description="最新操作记录不可读或仍在重新核对；当前统计对应上次读回结果。"
-              />
-            ) : null}
-            {operationHistoryState === 'failure' ? (
-              <Alert
-                type="error"
-                showIcon
-                message="工作台操作记录当前不可读"
-                description="请重试读取；读取失败不表示当前环境没有记录。"
-              />
-            ) : null}
             <div
               className="erp-dev-operation-history-filters"
               role="search"
@@ -301,13 +276,42 @@ export function buildVersionWorkspace({
                 >
                   {['failure', 'stale'].includes(operationHistoryState) ? '重试读取' : '刷新记录'}
                 </Button>
-                {hasOperationHistoryFilters ? (
-                  <Button type="link" onClick={clearOperationHistoryFilters}>
-                    清空筛选
-                  </Button>
-                ) : null}
+                <Button type="link" disabled={!hasOperationHistoryFilters} onClick={clearOperationHistoryFilters}>
+                  清空筛选
+                </Button>
               </div>
             </div>
+            {activeView === DEV_VERSION_CENTER_VIEW_HISTORY ? notices : null}
+            {operationHistoryFilters.target === 'test-133' ? (
+              <Alert type="info" showIcon message="原始目标已退役；此处仅保留当时的部署记录，不计入当前 demo、test 或 erp，也不能再次执行。" />
+            ) : null}
+            {sharedReleaseHistory ? (
+              <Alert type="info" showIcon message="制品供各环境部署使用；各环境的部署结果在各自记录中查看。" />
+            ) : null}
+            {historyResult && (historyResult.integrity.unreadableOperations > 0 || historyResult.integrity.unreadableRequests > 0) ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="部分记录未通过完整性校验"
+                description={`操作记录 ${historyResult.integrity.unreadableOperations} 条、请求索引 ${historyResult.integrity.unreadableRequests} 条暂不可读；当前列表或统计可能不完整。修复原始记录后可重新读取。`}
+              />
+            ) : null}
+            {operationHistoryState === 'stale' ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="当前显示上次成功读回的操作记录"
+                description="最新操作记录不可读或仍在重新核对；当前统计对应上次读回结果。"
+              />
+            ) : null}
+            {operationHistoryState === 'failure' ? (
+              <Alert
+                type="error"
+                showIcon
+                message="工作台操作记录当前不可读"
+                description="请重试读取；读取失败不表示当前环境没有记录。"
+              />
+            ) : null}
             {operationHistoryState === 'failure' ? null : (
               <>
                 {historyResult ? (

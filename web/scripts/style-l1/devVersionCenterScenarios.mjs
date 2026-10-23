@@ -801,8 +801,7 @@ export function createDevVersionCenterScenarios({
         await page
           .locator('.erp-dev-version-tab--versions .ant-pagination-item-2')
           .click()
-        await page
-          .locator('.erp-dev-version-tab--versions')
+        await versionTable
           .getByText('2026.08.08-8', { exact: true })
           .waitFor()
         const runningRow = versionTable.getByRole('row').filter({ hasText: '2026.08.08-7' })

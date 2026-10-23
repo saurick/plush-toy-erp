@@ -145,6 +145,8 @@ Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reaso
 
 `style-l1/scenarios.mjs` 只组合场景工厂和共享输入。登录、客户权限、工作台、移动任务、权限中心、打印和业务表单分别位于同目录对应的 `*Scenarios.mjs`。物料明细、色卡和作业指导书编辑各有独立的 `*InteractionScenario.mjs`，按命名交互步骤调用断言，每个场景使用自己的页面和 PDF 请求记录。
 
+`dev-workbench-switches-1024/1200/1280/1920` 从工作台路由目录检查主、次级页签、搜索提交与清除、筛选和恢复；逐帧记录控件挂载、选中状态和几何位置，报告写入 `workbench-switches-<width>.json`。运行与发布接口使用现有只读浏览器夹具，不触发迁移、造数或发布。
+
 场景名称、顺序与请求计数的生命周期保持独立；通过 `STYLE_L1_SCENARIOS` 选择受影响场景，完整运行遵循 QA 的高成本授权规则。
 
 `businessFormalScenarios.mjs` 组合主数据、订单、库存、生产、出货及附件恢复的领域场景；共享断言位于 `businessFormalAssertions.mjs`。跨业务页的 `businessCorePagesScenarios.mjs` 按固定顺序调用各领域的 `businessCore*Checks.mjs`，请求记录与局部夹具归对应检查持有，保留场景名称、顺序、分页及权限断言。

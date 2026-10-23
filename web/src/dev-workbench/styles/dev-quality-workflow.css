@@ -944,6 +944,8 @@
 .erp-dev-testing-coverage-panel {
   display: grid;
   min-width: 0;
+  min-height: calc(100dvh - 48px);
+  align-content: start;
   gap: 14px;
 }
 

@@ -97,7 +97,7 @@
 
 .erp-dev-business-usability-filters .ant-card-body {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) 180px 210px max-content;
+  grid-template-columns: minmax(240px, 1fr) 180px 210px 9em;
   align-items: center;
   gap: 10px;
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button, Empty, Space, Tag, Typography } from 'antd'
+import { ReloadOutlined } from '@ant-design/icons'
 import { Link, useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
@@ -163,6 +164,7 @@ export default function DevBusinessRulesPanel({ report, reportCurrent }) {
           allowClear
         />
         <Button
+          icon={<ReloadOutlined />}
           loading={loading}
           onClick={() => setReload((value) => value + 1)}
         >
