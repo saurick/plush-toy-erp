@@ -120,12 +120,13 @@ test('DEV passive guidance is collapsed while warnings and errors stay prominent
   const guidance = read(
     'web/src/dev-workbench/components/DevStaticGuidance.jsx'
   )
-  assert.match(guidance, /<details className="erp-dev-static-guidance">/u)
+  const disclosureCSS = read('web/src/dev-workbench/styles/dev-disclosure.css')
+  assert.match(guidance, /<details className="erp-dev-disclosure erp-dev-static-guidance">/u)
   assert.doesNotMatch(guidance, /<details\b[^>]*\bopen\b/u)
   assert.doesNotMatch(guidance, /<Alert\b/u)
   assert.match(
-    densityCSS,
-    /\.erp-dev-static-guidance > summary\s*\{[\s\S]*?font-size: var\(--erp-font-small\);/u
+    disclosureCSS,
+    /\.erp-dev-disclosure > summary\s*\{[\s\S]*?font-size: var\(--erp-font-small\);/u
   )
   assert.doesNotMatch(
     densityCSS,

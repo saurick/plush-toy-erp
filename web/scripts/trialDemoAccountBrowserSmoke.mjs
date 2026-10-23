@@ -181,6 +181,7 @@ const desktopAccounts = [
       '销售订单',
       '采购订单',
       '模板打印中心',
+      menuLabelByKey.get('shipments'),
       '出货放行',
       '异常处理',
     ],
@@ -485,11 +486,11 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
         plan.customerHiddenMenuLabels.includes(label)
       ) &&
       bossDesktop?.visibleExpectedMenus.includes('进度看板') &&
-      !warehouseDesktop?.visibleExpectedMenus.includes('出货放行') &&
-      financeDesktop?.visibleExpectedMenus.includes('出货放行') &&
+      warehouseDesktop?.visibleExpectedMenus.includes(menuLabelByKey.get('shipments')) &&
+      financeDesktop?.visibleExpectedMenus.includes(menuLabelByKey.get('shipments')) &&
       productionDesktop?.visibleExpectedMenus.includes('生产记录') &&
       !productionDesktop?.visibleExpectedMenus.includes('异常处理') &&
-      ['进度看板', '出货放行', '排产确认', '异常处理'].every((label) =>
+      ['进度看板', menuLabelByKey.get('shipments'), '出货放行', '排产确认', '异常处理'].every((label) =>
         adminDesktop?.forbiddenMenus.includes(label)
       ),
     coversLegacyMenuCleanup:

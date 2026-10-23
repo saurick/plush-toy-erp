@@ -565,7 +565,7 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze(Object.fromEntries(
         const key = businessTestKey(test);
         if (registered.has(key)) return [];
         registered.add(key);
-        return [goScenario(key, test.package, test.name, entry.label)];
+        return [goScenario(`${domain}:${key}`, test.package, test.name, entry.label)];
       }));
     return [domain, Object.freeze([...scenarios, ...extra])];
   }),

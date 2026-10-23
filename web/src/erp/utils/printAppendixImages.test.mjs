@@ -237,7 +237,7 @@ test('加工合同两图或三图同行，手动半宽、整行和长图仍独�
     { ...images[2], layoutMode: 'full' },
     createImage(3, { width: 1000, height: 6000 }),
   ], { autoColumns: 3 })
-  assert.deepEqual(mixed.map(row => row.layout), ['half', 'half', 'full', 'full'])
-  assert.deepEqual(mixed.flatMap(row => row.images.map(image => image.id)), ['appendix-1', 'appendix-2', 'appendix-3', 'appendix-4'])
+  assert.deepEqual(mixed.map((row) => row.layout), ['half', 'half', 'full', 'full'])
+  assert.deepEqual(mixed.flatMap((row) => row.images.map((image) => image.id)), ['appendix-1', 'appendix-2', 'appendix-3', 'appendix-4'])
   assert.equal(images[0].layoutMode, 'auto')
 })

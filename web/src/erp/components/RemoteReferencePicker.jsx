@@ -9,12 +9,13 @@ import {
 import { showPageLoadError } from './PageLoadFeedback.jsx'
 
 export default function RemoteReferencePicker(props) {
+  const { referenceType, params } = props
   const context = useContext(ReferenceRecordsContext)
   // A different account or candidate scope cannot reuse the prior selection.
   const scopeKey = JSON.stringify([
     context?.adminProfile || null,
-    props.referenceType,
-    props.params || {},
+    referenceType,
+    params || {},
   ])
   return <RemoteReferencePickerContent key={scopeKey} {...props} context={context} />
 }

@@ -495,7 +495,13 @@ test("workflow business role filters use shared role display names", () => {
     source,
     /function workflowRoleOption\(value\) \{[\s\S]*getRoleDisplayName\(value, '责任岗位'\)/u,
   );
-  for (const roleKey of ["pmc", "production", "warehouse", "finance", "boss"]) {
+  const productionRoles = ["pmc", "production", "warehouse", "boss"];
+  assert.deepEqual(
+    [...source.matchAll(/workflowRoleOption\('([a-z_]+)'\)/gu)].map((match) => match[1]),
+    productionRoles,
+    "Production workflow filters must follow the scheduling and exception responsibility roles",
+  );
+  for (const roleKey of productionRoles) {
     assert(
       source.includes(`workflowRoleOption('${roleKey}')`),
       `Workflow business owner-role filter must derive ${roleKey} label from shared role display names`,

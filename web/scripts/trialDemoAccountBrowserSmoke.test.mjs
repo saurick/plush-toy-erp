@@ -435,13 +435,13 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   assert(
     template.desktopAccounts
       .find((account) => account.username === 'demo_finance')
-      ?.expectedMenus.includes('出货放行')
+      ?.expectedMenus.includes('出货单')
   )
   assert.equal(
     template.desktopAccounts
       .find((account) => account.username === 'demo_warehouse')
-      ?.expectedMenus.includes('出货放行'),
-    false
+      ?.expectedMenus.includes('出货单'),
+    true
   )
   assert(
     template.desktopAccounts
@@ -569,13 +569,13 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
   assert(
     report.menuProjectionPlan.desktopAccounts
       .find((account) => account.username === 'demo_finance')
-      ?.configuredExpectedMenus.includes('出货放行')
+      ?.configuredExpectedMenus.includes('出货单')
   )
   assert.equal(
     report.menuProjectionPlan.desktopAccounts
       .find((account) => account.username === 'demo_warehouse')
-      ?.configuredExpectedMenus.includes('出货放行'),
-    false
+      ?.configuredExpectedMenus.includes('出货单'),
+    true
   )
   assert(
     report.menuProjectionPlan.desktopAccounts

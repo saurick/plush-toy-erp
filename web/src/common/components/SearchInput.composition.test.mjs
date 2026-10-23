@@ -94,7 +94,7 @@ test('candidate Enter and Escape do not submit, cancel, or reach enclosing keybo
   const h = await harness(t, { value: '已查询' })
   // React delegates to the root; observe propagation beyond that root.
   const outerKeys = []
-  const body = document.body
+  const { body } = document
   const listener = (event) => outerKeys.push(event.key)
   body.addEventListener('keydown', listener)
   t.after(() => body.removeEventListener('keydown', listener))
@@ -156,7 +156,6 @@ test('submitted search preserves a new composition when the preceding query is a
   assert.deepEqual(queries, ['已提交', '新查询'])
   assert.deepEqual(h.compositions, ['start', 'end'])
 })
-
 
 test('ordinary input recovers after native search cancellation without compositionend', async (t) => {
   const h = await harness(t, { value: '', type: 'search' })

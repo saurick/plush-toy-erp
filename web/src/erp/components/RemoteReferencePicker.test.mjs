@@ -36,12 +36,16 @@ async function harness(t, handler) {
     calls,
     accepted,
     button,
-    renderPicker: (props = {}, profile) => view.render(createElement(
+    renderPicker: (props, profile) => view.render(createElement(
       ReferenceRecordsContext.Provider,
       { value: { adminProfile: profile, materials: (rows) => accepted.push(...rows) } },
       createElement(Picker, {
-        referenceType: 'materials', open: true, title: '选择材料',
-        importText: '加入明细', columns, ...props,
+        referenceType: 'materials',
+open: true,
+title: '选择材料',
+        importText: '加入明细',
+columns,
+...props,
       })
     )),
     nextPage: () => view.act(async () => document.querySelector('.ant-pagination-next button').click()),
