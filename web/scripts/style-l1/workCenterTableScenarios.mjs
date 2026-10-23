@@ -4,6 +4,7 @@ import { createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
 import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { createBusinessListStickyScenarios } from './businessListStickyScenarios.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 async function verifyStickyTable(page, assert) {
   await page.locator('.erp-work-center-table .ant-table-sticky-holder').waitFor()
@@ -91,6 +92,8 @@ export function createWorkCenterTableScenarios(deps) {
         if (holdRead) await page.route('**/rpc/workflow', delayWorkbenchRead)
         await pager.locator('.ant-select-selector').click()
         const options = page.locator('.ant-select-dropdown:visible .ant-select-item-option-content')
+        await options.first().waitFor({ state: 'visible' })
+        await waitForFiniteAnimations(page, { selector: '.ant-select-dropdown' })
         assert.deepEqual(await options.allTextContents(), ['20 条/页', '50 条/页', '100 条/页'])
         const geometry = await options.evaluateAll((nodes) => nodes.map((node) => ({
           height: node.getBoundingClientRect().height,
