@@ -42,7 +42,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         width: 100,
         render: (value) => (value === 'RECEIPT' ? '收款' : '付款'),
         exportValue: (record) =>
-          record?.direction === 'RECEIPT' ? '收款' : '付款',
+          record?.direction ? record.direction === 'RECEIPT' ? '收款' : '付款' : '',
       },
       {
         align: 'right',
@@ -68,7 +68,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
             SETTLEMENT: '结算款',
             ADVANCE: '订单预收 / 预付',
             REFUND: '实际退款',
-          })[row.kind] || '用途待核对',
+          })[row.kind] || (row.kind ? '用途待核对' : ''),
       },
       {
         defaultPriority: 66,
@@ -76,7 +76,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         dataIndex: 'source_no',
         width: 190,
         render: (_value, record) => paymentSourceReference(record),
-        exportValue: paymentSourceReference,
+        exportValue: (record) => paymentSourceReference(record, { emptyText: '' }),
       },
       {
         defaultHidden: true,
@@ -123,7 +123,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         width: 200,
         detailValue: counterpartyLabel,
         render: (_, record) => counterpartyLabel(record),
-        exportValue: counterpartyLabel,
+        exportValue: (record) => record?.counterparty_id ? counterpartyLabel(record) : '',
       },
       {
         defaultPriority: 20,
@@ -131,7 +131,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         dataIndex: 'status',
         width: 110,
         render: paymentStatus,
-        exportValue: (record) => paymentStatusLabel(record?.status),
+        exportValue: (record) => record?.status ? paymentStatusLabel(record?.status) : '',
       },
       {
         align: 'left',
@@ -165,7 +165,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         dataIndex: 'occurred_at',
         width: 170,
         render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.occurred_at),
+        exportValue: (record) => formatUnixDateTime(record?.occurred_at, { emptyText: '' }),
       },
     ]
   }, [customers, suppliers])
@@ -188,7 +188,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         detailCopyable: true,
         width: 190,
         render: (value) => value || '已关联财务记录',
-        exportValue: (record) => record?.finance_fact_no || '已关联财务记录',
+        exportValue: (record) => record?.finance_fact_no || (record?.finance_fact_id ? '已关联财务记录' : ''),
       },
       {
         defaultPriority: 40,
@@ -197,7 +197,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         width: 110,
         render: financeFactTypeLabel,
         exportValue: (record) =>
-          financeFactTypeLabel(record?.finance_fact_type),
+          record?.finance_fact_type ? financeFactTypeLabel(record?.finance_fact_type) : '',
       },
       {
         align: 'right',
@@ -235,7 +235,7 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
             {creditStatusLabel(value)}
           </Tag>
         ),
-        exportValue: (record) => creditStatusLabel(record?.status),
+        exportValue: (record) => record?.status ? creditStatusLabel(record?.status) : '',
       },
       { align: 'left', title: '原因', dataIndex: 'reason', width: 260 },
     ],

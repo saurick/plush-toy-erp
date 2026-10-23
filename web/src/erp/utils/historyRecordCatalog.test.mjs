@@ -9,6 +9,25 @@ import {
   resolveHistoryStatusCounts,
 } from './historyRecordCatalog.mjs'
 
+test('历史导出在源字段投影时留空，保留页面占位、真实横杠和明确历史状态', () => {
+  for (const source of HISTORY_RECORD_SOURCES) {
+    const [exported] = normalizeHistoryRecords(source, [{ id: 1 }], { emptyText: '' })
+    for (const field of ['primary', 'secondary', 'summary', 'status']) {
+      assert.equal(exported[field], '', `${source.key}.${field}`)
+    }
+    const [display] = normalizeHistoryRecords(source, [{ id: 1 }])
+    assert.equal(display.primary, '未编号记录')
+    assert.equal(display.secondary, '-')
+    assert.equal(display.summary, '-')
+  }
+  const source = HISTORY_RECORD_SOURCES.find((item) => item.key === 'customers')
+  const [exported] = normalizeHistoryRecords(source, [{ id: 1, code: '-', name: '—', is_active: false, note: '-' }], { emptyText: '' })
+  assert.equal(exported.primary, '-')
+  assert.equal(exported.secondary, '—')
+  assert.equal(exported.summary, '-')
+  assert.equal(exported.status, '已停用')
+})
+
 test('历史记录源只暴露已有菜单且具备真实读取权限的对象', () => {
   const sources = getAvailableHistorySources({
     visibleMenuPaths: [

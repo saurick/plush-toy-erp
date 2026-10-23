@@ -71,9 +71,9 @@ const HISTORY_SOURCE_LOADERS = Object.freeze({
   bom_versions: listBOMVersions,
 })
 
-function formatHistoryTime(value) {
+function formatHistoryTime(value, { emptyText = '-' } = {}) {
   const timestamp = Number(value || 0)
-  if (!Number.isFinite(timestamp) || timestamp <= 0) return '-'
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return emptyText
   return new Date(timestamp * 1000).toLocaleString('zh-CN', { hour12: false })
 }
 
@@ -259,7 +259,7 @@ export default function HistoryRecordsPage() {
         dataIndex: 'updatedAt',
         width: 180,
         render: formatHistoryTime,
-        exportValue: (record) => formatHistoryTime(record.updatedAt),
+        exportValue: (record) => formatHistoryTime(record.updatedAt, { emptyText: '' }),
       },
     ],
     []
@@ -276,7 +276,7 @@ export default function HistoryRecordsPage() {
       if (!activeSource) return []
       if (activeSource.key === 'sales_orders') {
         const rows = await exportSalesOrders(listParams, { signal })
-        return normalizeHistoryRecords(activeSource, rows)
+        return normalizeHistoryRecords(activeSource, rows, { emptyText: '' })
       }
       const result = await listAllPaginatedRecords(
         HISTORY_SOURCE_LOADERS[activeSource.key],
@@ -286,7 +286,8 @@ export default function HistoryRecordsPage() {
       )
       return normalizeHistoryRecords(
         activeSource,
-        result[activeSource.responseKey]
+        result[activeSource.responseKey],
+        { emptyText: '' }
       )
     },
     [activeSource, listParams]

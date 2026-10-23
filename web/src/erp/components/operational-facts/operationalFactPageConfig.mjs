@@ -83,8 +83,8 @@ const RESERVED_DATE_FILTER_OPTIONS = [
 
 export const EMPTY_VIEW_OVERRIDES = Object.freeze({})
 
-export const financeCancelAuditText = (record) =>
-  buildFinanceCancelAuditText(record, formatUnixDate)
+export const financeCancelAuditText = (record, options) =>
+  buildFinanceCancelAuditText(record, formatUnixDate, options)
 
 const FACT_TYPE_LABELS = Object.freeze({
   MATERIAL_ISSUE: '发料',
@@ -166,14 +166,14 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
   OTHER: '其他业务',
 })
 
-function readableRef(label, value) {
+function readableRef(label, value, { emptyText = '-' } = {}) {
   return value === null || value === undefined || value === ''
-    ? '-'
+    ? emptyText
     : `${label}已关联`
 }
 
-function safeRefText(label, value) {
-  return readableRef(label, value)
+function safeRefText(label, value, options) {
+  return readableRef(label, value, options)
 }
 
 function normalizeText(value) {
@@ -193,26 +193,27 @@ function sourceColumnText(record = {}) {
   return `${sourceTypeLabel(record.source_type)} ${sourceDocumentRef(record)}`
 }
 
-function subjectColumnText(record = {}) {
+function subjectColumnText(record = {}, options = {}) {
   return [
     namedBusinessReference(record.subject_name, record.subject_code, safeRefText(
       SUBJECT_TYPE_LABELS[record.subject_type] || '业务记录',
-      record.subject_id || record.product_id
+      record.subject_id || record.product_id,
+      options
     )),
     normalizeText(record.sku_code_snapshot),
   ].filter(Boolean).join(' ')
 }
 
-function stockContextParts(record = {}) {
+function stockContextParts(record = {}, options = {}) {
   return [
-    namedBusinessReference(record.warehouse_name, record.warehouse_code, safeRefText('仓库', record.warehouse_id)),
-    normalizeText(record.lot_no) || safeRefText('批次', record.lot_id),
-    normalizeText(record.unit_name) || safeRefText('单位', record.unit_id),
+    namedBusinessReference(record.warehouse_name, record.warehouse_code, safeRefText('仓库', record.warehouse_id, options)),
+    normalizeText(record.lot_no) || safeRefText('批次', record.lot_id, options),
+    normalizeText(record.unit_name) || safeRefText('单位', record.unit_id, options),
   ]
 }
 
-function stockContextText(record = {}) {
-  return stockContextParts(record).join(' ')
+function stockContextText(record = {}, options = {}) {
+  return stockContextParts(record, options).filter(Boolean).join(' ')
 }
 
 function namedBusinessReference(name, code, fallback) {
@@ -224,26 +225,26 @@ function namedBusinessReference(name, code, fallback) {
   return normalizedName || normalizedCode || fallback
 }
 
-function reservationSalesOrderText(record = {}) {
+function reservationSalesOrderText(record = {}, { emptyText = '-' } = {}) {
   return (
     normalizeText(record.sales_order_no) ||
-    (record.sales_order_id ? '销售订单已关联' : '-')
+    (record.sales_order_id ? '销售订单已关联' : emptyText)
   )
 }
 
-function reservationSalesOrderLineText(record = {}) {
+function reservationSalesOrderLineText(record = {}, { emptyText = '-' } = {}) {
   const lineNo = Number(record.sales_order_line_no || 0)
   if (Number.isSafeInteger(lineNo) && lineNo > 0) {
     return `第 ${lineNo} 行`
   }
-  return record.sales_order_item_id ? '订单行已关联' : '-'
+  return record.sales_order_item_id ? '订单行已关联' : emptyText
 }
 
-function reservationProductParts(record = {}) {
+function reservationProductParts(record = {}, { emptyText = '-' } = {}) {
   const product = namedBusinessReference(
     record.product_name,
     record.product_code,
-    record.product_id ? '产品已关联' : '-'
+    record.product_id ? '产品已关联' : emptyText
   )
   const sku = namedBusinessReference(
     record.product_sku_name,
@@ -253,51 +254,51 @@ function reservationProductParts(record = {}) {
   return [product, sku]
 }
 
-function reservationProductText(record = {}) {
-  return reservationProductParts(record).filter(Boolean).join(' ')
+function reservationProductText(record = {}, options = {}) {
+  return reservationProductParts(record, options).filter(Boolean).join(' ')
 }
 
-function reservationWarehouseLotParts(record = {}) {
+function reservationWarehouseLotParts(record = {}, { emptyText = '-' } = {}) {
   const warehouse = namedBusinessReference(
     record.warehouse_name,
     record.warehouse_code,
-    record.warehouse_id ? '仓库已关联' : '-'
+    record.warehouse_id ? '仓库已关联' : emptyText
   )
   const lot =
     normalizeText(record.lot_no) || (record.lot_id ? '批次已关联' : '无批次')
   return [warehouse, lot]
 }
 
-function reservationWarehouseLotText(record = {}) {
-  return reservationWarehouseLotParts(record).join(' ')
+function reservationWarehouseLotText(record = {}, options = {}) {
+  return reservationWarehouseLotParts(record, options).filter(Boolean).join(' ')
 }
 
-function reservationUnitText(record = {}) {
+function reservationUnitText(record = {}, { emptyText = '-' } = {}) {
   return namedBusinessReference(
     record.unit_name,
     record.unit_code,
-    record.unit_id ? '单位已关联' : '-'
+    record.unit_id ? '单位已关联' : emptyText
   )
 }
 
-function supplierColumnText(record = {}) {
-  return record.supplier_name || safeRefText('供应商', record.supplier_id)
+function supplierColumnText(record = {}, options = {}) {
+  return record.supplier_name || safeRefText('供应商', record.supplier_id, options)
 }
 
-function customerColumnText(record = {}) {
-  return record.customer_snapshot || safeRefText('客户', record.customer_id)
+function customerColumnText(record = {}, options = {}) {
+  return record.customer_snapshot || safeRefText('客户', record.customer_id, options)
 }
 
-function counterpartyColumnText(record = {}) {
-  if (!record.counterparty_type) return '-'
-  const fallback = safeRefText('往来方', record.counterparty_id)
-  if (fallback === '-') return fallback
+function counterpartyColumnText(record = {}, { emptyText = '-' } = {}) {
+  if (!record.counterparty_type) return emptyText
+  const fallback = safeRefText('往来方', record.counterparty_id, { emptyText })
+  if (fallback === emptyText) return fallback
   const label = counterpartyTypeLabel(record.counterparty_type)
   return label === '往来方' ? fallback : `${label}已关联`
 }
 
-function factTypeLabel(value) {
-  return FACT_TYPE_LABELS[value] || (value ? '业务记录' : '-')
+function factTypeLabel(value, { emptyText = '-' } = {}) {
+  return FACT_TYPE_LABELS[value] || (value ? '业务记录' : emptyText)
 }
 
 export function sourceTypeLabel(value) {
@@ -419,7 +420,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       width: 150,
       sortValue: subjectColumnText,
       render: (_, record) => subjectColumnText(record),
-      exportValue: subjectColumnText,
+      exportValue: (record) => subjectColumnText(record, { emptyText: '' }),
     },
     {
       align: 'left',
@@ -435,7 +436,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
           secondary: [lot, unit].filter((value) => value && value !== '-').join(' '),
         })
       },
-      exportValue: stockContextText,
+      exportValue: (record) => stockContextText(record, { emptyText: '' }),
     },
     {
       align: 'right',
@@ -447,7 +448,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       sorter: (left, right) =>
         compareOperationalFactDecimalValues(left?.quantity, right?.quantity),
       render: formatQuantity,
-      exportValue: (record) => formatQuantity(record?.quantity),
+      exportValue: (record) => (record?.quantity ?? ''),
     },
   ]
 
@@ -479,9 +480,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
           record.occurred_at || record.planned_ship_at || record.reserved_at
         ),
       exportValue: (record) =>
-        formatUnixDate(
-          record.occurred_at || record.planned_ship_at || record.reserved_at
-        ),
+        formatUnixDate(record.occurred_at || record.planned_ship_at || record.reserved_at, { emptyText: '' }),
     },
     {
       align: 'left',
@@ -504,7 +503,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       width: 170,
       sortValue: counterpartyColumnText,
       render: (_, record) => counterpartyColumnText(record),
-      exportValue: counterpartyColumnText,
+      exportValue: (record) => counterpartyColumnText(record, { emptyText: '' }),
     },
     amount: {
       align: 'right',
@@ -516,7 +515,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       sorter: (left, right) =>
         compareOperationalFactDecimalValues(left?.amount, right?.amount),
       render: formatQuantity,
-      exportValue: (record) => formatQuantity(record?.amount),
+      exportValue: (record) => (record?.amount ?? ''),
     },
     fee_amount: {
       defaultHidden: true,
@@ -532,7 +531,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
           right?.fee_amount
         ),
       render: formatQuantity,
-      exportValue: (record) => formatQuantity(record?.fee_amount),
+      exportValue: (record) => (record?.fee_amount ?? ''),
     },
     currency: {
       defaultPriority: 60,
@@ -550,10 +549,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       render: (value) =>
         financeCollectionTypeText(value, FINANCE_COLLECTION_TYPE_LABELS),
       exportValue: (record) =>
-        financeCollectionTypeText(
-          record?.collection_type,
-          FINANCE_COLLECTION_TYPE_LABELS
-        ),
+        financeCollectionTypeText(record?.collection_type, FINANCE_COLLECTION_TYPE_LABELS, { emptyText: '' }),
     },
     payment_term: {
       defaultHidden: true,
@@ -570,7 +566,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       render: (_, record) =>
         financePaymentTermText(record, FINANCE_PAYMENT_TERM_LABELS),
       exportValue: (record) =>
-        financePaymentTermText(record, FINANCE_PAYMENT_TERM_LABELS),
+        financePaymentTermText(record, FINANCE_PAYMENT_TERM_LABELS, { emptyText: '' }),
     },
     due_at: {
       defaultPriority: 40,
@@ -580,7 +576,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       sorter: (left, right) =>
         Number(left?.due_at || 0) - Number(right?.due_at || 0),
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record?.due_at),
+      exportValue: (record) => formatUnixDate(record?.due_at, { emptyText: '' }),
     },
     invoice_category: {
       title: '发票类别',
@@ -590,10 +586,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       render: (value) =>
         financeInvoiceCategoryText(value, FINANCE_INVOICE_CATEGORY_LABELS),
       exportValue: (record) =>
-        financeInvoiceCategoryText(
-          record?.invoice_category,
-          FINANCE_INVOICE_CATEGORY_LABELS
-        ),
+        financeInvoiceCategoryText(record?.invoice_category, FINANCE_INVOICE_CATEGORY_LABELS, { emptyText: '' }),
     },
   }
   const financeColumnKeys =
@@ -611,7 +604,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
             width: 150,
             sortType: 'text',
             render: factTypeLabel,
-            exportValue: (record) => factTypeLabel(record?.fact_type),
+            exportValue: (record) => factTypeLabel(record?.fact_type, { emptyText: '' }),
           },
         ]),
     ...financeColumnKeys.map((key) => financeColumnByKey[key]),
@@ -622,7 +615,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       width: 180,
       sortable: false,
       render: (_, record) => financeCancelAuditText(record),
-      exportValue: financeCancelAuditText,
+      exportValue: (record) => financeCancelAuditText(record, { emptyText: '' }),
     },
     ...sourceColumns.map((column) => column.dataIndex === 'note' ? { ...column, defaultHidden: true } : column),
   ]
@@ -637,7 +630,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 170,
         sortType: 'text',
         render: factTypeLabel,
-        exportValue: (record) => factTypeLabel(record?.fact_type),
+        exportValue: (record) => factTypeLabel(record?.fact_type, { emptyText: '' }),
       },
       ...quantityColumns,
       ...sourceColumns,
@@ -651,7 +644,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 160,
         sortType: 'text',
         render: factTypeLabel,
-        exportValue: (record) => factTypeLabel(record?.fact_type),
+        exportValue: (record) => factTypeLabel(record?.fact_type, { emptyText: '' }),
       },
       {
         align: 'left',
@@ -660,7 +653,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 220,
         sortValue: supplierColumnText,
         render: (_, record) => supplierColumnText(record),
-        exportValue: supplierColumnText,
+        exportValue: (record) => supplierColumnText(record, { emptyText: '' }),
       },
       ...quantityColumns,
       ...sourceColumns,
@@ -685,7 +678,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 240,
         sortValue: customerColumnText,
         render: (_, record) => customerColumnText(record),
-        exportValue: customerColumnText,
+        exportValue: (record) => customerColumnText(record, { emptyText: '' }),
       },
       {
         align: 'right',
@@ -704,7 +697,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 190,
         sortValue: reservationSalesOrderText,
         render: (_, record) => reservationSalesOrderText(record),
-        exportValue: reservationSalesOrderText,
+        exportValue: (record) => reservationSalesOrderText(record, { emptyText: '' }),
       },
       {
         defaultPriority: 75,
@@ -712,7 +705,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 100,
         sortValue: reservationSalesOrderLineText,
         render: (_, record) => reservationSalesOrderLineText(record),
-        exportValue: reservationSalesOrderLineText,
+        exportValue: (record) => reservationSalesOrderLineText(record, { emptyText: '' }),
       },
       {
         align: 'left',
@@ -736,7 +729,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
             })
           )
         },
-        exportValue: reservationProductText,
+        exportValue: (record) => reservationProductText(record, { emptyText: '' }),
       },
       {
         align: 'left',
@@ -751,7 +744,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
             secondary: lot,
           })
         },
-        exportValue: reservationWarehouseLotText,
+        exportValue: (record) => reservationWarehouseLotText(record, { emptyText: '' }),
       },
       {
         align: 'right',
@@ -767,7 +760,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         sorter: (left, right) =>
           compareOperationalFactDecimalValues(left?.quantity, right?.quantity),
         render: formatQuantity,
-        exportValue: (record) => formatQuantity(record?.quantity),
+        exportValue: (record) => (record?.quantity ?? ''),
       },
       {
         defaultPriority: 55,
@@ -775,7 +768,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 110,
         sortValue: reservationUnitText,
         render: (_, record) => reservationUnitText(record),
-        exportValue: reservationUnitText,
+        exportValue: (record) => reservationUnitText(record, { emptyText: '' }),
       },
       {
         defaultPriority: 80,
@@ -784,7 +777,7 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
         width: 120,
         sortType: 'number',
         render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record?.reserved_at),
+        exportValue: (record) => formatUnixDate(record?.reserved_at, { emptyText: '' }),
       },
       {
         align: 'left',

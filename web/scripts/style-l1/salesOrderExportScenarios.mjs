@@ -16,6 +16,16 @@ const orders = Array.from({ length: 251 }, (_, index) => ({
   created_at: 1700000000,
   item_count: 1,
   version: 1,
+  ...(index === 0 ? {
+    order_date: 0,
+    planned_delivery_date: null,
+    goods_amount: '0',
+    tax_amount: '0',
+    order_total: '0',
+    payment_method: '月结',
+    payment_term_days: 0,
+    sales_owner: '跟单-甲',
+  } : {}),
 }))
 
 export function createSalesOrderExportScenarios({ assert, customerRuntimeEffectiveSession, outputDir, path }) {
@@ -66,6 +76,71 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
   return [
     {
       ...base,
+      path: '/erp/purchase/accessories',
+      name: 'purchase-order-export-empty-values',
+      beforeNavigate: async (page) => {
+        const rows = [{
+          id: 8801,
+          purchase_order_no: 'PO-EXPORT-EMPTY',
+          supplier_id: 1,
+          supplier_snapshot: { name: '导出模拟供应商' },
+          lifecycle_status: 'draft',
+          currency: 'CNY',
+          purchase_date: 0,
+          expected_arrival_date: null,
+          supplier_confirmed_arrival_date: 0,
+          payment_method: '月结',
+          payment_term_days: 0,
+          invoice_required: false,
+          delivery_address: '-',
+          items: [],
+        }]
+        page.purchaseExportRows = rows
+        await page.route('**/rpc/purchase_order', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_purchase_orders') return route.fallback()
+          await route.fulfill({ json: {
+            jsonrpc: '2.0',
+            id,
+            result: styleRpcResult(stylePaginatedRpcData(rows, 'purchase_orders', params)),
+          } })
+        })
+      },
+      verify: async (page) => {
+        await page.getByText('PO-EXPORT-EMPTY', { exact: true }).waitFor()
+        const downloadPromise = page.waitForEvent('download')
+        await openExport(page)
+        const download = await downloadPromise
+        const csv = await readFile(await download.path(), 'utf8')
+        await download.saveAs(path.join(outputDir, 'purchase-order-empty-values.csv'))
+        const [header, values] = csv.replace(/^\uFEFF/u, '').split('\n').map((line) => line.split(','))
+        const row = Object.fromEntries(header.map((label, index) => [label, values[index]]))
+        for (const label of ['下单日期', '预计到货日期', '供应商确认到货日期']) {
+          assert.equal(row[label], '', `${label} 缺失时必须导出空单元格`)
+        }
+        assert.equal(row['采购单号'], 'PO-EXPORT-EMPTY')
+        assert.equal(row['付款条件'], '月结 0天')
+        assert.equal(row['发票要求'], '不需要发票')
+        assert.equal(row['收货地址'], "'-", '真实横杠保留并继续执行 CSV 公式防护')
+        await page.getByText('已导出 1 条采购订单', { exact: true }).waitFor()
+        page.purchaseExportRows[0] = { ...page.purchaseExportRows[0], supplier_id: 0, supplier_snapshot: {} }
+        await page.getByText('到货计划', { exact: true }).click()
+        await page.getByText('供应商未填写', { exact: true }).waitFor()
+        const arrivalDownloadPromise = page.waitForEvent('download')
+        await page.getByRole('button', { name: '导出当前结果', exact: true }).click()
+        const arrivalDownload = await arrivalDownloadPromise
+        await arrivalDownload.saveAs(path.join(outputDir, 'purchase-arrival-empty-values.csv'))
+        const [arrivalHeader, arrivalValues] = (await readFile(await arrivalDownload.path(), 'utf8'))
+          .replace(/^\uFEFF/u, '').split('\n').map((line) => line.split(','))
+        const arrivalRow = Object.fromEntries(arrivalHeader.map((label, index) => [label, arrivalValues[index]]))
+        assert.equal(arrivalRow['供应商'], '')
+        assert.equal(arrivalRow['到货日期'], '')
+        assert.equal(arrivalRow['日期确认'], '待供应商确认')
+        assert.equal(arrivalRow['交期提醒'], '未填到货日')
+      },
+    },
+    {
+      ...base,
       name: 'sales-order-export-snapshot',
       verify: async (page) => {
         await page.getByText('EXPORT-001', { exact: true }).waitFor()
@@ -87,6 +162,14 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
         const csv = await readFile(await (await download).path(), 'utf8')
         assert(csv.includes('EXPORT-251'), 'CSV 必须包含正常分页以外的订单')
         assert.equal(csv.trim().split('\n').length, 252)
+        const [header, firstRow] = csv.replace(/^\uFEFF/u, '').split('\n').map((line) => line.split(','))
+        const exported = Object.fromEntries(header.map((label, index) => [label, firstRow[index]]))
+        for (const label of ['下单日期', '计划交付日期', '联系人', '收货信息', '计税信息', '运费条件']) {
+          assert.equal(exported[label], '', `${label} 缺失时必须导出空单元格`)
+        }
+        assert.equal(exported['付款条件'], '月结 0天')
+        assert.equal(exported['订单总额'], 'CNY 0.00')
+        assert.equal(exported['业务员（跟单人）'], '跟单-甲')
         const { limit: _limit, offset: _offset, include_status_counts: _counts, ...filters } = state.listRequests.at(-1)
         assert.deepEqual(state.requests[0], filters, '导出必须保留当前列表条件且不能分页')
         await page.getByText('已导出 251 条销售订单', { exact: true }).waitFor()
@@ -134,6 +217,8 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
         assert.deepEqual(page.salesExportState.requests, [{ keyword: 'EXPORT', lifecycle_scope: 'history' }])
         assert.equal(csv.trim().split('\n').length, 252)
         assert(csv.includes('EXPORT-251') && csv.includes('已关闭'))
+        const [header, , secondRow] = csv.replace(/^\uFEFF/u, '').split('\n').map((line) => line.split(','))
+        assert.equal(secondRow[header.indexOf('摘要')], '')
       },
     },
     {
@@ -147,7 +232,7 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
       beforeNavigate: async (page) => {
         await beforeNavigate(page)
         page.customerHistoryRequests = []
-        const rows = Array.from({ length: 201 }, (_, index) => ({ id: index + 1, code: `HISTORY-${index+1}`, name: '历史模拟客户', is_active: false }))
+        const rows = Array.from({ length: 201 }, (_, index) => ({ id: index + 1, code: `HISTORY-${index + 1}`, name: '历史模拟客户', is_active: false }))
         await page.route('**/rpc/masterdata', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           if (method !== 'list_customers') return route.fallback()
@@ -162,6 +247,9 @@ export function createSalesOrderExportScenarios({ assert, customerRuntimeEffecti
         const csv = await readFile(await (await download).path(), 'utf8')
         assert(csv.includes('HISTORY-201'))
         assert.equal(csv.trim().split('\n').length, 202)
+        const [header, firstRow] = csv.replace(/^\uFEFF/u, '').split('\n').map((line) => line.split(','))
+        assert.equal(firstRow[header.indexOf('摘要')], '')
+        assert.equal(firstRow[header.indexOf('最后更新')], '')
         const requests = page.customerHistoryRequests.filter((params) => params.limit === 200)
         assert.deepEqual(requests.map((params) => params.offset), [0, 200])
         assert(requests.every((params) => params.lifecycle_scope === 'history'))

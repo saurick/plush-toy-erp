@@ -116,24 +116,24 @@ const PURCHASE_INVOICE_CATEGORY_LABELS = Object.freeze(
   )
 )
 
-export function salesOrderTaxModeText(value) {
+export function salesOrderTaxModeText(value, { emptyText = '未填写' } = {}) {
   const key = String(value || '')
     .trim()
     .toUpperCase()
-  return SALES_ORDER_TAX_MODE_LABELS[key] || (key ? '税费方式待核对' : '未填写')
+  return SALES_ORDER_TAX_MODE_LABELS[key] || (key ? '税费方式待核对' : emptyText)
 }
 
-export function salesOrderFreightTermsText(value) {
+export function salesOrderFreightTermsText(value, { emptyText = '未填写' } = {}) {
   const key = String(value || '')
     .trim()
     .toUpperCase()
   return (
-    SALES_ORDER_FREIGHT_TERMS_LABELS[key] || (key ? '运费条件待核对' : '未填写')
+    SALES_ORDER_FREIGHT_TERMS_LABELS[key] || (key ? '运费条件待核对' : emptyText)
   )
 }
 
-export function purchaseInvoicePreferenceText(required, category) {
-  if (required === null || required === undefined) return '未填写'
+export function purchaseInvoicePreferenceText(required, category, { emptyText = '未填写' } = {}) {
+  if (required === null || required === undefined) return emptyText
   if (required === false) return '不需要发票'
   const key = String(category || '')
     .trim()
@@ -264,10 +264,10 @@ export function formatProductUnitNetWeight(value) {
   return `${weight} 克`
 }
 
-export function formatUnixDateTime(value) {
+export function formatUnixDateTime(value, { emptyText = '-' } = {}) {
   const timestamp = Number(value || 0)
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return '-'
+    return emptyText
   }
   return new Date(timestamp * 1000).toLocaleString('zh-CN', {
     year: 'numeric',
@@ -350,9 +350,9 @@ export function normalizeOutsourcingLineFormValue(item = {}) {
   }
 }
 
-export function statusText(status, labels = {}, fallback = '业务状态') {
+export function statusText(status, labels = {}, fallback = '业务状态', { emptyText = '-' } = {}) {
   const key = String(status || '').trim()
-  if (!key) return '-'
+  if (!key) return emptyText
   return labels[key] || fallback
 }
 
@@ -482,10 +482,10 @@ export function buildMaterialDraftCode(records = [], now = new Date()) {
   })
 }
 
-export function formatUnixDate(value) {
+export function formatUnixDate(value, { emptyText = '-' } = {}) {
   const timestamp = Number(value || 0)
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return '-'
+    return emptyText
   }
   return new Date(timestamp * 1000).toLocaleDateString('zh-CN', {
     year: 'numeric',

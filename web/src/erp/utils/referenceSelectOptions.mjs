@@ -43,9 +43,9 @@ export function uniqueReferenceOptions(records, toOption) {
   return toOption === unitOption ? sortUnitOptions(options) : options
 }
 
-export function referenceLabel(options, value, fallbackPrefix = '记录') {
+export function referenceLabel(options, value, fallbackPrefix = '记录', { emptyText = '-' } = {}) {
   const normalizedValue = positiveID(value)
-  if (!normalizedValue) return '-'
+  if (!normalizedValue) return emptyText
   const matched = (Array.isArray(options) ? options : []).find(
     (option) => option?.value === normalizedValue
   )

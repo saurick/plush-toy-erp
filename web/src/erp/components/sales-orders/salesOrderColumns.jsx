@@ -57,10 +57,10 @@ function moneyText(value, currency, fallback = '-') {
   )}`.trim()
 }
 
-function taxTermsText(record = {}) {
-  const mode = salesOrderTaxModeText(record.tax_mode)
+function taxTermsText(record = {}, options = {}) {
+  const mode = salesOrderTaxModeText(record.tax_mode, options)
   const rate = String(record.tax_rate ?? '').trim()
-  return rate ? `${mode} ${rate}%` : mode
+  return rate ? [mode, `${rate}%`].filter(Boolean).join(' ') : mode
 }
 
 function quotedFreightText(record = {}, fallback = '-') {
@@ -71,12 +71,12 @@ function quotedFreightText(record = {}, fallback = '-') {
   return moneyText(record.quoted_freight_amount, record.currency, fallback)
 }
 
-function deliveryText(snapshot = {}) {
+function deliveryText(snapshot = {}, fallback = '-') {
   const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
   return (
     [source.country_region, source.recipient, source.phone, source.address]
       .filter(Boolean)
-      .join(' ') || '-'
+      .join(' ') || fallback
   )
 }
 
@@ -178,7 +178,7 @@ export function buildSalesOrderColumns() {
           secondary={value?.mobile || value?.phone}
         />
       ),
-      exportValue: (record) => contactText(record?.contact_snapshot),
+      exportValue: (record) => contactText(record?.contact_snapshot, ''),
     },
     {
       defaultPriority: 60,
@@ -210,7 +210,7 @@ export function buildSalesOrderColumns() {
       width: 200,
       sorter: (a, b) => compareText(taxTermsText(a), taxTermsText(b)),
       render: (_, record) => taxTermsText(record),
-      exportValue: taxTermsText,
+      exportValue: (record) => taxTermsText(record, { emptyText: '' }),
     },
     {
       align: 'right',
@@ -248,7 +248,7 @@ export function buildSalesOrderColumns() {
       sorter: (a, b) => compareText(a?.freight_terms, b?.freight_terms),
       render: salesOrderFreightTermsText,
       exportValue: (record) =>
-        salesOrderFreightTermsText(record?.freight_terms),
+        salesOrderFreightTermsText(record?.freight_terms, { emptyText: '' }),
     },
     {
       align: 'right',
@@ -274,7 +274,7 @@ export function buildSalesOrderColumns() {
       sorter: (a, b) =>
         compareText(formatPaymentCondition(a), formatPaymentCondition(b)),
       render: (_, record) => formatPaymentCondition(record),
-      exportValue: formatPaymentCondition,
+      exportValue: (record) => formatPaymentCondition(record, { emptyText: '' }),
     },
     {
       defaultPriority: 100,
@@ -284,7 +284,7 @@ export function buildSalesOrderColumns() {
       width: 120,
       sorter: (a, b) => compareNumber(a?.order_date, b?.order_date),
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record?.order_date),
+      exportValue: (record) => formatUnixDate(record?.order_date, { emptyText: '' }),
     },
     {
       defaultPriority: 40,
@@ -296,7 +296,7 @@ export function buildSalesOrderColumns() {
       sorter: (a, b) =>
         compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
+      exportValue: (record) => formatUnixDate(record?.planned_delivery_date, { emptyText: '' }),
     },
     {
       align: 'left',
@@ -311,7 +311,7 @@ export function buildSalesOrderColumns() {
           deliveryText(b?.delivery_snapshot)
         ),
       render: (value) => <DeliveryInfoCell snapshot={value} />,
-      exportValue: (record) => deliveryText(record?.delivery_snapshot),
+      exportValue: (record) => deliveryText(record?.delivery_snapshot, ''),
     },
     {
       defaultPriority: 80,
@@ -331,7 +331,7 @@ export function buildSalesOrderColumns() {
       sorter: (a, b) => compareText(a?.lifecycle_status, b?.lifecycle_status),
       render: salesOrderStatusTag,
       exportValue: (record) =>
-        statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
+        statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS, undefined, { emptyText: '' }),
     },
   ])
 }
@@ -509,7 +509,7 @@ export function buildSalesOrderItemColumns() {
       sorter: (a, b) =>
         compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
+      exportValue: (record) => formatUnixDate(record?.planned_delivery_date, { emptyText: '' }),
     },
     {
       title: '行状态',
@@ -519,7 +519,7 @@ export function buildSalesOrderItemColumns() {
       sorter: (a, b) => compareText(a?.line_status, b?.line_status),
       render: lineStatusTag,
       exportValue: (record) =>
-        statusText(record?.line_status, SALES_ORDER_ITEM_STATUS_LABELS),
+        statusText(record?.line_status, SALES_ORDER_ITEM_STATUS_LABELS, undefined, { emptyText: '' }),
     },
   ]
 }

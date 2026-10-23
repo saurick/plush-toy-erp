@@ -16,6 +16,7 @@ function shouldProtectCSVText(value) {
 }
 
 export function protectCSVCellValue(value) {
+  if (typeof value === 'string' && value.trim() === '') return ''
   if (typeof value === 'string' && shouldProtectCSVText(value)) {
     return `'${value}`
   }

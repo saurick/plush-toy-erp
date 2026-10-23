@@ -23,11 +23,11 @@ import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
 import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'
-import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import {
-  currentBusinessDate,
-  unixSecondsToBusinessDate,
-} from '../../utils/businessDate.mjs'
+  hasActionPermission,
+  unixToDateInputValue,
+} from '../../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import {
   readSalesSummaryFilters,
   SALES_SUMMARY_STATUSES,
@@ -35,9 +35,9 @@ import {
 } from '../../utils/workbenchSummary.mjs'
 
 const valueOrDash = (value) => value ?? '—'
-const dateLabel = (value) => unixSecondsToBusinessDate(value) || '—'
-const productName = (row) =>
-  row.requested_product_name || row.product_name_snapshot || '未填写产品名称'
+const dateLabel = (value) => unixToDateInputValue(value) || '—'
+const productName = (row, { emptyText = '未填写产品名称' } = {}) =>
+  row.requested_product_name || row.product_name_snapshot || emptyText
 
 const statusLabel = (row) => {
   const order =
@@ -108,7 +108,7 @@ export default function SalesOrderSummaryPanel({
         dataIndex: 'order_date',
         width: 120,
         render: dateLabel,
-        exportValue: (row) => dateLabel(row.order_date),
+        exportValue: (row) => unixToDateInputValue(row.order_date),
       },
       { align: 'left', title: '客户', dataIndex: 'customer_name', width: 150 },
       {
@@ -159,7 +159,7 @@ export default function SalesOrderSummaryPanel({
             <span>{productName(row)}</span>
           </span>
         ),
-        exportValue: productName,
+        exportValue: (record) => productName(record, { emptyText: '' }),
       },
       {
         title: '订单数量',
@@ -185,7 +185,7 @@ export default function SalesOrderSummaryPanel({
         dataIndex: 'planned_delivery_date',
         width: 140,
         render: dateLabel,
-        exportValue: (row) => dateLabel(row.planned_delivery_date),
+        exportValue: (row) => unixToDateInputValue(row.planned_delivery_date),
       },
       {
         title: '未出货数',
@@ -207,7 +207,7 @@ export default function SalesOrderSummaryPanel({
         width: 90,
         render: (value) => (value === 'REPEAT' ? '返单' : '新单'),
         exportValue: (row) =>
-          row.order_category === 'REPEAT' ? '返单' : '新单',
+          row.order_category ? row.order_category === 'REPEAT' ? '返单' : '新单' : '',
       },
       ...(hasActionPermission(adminProfile, PermissionCode.FIELD_SALES_COMMERCIAL_READ)
         ? [

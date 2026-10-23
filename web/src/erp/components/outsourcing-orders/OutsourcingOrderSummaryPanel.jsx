@@ -30,11 +30,9 @@ import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActi
 import {
   hasActionPermission,
   OUTSOURCING_ORDER_STATUS_LABELS,
+  unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
-import {
-  currentBusinessDate,
-  unixSecondsToBusinessDate,
-} from '../../utils/businessDate.mjs'
+import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import {
   readOutsourcingSummaryFilters,
   updateOutsourcingSummarySearch,
@@ -46,7 +44,7 @@ import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 const valueOrDash = (value) =>
   value === undefined || value === null || value === '' ? '—' : value
-const dateLabel = (value) => unixSecondsToBusinessDate(value) || '—'
+const dateLabel = (value) => unixToDateInputValue(value) || '—'
 
 export default forwardRef((
   { adminProfile, supplierOptions, processOptions, onOpenContract },
@@ -226,14 +224,14 @@ export default forwardRef((
         dataIndex: 'expected_return_date',
         width: 140,
         render: dateLabel,
-        exportValue: (row) => dateLabel(row.expected_return_date),
+        exportValue: (row) => unixToDateInputValue(row.expected_return_date),
       },
       {
         title: '下单日期',
         dataIndex: 'order_date',
         width: 120,
         render: dateLabel,
-        exportValue: (row) => dateLabel(row.order_date),
+        exportValue: (row) => unixToDateInputValue(row.order_date),
       },
       {
         title: '加工品类',
@@ -242,7 +240,7 @@ export default forwardRef((
         width: 120,
         render: (value) => (value === 'MATERIAL' ? '材料' : '产品 / 半成品'),
         exportValue: (row) =>
-          row.subject_type === 'MATERIAL' ? '材料' : '产品 / 半成品',
+          row.subject_type ? row.subject_type === 'MATERIAL' ? '材料' : '产品 / 半成品' : '',
       },
       {
         title: '产品规格',

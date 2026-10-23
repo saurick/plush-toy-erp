@@ -32,5 +32,5 @@ test('历史记录中心保留来源与查询地址，失败关闭旧记录并�
   assert.match(source, /listAllPaginatedRecords/u)
   assert.match(source, /onOpenRecord=\{openDetail\}/u)
   assert.match(source, /useBusinessColumnOrder/u)
-  assert.match(source, /activeSource\.key === 'sales_orders'[\s\S]*?await exportSalesOrders\(listParams, \{ signal \}\)[\s\S]*?normalizeHistoryRecords\(activeSource, rows\)/u)
+  assert.match(source, /activeSource\.key === 'sales_orders'[\s\S]*?await exportSalesOrders\(listParams, \{ signal \}\)[\s\S]*?normalizeHistoryRecords\(activeSource, rows, \{ emptyText: '' \}\)/u)
 })

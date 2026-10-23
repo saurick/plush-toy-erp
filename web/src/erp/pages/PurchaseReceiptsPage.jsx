@@ -141,12 +141,12 @@ const STATUS_COLORS = Object.freeze({
 const DATE_FILTER_OPTIONS = [{ label: '入库日期', value: 'received_at' }]
 const REFERENCE_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
-function receiptStatusLabel(status, record) {
+function receiptStatusLabel(status, record, { emptyText = '-' } = {}) {
   const key = String(status || '').trim()
   if (key === PurchaseReceiptStatus.POSTED && Number(record?.pending_inbound_lines) > 0) {
     return '部分入库'
   }
-  return STATUS_LABELS[key] || (key ? '入库状态' : '-')
+  return STATUS_LABELS[key] || (key ? '入库状态' : emptyText)
 }
 
 function statusTag(status, record) {
@@ -930,7 +930,7 @@ export default function PurchaseReceiptsPage() {
           width: 110,
           sortType: 'text',
           render: statusTag,
-          exportValue: (record) => receiptStatusLabel(record?.status, record),
+          exportValue: (record) => receiptStatusLabel(record?.status, record, { emptyText: '' }),
         },
         {
           align: 'left',
@@ -950,7 +950,7 @@ export default function PurchaseReceiptsPage() {
           width: 130,
           sortType: 'date',
           render: formatUnixDate,
-          exportValue: (record) => formatUnixDate(record?.received_at),
+          exportValue: (record) => formatUnixDate(record?.received_at, { emptyText: '' }),
         },
         {
           defaultPriority: 70,
@@ -960,7 +960,7 @@ export default function PurchaseReceiptsPage() {
           width: 170,
           sortType: 'date',
           render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.posted_at),
+          exportValue: (record) => formatUnixDateTime(record?.posted_at, { emptyText: '' }),
         },
         {
           align: 'right',
@@ -987,7 +987,7 @@ export default function PurchaseReceiptsPage() {
           render: (_, record) =>
             formatUnitQuantitySummary(record.items, 'quantity', unitOptions),
           exportValue: (record) =>
-            formatUnitQuantitySummary(record.items, 'quantity', unitOptions),
+            formatUnitQuantitySummary(record.items, 'quantity', unitOptions, { emptyText: '' }),
         },
         {
           align: 'left',

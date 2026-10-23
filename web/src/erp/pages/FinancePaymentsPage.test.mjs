@@ -74,7 +74,7 @@ test('finance payments: exports complete active-tab filters with readable values
   for (const text of [
     'exportValue: paymentAllocationExportValue',
     'paymentStatusLabel(record?.status)',
-    'formatUnixDateTime(record?.occurred_at)',
+    "formatUnixDateTime(record?.occurred_at, { emptyText: '' })",
     'financeFactTypeLabel(record?.finance_fact_type)',
     'creditStatusLabel(record?.status)',
   ]) {

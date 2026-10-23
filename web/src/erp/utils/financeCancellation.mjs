@@ -28,9 +28,9 @@ export function validateFinanceCancellationResult(task, request) {
   return task
 }
 
-export function financeCancelAuditText(record, formatUnixDate) {
+export function financeCancelAuditText(record, formatUnixDate, { emptyText = '-' } = {}) {
   if (record?.status !== OperationalFactStatus.CANCELLED) {
-    return '-'
+    return emptyText
   }
   const actor = String(record?.cancelled_by_name || '').trim()
   const reason = String(record?.cancel_reason || '').trim()

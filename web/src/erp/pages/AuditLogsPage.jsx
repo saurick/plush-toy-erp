@@ -179,7 +179,7 @@ function normalizeAuditEvents(events = []) {
     : []
 }
 
-function formatTime(event = {}) {
+function formatTime(event = {}, { emptyText = '-' } = {}) {
   if (event.created_at_iso) {
     const date = new Date(event.created_at_iso)
     if (!Number.isNaN(date.getTime())) {
@@ -190,29 +190,29 @@ function formatTime(event = {}) {
   if (unix > 0) {
     return new Date(unix * 1000).toLocaleString('zh-CN', { hour12: false })
   }
-  return '-'
+  return emptyText
 }
 
-function getActorText(payload = {}) {
+function getActorText(payload = {}, { emptyText = '-' } = {}) {
   const actor = payload.actor || {}
   const identity = formatAdminIdentity(actor, { fallback: '' })
   if (identity) return identity
   if (actor.id) {
     return '管理员'
   }
-  return '-'
+  return emptyText
 }
 
-function getEventActorText(event = {}) {
+function getEventActorText(event = {}, { emptyText = '-' } = {}) {
   return (
     event.actor_label ||
-    getActorText(event.payload) ||
+    getActorText(event.payload, { emptyText }) ||
     event.actor_name ||
-    event.payload?.actor?.username
+    event.payload?.actor?.username || emptyText
   )
 }
 
-function getTargetText(payload = {}) {
+function getTargetText(payload = {}, { emptyText = '-' } = {}) {
   const target = payload.target || {}
   const targetType = String(target.type || '').trim()
   if (targetType === 'admin_user') {
@@ -243,13 +243,13 @@ function getTargetText(payload = {}) {
         workflow_task: '待办事项已记录',
       }[targetType] || '相关内容已记录'
     : ''
-  return key || readableTaskKey || id || '-'
+  return key || readableTaskKey || id || emptyText
 }
 
-function getEventTargetText(event = {}) {
+function getEventTargetText(event = {}, options = {}) {
   return getVisibleAuditText(
     event.target_label || event.target_name,
-    getTargetText(event.payload)
+    getTargetText(event.payload, options)
   )
 }
 
@@ -308,8 +308,8 @@ function getActionMeta(event = {}) {
   }
 }
 
-function getSourceLabel(source) {
-  return sourceLabelMap[source] || (source ? '其他系统操作' : '-')
+function getSourceLabel(source, { emptyText = '-' } = {}) {
+  return sourceLabelMap[source] || (source ? '其他系统操作' : emptyText)
 }
 
 function buildAuditConclusion(event = {}) {
@@ -567,14 +567,14 @@ export default function AuditLogsPage() {
         key: 'time',
         width: 175,
         render: (_, record) => formatTime(record),
-        exportValue: formatTime,
+        exportValue: (record) => formatTime(record, { emptyText: '' }),
       },
       {
         title: '操作人',
         key: 'actor',
         width: 160,
         render: (_, record) => getEventActorText(record),
-        exportValue: getEventActorText,
+        exportValue: (record) => getEventActorText(record, { emptyText: '' }),
       },
       {
         title: '动作',
@@ -597,7 +597,7 @@ export default function AuditLogsPage() {
         key: 'target',
         width: 180,
         render: (_, record) => getEventTargetText(record),
-        exportValue: getEventTargetText,
+        exportValue: (record) => getEventTargetText(record, { emptyText: '' }),
       },
       {
         title: '风险',
@@ -615,7 +615,7 @@ export default function AuditLogsPage() {
         dataIndex: 'source',
         width: 130,
         render: getSourceLabel,
-        exportValue: (record) => getSourceLabel(record.source),
+        exportValue: (record) => getSourceLabel(record.source, { emptyText: '' }),
       },
       {
         title: '变化摘要',

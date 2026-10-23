@@ -193,8 +193,8 @@ function queryFromSearchParams(params) {
   }
 }
 
-function displayTime(value) {
-  if (!value) return '-'
+function displayTime(value, { emptyText = '-' } = {}) {
+  if (!value) return emptyText
   return new Date(value * 1000).toLocaleString('zh-CN', { hour12: false })
 }
 
@@ -1548,14 +1548,14 @@ export default function ProductionOrdersPage() {
         dataIndex: 'planned_start_at',
         width: 150,
         render: displayTime,
-        exportValue: (record) => displayTime(record?.planned_start_at),
+        exportValue: (record) => displayTime(record?.planned_start_at, { emptyText: '' }),
       },
       {
         title: '计划结束',
         dataIndex: 'planned_end_at',
         width: 150,
         render: displayTime,
-        exportValue: (record) => displayTime(record?.planned_end_at),
+        exportValue: (record) => displayTime(record?.planned_end_at, { emptyText: '' }),
       },
       {
         align: 'left',

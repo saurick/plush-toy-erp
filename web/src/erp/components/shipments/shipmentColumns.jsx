@@ -35,9 +35,9 @@ const SHIPMENT_STATUS_COLORS = Object.freeze({
   [ShipmentStatus.CANCELLED]: 'red',
 })
 
-export function shipmentStatusText(status) {
+export function shipmentStatusText(status, { emptyText = '-' } = {}) {
   const key = String(status || '').trim()
-  return SHIPMENT_STATUS_LABELS[key] || (key ? '出货状态' : '-')
+  return SHIPMENT_STATUS_LABELS[key] || (key ? '出货状态' : emptyText)
 }
 
 export function shipmentStatusTag(status) {
@@ -49,31 +49,34 @@ export function shipmentStatusTag(status) {
   )
 }
 
-function deliveryText(snapshot = {}) {
+function deliveryText(snapshot = {}, { emptyText = '-' } = {}) {
   const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
   return (
     [source.country_region, source.recipient, source.phone, source.address]
       .filter(Boolean)
-      .join(' ') || '-'
+      .join(' ') || emptyText
   )
 }
 
-function transportText(record = {}) {
+function transportText(record = {}, { emptyText = '-' } = {}) {
   return (
     [record.transport_method, record.carrier_name, record.tracking_no]
       .filter(Boolean)
-      .join(' ') || '-'
+      .join(' ') || emptyText
   )
 }
 
-function packageText(record = {}) {
+function packageText(record = {}, { emptyText = '-', includeZero = false } = {}) {
   const packageCount = Number(record.package_count || 0)
+  const hasPackageCount = packageCount > 0 || (
+    includeZero && record.package_count != null && String(record.package_count).trim() !== ''
+  )
   const parts = [
-    packageCount > 0 ? `${packageCount} 件 / 箱` : '',
-    record.gross_weight_kg ? `毛重 ${record.gross_weight_kg} 千克` : '',
-    record.volume_m3 ? `体积 ${record.volume_m3} 立方米` : '',
+    hasPackageCount ? `${packageCount} 件 / 箱` : '',
+    record.gross_weight_kg || (includeZero && record.gross_weight_kg === 0) ? `毛重 ${record.gross_weight_kg} 千克` : '',
+    record.volume_m3 || (includeZero && record.volume_m3 === 0) ? `体积 ${record.volume_m3} 立方米` : '',
   ]
-  return parts.filter(Boolean).join(' ') || '-'
+  return parts.filter(Boolean).join(' ') || emptyText
 }
 
 function freightText(record = {}, fallback = '-') {
@@ -97,11 +100,11 @@ function shipmentWeightText(value, record) {
   return `${weight} 克`
 }
 
-function shipmentDatesText(record = {}) {
-  const planned = formatUnixDate(record.planned_ship_at)
-  const actual = formatUnixDate(record.shipped_at)
-  if (planned === '-' && actual === '-') return '-'
-  return `计划 ${planned}\n实际 ${actual}`
+function shipmentDatesText(record = {}, { emptyText = '-' } = {}) {
+  const planned = formatUnixDate(record.planned_ship_at, { emptyText })
+  const actual = formatUnixDate(record.shipped_at, { emptyText })
+  if (planned === emptyText && actual === emptyText) return emptyText
+  return [planned && `计划 ${planned}`, actual && `实际 ${actual}`].filter(Boolean).join('\n')
 }
 
 export function buildShipmentColumns({ salesOrdersByID }) {
@@ -123,7 +126,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       width: 110,
       sortValue: (record) => shipmentStatusText(record.status),
       render: shipmentStatusTag,
-      exportValue: (record) => shipmentStatusText(record?.status),
+      exportValue: (record) => shipmentStatusText(record?.status, { emptyText: '' }),
     },
     {
       align: 'left',
@@ -205,7 +208,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       width: 360,
       sortValue: (record) => deliveryText(record?.delivery_snapshot),
       render: (value) => <DeliveryInfoCell snapshot={value} />,
-      exportValue: (record) => deliveryText(record?.delivery_snapshot),
+      exportValue: (record) => deliveryText(record?.delivery_snapshot, { emptyText: '' }),
     },
     {
       align: 'left',
@@ -225,7 +228,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
           secondary={record.tracking_no}
         />
       ),
-      exportValue: transportText,
+      exportValue: (record) => transportText(record, { emptyText: '' }),
     },
     {
       align: 'left',
@@ -236,7 +239,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       width: 280,
       sortable: false,
       render: (_, record) => packageText(record),
-      exportValue: packageText,
+      exportValue: (record) => packageText(record, { emptyText: '', includeZero: true }),
     },
     {
       align: 'right',
@@ -272,7 +275,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
           {shipmentDatesText(record)}
         </span>
       ),
-      exportValue: shipmentDatesText,
+      exportValue: (record) => shipmentDatesText(record, { emptyText: '' }),
     },
     {
       align: 'left',

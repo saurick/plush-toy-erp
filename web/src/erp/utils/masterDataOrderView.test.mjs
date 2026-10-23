@@ -1316,11 +1316,11 @@ test('FL_shipment_ship_date__retains_planned_and_actual_ship_dates masterDataOrd
   )
   assert.match(
     shipmentColumnsSource,
-    /formatUnixDate\(record\.planned_ship_at\)/u
+    /formatUnixDate\(record\.planned_ship_at, \{ emptyText \}\)/u
   )
   assert.match(
     shipmentColumnsSource,
-    /formatUnixDate\(\s*record\.shipped_at\s*\)/u
+    /formatUnixDate\(record\.shipped_at, \{ emptyText \}\)/u
   )
   assert.match(
     shipmentColumnsSource,
@@ -3098,6 +3098,9 @@ test('masterDataOrderView: status display and snapshots are read models only', (
     { id: 9, code: 'C009', name: '客户九' }
   )
   assert.equal(unixToDateInputValue(1780185600), '2026-05-31')
+  for (const value of [undefined, null, '', 0, '0']) {
+    assert.equal(unixToDateInputValue(value), '')
+  }
   assert.equal(formatUnixDateTime(0), '-')
   assert.match(formatUnixDateTime(1780185600), /2026.*05.*31/)
 })

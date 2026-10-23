@@ -56,7 +56,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       width: 160,
       sortValue: resolveSupplierName,
       render: (_value, record) => resolveSupplierName(record),
-      exportValue: (record) => resolveSupplierName(record),
+      exportValue: (record) => record?.supplier_id || record?.supplier_snapshot?.name || record?.supplier_snapshot?.short_name ? resolveSupplierName(record) : '',
     },
     {
       defaultPriority: 30,
@@ -68,7 +68,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
         statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
       render: statusTag,
       exportValue: (record) =>
-        statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
+        statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS, undefined, { emptyText: '' }),
     },
     {
       defaultPriority: 70,
@@ -89,7 +89,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       sorter: (a, b) =>
         compareText(formatPaymentCondition(a), formatPaymentCondition(b)),
       render: (_, record) => formatPaymentCondition(record),
-      exportValue: formatPaymentCondition,
+      exportValue: (record) => formatPaymentCondition(record, { emptyText: '' }),
     },
     {
       defaultPriority: 90,
@@ -114,10 +114,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
           record?.invoice_category
         ),
       exportValue: (record) =>
-        purchaseInvoicePreferenceText(
-          record?.invoice_required,
-          record?.invoice_category
-        ),
+        purchaseInvoicePreferenceText(record?.invoice_required, record?.invoice_category, { emptyText: '' }),
     },
     {
       defaultPriority: 60,
@@ -127,7 +124,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       width: 130,
       sorter: (a, b) => compareNumber(a?.purchase_date, b?.purchase_date),
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record?.purchase_date),
+      exportValue: (record) => formatUnixDate(record?.purchase_date, { emptyText: '' }),
     },
     {
       defaultPriority: 40,
@@ -138,7 +135,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       sorter: (a, b) =>
         compareNumber(a?.expected_arrival_date, b?.expected_arrival_date),
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record?.expected_arrival_date),
+      exportValue: (record) => formatUnixDate(record?.expected_arrival_date, { emptyText: '' }),
     },
     {
       defaultPriority: 50,
@@ -153,7 +150,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
         ),
       render: formatUnixDate,
       exportValue: (record) =>
-        formatUnixDate(record?.supplier_confirmed_arrival_date),
+        formatUnixDate(record?.supplier_confirmed_arrival_date, { emptyText: '' }),
     },
     {
       align: 'left',

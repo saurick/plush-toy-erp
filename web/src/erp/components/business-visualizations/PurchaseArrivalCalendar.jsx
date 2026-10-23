@@ -29,15 +29,15 @@ import FilterSelect from '@/common/components/select/FilterSelect'
 const confirmationLabel = (row) =>
   row.confirmedDate ? '供应商已确认' : '待供应商确认'
 const columns = [
-  { title: '采购单号', dataIndex: 'orderNo', width: 190, copyable: true },
-  { title: '供应商', dataIndex: 'supplierName', width: 200, copyable: true },
+  { title: '采购单号', dataIndex: 'orderNo', width: 190, copyable: true, render: (value) => value || '采购订单未编号' },
+  { title: '供应商', dataIndex: 'supplierName', width: 200, copyable: true, render: (value) => value || '供应商未填写' },
   {
     title: '订单状态',
     dataIndex: 'lifecycleStatus',
     width: 100,
     render: (value) => statusText(value, PURCHASE_ORDER_STATUS_LABELS),
     exportValue: (row) =>
-      statusText(row.lifecycleStatus, PURCHASE_ORDER_STATUS_LABELS),
+      statusText(row.lifecycleStatus, PURCHASE_ORDER_STATUS_LABELS, undefined, { emptyText: '' }),
   },
   {
     title: '到货日期',
@@ -53,7 +53,7 @@ const columns = [
         ) : null}
       </span>
     ),
-    exportValue: (row) => row.arrivalDate || '未填日期',
+    exportValue: (row) => row.arrivalDate || '',
   },
   {
     title: '日期确认',

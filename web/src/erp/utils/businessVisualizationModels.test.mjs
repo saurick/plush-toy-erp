@@ -107,6 +107,32 @@ test('purchase arrival uses supplier confirmation before expected date and build
   assert.equal(moveBusinessDate('2026-02-30', 1), '')
 })
 
+test('purchase arrival export projections keep source blanks and literal hyphens', () => {
+  const { rows } = buildPurchaseArrivalModel([
+    { id: 1 },
+    { id: 2, purchase_order_no: '-', supplier_snapshot: { name: '—' } },
+  ], { today: '2026-10-23' })
+  const empty = rows.find((row) => row.id === 1)
+  assert.equal(empty.orderNo, '')
+  assert.equal(empty.supplierName, '')
+  assert.equal(empty.arrivalDate, '')
+  const literal = rows.find((row) => row.id === 2)
+  assert.equal(literal.orderNo, '-')
+  assert.equal(literal.supplierName, '—')
+})
+
+test('purchase arrival treats unset timestamps as unscheduled instead of the Unix epoch', () => {
+  for (const value of [undefined, null, '', 0, '0']) {
+    const model = buildPurchaseArrivalModel([
+      { id: 1, supplier_confirmed_arrival_date: value, expected_arrival_date: value },
+      { id: 2, supplier_confirmed_arrival_date: value, expected_arrival_date: unix('2026-10-24') },
+    ], { today: '2026-10-23' })
+    assert.equal(model.rows.find((row) => row.id === 1).arrivalDate, '')
+    assert.equal(model.rows.find((row) => row.id === 2).arrivalDate, '2026-10-24')
+    assert.equal(model.unscheduled.length, 1)
+  }
+})
+
 test('finance due uses outstanding facts without combining currencies', () => {
   const model = buildFinanceDueModel(
     [

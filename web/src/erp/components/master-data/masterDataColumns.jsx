@@ -49,6 +49,12 @@ function activeTag(active) {
   )
 }
 
+function booleanExportText(value, trueText = '是', falseText = '否') {
+  if (value === true) return trueText
+  if (value === false) return falseText
+  return ''
+}
+
 function statusColumn() {
   return {
     defaultPriority: 30,
@@ -57,7 +63,7 @@ function statusColumn() {
     dataIndex: 'is_active',
     width: 90,
     sorter: (a, b) => compareBoolean(a?.is_active, b?.is_active),
-    exportValue: (record) => (record?.is_active === false ? '停用' : '启用'),
+    exportValue: (record) => booleanExportText(record?.is_active, '启用', '停用'),
     render: activeTag,
   }
 }
@@ -75,7 +81,7 @@ function unitColumn(unitDisplay) {
         unitDisplay(b?.default_unit_id)
       ),
     render: (value) => unitDisplay(value),
-    exportValue: (record) => unitDisplay(record?.default_unit_id),
+    exportValue: (record) => Number(record?.default_unit_id) > 0 ? unitDisplay(record?.default_unit_id) : '',
   }
 }
 
@@ -196,7 +202,7 @@ function productSKUColumns({ productOptions, unitDisplay }) {
         />
       ),
       exportValue: (record) =>
-        referenceLabel(productOptions, record?.product_id, '产品'),
+        referenceLabel(productOptions, record?.product_id, '产品', { emptyText: '' }),
     },
     {
       defaultPriority: 20,
@@ -353,8 +359,7 @@ function processColumns() {
       width: 100,
       sorter: (a, b) =>
         compareBoolean(a?.outsourcing_enabled, b?.outsourcing_enabled),
-      exportValue: (record) =>
-        record?.outsourcing_enabled === true ? '是' : '否',
+      exportValue: (record) => booleanExportText(record?.outsourcing_enabled),
       render: (value) =>
         value === true ? <Tag color="blue">是</Tag> : <Tag>否</Tag>,
     },
@@ -364,7 +369,7 @@ function processColumns() {
       dataIndex: 'inhouse_enabled',
       width: 100,
       sorter: (a, b) => compareBoolean(a?.inhouse_enabled, b?.inhouse_enabled),
-      exportValue: (record) => (record?.inhouse_enabled === true ? '是' : '否'),
+      exportValue: (record) => booleanExportText(record?.inhouse_enabled),
       render: (value) =>
         value === true ? <Tag color="green">是</Tag> : <Tag>否</Tag>,
     },
@@ -376,8 +381,7 @@ function processColumns() {
       width: 100,
       sorter: (a, b) =>
         compareBoolean(a?.quality_required, b?.quality_required),
-      exportValue: (record) =>
-        record?.quality_required === true ? '是' : '否',
+      exportValue: (record) => booleanExportText(record?.quality_required),
       render: (value) =>
         value === true ? <Tag color="orange">是</Tag> : <Tag>否</Tag>,
     },
@@ -668,7 +672,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             exportValue: (record) =>
               formatPaymentCondition({
                 payment_term_days: record?.default_payment_term_days,
-              }),
+              }, { emptyText: '' }),
           },
           {
             title: '默认发票要求',
@@ -693,10 +697,7 @@ function baseColumns({ type, unitDisplay, processOptions }) {
                 record?.default_invoice_category
               ),
             exportValue: (record) =>
-              purchaseInvoicePreferenceText(
-                record?.default_invoice_required,
-                record?.default_invoice_category
-              ),
+              purchaseInvoicePreferenceText(record?.default_invoice_required, record?.default_invoice_category, { emptyText: '' }),
           },
           {
             align: 'left',

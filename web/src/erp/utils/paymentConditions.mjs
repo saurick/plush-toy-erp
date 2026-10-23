@@ -91,7 +91,7 @@ function paymentConditionCompleteness({ method, termDays } = {}) {
   }
 }
 
-function formatPaymentCondition(record = {}) {
+function formatPaymentCondition(record = {}, { emptyText = '-' } = {}) {
   const method = trimOptional(record?.payment_method)
   const termDays = normalizeOptionalNonNegativeInteger(
     record?.payment_term_days
@@ -114,7 +114,7 @@ function formatPaymentCondition(record = {}) {
   if (termDays !== undefined) {
     return canonicalTermText
   }
-  return '-'
+  return emptyText
 }
 
 export {

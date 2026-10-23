@@ -106,7 +106,7 @@ test('sales order contacts keep missing values safe and copy text independent of
     const markup = renderToStaticMarkup(contact.render(snapshot, record, 0))
     assert.equal(markup.replace(/<[^>]*>/gu, ''), display)
     assert.equal(contact.copyable.resolveValue(snapshot, record), copy)
-    assert.equal(contact.exportValue(record), copy || '-')
+    assert.equal(contact.exportValue(record), copy)
     assert.doesNotMatch(markup, /must-not-be-rendered|\[object Object\]/u)
   }
 })

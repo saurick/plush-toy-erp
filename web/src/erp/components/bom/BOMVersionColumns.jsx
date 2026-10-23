@@ -27,11 +27,11 @@ const BOM_STATUS_COLORS = {
   ARCHIVED: 'default',
 }
 
-export function bomStatusText(status) {
+export function bomStatusText(status, { emptyText = '-' } = {}) {
   const key = String(status || '')
     .trim()
     .toUpperCase()
-  return BOM_STATUS_LABELS[key] || (key ? 'BOM 状态' : '-')
+  return BOM_STATUS_LABELS[key] || (key ? 'BOM 状态' : emptyText)
 }
 
 function bomStatusTag(status) {
@@ -68,7 +68,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
         />
       ),
       exportValue: (record) =>
-        referenceLabel(productOptions, record?.product_id, '产品'),
+        referenceLabel(productOptions, record?.product_id, '产品', { emptyText: '' }),
     },
     {
       defaultPriority: 20,
@@ -88,7 +88,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       width: 110,
       sortValue: (record) => bomStatusText(record.status),
       render: bomStatusTag,
-      exportValue: (record) => bomStatusText(record.status),
+      exportValue: (record) => bomStatusText(record.status, { emptyText: '' }),
     },
     {
       defaultPriority: 60,
@@ -122,7 +122,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       width: 130,
       sortType: 'date',
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record.print_date),
+      exportValue: (record) => formatUnixDate(record.print_date, { emptyText: '' }),
     },
     {
       defaultPriority: 40,
@@ -133,7 +133,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       width: 130,
       sortType: 'date',
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record.effective_from),
+      exportValue: (record) => formatUnixDate(record.effective_from, { emptyText: '' }),
     },
     {
       defaultPriority: 50,
@@ -144,7 +144,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       width: 130,
       sortType: 'date',
       render: formatUnixDate,
-      exportValue: (record) => formatUnixDate(record.effective_to),
+      exportValue: (record) => formatUnixDate(record.effective_to, { emptyText: '' }),
     },
     {
       align: 'left',

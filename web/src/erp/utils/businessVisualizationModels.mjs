@@ -17,10 +17,8 @@ import {
   productionWipQualityInspectionMeta,
   PRODUCTION_WIP_QUALITY_GATE_LABELS as PRODUCTION_QUALITY_GATE_LABELS,
 } from './productionWipModel.mjs'
-import {
-  currentBusinessDate,
-  unixSecondsToBusinessDate,
-} from './businessDate.mjs'
+import { currentBusinessDate } from './businessDate.mjs'
+import { unixToDateInputValue } from './masterDataOrderView.mjs'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -51,7 +49,7 @@ function dayDistance(fromDateKey, toDateKey) {
 }
 
 function unixDateKey(value) {
-  return unixSecondsToBusinessDate(value)
+  return unixToDateInputValue(value)
 }
 
 function normalizedText(value, fallback = '') {
@@ -223,10 +221,9 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
     const expectedDate = unixDateKey(item?.expected_arrival_date)
     const row = {
       id: Number(item?.id || 0),
-      orderNo: normalizedText(item?.purchase_order_no, '采购订单未编号'),
+      orderNo: normalizedText(item?.purchase_order_no),
       supplierName: normalizedText(
-        item?.supplier_snapshot?.name || item?.supplier_name,
-        '供应商未填写'
+        item?.supplier_snapshot?.name || item?.supplier_name
       ),
       lifecycleStatus: normalizedText(item?.lifecycle_status).toLowerCase(),
       confirmedDate,

@@ -46,7 +46,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       width: 180,
       sortValue: resolveSupplierName,
       render: (_, record) => resolveSupplierName(record),
-      exportValue: resolveSupplierName,
+      exportValue: (record) => record?.supplier_id || record?.supplier_snapshot?.name || record?.supplier_snapshot?.short_name ? resolveSupplierName(record) : '',
     },
     {
       defaultPriority: 30,
@@ -58,7 +58,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
         statusText(record?.lifecycle_status, OUTSOURCING_ORDER_STATUS_LABELS),
       render: renderOutsourcingOrderStatusTag,
       exportValue: (record) =>
-        statusText(record?.lifecycle_status, OUTSOURCING_ORDER_STATUS_LABELS),
+        statusText(record?.lifecycle_status, OUTSOURCING_ORDER_STATUS_LABELS, undefined, { emptyText: '' }),
     },
     {
       defaultPriority: 60,
@@ -80,7 +80,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       width: 140,
       render: formatUnixDate,
       sortType: 'number',
-      exportValue: (record) => formatUnixDate(record?.order_date),
+      exportValue: (record) => formatUnixDate(record?.order_date, { emptyText: '' }),
     },
     {
       defaultPriority: 40,
@@ -90,7 +90,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       width: 140,
       render: formatUnixDate,
       sortType: 'number',
-      exportValue: (record) => formatUnixDate(record?.expected_return_date),
+      exportValue: (record) => formatUnixDate(record?.expected_return_date, { emptyText: '' }),
     },
     {
       align: 'left',

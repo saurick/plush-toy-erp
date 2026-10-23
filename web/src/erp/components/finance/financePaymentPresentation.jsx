@@ -76,10 +76,11 @@ export function paymentAllocationExportValue(record) {
     .map((item, index) => {
       const factNo = item?.finance_fact_no || `核销明细 ${index + 1}`
       const currency = item?.currency || record?.currency || ''
-      const amount = item?.amount || '-'
+      const amount = String(item?.amount ?? '').trim()
       const status =
         item?.status === FinanceAllocationStatus.REVERSED ? '已冲销' : '已过账'
-      return `${factNo} / ${amount}${currency ? ` ${currency}` : ''} / ${status}`
+      return [factNo, amount && `${amount}${currency ? ` ${currency}` : ''}`, status]
+        .filter(Boolean).join(' / ')
     })
     .join('；')
 }
@@ -97,7 +98,7 @@ export function partyOption(record, fallback) {
   }
 }
 
-export function paymentSourceReference(record) {
+export function paymentSourceReference(record, { emptyText = '—' } = {}) {
   if (record?.kind === FinancePaymentKind.REFUND) {
     return record.refund_of_payment_no || '原收付款单待核对'
   }
@@ -107,5 +108,5 @@ export function paymentSourceReference(record) {
   const allocations = Array.isArray(record?.allocations)
     ? record.allocations
     : []
-  return allocations.length ? `${allocations.length} 笔核销记录` : '—'
+  return allocations.length ? `${allocations.length} 笔核销记录` : emptyText
 }

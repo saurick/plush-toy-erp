@@ -285,7 +285,8 @@ export {
 export function formatUnitQuantitySummary(
   lines = [],
   quantityField = 'quantity',
-  unitOptions = []
+  unitOptions = [],
+  { emptyText = '—' } = {}
 ) {
   const groups = new Map()
   for (const line of Array.isArray(lines) ? lines : []) {
@@ -304,6 +305,6 @@ export function formatUnitQuantitySummary(
   return (
     [...groups.values()]
       .map(({ name, values }) => `${sumNumeric20Scale6Values(values)} ${name}`)
-      .join(' / ') || '—'
+      .join(' / ') || emptyText
   )
 }

@@ -45,12 +45,12 @@ function snapshotName(snapshot) {
     : ''
 }
 
-function joinSummary(values = []) {
+function joinSummary(values = [], { emptyText = '-' } = {}) {
   return (
     values
       .map((value) => text(value, ''))
       .filter(Boolean)
-      .join(' ') || '-'
+      .join(' ') || emptyText
   )
 }
 
@@ -67,7 +67,8 @@ function historyPath(path, params = {}) {
 function masterRecord(
   source,
   record,
-  { codeKey = 'code', nameKey = 'name' } = {}
+  { codeKey = 'code', nameKey = 'name' } = {},
+  { emptyText } = {}
 ) {
   const code = text(record?.[codeKey], '')
   const name = text(record?.[nameKey], '')
@@ -75,15 +76,16 @@ function masterRecord(
     key: `${source.key}:${record?.id}`,
     sourceKey: source.key,
     sourceLabel: source.label,
-    primary: code || name || '未编号记录',
-    secondary: name || code || '-',
-    status: MASTER_HISTORY_STATUS[String(record?.is_active === true)],
+    primary: code || name || (emptyText ?? '未编号记录'),
+    secondary: name || code || (emptyText ?? '-'),
+    status: record?.is_active == null && emptyText !== undefined
+      ? emptyText : MASTER_HISTORY_STATUS[String(record?.is_active === true)],
     summary: joinSummary([
       record?.category,
       record?.spec,
       record?.color,
       record?.note,
-    ]),
+    ], { emptyText }),
     updatedAt: record?.updated_at,
     createdAt: record?.created_at,
     link: historyPath(source.menuPath, {
@@ -93,16 +95,17 @@ function masterRecord(
   }
 }
 
-function sourceOrderRecord(source, record, config) {
+function sourceOrderRecord(source, record, config, { emptyText } = {}) {
   const statusValue = text(record?.[config.statusKey], '')
   return {
     key: `${source.key}:${record?.id}`,
     sourceKey: source.key,
     sourceLabel: source.label,
-    primary: text(record?.[config.numberKey], '未编号记录'),
-    secondary: text(config.secondary(record), '-'),
-    status: config.statusLabels[statusValue] || '历史状态待核对',
-    summary: joinSummary(config.summary(record)),
+    primary: text(record?.[config.numberKey], emptyText ?? '未编号记录'),
+    secondary: text(config.secondary(record), emptyText ?? '-'),
+    status: !statusValue && emptyText !== undefined
+      ? emptyText : config.statusLabels[statusValue] || '历史状态待核对',
+    summary: joinSummary(config.summary(record), { emptyText }),
     updatedAt: record?.updated_at,
     createdAt: record?.created_at,
     link: historyPath(source.menuPath, {
@@ -120,7 +123,7 @@ function masterSource(config) {
   }
   return Object.freeze({
     ...source,
-    normalize: (record) => masterRecord(source, record, config.recordConfig),
+    normalize: (record, options) => masterRecord(source, record, config.recordConfig, options),
   })
 }
 
@@ -128,8 +131,8 @@ function orderSource(config) {
   const source = { kind: 'order', statusCounts: true, ...config }
   return Object.freeze({
     ...source,
-    normalize: (record) =>
-      sourceOrderRecord(source, record, config.recordConfig),
+    normalize: (record, options) =>
+      sourceOrderRecord(source, record, config.recordConfig, options),
   })
 }
 
@@ -318,12 +321,12 @@ export function buildHistoryListParams(
   return params
 }
 
-export function normalizeHistoryRecords(source, records = []) {
+export function normalizeHistoryRecords(source, records = [], options = {}) {
   if (!source || typeof source.normalize !== 'function') return []
   return (Array.isArray(records) ? records : [])
     .filter((record) => record && record.id)
     .map((record) => {
-      const normalized = source.normalize(record)
+      const normalized = source.normalize(record, options)
       if (source.key === 'bom_versions') {
         normalized.link = historyPath(source.menuPath, {
           product_id: record.product_id,

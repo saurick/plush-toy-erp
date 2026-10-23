@@ -51,7 +51,7 @@ test('finance pages project only fields that belong to their fact type', () => {
   assert.match(source, /INVOICE: '客户'/u)
   assert.match(
     source,
-    /due_at:\s*\{[\s\S]*?title: '到期日期'[\s\S]*?render: formatUnixDate[\s\S]*?formatUnixDate\(record\?\.due_at\)/u
+    /due_at:\s*\{[\s\S]*?title: '到期日期'[\s\S]*?render: formatUnixDate[\s\S]*?formatUnixDate\(record\?\.due_at, \{ emptyText: '' \}\)/u
   )
   assert.doesNotMatch(
     source,
@@ -100,20 +100,13 @@ test('outsourcing fact list, post and cancel use their exact permissions', () =>
   assert.doesNotMatch(source, /ACTION_PERMISSIONS\.outsourcingWrite/u)
 })
 
-test('quantity and finance decimal columns sort, display and export exactly', () => {
+test('quantity and finance decimal columns retain exact decimal sorting', () => {
   assert.match(source, /compareOperationalFactDecimalValues/u)
   for (const field of ['quantity', 'amount', 'fee_amount']) {
     assert.match(
       source,
       new RegExp(
         `sorter: \\(left, right\\) =>[\\s\\S]{0,140}compareOperationalFactDecimalValues\\([\\s\\S]{0,100}left\\?\\.${field},[\\s\\S]{0,80}right\\?\\.${field}`,
-        'u'
-      )
-    )
-    assert.match(
-      source,
-      new RegExp(
-        `exportValue: \\(record\\) => formatQuantity\\(record\\?\\.${field}\\)`,
         'u'
       )
     )

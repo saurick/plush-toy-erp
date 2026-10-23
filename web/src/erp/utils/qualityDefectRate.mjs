@@ -74,12 +74,12 @@ export function buildQualityDefectRateParams(selection, customPercent) {
   }
 }
 
-export function formatQualityDefectRate(record = {}) {
+export function formatQualityDefectRate(record = {}, { emptyText = '未记录' } = {}) {
   const operator = String(record?.defect_rate_operator || '')
     .trim()
     .toUpperCase()
   const percentValue = record?.defect_rate_percent
-  if (!operator && !hasValue(percentValue)) return '未记录'
+  if (!operator && !hasValue(percentValue)) return emptyText
   if (!operator || !hasValue(percentValue)) return '比例待核对'
 
   try {
