@@ -11,7 +11,7 @@ import {
 test('exact references scale with requested IDs, include history and never scan an empty set', async () => {
   for (const size of [0, 1, 50, 500]) {
     const calls = []
-    const signal = new AbortController().signal
+    const { signal } = new AbortController()
     const result = await listReferenceRecordsByIDs(async (params, options) => {
       calls.push(params)
       assert.equal(options.signal, signal)
@@ -28,7 +28,9 @@ test('exact references scale with requested IDs, include history and never scan 
 test('batch source reads preserve every inspection and validate the source relationship', async () => {
   const data = await listReferenceRecordsByIDs(async (params) => ({
     quality_inspections: [{ id: 1, source_id: 7 }, { id: 2, source_id: 7 }, { id: 3, source_id: 9 }],
-    total: 3, offset: params.offset, limit: params.limit,
+    total: 3,
+    offset: params.offset,
+    limit: params.limit,
   }), {}, 'quality_inspections', [7, 9, 7], {}, { filterKey: 'fact_ids', referenceKey: 'source_id' })
   assert.deepEqual(data.quality_inspections.map((row) => row.id), [1, 2, 3])
   await assert.rejects(listReferenceRecordsByIDs(async (params) => ({

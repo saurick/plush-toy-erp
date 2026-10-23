@@ -16,8 +16,11 @@ async function harness(t, handler) {
   const { default: RemoteReferenceSelect, ReferenceRecordsContext } = await import('./RemoteReferenceSelect.jsx')
   let current
   const Probe = forwardRef((props, _ref) => { current = props; return createElement('output', null, JSON.stringify(props.options)) })
-  return { ...view, calls, get current() { return current },
-    renderSelect: (props = {}, profile) => view.render(createElement(ReferenceRecordsContext.Provider, { value: { adminProfile: profile } }, createElement(RemoteReferenceSelect, { referenceType: 'materials', component: Probe, ...props }))),
+  return {
+    ...view,
+    calls,
+    get current() { return current },
+    renderSelect: (props, profile) => view.render(createElement(ReferenceRecordsContext.Provider, { value: { adminProfile: profile } }, createElement(RemoteReferenceSelect, { referenceType: 'materials', component: Probe, ...props }))),
     wait: (ms = 15) => view.act(async () => delay(ms)),
   }
 }

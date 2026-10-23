@@ -20,7 +20,10 @@ async function harness(t, handler) {
     useReferenceHydration({ materials: { ids, records: current, onRecords: merge, enabled } }, profile, refresh)
     return null
   }
-  return { ...view, calls, get records() { return records },
+  return {
+    ...view,
+    calls,
+    get records() { return records },
     async renderReferences(props) {
       await view.render(createElement(Consumer, props))
       await view.flush()

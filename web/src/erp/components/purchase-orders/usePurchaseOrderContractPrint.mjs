@@ -1,4 +1,3 @@
-import { loadReferenceIDs } from '../../utils/remoteReferences.mjs'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { message } from '@/common/utils/antdApp'
@@ -13,6 +12,7 @@ import {
   unitOption,
   uniqueReferenceOptions,
 } from '../../utils/referenceSelectOptions.mjs'
+import { loadReferenceIDs } from '../../utils/remoteReferences.mjs'
 import {
   buildSupplierSnapshot,
   buildSupplierSnapshotWithContacts,

@@ -662,7 +662,6 @@ test('devHub: builds pinned items in stored route order', () => {
   )
 })
 
-
 test('devHub: every tool has a unique owner and old name searches retain their destination', () => {
   assert.equal(new Set(DEV_SECONDARY_NAV_ITEMS.map((item) => item.route)).size, DEV_SECONDARY_NAV_ITEMS.length)
   for (const navigation of DEV_SECONDARY_NAV_ITEMS) {

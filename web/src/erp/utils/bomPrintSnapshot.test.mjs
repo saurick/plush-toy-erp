@@ -35,7 +35,9 @@ function fixture() {
       assert.equal(params.active_only, false)
       assert.deepEqual(params.ids, [21])
       return {
-        total: 1, limit: params.limit, offset: params.offset,
+        total: 1,
+        limit: params.limit,
+        offset: params.offset,
         materials: [
           {
             id: 21,
@@ -48,7 +50,9 @@ function fixture() {
       }
     },
     listUnits: async (params) => ({
-      total: 1, limit: params.limit, offset: params.offset,
+      total: 1,
+      limit: params.limit,
+      offset: params.offset,
       units: [{ id: 31, name: '米', is_active: false }],
     }),
   }

@@ -127,7 +127,11 @@ export async function listOutsourcingReturnQualityInspections(
 
 export async function listOutsourcingReturnQualityInspectionsForFacts(factIDs, params = {}, options = {}) {
   return listReferenceRecordsByIDs(
-    listOutsourcingReturnQualityInspections, params, 'quality_inspections', factIDs, options,
+    listOutsourcingReturnQualityInspections,
+    params,
+    'quality_inspections',
+    factIDs,
+    options,
     { filterKey: 'fact_ids', referenceKey: 'source_id' }
   )
 }
