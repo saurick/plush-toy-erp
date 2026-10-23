@@ -13,6 +13,7 @@ import {
   readDeliveryOperation,
   readDeliveryOperationReceipt,
   persistDeliveryOperationReceipt,
+  recoverInterruptedDeliveryOperation,
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
 
@@ -23,6 +24,8 @@ import {
   REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT,
   validateRemotePromotionReceipt,
   validateRemoteTargetInitializationReceipt,
+  resolveRemotePromotionReceipt,
+  persistPromotionReceiptOutcome,
 } from "./promotion-executor.mjs";
 
 const SHA = "a".repeat(40);
@@ -227,6 +230,94 @@ const expected = {
   promotionFingerprint: "c".repeat(64),
   acquisitionExpectedBytes: 0,
 };
+
+test("promotion response loss reads only the bound saved receipt and rejects mismatches", () => {
+  let reads = 0;
+  const read = () => {
+    reads += 1;
+    return { status: 0, stdout: JSON.stringify(receipt()) };
+  };
+  assert.equal(resolveRemotePromotionReceipt(
+    { status: 0, stdout: JSON.stringify(receipt()) }, expected, read,
+  ).readBack, false);
+  assert.equal(reads, 0);
+  const recovered = resolveRemotePromotionReceipt(
+    { status: 255, stdout: "" }, expected, read,
+  );
+  assert.equal(recovered.readBack, true);
+  assert.equal(recovered.receipt.status, "passed");
+  assert.equal(reads, 1);
+  for (const overrides of [
+    { operationId: "123e4567-e89b-42d3-a456-426614174001" },
+    { gitSha: "8".repeat(40) },
+    { checks: { ...receipt().checks, ready: false } },
+  ]) {
+    assert.throws(() => resolveRemotePromotionReceipt(
+      { status: 255, stdout: "" }, expected,
+      () => ({ status: 0, stdout: JSON.stringify(receipt(overrides)) }),
+    ));
+  }
+  assert.throws(() => resolveRemotePromotionReceipt(
+    { error: new Error("connection closed"), status: null }, expected,
+    () => ({ status: 1, stdout: "" }),
+  ), /could not be read back/u);
+});
+
+function interruptedPromotionFixture(t) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "promotion-terminal-receipt-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const store = resolveDeliveryOperationStore(root);
+  createOrReuseDeliveryOperation(store, {
+    action: "promote", target: expected.targetKey, gitSha: SHA,
+    version: expected.version, operationId: OPERATION_ID,
+    idempotencyKey: "promotion:terminal-receipt:interruption",
+    metadata: { promotionFingerprint: expected.promotionFingerprint },
+  });
+  transitionDeliveryOperation(store, OPERATION_ID, { status: "running", message: "target execution started" });
+  recoverInterruptedDeliveryOperation(store, OPERATION_ID);
+  return store;
+}
+
+test("promotion coordinator interruption converges only from a complete matching terminal receipt", (t) => {
+  const store = interruptedPromotionFixture(t);
+  const unknown = readDeliveryOperation(store, OPERATION_ID);
+  assert.equal(unknown.status, "not_proven");
+  assert.throws(() => persistPromotionReceiptOutcome(store, {
+    receipt: receipt({ checks: { ...receipt().checks, ready: false } }),
+    expected, metadata: {},
+  }));
+  assert.deepEqual(readDeliveryOperation(store, OPERATION_ID), unknown);
+  assert.equal(readDeliveryOperationReceipt(store, unknown), null);
+  const completed = persistPromotionReceiptOutcome(store, {
+    receipt: receipt(), expected, metadata: { terminalReceiptReadBack: true },
+  });
+  assert.equal(completed.status, "passed");
+  assert.equal(completed.requestFingerprint, unknown.requestFingerprint);
+  assert.equal(completed.events.at(-2).status, "not_proven");
+  assert.match(completed.events.at(-1).message, /verified.*receipt/u);
+  assert.deepEqual(readDeliveryOperationReceipt(store, completed).receipt, receipt());
+  const replay = persistPromotionReceiptOutcome(store, {
+    receipt: receipt(), expected, metadata: {},
+  });
+  assert.equal(replay.revision, completed.revision);
+});
+
+test("an unknown saved promotion receipt never becomes a successful operation", (t) => {
+  const store = interruptedPromotionFixture(t);
+  const stillUnknown = receipt({
+    status: "not_proven", issueCode: "promotion_interrupted",
+    stage: "compose_start",
+    timings: PROMOTION_STAGES.slice(0, 13).map(id => ({
+      id, status: id === "compose_start" ? "failed" : "passed", durationMs: 1000,
+    })),
+    checks: Object.fromEntries(Object.keys(receipt().checks).map(key => [key, false])),
+  });
+  const outcome = persistPromotionReceiptOutcome(store, {
+    receipt: stillUnknown, expected, metadata: {},
+  });
+  assert.equal(outcome.status, "not_proven");
+  assert.equal(readDeliveryOperationReceipt(store, outcome).receipt.status, "not_proven");
+});
 
 const initializationExpected = {
   operationId: OPERATION_ID,

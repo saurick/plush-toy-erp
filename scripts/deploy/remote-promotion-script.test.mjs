@@ -1,11 +1,38 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import os from "node:os";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import test from "node:test";
 
 const script = path.join(import.meta.dirname, "remote-promotion.sh");
 const source = readFileSync(script, "utf8");
+
+for (const cleanupProven of [true, false]) {
+  test(`promotion success receipt survives response loss only after cleanup=${cleanupProven}`, (t) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "promotion-response-loss-"));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const incoming = path.join(root, "incoming");
+    mkdirSync(incoming);
+    const saved = path.join(root, "receipt.txt");
+    const finish = source.slice(source.lastIndexOf("enter_stage passed\n"));
+    assert.ok(finish.startsWith("enter_stage passed\n"));
+    const result = spawnSync("bash", ["-c", `set -Eeuo pipefail
+enter_stage() { :; }
+cleanup_transient_materialization() { credential_cleanup_proven="$CLEANUP_PROVEN"; }
+fail() { return 1; }
+on_error() { printf '%s\\n' not_proven >"$receipt"; exit 2; }
+write_receipt() { printf '%s\\n' "$1" >"$receipt"; }
+cat() { return 1; }
+trap on_error ERR
+${finish}`], {
+      encoding: "utf8",
+      env: { ...process.env, incoming, receipt: saved, CLEANUP_PROVEN: String(cleanupProven) },
+    });
+    assert.notEqual(result.status, 0);
+    assert.equal(readFileSync(saved, "utf8").trim(), cleanupProven ? "passed" : "not_proven");
+  });
+}
 
 function runEpochMillis(dateOutput) {
   const functionSource = source.match(/epoch_millis\(\) \{[\s\S]*?\n\}/u)?.[0];

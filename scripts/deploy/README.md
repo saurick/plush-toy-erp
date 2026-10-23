@@ -153,7 +153,9 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 `failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。执行器子进程启动或过早退出时只把 4 KiB 以内的 stderr 转成 240 字符以内的脱敏诊断写入 operation，命令、参数、PID、凭据和真实路径仍不入库。
 
-数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。
+晋级和数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过完整合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。晋级的 SSH 响应丢失或不完整时，仅从固定目标的同一 operation 路径读回原子回执；缺失、损坏或仍为 `not_proven` 的回执继续保留未证明状态。运行版本已更新不能替代历史终态回执。
+
+一个 operation store 的执行编排使用同一常驻工作台服务实例，或在临时 CLI 中完整串行执行准备、执行和终态读回。目标写入未结束时，不启动另一个会执行中断恢复的服务实例；只读现场诊断直接使用固定目标预检。远端在清理临时取件资料后写入成功回执，响应通道失败不会覆盖已经验证的终态。
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 

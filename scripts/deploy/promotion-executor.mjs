@@ -21,6 +21,7 @@ import {
   consumeDeliveryOperationStore,
   listDeliveryOperations,
   readDeliveryOperation,
+  reconcileDeliveryOperationFromTerminalReceipt,
   persistDeliveryOperationReceipt,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
@@ -1245,6 +1246,82 @@ export function validateRemotePromotionReceipt(receipt, expected) {
   return receipt;
 }
 
+export function resolveRemotePromotionReceipt(result, expected, readSavedReceipt) {
+  if (!result.error && Number.isInteger(result.status)) {
+    try {
+      const receipt = validateRemotePromotionReceipt(
+        JSON.parse(String(result.stdout || "").trim()),
+        expected,
+      );
+      if ((result.status === 0) === (receipt.status === "passed")) {
+        return { receipt, readBack: false };
+      }
+    } catch {
+      // A lost or incomplete response requires the same target's atomic receipt.
+    }
+  }
+  const saved = readSavedReceipt();
+  if (saved.error || saved.status !== 0) {
+    throw new Error("remote promotion terminal receipt could not be read back");
+  }
+  return {
+    receipt: validateRemotePromotionReceipt(
+      JSON.parse(String(saved.stdout || "").trim()),
+      expected,
+    ),
+    readBack: true,
+  };
+}
+
+export function persistPromotionReceiptOutcome(
+  store,
+  { receipt, expected, metadata, now = new Date().toISOString() },
+) {
+  const current = readDeliveryOperation(store, expected.operationId);
+  if (
+    current.action !== "promote" ||
+    current.target !== expected.targetKey ||
+    current.gitSha !== expected.gitSha ||
+    current.version !== expected.version
+  ) {
+    throw new Error("promotion outcome does not match its operation");
+  }
+  validateRemotePromotionReceipt(receipt, expected);
+  const file = persistDeliveryOperationReceipt(store, receipt);
+  if (["passed", "failed"].includes(current.status)) return current;
+  if (current.status === "not_proven" && receipt.status === "not_proven") {
+    return current;
+  }
+  const transition = {
+    status: receipt.status,
+    message: receipt.status === "passed"
+      ? "target promotion and basic runtime verification passed"
+      : receipt.status === "failed"
+        ? "target promotion failed before migration apply"
+        : "target promotion outcome requires readback",
+    issues: terminalIssue(receipt.status),
+    metadata: { ...current.metadata, ...metadata },
+    now,
+  };
+  if (current.status === "not_proven") {
+    return reconcileDeliveryOperationFromTerminalReceipt(store, current.id, {
+      ...transition,
+      message:
+        "verified promotion terminal receipt reconciled after coordinator interruption",
+      receiptIdentity: {
+        operationId: receipt.operationId,
+        action: current.action,
+        target: receipt.target,
+        gitSha: receipt.gitSha,
+        version: receipt.version,
+        status: receipt.status,
+        receiptSha256: sha256File(file),
+      },
+    });
+  }
+  return transitionDeliveryOperation(store, current.id, transition);
+}
+
 function fixedSshArgs(target) {
   return [
     "-o",
@@ -1526,46 +1603,39 @@ export function executePromotion(
         timeout: 60 * 60_000,
       },
     );
-    const rawReceipt = String(result.stdout || "").trim();
-    let receipt;
-    try {
-      receipt = validateRemotePromotionReceipt(JSON.parse(rawReceipt), {
-        targetKey,
-        operationId: operation.id,
-        gitSha: operation.gitSha,
-        version: operation.version,
-        releaseManifestSha256: plan.release.manifestSha256,
-        releaseRehearsalSha256: plan.release.rehearsalReceiptSha256,
-        promotionFingerprint: plan.fingerprint,
-        acquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
-      });
-    } catch (error) {
-      throw new Error(
-        `remote receipt is unavailable or invalid: ${error.message}`,
-      );
-    }
-    if (result.error) {
-      throw new Error(`remote promotion SSH failed: ${result.error.message}`);
-    }
+    const expectedReceipt = {
+      targetKey,
+      operationId: operation.id,
+      gitSha: operation.gitSha,
+      version: operation.version,
+      releaseManifestSha256: plan.release.manifestSha256,
+      releaseRehearsalSha256: plan.release.rehearsalReceiptSha256,
+      promotionFingerprint: plan.fingerprint,
+      acquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
+    };
+    const { receipt, readBack } = resolveRemotePromotionReceipt(
+      result,
+      expectedReceipt,
+      () => runCommand("ssh", [
+        ...sshArgs,
+        "cat",
+        `${target.filesystem.root}/operations/${operation.id}/receipt.json`,
+      ], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 30_000 }),
+    );
     if (
+      !readBack &&
       (result.status === 0) !== (receipt.status === "passed") &&
       !(result.status !== 0 && receipt.status !== "passed")
     ) {
       throw new Error("remote promotion exit status contradicts its receipt");
     }
-    persistDeliveryOperationReceipt(store, receipt);
-    operation = transitionDeliveryOperation(store, operation.id, {
-      status: receipt.status,
-      message:
-        receipt.status === "passed"
-          ? "target promotion and basic runtime verification passed"
-          : receipt.status === "failed"
-            ? "target promotion failed before migration apply"
-            : "target promotion outcome requires readback",
-      issues: terminalIssue(receipt.status),
+    operation = persistPromotionReceiptOutcome(store, {
+      receipt,
+      expected: expectedReceipt,
       metadata: {
         ...operation.metadata,
         remoteStage: receipt.stage,
+        terminalReceiptReadBack: readBack,
         backupSha256: receipt.rollbackPoint.backupSha256,
         releaseRehearsalSha256: receipt.releaseRehearsalSha256,
         backupSizeBytes: receipt.rollbackPoint.backupSizeBytes,

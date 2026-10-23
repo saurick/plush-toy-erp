@@ -1311,7 +1311,8 @@ mv "$next_current" "$current"
 
 enter_stage passed
 env_changed=0
-write_receipt passed none
+cleanup_transient_materialization
+[[ "$credential_cleanup_proven" == true ]] || fail "target fetch credential cleanup is not proven"
 rm -f \
   "$incoming/.target-cache.json" \
   "$incoming/checksums.sha256" \
@@ -1328,4 +1329,7 @@ rm -f \
   "$incoming/target-release-fetch.json" \
   "$incoming/web-image.tar"
 rmdir "$incoming"
+write_receipt passed none
+# The atomic receipt remains authoritative if its response channel closes.
+trap - ERR HUP INT TERM
 cat "$receipt"
