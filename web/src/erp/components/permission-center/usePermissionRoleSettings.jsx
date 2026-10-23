@@ -799,6 +799,31 @@ export function usePermissionRoleSettings({
                     />
                   </Popover>
                 </div>
+                <div
+                  className="erp-role-center-tools"
+                  role="group"
+                  aria-label="岗位辅助设置"
+                >
+                  <Button
+                    icon={<BankOutlined aria-hidden="true" />}
+                    onClick={() => setDetailView('scope')}
+                  >
+                    配置数据范围
+                  </Button>
+                  <Button
+                    icon={<SafetyCertificateOutlined aria-hidden="true" />}
+                    onClick={() => setDetailView('fields')}
+                  >
+                    查看敏感字段
+                  </Button>
+                  <Button
+                    icon={<TeamOutlined aria-hidden="true" />}
+                    onClick={() => setDetailView('accounts')}
+                  >
+                    关联账号
+                    {canReadUsers ? `（${selectedRoleAdmins.length}）` : ''}
+                  </Button>
+                </div>
                 <div className="erp-role-center-actions">
                   <Text
                     className="erp-role-center-save-status"
@@ -837,31 +862,6 @@ export function usePermissionRoleSettings({
                     保存岗位设置
                   </Button>
                 </div>
-              </div>
-              <div
-                className="erp-role-center-tools"
-                role="group"
-                aria-label="岗位辅助设置"
-              >
-                <Button
-                  icon={<BankOutlined aria-hidden="true" />}
-                  onClick={() => setDetailView('scope')}
-                >
-                  配置数据范围
-                </Button>
-                <Button
-                  icon={<SafetyCertificateOutlined aria-hidden="true" />}
-                  onClick={() => setDetailView('fields')}
-                >
-                  查看敏感字段
-                </Button>
-                <Button
-                  icon={<TeamOutlined aria-hidden="true" />}
-                  onClick={() => setDetailView('accounts')}
-                >
-                  关联账号
-                  {canReadUsers ? `（${selectedRoleAdmins.length}）` : ''}
-                </Button>
               </div>
 
               {selectedRoleConflict ? (

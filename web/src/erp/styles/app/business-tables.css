@@ -11,17 +11,15 @@
 .erp-permission-checklist-search {
   flex: 1 1 200px;
   min-width: 0;
+  max-width: 320px;
 }
 
 .erp-permission-capability-toolbar {
-  padding: 8px 11px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 12px;
-  border-bottom: 1px solid var(--erp-border);
-  background: var(--erp-surface-bg);
-  flex-shrink: 0;
+  min-width: 0;
 }
 
 .erp-permission-capability-summary {
@@ -39,6 +37,7 @@
 
 .erp-permission-expand-actions {
   display: flex;
+  flex-wrap: wrap;
   margin-left: auto;
   gap: 8px;
 }

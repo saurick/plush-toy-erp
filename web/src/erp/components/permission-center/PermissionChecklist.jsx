@@ -298,6 +298,38 @@ function PermissionChecklist({
           />
           <span>只看已选</span>
         </label>
+        <div className="erp-permission-capability-toolbar">
+          <div className="erp-permission-capability-summary">
+            <span>
+              <strong>{normalizedValue.length}</strong> /{' '}
+              {groups.reduce((sum, group) => sum + group.items.length, 0)}{' '}
+              项功能已授权 · {groups.length} 个业务域
+            </span>
+          </div>
+          {changedItems.length > 0 ? (
+            <Popover
+              {...changeSummaryPopoverProps}
+              trigger="click"
+              title="本次功能调整"
+              content={
+                <ul className="erp-permission-changes">
+                  {changedItems.map((item) => (
+                    <li key={item.key}>
+                      <strong>
+                        {selectedKeySet.has(item.key) ? '新增' : '撤销'}
+                      </strong>{' '}
+                      {item.label}
+                    </li>
+                  ))}
+                </ul>
+              }
+            >
+              <Button size="small">
+                新增 {addedCount} 项 · 撤销 {changedItems.length - addedCount} 项
+              </Button>
+            </Popover>
+          ) : null}
+        </div>
         <div className="erp-permission-expand-actions">
           <Button
             size="small"
@@ -317,38 +349,6 @@ function PermissionChecklist({
           </Button>
           {fullscreenAction}
         </div>
-      </div>
-      <div className="erp-permission-capability-toolbar">
-        <div className="erp-permission-capability-summary">
-          <span>
-            <strong>{normalizedValue.length}</strong> /{' '}
-            {groups.reduce((sum, group) => sum + group.items.length, 0)}{' '}
-            项功能已授权 · {groups.length} 个业务域
-          </span>
-        </div>
-        {changedItems.length > 0 ? (
-          <Popover
-            {...changeSummaryPopoverProps}
-            trigger="click"
-            title="本次功能调整"
-            content={
-              <ul className="erp-permission-changes">
-                {changedItems.map((item) => (
-                  <li key={item.key}>
-                    <strong>
-                      {selectedKeySet.has(item.key) ? '新增' : '撤销'}
-                    </strong>{' '}
-                    {item.label}
-                  </li>
-                ))}
-              </ul>
-            }
-          >
-            <Button size="small">
-              新增 {addedCount} 项 · 撤销 {changedItems.length - addedCount} 项
-            </Button>
-          </Popover>
-        ) : null}
       </div>
       <TableScrollRegion className="erp-permission-checklist">
         {visibleGroups.length > 0 ? (

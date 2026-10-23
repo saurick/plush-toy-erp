@@ -1592,6 +1592,7 @@
 }
 
 .erp-role-center-detail {
+  container: permission-role / inline-size;
   align-content: start;
   gap: 0;
   min-width: 0;
@@ -1694,11 +1695,10 @@
 }
 
 .erp-role-center-detail__head {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   border-bottom: 1px solid var(--erp-border);
   background: var(--erp-surface-bg);
   min-height: 48px;
@@ -1719,6 +1719,8 @@
 }
 
 .erp-role-center-actions {
+  grid-column: 2;
+  grid-row: 1;
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1727,13 +1729,27 @@
 }
 
 .erp-role-center-tools {
+  grid-column: 1 / -1;
+  grid-row: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--erp-border);
+}
+
+@container permission-role (min-width: 900px) {
+  .erp-role-center-detail__head {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .erp-role-center-tools {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .erp-role-center-actions {
+    grid-column: 3;
+  }
 }
 
 .erp-permission-help-trigger.ant-btn {

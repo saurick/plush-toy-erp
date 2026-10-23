@@ -1154,7 +1154,7 @@ body
     overflow: visible;
   }
   .erp-role-center-detail__head {
-    flex-wrap: wrap;
+    grid-template-columns: minmax(0, 1fr);
     gap: 4px;
   }
   .erp-permission-checklist {
@@ -1164,14 +1164,20 @@ body
     align-items: flex-start;
   }
   .erp-role-center-actions {
+    grid-column: 1;
+    grid-row: 2;
     width: 100%;
     justify-content: space-between;
+  }
+  .erp-role-center-tools {
+    grid-row: 3;
   }
   .erp-role-center-tools .ant-btn {
     flex: 1 1 auto;
   }
   .erp-permission-checklist-search {
     flex-basis: 100%;
+    max-width: none;
   }
   .erp-role-navigation-workspace-tabs,
   .erp-role-navigation-menu-tab,

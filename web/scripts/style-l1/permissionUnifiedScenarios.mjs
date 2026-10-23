@@ -1,6 +1,6 @@
+import assert from 'node:assert/strict'
 import { chooseSelectOption } from './selectControlActions.mjs'
 import { openUIDesignAppearance } from './devUIDesignNavigation.mjs'
-import assert from 'node:assert/strict'
 
 async function observeSlidingNav(
   page,
@@ -81,6 +81,95 @@ export function createPermissionUnifiedScenarios({
         .sort()
     )
   return [
+    {
+      name: 'permission-center-toolbar-density',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      themeMode: 'light',
+      verify: async (page) => {
+        await page.getByRole('table', { name: '岗位功能权限' }).waitFor()
+        const workspace = page.locator('.erp-role-center-detail')
+        const readGeometry = () => workspace.evaluate((root) => {
+          const rect = (selector) => root.querySelector(selector).getBoundingClientRect().toJSON()
+          const selectors = [
+            '.erp-role-center-detail__identity',
+            '.erp-role-center-tools',
+            '.erp-role-center-actions',
+            '.erp-permission-checklist-search',
+            '.erp-permission-checklist-filter',
+            '.erp-permission-capability-toolbar',
+            '.erp-permission-expand-actions',
+          ]
+          return {
+            workspace: root.getBoundingClientRect().toJSON(),
+            head: rect('.erp-role-center-detail__head'),
+            filter: rect('.erp-permission-checklist-toolbar'),
+            items: selectors.map((selector) => ({ selector, ...rect(selector) })),
+            controls: [...root.querySelectorAll('.erp-role-center-detail__head button.ant-btn, .erp-permission-checklist-toolbar button.ant-btn')]
+              .filter((node) => node.getBoundingClientRect().width > 0)
+              .map((node) => ({ text: node.textContent.trim(), ...node.getBoundingClientRect().toJSON() })),
+          }
+        })
+        const assertContained = (geometry) => {
+          for (const box of [...geometry.items, ...geometry.controls]) {
+            assert(box.left >= geometry.workspace.left - 1 && box.right <= geometry.workspace.right + 1,
+              `顶部入口不应横向溢出: ${JSON.stringify({ box, geometry })}`)
+          }
+          for (let i = 0; i < geometry.items.length; i += 1) {
+            for (const other of geometry.items.slice(i + 1)) {
+              const box = geometry.items[i]
+              const overlapX = Math.min(box.right, other.right) - Math.max(box.left, other.left)
+              const overlapY = Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top)
+              assert(overlapX <= 1 || overlapY <= 1, `顶部区域重叠: ${JSON.stringify({ box, other })}`)
+            }
+          }
+        }
+        const assertTwoRows = async () => {
+          const geometry = await readGeometry()
+          assertContained(geometry)
+          assert(geometry.filter.bottom - geometry.head.top <= 120,
+            `宽屏顶部应收为两行: ${JSON.stringify(geometry)}`)
+          for (const boxes of [geometry.items.slice(0, 3), geometry.items.slice(3)]) {
+            const centers = boxes.map((box) => box.y + box.height / 2)
+            assert(Math.max(...centers) - Math.min(...centers) <= 1,
+              `同行控件应垂直对齐: ${JSON.stringify(geometry)}`)
+          }
+          const search = geometry.items[3]
+          assert(search.width >= 200 && search.width <= 320, JSON.stringify(search))
+          assert(geometry.controls.every((box) => box.height >= 28), '合并工具行不应缩小按钮触区')
+          return geometry
+        }
+        const initial = await assertTwoRows()
+        const selection = await readSelection(page)
+        const permission = page.getByRole('checkbox', { name: '查看销售订单', exact: true })
+        const checked = await permission.isChecked()
+        await permission.setChecked(!checked)
+        await page.getByText('有未保存调整', { exact: true }).waitFor()
+        await assertTwoRows()
+        const dirtySelection = await readSelection(page)
+        for (const width of [1280, 1024, 390]) {
+          await page.setViewportSize({ width, height: 900 })
+          assertContained(await readGeometry())
+          await assertNoHorizontalOverflow(page, `permission-toolbar-${width}`)
+          assert.deepEqual(await readSelection(page), dirtySelection, '换行不得改变权限草稿')
+          assert.equal(await page.getByRole('button', { name: '保存岗位设置', exact: true }).isEnabled(), true)
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await permission.setChecked(checked)
+        assert.deepEqual(await readSelection(page), selection)
+        await page.getByText('当前设置已保存', { exact: true }).waitFor()
+        const title = workspace.locator('h5')
+        const originalTitle = await title.textContent()
+        await title.evaluate((node) => { node.textContent = '跨工厂生产计划与质量管理协同岗位（长名称布局验证）' })
+        assertContained(await readGeometry())
+        await title.evaluate((node, text) => { node.textContent = text }, originalTitle)
+        const restored = await assertTwoRows()
+        assert.equal(restored.filter.bottom - restored.head.top, initial.filter.bottom - initial.head.top)
+        assert.equal(await page.getByRole('button', { name: '保存岗位设置', exact: true }).isDisabled(), true)
+      },
+    },
     ...[
       {
         name: 'permission-center-fullscreen-desktop',
@@ -995,8 +1084,11 @@ export function createPermissionUnifiedScenarios({
         assert.equal(geometry.matrixColumns, 5)
         assert(geometry.matrix.width <= geometry.groups.width + 1)
         assert(
-          geometry.head.bottom <= geometry.tools.y + 1 &&
-            geometry.tools.bottom <= geometry.toolbar.y + 1 &&
+          geometry.tools.y >= geometry.head.y &&
+            geometry.tools.bottom <= geometry.head.bottom &&
+            Math.abs(geometry.head.bottom - geometry.toolbar.y) <= 1 &&
+            Math.abs(geometry.toolbar.bottom - geometry.groups.y) <= 1 &&
+            geometry.toolbar.bottom - geometry.head.y <= 120 &&
             geometry.settings.bottom <= geometry.viewport,
           JSON.stringify(geometry)
         )
@@ -1205,6 +1297,8 @@ export function createPermissionUnifiedScenarios({
         const fullGeometry = await fullWorkspace.evaluate((node) => {
           const box = node.getBoundingClientRect()
           const table = node.querySelector('.permission-groups')
+          const head = node.querySelector('.permission-toolbar').getBoundingClientRect()
+          const filter = node.querySelector('.permission-filter-toolbar').getBoundingClientRect()
           return {
             x: box.x,
             y: box.y,
@@ -1212,6 +1306,7 @@ export function createPermissionUnifiedScenarios({
             height: box.height,
             viewport: [innerWidth, innerHeight],
             tableHeight: table.clientHeight,
+            toolbarHeight: filter.bottom - head.top,
           }
         })
         assert.deepEqual([fullGeometry.x, fullGeometry.y], [0, 0])
@@ -1220,6 +1315,7 @@ export function createPermissionUnifiedScenarios({
           fullGeometry.viewport
         )
         assert(fullGeometry.tableHeight > geometry.height)
+        assert(fullGeometry.toolbarHeight <= 120, JSON.stringify(fullGeometry))
         await frame
           .getByRole('button', { name: '配置数据范围', exact: true })
           .click()
