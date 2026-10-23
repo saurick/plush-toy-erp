@@ -62,12 +62,41 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 构建和验证子进程同样设置 `GIT_OPTIONAL_LOCKS=0`。文件名差异须核对内容，不能把时间戳变化当成修改；保留其他任务的未提交内容。
 
+<a id="git-commit-entry"></a>
+
+## 本地提交入口 / Local commit entry
+
+多个聊天共用同一工作目录时，也共用暂存区和 HEAD。已获用户提交授权后，统一使用 `git-hooks/commit-scope.py`（Python 3，macOS / Linux），将候选核对、精确暂存、原有 hooks 和提交放在同一次进程互斥中。仅新增聊天、验证通过或生成补丁均不产生提交授权。
+
+1. 读取当前完整 HEAD SHA，核对归属和必要验证。整文件都属于本次提交时，使用精确文件路径；同文件混有其他任务改动时，准备相对该 SHA 的已审查 Git 补丁。保留 binary diff 和新增 / 删除路径，不在共享 index 中提前暂存。
+2. 在仓库根目录执行以下一种方式，将占位内容换成实际审核结果：
+
+   ```bash
+   python3 scripts/git-hooks/commit-scope.py --base <已审查的完整HEAD> \
+     --message 'fix(scope): 中文摘要' -- path/to/owned-file
+
+   python3 scripts/git-hooks/commit-scope.py --base <已审查的完整HEAD> \
+     --message 'fix(scope): 中文摘要' --patch /absolute/path/reviewed.patch
+   ```
+
+3. 回读提交 SHA、提交文件 / hunk 和剩余差异。脚本不推送，不省略项目 hooks；推送继续使用独立授权和原有门禁。
+
+| 情况 | 入口行为与后续 |
+| --- | --- |
+| 另一提交正在运行 | 使用同一 OS 文件锁等待一次，默认 45 秒，`--wait-seconds` 允许 0–60 秒；超时退出，不暂存、不重试。进程退出自动释放锁，无后台队列 |
+| 等待期间 HEAD 前进 | 仅当前 HEAD 是基线后继、且本次涉及文件的已提交内容未变时接续，重新运行 hooks；同文件变化须重新核对补丁 |
+| 原有暂存完全等于已审查候选 | 可以复用，支持裸提交被门禁拒绝后的恢复；任何额外或不一致的暂存都保留并停止 |
+| hooks 失败 | 完整 index 和 HEAD 未漂移时只撤销本次新加的暂存，保留工作文件；原有暂存或外来漂移保留供核对 |
+| Git `index.lock` 存在 | 保留原锁，按全局 `git-closeout-coordination` 核验；入口不自动恢复或删除 Git 锁 |
+
+pre-commit 与 commit-msg 检查持锁身份、分支、HEAD、完整候选和范围内工作文件；普通裸提交会提示改用此入口。`index.codex-commit-once.lock` 是持久的 OS 锁载体，文件存在不表示被占用，不删除它。该入口协调遵守约定的提交进程，不能阻止编辑器同时改同一文件或绕过 hooks 的外部 Git 命令；出现这类漂移须核对现场，不强行合并或反复重试。
+
 ## Hook 对应关系
 
 | Hook | 脚本与职责 |
 | --- | --- |
-| pre-commit | `git-hooks/pre-commit.sh`，只读 staged 快照并执行 db-guard，不生成、不 apply、不重新暂存 |
-| commit-msg | `git-hooks/commit-msg.sh`，校验项目提交格式 |
+| pre-commit | 先后核对提交互斥与候选；`git-hooks/pre-commit.sh` 只读 staged 快照并执行 db-guard，不生成、不 apply、不重新暂存 |
+| commit-msg | 先后核对提交互斥与候选；`git-hooks/commit-msg.sh` 校验项目提交格式 |
 | pre-push | `git-hooks/pre-push.sh`，核对真实 push 范围、签名回执、TTL 与最新 secrets；不现场回退到 full |
 
 回执不替代远端 protected main 与同 SHA 的 `CI Gate`。数据库可编程对象、schema / migration 和目标读回规则统一见 [模型与迁移](../server/docs/ent.md)。

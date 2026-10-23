@@ -2,4 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
+python3 "$ROOT_DIR/scripts/git-hooks/commit-scope.py" --verify
 "$ROOT_DIR/scripts/git-hooks/pre-commit.sh"
+python3 "$ROOT_DIR/scripts/git-hooks/commit-scope.py" --verify
