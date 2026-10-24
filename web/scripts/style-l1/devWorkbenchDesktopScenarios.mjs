@@ -64,7 +64,7 @@ export function createDevWorkbenchDesktopScenarios({
   assertNoHorizontalOverflow,
   expectHeading,
 }) {
-  return ORDINARY_DEV_ROUTES.map((item) => ({
+  const scenarios = ORDINARY_DEV_ROUTES.map((item) => ({
     name: `dev-page-${item.key}-desktop-light`,
     path: item.route,
     ...(item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE
@@ -697,6 +697,7 @@ export function createDevWorkbenchDesktopScenarios({
           .getByRole('region', { name: '门禁结果', exact: true })
           .waitFor()
         await switchEvidence('运行与验收')
+        assert.equal(await page.getByRole('region', { name: '服务器测试与交付证据', exact: true }).count(), 0, '服务器证据只在独立入口读取')
         assert((await coverage.innerText()).includes('RPC 夹具只证明页面协作'))
         await page.goBack()
         await coverage
@@ -1144,4 +1145,105 @@ export function createDevWorkbenchDesktopScenarios({
       await assertNoHorizontalOverflow(page, item.route)
     },
   }))
+  return [...scenarios, createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow })]
+}
+
+function createTestingReportLayoutScenario({ assert, assertNoHorizontalOverflow }) {
+  const counts = { total: 100, executed: 100, passed: 100, failed: 0, skipped: 0 }
+  const report = {
+    schemaVersion: 'plush-test-coverage-report/v1',
+    generatedAt: '2026-10-24T04:49:17Z',
+    repository: { commit: 'a'.repeat(40), fingerprint: 'b'.repeat(64), dirty: false },
+    codeCoverage: {
+      go: { ...counts, status: 'collected', metrics: { statements: { covered: 42305, total: 252400 } }, note: 'Go 包含生成代码，未执行 PostgreSQL 测试。', evidence: [`output/qa/${'long-evidence-path-'.repeat(16)}coverage.out`] },
+      web: { ...counts, status: 'collected', metrics: { lines: { percentage: 59.4 }, branches: { percentage: 84.1 }, functions: { percentage: 79.7 } }, note: 'Web 仅统计实际加载模块，不等于浏览器覆盖。' },
+    },
+    businessCoverage: { ...counts, status: 'passed' },
+    gates: [{ key: 'T5', label: '页面与浏览器', ...counts, status: 'passed' }],
+    acceptance: {},
+  }
+  let status = 'current'
+  const writes = []
+  return {
+    name: 'dev-testing-report-layout-desktop-light',
+    path: '/__dev/testing?view=coverage',
+    viewport: { width: 1280, height: 720 },
+    beforeNavigate: async (page) => {
+      page.on('request', (request) => {
+        if (request.url().includes('/__dev/api/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) writes.push(request.url())
+      })
+      await page.route('**/__dev/api/qa/coverage', (route) => route.fulfill({ json: { status, report: ['missing', 'failed'].includes(status) ? null : report } }))
+      await page.route('**/__dev/api/qa/coverage/snapshot', (route) => route.fulfill({ json: { status: 'snapshot', report: { ...report, snapshot: { kind: 'isolated' } } } }))
+    },
+    verify: async (page) => {
+      const coverage = page.locator('.erp-dev-testing-coverage-view')
+      const evidenceTabs = coverage.getByRole('tablist', { name: '覆盖证据类型' })
+      const source = coverage.locator('.erp-dev-testing-coverage-source')
+      const reload = () => coverage.getByRole('button', { name: '重新读取', exact: true }).click()
+      await coverage.getByText('报告与当前仓库指纹匹配', { exact: true }).waitFor()
+      await page.getByLabel('执行与报告来源').getByText('报告来源：本地工作台', { exact: true }).waitFor()
+      assert.equal(await page.getByRole('region', { name: '服务器测试与交付证据', exact: true }).count(), 0)
+      assert.equal(await coverage.locator('.ant-alert-success').count(), 0, '身份匹配不能呈现为整页测试成功')
+      const codeRows = coverage.locator('.erp-dev-testing-coverage-grid--code > article')
+      const go = codeRows.filter({ hasText: '后端 Go' })
+      for (const viewport of [{ width: 1280, height: 720 }, { width: 1024, height: 768 }, { width: 1920, height: 1080 }]) {
+        await page.setViewportSize(viewport)
+        await page.locator('.erp-dev-testing-primary-nav').scrollIntoViewIfNeeded()
+        const readingBoxes = await codeRows.evaluateAll((rows) => rows.map((row) => {
+          const rect = row.getBoundingClientRect()
+          return { top: rect.top, bottom: rect.bottom }
+        }))
+        assert.equal(readingBoxes.length, 2)
+        assert(readingBoxes.every((box) => box.top >= 0 && box.bottom < viewport.height - 40), `Go / Web 读数应在 ${viewport.width} 首屏完整可读`)
+        await assertNoHorizontalOverflow(page, `报告布局 ${viewport.width}`)
+      }
+      assert.equal(await go.getByText(report.codeCoverage.go.note, { exact: true }).isVisible(), false, '正常口径按需阅读')
+      await go.locator('summary').click()
+      await go.getByText(report.codeCoverage.go.note, { exact: true }).waitFor()
+      await go.getByText(report.codeCoverage.go.evidence[0], { exact: true }).waitFor()
+      await assertNoHorizontalOverflow(page, '长证据路径原处展开')
+      await go.locator('summary').click()
+      const details = coverage.locator('.erp-dev-testing-coverage-report-details')
+      await details.locator('summary').click()
+      await details.getByText(report.repository.fingerprint, { exact: true }).waitFor()
+      await details.locator('summary').click()
+      for (const [index, label] of ['业务场景', '关键规则', '门禁结果', '运行与验收', '代码覆盖'].entries()) {
+        const optionIndex = index === 4 ? 0 : index + 1
+        await verifySlidingMotion(page, assert, '.erp-dev-testing-coverage-tabs', optionIndex, index % 2 === 0)
+        await evidenceTabs.getByRole('tab', { name: new RegExp(`^${label}`, 'u'), selected: true }).waitFor()
+        assert.equal(await page.getByRole('region', { name: '服务器测试与交付证据', exact: true }).count(), 0, '报告页签不重复挂载服务器证据')
+        await assertNoHorizontalOverflow(page, label)
+      }
+      await source.getByText('历史隔离验证', { exact: true }).click()
+      await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()
+      await page.reload()
+      await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()
+      await source.getByText('当前工作区', { exact: true }).click()
+      await coverage.getByText('报告与当前仓库指纹匹配', { exact: true }).waitFor()
+      status = 'stale'
+      report.codeCoverage.go = { ...report.codeCoverage.go, status: 'failed', passed: 99, failed: 1, note: '编译失败，测试未完成。' }
+      await reload()
+      await coverage.getByText('覆盖报告已过期', { exact: true }).waitFor()
+      await go.getByText('编译失败，测试未完成。', { exact: true }).waitFor()
+      await go.locator('[data-issue="failed"]').getByText('失败 1', { exact: true }).waitFor()
+      await assertNoHorizontalOverflow(page, '过期与失败报告')
+      report.codeCoverage.go = { ...report.codeCoverage.go, status: 'collected', failed: 0, skipped: 1, note: '已有覆盖率，但有 1 条用例跳过。' }
+      await reload()
+      await go.getByText(report.codeCoverage.go.note, { exact: true }).waitFor()
+      await go.locator('[data-issue="skipped"]').getByText('跳过 1', { exact: true }).waitFor()
+      status = 'failed'
+      await reload()
+      await coverage.getByText('覆盖报告读取失败', { exact: true }).waitFor()
+      status = 'missing'
+      await reload()
+      await coverage.getByText('当前工作区尚未验证', { exact: true }).waitFor()
+      assert.equal(await codeRows.count(), 0, '缺报告不能回填旧读数')
+      status = 'current'
+      report.codeCoverage.go = { ...report.codeCoverage.go, status: 'collected', passed: 100, failed: 0, skipped: 0, note: 'Go 包含生成代码，未执行 PostgreSQL 测试。' }
+      await reload()
+      await coverage.getByText('报告与当前仓库指纹匹配', { exact: true }).waitFor()
+      await go.getByText('已执行 100', { exact: true }).waitFor()
+      assert.deepEqual(writes, [], '布局核验不启动采集或其他写入')
+    },
+  }
 }

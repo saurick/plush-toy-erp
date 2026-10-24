@@ -628,9 +628,7 @@
   padding: 14px;
 }
 
-.erp-dev-testing-coverage-overview,
 .erp-dev-testing-coverage-identity,
-.erp-dev-testing-coverage-section,
 .erp-dev-testing-coverage-loading,
 .erp-dev-testing-coverage-empty {
   border: 1px solid var(--erp-border);
@@ -641,7 +639,6 @@
 .erp-dev-testing-coverage-overview {
   display: grid;
   gap: 10px;
-  padding: 12px;
 }
 
 .erp-dev-testing-coverage-operation {
@@ -786,7 +783,6 @@
 .erp-dev-testing-coverage-section {
   display: grid;
   gap: 12px;
-  padding: 14px;
 }
 
 .erp-dev-testing-coverage-section__head {
@@ -885,11 +881,9 @@
 }
 
 .erp-dev-testing-coverage-card__counts span {
-  border: 1px solid var(--erp-border);
-  border-radius: 999px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
-  padding: 3px 7px;
+  font-variant-numeric: tabular-nums;
 }
 
 .erp-dev-testing-coverage-card__note,

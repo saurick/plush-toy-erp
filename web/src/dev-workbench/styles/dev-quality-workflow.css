@@ -176,6 +176,29 @@
   overflow-wrap: anywhere;
 }
 
+.erp-dev-testing-coverage-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-dev-testing-coverage-summary > span:first-child {
+  color: var(--erp-text);
+}
+
+.erp-dev-testing-coverage-summary > :last-child {
+  margin-inline-start: auto;
+}
+
+.erp-dev-testing-coverage-last-run {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .erp-dev-testing-related {
   display: flex;
   flex-wrap: wrap;
@@ -941,6 +964,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.erp-dev-testing-coverage-identity__fingerprint {
+  grid-column: 1 / -1;
+}
+
 .erp-dev-testing-coverage-identity__details {
   grid-column: 1 / -1;
 }
@@ -984,10 +1011,7 @@
 .erp-dev-testing-coverage-matrix__head,
 .erp-dev-testing-coverage-card {
   display: grid;
-  grid-template-columns: minmax(190px, 0.8fr) minmax(250px, 1.15fr) minmax(
-      240px,
-      1.2fr
-    );
+  grid-template-columns: minmax(150px, 0.55fr) minmax(250px, 1.5fr) minmax(210px, 0.8fr);
   min-width: 0;
   gap: 14px;
 }
@@ -1042,7 +1066,7 @@
 }
 
 .erp-dev-testing-coverage-card__head {
-  grid-template-columns: minmax(0, 1fr) auto;
+  justify-items: start;
 }
 
 .erp-dev-testing-coverage-card__metrics {
@@ -1050,11 +1074,26 @@
 }
 
 .erp-dev-testing-coverage-card__metrics > span {
-  padding: 5px 7px;
+  padding: 0;
+  background: transparent;
 }
 
 .erp-dev-testing-coverage-card__metrics b {
-  font-size: var(--erp-font-body);
+  font-size: var(--erp-font-emphasis);
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-dev-testing-coverage-card__counts {
+  gap: 4px 14px;
+}
+
+.erp-dev-testing-coverage-card__counts [data-issue] {
+  color: var(--erp-warning-text);
+  font-weight: 600;
+}
+
+.erp-dev-testing-coverage-card__counts [data-issue='failed'] {
+  color: var(--erp-visual-danger-text);
 }
 
 .erp-dev-testing-coverage-card__no-reading,

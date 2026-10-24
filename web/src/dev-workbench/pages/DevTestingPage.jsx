@@ -292,6 +292,7 @@ const COVERAGE_COUNT_LABELS = Object.freeze({
   blocked: '受阻',
   missing: '缺失',
 })
+const COVERAGE_ISSUE_COUNTS = ['failed', 'skipped', 'blocked', 'missing']
 
 function coverageTagColor(tone) {
   if (tone === 'primary') return 'blue'
@@ -313,7 +314,7 @@ function CoverageStatusTag({ status }) {
   )
 }
 
-function CoverageEvidenceCard({ item, showScenarios = false }) {
+function CoverageEvidenceCard({ item, showScenarios = false, noteInDetails = false }) {
   const [onlyIncomplete, setOnlyIncomplete] = useState(false)
   const scenarios = item?.scenarios || []
   const visibleScenarios = onlyIncomplete
@@ -328,6 +329,8 @@ function CoverageEvidenceCard({ item, showScenarios = false }) {
     (key === 'total' ? value !== item?.counts?.executed : value > 0)
   )
   const evidence = Array.isArray(item?.evidence) ? item.evidence : []
+  const deferNote = noteInDetails && ['collected', 'passed'].includes(item?.status) &&
+    item?.counts?.executed > 0 && !counts.some(([key, value]) => value > 0 && COVERAGE_ISSUE_COUNTS.includes(key))
   const ScenarioContainer = showScenarios ? 'section' : 'details'
 
   return (
@@ -359,7 +362,7 @@ function CoverageEvidenceCard({ item, showScenarios = false }) {
         {counts.length > 0 ? (
           <div className="erp-dev-testing-coverage-card__counts">
             {summaryCounts.map(([key, value]) => (
-              <span key={key}>
+              <span key={key} data-issue={value > 0 && COVERAGE_ISSUE_COUNTS.includes(key) ? key : undefined}>
                 {COVERAGE_COUNT_LABELS[key] || key} {value}
               </span>
             ))}
@@ -372,12 +375,13 @@ function CoverageEvidenceCard({ item, showScenarios = false }) {
         ) : null}
       </div>
       <div className="erp-dev-testing-coverage-card__conclusion">
-        {item?.note ? (
+        {item?.note && !deferNote ? (
           <p className="erp-dev-testing-coverage-card__note">{item.note}</p>
         ) : null}
-        {evidence.length > 0 || counts.length > 0 ? (
+        {evidence.length > 0 || counts.length > 0 || (deferNote && item?.note) ? (
           <details className="erp-dev-disclosure erp-dev-testing-coverage-card__details">
-            <summary>证据与计数</summary>
+            <summary>口径与证据</summary>
+            {deferNote && item?.note ? <p className="erp-dev-testing-coverage-card__note">{item.note}</p> : null}
             {counts.length > 0 ? <p>{counts.map(([key, value]) => `${COVERAGE_COUNT_LABELS[key] || key} ${value}`).join(' · ')}</p> : null}
             <div className="erp-dev-testing-coverage-card__evidence">
               {evidence.map((entry) => (
@@ -1148,6 +1152,13 @@ function CoverageReportView({
   const shortCommit = repository.commit
     ? repository.commit.slice(0, 12)
     : '未记录'
+  const reportSummary = (
+    <div className="erp-dev-testing-coverage-summary">
+      <span>{loading && !report ? '正在读取报告…' : alert.title}</span>
+      <Text type="secondary">{alert.description}</Text>
+      {report ? <DevTimestamp value={report.generatedAt} action="采集于" missing="采集时间未记录" /> : null}
+    </div>
+  )
 
   return (
     <div
@@ -1200,19 +1211,13 @@ function CoverageReportView({
             </Button>
           </div>
         </div>
-        <Alert
-          showIcon
-          type={alert.type}
-          message={alert.title}
-          description={alert.description}
-        />
+        {['stale', 'failed'].includes(activeState?.status) ? (
+          <Alert showIcon type={alert.type} message={reportSummary} />
+        ) : (
+          <div role="status">{reportSummary}</div>
+        )}
         {operationError || (operation && operation.status !== 'completed') ? (
           <CoverageOperationPanel operation={operation} error={operationError} />
-        ) : operation ? (
-          <details className="erp-dev-disclosure erp-dev-testing-coverage-last-run">
-            <summary>上次采集：{operationPresentation.label}</summary>
-            <CoverageOperationPanel operation={operation} error={operationError} />
-          </details>
         ) : null}
 
       </div>
@@ -1247,10 +1252,6 @@ function CoverageReportView({
       >
         {section === 'rules' ? <DevBusinessRulesPanel report={report} reportCurrent={source === 'workspace' && activeState?.status === 'current'} onRunConsistency={onRunConsistency} consistencyBusy={!qaReady || qaBusy?.active} /> : null}
 
-        {section === 'acceptance' ? (
-          <DevTestingStrategyGuide source={strategySource} evidence />
-        ) : null}
-
         {loading && !report && section !== 'rules' ? (
           <section
             className="erp-dev-testing-coverage-loading"
@@ -1271,24 +1272,14 @@ function CoverageReportView({
 
         {report && section !== 'rules' ? (
           <>
-            <details className="erp-dev-disclosure erp-dev-testing-coverage-report-details">
-              <summary>报告详情 · <DevTimestamp value={report.generatedAt} missing="时间未记录" /></summary>
-              <div className="erp-dev-testing-coverage-identity">
-                <span><small>来源</small>{source === 'snapshot' ? '历史隔离验证' : '工作区报告'}</span>
-                <span><small>提交</small><code>{shortCommit}</code></span>
-                <span><small>源码</small>{repository.dirty === null ? '未记录' : repository.dirty ? '有未提交改动' : '干净'}</span>
-                <span><small>Fingerprint</small><code>{repository.fingerprint || '未记录'}</code></span>
-              </div>
-            </details>
-
             {section === 'code' ? (
               <CoverageSection
                 title="代码覆盖"
                 description="Go 含生成物，Web 仅计已加载模块；均不等于本轮改动覆盖。"
               >
                 <div className="erp-dev-testing-coverage-grid erp-dev-testing-coverage-grid--code">
-                  <CoverageEvidenceCard item={report.codeCoverage.go} />
-                  <CoverageEvidenceCard item={report.codeCoverage.web} />
+                  <CoverageEvidenceCard item={report.codeCoverage.go} noteInDetails />
+                  <CoverageEvidenceCard item={report.codeCoverage.web} noteInDetails />
                 </div>
               </CoverageSection>
             ) : null}
@@ -1403,52 +1394,73 @@ function CoverageReportView({
             ) : null}
           </>
         ) : null}
-      </div>
-      <details className="erp-dev-disclosure erp-dev-testing-coverage-boundary">
-        <summary>采集与判定说明</summary>
-        <div className="erp-dev-testing-coverage-scope-map">
-          <section>
-            <strong>本页证明</strong>
-            <ul>
-              <li>报告是否绑定当前仓库身份</li>
-              <li>各层证据的状态、读数与缺口</li>
-            </ul>
-          </section>
-          <section>
-            <strong>本页不证明</strong>
-            <ul>
-              <li>未采集的数据库、浏览器或目标环境结果</li>
-              <li>发布、恢复可用或客户 UAT 已完成</li>
-            </ul>
-          </section>
-        </div>
-        <Paragraph>
-          空值表示未采集，不是 0%。“重新读取”只读取当前工作台保存的报告，历史报告的执行环境与范围按原始证据核对。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
-          和 0 tests executed
-          均不能算通过。
-        </Paragraph>
-        {import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
-          <Paragraph>采集覆盖基线请到本地开发机工作台；服务器 CI 测试与覆盖率在“服务器验证”核对。</Paragraph>
-        ) : (
-          <>
-            <Paragraph>
-              采集本地覆盖基线固定运行真实本地 baseline 测试并聚合报告，不会执行数据库写入、真实业务浏览器、目标环境部署或客户 UAT。
-              切换页面不会停止后台任务。应在代码基本稳定的检查点运行，不必每次编辑后执行；开发接口不可用时，可在本地开发机运行备用命令 {DEV_TESTING_COVERAGE_COLLECT_COMMAND}。
-            </Paragraph>
-            <Button icon={<CopyOutlined />} onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}>复制本地采集命令</Button>
-          </>
-        )}
-        {report?.policy.length > 0 ? (
-          <div className="erp-dev-testing-coverage-policy-list">
-            {report.policy.map((item) => (
-              <article key={item.key}>
-                <strong>{item.label}</strong>
-                <p>{item.note}</p>
-              </article>
-              ))}
+        {section === 'acceptance' ? <DevTestingStrategyGuide source={strategySource} evidence /> : null}
+        {report || operation?.status === 'completed' ? (
+          <details className="erp-dev-disclosure erp-dev-testing-coverage-report-details">
+            <summary>报告详情与采集记录</summary>
+            {report ? (
+              <div className="erp-dev-testing-coverage-identity">
+                <span><small>来源</small>{source === 'snapshot' ? '历史隔离验证' : '工作区报告'}</span>
+                <span><small>提交</small><code>{shortCommit}</code></span>
+                <span><small>源码</small>{repository.dirty === null ? '未记录' : repository.dirty ? '有未提交改动' : '干净'}</span>
+                <span><small>采集时间</small><DevTimestamp value={report.generatedAt} missing="时间未记录" /></span>
+                <span className="erp-dev-testing-coverage-identity__fingerprint"><small>Fingerprint</small><code>{repository.fingerprint || '未记录'}</code></span>
+              </div>
+            ) : null}
+            {operation?.status === 'completed' ? (
+              <div className="erp-dev-testing-coverage-last-run">
+                <Text strong>工作区上次采集：{operationPresentation.label}</Text>
+                <CoverageOperationPanel operation={operation} error="" />
+              </div>
+            ) : null}
+          </details>
+        ) : null}
+        <details className="erp-dev-disclosure erp-dev-testing-coverage-boundary">
+          <summary>采集与判定说明</summary>
+          <div className="erp-dev-testing-coverage-scope-map">
+            <section>
+              <strong>本页证明</strong>
+              <ul>
+                <li>报告是否绑定当前仓库身份</li>
+                <li>各层证据的状态、读数与缺口</li>
+              </ul>
+            </section>
+            <section>
+              <strong>本页不证明</strong>
+              <ul>
+                <li>未采集的数据库、浏览器或目标环境结果</li>
+                <li>发布、恢复可用或客户 UAT 已完成</li>
+              </ul>
+            </section>
           </div>
-          ) : null}
-      </details>
+          <Paragraph>
+            空值表示未采集，不是 0%。“重新读取”只读取当前工作台保存的报告，历史报告的执行环境与范围按原始证据核对。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
+            和 0 tests executed
+            均不能算通过。
+          </Paragraph>
+          {import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
+            <Paragraph>采集覆盖基线请到本地开发机工作台；服务器 CI 测试与覆盖率在“服务器验证”核对。</Paragraph>
+          ) : (
+            <>
+              <Paragraph>
+                采集本地覆盖基线固定运行真实本地 baseline 测试并聚合报告，不会执行数据库写入、真实业务浏览器、目标环境部署或客户 UAT。
+                切换页面不会停止后台任务。应在代码基本稳定的检查点运行，不必每次编辑后执行；开发接口不可用时，可在本地开发机运行备用命令 {DEV_TESTING_COVERAGE_COLLECT_COMMAND}。
+              </Paragraph>
+              <Button icon={<CopyOutlined />} onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}>复制本地采集命令</Button>
+            </>
+          )}
+          {report?.policy.length > 0 ? (
+            <div className="erp-dev-testing-coverage-policy-list">
+              {report.policy.map((item) => (
+                <article key={item.key}>
+                  <strong>{item.label}</strong>
+                  <p>{item.note}</p>
+                </article>
+                ))}
+            </div>
+            ) : null}
+        </details>
+      </div>
     </div>
   )
 }
