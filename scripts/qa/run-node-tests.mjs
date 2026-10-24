@@ -12,6 +12,7 @@ import {
   NODE_TEST_GROUPS,
 } from "./node-test-groups.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
+import { nativeNodeReportArgs } from "./ci-native-reports.mjs";
 
 const DEFAULT_REPO_ROOT = path.resolve(import.meta.dirname, "..", "..");
 const DEFAULT_TEST_ROOT = path.resolve(import.meta.dirname, "..");
@@ -193,6 +194,13 @@ export function parseArgs(argv) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === "--gitlab-report") {
+      const label = argv[++index];
+      if (!/^[a-z][a-z0-9_-]*$/u.test(label || ""))
+        throw new Error("invalid GitLab report label");
+      options.gitlabReport = label;
+      continue;
+    }
     if (arg === "--list") {
       options.list = true;
       continue;
@@ -375,8 +383,15 @@ export async function writeNodeTestFailureDiagnostic(filePath, diagnostic) {
   }
 }
 
-export function buildNodeTestArgs(tests) {
-  return ["--test", "--test-reporter=tap", "--test-concurrency=1", ...tests];
+export function buildNodeTestArgs(
+  tests,
+  reportLabel = "",
+  root = DEFAULT_REPO_ROOT,
+) {
+  const reporters = reportLabel
+    ? nativeNodeReportArgs(root, reportLabel)
+    : ["--test-reporter=tap"];
+  return ["--test", ...reporters, "--test-concurrency=1", ...tests];
 }
 
 function printHelp() {
@@ -423,11 +438,15 @@ async function main() {
   console.log(
     `[qa:node-tests] profile=${options.profile} running=${tests.length}`,
   );
-  const result = spawnSync(process.execPath, buildNodeTestArgs(tests), {
-    cwd: path.resolve(options.rootDir, ".."),
-    encoding: "utf8",
-    maxBuffer: 128 * 1024 * 1024,
-  });
+  const result = spawnSync(
+    process.execPath,
+    buildNodeTestArgs(tests, options.gitlabReport),
+    {
+      cwd: path.resolve(options.rootDir, ".."),
+      encoding: "utf8",
+      maxBuffer: 128 * 1024 * 1024,
+    },
+  );
   process.stdout.write(result.stdout || "");
   process.stderr.write(result.stderr || "");
   const outcome = classifyNodeTestResult(result);

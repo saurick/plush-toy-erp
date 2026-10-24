@@ -58,7 +58,8 @@ test('each target dimension fails closed on missing, false, mismatched and histo
     (x) => { x.operations['operation-0'].gitlabRecord.status = 'unavailable' },
     (x) => { x.operations['operation-0'].evidence.receiptSha256 = null },
     (x) => { x.operations['operation-0'].target = 'production-133' },
-    (x) => { x.delivery.repository = { ...x.delivery.repository, dirty: true } },
+    (x) => { x.operations['operation-0'].gitSha = 'f'.repeat(40) },
+    (x) => { x.delivery.targets[0].preflight.status = 'unavailable' },
     (x) => { x.delivery.targets[0].preflight.remote.runtime.webSha = 'f'.repeat(40) },
   ]) {
     const input = fixture(); mutate(input)
@@ -66,6 +67,18 @@ test('each target dimension fails closed on missing, false, mismatched and histo
   }
   const input = fixture(); input.quality.repository = { ...input.quality.repository, fingerprint: 'e'.repeat(64) }
   assert.equal(buildDevVerificationEvidence(input).ci.passed, false)
+})
+
+test('independent workbench updates preserve proof of the running ERP SHA without claiming the candidate is deployed', () => {
+  const input = fixture()
+  input.delivery.repository = { ...input.delivery.repository, commit: 'e'.repeat(40) }
+  input.quality.repository = input.delivery.repository
+  const result = buildDevVerificationEvidence(input)
+  assert.equal(result.ci.passed, true)
+  assert.equal(result.passed, false)
+  assert(result.targets.every((target) => target.passed && !target.current && target.runtimeSha === SHA))
+  input.delivery.repository.dirty = true
+  assert(buildDevVerificationEvidence(input).targets.every((target) => target.passed))
 })
 
 test('a later failed or unknown attempt is never hidden by an older successful receipt', () => {

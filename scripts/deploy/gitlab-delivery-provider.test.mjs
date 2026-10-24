@@ -918,3 +918,71 @@ test("release status follows the recorded pipeline instead of another attempt at
   actualSha = "b".repeat(40);
   await assert.rejects(provider.getReleaseStatus(SHA, { pipelineId: 91 }), /does not match/u);
 });
+
+test("GitLab native reports bind counts, coverage and deep links to the exact pipeline SHA", async () => {
+  let sha = SHA;
+  let total = {
+    count: 5,
+    success: 3,
+    failed: 1,
+    skipped: 1,
+    error: 0,
+    suite_error: null,
+  };
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(),
+    env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      if (url.endsWith("/test_report_summary")) return json({ total });
+      if (url.includes("/jobs?"))
+        return json([
+          {
+            id: 301,
+            name: "quality_web_checks",
+            status: "success",
+            coverage: "81.25",
+            artifacts_file: { filename: "artifacts.zip", size: 1024 },
+          },
+        ]);
+      return json({
+        id: 91,
+        iid: 17,
+        sha,
+        source: "push",
+        status: "success",
+        created_at: "2026-10-24T01:00:00Z",
+        finished_at: "2026-10-24T01:01:00Z",
+        web_url: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/pipelines/91`,
+      });
+    },
+  });
+  const reports = await provider.readPipelineReports({
+    pipelineId: 91,
+    sha: SHA,
+  });
+  assert.equal(reports.status, "available");
+  assert.equal(reports.tests.failed, 1);
+  assert.equal(reports.coverage[0].percent, 81.25);
+  assert.match(reports.testsUrl, /\/pipelines\/91\/test_report$/u);
+  assert.match(
+    reports.coverage[0].artifactUrl,
+    /\/jobs\/301\/artifacts\/browse\/output\/ci\/reports\/coverage\/$/u,
+  );
+  total = { count: 0, success: 0, failed: 0, skipped: 0, error: 0 };
+  const missing = await provider.readPipelineReports({
+    pipelineId: 91,
+    sha: SHA,
+  });
+  assert.equal(missing.status, "missing");
+  assert.equal(missing.testsUrl, null);
+  total.count = 2;
+  await assert.rejects(
+    provider.readPipelineReports({ pipelineId: 91, sha: SHA }),
+    /counts/u,
+  );
+  sha = "b".repeat(40);
+  await assert.rejects(
+    provider.readPipelineReports({ pipelineId: 91, sha: SHA }),
+    /mismatch/u,
+  );
+});

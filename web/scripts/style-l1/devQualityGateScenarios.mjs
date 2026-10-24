@@ -128,10 +128,6 @@ function serverCiTopologyJob(name) {
 const SERVER_CI_TOPOLOGY = Object.freeze(
   SERVER_JOB_TIMINGS.map(([name]) => Object.freeze(serverCiTopologyJob(name)))
 )
-const SERVER_CI_TOPOLOGY_EDGE_COUNT = SERVER_CI_TOPOLOGY.reduce(
-  (total, job) => total + job.needs.length,
-  0
-)
 
 function serverHistoryJobs(pipelineId, durationOffset = 0, failureJob = '') {
   const originByPipeline = {
@@ -419,6 +415,7 @@ function createServerEvidence(status = 'passed') {
     }))
     return {
       ...full,
+      reports: null,
       status,
       jobs,
       jobGuides: projectCiJobGuides(names),
@@ -438,6 +435,7 @@ function createServerEvidence(status = 'passed') {
   if (status === 'unavailable') {
     return {
       kind: 'plush.dev-quality-gate-server-evidence',
+      reports: null,
       status: 'unavailable',
       current: false,
       coversWorkingTree: false,
@@ -459,6 +457,7 @@ function createServerEvidence(status = 'passed') {
   if (status === 'missing') {
     return {
       kind: 'plush.dev-quality-gate-server-evidence',
+      reports: null,
       status: 'missing',
       current: false,
       coversWorkingTree: false,
@@ -480,6 +479,14 @@ function createServerEvidence(status = 'passed') {
   }
   return {
     kind: 'plush.dev-quality-gate-server-evidence',
+    reports: {
+      status: 'available',
+      gitSha: repository.commit,
+      pipelineId: 41,
+      tests: { count: 120, success: 118, failed: 1, skipped: 1, error: 0 },
+      testsUrl: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41/test_report',
+      coverage: serverHistoryJobs(41).filter((job) => job.name === 'quality_web_checks').map((job) => ({ job: job.name, percent: 81.25, url: job.url, artifactUrl: `${job.url}/artifacts/browse/output/ci/reports/coverage/` })),
+    },
     status: 'passed',
     current: true,
     coversWorkingTree: false,
@@ -910,216 +917,23 @@ export function createDevQualityGateScenarios({
           name: 'GitLab CI 质量证据',
         })
         await serverPanel.waitFor()
-        await serverPanel.locator('#gitlab-pipeline-flow-title').waitFor()
-        const dependencySource = serverPanel.locator('.erp-dev-tool-disclosure')
-        await dependencySource.locator('summary').click()
-        await dependencySource.getByText('依赖来自同一 SHA 的 CI 配置，状态与耗时来自实际 Pipeline。依赖不可读时不绘制推测连线。', { exact: true }).waitFor()
-        await dependencySource.locator('summary').click()
-        assert.equal(
-          await serverPanel
-            .getByRole('table', {
-              name: '本机阶段与 GitLab CI Job 对照',
-            })
-            .count(),
-          0
-        )
-        const pipelineDag = serverPanel.locator(
-          '.erp-dev-quality-server-pipeline__dag > .erp-markdown-mermaid'
-        )
-        await pipelineDag
-          .locator('.erp-markdown-mermaid__canvas > svg')
-          .waitFor()
-        assert.equal(
-          await pipelineDag.getAttribute('data-mermaid-status'),
-          'rendered'
-        )
-        assert.equal(
-          await pipelineDag.getAttribute('data-mermaid-html-labels'),
-          'false'
-        )
-        const fullGraph = serverPanel.locator('.erp-dev-quality-server-pipeline__dag details')
-        assert.equal(await fullGraph.locator('.erp-markdown-mermaid').count(), 0)
-        assert((await pipelineDag.locator('svg .node').count()) <= 12)
-        await fullGraph.locator('summary').click()
-        await fullGraph.locator('[data-mermaid-status="rendered"]').waitFor()
-        assert((await fullGraph.locator('svg .node').count()) > 12)
-        await fullGraph.locator('summary').click()
-        await fullGraph.locator('.erp-markdown-mermaid').waitFor({ state: 'detached' })
-        assert.deepEqual(
-          await serverPanel
-            .locator('.erp-dev-quality-server-pipeline__relationship .ant-tag')
-            .allTextContents(),
-          [
-            `${SERVER_JOB_TIMINGS.length} 个 Job`,
-            `${SERVER_CI_TOPOLOGY_EDGE_COUNT} 条依赖`,
-          ]
-        )
-
-        const pipelineNodes = serverPanel.locator(
-          '.erp-dev-quality-server-pipeline__node'
-        )
-        await serverPanel.locator('.erp-dev-quality-server-pipeline__node:visible').first().waitFor()
-        assert((await serverPanel.locator('.erp-dev-quality-server-pipeline__phase:not([open])').count()) > 0, '正常分组默认收起，异常与最慢执行组直接可见')
-        assert.deepEqual(
-          (await pipelineNodes.locator('code').allTextContents()).sort(),
-          SERVER_JOB_TIMINGS.map(([jobName]) => jobName).sort()
-        )
-        assert.deepEqual(
-          await serverPanel
-            .locator('.erp-dev-quality-server-pipeline__phase-heading')
-            .locator('strong')
-            .allTextContents(),
-          [
-            '准备',
-            '静态检查',
-            'Node 合同',
-            '资源敏感',
-            'Web',
-            'Server / PostgreSQL',
-            '浏览器',
-            '安全',
-            '聚合与终态',
-          ]
-        )
-        const nodePhase = serverPanel
-          .locator('.erp-dev-quality-server-pipeline__phase')
-          .filter({ hasText: 'Node 合同' })
-        if (await nodePhase.getAttribute('open') !== null) await nodePhase.locator('summary').click()
-        assert.equal(await nodePhase.evaluate((node) => node.open), false)
-        assert.equal(
-          await nodePhase
-            .locator('.erp-dev-quality-server-pipeline__nodes')
-            .isVisible(),
-          false
-        )
-        await nodePhase.locator('summary').click()
-        assert.equal(await nodePhase.evaluate((node) => node.open), true)
-
-        const viewSwitch = serverPanel.locator('[aria-label="CI 结果详情"]')
-        await viewSwitch.getByText('Job 性能', { exact: true }).click()
-        await page.waitForFunction(
-          () =>
-            new URL(window.location.href).searchParams.get('serverView') ===
-            'performance'
-        )
-        const performance = serverPanel.getByRole('region', {
-          name: '历史 Job 性能',
-        })
-        await performance.waitFor()
-        const timeline = serverPanel.locator('.erp-dev-ci-timeline')
-        assert.equal(await timeline.evaluate((node) => node.open), false)
-        await timeline.locator('summary').click()
-        const timelineTable = timeline.getByRole('table', {
-          name: '本次 CI Job 运行时间轴',
-        })
-        await timelineTable.waitFor()
-        assert.equal(
-          await timelineTable.locator('tbody tr').count(),
-          SERVER_JOB_TIMINGS.length
-        )
-        await timeline
-          .getByText('已完成记录最大重叠', { exact: false })
-          .waitFor()
-        assert.equal(
-          await timelineTable
-            .getByRole('img', {
-              name: 'plan：起点后 0 秒 开始，实际运行 6 秒',
-              exact: true,
-            })
-            .count(),
-          1
-        )
-        await timeline.locator('summary').click()
-        await performance.getByText('超过 120 秒', { exact: true }).waitFor()
-        await performance
-          .getByText('超过 90 秒', { exact: true })
-          .first()
-          .waitFor()
-        const remainingPerformance = performance.locator(
-          '.erp-dev-quality-server-performance__remaining'
-        )
-        await remainingPerformance.locator('summary').click()
-        await remainingPerformance
-          .getByText('quality_node', { exact: true })
-          .waitFor()
-        await remainingPerformance.locator('summary').click()
-
-        await viewSwitch.getByText('CI 历史', { exact: true }).click()
-        await page.waitForFunction(
-          () =>
-            new URL(window.location.href).searchParams.get('serverView') ===
-            'history'
-        )
-        await page.reload()
-        await expectHeading(page, '质量门禁')
-        await serverPanel.locator('[data-server-view="history"]').waitFor()
-        const firstHistoryLink = serverPanel.locator('.erp-dev-quality-server-history__pipeline-link').first()
-        await firstHistoryLink.waitFor()
-        assert.match(await firstHistoryLink.getAttribute('href'), /^https:\/\/gitlab[.]saurick[.]me\/saurick\/plush-toy-erp\/-\/pipelines\/[0-9]+$/u)
-        assert.equal(await serverPanel.locator('.erp-dev-quality-server-history__jobs').count(), 0)
-
-        await viewSwitch.getByText('本次流水线', { exact: true }).click()
-        await page.waitForFunction(
-          () =>
-            new URL(window.location.href).searchParams.get('serverView') ===
-            'pipeline'
-        )
-        await serverPanel.locator('[data-server-view="pipeline"]').waitFor()
-        await pipelineDag
-          .locator('.erp-markdown-mermaid__canvas > svg')
-          .waitFor()
-        assert.equal(
-          await pipelineDag.getAttribute('data-mermaid-status'),
-          'rendered'
-        )
-        const pipelineGeometry = await serverPanel
-          .locator('.erp-dev-quality-server-pipeline__track')
-          .evaluate((track) => {
-            const phase = track.querySelector(
-              '.erp-dev-quality-server-pipeline__phase'
-            )
-            const nodes = phase?.querySelector(
-              '.erp-dev-quality-server-pipeline__nodes'
-            )
-            const nodeRects = Array.from(
-              nodes?.querySelectorAll(
-                '.erp-dev-quality-server-pipeline__node'
-              ) || []
-            ).map((node) => node.getBoundingClientRect())
-            const trackRect = track.getBoundingClientRect()
-            const phaseRect = phase?.getBoundingClientRect()
-            const nodesRect = nodes?.getBoundingClientRect()
-            return {
-              trackWidth: trackRect.width,
-              phaseWidth: phaseRect?.width || 0,
-              nodesClientWidth: nodes?.clientWidth || 0,
-              nodesScrollWidth: nodes?.scrollWidth || 0,
-              columnCount: new Set(nodeRects.map((rect) => Math.round(rect.x)))
-                .size,
-              maxNodeRight: nodeRects.reduce(
-                (right, rect) => Math.max(right, rect.right),
-                0
-              ),
-              nodesRight: nodesRect?.right || 0,
-            }
-          })
-        assert(
-          pipelineGeometry.phaseWidth >= pipelineGeometry.trackWidth - 1,
-          JSON.stringify(pipelineGeometry)
-        )
-        assert(
-          pipelineGeometry.columnCount > 1,
-          JSON.stringify(pipelineGeometry)
-        )
-        assert(
-          pipelineGeometry.nodesScrollWidth <=
-            pipelineGeometry.nodesClientWidth + 1,
-          JSON.stringify(pipelineGeometry)
-        )
-        assert(
-          pipelineGeometry.maxNodeRight <= pipelineGeometry.nodesRight + 1,
-          JSON.stringify(pipelineGeometry)
-        )
+        await serverPanel.getByText('完整 CI 通过', { exact: true }).waitFor()
+        const pipelineLink = serverPanel.getByRole('link', { name: '查看 GitLab 流水线 #41', exact: true })
+        assert.equal(await pipelineLink.getAttribute('href'), 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41')
+        assert.equal(await pipelineLink.getAttribute('target'), '_blank')
+        await serverPanel.getByText('测试 120 项 · 成功 118 · 失败 1 · 跳过 1', { exact: true }).waitFor()
+        const reportLink = serverPanel.getByRole('link', { name: '查看 GitLab 测试报告', exact: true })
+        assert.equal(await reportLink.getAttribute('href'), 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41/test_report')
+        await serverPanel.getByText('Web 行覆盖 81.25%', { exact: true }).waitFor()
+        const job = serverHistoryJobs(41).find((item) => item.name === 'quality_web_checks')
+        assert.equal(await serverPanel.getByRole('link', { name: '查看覆盖率 Job', exact: true }).getAttribute('href'), job.url)
+        assert.equal(await serverPanel.getByRole('link', { name: '查看覆盖率制品', exact: true }).getAttribute('href'), `${job.url}/artifacts/browse/output/ci/reports/coverage/`)
+        assert.equal(await serverPanel.locator('.erp-dev-quality-server-pipeline__dag, .erp-dev-ci-timeline').count(), 0)
+        const history = serverPanel.locator('details').filter({ hasText: '历史 CI 记录（GitLab）' })
+        await history.locator('summary').click()
+        assert.equal(await history.getByRole('link').count(), SERVER_CI_HISTORY.length)
+        assert.equal(await history.getByRole('link').first().getAttribute('target'), '_blank')
+        await history.locator('summary').click()
 
         const jobGuideButton = serverPanel.getByRole('button', {
           name: '流程与原理',
@@ -1290,47 +1104,6 @@ export function createDevQualityGateScenarios({
           document.activeElement?.textContent?.includes('流程与原理')
         )
 
-        const coreGuideButton = serverPanel.getByRole('button', {
-          name: '查看 quality_node_core 说明',
-        })
-        const corePhase = serverPanel.locator('.erp-dev-quality-server-pipeline__phase').filter({ has: page.locator('button[aria-label="查看 quality_node_core 说明"]') })
-        if (await corePhase.getAttribute('open') === null) await corePhase.locator('summary').click()
-        await coreGuideButton.click()
-        await jobGuideDrawer
-          .getByText('Node 核心测试', { exact: true })
-          .first()
-          .waitFor()
-        await jobGuideDrawer.getByText('fast 测试组', { exact: true }).waitFor()
-        await jobGuideDrawer.getByText('运行 1 分 42 秒').waitFor()
-        await jobGuideDrawer.locator('.ant-drawer-close').click()
-        await jobGuideDrawer.waitFor({ state: 'hidden' })
-        await page.waitForFunction(
-          () =>
-            document.activeElement?.getAttribute('aria-label') ===
-            '查看 quality_node_core 说明'
-        )
-
-        await coreGuideButton.click()
-        await jobGuideDrawer.locator('.ant-drawer-content').waitFor()
-        const drawerGeometry = await jobGuideDrawer.evaluate((drawer) => {
-          const rect = drawer.getBoundingClientRect()
-          return {
-            left: rect.left,
-            right: rect.right,
-            viewportWidth: window.innerWidth,
-          }
-        })
-        assert(drawerGeometry.left >= 0, JSON.stringify(drawerGeometry))
-        assert(
-          drawerGeometry.right <= drawerGeometry.viewportWidth + 1,
-          JSON.stringify(drawerGeometry)
-        )
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-quality-gates-desktop-light'
-        )
-        await jobGuideDrawer.locator('.ant-drawer-close').click()
-        await jobGuideDrawer.waitFor({ state: 'hidden' })
         await page.unroute('**/__dev/api/qa/quality-gates**')
         await installQualityRoutes(
           page,
@@ -1367,20 +1140,10 @@ export function createDevQualityGateScenarios({
           document.activeElement?.textContent?.includes('流程与原理')
         )
         const panel = page.getByRole('region', { name: 'GitLab CI 质量证据' })
-        await panel.getByText('Job 性能', { exact: true }).click()
-        const missingTimeline = panel.locator('.erp-dev-ci-timeline')
-        await missingTimeline.locator('summary').click()
-        await missingTimeline.getByText('本次尚无已结束且包含完整起止时间的 Job，时间轴等待实际记录', { exact: true }).waitFor()
-        assert.equal(await missingTimeline.locator('.erp-dev-ci-timeline__bar').count(), 0)
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-quality-gates-desktop-light'
-        )
+        await panel.getByText('当前提交尚无 CI', { exact: true }).waitFor()
+        assert.equal(await panel.getByRole('link', { name: '查看 GitLab 测试报告', exact: true }).count(), 0)
+        await assertNoHorizontalOverflow(page, 'dev-quality-gates-desktop-light')
 
-        await panel.getByText('本次流水线', { exact: true }).click()
-        await page.waitForFunction(() =>
-          new URL(window.location.href).searchParams.get('serverView') === 'pipeline'
-        )
         await page.unroute('**/__dev/api/qa/quality-gates**')
         await installQualityRoutes(
           page,
@@ -1396,9 +1159,7 @@ export function createDevQualityGateScenarios({
           0
         )
         await page.locator('.erp-dev-quality-status-banner strong').getByText('QA_MODE=full', { exact: false }).waitFor()
-        const docsDiagram = panel.locator('[data-mermaid-status="rendered"]')
-        await docsDiagram.waitFor()
-        assert.equal(await docsDiagram.locator('svg g.node').count(), 3)
+        await panel.getByText('文档检查通过', { exact: true }).waitFor()
         assert.equal(
           await panel.getByText('GitLab 普通 CI 已通过', { exact: true }).count(),
           0

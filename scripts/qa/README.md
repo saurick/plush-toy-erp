@@ -131,9 +131,13 @@ dirty / clean、full / strict 和不同 environment fingerprint 不混算；少�
 
 GitLab CI 历史不写入上述本地 operation 目录。
 
-development-only Bridge 每次从 GitLab 读取最近 20 次普通 push pipeline 及其全部 Job，将运行、排队、最新 attempt、重试数和 GitLab 链接放入同一质量门禁摘要；当前流水线的 DAG 另由同一 exact SHA 的 GitLab CI Lint `needs` 投影，配置依赖与实际 Job 不一致时不画推测连线。
+工作台读取当前提交对应的 GitLab Pipeline、原生测试报告摘要及各覆盖率 Job。页面只保留提交、通过/失败、总耗时、首个失败、测试计数与分类覆盖率；完整 DAG、排队、Job 性能与日志直接跳转同一 Pipeline / Job。历史 CI 链接继续保留，本地 operation 不与 GitLab 混算。
 
-`ci-job-guide.mjs` 只补充每个 Job 的名称、用途、检查项与结果用途，并按 GitLab 实际 Job 名单投影，不保存运行事实。页面和 Codex 都可读取该结构化投影，但 GitLab 仍是唯一 CI 历史真源。
+`ci-native-reports.mjs` 将同一次执行的结果交给 GitLab，不再次运行测试：Node / resource lanes 和 Web 使用 Node 原生 JUnit reporter；Web 同时采集 LCOV 并转换为仓库相对路径的 Cobertura；Go test 的 JSON 与 coverprofile 分别转换为 JUnit 和 Cobertura。Web 数值是已加载源文件的行覆盖，Go 数值是测试包语句覆盖，分别展示，不视为整仓或业务验收比例。数据库、浏览器与专项发布回执仍走原有门禁合同，JUnit 不替代零 skip、真实执行数、exact SHA 或清理读回。
+
+产出 Job 的 `artifacts:when:always` 上传原生报告，失败测试仍可查；`coverage` 与 `reports:coverage_report` 分别接入数值和逐行注释，沿用 90 天 CI 制品保留。报告未产生、解析失败、读取失败与制品过期分别显示，旧流水线不会补造报告。关键发布/部署记录及已归档证据继续长期保留。
+
+独立工作台只读这些通用 CI 结果，服务端拒绝新建 full / strict 与本地覆盖基线；本地 Vite 入口保留诊断执行。独立端历史、取消和项目专项入口不删除。
 
 CI 拆分采用 `90 / 120 / 40 / 20` 性能观察线：最近 5 次受保护 `main` 成功流水线中，实质工作 Job 的目标区间为 45–90 秒；中位数超过 90 秒时分析拆分，至少 3 次超过 120 秒时拆分或记录不可拆原因。新子 Job 原则上不少于 40 秒，且拆分应让关键路径至少缩短 20%；汇总 Job 不适用工作下限，但目标不超过 30 秒。
 

@@ -812,6 +812,44 @@ function normalizeServerEvidenceHistory(history) {
   return normalized
 }
 
+function normalizeServerReports(reports, evidence) {
+  if (reports === null) return null
+  assertExactKeys(reports, ['status', 'gitSha', 'pipelineId', 'tests', 'testsUrl', 'coverage'], 'quality server reports')
+  if (
+    !evidence.pipeline ||
+    reports.gitSha !== evidence.gitSha ||
+    reports.pipelineId !== evidence.pipeline.id ||
+    !['available', 'missing', 'invalid', 'unavailable'].includes(reports.status) ||
+    !Array.isArray(reports.coverage) || reports.coverage.length > 100
+  ) throw new Error('quality server reports identity is invalid')
+  if (reports.status === 'unavailable') {
+    if (reports.tests !== null || reports.testsUrl !== null || reports.coverage.length !== 0) {
+      throw new Error('quality unavailable reports must not retain stale results')
+    }
+    return reports
+  }
+  const counts = ['count', 'success', 'failed', 'skipped', 'error']
+  assertExactKeys(reports.tests, counts, 'quality server report counts')
+  if (
+    !counts.every((key) => Number.isSafeInteger(reports.tests[key]) && reports.tests[key] >= 0) ||
+    reports.tests.count !== reports.tests.success + reports.tests.failed + reports.tests.skipped + reports.tests.error ||
+    (reports.status === 'available' && reports.tests.count === 0) ||
+    (reports.status === 'missing' && reports.tests.count !== 0) ||
+    reports.testsUrl !== (reports.tests.count > 0 ? `${evidence.pipeline.url}/test_report` : null)
+  ) throw new Error('quality server report counts or link are invalid')
+  const seen = new Set()
+  for (const item of reports.coverage) {
+    assertExactKeys(item, ['job', 'percent', 'url', 'artifactUrl'], 'quality server coverage')
+    const job = evidence.jobs.find((entry) => entry.name === item.job && entry.url === item.url)
+    if (
+      !job || seen.has(item.job) || !Number.isFinite(item.percent) || item.percent < 0 || item.percent > 100 ||
+      (item.artifactUrl !== null && item.artifactUrl !== `${job.url}/artifacts/browse/output/ci/reports/coverage/`)
+    ) throw new Error('quality server coverage job or link is invalid')
+    seen.add(item.job)
+  }
+  return reports
+}
+
 function normalizeServerEvidence(evidence) {
   assertExactKeys(
     evidence,
@@ -825,6 +863,7 @@ function normalizeServerEvidence(evidence) {
       'message',
       'notProven',
       'pipeline',
+      'reports',
       'kind',
       'status',
       'topology',
@@ -881,6 +920,7 @@ function normalizeServerEvidence(evidence) {
     history,
     jobs,
     jobGuides,
+    reports: normalizeServerReports(evidence.reports, { ...evidence, pipeline, jobs }),
     message: safeText(evidence.message, 'quality server evidence message'),
     notProven: evidence.notProven.map((item) =>
       safeText(item, 'quality server evidence missing item', { max: 200 })

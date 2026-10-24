@@ -135,7 +135,7 @@ export default function DevQualityGatesPage() {
         ) {
           return null
         }
-        setSummaryError('质量门禁状态暂时不可用，请确认本机开发服务。')
+        setSummaryError('质量门禁状态暂时不可用，请确认当前工作台服务。')
         return null
       } finally {
         if (summaryRequestRef.current === requestId) {
@@ -356,6 +356,7 @@ export default function DevQualityGatesPage() {
   })
   const busy = summary?.busy?.active || Boolean(actionProfile)
   const canRun = Boolean(
+    !import.meta.env.PLUSH_STANDALONE_WORKBENCH &&
     parsed.valid &&
     summary?.environment?.disposableDatabaseReady &&
     !busy &&
@@ -382,7 +383,7 @@ export default function DevQualityGatesPage() {
         <DevTaskNav
           idPrefix="quality-gates"
           ariaLabel="质量门禁视图"
-          items={VIEW_ITEMS.map(({ value, label }) => ({ value, label }))}
+          items={VIEW_ITEMS.map(({ value, label }) => ({ value, label: value === 'run' && import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '诊断历史' : label }))}
           value={activeView}
           onChange={selectView}
           disabled={!parsed.valid}
@@ -474,7 +475,7 @@ export default function DevQualityGatesPage() {
             ) : null}
             {parsed.valid && activeView === 'run' ? (
               <>
-                <LocalDiagnosticsActions
+                {!import.meta.env.PLUSH_STANDALONE_WORKBENCH ? <LocalDiagnosticsActions
                   summary={summary}
                   initialLoading={initialLoading}
                   canRun={canRun}
@@ -482,7 +483,7 @@ export default function DevQualityGatesPage() {
                   profile={parsed.values.profile || 'strict'}
                   onProfileChange={(profile) => updateViewValues({ profile })}
                   onStart={start}
-                />
+                /> : <Alert type="info" showIcon message="完整测试由 GitLab CI 执行。此处保留本执行端的诊断历史；本地 full / strict 请在开发机工作台运行。" />}
                 <RunView
                   summary={summary}
                   operation={displayedOperation}

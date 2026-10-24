@@ -491,12 +491,18 @@ export function runCiNodeTestLane({
       ? [
           {
             profile: definition.profiles[0],
-            args: buildNodeTestArgs(laneTestFiles(lane)),
+            args: buildNodeTestArgs(laneTestFiles(lane), `node_${lane}`, root),
           },
         ]
       : definition.profiles.map((profile) => ({
           profile,
-          args: ["scripts/qa/run-node-tests.mjs", "--profile", profile],
+          args: [
+            "scripts/qa/run-node-tests.mjs",
+            "--profile",
+            profile,
+            "--gitlab-report",
+            `node_${lane}_${profile}`,
+          ],
         }));
     for (const { profile, args } of runs) {
       const profileStarted = Date.now();

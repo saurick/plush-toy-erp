@@ -228,10 +228,17 @@ qa_full_web_checks() {
     qa_run_substep "$full_profile" web eslint "$PNPM_BIN" lint
     qa_run_substep "$full_profile" web stylelint "$PNPM_BIN" css
   fi
+  local web_test_command=("$PNPM_BIN" test --test-reporter=tap)
+  if [[ "$ci_lane" == "web-checks" ]]; then
+    web_test_command=(node "$ROOT_DIR/scripts/qa/ci-native-reports.mjs" web)
+  fi
   qa_run_substep "$full_profile" web web_test \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind node --label web-all "${test_gate_output_args[@]}" -- \
-    "$PNPM_BIN" test --test-reporter=tap
+    "${web_test_command[@]}"
+  if [[ "$ci_lane" == "web-checks" ]]; then
+    node "$ROOT_DIR/scripts/qa/ci-native-reports.mjs" print web
+  fi
 }
 
 qa_full_web_build() {
@@ -303,12 +310,19 @@ qa_full_server_upgrade() {
 qa_full_server_test_build() {
   echo "[qa:full] 运行 server 测试与构建"
   cd "$ROOT_DIR/server"
+  local server_test_command=(go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...)
+  if [[ "$ci_lane" == "server-test-build" ]]; then
+    server_test_command=(node "$ROOT_DIR/scripts/qa/ci-native-reports.mjs" go -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...)
+  fi
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --business-rules server --kind go --label server-all \
     --exclude-skip-pattern "$CRITICAL_POSTGRES_TEST_PATTERN" \
     "${test_gate_output_args[@]}" -- \
-    go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...
+    "${server_test_command[@]}"
+  if [[ "$ci_lane" == "server-test-build" ]]; then
+    node "$ROOT_DIR/scripts/qa/ci-native-reports.mjs" print go
+  fi
   make build
 }
 

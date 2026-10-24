@@ -1667,3 +1667,33 @@ test("Runner VM bootstrap skips only exact secondary tools and normalizes owners
     );
   }
 });
+
+test("native reports upload from producing lanes even on failure and coverage keeps separate scopes", () => {
+  const blocks = new Map(
+    [
+      ...workflow.matchAll(
+        /^([a-z][a-z0-9_]+):\n([\s\S]*?)(?=^[a-z.][^\n]*:|$(?![\s\S]))/gmu,
+      ),
+    ].map((match) => [match[1], match[2]]),
+  );
+  for (const name of [
+    ...Object.values(CI_NODE_TEST_LANES),
+    ...Object.values(CI_RESOURCE_TEST_LANES),
+  ]
+    .map((item) => item.job)
+    .concat(["quality_web_checks", "quality_server_test_build"])) {
+    assert.match(blocks.get(name), /when: always/u, name);
+    assert.match(
+      blocks.get(name),
+      /junit: output\/ci\/reports\/tests\/\*\.xml/u,
+      name,
+    );
+  }
+  assert.match(blocks.get("quality_web_checks"), /CI_WEB_LINE_COVERAGE/u);
+  assert.match(
+    blocks.get("quality_server_test_build"),
+    /CI_GO_STATEMENT_COVERAGE/u,
+  );
+  for (const name of ["quality_web_checks", "quality_server_test_build"])
+    assert.match(blocks.get(name), /coverage_format: cobertura/u);
+});

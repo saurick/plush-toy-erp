@@ -286,6 +286,23 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
     })
   }
 
+  if (nativeGitlabDetails) {
+    const failed = latestRun?.jobs?.find((job) => job.conclusion === 'failure')
+    return (
+      <Card className="erp-dev-pipeline-timing" variant="borderless">
+        <Title level={2}>GitLab 发布流水线</Title>
+        <Space wrap>
+          <Text code>{latestRun.gitSha?.slice(0, 12)}</Text>
+          <Tag color={latestRun.conclusion === 'success' ? 'success' : 'warning'}>{latestRun.conclusion === 'success' ? '通过' : '尚未通过'}</Tag>
+          <Text>总耗时 {formatDeliveryDuration(latestRun.durationMs)}</Text>
+          <Link href={latestRun.url} target="_blank" rel="noreferrer">在 GitLab 查看全部任务与日志</Link>
+          {failed ? <Link href={failed.url} target="_blank" rel="noreferrer">查看失败 Job：{failed.name}</Link> : null}
+        </Space>
+        <p>任务、日志和流水线耗时由 GitLab 提供。备份、迁移、部署读回及各环境历史仍在工作台的操作记录中查看。</p>
+      </Card>
+    )
+  }
+
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
       <div className="erp-dev-pipeline-timing__head">

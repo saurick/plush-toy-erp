@@ -1367,7 +1367,7 @@ test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () =>
   assert.match(testingPageSource, /const VIEW_CLOSEOUT = 'closeout'/)
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
   assert.match(testingPageSource, /DEV_PAGE_TITLE_BY_ROUTE\[DEV_TESTING_ROUTE\]/)
-  assert.deepEqual(DEV_TESTING_PRIMARY_VIEWS.map(({ label }) => label), ['测试总览', '本轮验证', '测试报告', '压力测试', '测试指引'])
+  assert.deepEqual(DEV_TESTING_PRIMARY_VIEWS.map(({ label }) => label), ['服务器验证', '测试总览', '本轮验证', '测试报告', '压力测试', '测试指引'])
   assert.doesNotMatch(
     testingPageSource,
     /\{ label: '(?:专项检查库|Git 收口)', value: VIEW_(?:COMMANDS|CLOSEOUT) \}/

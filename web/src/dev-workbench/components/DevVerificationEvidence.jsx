@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import DevTimestamp from './DevTimestamp.jsx'
 import { readDevVerificationEvidence } from '../config/devVerificationEvidence.mjs'
 import '../styles/dev-verification-evidence.css'
+import { ServerCiEvidencePanel } from './quality-gates/ServerCiEvidencePanel.jsx'
 
 const CHECK_LABELS = { tests: '运行冒烟', migration: '迁移', recovery: '备份恢复', deployment: '部署读回' }
 const RECEIPT_CHECK_LABELS = { releaseIdentity: '制品身份', health: '健康检查', ready: '就绪检查', basicSmoke: '业务基础冒烟', publicEntry: '公网入口', backupRestore: '新备份与隔离恢复', staticConfig: '静态配置', dataEnvironment: '数据环境' }
@@ -50,7 +51,7 @@ function TargetRow({ target, loading, failed }) {
       <th scope="row">{target.shortLabel}</th>
       <td>
         <code>{target.runtimeSha.slice(0, 12) || '未读取'}</code>
-        <div>{target.current ? '当前提交' : '历史版本 / 身份未证明'}</div>
+        <div>{target.current ? '与工作台源码一致' : target.passed ? '已验证运行版本 · 与工作台源码不同' : '运行版本待核实'}</div>
       </td>
       {Object.keys(CHECK_LABELS).map((key) => (
         <td key={key}>
@@ -82,7 +83,6 @@ export default function DevVerificationEvidence() {
     })
     return () => controller.abort()
   }, [reload])
-  const ciPassed = !loading && !failed && state?.ci.passed
   return (
     <section className="erp-dev-verification-evidence" aria-label="服务器测试与交付证据" aria-busy={loading}>
       <div className="erp-dev-verification-evidence__heading">
@@ -91,20 +91,14 @@ export default function DevVerificationEvidence() {
       </div>
       <p className="erp-dev-verification-evidence__context">
         当前提交 <code>{state?.repository?.commit?.slice(0, 12) || '未读取'}</code>
-        {state?.repository?.dirty ? ' · 工作区有未提交改动，服务器结果仅作历史参考' : null}
+        {state?.repository?.dirty ? ' · 工作区有未提交改动；CI 仅覆盖已提交版本，环境结果按实际运行版本核对' : null}
         {' · '}<DevTimestamp value={state?.readAt} action="读取于" />
       </p>
       {failed ? <Alert type="error" showIcon message="服务器证据读取失败，上次结果仅供追溯" /> : null}
       {state?.errors?.map((error) => <Alert key={error} type="error" showIcon message={error} />)}
       {state ? (
         <>
-          <div className="erp-dev-verification-evidence__ci">
-            <strong>GitLab Runner 门禁</strong>
-            <Tag color={ciPassed ? 'success' : 'warning'}>{loading ? '正在核对' : ciPassed ? '当前提交通过' : '当前版本未证明'}</Tag>
-            {state.ci.evidence?.pipeline ? <a href={state.ci.evidence.pipeline.url} target="_blank" rel="noreferrer">流水线 #{state.ci.evidence.pipeline.id}</a> : null}
-            <span>{state.ci.evidence?.jobs?.filter((job) => job.conclusion === 'success').length || 0} / {state.ci.evidence?.jobs?.length || 0} 项成功</span>
-            <Link to="/__dev/quality-gates?view=server">查看门禁与 Job 明细</Link>
-          </div>
+          {!loading && !failed ? <ServerCiEvidencePanel summary={{ repository: state.repository, serverEvidence: state.ci.evidence }} /> : <p role="status">{loading ? '正在核对 GitLab 报告…' : '本次 GitLab 报告尚未核实'}</p>}
           <div className="erp-dev-tool-table-wrap">
             <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="目标服务器验证结果">
               <thead>

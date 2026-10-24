@@ -1165,26 +1165,28 @@ function CoverageReportView({
           />
           <div className="erp-dev-testing-coverage-actions">
             <Link to={DEV_BUSINESS_CHAIN_AUDIT_ROUTE} state={{ testingReturnSearch: reportSearch }}>链路实测报告</Link>
-            <Button
-              type="primary"
-              icon={<PlayCircleOutlined aria-hidden="true" />}
-              loading={operationStarting || operationPresentation.active}
-              disabled={
+            {!import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
+              <Button
+                type="primary"
+                icon={<PlayCircleOutlined aria-hidden="true" />}
+                loading={operationStarting || operationPresentation.active}
+                disabled={
                 operationPresentation.active || qaBusy?.active || !qaReady
               }
-              onClick={() => {
+                onClick={() => {
                 setSource('workspace')
                 onCollect()
               }}
-            >
-              {operationPresentation.active
+              >
+                {operationPresentation.active
                 ? '采集中…'
                 : qaBusy?.active
                   ? '已有验证在运行'
                   : !qaReady
                     ? '正在核对任务状态'
                     : '采集本地覆盖基线'}
-            </Button>
+              </Button>
+            ) : <Link to="/__dev/testing?view=server">查看 GitLab 测试与覆盖率</Link>}
             <Button
               icon={<ReloadOutlined aria-hidden="true" />}
               loading={loading}
@@ -1501,7 +1503,7 @@ export default function DevTestingPage() {
     [documentRoleOptions]
   )
   const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
-  const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_OVERVIEW
+  const view = VIEW_VALUES.has(requestedView) ? requestedView : import.meta.env.PLUSH_STANDALONE_WORKBENCH ? 'server' : VIEW_OVERVIEW
   const coverageSection = parseDevTestingCoverageSection(searchParams)
   const guideTopic = GUIDE_OPTIONS.find((item) => item.value === searchParams.get('guide'))?.value || 'methods'
   const customerScope = useDevCustomerScope({
@@ -1920,7 +1922,7 @@ export default function DevTestingPage() {
         >
           <SlidingTabList
             aria-label="测试验证工作区主视图"
-            options={VIEW_OPTIONS}
+            options={VIEW_OPTIONS.map((item) => item.value === 'overview' ? { ...item, label: import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '项目专项与历史' : '本地测试总览' } : item)}
             value={isAuxiliaryView ? returnView : view}
             onChange={selectView}
           />
@@ -1952,7 +1954,8 @@ export default function DevTestingPage() {
 
       <main className="erp-dev-testing-shell">
         <section className="erp-dev-testing-reader">
-          {([VIEW_OVERVIEW, VIEW_COVERAGE].includes(view) || (view === VIEW_TIERS && import.meta.env.PLUSH_STANDALONE_WORKBENCH)) ? <DevVerificationEvidence /> : null}
+          {view === 'server' ? <DevVerificationEvidence /> : null}
+          {view !== 'server' && !isAuxiliaryView ? <Alert type="info" showIcon message={import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '服务器独立工作台：此处保留本服务的项目专项与历史。CI 和三环境部署记录见“服务器验证”。' : '本地工作区：报告与操作来自当前开发机。CI 和三环境部署记录见“服务器验证”。'} /> : null}
           {view === VIEW_OVERVIEW ? (
             <DevTestingOverview
               source={strategySource}

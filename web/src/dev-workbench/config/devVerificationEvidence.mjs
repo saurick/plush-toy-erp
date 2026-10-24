@@ -29,7 +29,8 @@ export function buildDevVerificationEvidence({ quality, delivery, operations = {
     const evidence = operation?.evidence
     const current = SHA.test(repository?.commit || '') && repository.dirty === false &&
       runtime?.serverSha === repository.commit && runtime?.webSha === repository.commit
-    const bound = current && operation?.target === definition.key && operation.gitSha === repository.commit &&
+    const bound = target?.preflight?.status === 'passed' && SHA.test(runtime?.serverSha || '') && runtime.serverSha === runtime.webSha &&
+      operation?.target === definition.key && operation.gitSha === runtime.serverSha &&
       evidence?.status === 'passed' && operation.status === 'passed' && HASH.test(evidence.receiptSha256 || '')
     const checks = evidence?.checks || {}
     const passedStage = (id) => operation?.stages?.some((stage) => stage.id === id && stage.status === 'passed')
@@ -62,7 +63,7 @@ export function buildDevVerificationEvidence({ quality, delivery, operations = {
     errors,
     ci: { passed: Boolean(ciPassed), evidence: server || null },
     targets,
-    passed: Boolean(ciPassed) && targets.every((target) => target.passed),
+    passed: Boolean(ciPassed) && targets.every((target) => target.passed && target.current),
   }
 }
 

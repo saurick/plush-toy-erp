@@ -10,6 +10,7 @@ export const DEV_TESTING_COVERAGE_SECTION_QUERY_KEY = 'coverage'
 export const DEV_TESTING_COMMAND_PAGE_QUERY_KEY = 'commandsPage'
 export const DEV_TESTING_COMMAND_PAGE_SIZE = 10
 export const DEV_TESTING_PRIMARY_VIEWS = Object.freeze([
+  { value: 'server', label: '服务器验证' },
   Object.freeze({ value: 'overview', label: '测试总览' }),
   Object.freeze({ value: 'tiers', label: '本轮验证' }),
   Object.freeze({ value: 'coverage', label: '测试报告' }),

@@ -284,7 +284,10 @@ quality_node_release_preflight_a:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/node-lanes/release_preflight_a.json
 
 quality_node_release_preflight_b:
@@ -299,7 +302,10 @@ quality_node_release_preflight_b:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/node-lanes/release_preflight_b.json
 
 quality_node_release_a:
@@ -314,7 +320,10 @@ quality_node_release_a:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/node-lanes/release_a.json
 
 quality_node_release_b:
@@ -329,7 +338,10 @@ quality_node_release_b:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/node-lanes/release_b.json
 
 quality_node_release_c:
@@ -344,7 +356,10 @@ quality_node_release_c:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/node-lanes/release_c.json
 
 quality_node_core:
@@ -359,7 +374,10 @@ quality_node_core:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/node-lanes/core.json
 
 quality_resource_contract_a:
@@ -378,7 +396,10 @@ quality_resource_contract_a:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/resource-lanes/contract_a.json
 
 quality_resource_contract_b:
@@ -397,7 +418,10 @@ quality_resource_contract_b:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/resource-lanes/contract_b.json
 
 quality_resource_runtime_a:
@@ -416,7 +440,10 @@ quality_resource_runtime_a:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/resource-lanes/runtime_a.json
 
 quality_resource_runtime_b:
@@ -435,7 +462,10 @@ quality_resource_runtime_b:
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
     paths:
+      - output/ci/reports/
       - output/ci/resource-lanes/runtime_b.json
 
 quality_web_checks:
@@ -447,10 +477,17 @@ quality_web_checks:
       artifacts: false
   script:
     - node scripts/qa/ci-quality-stage-lane.mjs --shard web --lane checks
+  coverage: '/CI_WEB_LINE_COVERAGE=([0-9]+(?:\.[0-9]+)?)%/'
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: output/ci/reports/coverage/web.xml
     paths:
+      - output/ci/reports/
       - output/ci/web-lanes/checks.json
 
 quality_web_build:
@@ -519,10 +556,17 @@ quality_server_test_build:
       artifacts: false
   script:
     - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane test_build
+  coverage: '/CI_GO_STATEMENT_COVERAGE=([0-9]+(?:\.[0-9]+)?)%/'
   artifacts:
     when: always
     expire_in: 90 days
+    reports:
+      junit: output/ci/reports/tests/*.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: output/ci/reports/coverage/go.xml
     paths:
+      - output/ci/reports/
       - output/ci/server-lanes/test_build.json
 
 quality_server_critical_postgres:

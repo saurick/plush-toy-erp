@@ -806,8 +806,9 @@ export function createDevVersionCenterScenarios({
           .locator('.erp-dev-version-tab--versions .ant-pagination-item-2')
           .click()
         await versionTable
-          .getByText('2026.08.08-8', { exact: true })
+          .getByText('2026.08.08-7', { exact: true })
           .waitFor()
+        assert.equal(await versionTable.locator('tbody tr[data-row-key]').count(), 7)
         const runningRow = versionTable.getByRole('row').filter({ hasText: '2026.08.08-7' })
         assert.equal(await runningRow.getByText('当前运行', { exact: true }).count(), 1)
         assert.equal(await runningRow.getByRole('button').count(), 0)

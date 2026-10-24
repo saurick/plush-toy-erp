@@ -752,6 +752,7 @@ function unavailableServerEvidence(message) {
     coversWorkingTree: false,
     gitSha: '',
     pipeline: null,
+    reports: null,
     jobs: [],
     jobGuides: [],
     topology: {
@@ -908,6 +909,7 @@ export function projectDevQualityGateServerEvidence(
       coversWorkingTree: false,
       gitSha: repository.commit,
       pipeline: null,
+      reports: null,
       jobs: [],
       jobGuides: [],
       topology: projectServerTopology(topology, repository, []),
@@ -944,6 +946,7 @@ export function projectDevQualityGateServerEvidence(
       finishedAt: selected.run.finishedAt,
     },
     jobs: selected.jobs,
+    reports: null,
     jobGuides: projectCiJobGuides(selected.jobs.map((job) => job.name)),
     topology: projectServerTopology(topology, repository, selected.jobs),
     history,
@@ -1097,19 +1100,17 @@ export function createDevQualityGateService({
             ],
           }
         }
-        let topology = null
-        try {
-          topology = await provider.readPipelineTopology({
-            sha: repository.commit,
-          })
-        } catch {
-          // Job timing remains useful when GitLab cannot expose the exact-SHA needs graph.
-        }
         value = projectDevQualityGateServerEvidence(
           timings,
-          repository,
-          topology
+          repository
         )
+        if (value.pipeline) {
+          try {
+            value.reports = await provider.readPipelineReports({ pipelineId: value.pipeline.id, sha: repository.commit })
+          } catch {
+            value.reports = { status: 'unavailable', gitSha: repository.commit, pipelineId: value.pipeline.id, tests: null, coverage: [], testsUrl: null }
+          }
+        }
       }
       if (value?.kind !== DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND) {
         throw new Error('server CI evidence projection is invalid')

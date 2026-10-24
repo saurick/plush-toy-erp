@@ -59,6 +59,16 @@ export async function createStandaloneWorkbenchServer({
   })
   const apiOrigin = getDeploymentTarget(target.businessTarget).endpoints.server
   const middlewares = []
+  // Generic CI is owned by GitLab. Keep reads, cancellation and project actions.
+  middlewares.push((request, response, next) => {
+    const pathname = new URL(request.url, origin).pathname
+    if (request.method === 'POST' && ['/__dev/api/qa/quality-gates/actions', '/__dev/api/qa/coverage/actions'].includes(pathname)) {
+      response.writeHead(403, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+      response.end(JSON.stringify({ status: 'blocked', message: '完整测试与代码覆盖由 GitLab CI 执行；本地诊断请使用开发机工作台。' }))
+      return
+    }
+    return next()
+  })
   const bridge = { middlewares: { use: (middleware) => middlewares.push(middleware) } }
   for (const plugin of plugins ?? createStandaloneWorkbenchPlugins(projectRoot, apiOrigin, writeEvent)) {
     plugin.configureServer(bridge)

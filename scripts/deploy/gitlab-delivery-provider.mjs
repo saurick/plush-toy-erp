@@ -356,6 +356,18 @@ function normalizeJob(job) {
         : elapsedMs(createdAt, startedAt),
     url: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/jobs/${String(job.id)}`,
     steps: [],
+    hasArtifacts: Boolean(
+      job.artifacts_file?.filename && Number(job.artifacts_file?.size) > 0,
+    ),
+    coverage:
+      job.coverage !== null &&
+      job.coverage !== undefined &&
+      job.coverage !== "" &&
+      Number.isFinite(Number(job.coverage)) &&
+      Number(job.coverage) >= 0 &&
+      Number(job.coverage) <= 100
+        ? Number(job.coverage)
+        : null,
   };
 }
 
@@ -983,6 +995,61 @@ export function createGitlabDeliveryProvider({
         schemaVersion: GITLAB_PIPELINE_TIMINGS_CONTRACT,
         generatedAt: normalizeTimestamp(now(), "timing generation"),
         runs,
+      };
+    },
+
+    async readPipelineReports({ pipelineId, sha } = {}) {
+      if (
+        !Number.isSafeInteger(pipelineId) ||
+        pipelineId < 1 ||
+        !SHA_PATTERN.test(String(sha || ""))
+      )
+        throw new Error("invalid pipeline report identity");
+      const [pipeline, report] = await Promise.all([
+        readPipeline({ id: pipelineId }),
+        requestJson(
+          request,
+          env,
+          `/projects/${PROJECT_ID}/pipelines/${pipelineId}/test_report_summary`,
+        ),
+      ]);
+      if (pipeline.gitSha !== sha)
+        throw new Error("pipeline report SHA mismatch");
+      const total = report?.total;
+      const keys = ["count", "success", "failed", "skipped", "error"];
+      if (
+        !keys.every(
+          (key) => Number.isSafeInteger(total?.[key]) && total[key] >= 0,
+        ) ||
+        total.count !==
+          total.success + total.failed + total.skipped + total.error
+      )
+        throw new Error("invalid GitLab test report counts");
+      const latestJobs = new Map();
+      for (const job of pipeline.jobs)
+        if (!latestJobs.has(job.name) || latestJobs.get(job.name).id < job.id)
+          latestJobs.set(job.name, job);
+      return {
+        status:
+          total.count > 0 && !total.suite_error
+            ? "available"
+            : total.suite_error
+              ? "invalid"
+              : "missing",
+        gitSha: sha,
+        pipelineId,
+        tests: Object.fromEntries(keys.map((key) => [key, total[key]])),
+        testsUrl: total.count > 0 ? `${pipeline.url}/test_report` : null,
+        coverage: [...latestJobs.values()]
+          .filter((job) => job.coverage !== null && job.coverage !== undefined)
+          .map((job) => ({
+            job: job.name,
+            percent: job.coverage,
+            url: job.url,
+            artifactUrl: job.hasArtifacts
+              ? `${job.url}/artifacts/browse/output/ci/reports/coverage/`
+              : null,
+          })),
       };
     },
 

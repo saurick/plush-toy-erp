@@ -122,6 +122,7 @@ function summary(overrides = {}) {
     },
     serverEvidence: {
       kind: 'plush.dev-quality-gate-server-evidence',
+      reports: null,
       status: 'passed',
       current: true,
       coversWorkingTree: true,
@@ -1264,20 +1265,23 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.charts, /buildQualityGateCoverageMatrix/u)
   assert.match(sources.execution, /当前正式回执/u)
   assert.match(sources.server, /aria-label="GitLab CI 质量证据"/u)
-  assert.match(sources.server, /evidence\.pipeline \? \(/u)
+  assert.match(sources.server, /查看 GitLab 测试报告/u)
+  assert.match(sources.server, /target="_blank"/u)
+  assert.doesNotMatch(sources.server, /ServerCiPipelineFlow|ServerJobPerformance/u)
+  assert.match(sources.server, /evidence\.pipeline\?\.url/u)
   assert.match(
     sources.pipeline,
     /状态与耗时来自实际\s+Pipeline/u
   )
   assert.match(sources.pipeline, /依赖不可读时不绘制推测连线/u)
-  assert.match(sources.server, /aria-label="CI 结果详情"/u)
+
   assert.match(sources.guide, /<Drawer/u)
-  assert.match(sources.server, />\s*流程与原理\s*</u)
+
   assert.match(sources.pipeline, /aria-label=\{`查看 \$\{job\.name\} 说明`\}/u)
   assert.match(sources.guide, /先看阶段，再按需查看单个 Job/u)
   assert.match(sources.presentation, /核对子 Job 回执并形成领域结论/u)
-  assert.match(sources.server, /data-server-view="performance"/u)
-  assert.match(sources.server, /data-server-view="history"/u)
+
+
   assertNoSourceMatches(/serverJobLocalStageLabels/u)
   assertNoSourceMatches(/本机阶段与 GitLab CI Job 对照/u)
   assertNoSourceMatches(/CI：\{ciJob\.label\}/u)
@@ -1305,6 +1309,33 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assertNoSourceMatches(/Fixed quality evidence/u)
   assert.match(taskNavSource, /aria-controls/u)
   assert.match(taskNavSource, /-panel-/u)
+})
+
+test('native reports reject another pipeline, stale results and untrusted coverage links', () => {
+  const payload = summary()
+  const evidence = payload.serverEvidence
+  const reports = {
+    status: 'available', gitSha: evidence.gitSha, pipelineId: evidence.pipeline.id,
+    tests: { count: 3, success: 2, failed: 1, skipped: 0, error: 0 },
+    testsUrl: `${evidence.pipeline.url}/test_report`,
+    coverage: [{ job: evidence.jobs[0].name, percent: 81.25, url: evidence.jobs[0].url, artifactUrl: null }],
+  }
+  evidence.reports = reports
+  assert.equal(normalizeDevQualityGateSummary(payload).serverEvidence.reports.tests.failed, 1)
+  for (const override of [
+    { pipelineId: 40 }, { gitSha: 'b'.repeat(40) }, { testsUrl: 'https://example.com/test_report' },
+    { status: 'unavailable' }, { status: 'missing' },
+    { tests: { ...reports.tests, count: 4 } },
+    { coverage: [{ ...reports.coverage[0], percent: 101 }] },
+    { coverage: [{ ...reports.coverage[0], url: `${evidence.jobs[0].url}0` }] },
+    { coverage: [{ ...reports.coverage[0], artifactUrl: 'https://example.com/archive' }] },
+    { coverage: [...reports.coverage, ...reports.coverage] },
+  ]) {
+    evidence.reports = { ...reports, ...override }
+    assert.throws(() => normalizeDevQualityGateSummary(payload), /quality /u)
+  }
+  evidence.reports = { ...reports, status: 'unavailable', tests: null, testsUrl: null, coverage: [] }
+  assert.equal(normalizeDevQualityGateSummary(payload).serverEvidence.reports.status, 'unavailable')
 })
 
 test('server Job timestamp contract accepts missing records and rejects reversed intervals', () => {

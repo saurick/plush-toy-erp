@@ -23,6 +23,7 @@ import {
 import { sha256File } from "../lib/file-digest.mjs";
 import { NODE_TEST_GROUPS } from "./node-test-groups.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
+import { nativeNodeReportArgs } from "./ci-native-reports.mjs";
 
 export const CI_RESOURCE_TEST_LANE_SCHEMA = "plush.ci-resource-test-lane/v1";
 export const CI_RESOURCE_TEST_LANES = Object.freeze({
@@ -462,7 +463,7 @@ export function runCiResourceTestLane({
     process.execPath,
     [
       "--test",
-      "--test-reporter=tap",
+      ...nativeNodeReportArgs(root, `resource_${lane}`),
       "--test-concurrency=1",
       definition.testFile,
     ],

@@ -7,6 +7,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { loadConfigFromFile } from 'vite'
 import { CI_STRICT_JOB_NAMES } from '../../scripts/qa/ci-quality-shard.mjs'
+import { createGitlabDeliveryProvider } from '../../scripts/deploy/gitlab-delivery-provider.mjs'
 import { normalizeDevQualityGateSummary } from '../src/dev-workbench/config/devQualityGates.mjs'
 
 import {
@@ -383,6 +384,38 @@ test('documentation success is visible without granting strict proof or release 
   assert.equal(summary.proofs.strict.releaseEligible, false)
   assert.equal(summary.serverEvidence.status, 'docs_passed')
   assert.match(summary.status.title, /文档检查已通过/u)
+})
+
+test('GitLab native reports survive the service and strict browser response contract', async (t) => {
+  const root = await project(t)
+  const repository = { ...REPOSITORY, dirty: false }
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: root,
+    env: { PLUSH_GITLAB_TOKEN: 'fixture-token' },
+    request: async (url) => {
+      const value = url.endsWith('/test_report_summary')
+        ? { total: { count: 2, success: 2, failed: 0, skipped: 0, error: 0 } }
+        : url.includes('/jobs?')
+          ? [{ id: 301, name: 'quality_web_checks', status: 'success', coverage: '81.25', artifacts_file: { filename: 'artifacts.zip', size: 1024 } }]
+          : { id: 91, iid: 91, sha: repository.commit, source: 'push', status: 'success', created_at: '2026-10-24T01:00:00Z', finished_at: '2026-10-24T01:01:00Z', web_url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/91' }
+      return new Response(JSON.stringify(value), { status: 200 })
+    },
+  })
+  const reports = await provider.readPipelineReports({ pipelineId: 91, sha: repository.commit })
+  const evidence = projectDevQualityGateServerEvidence({ schemaVersion: 'plush.delivery-pipeline-timings/v1', runs: [{
+    id: 91, attempt: 91, workflow: 'ci', event: 'push', gitSha: repository.commit,
+    status: 'completed', conclusion: 'success', createdAt: '2026-10-24T01:00:00.000Z', finishedAt: '2026-10-24T01:01:00.000Z',
+    durationMs: 60_000, queueMs: 0, url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/91',
+    jobs: [{ id: 301, name: 'quality_web_checks', status: 'completed', conclusion: 'success', durationMs: 60_000, queueMs: 0 }],
+  }] }, repository)
+  const service = createDevQualityGateService({
+    projectRoot: root, env: DATABASE_ENV, readRepositoryState: async () => repository,
+    readReceipt: () => null, loadServerEvidence: () => ({ ...evidence, reports }),
+  })
+  const result = normalizeDevQualityGateSummary(await service.summary()).serverEvidence
+  assert.deepEqual(result.reports, reports)
+  assert.equal(result.reports.coverage[0].percent, 81.25)
+  assert.equal(result.status, 'failed', 'report counts alone must not grant strict CI proof')
 })
 
 test('quality gate command uses only fixed formal runners', () => {

@@ -279,3 +279,17 @@ test('standalone reuses the same tools and omits local Vite availability and Bas
   assert(!names.includes('plush-dev-web-instance'))
   assert(!names.includes('plush-dev-database-migration-recovery'))
 })
+
+test('standalone refuses duplicate generic CI execution but leaves reads and project routes available', async (t) => {
+  const { request, login, calls } = await fixture(t)
+  const cookie = (await login()).headers.get('set-cookie').split(';')[0]
+  for (const route of ['/__dev/api/qa/quality-gates/actions', '/__dev/api/qa/coverage/actions']) {
+    const response = await request(route, { method: 'POST', headers: { cookie, origin } })
+    assert.equal(response.status, 403)
+    assert.match(await response.text(), /GitLab CI/u)
+  }
+  assert.equal(calls(), 0)
+  assert.equal((await request('/__dev/api/test/history', { headers: { cookie } })).status, 200)
+  assert.equal((await request('/__dev/api/test/project-action', { method: 'POST', headers: { cookie, origin } })).status, 200)
+  assert.equal(calls(), 2)
+})
