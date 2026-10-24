@@ -8,10 +8,18 @@ function fixture() {
   const repository = { commit: SHA, dirty: false, fingerprint: 'b'.repeat(64) }
   const operations = Object.fromEntries(DEV_DELIVERY_TARGETS.map((target, i) => {
     const id = `operation-${i}`
-    return [id, { id, target: target.key, gitSha: SHA, action: 'promote', status: 'passed', createdAt: '2026-10-24T00:00:00Z',
+    return [id, {
+      id,
+      target: target.key,
+      gitSha: SHA,
+      action: 'promote',
+      status: 'passed',
+      createdAt: '2026-10-24T00:00:00Z',
       gitlabRecord: { status: 'recorded' },
       stages: ['fresh_backup_and_restore_check', 'runtime_verified'].map((id) => ({ id, status: 'passed' })),
-      evidence: { status: 'passed', receiptSha256: 'c'.repeat(64),
+      evidence: {
+        status: 'passed',
+        receiptSha256: 'c'.repeat(64),
         checks: { releaseIdentity: true, health: true, ready: true, basicSmoke: true, publicEntry: true, backupRestore: true },
         migration: { required: '20261023044447', readback: '20261023044447', readbackStatus: 'passed' },
         backup: { restoreChecked: true, sha256: 'd'.repeat(64), sizeBytes: 42 } } }]
