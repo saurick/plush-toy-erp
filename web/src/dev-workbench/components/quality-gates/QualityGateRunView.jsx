@@ -44,12 +44,16 @@ export function LocalDiagnosticsActions({
       <div className="erp-dev-quality-actions__buttons">
         <label htmlFor="quality-diagnostic-profile">诊断范围</label>
         <Select
-          allowClear={false /* 不可清空：诊断执行必须明确严格或完整范围，不能用空值隐式选择执行任务。 */}
+          allowClear={
+            false /* 不可清空：诊断执行必须明确严格或完整范围，不能用空值隐式选择执行任务。 */
+          }
           placeholder="诊断范围"
           id="quality-diagnostic-profile"
           aria-label="诊断范围"
           value={profile}
-          disabled={initialLoading || Boolean(actionProfile) || summary?.busy?.active}
+          disabled={
+            initialLoading || Boolean(actionProfile) || summary?.busy?.active
+          }
           onChange={onProfileChange}
           options={[
             { value: 'strict', label: '严格诊断' },
@@ -65,15 +69,10 @@ export function LocalDiagnosticsActions({
           {profile === 'strict' ? '运行本机严格诊断' : '运行本机完整诊断'}
         </Button>
         <Text type="secondary">
-          最近耗时 {formatQualityGateDuration(profileDuration(summary, profile))}
+          最近耗时{' '}
+          {formatQualityGateDuration(profileDuration(summary, profile))}
         </Text>
-      </div>
-      <Text type="secondary">
-        {profile === 'strict' ? '严格诊断额外检查工具链、Shell 和 YAML。' : ''}
-        结果仅证明当前工作区；固定提交门禁由 GitLab CI 执行。
-      </Text>
-      {!initialLoading && summary?.environment ? (
-        <div className="erp-dev-quality-actions__environment">
+        {!initialLoading && summary?.environment ? (
           <Tag
             color={
               summary.environment.disposableDatabaseReady
@@ -85,13 +84,23 @@ export function LocalDiagnosticsActions({
               ? '运行环境已就绪'
               : '运行环境未就绪'}
           </Tag>
+        ) : null}
+      </div>
+      <div className="erp-dev-quality-actions__environment">
+        <Text type="secondary">
+          {profile === 'strict'
+            ? '严格诊断额外检查工具链、Shell 和 YAML。'
+            : ''}
+          结果仅证明当前工作区；固定提交门禁由 GitLab CI 执行。
+        </Text>
+        {!initialLoading && summary?.environment ? (
           <Text type="secondary">
             {summary.environment.disposableDatabaseReady
               ? summary.environment.message
               : '请按上方建议完成本机运行环境准备。'}
           </Text>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <ManagedDatabaseLifecycleGuide />
     </section>
   )
@@ -244,8 +253,14 @@ export function RunView({
               <Alert
                 type="error"
                 showIcon
-                message={`第一失败：${operation.firstFailure}`}
-                description="请先修复第一失败阶段，再重新运行；页面不会自动重试。"
+                message={
+                  <Space size={[12, 2]} wrap>
+                    <Text strong>第一失败：{operation.firstFailure}</Text>
+                    <Text>
+                      请先修复第一失败阶段，再重新运行；页面不会自动重试。
+                    </Text>
+                  </Space>
+                }
               />
             ) : null}
           </>

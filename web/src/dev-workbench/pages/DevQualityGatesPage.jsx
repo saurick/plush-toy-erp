@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  InfoCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
@@ -47,7 +44,7 @@ import {
   GapsView,
 } from '../components/quality-gates/QualityGateGovernanceViews.jsx'
 
-const { Text, Title } = Typography
+const { Title } = Typography
 
 const POLL_INTERVAL_MS = 1500
 
@@ -451,38 +448,9 @@ export default function DevQualityGatesPage() {
               />
             </div>
           </div>
-          <Alert
-            className="erp-dev-quality-status-banner"
-            type={summaryError ? 'error' : displayedStatus?.tone || 'info'}
-            showIcon
-            icon={
-              summaryError ? <CloseCircleOutlined /> : displayedStatus?.tone === 'success' ? (
-                <CheckCircleOutlined />
-              ) : displayedStatus?.tone === 'error' ? (
-                <CloseCircleOutlined />
-              ) : (
-                <InfoCircleOutlined />
-              )
-            }
-            message={summaryError ? '质量门禁状态读取失败' : displayedStatus?.title || '正在读取当前质量状态'}
-            description={
-              <Space direction="vertical" size={4}>
-                <Text>{summaryError || displayedStatus?.description || '正在读取状态。'}</Text>
-                {summaryError ? <Text strong>请刷新状态；当前数据尚未重新核实。</Text> : displayedStatus?.recommendation ? (
-                  <Text strong>下一步：{displayedStatus.recommendation}</Text>
-                ) : null}
-                {!summaryError && activeView !== 'server' && displayedStatus?.notProven?.length ? (
-                  <details className="erp-dev-disclosure">
-                    <summary>证据边界</summary>
-                    <Text type="secondary">尚未证明：{displayedStatus.notProven.join('、')}</Text>
-                  </details>
-                ) : null}
-              </Space>
-            }
-          />
-
           <ContextStrip
             summary={summary}
+            status={displayedStatus}
             view={activeView}
             summaryError={summaryError}
             onReturnLocal={() => selectView('run')}
