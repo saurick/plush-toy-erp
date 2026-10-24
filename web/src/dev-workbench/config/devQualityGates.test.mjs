@@ -1281,7 +1281,6 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.guide, /先看阶段，再按需查看单个 Job/u)
   assert.match(sources.presentation, /核对子 Job 回执并形成领域结论/u)
 
-
   assertNoSourceMatches(/serverJobLocalStageLabels/u)
   assertNoSourceMatches(/本机阶段与 GitLab CI Job 对照/u)
   assertNoSourceMatches(/CI：\{ciJob\.label\}/u)
@@ -1315,7 +1314,9 @@ test('native reports reject another pipeline, stale results and untrusted covera
   const payload = summary()
   const evidence = payload.serverEvidence
   const reports = {
-    status: 'available', gitSha: evidence.gitSha, pipelineId: evidence.pipeline.id,
+    status: 'available',
+    gitSha: evidence.gitSha,
+    pipelineId: evidence.pipeline.id,
     tests: { count: 3, success: 2, failed: 1, skipped: 0, error: 0 },
     testsUrl: `${evidence.pipeline.url}/test_report`,
     coverage: [{ job: evidence.jobs[0].name, percent: 81.25, url: evidence.jobs[0].url, artifactUrl: null }],

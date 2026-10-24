@@ -1,23 +1,25 @@
 import { junit } from "node:test/reporters";
 import path from "node:path";
 
-// GitLab deduplicates classname/name; Node's native classname is only "test".
-// Preserve its failure/skip handling and qualify names with their source identity.
+// Node matches start/result events by name; keep that identity intact and use
+// classname for GitLab deduplication, including repeated names on the same line.
 async function* identify(source) {
+  const occurrences = new Map();
   for await (const event of source) {
-    if (event.data?.file && event.data?.name) {
-      const relative = path
-        .relative(process.cwd(), event.data.file)
-        .split(path.sep)
-        .join("/");
-      const file = relative.startsWith("../")
-        ? path.basename(event.data.file)
-        : relative;
+    if (["test:pass", "test:fail"].includes(event.type) && event.data?.file && event.data?.name) {
+      let relative = path.relative(path.resolve(import.meta.dirname, "../.."), event.data.file);
+      if (relative.startsWith(`..${path.sep}`)) relative = path.relative(process.cwd(), event.data.file);
+      const file = (relative.startsWith(`..${path.sep}`) ? path.basename(event.data.file) : relative).split(path.sep).join("/");
+      const identity = `${file}:${event.data.line || 0}`;
+      const key = `${identity}\n${event.data.name}`;
+      const occurrence = (occurrences.get(key) || 0) + 1;
+      occurrences.set(key, occurrence);
       yield {
         ...event,
         data: {
           ...event.data,
-          name: `${file}:${event.data.line || 0} · ${event.data.name}${event.data.testNumber ? ` [${event.data.testNumber}]` : ""}`,
+          classname: `${identity} [${occurrence}]`,
+          file,
         },
       };
     } else yield event;

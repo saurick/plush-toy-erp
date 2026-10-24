@@ -56,10 +56,17 @@ test("native Node reporters publish the same execution including failed and skip
     "utf8",
   );
   assert.match(junit, /pass &amp; escape/u);
-  assert.match(junit, /case\.test\.mjs:1 · pass &amp; escape/u);
-  assert.match(junit, /other\.test\.mjs:1 · pass &amp; escape/u);
-  assert.match(junit, /same child \[1\]/u);
-  assert.match(junit, /same child \[2\]/u);
+  assert.match(junit, /classname="web\/src\/case\.test\.mjs:1 \[1\]"/u);
+  assert.match(junit, /classname="web\/src\/other\.test\.mjs:1 \[1\]"/u);
+  assert.match(junit, /classname="web\/src\/other\.test\.mjs:1 \[2\]"/u);
+  assert.doesNotMatch(junit, /<\/?undefined\b/u);
+  const cases = [...junit.matchAll(/<testcase\s+([^>]+)>?/gu)].map((match) => {
+    const name = /\bname="([^"]+)"/u.exec(match[1])[1];
+    const classname = /\bclassname="([^"]+)"/u.exec(match[1])[1];
+    return `${classname}\n${name}`;
+  });
+  assert.equal(cases.length, 6);
+  assert.equal(new Set(cases).size, 6);
   assert.match(junit, /<failure/u);
   assert.match(junit, /<skipped/u);
   const lines = lcovLines(
