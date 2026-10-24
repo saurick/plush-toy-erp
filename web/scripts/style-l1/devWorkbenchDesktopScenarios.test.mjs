@@ -42,14 +42,22 @@ test('ordinary DEV routes each expose one generated desktop smoke', () => {
 
   assert.deepEqual(
     scenarios.map((scenario) => scenario.path).sort(),
-    expectedRoutes
+    [...expectedRoutes, '/__dev/testing?view=coverage'].sort()
   )
+  const ordinaryScenarios = scenarios.filter(({ path }) => expectedRoutes.includes(path))
+  assert.equal(ordinaryScenarios.length, expectedRoutes.length)
+  const reportScenarios = scenarios.filter(({ path }) => path === '/__dev/testing?view=coverage')
+  assert.equal(reportScenarios.length, 1)
+  assert.equal(reportScenarios[0].name, 'dev-testing-report-layout-desktop-light')
+  assert.deepEqual(reportScenarios[0].viewport, { width: 1280, height: 720 })
+  assert.equal(typeof reportScenarios[0].beforeNavigate, 'function')
+  assert.equal(typeof reportScenarios[0].verify, 'function')
   assert.equal(
     new Set(scenarios.map((scenario) => scenario.name)).size,
     scenarios.length
   )
   assert(
-    scenarios.every(
+    ordinaryScenarios.every(
       (scenario) =>
         scenario.name.endsWith('-desktop-light') &&
         scenario.viewport.width === 1440 &&
