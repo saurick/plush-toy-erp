@@ -1810,43 +1810,6 @@
     .batch-dialog-row strong { min-width: 155px; }
     .batch-dialog-row span { color: var(--text-2); }
 
-    /* 评审专用：数据、文字与动作增长边界 */
-    .boundary-review-note { min-height: 54px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; }
-    .boundary-review-note > div { min-width: 0; flex: 1; }
-    .boundary-review-note strong, .boundary-review-note span { display: block; }
-    .boundary-review-note strong { margin-top: 3px; font-size: 13px; }
-    .boundary-review-note span { margin-top: 2px; color: var(--text-3); font-size: 11px; line-height: 1.45; }
-    .boundary-filter-strip { min-width: 0; display: flex; align-items: center; gap: 5px; overflow-x: auto; scrollbar-width: thin; }
-    .boundary-filter-strip button { min-height: 30px; padding: 0 9px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; color: var(--text-2); background: var(--surface); white-space: nowrap; }
-    .boundary-filter-strip button.active { color: var(--brand-strong); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); background: var(--brand-soft); font-weight: 650; }
-    .boundary-control-row { min-width: 0; padding: 6px 7px; display: flex; align-items: center; gap: 7px; border-bottom: 1px solid var(--line); }
-    .boundary-control-row .search { min-width: 260px; }
-    .boundary-command-actions { min-width: 0; margin-left: auto; display: flex; align-items: center; gap: 6px; }
-    .boundary-selection { min-width: 0; padding: 6px 9px; display: flex; align-items: center; gap: 8px; background: var(--brand-softer); }
-    .boundary-selection-copy { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; }
-    .boundary-selection-copy strong { white-space: nowrap; }
-    .boundary-selection-copy span { min-width: 0; overflow: hidden; color: var(--text-2); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-    .boundary-selection-actions { display: flex; align-items: center; gap: 5px; }
-    .boundary-table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; scrollbar-width: thin; }
-    .boundary-table { min-width: 1510px; }
-    .boundary-table th:last-child, .boundary-table td:last-child { position: sticky; right: 0; z-index: 4; min-width: 116px; background: var(--surface); box-shadow: -8px 0 12px -12px rgba(20, 35, 26, .55); }
-    .boundary-table th:last-child { z-index: 7; background: var(--surface-muted); }
-    .boundary-table tr:hover td:last-child { background: var(--surface-hover); }
-    .boundary-table tr.selected td:last-child { background: color-mix(in srgb, var(--brand-softer) 82%, var(--surface)); }
-    .boundary-identity { min-width: 250px; max-width: 320px; }
-    .boundary-text-trigger { width: 100%; min-width: 0; padding: 0; border: 0; display: block; overflow: hidden; color: inherit; background: transparent; font-weight: 650; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-    .boundary-text-trigger:hover, .boundary-text-trigger:focus-visible { color: var(--brand-strong); text-decoration: underline; text-underline-offset: 3px; }
-    .boundary-tag-stack { max-width: 190px; display: flex; align-items: center; gap: 4px; overflow: hidden; }
-    .boundary-tag-stack .badge { flex: 0 0 auto; }
-    .boundary-actions-cell { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-    .boundary-footer-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .boundary-mobile-list { display: none; }
-    .boundary-mobile-card { padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
-    .boundary-mobile-card h3 { margin: 8px 0 4px; display: -webkit-box; overflow: hidden; font-size: 14px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-    .boundary-mobile-card p { margin: 0; display: -webkit-box; overflow: hidden; color: var(--text-2); font-size: 12px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-    .boundary-mobile-meta, .boundary-mobile-actions { margin-top: 9px; display: flex; align-items: center; gap: 6px; }
-    .boundary-mobile-meta span:last-child { margin-left: auto; color: var(--text-3); font-size: 11px; }
-    .boundary-mobile-actions .btn:first-child { flex: 1; }
     .boundary-more-wrap { position: relative; }
     .boundary-action-menu { position: absolute; right: 0; bottom: calc(100% + 7px); z-index: 5; width: 180px; padding: 5px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); box-shadow: var(--shadow); }
     .boundary-action-menu button { min-height: 34px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; text-align: left; }
@@ -2360,11 +2323,6 @@
       .print-grid, .help-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .permission-layout { grid-template-columns: 210px minmax(0, 1fr); }
       .print-workbench { grid-template-columns: 270px minmax(420px, 1fr); }
-      .boundary-control-row { flex-wrap: wrap; }
-      .boundary-control-row .search { width: 100%; flex-basis: 100%; }
-      .boundary-command-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
-      .boundary-selection { align-items: flex-start; flex-direction: column; }
-      .boundary-selection-actions { width: 100%; overflow-x: auto; }
       .print-template-row { grid-template-columns: minmax(180px, 1fr) minmax(120px, .6fr) auto; }
       .print-template-row .template-desc { display: none; }
       .help-center-layout { grid-template-columns: 240px minmax(0, 1fr); }
@@ -2421,15 +2379,6 @@
       .table-footer .pager { flex-wrap: wrap; margin-left: 0; }
       .audit-data-surface .table-wrap { display: block; overflow: auto; }
       .audit-data-surface .audit-toolbar { flex-wrap: wrap; }
-      .boundary-review-note { align-items: flex-start; }
-      .boundary-review-note > .btn { flex: 0 0 auto; }
-      .boundary-control-row .search { width: 100%; min-width: 0; }
-      .boundary-command-actions { overflow-x: auto; justify-content: flex-start; }
-      .boundary-command-actions .btn { flex: 0 0 auto; }
-      .boundary-table-wrap, .boundary-selection { display: none; }
-      .boundary-mobile-list { flex: 1 1 auto; padding: 7px; display: grid; align-content: start; gap: 7px; overflow: visible; background: var(--surface-muted); }
-      .boundary-data-surface { min-height: 560px; }
-      .boundary-data-surface .table-footer { display: none; }
       .modal-foot > .data-note { flex-basis: 100%; }
       .popover { left: 7px !important; right: 7px; width: auto; top: 145px !important; }
       .drawer { width: 100%; }
@@ -4800,7 +4749,7 @@
       previewState: 'data', detailTab: 'basic', businessAction: 'primary', businessActionLabel: '', batchAction: '', summaryOpen: false, permissionRole: 'warehouse', permissionTab: 'roles', permissionDirty: false, permissionFullscreen: false,
       permissionNavigationView: 'menu', permissionSelectedOnly: false, permissionAccountStatus: '全部', permissionAccountSearch: '', permissionAccountEditor: null, permissionAccountDirty: false, permissionApprovalDirty: false, permissionSaved: null, permissionSearch: '', permissionOpenGroups: new Set(permissionGroupsData.map(([key])=>key)),
       permissionValues: {}, approvalRuleStatus: {}, permissionScopeType: {warehouse:'warehouses'}, permissionScopeValue: {warehouse:['finished','raw']},
-      boundaryAllResults: false, boundaryExcluded: new Set(), boundaryMoreOpen: false,
+      boundaryMoreOpen: false,
       moduleTabs: { 'master-hub': 'customers', 'engineering-hub': 'bom', 'warehouse-hub': 'inbound','production-hub':'production','shipping-hub':'shipments','finance-hub':'receivables'}, sidebarCollapsed: false,
       salesView: 'list', deliveryFilter: 'all', deliverySearch: '',
       inventoryView: 'balances', inventoryDisplay: 'list',
@@ -4957,7 +4906,7 @@
     }
 
     function getRecordAction(config, row) {
-      if (!config || !row || config.readOnly) return null;
+      if (!config || !row || row.previewOnly || config.readOnly) return null;
       if (config.workflow) return { label: config.rowAction || '办理任务', key: 'workflow' };
       const actionMap = {
         sales: { draft:'提交订单', submitted:'确认订单', active:'查看履约进度' },
@@ -4979,7 +4928,7 @@
     }
 
     function canEditRecord(config, row) {
-      if (!config || !row || config.readOnly || config.workflow || config.key === 'inventory') return false;
+      if (!config || !row || row.previewOnly || config.readOnly || config.workflow || config.key === 'inventory') return false;
       if (config.simpleForm) return ['active', 'inactive', 'draft'].includes(row.status);
       return row.status === 'draft';
     }
@@ -5399,9 +5348,9 @@
 
     function currentPageConfig() {
       if (state.page === 'entity-form') return listConfig[state.formSourcePage] || listConfig.sales;
-      if (state.page === 'production-hub' && state.moduleTabs[state.page] !== 'production') return productionRecordPreviewConfig();
-      if (moduleHubs[state.page]) return listConfig[state.moduleTabs[state.page]];
-      return listConfig[state.page] || null;
+      if (state.page === 'production-hub' && state.moduleTabs[state.page] !== 'production') return listPreviewConfig(productionRecordPreviewConfig());
+      if (moduleHubs[state.page]) return listPreviewConfig(listConfig[state.moduleTabs[state.page]]);
+      return listPreviewConfig(listConfig[state.page]) || null;
     }
 
     function savePrototypeAppearance() {
@@ -6436,7 +6385,12 @@ active = new Set()
       return `<button data-action="page-prev" ${currentPage===1?'disabled':''} aria-label="上一页">${icon('left')}</button>${pagerItems(pageCount,currentPage).map(item=>item==='gap'?'<span class="pager-gap" aria-hidden="true">…</span>':`<button class="${currentPage===item?'active':''}" data-action="page-number" data-value="${item}" aria-label="第 ${item} 页">${item}</button>`).join('')}<button data-action="page-next" ${currentPage===pageCount?'disabled':''} aria-label="下一页">${icon('chevron')}</button>`;
     }
 
-    function boundaryRowsFor(pageNo = 1) {
+    const boundaryPreviewConfigs = new Map();
+    let boundaryPreviewContext = null;
+
+    function listPreviewConfig(config) {
+      if (!config || state.previewState !== 'stress' || !config.rows.length) return config;
+      if (boundaryPreviewConfigs.has(config.key)) return {...config, rows: boundaryPreviewConfigs.get(config.key)};
       const customers = [
         '华东国际文化创意礼品供应链管理（深圳）有限公司',
         '北辰乐园主题娱乐项目运营管理股份有限公司华南采购中心',
@@ -6456,46 +6410,59 @@ active = new Set()
         '出货资料已齐，等待仓库复核箱唛与承运车辆信息'
       ];
       const owners = ['欧阳晨曦（华南大区）','上官雨桐（重点客户组）','林晓 / 周敏','仓库主管值班组'];
-      const statusList = [['待确认','warning'],['生产中','info'],['已阻塞','danger'],['待出货','warning'],['已完成','success']];
-      const tagSets = [['重点客户','海外订单','多币种','定制包装','客户供图','分批交付','需审批'],['临近交付','分批到货','含附件','已催办','跨岗位'],['质量复核','返工','客户确认','有变更','高金额'],['正常','含图片','有协同任务','三种计量单位']];
-      const start = (pageNo - 1) * 100;
-      return Array.from({length: 30}, (_, index) => {
-        const seq = start + index + 1;
-        const [status,badge] = statusList[index % statusList.length];
+      const rows = Array.from({length: 500}, (_, index) => {
+        const source = config.rows[index % config.rows.length], seq = index + 1;
+        const party = config.key === 'sales' ? customers[index % customers.length] : `${rowParty(source,config)}（跨部门协同与长名称样例）`;
+        const item = config.key === 'sales' ? products[index % products.length] : `${rowItem(source,config)} · 加长规格与包装资料样例`;
         return {
-          id: `EDGE-${seq}`,
-          no: `SO-20260926-${String(seq).padStart(9,'0')}`,
-          customer: customers[index % customers.length],
-          product: products[index % products.length],
-          status, badge,
-          tags: tagSets[index % tagSets.length],
-          amount: `¥ ${new Intl.NumberFormat('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}).format(12345678901.99 + seq * 9876.54)}`,
+          ...source,
+          id: `EDGE-${config.key}-${seq}`,
+          no: `${source.no.split('-')[0]}-20260926-${String(seq).padStart(9,'0')}`,
+          customerOrderNo: config.key === 'sales' ? `2026-INTL-${seq}` : source.customerOrderNo,
+          customer: source.customer === undefined ? undefined : party,
+          party,
+          supplier: source.supplier === undefined ? undefined : party,
+          product: source.product === undefined ? undefined : item,
+          item,
+          lines: 18,
+          amount: 12345678901.99 + seq * 9876.54,
+          metric: config.metricType === 'quantity' ? `12,345,678.123456 ${config.unit || '个'}` : '',
           progress: progresses[index % progresses.length],
-          owner: owners[index % owners.length]
+          owner: owners[index % owners.length],
+          previewOnly: true,
         };
       });
+      boundaryPreviewConfigs.set(config.key, rows);
+      return {...config, rows};
     }
 
-    function renderBoundaryPreview(config) {
-      const total = 128436;
-      const pageCount = Math.ceil(total / 100);
-      state.pageNo = Math.min(Math.max(1, state.pageNo), pageCount);
-      const rows = boundaryRowsFor(state.pageNo);
-      const allPageSelected = state.boundaryAllResults ? rows.every(row => !state.boundaryExcluded.has(row.id)) : rows.every(row => state.selected.has(row.id));
-      const selectedCount = state.boundaryAllResults ? total - state.boundaryExcluded.size : state.selected.size;
-      const primaryLabel = config.primary || `新建${config.entity || '记录'}`;
-      const selectedLabel = state.boundaryAllResults ? `已选择全部结果${state.boundaryExcluded.size?`，排除 ${state.boundaryExcluded.size} 条`:''} · 共 ${new Intl.NumberFormat('zh-CN').format(selectedCount)} 条` : `已选择 ${selectedCount} 条 · 选择可跨分页保留`;
-      return `<section class="surface boundary-review-note" role="note"><span class="badge info">评审状态</span><div><strong>${config.title || '业务列表'} · 增长边界预览</strong><span>只在评审状态展示压力数据；正式页面保持简约，低频动作收进“更多”，完整值进入详情。</span></div><button class="btn" data-action="state-reset">退出边界预览</button></section>
-        <section class="surface operation-surface">
-          <div class="command-row"><div class="boundary-filter-strip" aria-label="大量状态筛选"><button class="active" data-action="boundary-action" data-value="status-all">全部 128,436</button><button data-action="boundary-action" data-value="status-confirm">待确认 18,204</button><button data-action="boundary-action" data-value="status-production">生产中 36,891</button><button data-action="boundary-action" data-value="status-due">临近交付 7,602</button><button data-action="boundary-action" data-value="status-blocked">阻塞 386</button><button data-action="boundary-action" data-value="statuses">更多状态 7</button></div></div>
-          <div class="boundary-control-row"><label class="search">${icon('search')}<input id="list-search" value="${escapeHTML(state.search)}" placeholder="搜索单号、客户、产品、负责人或外部参考号" aria-label="边界预览搜索" /></label><div class="boundary-command-actions"><button class="control filter-active" data-action="boundary-action" data-value="filters">${icon('filter')}筛选<b>11</b></button><button class="btn" data-action="boundary-action" data-value="export">${icon('export')}导出</button><button class="btn" data-action="boundary-open-modal">弹窗边界</button><button class="btn" data-action="boundary-action" data-value="more-actions">${icon('more')}更多 6</button><button class="btn primary" data-action="boundary-action" data-value="create">${icon('plus')}${primaryLabel}</button></div></div>
-          <div class="boundary-selection"><div class="boundary-selection-copy"><strong>${selectedLabel}</strong><span>${state.boundaryAllResults?'跨页全选只作用于当前筛选，并在执行前再次确认。':'已选记录即使翻页也保留，批量动作按共同权限与状态取交集。'}</span>${state.boundaryAllResults?'<button class="text-btn" data-action="clear-selection">取消跨页全选</button>':`<button class="text-btn" data-action="boundary-select-all-results">扩展为全部 ${new Intl.NumberFormat('zh-CN').format(total)} 条结果</button>`}</div><div class="boundary-selection-actions"><button class="btn" data-action="boundary-action" data-value="assign" ${selectedCount?'':'disabled'}>分配负责人</button><button class="btn" data-action="boundary-action" data-value="batch-export" ${selectedCount?'':'disabled'}>导出所选</button><button class="btn" data-action="boundary-action" data-value="batch-more" ${selectedCount?'':'disabled'}>${icon('more')}更多批量操作 5</button></div></div>
-        </section>
-        <section class="surface data-surface boundary-data-surface">
-          <div class="boundary-table-wrap"><table class="boundary-table"><thead><tr><th><input class="checkbox" type="checkbox" data-action="boundary-select-page" ${allPageSelected?'checked':''} aria-label="选择当前页样例记录" /></th><th>业务单号</th><th>客户 / 产品</th><th>状态</th><th>标签</th><th>含税金额</th><th>当前进度</th><th>负责人 / 岗位</th><th>操作</th></tr></thead><tbody>${rows.map(row=>{const checked=state.boundaryAllResults?!state.boundaryExcluded.has(row.id):state.selected.has(row.id);return `<tr class="${checked?'selected':''}"><td><input class="checkbox" type="checkbox" data-action="select-row" data-id="${row.id}" ${checked?'checked':''} aria-label="选择 ${row.no}" /></td><td><span class="mono strong">${row.no}</span><span class="subline">18 条明细 · 外部参考 2026-INTL-${row.id.slice(5)}</span></td><td class="boundary-identity"><button class="boundary-text-trigger" data-action="boundary-fulltext" data-id="${row.id}" title="${escapeHTML(row.customer)}">${escapeHTML(row.customer)}</button><button class="boundary-text-trigger subline" data-action="boundary-fulltext" data-id="${row.id}" title="${escapeHTML(row.product)}">${escapeHTML(row.product)}</button></td><td><span class="badge ${row.badge}">${row.status}</span></td><td><div class="boundary-tag-stack">${row.tags.slice(0,2).map(tag=>`<span class="badge">${tag}</span>`).join('')}<button class="text-btn" data-action="boundary-tags" data-id="${row.id}">+${row.tags.length-2}</button></div></td><td class="mono strong">${row.amount}</td><td><button class="boundary-text-trigger" data-action="boundary-fulltext" data-id="${row.id}" title="${escapeHTML(row.progress)}">${escapeHTML(row.progress)}</button></td><td><button class="boundary-text-trigger" data-action="boundary-fulltext" data-id="${row.id}" title="${escapeHTML(row.owner)}">${escapeHTML(row.owner)}</button></td><td><div class="boundary-actions-cell"><button class="text-btn" data-action="boundary-fulltext" data-id="${row.id}">查看</button><button class="btn icon-btn" data-action="boundary-action" data-value="row-more" aria-label="${row.no} 更多操作">${icon('more')}</button></div></td></tr>`}).join('')}</tbody></table></div>
-          <div class="boundary-mobile-list">${rows.slice(0,8).map(row=>`<article class="boundary-mobile-card"><div class="mobile-row-head"><span class="mono strong">${row.no}</span><span class="badge ${row.badge}">${row.status}</span></div><h3>${escapeHTML(row.customer)}</h3><p>${escapeHTML(row.product)} · ${escapeHTML(row.progress)}</p><div class="boundary-mobile-meta"><strong>${row.amount}</strong><span>${escapeHTML(row.owner)}</span></div><div class="boundary-mobile-actions"><button class="btn" data-action="boundary-fulltext" data-id="${row.id}">查看完整内容</button><button class="btn icon-btn" data-action="boundary-action" data-value="row-more" aria-label="更多操作">${icon('more')}</button></div></article>`).join('')}</div>
-          <footer class="table-footer"><span class="boundary-footer-note">共 ${new Intl.NumberFormat('zh-CN').format(total)} 条 · 当前页展示 30 条压力样例 · 正式数据服务端按 100 条分页，不一次性加载全部记录</span><span>已选 ${new Intl.NumberFormat('zh-CN').format(selectedCount)} 条</span><div class="pager">${renderPagerButtons(pageCount,state.pageNo)}</div></footer>
-        </section>`;
+    function applyBusinessPreviewState(value) {
+      if (value === 'stress' && state.previewState !== 'stress') {
+        boundaryPreviewConfigs.clear();
+        for (const key of entityContexts.keys()) if (key.startsWith('stress:')) entityContexts.delete(key);
+        rememberEntity();
+        const fields = ['page','businessPageSize',...sharedContextFields,...new Set(Object.values(viewFields).flat())];
+        const values = Object.fromEntries(fields.map(key => [key,state[key]]));
+        values.selected = new Set(state.selected);
+        values.visibleColumns = new Set(state.visibleColumns);
+        values.columnOrder = [...state.columnOrder];
+        values.moduleTabs = {...state.moduleTabs};
+        if (!currentPageConfig()) state.page = 'sales';
+        boundaryPreviewContext = {key:currentPageConfig().key, values};
+        Object.assign(state,{status:'all',search:'',pageNo:1,filterParty:'',filterOwner:'all',filterRisk:'all',filterIncludeEnded:true,filterDateFrom:'',filterDateTo:''});
+        state.selected = new Set();
+      } else if (value !== 'stress' && boundaryPreviewContext) {
+        const key = currentPageConfig()?.key;
+        state.previewState = value;
+        if (key === boundaryPreviewContext.key) Object.assign(state,boundaryPreviewContext.values);
+        else if (key) restoreEntity(key);
+        boundaryPreviewContext = null;
+      }
+      state.previewState = value;
+      state.overlay = null;
+      state.drawer = null;
+      state.floatingStack = [];
+      state.actionContext = null;
     }
 
     function renderHubTabsRow(hub, config) {
@@ -6559,7 +6526,7 @@ active = new Set()
         <div class="table-wrap"><table data-table-lines="appearance"><thead><tr><th>选择</th><th>采购单号</th><th>供应商</th><th>订单状态</th><th>到货日期</th><th>日期确认</th><th>交期提醒</th></tr></thead><tbody>${p.rows.map(item=>`<tr class="${state.selected.has(item.id)?'selected':''}" data-row="${item.id}"><td><input type="radio" name="arrival-record" data-action="arrival-choose" data-id="${item.id}" ${state.selected.has(item.id)?'checked':''} aria-label="选择 ${item.no}"/></td><td><button class="entity-link" data-action="arrival-open" data-id="${item.id}">${item.no}</button></td><td>${escapeHTML(item.supplier)}</td><td>${escapeHTML(item.record.statusText)}</td><td>${item.date?displayDate(item.date):'未填日期'}</td><td>${item.confirmed?'供应商已确认':'待供应商确认'}</td><td><span class="badge ${item.status==='overdue'?'danger':''}">${item.status==='completed'?'订单已关闭':item.status==='cancelled'?'已取消':item.status==='overdue'?`逾期 ${Math.abs(dayDelta(item.date))} 天`:!item.date?'未填到货日':'计划到货'}</span></td></tr>`).join('')}</tbody></table>${selected.length?'':'<div class="empty">当前条件暂无到货安排 <button class="btn" data-action="arrival-reset">查看全部到货安排</button></div>'}</div>${selected.length?renderVisualPager(p,config.key):''}<p class="data-note arrival-results-head">按订单交期提醒，供应商确认日期优先；实际到货以收货记录为准。</p></section>`;
     }
     function renderListPage(config, hub = null) {
-      if (state.previewState === 'stress' && visualMode(config.key) === 'list') return renderBoundaryPreview(config);
+      config = listPreviewConfig(config);
       if (config.key === 'sales' && state.salesView === 'delivery') return renderSalesDeliveryView(config);
       if (config.key === 'purchase' && state.purchaseView === 'arrival') return renderPurchaseArrivalPlan(config);
       if (['receivables','payables'].includes(config.key) && state.financeDueView === 'due') return renderFinanceDueView(config,hub);
@@ -6569,7 +6536,7 @@ active = new Set()
       const page = getPageSlice(rows);
       const pageRows = page.rows;
       const selectedRows = config.rows.filter(row => state.selected.has(row.id));
-      const showUnselectedActions = state.previewState==='data' && pageRows.length>0 && selectedRows.length===0;
+      const showUnselectedActions = ['data','stress'].includes(state.previewState) && pageRows.length>0 && selectedRows.length===0;
       const selectedLabel = selectedRows.length ? `已选择 ${selectedRows.length} 条 · ${selectedRows.map(row => row.no).slice(0, 2).join('、')}${selectedRows.length > 2 ? '…' : ''}` : '请选择一条记录后执行相关操作';
       const allVisibleSelected = pageRows.length > 0 && pageRows.every(row => state.selected.has(row.id));
       const cols = columnDefs(config).filter(([key]) => state.visibleColumns.has(key));
@@ -6591,13 +6558,13 @@ active = new Set()
           <div class="command-actions">
             ${renderFilterTrigger(activeFilterCount(),'open-filter','clear-filter')}
             ${config.key === 'inventory' ? '<button class="btn" data-action="warehouse-settings">仓库设置</button>' : ''}
-            ${renderBusinessActionMenu(`<button class="btn" data-action="export">${icon('export')}导出筛选结果</button><button class="btn" data-action="open-columns">${icon('columns')}列设置</button>`,'表格工具')}
+            ${renderBusinessActionMenu(`<button class="btn" data-action="export">${icon('export')}导出筛选结果</button><button class="btn" data-action="open-columns">${icon('columns')}列设置</button>${state.previewState==='stress'?'<button class="btn" data-action="boundary-open-modal">弹窗边界</button>':''}`,'表格工具')}
             ${config.primary ? `<button class="btn ${selectedRows.length?'':'primary'}" data-action="new-record">${icon('plus')}<span>${config.primary}</span></button>` : ''}
           </div>
         </div>
         ${selectedRows.length===0?(showUnselectedActions?`<div class="record-row business-record-row record-row--empty"><div class="record-state"><strong>当前操作</strong><span>请选择一条记录</span></div>${businessRecordActions[config.key]?renderBusinessRecordActions(config,[]):''}</div>`:''):businessRecordActions[config.key] ? `<div class="record-row business-record-row"><div class="record-state"><span title="${escapeHTML(selectedLabel)}">${selectedLabel}</span>${selectedRows.length===1?`<button class="btn ghost icon-btn" data-action="clear-selection" aria-label="清空已选" title="清空已选">${icon('close')}</button>`:''}</div>${renderBusinessRecordActions(config,selectedRows)}</div>` : selectedRows.length > 1 ? `<div class="record-row batch-mode"><div class="batch-summary"><strong>已选择 ${selectedRows.length} 条</strong><span>${selectedRows.map(row=>row.no).slice(0,3).join('、')}${selectedRows.length>3?'…':''}</span><button class="text-btn" data-action="clear-selection">清除选择</button></div><div class="batch-actions"><button class="btn" data-action="batch-action" data-value="export">${icon('export')}导出所选</button>${supportsBatchPrint(config)?`<button class="btn" data-action="batch-action" data-value="print">${icon('printer')}批量打印</button>`:''}<button class="btn" data-action="batch-action" data-value="assign">分配负责人</button>${commonBatchAction?`<button class="btn primary" data-action="batch-action" data-value="primary" data-label="${commonBatchAction.label}">批量${commonBatchAction.label}</button>`:`<span class="batch-hint">状态不同，不提供批量状态变更</span>`}</div></div>` : `<div class="record-row"><div class="record-state"><strong>当前操作</strong><span>${selectedLabel}</span></div><div class="record-actions"><button class="btn desktop-only" ${selectedRows.length !== 1 ? 'disabled' : ''} data-action="open-selected">查看详情</button>${config.readOnly ? '' : `<button class="btn" ${canEditSelected ? '' : 'disabled'} title="${selectedRows.length===1&&!canEditSelected?'当前状态不可直接编辑':''}" data-action="edit-selected">编辑</button>${supportsTaskCreation(config)?`<button class="btn" ${selectedRows.length!==1?'disabled':''} data-action="open-related-tasks">相关任务</button>`:''}${singleAction?`<button class="btn primary" data-action="submit-selected" data-label="${singleAction.label}">${singleAction.label}</button>`:''}<button class="btn icon-btn" ${selectedRows.length === 0 ? 'disabled' : ''} data-action="more-selected" aria-label="更多操作">${icon('more')}</button>`}</div></div>`}
       </section>`;
-      if (state.previewState !== 'data') return `${operation}${renderDataState(config)}`;
+      if (!['data','stress'].includes(state.previewState)) return `${operation}${renderDataState(config)}`;
       if (config.key === 'inventory' && state.inventoryView === 'balances' && state.inventoryDisplay === 'distribution') {
         return `${operation}<section class="surface inventory-distribution-preview" aria-label="仓库库存分布">${config.sampleParties.map(warehouse=>`<button class="btn" data-action="inventory-warehouse" data-value="${escapeHTML(warehouse)}"><strong>${escapeHTML(warehouse)}</strong><span>${rows.filter(row=>row.party===warehouse).length} 个样例库存项</span><span>查看明细 →</span></button>`).join('')}</section>`;
       }
@@ -18159,10 +18126,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const handlingReturn=state.page==='entity-form'&&state.handlingReturnContext?.page===page?state.handlingReturnContext:null;
       if(state.page==='entity-form')state.handlingReturnContext=null;
       rememberEntity();
-      if (state.previewState === 'stress' && !listConfig[page] && !moduleHubs[page]) state.previewState = 'data';
+      if (state.previewState === 'stress' && !listConfig[page] && !moduleHubs[page]) applyBusinessPreviewState('data');
       state.page=page;state.overlay=null;state.drawer=null;state.floatingStack=[];state.actionContext=null;
       const config=currentPageConfig();if(config)restoreEntity(config.key);
-      state.boundaryAllResults=false;state.boundaryExcluded.clear();
       if(handlingReturn)Object.assign(state,handlingReturn);
       setNavigationOpen(false);renderAll();
     }
@@ -18237,7 +18203,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'toggle-sidebar') { state.sidebarCollapsed = !state.sidebarCollapsed; renderSidebar(); document.querySelector('[data-action="toggle-sidebar"]')?.focus(); }
       else if (action === 'module-tab') { rememberEntity();state.moduleTabs[state.page]=target.dataset.value;restoreEntity(target.dataset.value);if(state.page==='production-hub')state.productionRecordsView=target.dataset.value==='production-execution'?'route':'list';state.overlay=null;state.drawer=null;renderAll(); }
       else if (action === 'open-route-view') navigate(target.dataset.page);
-      else if (action === 'state-reset') { state.previewState = 'data'; state.status = 'all'; state.search = ''; state.pageNo = 1; state.selected.clear(); state.boundaryAllResults = false; state.boundaryExcluded.clear(); state.boundaryMoreOpen = false; resetListFilters(); renderAll(); }
+      else if (action === 'state-reset') { applyBusinessPreviewState('data'); state.status = 'all'; state.search = ''; state.pageNo = 1; state.selected.clear(); state.boundaryMoreOpen = false; resetListFilters(); renderAll(); }
       else if (action === 'state-retry') { state.previewState = 'data'; renderAll(); toast('已重新读取当前页面'); }
       else if (action === 'state-home') { state.previewState = 'data'; navigate('dashboard'); }
       else if (action === 'open-mobile-tasks') {
@@ -18431,35 +18397,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'select-row') {
         const id = target.dataset.id;
-        if (state.previewState === 'stress' && state.boundaryAllResults) target.checked ? state.boundaryExcluded.delete(id) : state.boundaryExcluded.add(id);
-        else target.checked ? state.selected.add(id) : state.selected.delete(id);
+        target.checked ? state.selected.add(id) : state.selected.delete(id);
         renderView();
       }
       else if (action === 'select-all') { const config = currentPageConfig(); if (!config) return; const rows = getPageSlice(getFilteredRows(config)).rows; if (target.checked) rows.forEach(row=>state.selected.add(row.id)); else rows.forEach(row=>state.selected.delete(row.id)); renderView(); }
-      else if (action === 'boundary-select-page') {
-        const rows = boundaryRowsFor(state.pageNo);
-        if (state.boundaryAllResults) rows.forEach(row => target.checked ? state.boundaryExcluded.delete(row.id) : state.boundaryExcluded.add(row.id));
-        else rows.forEach(row => target.checked ? state.selected.add(row.id) : state.selected.delete(row.id));
-        renderView();
-      }
-      else if (action === 'boundary-select-all-results') { state.boundaryAllResults = true; state.boundaryExcluded.clear(); renderView(); }
-      else if (action === 'clear-selection') { state.selected.clear(); state.boundaryAllResults = false; state.boundaryExcluded.clear(); renderView(); }
-      else if (action === 'boundary-fulltext') {
-        const row = boundaryRowsFor(state.pageNo).find(item=>item.id===target.dataset.id) || boundaryRowsFor(1)[0];
-        state.infoModal = { title: `完整内容 · ${row.no}`, html: `<dl class="detail-grid"><dt>客户</dt><dd>${copyValue(row.customer)}</dd><dt>产品</dt><dd>${copyValue(row.product)}</dd><dt>当前进度</dt><dd>${copyValue(row.progress)}</dd><dt>负责人 / 岗位</dt><dd>${copyValue(row.owner)}</dd><dt>含税金额</dt><dd>${copyValue(row.amount)}</dd></dl><p class="data-note" style="margin:12px 0 0">列表截断只用于扫描；详情、复制、导出和打印继续使用完整值。</p>` };
-        state.overlay = 'info'; renderFloating();
-      }
-      else if (action === 'boundary-tags') {
-        const row = boundaryRowsFor(state.pageNo).find(item=>item.id===target.dataset.id) || boundaryRowsFor(1)[0];
-        state.infoModal = { title: `全部标签 · ${row.no}`, html: `<div style="display:flex;flex-wrap:wrap;gap:7px">${row.tags.map(tag=>`<span class="badge">${tag}</span>`).join('')}</div><p class="data-note" style="margin:12px 0 0">列表只保留高辨识度标签，其余以 +N 汇总；筛选与详情仍可查看全部标签。</p>` };
-        state.overlay = 'info'; renderFloating();
-      }
-      else if (action === 'boundary-action') {
-        const labels = {statuses:'状态筛选增长','status-all':'全部状态','status-confirm':'待确认状态','status-production':'生产中状态','status-due':'临近交付状态','status-blocked':'阻塞状态',filters:'筛选条件增长',export:'大数据导出','more-actions':'页面低频动作',create:'新建入口',assign:'批量分配','batch-export':'批量导出','batch-more':'批量低频动作','row-more':'单行低频动作'};
-        const label = labels[target.dataset.value] || '边界动作';
-        state.infoModal = { title: label, html: `<section class="detail-section"><h3>设计约束</h3><p style="margin:0;color:var(--text-2);line-height:1.7">高频且安全的动作直接显示；其余动作进入有文字名称的“更多”菜单。动作仍按当前记录状态、岗位权限与数据范围校验，不因收口到菜单而扩大能力。</p></section><section class="detail-section" style="margin-top:10px"><h3>大量数据</h3><p style="margin:0;color:var(--text-2);line-height:1.7">查询、汇总、跨页选择和导出均以服务端筛选口径为准；界面只渲染当前页，耗时导出应显示生成进度、完成入口和失败重试。</p></section>` };
-        state.overlay = 'info'; renderFloating();
-      }
+      else if (action === 'clear-selection') { state.selected.clear(); renderView(); }
       else if (action === 'boundary-open-modal') { state.boundaryMoreOpen = false; state.overlay = 'boundary-modal'; renderFloating(); }
       else if (action === 'boundary-modal-more') { state.boundaryMoreOpen = !state.boundaryMoreOpen; renderFloating(); }
       else if (action === 'boundary-modal-action') {
@@ -18485,7 +18427,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'clear-filter') { resetListFilters(); state.overlay=null; state.selected.clear(); renderAll(); document.querySelector('[data-action="open-filter"]')?.focus(); toast('附加筛选已重置'); }
       else if (action === 'page-prev') { state.pageNo=Math.max(1,state.pageNo-1);renderView(); }
       else if (action === 'page-number') { state.pageNo=Number(target.dataset.value)||1;renderView(); }
-      else if (action === 'page-next') { if(state.previewState==='stress'){state.pageNo=Math.min(1285,state.pageNo+1);renderView();}else{const config=currentPageConfig();if(config){const page=getPageSlice(getFilteredRows(config));state.pageNo=Math.min(page.pageCount,state.pageNo+1);renderView();}} }
+      else if (action === 'page-next') { const config=currentPageConfig();if(config){const page=getPageSlice(getFilteredRows(config));state.pageNo=Math.min(page.pageCount,state.pageNo+1);renderView();} }
       else if (action === 'open-columns') { state.columnDraft=columnSettingsState(currentPageConfig() || listConfig.sales);state.overlay = 'columns'; renderFloating(); }
       else if (action === 'open-theme') { state.overlay = 'theme'; renderFloating(); }
       else if (action === 'task-associations') { state.taskAssociationsId=target.dataset.id;state.overlay='task-associations';renderFloating(); }
@@ -18784,9 +18726,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         return;
       }
       if (!['data','route-loading','loading','empty','error','forbidden','stress'].includes(value)) return;
-      state.previewState=value;state.overlay=null;
-      if (value==='stress' && visualMode()!=='list') {state.visualLarge[currentPageConfig().key]=true;state.previewState='data';state.visualPages[currentPageConfig().key]=1;}
-      else if(value==='stress'){state.page='sales';state.salesView='list';state.pageNo=1;state.boundaryAllResults=false;state.boundaryExcluded.clear();state.selected=new Set(['EDGE-1','EDGE-2','EDGE-3']);}
+      applyBusinessPreviewState(value);
       renderAll();
     });
 
@@ -18846,10 +18786,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       rememberScroll();const saved={};
       [...sharedContextFields,...(viewFields[key]||[])].forEach(field=>saved[field]=state[field]);
       saved.selected=[...state.selected];saved.visibleColumns=[...state.visibleColumns];saved.columnOrder=[...state.columnOrder];
-      entityContexts.set(key,saved);
+      entityContexts.set(state.previewState==='stress'?`stress:${key}`:key,saved);
     }
     function restoreEntity(key) {
-      const saved=entityContexts.get(key);
+      const saved=entityContexts.get(state.previewState==='stress'?`stress:${key}`:key);
       Object.assign(state,{status:'all',search:'',pageNo:1,sortKey:'date',sortDir:'asc',filterParty:'',filterOwner:'all',filterRisk:'all',filterIncludeEnded:true,filterDateFrom:'',filterDateTo:'',summaryOpen:false});
       (viewFields[key]||[]).forEach(field=>state[field]=viewDefaults[field]);
       state.selected=new Set();
@@ -18948,11 +18888,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return {id:row.id,record:row,fact:row.no,source:row.source||'',party:row.party,owner:row.owner,due,amount:row.amount,outstanding,currency:row.currency||'CNY',status,statusText:labels[status],badge:status==='overdue'?'danger':status==='due'||status==='undated'?'warning':status==='settled'?'success':''};
     }
     function visualBaseRows(key) {
-      if(key==='sales')return listConfig.sales.rows.map(deliveryProjection);
-      if(['receivables','payables'].includes(key))return listConfig[key].rows.map(financeProjection);
-      if(key==='purchase')return listConfig.purchase.rows.map(row=>{const date=row.arrival?.planned??isoDay(rowDate(row));const confirmed=!!row.arrival?.confirmed;return {id:row.id,record:row,no:row.no,supplier:row.supplier||row.party,material:row.material||row.item,owner:row.owner,quantity:row.arrival?.quantity||'数量待核对',date,confirmed,status:['done','completed','closed'].includes(row.status)?'completed':row.status==='cancelled'?'cancelled':!date?'undated':dayDelta(date)<0?'overdue':confirmed?'confirmed':'pending'};});
+      if(key==='sales')return listPreviewConfig(listConfig.sales).rows.map(deliveryProjection);
+      if(['receivables','payables'].includes(key))return listPreviewConfig(listConfig[key]).rows.map(financeProjection);
+      if(key==='purchase')return listPreviewConfig(listConfig.purchase).rows.map(row=>{const date=row.arrival?.planned??isoDay(rowDate(row));const confirmed=!!row.arrival?.confirmed;return {id:row.id,record:row,no:row.no,supplier:row.supplier||row.party,material:row.material||row.item,owner:row.owner,quantity:row.arrival?.quantity||'数量待核对',date,confirmed,status:['done','completed','closed'].includes(row.status)?'completed':row.status==='cancelled'?'cancelled':!date?'undated':dayDelta(date)<0?'overdue':confirmed?'confirmed':'pending'};});
       if(key==='production-records')return productionRouteRows.map(row=>({...row,record:listConfig.production.rows.find(item=>item.no===row.order)}));
-      return listConfig[key].rows.map(row=>({id:row.id,record:row}));
+      return listPreviewConfig(listConfig[key]).rows.map(row=>({id:row.id,record:row}));
     }
     function visualRows(key) {
       const base=visualBaseRows(key);let rows=base;
@@ -18969,7 +18909,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const viewSwitch = renderBusinessViewRow(config, inlineView);
       return `${renderHubTabsRow(hub,config)}${inlineView?'':viewSwitch}<section class="surface operation-surface"><div class="visual-controls">${inlineView?viewSwitch:''}<div class="visual-chips">${chips}</div><div class="visual-query"><label class="search">${icon('search')}<input id="visual-search" aria-label="搜索当前业务" value="${escapeHTML(state.search)}" placeholder="${placeholder}"/></label><button class="btn" data-action="open-filter">${icon('filter')}筛选${activeFilterCount()?` ${activeFilterCount()}`:''}</button><button class="btn" data-action="export">${icon('export')}导出</button><button class="btn" data-action="visual-stress" aria-pressed="${!!state.visualLarge[config.key]}">${state.visualLarge[config.key]?'恢复常规样例':'500 条样例'}</button></div></div>${state.status!=='all'?`<div class="visual-scope">沿用列表状态：${escapeHTML(config.statuses.find(item=>item[0]===state.status)?.[1]||state.status)}<button class="text-btn" data-action="visual-clear-status">清除状态条件</button></div>`:''}</section>`;
     }
-    function visibleDataState(operation,title) {return state.previewState!=='data'?`${operation}${renderDataState({title})}`:null;}
+    function visibleDataState(operation,title) {return !['data','stress'].includes(state.previewState)?`${operation}${renderDataState({title})}`:null;}
     function arrivalSelectionMatches(item,selection) { const delta=dayDelta(item.date);if(selection==='all')return true;if(['completed','cancelled'].includes(item.status))return false;if(selection==='period')return item.date>=state.arrivalStart&&item.date<=addDays(state.arrivalStart,13);if(selection==='overdue')return item.status==='overdue';return selection==='today'?delta===0:selection==='week'?delta!==null&&delta>=0&&delta<=7:selection==='undated'?!item.date:item.date===selection; }
     function renderProductionOverview(config,hub) {
       const all=visualRows(config.key);const options=[['all','不限提醒'],['overdue','计划逾期'],['due','7 天内结束'],['undated','未排结束日']];const chips='<span class="data-note">计划提醒</span>'+options.map(([value,label])=>visualChip('production-overview-filter',value,label,`${all.filter(row=>productionOverviewMatches(row,value)).length} 张`,state.productionOverviewFilter===value)).join('');const operation=renderVisualToolbar(config,hub,chips,'搜索生产订单、产品或负责人');const empty=visibleDataState(operation,'生产总览');if(empty)return empty;const p=visualPage(all.filter(row=>productionOverviewMatches(row,state.productionOverviewFilter)),config.key);
