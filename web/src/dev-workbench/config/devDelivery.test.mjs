@@ -1599,7 +1599,6 @@ operations: [operation],
   await assert.rejects(historyClient.history({ target: wrongTarget }), /发布历史响应无效/u)
 })
 
-
 test('pipeline status summary keeps an active native run and skips historical performance calculations', () => {
   const active = { id: 3, workflow: 'ci', status: 'in_progress', jobs: [], durationMs: null }
   const release = { id: 2, workflow: 'release', status: 'completed', jobs: [], durationMs: 100 }
@@ -1610,13 +1609,17 @@ test('pipeline status summary keeps an active native run and skips historical pe
   assert.equal(summarizePipelineStatus(null).latest, null)
 })
 
-
 test('native failure links use the latest attempt and do not revive a recovered failure', () => {
-  const run = { workflow: 'ci', status: 'completed', conclusion: 'failure', jobs: [
-    { id: 2, name: 'retried', conclusion: 'success' },
-    { id: 1, name: 'retried', conclusion: 'failure' },
-    { id: 3, name: 'failed', conclusion: 'failure' },
-  ] }
+  const run = {
+    workflow: 'ci',
+    status: 'completed',
+    conclusion: 'failure',
+    jobs: [
+      { id: 2, name: 'retried', conclusion: 'success' },
+      { id: 1, name: 'retried', conclusion: 'failure' },
+      { id: 3, name: 'failed', conclusion: 'failure' },
+    ],
+  }
   assert.equal(summarizePipelineStatus({ runs: [run] }).failureJob.id, 3)
   assert.equal(summarizePipelineStatus({ runs: [{ ...run, conclusion: 'success' }] }).failureJob, null)
 })
