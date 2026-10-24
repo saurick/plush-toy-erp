@@ -92,7 +92,7 @@ test("Go JUnit retains failing packages, unfinished tests and skips without fabr
 });
 
 test("coverage percentage can be published after the bounded test gate without rerunning tests", (t) => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "plush-coverage-summary-"));
+  const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), "plush-coverage-summary-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, "scripts/qa"), { recursive: true });
   mkdirSync(path.join(root, "output/ci/reports/coverage"), { recursive: true });

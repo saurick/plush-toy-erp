@@ -144,7 +144,8 @@ test("DEV quality gate has no second CI job topology source", () => {
     plugin,
     /timings\.runs\.some\(\(run\) => run\.gitSha === repository\.commit\)[\s\S]*?sha: repository\.commit/u,
   );
-  assert.match(plugin, /readPipelineTopology\(\{[\s\S]*?repository\.commit/u);
+  assert.doesNotMatch(plugin, /readPipelineTopology\(/u);
+  assert.match(plugin, /readPipelineReports\(\{[\s\S]*?pipelineId: value\.pipeline\.id,[\s\S]*?sha: repository\.commit/u);
   assert.match(provider, /content_ref: sha/u);
   assert.match(provider, /\/ci\/lint\?/u);
   assert.match(provider, /include_jobs/u);
