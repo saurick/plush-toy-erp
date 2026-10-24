@@ -47,6 +47,10 @@ function formatJobDuration(job) {
   return formatDeliveryDuration(job.durationMs)
 }
 
+function isGitLabPipeline(run) {
+  return run?.url?.startsWith('https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/')
+}
+
 export function DevTimingBars({
   stages = [],
   totalDurationMs = 0,
@@ -200,10 +204,16 @@ export function DevPipelineStatusStrip({
                 ? formatDeliveryDuration(latestFullRelease.durationMs)
                 : '未证明'}
             </Text>
-            <Text type="secondary">
-              严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
-              {formatJobDuration(publishJob)}
-            </Text>
+            {isGitLabPipeline(latestFullRelease) ? (
+              <Link href={latestFullRelease.url} target="_blank" rel="noreferrer">
+                查看 GitLab 发布记录
+              </Link>
+            ) : (
+              <Text type="secondary">
+                严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
+                {formatJobDuration(publishJob)}
+              </Text>
+            )}
             <DevTimestamp
               value={latestFullRelease?.finishedAt}
               action="完成于"
@@ -262,7 +272,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
     (job) => job.name === 'Publish immutable artifact set'
   )
   const analysisJobs = analysisRun?.jobs || []
-  const nativeGitlabDetails = analysisRun?.url?.startsWith('https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/')
+  const nativeGitlabDetails = isGitLabPipeline(latestRun)
   const [expandedJobIds, setExpandedJobIds] = React.useState([])
 
   React.useEffect(() => {

@@ -637,6 +637,12 @@ async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOv
         const gitlabSummary = await installSummaryRoute(page)
         gitlabSummary.boundaries.provider = 'gitlab'
         gitlabSummary.timings.runs[0].url = 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/9001'
+        gitlabSummary.timings.runs[0].event = 'api'
+        gitlabSummary.timings.runs[0].jobs = [{
+          ...gitlabSummary.timings.runs[0].jobs[1],
+          name: 'publish_release',
+          steps: [],
+        }]
         const archived = gitlabSummary.operations.find((item) => item.target === 'demo-133' && item.status === 'passed')
         archived.gitlabRecord = { status: 'recorded', mode: 'historical', deploymentId: 77, environmentUrl: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments/2', deploymentUrl: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments/2', evidenceUrl: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/packages/99' }
         await page.goto(new URL('/__dev/version-center?view=pipeline&target=demo-133&customer=yoyoosun', page.url()).href)
@@ -644,6 +650,10 @@ async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOv
         await nativeLink.waitFor()
         assert.equal(await nativeLink.getAttribute('href'), gitlabSummary.timings.runs[0].url)
         assert.equal(await page.locator('.erp-dev-pipeline-timing__details').count(), 0)
+        const releaseSummary = page.locator('.erp-dev-pipeline-status-strip')
+        const nativeReleaseLink = releaseSummary.getByRole('link', { name: '查看 GitLab 发布记录', exact: true })
+        assert.equal(await nativeReleaseLink.getAttribute('href'), gitlabSummary.timings.runs[0].url)
+        assert.doesNotMatch(await releaseSummary.innerText(), /严格门禁.*未证明|发布制品.*未证明/u)
         await page.getByRole('tab', { name: '操作记录', exact: true }).click()
         const recordLink = history.getByRole('link', { name: 'GitLab #77', exact: true })
         await recordLink.waitFor()
