@@ -65,7 +65,7 @@ import {
 } from "./target-release-fetch.mjs";
 
 export const REMOTE_PROMOTION_RECEIPT_CONTRACT =
-  "plush.remote-promotion-receipt/v5";
+  "plush.remote-promotion-receipt/v6";
 export const REMOTE_TARGET_INITIALIZATION_RECEIPT_CONTRACT =
   "plush.remote-target-initialization-receipt/v3";
 export const TARGET_INITIALIZATION_RECEIPT_FILE_SUFFIX =
@@ -1128,6 +1128,8 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     !hasExactKeys(receipt?.migration, [
       "applyStarted",
       "automaticDownMigration",
+      "required",
+      "readback",
     ]) ||
     !hasExactKeys(receipt?.checks, [
       "basicSmoke",
@@ -1157,6 +1159,9 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     receipt?.rollbackPoint?.backupAlias !==
       `pre-migration-${expected.gitSha.slice(0, 12)}-${expected.operationId}` ||
     typeof receipt?.migration?.applyStarted !== "boolean" ||
+    ![receipt?.migration?.required, receipt?.migration?.readback].every(
+      (value) => value === "unknown" || /^20[0-9]{12}$/u.test(String(value || "")),
+    ) ||
     !Array.isArray(receipt?.notProven) ||
     receipt.notProven.length !== 2 ||
     receipt.notProven.some(
@@ -1223,6 +1228,8 @@ export function validateRemotePromotionReceipt(receipt, expected) {
         !SHA256_PATTERN.test(backupSha256) ||
         backupSizeBytes <= 0 ||
         receipt.rollbackPoint.restoreChecked !== true ||
+        receipt.migration.required !== expected.migration ||
+        receipt.migration.readback !== expected.migration ||
         receipt.checks?.releaseIdentity !== true ||
         receipt.checks?.health !== true ||
         receipt.checks?.ready !== true ||
@@ -1611,6 +1618,7 @@ export function executePromotion(
       releaseManifestSha256: plan.release.manifestSha256,
       releaseRehearsalSha256: plan.release.rehearsalReceiptSha256,
       promotionFingerprint: plan.fingerprint,
+      migration: plan.release.migration.latest,
       acquisitionExpectedBytes: transfer.acquisitionExpectedBytes,
     };
     const { receipt, readBack } = resolveRemotePromotionReceipt(

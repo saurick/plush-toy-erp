@@ -10,6 +10,7 @@ import { RECOVERY_VIEWS } from './delivery/recovery/shared.jsx'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevVerificationEvidence from '../components/DevVerificationEvidence.jsx'
 import {
   DEV_VERSION_CENTER_ROUTE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
@@ -106,6 +107,7 @@ export default function DevDrillRecoveryPage() {
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-recovery-shell">
+        <DevVerificationEvidence />
         {loadError ? (
           <Alert
             type={summary ? 'warning' : 'error'}

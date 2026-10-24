@@ -61,7 +61,7 @@ export async function verifyTestingOverview(page, assert, assertNoHorizontalOver
   await page.route('**/__dev/api/qa/coverage', response)
   try {
     await reports.getByRole('button', { name: '重新读取', exact: true }).click()
-    await reports.getByText('当前工作区 · 尚未生成报告，可进入代码覆盖采集基线。', { exact: true }).waitFor()
+    await reports.getByText('当前工作区的本地执行结果 · 尚未生成报告，可进入代码覆盖采集基线。', { exact: true }).waitFor()
     assert.equal(await reports.getByText('报告缺失', { exact: true }).count(), 4)
     await reports.getByRole('link', { name: '关键规则 查看独立结果', exact: true }).waitFor()
     assert.equal(await methods.locator('tbody tr').count(), 10)

@@ -88,6 +88,8 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 
 固定 Go 命令 `server/cmd/dev-permission-relationships` 核验开发库集群身份，使用强制只读连接，不执行启动初始化。返回账号识别、岗位及权限关系所需字段，排除手机号、口令、token 和连接信息。未登录、普通 ERP 岗位和切换岗位均不影响工作台读取；正式权限配置仍通过业务接口授权。
 
+独立服务复用同一 Go 命令的预编译制品和已有登记开发库的只读审计账号，不执行 `go run`，也不依赖 Mac 的本地配置。配置、构建与状态保全见[独立工作台部署](../../server/deploy/workbench/README.md)。权限读取失败记录允许列出的事件与请求编号，不记录原始异常或连接信息。
+
 该接口仅反映当前工作区逻辑与登记开发库，不证明其他环境或旧运行制品的实际权限。
 
 项目 Skill 使用固定 `GET /__dev/api/project-skills`，只读取当前仓库 `.agents/skills/`，不接受查询参数、请求体或写方法。

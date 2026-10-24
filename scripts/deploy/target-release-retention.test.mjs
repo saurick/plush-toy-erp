@@ -224,6 +224,12 @@ test("unresolved and failed operations retain their exact source and candidate r
   assert.equal(f.run().cacheCount, 0);
 });
 
+test("retention preserves promotion v6 alongside immutable historical receipts", (t) => {
+  const f = retentionFixture(t);
+  f.operation(4, { schemaVersion: "plush.remote-promotion-receipt/v6" });
+  assert.equal(f.run().protection, "complete");
+});
+
 test("recovery selection stays on the latest two even when another operation already pins them", (t) => {
   const f = retentionFixture(t);
   f.operation(5, {

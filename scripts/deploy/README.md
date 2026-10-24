@@ -205,6 +205,8 @@ Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/releas
 
 即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。promotion 在已创建权限为 `0600` 的 env 备份后，同时推进 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本；外部附件存储不在该动作中变更。
 
+新晋级使用 `plush.remote-promotion-receipt/v6`，在 Atlas 状态检查后通过固定只读查询记录当次实际 migration 版本，与不可变制品要求比较；缺失或不一致不得形成成功回执。工作台将当次版本与当前运行态再次核对，备份恢复另以当次恢复核验、备份摘要和实际步骤证明。已留存的旧格式回执原文保持不变，缺少实际版本的历史记录继续显示未记录，不以当前运行版本补写旧执行结果。
+
 固定的基础服务镜像须在执行前预置到目标，执行器使用 `--pull never`，并在创建新备份和进入维护窗口前核对所需镜像与 `linux/amd64` 平台，缺失时失败关闭。operation 分别记录 Mac 控制包字节/耗时、目标宿主内部取件期望与实际字节/耗时、校验与缓存命中，不把控制面等待伪装成制品传输。
 
 传输不使用 `--delete`，不全局 prune，不删除数据库、volume、env、证书、当前版本或规定回滚版本。

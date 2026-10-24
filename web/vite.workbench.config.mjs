@@ -7,6 +7,7 @@ const root = import.meta.dirname
 
 export default defineConfig({
   root,
+  define: { 'import.meta.env.PLUSH_STANDALONE_WORKBENCH': true },
   plugins: [react(), createDevDocsMetadataPlugin()],
   resolve: { alias: { '@': path.join(root, 'src') } },
   build: {

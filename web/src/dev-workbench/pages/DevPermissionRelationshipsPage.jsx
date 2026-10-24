@@ -520,6 +520,7 @@ export default function DevPermissionRelationshipsPage() {
       </header>
 
       <main className="erp-dev-permission-relationships-shell">
+        <Text type="secondary">数据来源：登记开发库，只读查询；不代表 test 或正式环境的账号配置。</Text>
         <section className="erp-permission-relationship">
           {baseError ? (
             <Alert

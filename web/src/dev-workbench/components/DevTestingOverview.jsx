@@ -34,7 +34,7 @@ export default function DevTestingOverview({ source, state, snapshotState, loadi
     <div className="erp-dev-testing-overview">
       <section className="erp-dev-testing-overview__reports" aria-label="已有测试报告" aria-busy={loading}>
         <div className="erp-dev-testing-overview__heading">
-          <h2>已有报告</h2>
+          <h2>本执行端报告</h2>
           <div className="erp-dev-testing-overview__links">
             {link({ label: '链路实测报告', to: DEV_BUSINESS_CHAIN_AUDIT_ROUTE })}
             {link({ label: '压力报告', view: 'pressure' })}
@@ -59,7 +59,7 @@ export default function DevTestingOverview({ source, state, snapshotState, loadi
         </div>
         <div className="erp-dev-testing-overview__report-context">
           <span>
-            当前工作区
+            当前工作区的本地执行结果
             {state?.report ? <> · <DevTimestamp value={state.report.generatedAt} /></> : null}
             {!loading && state?.status === 'missing' ? ' · 尚未生成报告，可进入代码覆盖采集基线。' : null}
             {!loading && state?.status === 'stale' ? ' · 报告已过期，仅供追溯。' : null}

@@ -19,6 +19,7 @@ import {
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
+import DevVerificationEvidence from '../components/DevVerificationEvidence.jsx'
 import {
   DEV_DATABASE_MIGRATION_SOURCE_PATH,
   createDatabaseMigrationIdempotencyKey,
@@ -28,6 +29,22 @@ import {
 const { Text, Title } = Typography
 
 export default function DevDatabaseMigrationPage() {
+  if (import.meta.env.PLUSH_STANDALONE_WORKBENCH) {
+    return (
+      <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page">
+        <DevPageNav sourcePath={DEV_DATABASE_MIGRATION_SOURCE_PATH} />
+        <header className="erp-dev-hub-header">
+          <Title level={1}>数据库迁移</Title>
+        </header>
+        <p>133 各环境的迁移随固定版本发布执行，下面保留实际版本、恢复核验与完整回执。本机开发库的迁移准备请在本机工作台办理。</p>
+        <DevVerificationEvidence />
+      </div>
+    )
+  }
+  return <LocalDatabaseMigrationPage />
+}
+
+function LocalDatabaseMigrationPage() {
   const {
     actionKey,
     activeOperation,

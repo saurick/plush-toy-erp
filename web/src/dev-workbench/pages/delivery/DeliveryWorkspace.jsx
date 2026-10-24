@@ -4,6 +4,7 @@ import { DEV_DELIVERY_TARGETS } from '../../config/devDelivery.mjs'
 import { DEV_TESTING_ROUTE } from '../../config/devRoutes.mjs'
 import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import { DeliveryTaskPath } from './DeliveryTaskPath.jsx'
+import DevVerificationEvidence from '../../components/DevVerificationEvidence.jsx'
 
 const tasks = {
   'customer-config': {
@@ -42,6 +43,7 @@ const path = [
 export function DeliveryWorkspace({ items, scope }) {
   return (
     <div className="erp-dev-delivery-home">
+      <DevVerificationEvidence />
       {scope.status === 'ready' ? (
         <section className="erp-dev-delivery-jobs" aria-label="交付运维任务">
           {taskGroups.map((group) => (

@@ -444,6 +444,24 @@ export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
       }),
     })
   })
+  await page.route('**/__dev/api/delivery/operations/*', async (route) => {
+    const operationId = new URL(route.request().url()).pathname
+      .split('/')
+      .at(-1)
+    const operation = summary.operations.find((item) => item.id === operationId)
+    await route.fulfill({
+      status: operation ? 200 : 404,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        operation
+          ? {
+              kind: 'plush.dev-delivery-operation-result',
+              operation,
+            }
+          : { message: 'Operation 不存在' }
+      ),
+    })
+  })
   return summary
 }
 
@@ -492,24 +510,7 @@ export async function installSummaryRoute(page, onRequest = () => {}) {
       body: JSON.stringify(qualityGateSummary),
     })
   })
-  await page.route('**/__dev/api/delivery/operations/*', async (route) => {
-    const operationId = new URL(route.request().url()).pathname
-      .split('/')
-      .at(-1)
-    const operation = summary.operations.find((item) => item.id === operationId)
-    await route.fulfill({
-      status: operation ? 200 : 404,
-      contentType: 'application/json',
-      body: JSON.stringify(
-        operation
-          ? {
-              kind: 'plush.dev-delivery-operation-result',
-              operation,
-            }
-          : { message: 'Operation 不存在' }
-      ),
-    })
-  })
+
   return summary
 }
 

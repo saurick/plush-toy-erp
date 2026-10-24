@@ -189,6 +189,8 @@ function receipt(overrides = {}) {
     migration: {
       automaticDownMigration: false,
       applyStarted: true,
+      required: "20260729000000",
+      readback: "20260729000000",
     },
     checks: {
       releaseIdentity: true,
@@ -228,6 +230,7 @@ const expected = {
   releaseManifestSha256: HASH,
   releaseRehearsalSha256: "9".repeat(64),
   promotionFingerprint: "c".repeat(64),
+  migration: "20260729000000",
   acquisitionExpectedBytes: 0,
 };
 
@@ -445,6 +448,17 @@ test("promotion executor accepts only an identity-bound redacted receipt", () =>
       ),
     /timing contract/u,
   );
+});
+
+test("a passing promotion requires the actual migration version to match the frozen release", () => {
+  for (const readback of ["unknown", "20260728000000", "", null]) {
+    assert.throws(() => validateRemotePromotionReceipt(receipt({ migration: { ...receipt().migration, readback } }), expected));
+  }
+  assert.throws(() => validateRemotePromotionReceipt(receipt(), { ...expected, migration: "20260728000000" }));
+  const old = receipt({ schemaVersion: "plush.remote-promotion-receipt/v5" });
+  delete old.migration.required;
+  delete old.migration.readback;
+  assert.throws(() => validateRemotePromotionReceipt(old, expected));
 });
 
 test("promotion executor defers only the exact planned first customer config activation blocker", () => {
@@ -768,6 +782,8 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
     migration: {
       automaticDownMigration: false,
       applyStarted: false,
+      required: "unknown",
+      readback: "unknown",
     },
   });
   assert.equal(
@@ -819,6 +835,8 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
     migration: {
       automaticDownMigration: false,
       applyStarted: false,
+      required: "unknown",
+      readback: "unknown",
     },
     checks: {
       releaseIdentity: false,
@@ -1044,7 +1062,7 @@ test("validated promotion receipts persist privately and cannot be rebound or ov
   validateRemotePromotionReceipt(raw, {
     operationId: OPERATION_ID, targetKey: "demo-133", gitSha: SHA, version: raw.version,
     releaseManifestSha256: HASH, releaseRehearsalSha256: "9".repeat(64),
-    promotionFingerprint: "c".repeat(64), acquisitionExpectedBytes: 0,
+    promotionFingerprint: "c".repeat(64), migration: "20260729000000", acquisitionExpectedBytes: 0,
   });
   const archived = persistDeliveryOperationReceipt(store, raw);
   assert.equal(statSync(archived).mode & 0o777, 0o600);

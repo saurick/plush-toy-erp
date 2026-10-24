@@ -8,6 +8,22 @@ import test from "node:test";
 const script = path.join(import.meta.dirname, "remote-promotion.sh");
 const source = readFileSync(script, "utf8");
 
+test("migration readback records only a real version matching the immutable release", () => {
+  const reader = source.match(/read_migration_version\(\) \{[\s\S]*?\n\}/u)?.[0];
+  assert.ok(reader);
+  assert.match(reader, /default_transaction_read_only=on/u);
+  for (const sample of ["20261023044447", "20261023044446", "", "unknown", "20261023044447\n20261023044447"]) {
+    const result = spawnSync("bash", ["-c", `set -euo pipefail
+docker() { printf '%s\\n' "$MIGRATION_SAMPLE"; }
+fail() { return 1; }
+${reader}
+read_migration_version
+printf '%s' "$migration_readback"`], { encoding: "utf8", env: { ...process.env, postgres_cid: "fixed-container", migration_required: "20261023044447", MIGRATION_SAMPLE: sample } });
+    assert.equal(result.status === 0, sample === "20261023044447");
+    if (result.status === 0) assert.equal(result.stdout, sample);
+  }
+});
+
 for (const cleanupProven of [true, false]) {
   test(`promotion success receipt survives response loss only after cleanup=${cleanupProven}`, (t) => {
     const root = mkdtempSync(path.join(os.tmpdir(), "promotion-response-loss-"));
@@ -107,7 +123,7 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /write_receipt not_proven/u);
   assert.match(source, /unknown prior target outcome; read back before retry/u);
   assert.match(source, /flock -n 9/u);
-  assert.match(source, /plush[.]remote-promotion-receipt\/v5/u);
+  assert.match(source, /plush[.]remote-promotion-receipt\/v6/u);
   assert.match(source, /credentialCleanupProven/u);
   assert.match(source, /trap on_signal HUP INT TERM/u);
   assert.match(source, /trap on_exit EXIT/u);

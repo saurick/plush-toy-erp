@@ -39,7 +39,7 @@ test('shared DEV delivery route serves the validated fixture without live target
   const summary = await installDeliverySummaryRoute(page, () => {
     requestCount += 1
   })
-  assert.deepEqual([...handlers.keys()], ['**/__dev/api/delivery/summary', '**/__dev/api/delivery/operations?*'])
+  assert.deepEqual([...handlers.keys()], ['**/__dev/api/delivery/summary', '**/__dev/api/delivery/operations?*', '**/__dev/api/delivery/operations/*'])
   const registeredHandler = handlers.get('**/__dev/api/delivery/summary')
   assert.equal(typeof registeredHandler, 'function')
   assert.deepEqual(summary, createVersionCenterSummary())
@@ -103,8 +103,8 @@ test('drill recovery installs both target and data readback isolation before nav
     '**/__dev/api/data-preparation/summary',
     '**/__dev/api/delivery/summary',
     '**/__dev/api/delivery/operations?*',
-    '**/__dev/api/qa/quality-gates',
     '**/__dev/api/delivery/operations/*',
+    '**/__dev/api/qa/quality-gates',
   ])
 })
 

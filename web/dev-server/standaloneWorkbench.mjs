@@ -10,6 +10,7 @@ import { createDevHttpsProxyMiddleware, isSameOriginRequest, normalizeDevHttpsOr
 import { createWorkbenchSessionMiddleware } from './workbenchSession.mjs'
 import { getDeploymentTarget } from '../../scripts/deploy/deployment-targets.mjs'
 import target from '../../server/deploy/workbench/target.json' with { type: 'json' }
+import { createDevPermissionRelationshipsPlugin, readStandalonePermissionRelationships } from './devPermissionRelationshipsPlugin.mjs'
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'],
@@ -20,16 +21,21 @@ const MIME_TYPES = new Map([
   ['.pdf', 'application/pdf'], ['.txt', 'text/plain; charset=utf-8'],
 ])
 
-export function createStandaloneWorkbenchPlugins(projectRoot, apiOrigin) {
+export function createStandaloneWorkbenchPlugins(projectRoot, apiOrigin, writeEvent = () => {}) {
   // Local startup/recovery and Basic authentication belong to the local Vite
   // lifecycle. The standalone host has its own readiness and session boundary.
   const excluded = new Set([
     'plush-dev-operator-auth', 'plush-dev-web-instance',
+    'plush-dev-permission-relationships',
     DEV_DATABASE_MIGRATION_RECOVERY_PLUGIN_NAME,
   ])
-  return createDevWorkbenchServePlugins({
+  return [...createDevWorkbenchServePlugins({
     command: 'serve', mode: 'development', projectRoot, apiOrigin,
-  }).filter((plugin) => !excluded.has(plugin.name))
+  }).filter((plugin) => !excluded.has(plugin.name)), createDevPermissionRelationshipsPlugin({
+    projectRoot,
+    readSnapshot: () => readStandalonePermissionRelationships(projectRoot),
+    onDiagnostic: writeEvent,
+  })]
 }
 
 export async function createStandaloneWorkbenchServer({
@@ -54,7 +60,7 @@ export async function createStandaloneWorkbenchServer({
   const apiOrigin = getDeploymentTarget(target.businessTarget).endpoints.server
   const middlewares = []
   const bridge = { middlewares: { use: (middleware) => middlewares.push(middleware) } }
-  for (const plugin of plugins ?? createStandaloneWorkbenchPlugins(projectRoot, apiOrigin)) {
+  for (const plugin of plugins ?? createStandaloneWorkbenchPlugins(projectRoot, apiOrigin, writeEvent)) {
     plugin.configureServer(bridge)
   }
 
@@ -135,8 +141,11 @@ export async function createStandaloneWorkbenchServer({
     response.setHeader('x-request-id', requestId)
     const started = performance.now()
     response.once('finish', () => writeEvent({
-      event: 'workbench_http', requestId, method: request.method,
-      status: response.statusCode, durationMs: Math.round(performance.now() - started),
+      event: 'workbench_http',
+      requestId,
+      method: request.method,
+      status: response.statusCode,
+      durationMs: Math.round(performance.now() - started),
       at: new Date().toISOString(),
     }))
     const fail = () => {
@@ -167,14 +176,16 @@ export async function createStandaloneWorkbenchServer({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const port = target.port
+  const { port } = target
   if (process.env.PLUSH_WORKBENCH_ORIGIN !== target.httpsOrigin) throw new Error('Workbench deployment origin does not match target')
   const server = await createStandaloneWorkbenchServer()
   server.listen(port, target.bindAddress, () => {
     process.stdout.write(`${JSON.stringify({ event: 'workbench_ready', port })}\n`)
   })
-  for (const signal of ['SIGTERM', 'SIGINT']) process.once(signal, () => {
-    server.close(() => process.exit(0))
-    setTimeout(() => { server.closeAllConnections(); process.exit(1) }, 10_000).unref()
-  })
+  for (const signal of ['SIGTERM', 'SIGINT']) {
+    process.once(signal, () => {
+      server.close(() => process.exit(0))
+      setTimeout(() => { server.closeAllConnections(); process.exit(1) }, 10_000).unref()
+    })
+  }
 }

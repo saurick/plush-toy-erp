@@ -35,7 +35,7 @@ export async function readPermissionRelationshipSnapshot({
     const message =
       response.status === 401 || response.status === 403
         ? '当前连接未通过开发工作台访问检查，请从受控的本地或内网入口打开'
-        : '本地开发权限数据暂不可用，请检查开发服务与数据库后重试'
+        : '登记开发库的权限数据暂不可用，请检查只读查询配置后重试'
     throw Object.assign(new Error(message), { userMessage: message })
   }
   return validatePermissionRelationshipSnapshot(await response.json())

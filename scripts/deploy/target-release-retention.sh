@@ -78,7 +78,7 @@ preview_target_release_retention() {
       if ! plain_file "$file" || ! document="$(jq -cse --arg target "$target_key" --arg operation "$operation_id" '
         select(length == 1) | .[0] |
         select(type == "object" and .target == $target and .operationId == $operation) |
-        select(.schemaVersion | test("^plush[.]remote-(promotion|rollback|database-rebuild|target-initialization)-(state|receipt)/v[1-5]$")) |
+        select(.schemaVersion | . == "plush.remote-promotion-receipt/v6" or test("^plush[.]remote-(promotion|rollback|database-rebuild|target-initialization)-(state|receipt)/v[1-5]$")) |
         select(.status | IN("running", "passed", "failed", "blocked", "not_proven"))
       ' "$file" 2>/dev/null)"; then
         retention_protection_status=manual_review

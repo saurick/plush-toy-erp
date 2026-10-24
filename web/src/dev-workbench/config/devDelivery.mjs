@@ -1329,7 +1329,7 @@ signal: controller.signal,
       })
       return payload
     },
-    async summary() {
+    async summary({ signal } = {}) {
       return validateDevDeliverySummary(
         await readJson(
           await fetchImpl(DEV_DELIVERY_SUMMARY_API_PATH, {
@@ -1337,6 +1337,7 @@ signal: controller.signal,
             cache: 'no-store',
             credentials: 'same-origin',
             headers: { accept: 'application/json' },
+            signal,
           })
         )
       )

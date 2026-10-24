@@ -37,6 +37,7 @@ import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
 import DevTestingStrategyGuide from '../components/DevTestingStrategyGuide.jsx'
 import DevTestingOverview from '../components/DevTestingOverview.jsx'
+import DevVerificationEvidence from '../components/DevVerificationEvidence.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COMMAND_PAGE_QUERY_KEY,
@@ -1951,6 +1952,7 @@ export default function DevTestingPage() {
 
       <main className="erp-dev-testing-shell">
         <section className="erp-dev-testing-reader">
+          {([VIEW_OVERVIEW, VIEW_COVERAGE].includes(view) || (view === VIEW_TIERS && import.meta.env.PLUSH_STANDALONE_WORKBENCH)) ? <DevVerificationEvidence /> : null}
           {view === VIEW_OVERVIEW ? (
             <DevTestingOverview
               source={strategySource}
@@ -1960,7 +1962,10 @@ export default function DevTestingPage() {
               onReload={() => setCoverageReloadKey((value) => value + 1)}
             />
           ) : null}
-          {view === VIEW_TIERS ? (
+          {view === VIEW_TIERS && import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
+            <Alert type="info" showIcon message="线上入口展示 CI 与目标服务器实跑结果。本机专项检查、覆盖基线与隔离压力测试请在本机工作台执行并查看原始记录。" />
+          ) : null}
+          {view === VIEW_TIERS && !import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
             <div className="erp-dev-testing-tier-view">
               <ValidationWorkspace
                 plan={testingPlan}

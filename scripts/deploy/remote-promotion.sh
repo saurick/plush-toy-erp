@@ -196,6 +196,8 @@ restore_database="${restore_database:0:50}"
 restore_database_created=0
 stage=initial
 migration_apply_started=0
+migration_required=unknown
+migration_readback=unknown
 env_changed=0
 runtime_stop_started=0
 env_backup=""
@@ -318,7 +320,7 @@ write_receipt() {
   finished_epoch_ms="$(epoch_millis)"
   duration_ms=$((finished_epoch_ms - operation_started_epoch_ms))
   jq -n \
-    --arg schemaVersion "plush.remote-promotion-receipt/v5" \
+    --arg schemaVersion "plush.remote-promotion-receipt/v6" \
     --arg status "$status" \
     --arg operationId "$operation_id" \
     --arg target "$target" \
@@ -335,6 +337,8 @@ write_receipt() {
     --arg backupSha256 "$backup_sha256" \
     --argjson backupSizeBytes "$backup_size_bytes" \
     --argjson migrationApplyStarted "$migration_apply_started" \
+    --arg migrationRequired "$migration_required" \
+    --arg migrationReadback "$migration_readback" \
     --arg startedAt "$operation_started_at" \
     --arg finishedAt "$finished_at" \
     --argjson durationMs "$duration_ms" \
@@ -390,7 +394,9 @@ write_receipt() {
       },
       migration: {
         automaticDownMigration: false,
-        applyStarted: ($migrationApplyStarted == 1)
+        applyStarted: ($migrationApplyStarted == 1),
+        required: $migrationRequired,
+        readback: $migrationReadback
       },
       checks: {
         releaseIdentity: ($status == "passed"),
@@ -830,6 +836,8 @@ fi
 source_sha256="$(jq -r '.sourceArchive.sha256' "$incoming/release-artifact.json")"
 sbom_sha256="$(jq -r '.sbom.sha256' "$incoming/release-artifact.json")"
 migration_sequence_sha256="$(jq -r '.migration.sequenceSha256' "$incoming/release-artifact.json")"
+migration_required="$(jq -r '.migration.latest' "$incoming/release-artifact.json")"
+[[ "$migration_required" =~ ^20[0-9]{12}$ ]] || fail "release migration version is invalid"
 [[ "$source_sha256" =~ $sha256_pattern && "$sbom_sha256" =~ $sha256_pattern &&
   "$migration_sequence_sha256" =~ $sha256_pattern ]] ||
   fail "release artifact checksums are invalid"
@@ -1240,6 +1248,21 @@ enter_stage migration_applied
   "RELEASE_SHA=$release_sha" \
   "APPLICATION_IMAGE_DIGEST=$server_content_id" \
   sh "$migrate_script" --status-only >>"$log_file" 2>&1
+
+read_migration_version() {
+  local version
+  version="$(docker exec \
+    -e PGCONNECT_TIMEOUT=5 \
+    -e 'PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=10000' \
+    "$postgres_cid" sh -ceu '
+      psql -X --no-psqlrc -Atq -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+        -c "SELECT version FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2 ORDER BY executed_at DESC LIMIT 1"
+    ')"
+  [[ "$version" =~ ^20[0-9]{12}$ && "$version" == "$migration_required" ]] ||
+    fail "migration version readback does not match release"
+  migration_readback="$version"
+}
+read_migration_version
 
 enter_stage compose_start
 "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never \

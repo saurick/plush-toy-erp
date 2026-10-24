@@ -1,0 +1,41 @@
+.erp-dev-verification-evidence {
+  display: grid;
+  gap: 12px;
+  margin-block-end: 20px;
+}
+
+.erp-dev-verification-evidence__heading,
+.erp-dev-verification-evidence__ci {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.erp-dev-verification-evidence__heading {
+  justify-content: space-between;
+}
+
+.erp-dev-verification-evidence__heading h2,
+.erp-dev-verification-evidence__context,
+.erp-dev-verification-evidence__details p {
+  margin: 0;
+}
+
+.erp-dev-verification-evidence__heading h2 {
+  font-size: var(--font-size-lg, 16px);
+}
+
+.erp-dev-verification-evidence__context {
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-verification-evidence__details {
+  display: grid;
+  gap: 8px;
+  padding-block: 12px;
+  min-width: 280px;
+  max-width: 520px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

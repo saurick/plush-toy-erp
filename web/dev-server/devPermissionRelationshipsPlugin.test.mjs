@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict'
 import { createServer, get } from 'node:http'
 import test from 'node:test'
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import { createDevOperatorAuthMiddleware } from './devOperatorAuthPlugin.mjs'
 import {
   createDevPermissionRelationshipsPlugin,
   readLocalPermissionRelationships,
+  readStandalonePermissionRelationships,
 } from './devPermissionRelationshipsPlugin.mjs'
 import { DEV_PERMISSION_RELATIONSHIPS_API } from '../src/dev-workbench/config/devPermissionRelationshipApi.mjs'
 
@@ -149,4 +153,33 @@ test('local reader uses fixed commands and keeps database credentials on the ser
   assert.equal(calls[0].options.env.GIT_OPTIONAL_LOCKS, '0')
   assert.equal(calls[0].options.cwd, '/workspace/project/server')
   assert.doesNotMatch(JSON.stringify(result), /internal-secret/u)
+})
+
+test('standalone reads the registered audit role with a fixed artifact and never invokes a compiler', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'workbench-permission-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await mkdir(path.join(root, 'toolchain/bin'), { recursive: true })
+  await writeFile(path.join(root, 'toolchain/bin/dev-permission-relationships'), 'artifact', { mode: 0o700 })
+  const file = path.join(root, 'audit-dsn')
+  const dsn = 'postgres://plush_dev_backup:private-read-secret@192.168.0.133:5432/plush_erp?sslmode=disable'
+  await writeFile(file, dsn, { mode: 0o600 })
+  const calls = []
+  const options = { env: { PLUSH_WORKBENCH_PERMISSION_AUDIT_DSN_FILE: file, PLUSH_GITLAB_TOKEN: 'must-not-inherit', ERP_CUSTOMER_KEY: snapshot.customer_key },
+    verifyRole: async (value) => { assert.equal(value, dsn) },
+    run: async (...args) => { calls.push(args); return { stdout: JSON.stringify(snapshot) } } }
+  const result = await readStandalonePermissionRelationships(root, options)
+  assert.deepEqual(result, snapshot)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0][0], path.join(root, 'toolchain/bin/dev-permission-relationships'))
+  assert.deepEqual(calls[0][1], [])
+  assert.equal(calls[0][2].env.POSTGRES_DSN, dsn)
+  assert.equal(calls[0][2].env.PLUSH_GITLAB_TOKEN, undefined)
+  for (const bad of [dsn.replace('plush_dev_backup', 'plush_dev_app'), dsn.replace('/plush_erp?', '/plush_erp_production?'), dsn.replace('192.168.0.133:5432', '127.0.0.1:15432')]) {
+    await writeFile(file, bad)
+    await assert.rejects(readStandalonePermissionRelationships(root, options))
+  }
+  await rm(file)
+  await symlink(path.join(root, 'other'), file)
+  await assert.rejects(readStandalonePermissionRelationships(root, options))
+  assert.equal(calls.length, 1)
 })

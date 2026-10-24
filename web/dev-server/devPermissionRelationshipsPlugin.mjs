@@ -1,9 +1,14 @@
 import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { constants } from 'node:fs'
+import { lstat, open } from 'node:fs/promises'
 import { readLocalRuntimeEnvironment } from '../../scripts/local-runtime-bundle.mjs'
 import {
   configuredDatabaseURL,
+  assertRegisteredDatabase,
+  DEVELOPMENT_TARGETS,
+  LOCAL_DATABASE_ROLE_PREFIX,
   readLocalDatabaseRoles,
   verifyAuditRole,
 } from '../../scripts/local-database-roles.mjs'
@@ -17,6 +22,45 @@ import {
 } from './devServerSecurity.mjs'
 
 const exec = promisify(execFile)
+
+export async function readStandalonePermissionRelationships(projectRoot, {
+  env = process.env,
+  run = exec,
+  verifyRole = verifyAuditRole,
+} = {}) {
+  const file = env.PLUSH_WORKBENCH_PERMISSION_AUDIT_DSN_FILE
+  if (!file || !path.isAbsolute(file)) throw new Error('permission audit credential is not configured')
+  const handle = await open(file, constants.O_RDONLY + constants.O_NOFOLLOW)
+  let dsn
+  try {
+    const stat = await handle.stat()
+    if (!stat.isFile() || ![0o400, 0o600].includes(stat.mode % 0o1000) ||
+        stat.uid !== process.getuid() || stat.size > 4096) {
+      throw new Error('permission audit credential is not a private regular file')
+    }
+    dsn = (await handle.readFile('utf8')).trim()
+  } finally {
+    await handle.close()
+  }
+  const url = assertRegisteredDatabase(dsn)
+  // The standalone workbench reads the registered shared development database,
+  // never a customer test/production database or an application credential.
+  if (url.hostname !== DEVELOPMENT_TARGETS.shared.host || decodeURIComponent(url.username) !== `${LOCAL_DATABASE_ROLE_PREFIX}_backup`) {
+    throw new Error('permission audit credential does not identify the registered reader')
+  }
+  await verifyRole(dsn)
+  const binary = path.join(projectRoot, 'toolchain/bin/dev-permission-relationships')
+  const binaryStat = await lstat(binary)
+  if (!binaryStat.isFile() || binaryStat.isSymbolicLink()) throw new Error('permission reader artifact is unavailable')
+  const result = await run(binary, [], {
+    cwd: path.join(projectRoot, 'server'),
+    env: { PATH: env.PATH, POSTGRES_DSN: dsn, ERP_CUSTOMER_KEY: readLocalRuntimeEnvironment(projectRoot, env).ERP_CUSTOMER_KEY, GIT_OPTIONAL_LOCKS: '0' },
+    encoding: 'utf8',
+    timeout: 40_000,
+    maxBuffer: 16 * 1024 * 1024,
+  })
+  return validatePermissionRelationshipSnapshot(JSON.parse(result.stdout))
+}
 
 async function resolveLocalAuditDSN(projectRoot) {
   const configured = await configuredDatabaseURL(projectRoot)
@@ -62,6 +106,7 @@ export async function readLocalPermissionRelationships(
 export function createDevPermissionRelationshipsPlugin({
   projectRoot,
   readSnapshot = () => readLocalPermissionRelationships(projectRoot),
+  onDiagnostic = () => {},
 } = {}) {
   return {
     name: 'plush-dev-permission-relationships',
@@ -109,8 +154,9 @@ export function createDevPermissionRelationshipsPlugin({
             validatePermissionRelationshipSnapshot(await readSnapshot())
           )
         } catch {
+          onDiagnostic({ event: 'permission_relationships', outcome: 'unavailable', requestId: response.getHeader?.('x-request-id') || null })
           reply(503, {
-            message: '本地开发权限数据暂不可用，请检查开发服务与数据库后重试',
+            message: '登记开发库的权限数据暂不可用，请检查只读查询配置后重试',
           })
         }
       })
