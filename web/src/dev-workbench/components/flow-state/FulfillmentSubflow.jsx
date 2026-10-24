@@ -52,9 +52,6 @@ export default function FulfillmentSubflow({
       <MermaidDiagram
         chart={graph.chart}
         label={`${step.label}流程图`}
-        toolbar="compact"
-        initialZoom={1}
-        nativeSize
         interactiveNodes={graph.nodes}
         selectedNodeId={selectedID}
         onNodeSelect={selectNode}

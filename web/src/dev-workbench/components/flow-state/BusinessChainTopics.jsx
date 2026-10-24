@@ -90,9 +90,6 @@ export default function BusinessChainTopics({
           <MermaidDiagram
             chart={chart}
             label={`${topic.label}流程图`}
-            toolbar="compact"
-            initialZoom={1}
-            nativeSize
             interactiveNodes={nodes}
             selectedNodeId={nodes.find((item) => item.key === node.key)?.id}
             onNodeSelect={(id) =>

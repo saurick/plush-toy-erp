@@ -1,6 +1,7 @@
 import { expect } from 'playwright/test'
 import { assertFulfillmentChainClickTargets, assertFulfillmentChainGeometry, assertFulfillmentDetailGeometry, openFulfillmentExceptionDirectory } from './fulfillmentChainAssertions.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
+import { assertMermaidDefaultView, switchMermaidLayout, verifyMermaidZoomModes } from './mermaidViewerAssertions.mjs'
 
 export const DEV_FLOW_STATE_OBSERVATORY_PATH =
   '/__dev/status-flows?view=chain&chain=all'
@@ -17,6 +18,17 @@ export function startNoWriteAudit(page, store) {
 }
 
 export function createDevFlowStateObservatoryScenarios({ assert, assertNoHorizontalOverflow, expectText, outputDir, path }) {
+  const verifyDiagram = async (page, diagram) => {
+    await assertMermaidDefaultView(page, diagram, assert)
+    assert.equal(await diagram.getAttribute('data-mermaid-native-size'), null, '业务链路沿用共享尺寸基准')
+    await verifyMermaidZoomModes(page, diagram, assert)
+    const labels = () => diagram.locator('.node').allTextContents()
+    const originalLabels = await labels()
+    await switchMermaidLayout(page, diagram, assert)
+    await switchMermaidLayout(page, diagram, assert)
+    assert.deepEqual(await labels(), originalLabels, '切换布局保留全部流程节点')
+    await assertNoHorizontalOverflow(page, '业务链路共享图表工具栏')
+  }
   const verifySelectionRecovery = async (page) => {
       for (const [view, id, key, detail, placeholder] of [
         ['states', 'dev-flow-state-select', 'flow', '[data-selected-flow]', '选择状态对象'],
@@ -75,10 +87,14 @@ export function createDevFlowStateObservatoryScenarios({ assert, assertNoHorizon
       await expect(page.locator('#dev-flow-task-search')).toHaveCount(0)
       await assertInactivePrintStylesDoNotHideApp(page)
       await assertFulfillmentChainClickTargets(guide.locator('[data-fulfillment-chain]'))
+      await guide.getByRole('button', { name: '11 皮套检验', exact: true }).click()
+      await verifyDiagram(page, panel.locator('.erp-markdown-mermaid'))
+      await assertFulfillmentDetailGeometry(panel)
       await guide.locator('[data-stage-exception="cutting_quality"]').click()
       await panel.locator('[data-mermaid-status="rendered"]').waitFor()
       await panel.getByRole('button', { name: '原厂 / 本厂返工', exact: true }).click()
       await panel.locator('[data-exception-plan="original_rework"] [data-mermaid-status="rendered"]').waitFor()
+      await verifyDiagram(page, panel.locator('.erp-markdown-mermaid'))
       await assertFulfillmentChainGeometry(guide.locator('[data-fulfillment-chain]'))
       await assertFulfillmentDetailGeometry(panel)
       await views.getByText('业务专题', { exact: true }).click()
@@ -90,6 +106,7 @@ export function createDevFlowStateObservatoryScenarios({ assert, assertNoHorizon
       await topicOptions.getByRole('option', { name: '成品出货到应收建立', exact: true }).click()
       await topicOptions.waitFor({ state: 'hidden' })
       await guide.locator('[data-topic-diagram="delivery_to_settlement"] [data-mermaid-status="rendered"]').waitFor()
+      await verifyDiagram(page, guide.locator('[data-topic-diagram="delivery_to_settlement"] .erp-markdown-mermaid'))
       await guide.getByRole('button', { name: '真实出货事实', exact: true }).click()
       assert((await guide.locator('.erp-dev-fulfillment-guide__focus').innerText()).includes('取消出货'))
       await guide.getByRole('button', { name: '系统衔接图', exact: true }).click()

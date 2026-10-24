@@ -2,64 +2,25 @@ import { openERPAppearance } from './themeAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
-export async function clickMermaidControl(diagram, action) {
-  const page = diagram.page()
-  const previousID = action === 'layout' ? await diagram.locator('.erp-markdown-mermaid__canvas > svg').getAttribute('id') : null
-  const selector = action === 'layout' ? '[data-mermaid-layout-action="toggle"]' : `[data-mermaid-zoom-action="${action}"]`
-  const direct = diagram.locator(selector)
-  if (await direct.count()) await direct.click()
-  else {
-    const labels = { layout: '切换布局', 'fit-all': '适应全图', fit: '适配宽度', 'zoom-in': '放大', 'zoom-out': '缩小', reset: '原始大小（100%）' }
-    await diagram.locator('[data-mermaid-menu-trigger]').click()
-    await page.getByRole('menuitem', { name: labels[action], exact: true }).click()
-  }
-  if (previousID) {
-    await page.waitForFunction(({ root, previous }) => root.dataset.mermaidStatus === 'rendered' && root.querySelector('.erp-markdown-mermaid__canvas > svg')?.id !== previous, { root: await diagram.elementHandle(), previous: previousID })
-  }
-  await waitForFiniteAnimations(page)
-}
-
-export async function verifyCompactMermaidViewer(page, diagram, assert) {
+export async function assertMermaidDefaultView(page, diagram, assert) {
   await diagram.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
-  assert.equal(await diagram.getAttribute('data-mermaid-toolbar'), 'compact')
-  assert.equal(await diagram.locator('.erp-markdown-mermaid__toolbar button').count(), 2)
-  const canvas = diagram.locator('.erp-markdown-mermaid__canvas')
-  const originalWidth = (await canvas.locator('svg').boundingBox()).width
-  await clickMermaidControl(diagram, 'zoom-in')
-  assert((await canvas.locator('svg').boundingBox()).width > originalWidth)
-  await clickMermaidControl(diagram, 'reset')
-  assert.equal(await canvas.getAttribute('data-mermaid-zoom'), '100')
-  await clickMermaidControl(diagram, 'fit')
-  assert.equal(await diagram.getAttribute('data-mermaid-zoom-mode'), 'fit-width')
-  await clickMermaidControl(diagram, 'fit-all')
+  await waitForMermaidFit(page, diagram)
+  const controls = await diagram
+    .locator('.erp-markdown-mermaid__toolbar button')
+    .evaluateAll((buttons) => buttons.map((button) =>
+      button.dataset.mermaidLayoutAction ||
+      button.dataset.mermaidZoomAction ||
+      button.dataset.mermaidFullscreenAction
+    ))
+  const hasLayout = Boolean(await diagram.getAttribute('data-mermaid-direction'))
+  assert.deepEqual(controls, [
+    ...(hasLayout ? ['toggle'] : []),
+    'fit-all', 'fit', 'zoom-out', 'zoom-in', 'reset', 'open',
+  ], '所有页面直接显示相同的图表工具及顺序')
+  assert.equal(await diagram.getAttribute('data-mermaid-zoom-mode'), 'fit-all')
+  await assertMermaidZoomMode(diagram, assert, 'fit-all')
   await assertMermaidFits(diagram, assert)
   await assertMermaidCentered(diagram, assert)
-  await diagram.locator('[data-mermaid-fullscreen-action="open"]').click()
-  await diagram.locator('[data-mermaid-fullscreen-action="close"]').waitFor()
-  assert.equal(await diagram.getAttribute('data-mermaid-toolbar'), 'full')
-  await clickMermaidControl(diagram, 'reset')
-  assert.equal(await canvas.getAttribute('data-mermaid-zoom'), '100')
-  await clickMermaidControl(diagram, 'fit-all')
-  await assertMermaidFits(diagram, assert)
-  await diagram.locator('[data-mermaid-fullscreen-action="close"]').press('Escape')
-  await diagram.locator('[data-mermaid-fullscreen-action="open"]').waitFor()
-  await page.waitForFunction((root) => root.querySelector('[data-mermaid-fullscreen-action="open"]') === document.activeElement, await diagram.elementHandle())
-  await waitForFiniteAnimations(page)
-  assert.equal(await diagram.getAttribute('data-mermaid-toolbar'), 'compact')
-  assert.equal(await diagram.getAttribute('data-mermaid-zoom-mode'), 'fit-all')
-  await assertMermaidFits(diagram, assert)
-  // 自动适配随容器重新计算；手动比例必须在退出全屏后原样恢复。
-  await clickMermaidControl(diagram, 'reset')
-  const inlineZoom = await canvas.getAttribute('data-mermaid-zoom')
-  await diagram.locator('[data-mermaid-fullscreen-action="open"]').click()
-  await diagram.locator('[data-mermaid-fullscreen-action="close"]').waitFor()
-  await clickMermaidControl(diagram, 'zoom-out')
-  await diagram.locator('[data-mermaid-fullscreen-action="close"]').click()
-  await diagram.locator('[data-mermaid-fullscreen-action="open"]').waitFor()
-  await waitForFiniteAnimations(page)
-  assert.equal(await diagram.getAttribute('data-mermaid-zoom-mode'), 'manual')
-  assert.equal(await canvas.getAttribute('data-mermaid-zoom'), inlineZoom)
-  await clickMermaidControl(diagram, 'fit-all')
 }
 
 async function verifyStableMermaidScroll(page, diagram, assert, action) {
@@ -443,11 +404,7 @@ export async function verifyMermaidViewer(page, diagram, assert) {
   const svg = diagram.locator('.erp-markdown-mermaid__canvas > svg')
   const viewport = diagram.locator('.erp-markdown-mermaid__viewport')
   const canvas = diagram.locator('.erp-markdown-mermaid__canvas')
-  await svg.waitFor()
-  await waitForMermaidFit(page, diagram)
-  await assertMermaidZoomMode(diagram, assert, 'fit-all')
-  await assertMermaidFits(diagram, assert)
-  await assertMermaidCentered(diagram, assert)
+  await assertMermaidDefaultView(page, diagram, assert)
   await verifyMermaidZoomModes(page, diagram, assert)
   const initialViewport = page.viewportSize()
   await page.setViewportSize({

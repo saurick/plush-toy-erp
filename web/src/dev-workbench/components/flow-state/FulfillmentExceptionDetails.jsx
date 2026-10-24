@@ -85,9 +85,6 @@ export default function FulfillmentExceptionDetails({
         <MermaidDiagram
           chart={graph.chart}
           label={`${guide.label}流程图`}
-          toolbar="compact"
-          initialZoom={1}
-          nativeSize
           interactiveNodes={graph.nodes}
           selectedNodeId={
             graph.nodes.find((node) => node.key === selected?.key)?.id
