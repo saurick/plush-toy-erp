@@ -66,7 +66,7 @@ test('access errors direct users to the workbench boundary and never ERP login o
       (error) => {
         assert.match(
           error.userMessage,
-          status === 503 ? /本地开发权限数据/u : /开发工作台访问检查/u
+          status === 503 ? /登记开发库的权限数据/u : /开发工作台访问检查/u
         )
         assert.doesNotMatch(error.userMessage, /后台登录|secret|数据库密码/u)
         return true
