@@ -25,17 +25,17 @@ export function OperationEvidence({ operation, loading }) {
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         {trace ? (
           <Space wrap>
-            <Link href={trace.commitUrl} rel="noreferrer">
+            <Link href={trace.commitUrl} target="_blank" rel="noopener noreferrer">
               源码提交
             </Link>
-            <Link href={trace.pipelinesUrl} rel="noreferrer">
+            <Link href={trace.pipelinesUrl} target="_blank" rel="noopener noreferrer">
               该提交的 CI / CD
             </Link>
-            <Link href={trace.releaseUrl} rel="noreferrer">
+            <Link href={trace.releaseUrl} target="_blank" rel="noopener noreferrer">
               版本与制品
             </Link>
             {trace.pipelineUrl ? (
-              <Link href={trace.pipelineUrl} rel="noreferrer">
+              <Link href={trace.pipelineUrl} target="_blank" rel="noopener noreferrer">
                 本次发布流水线
               </Link>
             ) : null}
@@ -44,8 +44,9 @@ export function OperationEvidence({ operation, loading }) {
         {gitlabRecord ? (
           <Space direction="vertical" size={4}>
             <Space wrap>
-              {gitlabRecord.deploymentUrl ? <Link href={gitlabRecord.deploymentUrl} rel="noreferrer">GitLab 部署 #{gitlabRecord.deploymentId}</Link> : null}
-              {gitlabRecord.evidenceUrl ? <Link href={gitlabRecord.evidenceUrl} rel="noreferrer">GitLab 项目回执归档</Link> : null}
+              {gitlabRecord.environmentUrl ? <Link href={gitlabRecord.environmentUrl} target="_blank" rel="noopener noreferrer">GitLab 环境部署列表</Link> : null}
+              {gitlabRecord.evidenceUrl ? <Link href={gitlabRecord.evidenceUrl} target="_blank" rel="noopener noreferrer">GitLab 本次回执归档</Link> : null}
+              {gitlabRecord.deploymentId ? <Text type="secondary">登记编号 #{gitlabRecord.deploymentId}</Text> : null}
               <Tag color={gitlabRecord.status === 'recorded' ? 'success' : 'warning'}>{gitlabRecord.status === 'recorded' ? '已登记 GitLab' : 'GitLab 登记待核对'}</Tag>
             </Space>
             {gitlabRecord.mode === 'historical' ? <Text type="secondary">历史补录：本页保留实际执行时间，GitLab 中的创建时间是登记时间。</Text> : null}

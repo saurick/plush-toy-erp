@@ -46,6 +46,7 @@ import {
   resolveDevVersionCenterView,
   shortGitSha,
   summarizePipelineTimings,
+  summarizePipelineStatus,
   validateDevDeliverySummary,
   validatePipelineTimings,
 } from './devDelivery.mjs'
@@ -1382,12 +1383,8 @@ test('version center keeps critical state visible and uses stable tab pagination
     /operationHistoryState === 'failure' \? null : \([\s\S]*?<Table/u
   )
   assert.match(versionCenterPageSource, /DevPipelineStatusStrip/u)
-  assert.match(versionCenterPageSource, /erp-dev-version-published-at/u)
-  assert.match(versionCenterPageSource, /发布于/u)
-  assert.match(
-    versionCenterPageSource,
-    /<DevTimestamp[\s\S]*?value=\{record[.]publishedAt\}[\s\S]*?action="发布于"/u
-  )
+  assert.match(versionCenterPageSource, /保留与可用性说明/u)
+  assert.match(versionCenterPageSource, /href=\{record.url\} target="_blank"/u)
   assert.match(
     versionCenterPageSource,
     /value=\{strictProof[?][.]receipt[?][.]finishedAt\}/u
@@ -1600,4 +1597,26 @@ operations: [operation],
   await assert.rejects(historyClient.history({ target: wrongTarget }), /环境不匹配/u)
   data.target = operation.target
   await assert.rejects(historyClient.history({ target: wrongTarget }), /发布历史响应无效/u)
+})
+
+
+test('pipeline status summary keeps an active native run and skips historical performance calculations', () => {
+  const active = { id: 3, workflow: 'ci', status: 'in_progress', jobs: [], durationMs: null }
+  const release = { id: 2, workflow: 'release', status: 'completed', jobs: [], durationMs: 100 }
+  const summary = summarizePipelineStatus({ runs: [active, release] })
+  assert.strictEqual(summary.latest, active)
+  assert.strictEqual(summary.latestFullRelease, release)
+  assert.equal('criticalPath' in summary, false)
+  assert.equal(summarizePipelineStatus(null).latest, null)
+})
+
+
+test('native failure links use the latest attempt and do not revive a recovered failure', () => {
+  const run = { workflow: 'ci', status: 'completed', conclusion: 'failure', jobs: [
+    { id: 2, name: 'retried', conclusion: 'success' },
+    { id: 1, name: 'retried', conclusion: 'failure' },
+    { id: 3, name: 'failed', conclusion: 'failure' },
+  ] }
+  assert.equal(summarizePipelineStatus({ runs: [run] }).failureJob.id, 3)
+  assert.equal(summarizePipelineStatus({ runs: [{ ...run, conclusion: 'success' }] }).failureJob, null)
 })

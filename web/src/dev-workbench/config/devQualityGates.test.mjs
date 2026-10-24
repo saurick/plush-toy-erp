@@ -5,13 +5,11 @@ import { projectCiJobGuides } from '../../../../scripts/qa/ci-job-guide.mjs'
 import { getQualityGateProfileLabel } from './qualityGatePresentation.mjs'
 
 import {
-  DEFAULT_SERVER_VIEW,
   DEFAULT_VIEW,
   DEV_QUALITY_GATE_ACTION_API_PATH,
   DEV_QUALITY_GATE_API_PATH,
   DEV_QUALITY_GATE_SESSION_API_PATH,
   DEV_QUALITY_GATES_ROUTE,
-  DEV_QUALITY_GATE_SERVER_VIEWS,
   QUERY_KEYS,
   VIEW_ITEMS,
   WORKSPACE_VIEW_ITEMS,
@@ -22,9 +20,7 @@ import {
   VIEW_QUERY_KEYS,
   buildQualityGateCoverageMatrix,
   buildQualityGateHistoryTrend,
-  buildQualityGateServerPerformance,
-  buildQualityGateServerDag,
-  buildQualityGateServerTiming,
+  buildQualityGateServerJobGuide,
   buildQualityGateStageDurationComposition,
   buildQualityGateViewSearch,
   createDevQualityGateClient,
@@ -183,67 +179,10 @@ function summary(overrides = {}) {
         },
       ],
       jobGuides: projectCiJobGuides(['CI Gate']),
-      topology: {
-        status: 'available',
-        gitSha: 'a'.repeat(40),
-        jobs: [{ name: 'CI Gate', stage: 'gate', needs: [] }],
-        message: '依赖来自当前 exact SHA 的 GitLab CI Lint。',
-      },
+      historyStatus: 'available',
       history: [
-        {
-          id: 39,
-          result: 'passed',
-          gitSha: 'a'.repeat(40),
-          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/39',
-          createdAt: '2026-08-09T07:50:00.000Z',
-          finishedAt: NOW,
-          durationMs: 395_000,
-          queueMs: 3_500,
-          failureJob: '',
-          jobs: [
-            {
-              id: 390,
-              name: 'CI Gate',
-              status: 'completed',
-              conclusion: 'success',
-              durationMs: 2_000,
-              queueMs: 500,
-              attemptCount: 1,
-              startedAt: null,
-              finishedAt: null,
-              role: 'terminal',
-              group: 'pipeline',
-              url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/390',
-            },
-          ],
-        },
-        {
-          id: 38,
-          result: 'failed',
-          gitSha: 'c'.repeat(40),
-          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/38',
-          createdAt: '2026-08-09T06:50:00.000Z',
-          finishedAt: '2026-08-09T06:56:00.000Z',
-          durationMs: 360_000,
-          queueMs: 6_000,
-          failureJob: 'quality_web',
-          jobs: [
-            {
-              id: 380,
-              name: 'quality_web',
-              status: 'completed',
-              conclusion: 'failure',
-              durationMs: 120_000,
-              queueMs: 2_000,
-              attemptCount: 1,
-              startedAt: null,
-              finishedAt: null,
-              role: 'aggregate',
-              group: 'web',
-              url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/380',
-            },
-          ],
-        },
+        { id: 39, result: 'success', gitSha: 'a'.repeat(40), url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/39' },
+        { id: 38, result: 'failed', gitSha: 'c'.repeat(40), url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/38' },
       ],
       message: 'GitLab CI 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。',
       notProven: ['不可变 Release', '目标部署', '客户 UAT'],
@@ -316,12 +255,6 @@ function receipt(overrides = {}) {
 test('quality gates config: route, four views and per-view query contracts stay stable', () => {
   assert.equal(DEV_QUALITY_GATES_ROUTE, '/__dev/quality-gates')
   assert.equal(DEFAULT_VIEW, 'server')
-  assert.equal(DEFAULT_SERVER_VIEW, 'pipeline')
-  assert.deepEqual(DEV_QUALITY_GATE_SERVER_VIEWS, [
-    'pipeline',
-    'performance',
-    'history',
-  ])
   assert.deepEqual(VIEW_KEYS, ['server', 'run', 'governance', 'gaps'])
   assert.deepEqual(
     VIEW_ITEMS.map((item) => item.label),
@@ -329,7 +262,6 @@ test('quality gates config: route, four views and per-view query contracts stay 
   )
   assert.deepEqual(QUERY_KEYS, {
     view: 'view',
-    serverView: 'serverView',
     profile: 'profile',
     operation: 'operation',
     q: 'q',
@@ -338,7 +270,7 @@ test('quality gates config: route, four views and per-view query contracts stay 
     risk: 'risk',
   })
   assert.deepEqual(VIEW_QUERY_KEYS, {
-    server: ['view', 'serverView'],
+    server: ['view'],
     run: ['view', 'profile', 'operation'],
     governance: ['view', 'q', 'filter'],
     gaps: ['view', 'range', 'risk'],
@@ -351,7 +283,7 @@ test('quality gates config: deep links restore each view and switching drops for
     canonicalMissingView: true,
     issues: [],
     view: 'server',
-    values: { view: 'server', serverView: 'pipeline' },
+    values: { view: 'server' },
   })
   assert.equal(
     buildQualityGateViewSearch('server', {
@@ -359,14 +291,6 @@ test('quality gates config: deep links restore each view and switching drops for
       q: 'must not leak',
     }),
     '?view=server'
-  )
-  assert.equal(
-    buildQualityGateViewSearch('server', { serverView: 'performance' }),
-    '?view=server&serverView=performance'
-  )
-  assert.equal(
-    parseQualityGateSearch('?view=server&serverView=history').values.serverView,
-    'history'
   )
   assert.equal(
     buildQualityGateViewSearch('run', {
@@ -625,9 +549,9 @@ test('quality gates config: summary preserves one shared operation truth', () =>
   assert.equal(normalized.serverEvidence.jobs[0].name, 'CI Gate')
   assert.equal(normalized.serverEvidence.jobGuides[0].label, 'CI 最终门禁')
   assert.match(normalized.serverEvidence.jobGuides[0].diagnostics.entry, /CI Gate/u)
-  assert.equal(normalized.serverEvidence.topology.status, 'available')
   assert.equal(normalized.serverEvidence.history.length, 2)
-  assert.equal(normalized.serverEvidence.history[1].failureJob, 'quality_web')
+  assert.equal(normalized.serverEvidence.history[1].result, 'failed')
+  assert.equal('jobs' in normalized.serverEvidence.history[0], false)
   assert.throws(
     () =>
       normalizeDevQualityGateSummary(
@@ -683,21 +607,6 @@ test('quality gates config: summary preserves one shared operation truth', () =>
         summary({
           serverEvidence: {
             ...summary().serverEvidence,
-            topology: {
-              ...summary().serverEvidence.topology,
-              jobs: [{ name: 'CI Gate', stage: 'gate', needs: ['unknown'] }],
-            },
-          },
-        })
-      ),
-    /topology graph is invalid/u
-  )
-  assert.throws(
-    () =>
-      normalizeDevQualityGateSummary(
-        summary({
-          serverEvidence: {
-            ...summary().serverEvidence,
             jobGuides: [],
           },
         })
@@ -734,346 +643,19 @@ test('quality job diagnostics rejects unknown fields and unbounded copied conten
   }
 })
 
-test('quality gates config: GitLab CI DAG is derived from exact needs and actual Job states', () => {
-  const dag = buildQualityGateServerDag({
-    status: 'running',
-    topology: {
-      status: 'available',
-      gitSha: 'a'.repeat(40),
-      message: '同 SHA 依赖已读取。',
-      jobs: [
-        { name: 'plan', stage: 'plan', needs: [] },
-        { name: 'prepare', stage: 'prepare', needs: ['plan'] },
-        {
-          name: 'quality_node_core',
-          stage: 'quality',
-          needs: ['prepare'],
-        },
-        {
-          name: 'quality_aggregate',
-          stage: 'aggregate',
-          needs: ['quality_node_core'],
-        },
-        { name: 'CI Gate', stage: 'gate', needs: ['quality_aggregate'] },
-      ],
-    },
-    jobs: [
-      {
-        name: 'plan',
-        status: 'completed',
-        conclusion: 'success',
-        durationMs: 1_000,
-      },
-      {
-        name: 'prepare',
-        status: 'completed',
-        conclusion: 'success',
-        durationMs: 2_000,
-      },
-      {
-        name: 'quality_node_core',
-        status: 'in_progress',
-        conclusion: '',
-        durationMs: 28_000,
-      },
-      {
-        name: 'quality_aggregate',
-        status: 'queued',
-        conclusion: '',
-        durationMs: null,
-      },
-      {
-        name: 'CI Gate',
-        status: 'queued',
-        conclusion: '',
-        durationMs: null,
-      },
-    ],
-  })
-
-  assert.equal(dag.status, 'available')
-  assert.equal(dag.nodeCount, 5)
-  assert.equal(dag.edgeCount, 4)
-  assert.match(dag.chart, /^flowchart LR/mu)
-  assert.match(dag.chart, /J0 --> J1/u)
-  assert.match(dag.chart, /J3 --> J4/u)
-  assert.match(dag.chart, /quality_node_core · 运行中 · 28 秒/u)
-  assert.deepEqual(
-    buildQualityGateServerDag({
-      topology: {
-        status: 'unavailable',
-        gitSha: 'a'.repeat(40),
-        jobs: [],
-        message: '依赖暂不可读。',
-      },
-    }),
-    {
-      status: 'unavailable',
-      chart: '',
-      nodeCount: 0,
-      edgeCount: 0,
-      message: '依赖暂不可读。',
-    }
-  )
-})
-
-test('pipeline overview aggregates actual stage dependencies without fabricating a linear sequence', () => {
-  const evidence = {
-    topology: {
-      status: 'available',
-      jobs: [
-        { name: 'plan', stage: 'plan', needs: [] },
-        { name: 'web', stage: 'quality', needs: ['plan'] },
-        { name: 'server', stage: 'quality', needs: ['plan'] },
-        { name: 'browser', stage: 'quality', needs: ['web', 'server'] },
-        { name: 'gate', stage: 'gate', needs: ['web', 'browser'] },
-        { name: 'independent', stage: 'audit', needs: [] },
-      ],
-    },
-    jobs: [],
-  }
-  const result = buildQualityGateServerDag(evidence)
-  assert.equal(result.nodeCount, 6)
-  assert.equal(result.edgeCount, 6)
-  assert.equal(result.stageCount, 4)
-  assert.equal((result.overviewChart.match(/G0 --> G1/gu) || []).length, 1)
-  assert.equal((result.overviewChart.match(/G1 --> G2/gu) || []).length, 1)
-  assert.doesNotMatch(result.overviewChart, /G1 --> G1|G2 --> G3|classDef passed/u)
-  assert.match(result.overviewChart, /3 个 Job/u)
-  assert.match(result.chart, /J1 --> J3/u)
-  assert.match(result.chart, /J2 --> J3/u)
-  assert.equal(buildQualityGateServerDag({ topology: { status: 'unavailable' } }).chart, '')
-})
-
-test('quality gates config: GitLab CI timing ranks bottlenecks without summing parallel jobs', () => {
-  const timing = buildQualityGateServerTiming({
-    status: 'running',
-    pipeline: { durationMs: 120_000, queueMs: 5_000 },
-    jobs: [
-      {
-        id: 1,
-        name: 'quality_web_build',
-        status: 'completed',
-        conclusion: 'success',
-        durationMs: 60_000,
-        queueMs: 1_000,
-        role: 'execution',
-        group: 'web',
-      },
-      {
-        id: 2,
-        name: 'quality_server_test_build',
-        status: 'completed',
-        conclusion: 'success',
-        durationMs: 90_000,
-        queueMs: 2_000,
-        role: 'execution',
-        group: 'server',
-      },
-      {
-        id: 3,
-        name: 'CI Gate',
-        status: 'queued',
-        conclusion: '',
-        durationMs: null,
-        queueMs: 3_000,
-        role: 'terminal',
-        group: 'pipeline',
-      },
-    ],
-  })
-
-  assert.equal(timing.wallClockMs, 120_000)
-  assert.equal(timing.queueMs, 5_000)
-  assert.equal(timing.longestJob.name, 'quality_server_test_build')
-  assert.equal(timing.longestExecutionJob.name, 'quality_server_test_build')
-  assert.equal(timing.flowJobs.length, 3)
-  assert.equal(
-    timing.flowJobs.find((job) => job.name === 'quality_server_test_build')
-      .status,
-    'passed'
-  )
-  assert.equal(
-    timing.flowJobs.find((job) => job.name === 'CI Gate').status,
-    'pending'
-  )
-  assert.deepEqual(
-    timing.jobs.map(({ name, relativePercent }) => ({
-      name,
-      relativePercent,
-    })),
-    [
-      { name: 'quality_server_test_build', relativePercent: 100 },
-      { name: 'quality_web_build', relativePercent: 66.7 },
-      { name: 'CI Gate', relativePercent: null },
-    ]
-  )
-  assert.deepEqual(
-    timing.flowGroups.map(({ key, jobs }) => [
-      key,
-      jobs.map((job) => job.name),
-    ]),
-    [
-      ['web', ['quality_web_build']],
-      ['server', ['quality_server_test_build']],
-      ['closeout', ['CI Gate']],
-    ]
-  )
-  assert.equal('totalDurationMs' in timing, false)
-})
-
-test('quality gates config: GitLab CI history separates execution limits from fan-in and queue delay', () => {
-  function historyJob(
-    pipelineId,
-    index,
-    {
-      name,
-      role,
-      group,
-      durationMs,
-      queueMs,
-      conclusion = 'success',
-      attemptCount = 1,
-    }
-  ) {
-    return {
-      id: pipelineId * 100 + index,
-      name,
-      role,
-      group,
-      status: 'completed',
-      conclusion,
-      durationMs,
-      queueMs,
-      attemptCount,
-      url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/${String(
-        pipelineId * 100 + index
-      )}`,
-    }
-  }
-
-  const runs = [
-    {
-      id: 44,
-      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/44',
-      executionMs: 125_000,
-      aggregateMs: 35_000,
-      prepareQueueMs: 40_000,
-      attemptCount: 2,
-      startedAt: null,
-      finishedAt: null,
-    },
-    {
-      id: 43,
-      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/43',
-      executionMs: 88_000,
-      aggregateMs: 22_000,
-      prepareQueueMs: 4_000,
-      attemptCount: 1,
-      startedAt: null,
-      finishedAt: null,
-    },
-    {
-      id: 42,
-      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/42',
-      executionMs: 92_000,
-      aggregateMs: 20_000,
-      prepareQueueMs: 3_000,
-      attemptCount: 1,
-      startedAt: null,
-      finishedAt: null,
-    },
-    {
-      id: 41,
-      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41',
-      executionMs: 95_000,
-      aggregateMs: 18_000,
-      prepareQueueMs: 2_000,
-      attemptCount: 1,
-      startedAt: null,
-      finishedAt: null,
-      failed: true,
-    },
-  ].map((run) => ({
-    id: run.id,
-    url: run.url,
-    jobs: [
-      historyJob(run.id, 1, {
-        name: 'quality_node_release_preflight',
-        role: 'execution',
-        group: 'node',
-        durationMs: run.executionMs,
-        queueMs: 5_000,
-        conclusion: run.failed ? 'failure' : 'success',
-        attemptCount: run.attemptCount,
-      }),
-      historyJob(run.id, 2, {
-        name: 'quality_node',
-        role: 'aggregate',
-        group: 'node',
-        durationMs: run.aggregateMs,
-        queueMs: 1_000,
-      }),
-      historyJob(run.id, 3, {
-        name: 'prepare',
-        role: 'orchestration',
-        group: 'pipeline',
-        durationMs: 10_000,
-        queueMs: run.prepareQueueMs,
-      }),
-      historyJob(run.id, 4, {
-        name: 'quality_web_checks',
-        role: 'execution',
-        group: 'web',
-        durationMs: 20_000,
-        queueMs: 1_000,
-        attemptCount: run.id === 44 ? 2 : 1,
-      }),
-    ],
-  }))
-
-  const performance = buildQualityGateServerPerformance({ history: runs })
-  const execution = performance.rows.find(
-    (row) => row.name === 'quality_node_release_preflight'
-  )
-  const aggregate = performance.rows.find((row) => row.name === 'quality_node')
-  const prepare = performance.rows.find((row) => row.name === 'prepare')
-  const retried = performance.rows.find(
-    (row) => row.name === 'quality_web_checks'
-  )
-
-  assert.equal(performance.historyCount, 4)
-  assert.equal(performance.executionCount, 2)
-  assert.equal(performance.criticalCount, 1)
-  assert.equal(performance.unstableCount, 2)
-  assert.equal(execution.attention, 'critical')
-  assert.equal(execution.sampleCount, 3)
-  assert.equal(execution.medianDurationMs, 92_000)
-  assert.equal(execution.p95DurationMs, 125_000)
-  assert.equal(execution.medianQueueMs, 5_000)
-  assert.equal(execution.p95QueueMs, 5_000)
-  assert.equal(execution.retryCount, 1)
-  assert.equal(execution.failureCount, 1)
-  assert.match(execution.latestJobUrl, /\/jobs\/4401$/u)
-  assert.equal(aggregate.attention, 'aggregate_slow')
-  assert.equal(prepare.attention, 'queued')
-  assert.equal(retried.attention, 'unstable')
-})
-
 test('quality gates config: GitLab CI timing does not invent jobs without evidence', () => {
-  const timing = buildQualityGateServerTiming({
+  const timing = buildQualityGateServerJobGuide({
     status: 'unavailable',
     pipeline: null,
     jobs: [],
   })
 
   assert.deepEqual(timing.flowJobs, [])
-  assert.equal(timing.jobs.length, 0)
-  assert.equal(timing.longestJob, null)
+  assert.deepEqual(timing.flowGroups, [])
 })
 
 test('quality gates config: GitLab CI missing evidence is distinct from unreadable evidence', () => {
-  const timing = buildQualityGateServerTiming({
+  const timing = buildQualityGateServerJobGuide({
     status: 'missing',
     pipeline: null,
     jobs: [],
@@ -1083,7 +665,7 @@ test('quality gates config: GitLab CI missing evidence is distinct from unreadab
 })
 
 test('quality gates config: GitLab CI queued and in-progress jobs keep distinct states', () => {
-  const timing = buildQualityGateServerTiming({
+  const timing = buildQualityGateServerJobGuide({
     status: 'running',
     pipeline: { durationMs: null, queueMs: 2_000 },
     jobs: [
@@ -1254,10 +836,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
     execution: readFileSync(new URL('../components/quality-gates/QualityGateExecutionFlow.jsx', import.meta.url), 'utf8'),
     charts: readFileSync(new URL('../components/quality-gates/QualityGateEvidenceCharts.jsx', import.meta.url), 'utf8'),
     server: readFileSync(new URL('../components/quality-gates/ServerCiEvidencePanel.jsx', import.meta.url), 'utf8'),
-    pipeline: readFileSync(new URL('../components/quality-gates/ServerCiPipelineFlow.jsx', import.meta.url), 'utf8'),
     guide: readFileSync(new URL('../components/quality-gates/ServerCiJobGuideDrawer.jsx', import.meta.url), 'utf8'),
-    history: readFileSync(new URL('../components/quality-gates/ServerCiHistory.jsx', import.meta.url), 'utf8'),
-    performance: readFileSync(new URL('../components/quality-gates/ServerCiPerformance.jsx', import.meta.url), 'utf8'),
     run: readFileSync(new URL('../components/quality-gates/QualityGateRunView.jsx', import.meta.url), 'utf8'),
     governance: readFileSync(new URL('../components/quality-gates/QualityGateGovernanceViews.jsx', import.meta.url), 'utf8'),
     context: readFileSync(new URL('../components/quality-gates/QualityGateContextStrip.jsx', import.meta.url), 'utf8'),
@@ -1285,9 +864,6 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.presentation, /getQualityGateFlowSegments/u)
   assert.match(sources.execution, /<ol/u)
   assert.match(sources.execution, /aria-current=/u)
-  assert.match(sources.pipeline, /chart=\{dag\.overviewChart\}/u)
-  assert.match(sources.pipeline, /fullDagOpen \? \(/u)
-  assert.match(sources.pipeline, /查看完整 Job 依赖图/u)
   assert.match(sources.execution, /静态工作原理，不代表当前运行状态/u)
   assert.match(sources.execution, /buildQualityGateStageDurationComposition/u)
   assert.match(sources.charts, /buildQualityGateHistoryTrend/u)
@@ -1298,15 +874,8 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.server, /target="_blank"/u)
   assert.doesNotMatch(sources.server, /ServerCiPipelineFlow|ServerJobPerformance/u)
   assert.match(sources.server, /evidence\.pipeline\?\.url/u)
-  assert.match(
-    sources.pipeline,
-    /状态与耗时来自实际\s+Pipeline/u
-  )
-  assert.match(sources.pipeline, /依赖不可读时不绘制推测连线/u)
-
   assert.match(sources.guide, /<Drawer/u)
 
-  assert.match(sources.pipeline, /aria-label=\{`查看 \$\{job\.name\} 说明`\}/u)
   assert.match(sources.guide, /先看阶段，再按需查看单个 Job/u)
   assert.match(sources.presentation, /核对子 Job 回执并形成领域结论/u)
 
@@ -1322,11 +891,6 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.presentation, /连接正常 · 当前提交无 CI/u)
   assert.match(sources.presentation, /连接正常 · 当前提交无 CI/u)
   assert.match(sources.presentation, /GitLab CI 正在读取服务器证据/u)
-  assert.match(sources.history, /最近 CI/u)
-  assert.match(sources.history, /历史通过不代表当前提交已通过/u)
-  assert.match(sources.history, /href=\{run\.url\}/u)
-  assert.match(sources.history, /GitLab 任务与日志/u)
-  assert.match(sources.history, /最近 GitLab CI 历史/u)
   assert.match(sources.presentation, /serverHistoryFailureLabel/u)
   assertNoSourceMatches(/missing: '暂无当前 CI'/u)
   assertNoSourceMatches(/unavailable: '待读取'/u)

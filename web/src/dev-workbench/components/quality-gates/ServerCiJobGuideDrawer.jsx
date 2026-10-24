@@ -10,7 +10,7 @@ import {
 } from 'antd'
 import DevCiWorkflowGuide from '../DevCiWorkflowGuide.jsx'
 import { buildCiDiagnosticText } from '../../config/devCiWorkflow.mjs'
-import { formatQualityGateDuration } from '../../config/devQualityGates.mjs'
+import { buildQualityGateServerJobGuide } from '../../config/devQualityGates.mjs'
 import {
   SERVER_PIPELINE_JOB_STATUS,
   SERVER_JOB_ROLE,
@@ -25,7 +25,6 @@ const { Paragraph, Text } = Typography
 export function ServerJobGuideDrawer({
   repository,
   evidence,
-  timing,
   open,
   selectedJobName,
   onSelect,
@@ -33,6 +32,7 @@ export function ServerJobGuideDrawer({
   onClose,
   onAfterOpenChange,
 }) {
+  const timing = buildQualityGateServerJobGuide(evidence)
   const guideByName = new Map(
     (evidence.jobGuides || []).map((guide) => [guide.name, guide])
   )
@@ -40,34 +40,10 @@ export function ServerJobGuideDrawer({
     (job) => job.name === selectedJobName
   )
   const selectedGuide = selectedJob ? guideByName.get(selectedJob.name) : null
-  const topologyJob =
-    evidence.topology?.status === 'available' && selectedJob
-      ? evidence.topology.jobs.find((job) => job.name === selectedJob.name)
-      : null
   const selectedGroup = selectedJob ? serverJobFlowGroup(selectedJob) : ''
   const selectedRole = selectedJob
     ? SERVER_JOB_ROLE[selectedJob.role] || SERVER_JOB_ROLE.execution
     : null
-
-  const dependencyContent = (() => {
-    if (evidence.topology?.status !== 'available') {
-      return (
-        <Text type="secondary">
-          当前依赖暂不可读；以 GitLab Pipeline 为准。
-        </Text>
-      )
-    }
-    if (!topologyJob?.needs.length) return <Text>无前置依赖</Text>
-    return (
-      <Space size={[4, 4]} wrap>
-        {topologyJob.needs.map((name) => (
-          <Text key={name} code>
-            {name}
-          </Text>
-        ))}
-      </Space>
-    )
-  })()
 
   return (
     <Drawer
@@ -131,15 +107,7 @@ export function ServerJobGuideDrawer({
                 children: (
                   <Space size={[8, 4]} wrap>
                     <Tag>{SERVER_PIPELINE_JOB_STATUS[selectedJob.status]}</Tag>
-                    <Text>
-                      运行 {formatQualityGateDuration(selectedJob.durationMs)}
-                    </Text>
-                    <Text>
-                      等待 {formatQualityGateDuration(selectedJob.queueMs)}
-                    </Text>
-                    {selectedJob.attemptCount > 1 ? (
-                      <Text>重试 {selectedJob.attemptCount - 1} 次</Text>
-                    ) : null}
+
                   </Space>
                 ),
               },
@@ -155,11 +123,6 @@ export function ServerJobGuideDrawer({
                 ),
               },
               {
-                key: 'needs',
-                label: '前置依赖',
-                children: dependencyContent,
-              },
-              {
                 key: 'outcome',
                 label: '结果用途',
                 children: selectedGuide.outcome,
@@ -167,8 +130,8 @@ export function ServerJobGuideDrawer({
             ]}
           />
           <Space size={8} wrap>
-            <Button href={selectedJob.url}>
-              在 GitLab 查看日志
+            <Button href={selectedJob.url} target="_blank" rel="noopener noreferrer">
+              在 GitLab 查看 Job 与日志
             </Button>
             <Button type="link" onClick={onShowAll}>
               查看全部 Job 说明

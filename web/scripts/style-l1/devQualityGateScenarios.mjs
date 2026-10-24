@@ -45,90 +45,6 @@ const SERVER_JOB_TIMINGS = Object.freeze([
   ['quality_aggregate', 9_000, 500, 'aggregate', 'pipeline', 1],
   ['CI Gate', 2_000, 300, 'terminal', 'pipeline', 1],
 ])
-const SERVER_CI_AGGREGATE_NEEDS = Object.freeze({
-  quality_node: [
-    'plan',
-    'prepare',
-    'quality_node_release_preflight_a',
-    'quality_node_release_preflight_b',
-    'quality_node_release_a',
-    'quality_node_release_b',
-    'quality_node_release_c',
-    'quality_node_core',
-  ],
-  quality_resource: [
-    'plan',
-    'prepare',
-    'quality_resource_contract_a',
-    'quality_resource_contract_b',
-    'quality_resource_runtime_a',
-    'quality_resource_runtime_b',
-  ],
-  quality_web: ['plan', 'prepare', 'quality_web_checks', 'quality_web_build'],
-  quality_server: [
-    'plan',
-    'prepare',
-    'quality_server_schema',
-    'quality_server_upgrade',
-    'quality_server_test_build',
-    'quality_server_critical_postgres',
-  ],
-  'quality_browser 2/2': ['plan', 'prepare', 'quality_browser 1/2'],
-})
-
-function serverCiTopologyJob(name) {
-  if (name === 'plan') return { name, stage: 'plan', needs: [] }
-  if (name === 'prepare') {
-    return { name, stage: 'prepare', needs: ['plan'] }
-  }
-  if (name === 'quality_aggregate') {
-    return {
-      name,
-      stage: 'aggregate',
-      needs: [
-        'plan',
-        'prepare',
-        'quality_static',
-        'quality_node',
-        'quality_web',
-        'quality_server',
-        'quality_resource',
-        'quality_browser 2/2',
-        'quality_security',
-      ],
-    }
-  }
-  if (name === 'CI Gate') {
-    return { name, stage: 'gate', needs: ['plan', 'quality_aggregate'] }
-  }
-  if (Object.hasOwn(SERVER_CI_AGGREGATE_NEEDS, name)) {
-    return {
-      name,
-      stage: 'quality',
-      needs: SERVER_CI_AGGREGATE_NEEDS[name],
-    }
-  }
-  if (name === 'quality_server_test_build' || name === 'quality_browser 1/2') {
-    return {
-      name,
-      stage: 'quality',
-      needs: [
-        'plan',
-        'prepare',
-        ...(name === 'quality_browser 1/2' ? ['quality_web_build'] : []),
-        'quality_server_schema',
-        'quality_server_upgrade',
-        'quality_server_critical_postgres',
-      ],
-    }
-  }
-  return { name, stage: 'quality', needs: ['plan', 'prepare'] }
-}
-
-const SERVER_CI_TOPOLOGY = Object.freeze(
-  SERVER_JOB_TIMINGS.map(([name]) => Object.freeze(serverCiTopologyJob(name)))
-)
-
 function serverHistoryJobs(pipelineId, durationOffset = 0, failureJob = '') {
   const originByPipeline = {
     41: '2026-08-09T07:53:15.000Z',
@@ -168,43 +84,10 @@ function serverHistoryJobs(pipelineId, durationOffset = 0, failureJob = '') {
 }
 
 const SERVER_CI_HISTORY = Object.freeze([
-  Object.freeze({
-    id: 41,
-    result: 'passed',
-    gitSha: repository.commit,
-    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/41',
-    createdAt: '2026-08-09T07:53:15.000Z',
-    finishedAt: NOW,
-    durationMs: 405_000,
-    queueMs: 12_000,
-    failureJob: '',
-    jobs: serverHistoryJobs(41),
-  }),
-  Object.freeze({
-    id: 40,
-    result: 'failed',
-    gitSha: '1'.repeat(40),
-    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/40',
-    createdAt: '2026-08-09T06:48:00.000Z',
-    finishedAt: '2026-08-09T06:55:00.000Z',
-    durationMs: 420_000,
-    queueMs: 18_000,
-    failureJob: 'quality_web',
-    jobs: serverHistoryJobs(40, 8_000, 'quality_web'),
-  }),
-  Object.freeze({
-    id: 39,
-    result: 'running',
-    gitSha: '2'.repeat(40),
-    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/39',
-    createdAt: '2026-08-09T05:50:00.000Z',
-    finishedAt: null,
-    durationMs: null,
-    queueMs: 35_000,
-    failureJob: '',
-    jobs: serverHistoryJobs(39, -5_000),
-  }),
-])
+  { id: 41, result: 'success', gitSha: repository.commit },
+  { id: 40, result: 'failed', gitSha: '1'.repeat(40) },
+  { id: 39, result: 'running', gitSha: '2'.repeat(40) },
+].map((run) => ({ ...run, url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/${run.id}` })))
 const historicalRepository = Object.freeze({
   commit: 'f'.repeat(40),
   dirty: false,
@@ -419,14 +302,6 @@ function createServerEvidence(status = 'passed') {
       status,
       jobs,
       jobGuides: projectCiJobGuides(names),
-      topology: {
-        ...full.topology,
-        jobs: names.map((name, index) => ({
-          name,
-          stage: ['plan', 'quality', 'gate'][index],
-          needs: names.slice(0, index),
-        })),
-      },
       history: [],
       message: '文档检查已通过；完整发布验证未运行。需要发布此 SHA 时，在 GitLab 新建 main 流水线并设置 QA_MODE=full。',
       notProven: ['当前 exact SHA 的完整 CI 严格门禁', '不可变 Release', '目标部署', '客户 UAT'],
@@ -435,6 +310,7 @@ function createServerEvidence(status = 'passed') {
   if (status === 'unavailable') {
     return {
       kind: 'plush.dev-quality-gate-server-evidence',
+      historyStatus: status === 'unavailable' ? 'unavailable' : 'available',
       reports: null,
       status: 'unavailable',
       current: false,
@@ -443,12 +319,6 @@ function createServerEvidence(status = 'passed') {
       pipeline: null,
       jobs: [],
       jobGuides: [],
-      topology: {
-        status: 'unavailable',
-        gitSha: '',
-        jobs: [],
-        message: '当前 exact SHA 的 GitLab CI 依赖暂不可读。',
-      },
       history: [],
       message: '未登记只读 GitLab 凭据，当前仅显示本机回执。',
       notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
@@ -457,6 +327,7 @@ function createServerEvidence(status = 'passed') {
   if (status === 'missing') {
     return {
       kind: 'plush.dev-quality-gate-server-evidence',
+      historyStatus: status === 'unavailable' ? 'unavailable' : 'available',
       reports: null,
       status: 'missing',
       current: false,
@@ -465,12 +336,6 @@ function createServerEvidence(status = 'passed') {
       pipeline: null,
       jobs: [],
       jobGuides: [],
-      topology: {
-        status: 'missing',
-        gitSha: repository.commit,
-        jobs: [],
-        message: '当前提交尚未形成实际 Pipeline Job。',
-      },
       history: SERVER_CI_HISTORY.slice(1),
       message:
         'GitLab 凭据与 API 读取正常；GitLab CI 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
@@ -479,6 +344,7 @@ function createServerEvidence(status = 'passed') {
   }
   return {
     kind: 'plush.dev-quality-gate-server-evidence',
+      historyStatus: status === 'unavailable' ? 'unavailable' : 'available',
     reports: {
       status: 'available',
       gitSha: repository.commit,
@@ -503,13 +369,6 @@ function createServerEvidence(status = 'passed') {
     },
     jobs: serverHistoryJobs(41),
     jobGuides: projectCiJobGuides(SERVER_JOB_TIMINGS.map(([name]) => name)),
-    topology: {
-      status: 'available',
-      gitSha: repository.commit,
-      jobs: SERVER_CI_TOPOLOGY,
-      message:
-        '依赖来自当前 exact SHA 的 GitLab CI Lint，状态来自本次实际 Pipeline。',
-    },
     history: SERVER_CI_HISTORY,
     message: 'GitLab CI 已证明当前提交 SHA；该证据不覆盖工作区未提交改动。',
     notProven: ['工作区未提交改动', '不可变 Release', '目标部署', '客户 UAT'],
@@ -929,9 +788,9 @@ export function createDevQualityGateScenarios({
         assert.equal(await serverPanel.getByRole('link', { name: '查看覆盖率 Job', exact: true }).getAttribute('href'), job.url)
         assert.equal(await serverPanel.getByRole('link', { name: '查看覆盖率制品', exact: true }).getAttribute('href'), `${job.url}/artifacts/browse/output/ci/reports/coverage/`)
         assert.equal(await serverPanel.locator('.erp-dev-quality-server-pipeline__dag, .erp-dev-ci-timeline').count(), 0)
-        const history = serverPanel.locator('details').filter({ hasText: '历史 CI 记录（GitLab）' })
+        const history = serverPanel.locator('details').filter({ hasText: '历史流水线记录（GitLab）' })
         await history.locator('summary').click()
-        assert.equal(await history.getByRole('link').count(), SERVER_CI_HISTORY.length)
+        assert.equal(await history.getByRole('link').count(), SERVER_CI_HISTORY.length + 1)
         assert.equal(await history.getByRole('link').first().getAttribute('target'), '_blank')
         await history.locator('summary').click()
 
@@ -1084,10 +943,11 @@ export function createDevQualityGateScenarios({
             { exact: true }
           )
           .waitFor()
-        await jobGuideDrawer.getByText('运行 28 秒', { exact: true }).waitFor()
-        await jobGuideDrawer
-          .getByText('quality_node_core', { exact: true })
-          .waitFor()
+        assert.equal(await jobGuideDrawer.getByText('运行 28 秒', { exact: true }).count(), 0)
+        assert.equal(await jobGuideDrawer.getByText('前置依赖', { exact: true }).count(), 0)
+        const jobLink = jobGuideDrawer.getByRole('link', { name: '在 GitLab 查看 Job 与日志', exact: true })
+        assert.equal(await jobLink.getAttribute('target'), '_blank')
+        assert.equal(await jobLink.getAttribute('href'), serverHistoryJobs(41).find((job) => job.name === 'quality_node').url)
         await jobGuideDrawer.getByText('定义入口', { exact: true }).waitFor()
         await jobGuideDrawer.getByText('失败排查', { exact: true }).waitFor()
         const diagnostic = jobGuideDrawer.locator('.erp-dev-ci-diagnostic')

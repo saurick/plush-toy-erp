@@ -755,71 +755,17 @@ function unavailableServerEvidence(message) {
     reports: null,
     jobs: [],
     jobGuides: [],
-    topology: {
-      status: 'unavailable',
-      gitSha: '',
-      jobs: [],
-      message: '当前 exact SHA 的 GitLab CI 依赖暂不可读。',
-    },
     history: [],
+    historyStatus: 'unavailable',
     message,
     notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
-  }
-}
-
-function projectServerTopology(topology, repository, jobs) {
-  if (jobs.length === 0) {
-    return {
-      status: 'missing',
-      gitSha: repository.commit,
-      jobs: [],
-      message: '当前提交尚未形成实际 Pipeline Job，配置依赖不冒充运行证据。',
-    }
-  }
-  if (
-    topology?.schemaVersion !== 'plush.delivery-pipeline-topology/v1' ||
-    topology.gitSha !== repository.commit ||
-    !Array.isArray(topology.jobs)
-  ) {
-    return {
-      status: 'unavailable',
-      gitSha: repository.commit,
-      jobs: [],
-      message: '当前 Pipeline 可读，但同一 SHA 的 GitLab CI 依赖暂不可读。',
-    }
-  }
-  const actualNames = new Set(jobs.map((job) => job.name))
-  const definitions = new Map(topology.jobs.map((job) => [job.name, job]))
-  if (
-    definitions.size !== topology.jobs.length ||
-    jobs.some((job) => !definitions.has(job.name))
-  ) {
-    return {
-      status: 'unavailable',
-      gitSha: repository.commit,
-      jobs: [],
-      message: 'GitLab CI 配置与本次实际 Job 不一致，依赖图已失败关闭。',
-    }
-  }
-  return {
-    status: 'available',
-    gitSha: repository.commit,
-    jobs: topology.jobs
-      .filter((job) => actualNames.has(job.name))
-      .map((job) => ({
-        name: job.name,
-        stage: job.stage,
-        needs: job.needs.filter((name) => actualNames.has(name)),
-      })),
-    message:
-      '依赖来自当前 exact SHA 的 GitLab CI Lint，状态来自本次实际 Pipeline。',
   }
 }
 
 export function projectDevQualityGateServerEvidence(
   timings,
   repository,
-  topology = null
+  pipelineHistory = timings?.runs
 ) {
   if (
     timings?.schemaVersion !== 'plush.delivery-pipeline-timings/v1' ||
@@ -867,37 +813,18 @@ export function projectDevQualityGateServerEvidence(
     )
     .map(projectRun)
     .sort((left, right) => right.run.id - left.run.id)
-  const history = candidates
+  const history = (pipelineHistory || [])
     .slice(0, SERVER_CI_HISTORY_LIMIT)
-    .map(({ run, jobs, passed, docsPassed }) => {
-      const active = run.status !== 'completed'
-      const result = passed
-        ? 'passed'
-        : docsPassed
-          ? 'docs_passed'
-          : active
-            ? run.status === 'in_progress'
-              ? 'running'
-              : 'queued'
-            : run.conclusion === 'cancelled'
-              ? 'cancelled'
-              : run.conclusion === 'skipped'
-                ? 'skipped'
-                : 'failed'
-      return {
-        id: run.id,
-        result,
-        gitSha: run.gitSha,
-        url: run.url,
-        createdAt: run.createdAt,
-        finishedAt: run.finishedAt,
-        durationMs: run.durationMs,
-        queueMs: run.queueMs,
-        failureJob:
-          jobs.find((job) => job.conclusion === 'failure')?.name || '',
-        jobs,
-      }
-    })
+    .map((run) => ({
+      id: run.id,
+      gitSha: run.gitSha,
+      url: run.url,
+      result: run.status !== 'completed'
+        ? run.status === 'in_progress' ? 'running' : 'queued'
+        : ({ success: 'success', cancelled: 'cancelled', skipped: 'skipped' }[run.conclusion] || 'failed'),
+    }))
+    .sort((left, right) => right.id - left.id)
+  const historyStatus = pipelineHistory === null ? 'unavailable' : 'available'
   const exactRuns = candidates.filter(
     (candidate) => candidate.run.gitSha === repository.commit
   )
@@ -912,8 +839,9 @@ export function projectDevQualityGateServerEvidence(
       reports: null,
       jobs: [],
       jobGuides: [],
-      topology: projectServerTopology(topology, repository, []),
+
       history,
+      historyStatus,
       message:
         'GitLab 凭据与 API 读取正常；GitLab CI 尚无绑定当前已提交 SHA 的 push 或手动完整 CI 记录。',
       notProven: ['当前 exact SHA 的 GitLab CI'],
@@ -948,8 +876,9 @@ export function projectDevQualityGateServerEvidence(
     jobs: selected.jobs,
     reports: null,
     jobGuides: projectCiJobGuides(selected.jobs.map((job) => job.name)),
-    topology: projectServerTopology(topology, repository, selected.jobs),
+
     history,
+    historyStatus,
     message: selected.passed
       ? repository.dirty
         ? 'GitLab CI 已证明当前提交 SHA；该证据不覆盖工作区未提交改动。'
@@ -998,6 +927,34 @@ function upsertStageTiming(operation, event, now) {
   return stageTimings
 }
 
+// History is a native navigation summary. Only exact-SHA jobs establish release proof.
+export async function loadDevQualityGateServerEvidence(provider, repository) {
+  const [exact, history] = await Promise.allSettled([
+    provider.listPipelineTimings({ limit: SERVER_CI_HISTORY_LIMIT, sha: repository.commit }),
+    provider.listPipelineHistory({ limit: SERVER_CI_HISTORY_LIMIT }),
+  ])
+  const historyRuns = history.status === 'fulfilled' ? history.value : null
+  if (exact.status !== 'fulfilled') {
+    const value = projectDevQualityGateServerEvidence(
+      { schemaVersion: 'plush.delivery-pipeline-timings/v1', runs: [] }, repository, historyRuns
+    )
+    return { ...value, status: 'unavailable', message: '当前提交的 GitLab CI 证据暂时不可读取；已读取的历史入口仍可查看。' }
+  }
+  const value = projectDevQualityGateServerEvidence(exact.value, repository, historyRuns)
+  if (value.pipeline) {
+    try {
+      value.reports = await provider.readPipelineReports({
+        pipelineId: value.pipeline.id,
+        sha: repository.commit,
+        pipeline: exact.value.runs.find((run) => run.id === value.pipeline.id),
+      })
+    } catch {
+      value.reports = { status: 'unavailable', gitSha: repository.commit, pipelineId: value.pipeline.id, tests: null, coverage: [], testsUrl: null }
+    }
+  }
+  return value
+}
+
 export function createDevQualityGateService({
   projectRoot,
   operationStore,
@@ -1029,6 +986,7 @@ export function createDevQualityGateService({
   const orphanStopTimers = new Map()
   let environmentReadinessCache = null
   let serverEvidenceCache = null
+  let serverEvidencePending = null
   const loadReceipt =
     readReceipt || ((profile) => readFixedQualityGateReceipt(root, profile))
   const loadChangedFiles =
@@ -1068,6 +1026,17 @@ export function createDevQualityGateService({
     ) {
       return serverEvidenceCache.value
     }
+    if (serverEvidencePending?.key === cacheKey) return serverEvidencePending.promise
+    const promise = readServerCiEvidence(repository, cacheKey)
+    serverEvidencePending = { key: cacheKey, promise }
+    try {
+      return await promise
+    } finally {
+      if (serverEvidencePending?.promise === promise) serverEvidencePending = null
+    }
+  }
+
+  async function readServerCiEvidence(repository, cacheKey) {
     let value
     try {
       if (loadServerEvidence) {
@@ -1083,34 +1052,7 @@ export function createDevQualityGateService({
           projectRoot: root,
           env: serverEvidenceEnvironment,
         })
-        let timings = await provider.listPipelineTimings({
-          limit: SERVER_CI_HISTORY_LIMIT,
-        })
-        if (!timings.runs.some((run) => run.gitSha === repository.commit)) {
-          const exactTimings = await provider.listPipelineTimings({
-            limit: SERVER_CI_HISTORY_LIMIT,
-            sha: repository.commit,
-          })
-          const knownRunIds = new Set(timings.runs.map((run) => run.id))
-          timings = {
-            ...timings,
-            runs: [
-              ...timings.runs,
-              ...exactTimings.runs.filter((run) => !knownRunIds.has(run.id)),
-            ],
-          }
-        }
-        value = projectDevQualityGateServerEvidence(
-          timings,
-          repository
-        )
-        if (value.pipeline) {
-          try {
-            value.reports = await provider.readPipelineReports({ pipelineId: value.pipeline.id, sha: repository.commit })
-          } catch {
-            value.reports = { status: 'unavailable', gitSha: repository.commit, pipelineId: value.pipeline.id, tests: null, coverage: [], testsUrl: null }
-          }
-        }
+        value = await loadDevQualityGateServerEvidence(provider, repository)
       }
       if (value?.kind !== DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND) {
         throw new Error('server CI evidence projection is invalid')
@@ -1122,7 +1064,7 @@ export function createDevQualityGateService({
     }
     serverEvidenceCache = {
       key: cacheKey,
-      expiresAt: timestamp + 15_000,
+      expiresAt: Date.now() + (value.status === 'unavailable' ? 3_000 : 15_000),
       value,
     }
     return value

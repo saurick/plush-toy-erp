@@ -655,13 +655,21 @@ async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOv
         assert.equal(await nativeReleaseLink.getAttribute('href'), gitlabSummary.timings.runs[0].url)
         assert.doesNotMatch(await releaseSummary.innerText(), /严格门禁.*未证明|发布制品.*未证明/u)
         await page.getByRole('tab', { name: '操作记录', exact: true }).click()
-        const recordLink = history.getByRole('link', { name: 'GitLab #77', exact: true })
+        const recordLink = history.getByRole('link', { name: 'GitLab 本次回执', exact: true })
         await recordLink.waitFor()
-        assert.equal(await recordLink.getAttribute('href'), archived.gitlabRecord.deploymentUrl)
-        const row = history.getByRole('row').filter({ hasText: 'GitLab #77' })
+        assert.equal(await recordLink.getAttribute('href'), archived.gitlabRecord.evidenceUrl)
+        assert.equal(await recordLink.getAttribute('target'), '_blank')
+        const row = history.getByRole('row').filter({ hasText: 'GitLab 本次回执' })
         assert.equal(await row.getByRole('button', { name: '补录 GitLab', exact: true }).count(), 0)
         await row.getByRole('button', { name: '查看详情', exact: true }).click()
-        await page.getByRole('dialog').getByText('已登记 GitLab', { exact: true }).waitFor()
+        const detail = page.getByRole('dialog')
+        await detail.getByText('已登记 GitLab', { exact: true }).waitFor()
+        assert.equal(await detail.getByRole('link', { name: 'GitLab 环境部署列表', exact: true }).getAttribute('href'), archived.gitlabRecord.environmentUrl)
+        assert.equal(await detail.getByRole('link', { name: 'GitLab 本次回执归档', exact: true }).getAttribute('href'), archived.gitlabRecord.evidenceUrl)
+        for (const link of await detail.locator('a[href^="https://gitlab.saurick.me/"]').all()) {
+          assert.equal(await link.getAttribute('target'), '_blank')
+          assert.match(await link.getAttribute('rel'), /noopener/u)
+        }
         await page.getByRole('dialog').getByText(/历史补录：本页保留实际执行时间/u).waitFor()
         await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
 }
@@ -727,10 +735,10 @@ export function createDevVersionCenterScenarios({
         assert.equal(await versionTable.getByRole('button', { name: '检查回滚', exact: true }).count(), 0)
         const artifactDetails = page.locator('.erp-dev-version-tab--versions .erp-dev-delivery-inline-details').first()
         assert.equal(await artifactDetails.evaluate((element) => element.open), false)
-        await artifactDetails.getByText('制品信息', { exact: true }).click()
-        await artifactDetails.getByText(/BuildKit/u).waitFor({ state: 'visible' })
-        await artifactDetails.locator('time').waitFor({ state: 'visible' })
-        await artifactDetails.getByText('制品信息', { exact: true }).click()
+        await artifactDetails.getByText('保留与可用性说明', { exact: true }).click()
+        assert.doesNotMatch(await artifactDetails.innerText(), /BuildKit|总大小|Server.*Web/u)
+        await artifactDetails.getByText(/制品齐全/u).waitFor({ state: 'visible' })
+        await artifactDetails.getByText('保留与可用性说明', { exact: true }).click()
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
           0

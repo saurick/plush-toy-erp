@@ -14,6 +14,7 @@ import {
   formatDeliveryPercent,
   shortGitSha,
   summarizePipelineTimings,
+  summarizePipelineStatus,
 } from '../config/devDelivery.mjs'
 
 const { Link, Text, Title } = Typography
@@ -133,7 +134,7 @@ export function DevPipelineStatusStrip({
   operations = [],
   onOpenDetails,
 }) {
-  const summary = summarizePipelineTimings(timings)
+  const summary = summarizePipelineStatus(timings)
   const { latest: latestRun, latestFullRelease } = summary
   const [release = null] = versions
   const deploymentOperation = findLatestTransferredPromotion(operations)
@@ -169,14 +170,20 @@ export function DevPipelineStatusStrip({
                 color={
                   !latestRun
                     ? 'default'
-                    : latestRun.conclusion === 'success'
+                    : latestRun.status !== 'completed'
+                      ? 'processing'
+                      : latestRun.conclusion === 'success'
                       ? 'success'
                       : 'error'
                 }
               >
                 {!latestRun
                   ? '尚无运行'
-                  : latestRun.conclusion === 'success'
+                  : latestRun.status === 'in_progress'
+                    ? '运行中'
+                    : latestRun.status === 'queued'
+                      ? '等待运行'
+                      : latestRun.conclusion === 'success'
                     ? '已通过'
                     : '未通过'}
               </Tag>
@@ -205,7 +212,7 @@ export function DevPipelineStatusStrip({
                 : '未证明'}
             </Text>
             {isGitLabPipeline(latestFullRelease) ? (
-              <Link href={latestFullRelease.url} target="_blank" rel="noreferrer">
+              <Link href={latestFullRelease.url} target="_blank" rel="noopener noreferrer">
                 查看 GitLab 发布记录
               </Link>
             ) : (
@@ -262,6 +269,28 @@ export function DevPipelineStatusStrip({
 }
 
 export default function DevPipelineTimingPanel({ timings, versions = [] }) {
+  const latestRun = timings?.runs?.[0] || null
+  if (isGitLabPipeline(latestRun)) {
+    const failed = summarizePipelineStatus(timings).failureJob
+    return (
+      <Card className="erp-dev-pipeline-timing" variant="borderless">
+        <Title level={2}>{latestRun.workflow === 'release' ? 'GitLab 发布流水线' : 'GitLab CI 流水线'}</Title>
+        <Space wrap>
+          <Text code>{latestRun.gitSha?.slice(0, 12)}</Text>
+          <Tag color={latestRun.conclusion === 'success' ? 'success' : 'warning'}>{latestRun.status === 'in_progress' ? '运行中' : latestRun.status === 'queued' ? '等待运行' : latestRun.conclusion === 'success' ? '通过' : '尚未通过'}</Tag>
+          <Text>总耗时 {formatDeliveryDuration(latestRun.durationMs)}</Text>
+          <Link href={latestRun.url} target="_blank" rel="noopener noreferrer">在 GitLab 查看全部任务与日志</Link>
+          {failed ? <Link href={failed.url} target="_blank" rel="noopener noreferrer">查看失败 Job：{failed.name}</Link> : null}
+        </Space>
+        <p>任务、日志和流水线耗时由 GitLab 提供。备份、迁移、部署读回及各环境历史仍在工作台的操作记录中查看。</p>
+      </Card>
+    )
+  }
+
+  return <LegacyPipelineTimingPanel timings={timings} versions={versions} />
+}
+
+function LegacyPipelineTimingPanel({ timings, versions = [] }) {
   const summary = summarizePipelineTimings(timings)
   const { latest: latestRun, analysisRun } = summary
   const [release = null] = versions
@@ -272,7 +301,6 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
     (job) => job.name === 'Publish immutable artifact set'
   )
   const analysisJobs = analysisRun?.jobs || []
-  const nativeGitlabDetails = isGitLabPipeline(latestRun)
   const [expandedJobIds, setExpandedJobIds] = React.useState([])
 
   React.useEffect(() => {
@@ -294,23 +322,6 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
         ? [...current, jobId]
         : current.filter((currentJobId) => currentJobId !== jobId)
     })
-  }
-
-  if (nativeGitlabDetails) {
-    const failed = latestRun?.jobs?.find((job) => job.conclusion === 'failure')
-    return (
-      <Card className="erp-dev-pipeline-timing" variant="borderless">
-        <Title level={2}>GitLab 发布流水线</Title>
-        <Space wrap>
-          <Text code>{latestRun.gitSha?.slice(0, 12)}</Text>
-          <Tag color={latestRun.conclusion === 'success' ? 'success' : 'warning'}>{latestRun.conclusion === 'success' ? '通过' : '尚未通过'}</Tag>
-          <Text>总耗时 {formatDeliveryDuration(latestRun.durationMs)}</Text>
-          <Link href={latestRun.url} target="_blank" rel="noreferrer">在 GitLab 查看全部任务与日志</Link>
-          {failed ? <Link href={failed.url} target="_blank" rel="noreferrer">查看失败 Job：{failed.name}</Link> : null}
-        </Space>
-        <p>任务、日志和流水线耗时由 GitLab 提供。备份、迁移、部署读回及各环境历史仍在工作台的操作记录中查看。</p>
-      </Card>
-    )
   }
 
   return (
@@ -419,7 +430,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
                 ? `失败原因：${deliveryPipelinePresentation(summary.failureReason.job).label} / ${deliveryPipelinePresentation(summary.failureReason.step).label}`
                 : '最近流水线没有失败步骤'}
             </Text>
-            <Link href={latestRun.url} rel="noreferrer">
+            <Link href={latestRun.url} rel="noopener noreferrer">
               {latestRun.url.includes('github.com')
                 ? '查看 GitHub 运行'
                 : '查看 GitLab pipeline'}
@@ -454,12 +465,7 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
             />
           </div>
 
-          {nativeGitlabDetails ? (
-            <Space className="erp-dev-pipeline-native-details" direction="vertical">
-              <Link href={analysisRun.url} rel="noreferrer">在 GitLab 查看全部任务与日志</Link>
-              <Text type="secondary">此处保留发布复用、关键路径与耗时汇总；原始任务记录由 GitLab 管理。</Text>
-            </Space>
-          ) : analysisJobs.length > 0 ? (
+          {analysisJobs.length > 0 ? (
             <details className="erp-dev-disclosure erp-dev-pipeline-timing__details">
               <summary>
                 查看全部任务与步骤（{String(analysisJobs.length)} 个任务）

@@ -7,8 +7,7 @@ import { fileURLToPath } from "node:url";
 import { projectDevQualityGateServerEvidence } from "../../web/dev-server/devQualityGatePlugin.mjs";
 import { CI_JOB_GUIDES } from "./ci-job-guide.mjs";
 import {
-  buildQualityGateServerDag,
-  buildQualityGateServerTiming,
+  buildQualityGateServerJobGuide,
 } from "../../web/src/dev-workbench/config/devQualityGates.mjs";
 
 const ROOT = path.resolve(
@@ -50,27 +49,13 @@ function providerTiming(jobNames) {
   };
 }
 
-function providerTopology(jobNames) {
-  return {
-    schemaVersion: "plush.delivery-pipeline-topology/v1",
-    gitSha: SHA,
-    jobs: jobNames.map((name, index) => ({
-      name,
-      stage: index === jobNames.length - 1 ? "gate" : "quality",
-      needs: index === 0 ? [] : [jobNames[index - 1]],
-    })),
-  };
-}
-
 test("DEV quality gate projects provider jobs without a synchronized frontend catalog", () => {
   const jobNames = ["setup-renamed", "quality_new_lane", "CI Gate"];
   const evidence = projectDevQualityGateServerEvidence(
     providerTiming(jobNames),
     { commit: SHA, dirty: false },
-    providerTopology(jobNames),
   );
-  const timing = buildQualityGateServerTiming(evidence);
-  const dag = buildQualityGateServerDag(evidence);
+  const timing = buildQualityGateServerJobGuide(evidence);
 
   assert.equal(evidence.status, "failed");
   assert.equal(evidence.coversWorkingTree, false);
@@ -93,12 +78,7 @@ test("DEV quality gate projects provider jobs without a synchronized frontend ca
     timing.flowJobs.map((job) => job.name),
     jobNames,
   );
-  assert(timing.flowJobs.every((job) => job.observed === true));
   assert(timing.flowJobs.every((job) => !("localStageIds" in job)));
-  assert.equal(evidence.topology.status, "available");
-  assert.equal(dag.nodeCount, jobNames.length);
-  assert.equal(dag.edgeCount, jobNames.length - 1);
-  assert.match(dag.chart, /quality_new_lane/u);
   assert.deepEqual(
     evidence.jobs.map(({ name, role, group }) => ({ name, role, group })),
     [
@@ -136,20 +116,16 @@ test("DEV quality gate has no second CI job topology source", () => {
   );
   assert.match(
     plugin,
-    /listPipelineTimings\(\{\s*limit: SERVER_CI_HISTORY_LIMIT,\s*\}\)/u,
+    /listPipelineTimings\(\{\s*limit: SERVER_CI_HISTORY_LIMIT,\s*sha: repository\.commit\s*\}\)/u,
   );
   assert.match(plugin, /CI_STRICT_PIPELINE_SOURCES\.includes\(run\?\.event\)/u);
   assert.match(plugin, /CI_STRICT_JOB_NAMES\.every/u);
   assert.match(
     plugin,
-    /timings\.runs\.some\(\(run\) => run\.gitSha === repository\.commit\)[\s\S]*?sha: repository\.commit/u,
+    /listPipelineHistory\(\{\s*limit: SERVER_CI_HISTORY_LIMIT/u,
   );
   assert.doesNotMatch(plugin, /readPipelineTopology\(/u);
   assert.match(plugin, /readPipelineReports\(\{[\s\S]*?pipelineId: value\.pipeline\.id,[\s\S]*?sha: repository\.commit/u);
-  assert.match(provider, /content_ref: sha/u);
-  assert.match(provider, /\/ci\/lint\?/u);
-  assert.match(provider, /include_jobs/u);
-  assert.match(provider, /dry_run: "false"/u);
   assert.doesNotMatch(
     config,
     /SERVER_CI_JOB_CATALOG|localStageIds|devQualityGateServerPipeline/u,
@@ -158,6 +134,7 @@ test("DEV quality gate has no second CI job topology source", () => {
     page,
     /SERVER_CI_JOB_CATALOG|localStageIds|CI 7 分片|七个固定分片/u,
   );
+  assert.doesNotMatch(provider, /readPipelineTopology|\/ci\/lint/u);
   assert.match(guide, /projectCiJobGuides/u);
   const assertNoRuntimeFields = (value) => {
     if (!value || typeof value !== "object") return;

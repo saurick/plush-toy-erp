@@ -19,6 +19,7 @@ import {
   createDevQualityGatePlugin,
   createDevQualityGateService,
   projectDevQualityGateServerEvidence,
+  loadDevQualityGateServerEvidence,
   resolveDevQualityGateEnvironment,
   validateDevQualityGateAction,
   validateDevQualityGateCancel,
@@ -202,30 +203,7 @@ test('quality gate projects GitLab exact-SHA CI separately from local dirty stat
         },
       ],
     },
-    REPOSITORY,
-    {
-      schemaVersion: 'plush.delivery-pipeline-topology/v1',
-      gitSha: REPOSITORY.commit,
-      jobs: names.map((name) => ({
-        name,
-        stage:
-          name === 'plan'
-            ? 'plan'
-            : name === 'prepare'
-              ? 'prepare'
-              : name === 'quality_aggregate'
-                ? 'aggregate'
-                : name === 'CI Gate'
-                  ? 'gate'
-                  : 'quality',
-        needs:
-          name === 'prepare'
-            ? ['plan']
-            : name === 'CI Gate'
-              ? ['quality_aggregate']
-              : [],
-      })),
-    }
+    REPOSITORY
   )
   assert.equal(evidence.kind, DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND)
   assert.equal(evidence.status, 'passed')
@@ -251,15 +229,10 @@ test('quality gate projects GitLab exact-SHA CI separately from local dirty stat
     'aggregate'
   )
   assert.equal(evidence.history.length, 1)
-  assert.equal(evidence.history[0].result, 'passed')
+  assert.equal(evidence.history[0].result, 'success')
   assert.equal(evidence.history[0].gitSha, REPOSITORY.commit)
-  assert.equal(evidence.history[0].jobs.length, names.length)
-  assert.equal(evidence.history[0].queueMs, 3000)
-  assert.equal(evidence.topology.status, 'available')
-  assert.deepEqual(
-    evidence.topology.jobs.find((job) => job.name === 'CI Gate').needs,
-    ['quality_aggregate']
-  )
+  assert.equal('jobs' in evidence.history[0], false)
+  assert.equal(evidence.historyStatus, 'available')
   assert.match(evidence.message, /不覆盖工作区未提交改动/u)
 })
 
@@ -300,10 +273,9 @@ test('quality gate distinguishes a readable GitLab response from a missing exact
   assert.equal(evidence.pipeline, null)
   assert.deepEqual(evidence.jobs, [])
   assert.deepEqual(evidence.jobGuides, [])
-  assert.equal(evidence.topology.status, 'missing')
   assert.equal(evidence.history.length, 1)
   assert.equal(evidence.history[0].result, 'failed')
-  assert.equal(evidence.history[0].failureJob, 'quality_web')
+  assert.equal(evidence.history[0].result, 'failed')
   assert.match(evidence.message, /GitLab 凭据与 API 读取正常/u)
   assert.match(evidence.message, /尚无绑定当前已提交 SHA/u)
 })
@@ -340,7 +312,7 @@ test('documentation success is visible without granting strict proof or release 
   const evidence = projectEvidence(run)
   assert.equal(evidence.status, 'docs_passed')
   assert.equal(evidence.coversWorkingTree, false)
-  assert.equal(evidence.history[0].result, 'docs_passed')
+  assert.equal(evidence.history[0].result, 'success')
   assert.match(evidence.message, /QA_MODE=full/u)
   assert(evidence.jobGuides.every((guide) => guide.registered))
   assert.equal(
@@ -1393,5 +1365,93 @@ test('server Job timeline preserves upstream timestamps for the latest retry', (
   assert.equal(result.jobs[0].attemptCount, 2)
   assert.equal(result.jobs[0].startedAt, startedAt)
   assert.equal(result.jobs[0].finishedAt, finishedAt)
-  assert.equal(result.history[0].jobs[0].startedAt, startedAt)
+  assert.equal('jobs' in result.history[0], false)
+})
+
+
+function exactCiTimings() {
+  return {
+    schemaVersion: 'plush.delivery-pipeline-timings/v1',
+    runs: [{ id: 91, attempt: 1, workflow: 'ci', event: 'push', gitSha: REPOSITORY.commit,
+      status: 'completed', conclusion: 'success', createdAt: '2026-10-24T01:00:00.000Z',
+      finishedAt: '2026-10-24T01:01:00.000Z', durationMs: 60000, queueMs: 0,
+      url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/91',
+      jobs: CI_STRICT_JOB_NAMES.map((name, index) => ({ id: index + 100, name, status: 'completed', conclusion: 'success' })),
+    }],
+  }
+}
+
+test('light history never grants strict proof; exact SHA retains every required successful job', async () => {
+  const timings = exactCiTimings()
+  const historical = { ...timings.runs[0], id: 99, gitSha: 'b'.repeat(40), url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/99' }
+  const queries = []
+  const provider = {
+    listPipelineTimings: async (query) => { queries.push(query); return timings },
+    listPipelineHistory: async () => [historical],
+    readPipelineReports: async ({ pipeline }) => { assert.strictEqual(pipeline, timings.runs[0]); throw new Error('report temporarily unavailable') },
+  }
+  const result = await loadDevQualityGateServerEvidence(provider, REPOSITORY)
+  assert.equal(result.status, 'passed')
+  assert.equal(result.coversWorkingTree, false)
+  assert.equal(result.history[0].result, 'success')
+  assert.deepEqual(Object.keys(result.history[0]).sort(), ['gitSha', 'id', 'result', 'url'])
+  assert.equal(result.reports.status, 'unavailable')
+  assert.deepEqual(queries, [{ limit: 20, sha: REPOSITORY.commit }])
+  for (const conclusion of ['skipped', 'cancelled', 'failure']) {
+    timings.runs[0].jobs[0].conclusion = conclusion
+    assert.equal((await loadDevQualityGateServerEvidence(provider, REPOSITORY)).status, 'failed', conclusion)
+  }
+  timings.runs[0].jobs[0].conclusion = 'success'
+  timings.runs[0].jobs = timings.runs[0].jobs.filter((job) => job.name !== 'CI Gate')
+  assert.equal((await loadDevQualityGateServerEvidence(provider, REPOSITORY)).status, 'failed')
+  timings.runs[0].gitSha = 'c'.repeat(40)
+  assert.equal((await loadDevQualityGateServerEvidence(provider, REPOSITORY)).status, 'missing')
+})
+
+test('history and report failures stay separate from exact-SHA CI proof', async (t) => {
+  const timings = exactCiTimings()
+  const provider = {
+    listPipelineTimings: async () => timings,
+    listPipelineHistory: async () => { throw new Error('history offline') },
+    readPipelineReports: async () => { throw new Error('reports offline') },
+  }
+  const result = await loadDevQualityGateServerEvidence(provider, { ...REPOSITORY, dirty: false })
+  assert.equal(result.status, 'passed')
+  assert.equal(result.historyStatus, 'unavailable')
+  assert.deepEqual(result.history, [])
+  const root = await project(t)
+  const service = createDevQualityGateService({ projectRoot: root, env: DATABASE_ENV,
+    readRepositoryState: async () => REPOSITORY, readReceipt: () => null, loadServerEvidence: () => result })
+  assert.equal(normalizeDevQualityGateSummary(await service.summary()).serverEvidence.status, 'passed')
+  provider.listPipelineHistory = async () => timings.runs
+  provider.listPipelineTimings = async () => { throw new Error('exact pipeline offline') }
+  const unavailable = await loadDevQualityGateServerEvidence(provider, REPOSITORY)
+  assert.equal(unavailable.status, 'unavailable')
+  assert.equal(unavailable.history.length, 1)
+  assert.equal(unavailable.pipeline, null)
+  assert.equal(unavailable.coversWorkingTree, false)
+})
+
+test('concurrent page reads share one CI request and refreshed repository identity bypasses it', async (t) => {
+  const root = await project(t)
+  let repository = REPOSITORY
+  let calls = 0
+  const response = deferred()
+  const entered = deferred()
+  const service = createDevQualityGateService({ projectRoot: root, env: DATABASE_ENV,
+    readRepositoryState: async () => repository, readReceipt: () => null,
+    loadServerEvidence: async () => { calls += 1; entered.resolve(); return response.promise },
+  })
+  const first = service.summary()
+  const second = service.summary()
+  await entered.promise
+  response.resolve(projectDevQualityGateServerEvidence(exactCiTimings(), repository))
+  const results = await Promise.all([first, second])
+  assert.equal(calls, 1)
+  assert(results.every((result) => normalizeDevQualityGateSummary(result).serverEvidence.status === 'passed'))
+  await service.summary()
+  assert.equal(calls, 1)
+  repository = { ...repository, dirty: false }
+  await service.summary()
+  assert.equal(calls, 2)
 })

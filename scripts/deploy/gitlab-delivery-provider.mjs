@@ -42,8 +42,6 @@ export const GITLAB_LEGACY_RELEASE_ASSETS = LEGACY_DELIVERY_RELEASE_ASSETS;
 export const GITLAB_RELEASE_ASSETS = DELIVERY_RELEASE_ASSETS;
 export const GITLAB_PIPELINE_TIMINGS_CONTRACT =
   "plush.delivery-pipeline-timings/v1";
-export const GITLAB_PIPELINE_TOPOLOGY_CONTRACT =
-  "plush.delivery-pipeline-topology/v1";
 
 const PROJECT_ID = encodeURIComponent(GITLAB_DELIVERY_PROJECT);
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -368,62 +366,6 @@ function normalizeJob(job) {
       Number(job.coverage) <= 100
         ? Number(job.coverage)
         : null,
-  };
-}
-
-function normalizeTopologyNeed(need) {
-  const name =
-    typeof need === "string" ? need : String(need?.name || need?.job || "");
-  return {
-    name: normalizeLabel(name, "CI job dependency"),
-    optional: typeof need === "object" && need?.optional === true,
-  };
-}
-
-function normalizePipelineTopology(value, gitSha) {
-  if (
-    value?.valid !== true ||
-    !Array.isArray(value.jobs) ||
-    value.jobs.length < 1 ||
-    value.jobs.length > 100
-  ) {
-    throw new Error("GitLab pipeline topology response is invalid");
-  }
-  const jobs = value.jobs.map((job) => {
-    const rawNeeds = job?.needs === null ? [] : job?.needs;
-    if (!Array.isArray(rawNeeds) || rawNeeds.length > 100) {
-      throw new Error("GitLab CI job dependencies are invalid");
-    }
-    const needs = rawNeeds.map(normalizeTopologyNeed);
-    if (new Set(needs.map((need) => need.name)).size !== needs.length) {
-      throw new Error("GitLab CI job dependencies are not unique");
-    }
-    return {
-      name: normalizeLabel(job?.name, "CI job"),
-      stage: normalizeLabel(job?.stage, "CI job stage"),
-      needs,
-    };
-  });
-  const names = new Set(jobs.map((job) => job.name));
-  if (
-    names.size !== jobs.length ||
-    jobs.some(
-      (job) =>
-        job.needs.some((need) => need.name === job.name) ||
-        job.needs.some((need) => !need.optional && !names.has(need.name)),
-    )
-  ) {
-    throw new Error("GitLab pipeline topology graph is invalid");
-  }
-  return {
-    schemaVersion: GITLAB_PIPELINE_TOPOLOGY_CONTRACT,
-    gitSha,
-    jobs: jobs.map((job) => ({
-      ...job,
-      needs: job.needs
-        .filter((need) => names.has(need.name))
-        .map((need) => need.name),
-    })),
   };
 }
 
@@ -998,7 +940,26 @@ export function createGitlabDeliveryProvider({
       };
     },
 
-    async readPipelineReports({ pipelineId, sha } = {}) {
+    async listPipelineHistory({ limit = 20 } = {}) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) {
+        throw new Error("GitLab pipeline history limit is invalid");
+      }
+      // Native history is navigation, not proof of the project's strict gate.
+      return (await listPipelines({ limit })).map((run) => {
+        if (!Number.isSafeInteger(run?.id) || run.id < 1 || !SHA_PATTERN.test(run.sha)) {
+          throw new Error("GitLab pipeline history identity is invalid");
+        }
+        return {
+          id: run.id,
+          gitSha: run.sha,
+          status: normalizeStatus(run.status),
+          conclusion: normalizeConclusion(run.status),
+          url: parsePipelineUrl(run.web_url, run.id),
+        };
+      });
+    },
+
+    async readPipelineReports({ pipelineId, sha, pipeline: observedPipeline } = {}) {
       if (
         !Number.isSafeInteger(pipelineId) ||
         pipelineId < 1 ||
@@ -1006,14 +967,14 @@ export function createGitlabDeliveryProvider({
       )
         throw new Error("invalid pipeline report identity");
       const [pipeline, report] = await Promise.all([
-        readPipeline({ id: pipelineId }),
+        observedPipeline || readPipeline({ id: pipelineId }),
         requestJson(
           request,
           env,
           `/projects/${PROJECT_ID}/pipelines/${pipelineId}/test_report_summary`,
         ),
       ]);
-      if (pipeline.gitSha !== sha)
+      if (pipeline.id !== pipelineId || pipeline.gitSha !== sha)
         throw new Error("pipeline report SHA mismatch");
       const total = report?.total;
       const keys = ["count", "success", "failed", "skipped", "error"];
@@ -1051,28 +1012,6 @@ export function createGitlabDeliveryProvider({
               : null,
           })),
       };
-    },
-
-    async readPipelineTopology({ sha } = {}) {
-      if (!SHA_PATTERN.test(String(sha || ""))) {
-        throw new Error("GitLab pipeline topology query is invalid");
-      }
-      const query = new URLSearchParams({
-        content_ref: sha,
-        // Read the exact-SHA job definitions, then let the workbench intersect
-        // them with the observed run. A simulated new push has a different range.
-        dry_run: "false",
-        dry_run_ref: "main",
-        include_jobs: "true",
-      });
-      return normalizePipelineTopology(
-        await requestJson(
-          request,
-          env,
-          `/projects/${PROJECT_ID}/ci/lint?${query.toString()}`,
-        ),
-        sha,
-      );
     },
 
     async getReleaseStatus(gitSha, { pipelineId = null } = {}) {

@@ -183,8 +183,7 @@ export function buildVersionWorkspace({
             }
           >
             <Space wrap style={{ marginBottom: 12 }}>
-              <Link href={historyResult?.operations?.find((operation) => operation.gitlabRecord?.environmentUrl)?.gitlabRecord.environmentUrl || 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments'} rel="noreferrer">GitLab 环境与部署</Link>
-              <Link href="https://gitlab.saurick.me/saurick/plush-toy-erp/-/packages" rel="noreferrer">回执归档</Link>
+              <Link href={historyResult?.operations?.find((operation) => operation.gitlabRecord?.environmentUrl)?.gitlabRecord.environmentUrl || 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/environments'} target="_blank" rel="noopener noreferrer">GitLab 环境部署列表</Link>
               <Text type="secondary">此处保留项目检查、原始时间和恢复操作。</Text>
             </Space>
             <div

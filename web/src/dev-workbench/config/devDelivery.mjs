@@ -1670,6 +1670,25 @@ export function findLatestTransferredPromotion(operations) {
   )
 }
 
+export function summarizePipelineStatus(timings) {
+  const runs = timings?.runs || []
+  const latest = runs[0] || null
+  const latestJobs = new Map()
+  for (const job of latest?.jobs || []) {
+    if (!latestJobs.has(job.name) || latestJobs.get(job.name).id < job.id) latestJobs.set(job.name, job)
+  }
+  return {
+    latest,
+    latestMode: deliveryPipelineRunMode(latest),
+    latestFullRelease: runs.find((run) =>
+      run.status === 'completed' && deliveryPipelineRunMode(run) === 'full_release'
+    ) || null,
+    failureJob: latest?.conclusion === 'failure'
+      ? [...latestJobs.values()].find((job) => job.conclusion === 'failure') || null
+      : null,
+  }
+}
+
 export function summarizePipelineTimings(timings) {
   const runs = timings?.runs || []
   const completed = runs.filter(

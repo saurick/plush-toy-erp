@@ -301,17 +301,9 @@ export function buildCiDiagnosticText({ repository, evidence, job } = {}) {
   ]
   for (const item of selectedJobs) {
     const guide = guides.get(item.name)
-    const dependencies =
-      evidence?.topology?.status === 'available'
-        ? evidence.topology.jobs.find(
-            (definition) => definition.name === item.name
-          )?.needs
-        : null
     lines.push(
       '',
       `Job：${item.name} / ${item.id} / ${item.status} / ${item.conclusion || '无终态'}`,
-      `执行次数：${item.attemptCount ?? '未读取'}；运行 ms：${item.durationMs ?? '未读取'}；排队 ms：${item.queueMs ?? '未读取'}`,
-      `前置依赖：${dependencies ? dependencies.join('、') || '无' : '未读取'}`,
       `日志 URL：${item.url || '未读取'}`,
       ...(guide?.diagnostics
         ? [
@@ -332,54 +324,4 @@ export function buildCiDiagnosticText({ repository, evidence, job } = {}) {
     '修复后核对同一候选的相关检查；提交、推送、发布与部署仍按当前任务授权分别执行。'
   )
   return lines.join('\n')
-}
-
-export function buildCiJobTimeline(jobs = []) {
-  const rows = jobs
-    .flatMap((job) => {
-      if (job.status !== 'completed') {
-        return []
-      }
-      const start =
-        typeof job.startedAt === 'string' ? Date.parse(job.startedAt) : NaN
-      const end =
-        typeof job.finishedAt === 'string' ? Date.parse(job.finishedAt) : NaN
-      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
-        return []
-      }
-      return [{ ...job, start, end }]
-    })
-    .sort((a, b) => a.start - b.start || a.id - b.id)
-  if (!rows.length) {
-    return { rows: [], excludedCount: jobs.length, spanMs: null, peak: null }
-  }
-  const origin = Math.min(...rows.map((row) => row.start))
-  const end = Math.max(...rows.map((row) => row.end))
-  const spanMs = end - origin
-  const events = rows
-    .filter((row) => row.end > row.start)
-    .flatMap((row) => [
-      { at: row.start, delta: 1 },
-      { at: row.end, delta: -1 },
-    ])
-    .sort((a, b) => a.at - b.at || a.delta - b.delta)
-  let active = 0
-  let peak = 0
-  for (const event of events) {
-    active += event.delta
-    peak = Math.max(peak, active)
-  }
-  return {
-    rows: rows.map((row) => ({
-      ...row,
-      offsetMs: row.start - origin,
-      elapsedMs: row.end - row.start,
-      leftPercent: spanMs ? ((row.start - origin) / spanMs) * 100 : 0,
-      widthPercent: spanMs ? ((row.end - row.start) / spanMs) * 100 : 0,
-    })),
-    origin: new Date(origin).toISOString(),
-    excludedCount: jobs.length - rows.length,
-    spanMs,
-    peak,
-  }
 }
