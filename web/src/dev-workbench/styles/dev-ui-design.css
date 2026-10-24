@@ -62,6 +62,10 @@
 .erp-dev-ui-design-toolbar small {
   color: var(--erp-text-muted);
 }
+.erp-dev-ui-design-state-select {
+  width: 256px;
+  max-width: 100%;
+}
 .erp-dev-ui-design-stage {
   position: relative;
   display: flex;

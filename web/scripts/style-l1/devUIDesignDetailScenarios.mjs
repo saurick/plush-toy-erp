@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
+import { chooseUIDesignState, openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { getContrastRatio } from './colorAssertions.mjs'
 import { createDevWorkCenterDesignScenarios } from './devWorkCenterDesignScenarios.mjs'
@@ -668,11 +668,9 @@ export function createDevUIDesignDetailScenarios({
           true
         )
         assert.equal(await frame.getByRole('button', { name: '全部模块', exact: true }).count(), 0)
-        await page.getByRole('button', { name: '状态模拟', exact: true }).click()
-        await page.getByRole('menuitem', { name: '空结果', exact: true }).click()
+        await chooseUIDesignState(page, '空结果')
         await frame.getByText('当前筛选没有记录', { exact: true }).waitFor()
-        await page.getByRole('button', { name: '状态模拟', exact: true }).click()
-        await page.getByRole('menuitem', { name: '正常', exact: true }).click()
+        await chooseUIDesignState(page, '正常')
         await frame.locator('.data-surface').waitFor()
         await frame.locator('.preview-account-trigger').click()
         const account = frame.getByRole('menu', { name: '账号菜单' })

@@ -1,15 +1,11 @@
 import { UI_DESIGN_MOBILE_STATES } from '../../src/dev-workbench/config/devUIDesign.mjs'
+import { chooseUIDesignState as simulate } from './devUIDesignNavigation.mjs'
 
 const frameSelector = 'iframe[title="ERP 最新可交互设计"]'
 
 async function choosePageState(page, label) {
   await page.locator('.erp-page-state-examples .ant-select-selector').click()
   await page.locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
-}
-
-async function simulate(page, label) {
-  await page.getByRole('button', { name: '状态模拟', exact: true }).click()
-  await page.getByRole('menuitem', { name: label, exact: true }).click()
 }
 
 function watchBusinessRequests(page) {
@@ -27,6 +23,63 @@ export function createDevUIPageStateScenarios({ assert, assertNoHorizontalOverfl
   }
   const shared = { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 }
   return [
+    {
+      ...shared,
+      name: 'dev-ui-design-state-select',
+      path: '/__dev/ui-design',
+      verify: async (page) => {
+        const requests = watchBusinessRequests(page)
+        const frame = page.frameLocator(frameSelector)
+        const select = page.locator('.erp-dev-ui-design-state-select')
+        const input = select.getByRole('combobox', { name: '状态模拟', exact: true })
+        await input.waitFor()
+        await frame.getByRole('button', { name: '销售管理', exact: true }).click()
+        assert.equal(await select.locator('.ant-select-selection-placeholder').innerText(), '状态模拟')
+        await simulate(page, '读取失败')
+        await frame.getByRole('button', { name: '重新读取', exact: true }).waitFor()
+        assert.equal(await select.locator('.app-select__label').innerText(), '状态模拟')
+        assert.equal(await select.locator('.ant-select-selection-item').innerText(), '读取失败')
+        await select.locator('.ant-select-selector').click()
+        const popup = page.locator('.ant-select-dropdown:visible')
+        await popup.locator('.ant-select-item-option-content').first().waitFor()
+        assert.equal(await popup.locator('.ant-select-item-option-selected').innerText(), '读取失败')
+        await input.press('Escape')
+        await popup.waitFor({ state: 'hidden' })
+        await frame.getByRole('button', { name: '重新读取', exact: true }).click()
+        await select.locator('.ant-select-selection-item').filter({ hasText: '正常' }).waitFor()
+        await simulate(page, '空结果')
+        await frame.getByText('当前筛选没有记录', { exact: true }).waitFor()
+        await select.locator('.ant-select-clear').click()
+        await frame.locator('.data-surface').waitFor()
+        assert.equal(await select.locator('.ant-select-selection-placeholder').innerText(), '状态模拟')
+        assert.equal(await select.locator('.ant-select-clear').count(), 0)
+        await simulate(page, '无权限')
+        await frame.getByText('当前账号无权查看此页面', { exact: true }).waitFor()
+        await page.getByRole('tab', { name: '设计说明', exact: true }).click()
+        await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+        assert.equal(await select.locator('.ant-select-selection-item').innerText(), '无权限')
+        await page.getByRole('button', { name: /全屏预览/ }).click()
+        await simulate(page, '正常')
+        await select.locator('.ant-select-selector').click()
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').first().waitFor()
+        await input.press('Escape')
+        await page.getByRole('dialog', { name: '交互设计全屏预览', exact: true }).waitFor()
+        await page.getByRole('button', { name: /退出全屏/ }).click()
+        await page.getByRole('button', { name: /重置演示/ }).click()
+        await frame.getByRole('heading', { name: '工作台', exact: true }).waitFor()
+        assert.equal(await select.locator('.ant-select-selection-placeholder').innerText(), '状态模拟')
+        for (const width of [1440, 1280]) {
+          await page.setViewportSize({ width, height: 900 })
+          await simulate(page, '读取失败')
+          assert(await select.locator('.ant-select-selection-item').evaluate((node) => node.scrollWidth <= node.clientWidth + 1), '状态名称不被用途和清空入口截断')
+          await assertNoHorizontalOverflow(page)
+          await select.locator('.ant-select-clear').click()
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await screenshot(page, 'ui-design-state-select')
+        assert.deepEqual(requests, [])
+      },
+    },
     {
       ...shared,
       name: 'dev-ui-page-states-controls',

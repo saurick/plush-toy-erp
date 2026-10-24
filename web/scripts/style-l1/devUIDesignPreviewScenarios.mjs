@@ -1,5 +1,6 @@
 import { UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
+import { chooseUIDesignState } from './devUIDesignNavigation.mjs'
 
 const frameSelector = 'iframe[title="ERP 最新可交互设计"]'
 
@@ -30,6 +31,62 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     if (value === 'workbench') await page.getByText('整体交互预览', { exact: true }).click()
   }
   return [
+    {
+      name: 'dev-ui-design-order-identifiers',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const frame = await waitReady(page)
+        await frame.getByRole('button', { name: '销售管理', exact: true }).click()
+        const checkIdentifiers = async () => {
+          const rows = frame.locator('tbody tr').filter({ has: frame.locator('.copy-value .entity-link') })
+          await rows.first().waitFor()
+          const metrics = await rows.evaluateAll((nodes) => nodes.map((row) => {
+            const link = row.querySelector('.copy-value .entity-link')
+            const copy = link.closest('.copy-value').querySelector(':scope > button')
+            const linkBox = link.getBoundingClientRect()
+            const copyBox = copy.getBoundingClientRect()
+            const cellBox = link.closest('td').getBoundingClientRect()
+            const range = document.createRange()
+            range.selectNodeContents(link)
+            return {
+              number: link.textContent,
+              linkWidth: linkBox.width,
+              textHeight: range.getBoundingClientRect().height,
+              linkHeight: linkBox.height,
+              copyWidth: copyBox.width,
+              copyHeight: copyBox.height,
+              withinCell: linkBox.top >= cellBox.top && linkBox.bottom <= cellBox.bottom && linkBox.right <= copyBox.left && copyBox.right <= cellBox.right,
+              color: getComputedStyle(link).color,
+              expectedColor: getComputedStyle(row).color,
+            }
+          }))
+          assert(metrics.length > 0)
+          for (const metric of metrics) {
+            assert(metric.linkWidth > 100, `订单编号不应套用图标尺寸: ${JSON.stringify(metric)}`)
+            assert(metric.textHeight <= metric.linkHeight + 1 && metric.withinCell, `编号不得溢出或重叠: ${JSON.stringify(metric)}`)
+            assert.equal(metric.copyWidth, 26)
+            assert.equal(metric.copyHeight, 26)
+            assert.equal(metric.color, metric.expectedColor, '订单编号保留主文本颜色')
+          }
+        }
+        await checkIdentifiers()
+        await frame.getByRole('button', { name: '复制 SO-20260918-032', exact: true }).click()
+        await frame.getByRole('button', { name: 'SO-20260918-032', exact: true }).click()
+        await frame.getByRole('dialog').waitFor()
+        await frame.getByRole('button', { name: '关闭', exact: true }).click()
+        await checkIdentifiers()
+        await page.setViewportSize({ width: 1280, height: 800 })
+        await checkIdentifiers()
+        await assertNoHorizontalOverflow(page)
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-order-identifiers-4k.png') })
+        await chooseUIDesignState(page, '边界压力')
+        await frame.locator('.boundary-data-surface').waitFor()
+        await assertNoHorizontalOverflow(page)
+      },
+    },
     {
       name: 'dev-ui-design-help-role-clear',
       path: '/__dev/ui-design?page=help',
@@ -337,7 +394,16 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await waitReady(page)
         assert.equal(await beforeReset.evaluate((node) => node.isConnected), false)
         const search = frame.getByRole('searchbox', { name: '搜索操作图解和参考手册' })
+        const results = frame.locator('#rh-manualResults')
+        const assertSearch = async (draft, submitted) => {
+          await search.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+          assert.equal(await search.inputValue(), draft, '布局重绘保留当前搜索草稿')
+          assert.equal(await search.evaluate((node) => node.defaultValue), submitted, '布局切换不提交搜索草稿')
+          assert.equal(await results.isVisible(), Boolean(submitted))
+          if (submitted) await results.getByRole('heading', { name: `搜索“${submitted}”`, exact: true }).waitFor()
+        }
         await search.fill('采购')
+        await assertSearch('采购', '')
         const frameBeforeExpand = await preview.elementHandle()
         const normalFrame = await preview.boundingBox()
         await page.getByRole('button', { name: /全屏预览/u }).click()
@@ -345,12 +411,27 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         const expandedFrame = await preview.boundingBox()
         assert(expandedFrame.width > normalFrame.width && expandedFrame.height > normalFrame.height, '宿主放大同时增加宽高，不以内容宽度切换代替')
         assert.equal(await frameBeforeExpand.evaluate((node) => node.isConnected), true)
-        assert.equal(await search.inputValue(), '采购', '放大保留当前选择')
+        await assertSearch('采购', '')
+        await page.screenshot({ path: path.join(outputDir, 'ui-preview-help-fullscreen-search-4k.png') })
+        await search.press('Enter')
+        await assertSearch('采购', '采购')
         await search.fill('采购订单')
         await page.getByRole('button', { name: /退出全屏/u }).click()
         await page.getByRole('dialog', { name: '交互设计全屏预览', exact: true }).waitFor({ state: 'hidden' })
-        assert.equal(await search.inputValue(), '采购订单', '放大后仍可交互，退出保留选择')
-        await search.fill('')
+        await assertSearch('采购订单', '采购')
+        for (const width of [1280, 1920]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await assertSearch('采购订单', '采购')
+          await assertNoHorizontalOverflow(page)
+        }
+        await page.screenshot({ path: path.join(outputDir, 'ui-preview-help-restored-search-4k.png') })
+        await search.press('Escape')
+        await assertSearch('采购', '采购')
+        await search.locator('xpath=..').getByRole('button', { name: '清除搜索', exact: true }).click()
+        await assertSearch('', '')
+        await search.fill('未提交的修改')
+        await frame.getByRole('tab', { name: '业务使用手册', exact: true }).click()
+        await assertSearch('', '')
         await page.getByRole('button', { name: /全屏预览/u }).click()
         await page.getByRole('dialog', { name: '交互设计全屏预览', exact: true }).waitFor()
         await search.press('Escape')

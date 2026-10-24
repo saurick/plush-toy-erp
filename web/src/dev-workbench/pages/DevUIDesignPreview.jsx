@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { DownloadOutlined, FullscreenOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Result, Space } from 'antd'
+import { Button, Result, Space } from 'antd'
 import { Link } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
+import Select from '@/common/components/select/AppSelect'
 import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
 import { getUIDesignStateOptions, prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
@@ -12,7 +13,9 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
   const [previewRevision, setPreviewRevision] = useState(0)
   const previewId = `${page}-${previewRevision}`
   const [previewState, setPreviewState] = useState(null)
+  const [simulationState, setSimulationState] = useState(null)
   const previewStatus = previewState?.id === previewId ? previewState.status : 'loading'
+  const simulationValue = simulationState?.id === previewId ? simulationState.value : undefined
   const stateOptions = getUIDesignStateOptions(page)
   const frameRef = useRef(null)
   const readerRef = useRef(null)
@@ -24,6 +27,7 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
 
   useEffect(() => {
     if (!active) return undefined
+    setSimulationState((current) => current?.id === previewId ? current : { id: previewId, value: undefined })
     const frame = frameRef.current
     let timeout
     const finish = (status, reason) => {
@@ -42,11 +46,17 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
       frame?.contentWindow?.postMessage({ type: 'ui-design-preview-check', previewId }, '*')
     }
     const onMessage = (event) => {
+      if (event.source !== frame?.contentWindow || event.data?.previewId !== previewId) return
+      if (event.data.type === 'ui-design-data-state-change') {
+        if (!getUIDesignStateOptions(page).some(({ key }) => key === event.data.value)) return
+        setSimulationState((current) => current?.id === previewId && current.value !== undefined && current.value !== event.data.value
+          ? { id: previewId, value: event.data.value }
+          : current)
+        return
+      }
       if (
         document.hidden ||
-        event.source !== frame?.contentWindow ||
-        event.data?.type !== 'ui-design-preview-status' ||
-        event.data.previewId !== previewId ||
+        event.data.type !== 'ui-design-preview-status' ||
         !['ready', 'failed'].includes(event.data.status)
       ) return
       finish(event.data.status, event.data.reason)
@@ -61,7 +71,7 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
       document.removeEventListener('visibilitychange', check)
       frame?.removeEventListener('load', check)
     }
-  }, [active, previewId])
+  }, [active, page, previewId])
 
   useEffect(() => {
     if (!active) setFullscreen(false)
@@ -99,7 +109,7 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
       if (event.key !== 'Tab') return
       const controls = [
         ...reader.querySelectorAll(
-          'button:not([disabled]),iframe,[data-design-focus-guard]'
+          'button:not([disabled]),[role="combobox"]:not(:disabled),iframe,[data-design-focus-guard]'
         ),
       ]
       const first = controls[0]
@@ -157,18 +167,21 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
         {pageSelector}
         <Space wrap>
           {stateOptions.length ? (
-            <Dropdown
-              trigger={['click']}
+            <Select
+              label="状态模拟"
+              placeholder="状态模拟"
+              className="erp-dev-ui-design-state-select"
+              disabled={previewStatus !== 'ready'}
+              value={simulationValue}
+              options={stateOptions.map(({ key, label }) => ({ value: key, label }))}
               getPopupContainer={(trigger) => trigger.parentElement}
-              menu={{
-                items: stateOptions,
-                onClick: ({ key }) => frameRef.current?.contentWindow?.postMessage(
-                  { type: 'ui-design-data-state', value: key }, '*'
-                ),
+              onChange={(value) => {
+                setSimulationState({ id: previewId, value })
+                frameRef.current?.contentWindow?.postMessage(
+                  { type: 'ui-design-data-state', value: value ?? 'data' }, '*'
+                )
               }}
-            >
-              <Button disabled={previewStatus !== 'ready'}>状态模拟</Button>
-            </Dropdown>
+            />
           ) : null}
           {stateOptions.length ? <Link to="/__dev/ui-design?page=controls&control=empty">页面状态样例</Link> : null}
           {['task-handling', 'mobile-tasks'].includes(page) ? <TaskFulfillmentGuideButton /> : null}

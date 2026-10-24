@@ -1734,9 +1734,9 @@
     .batch-hint { color: var(--text-3); font-size: 11px; }
     .copy-value { min-width: 0; display: flex; align-items: center; gap: 6px; }
     .copy-value > span { min-width: 0; overflow-wrap: anywhere; }
-    .copy-value button { width: 26px; height: 26px; flex: 0 0 auto; display: inline-grid; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-3); }
-    .copy-value button:hover, .copy-value button:focus-visible { border-color: var(--line-strong); background: var(--surface-muted); color: var(--brand-strong); }
-    .copy-value button svg { width: 14px; height: 14px; }
+    .copy-value > button { width: 26px; height: 26px; flex: 0 0 auto; display: inline-grid; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-3); }
+    .copy-value > button:hover, .copy-value > button:focus-visible { border-color: var(--line-strong); background: var(--surface-muted); color: var(--brand-strong); }
+    .copy-value > button svg { width: 14px; height: 14px; }
     .product-cell { display: flex; align-items: center; gap: 9px; }
     .product-cell > span:last-child { min-width: 0; }
     .product-art { width: 100%; height: 100%; display: block; }
@@ -15643,7 +15643,7 @@ return {orders,financeCustomers};})();
       const active=strip.querySelector('[aria-selected="true"]');strip.style.setProperty('--manual-left',active.offsetLeft+'px');strip.style.setProperty('--manual-width',active.offsetWidth+'px');
       byId('manualDirectory').setAttribute('aria-expanded',String(showDirectory));byId('manualDirectory').hidden=searching||(wide&&!directoryCollapsed);byId('manualDirectoryCollapse').textContent=wide?'收起目录':'返回正文';byId('manualRoleTools').hidden=!home;byId('manualDownload').hidden=!isReference||searching;byId('manualHome').hidden=!home;if(home)byId('manualHome').innerHTML=`<h2>你想完成什么？</h2><p>按${esc(role().label)}常用工作推荐</p><nav aria-label="推荐办事场景">${role().scenes.map(s=>`<button type="button" data-scene="${esc(s.key)}"><strong>${esc(custom[s.key]?.title||s.title)}</strong><span>${esc(s.description)}</span></button>`).join('')}</nav><h3>从这里系统了解</h3>${handbookIntroductions.filter(c=>['handbook:start','handbook:roles','handbook:problems'].includes(c.id)).map(c=>`<button type="button" data-manual-reference="${c.id}">${esc(c.title)} →</button>`).join('')}`;
 
-      byId('manualSearch').defaultValue=state.query;byId('manualSearch').placeholder=wide?'搜索操作、字段或问题':'搜索帮助内容';if(byId('manualSearch').value!==state.query)byId('manualSearch').value=state.query;
+      byId('manualSearch').placeholder=wide?'搜索操作、字段或问题':'搜索帮助内容';
       byId('businessChain').hidden=isReference||searching||home;root().querySelector('.view-tabs').hidden=isReference||searching||home;byId('viewBody').hidden=isReference||searching||home;
       byId('manualReference').hidden=!isReference||searching;byId('manualResults').hidden=!searching;byId('manualGuideLinks').hidden=isReference||searching||home;byId('entryButton').hidden=searching||home||Boolean((ref?.sections||ref?.projectHTML)&&isReference);
       root().querySelector('.page-heading').hidden=searching||home;root().querySelector('.article').hidden=searching||home;
@@ -15661,7 +15661,12 @@ return {orders,financeCustomers};})();
         byId('manualResults').innerHTML=`<h3>搜索“${esc(state.query.trim())}”</h3><p role="status">找到 ${found.length} 条操作图解和参考说明</p>${found.length?found.map(doc=>`<button type="button" ${doc.kind==='guide'?'data-scene':'data-manual-reference'}="${esc(doc.id)}"><small>${doc.kind==='guide'?'操作图解':'参考手册'}</small><strong>${esc(doc.title)}</strong><span>${esc(doc.summary)}</span></button>`).join(''):'<p>没有找到相关说明。可尝试单据名称、字段名称，或打开目录查阅。</p>'}`;
       }
     }
-    function render(){const emptyRole=!role();root().classList.toggle('help-role-empty',emptyRole);byId('manualRoleEmpty').hidden=!emptyRole;if(emptyRole){renderPicker('roleSelect');byId('manualRoleTools').hidden=false;return;}const p=specification();byId('sceneDescription').hidden=false;renderNavigation();byId('sceneTitle').textContent=p.title;byId('sceneDescription').textContent=p.description;root().querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===state.view)));byId('viewBody').innerHTML=namespace((state.view==='result'?resultView():state.view==='exception'?exceptionView():guideView())+(state.view==='guide'?`<section class="help-step-checks"><h3>怎样算办成了</h3><p>${esc(scene().completion)}</p><h3>完成后交给谁</h3><p>${esc(scene().handoff)}</p><details><summary>卡住时看这里</summary><p>${esc(scene().exception.trigger)}</p><p>${esc(scene().exception.action)}</p></details></section>`:''));byId('viewBody').dataset.scene=state.scene;byId('viewBody').dataset.view=state.view;renderChain();paintPoints();renderManual();}
+    function render(){
+      const emptyRole=!role();root().classList.toggle('help-role-empty',emptyRole);byId('manualRoleEmpty').hidden=!emptyRole;if(emptyRole){renderPicker('roleSelect');byId('manualRoleTools').hidden=false;return;}
+      // 仅帮助状态更新同步查询；布局重绘保留输入框中的搜索草稿。
+      const search=byId('manualSearch');search.defaultValue=state.query;search.value=state.query;
+      const p=specification();byId('sceneDescription').hidden=false;renderNavigation();byId('sceneTitle').textContent=p.title;byId('sceneDescription').textContent=p.description;root().querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===state.view)));byId('viewBody').innerHTML=namespace((state.view==='result'?resultView():state.view==='exception'?exceptionView():guideView())+(state.view==='guide'?`<section class="help-step-checks"><h3>怎样算办成了</h3><p>${esc(scene().completion)}</p><h3>完成后交给谁</h3><p>${esc(scene().handoff)}</p><details><summary>卡住时看这里</summary><p>${esc(scene().exception.trigger)}</p><p>${esc(scene().exception.action)}</p></details></section>`:''));byId('viewBody').dataset.scene=state.scene;byId('viewBody').dataset.view=state.view;renderChain();paintPoints();renderManual();
+    }
 
       state=normalize({});
       return {
@@ -17046,6 +17051,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     });
 
     function renderView() {
+      if (window.parent !== window) window.parent.postMessage({
+        type: 'ui-design-data-state-change',
+        previewId: window.__ERP_UI_DESIGN_PREVIEW_ID__,
+        value: state.page === 'mobile-tasks' ? state.mobilePreviewState : state.previewState,
+      }, '*');
       if (state.page !== 'entity-form') { formFullscreen = false; syncFormFullscreen(); }
       if(state.page!=='permissions'&&state.permissionFullscreen){state.permissionFullscreen=false;syncPermissionFullscreen();}
       roleHelpPreview.unmount();
