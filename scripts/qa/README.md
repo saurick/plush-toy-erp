@@ -135,7 +135,7 @@ GitLab CI 历史不写入上述本地 operation 目录。
 
 `ci-native-reports.mjs` 将同一次执行的结果交给 GitLab，不再次运行测试：Node / resource lanes 和 Web 使用 Node 原生 JUnit reporter；Web 同时采集 LCOV 并转换为仓库相对路径的 Cobertura；Go test 的 JSON 与 coverprofile 分别转换为 JUnit 和 Cobertura。Web 数值是已加载源文件的行覆盖，Go 数值是测试包语句覆盖，分别展示，不视为整仓或业务验收比例。数据库、浏览器与专项发布回执仍走原有门禁合同，JUnit 不替代零 skip、真实执行数、exact SHA 或清理读回。
 
-Node JUnit 保留原生 start/result 名称对应关系，使用仓库相对文件、行号和同名出现序号作为 `classname`，避免重复用例被 GitLab 合并。回归覆盖嵌套同名、失败、跳过及有效层级；发布验收同时核对 GitLab 实际解析数量，不能仅凭报告上传成功判断接入完成。
+Node JUnit 保留原生 start/result 名称对应关系，使用仓库相对文件、行号和同名出现序号作为 `classname`，避免重复用例被 GitLab 合并。Web LCOV 路径按实际测试进程的 `web/` 工作目录解析，再转换为仓库相对路径，供 GitLab 对应源码行。回归覆盖嵌套同名、失败、跳过、有效层级和子目录执行；发布验收同时核对 GitLab 实际解析数量及覆盖文件路径，不能仅凭报告上传成功判断接入完成。
 
 产出 Job 的 `artifacts:when:always` 上传原生报告，失败测试仍可查；`coverage` 与 `reports:coverage_report` 分别接入数值和逐行注释，沿用 90 天 CI 制品保留。报告未产生、解析失败、读取失败与制品过期分别显示，旧流水线不会补造报告。关键发布/部署记录及已归档证据继续长期保留。
 

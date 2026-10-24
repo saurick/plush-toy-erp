@@ -47,7 +47,7 @@ test("native Node reporters publish the same execution including failed and skip
       path.join(root, "web/src/case.test.mjs"),
       path.join(root, "web/src/other.test.mjs"),
     ],
-    { cwd: root, env, encoding: "utf8" },
+    { cwd: path.join(root, "web"), env, encoding: "utf8" },
   );
   assert.equal(result.status, 1);
   assert.match(result.stdout, /# tests 7/u);
@@ -56,9 +56,9 @@ test("native Node reporters publish the same execution including failed and skip
     "utf8",
   );
   assert.match(junit, /pass &amp; escape/u);
-  assert.match(junit, /classname="web\/src\/case\.test\.mjs:1 \[1\]"/u);
-  assert.match(junit, /classname="web\/src\/other\.test\.mjs:1 \[1\]"/u);
-  assert.match(junit, /classname="web\/src\/other\.test\.mjs:1 \[2\]"/u);
+  assert.match(junit, /classname="src\/case\.test\.mjs:1 \[1\]"/u);
+  assert.match(junit, /classname="src\/other\.test\.mjs:1 \[1\]"/u);
+  assert.match(junit, /classname="src\/other\.test\.mjs:1 \[2\]"/u);
   assert.doesNotMatch(junit, /<\/?undefined\b/u);
   const cases = [...junit.matchAll(/<testcase\s+([^>]+)>?/gu)].map((match) => {
     const name = /\bname="([^"]+)"/u.exec(match[1])[1];
@@ -75,6 +75,7 @@ test("native Node reporters publish the same execution including failed and skip
       "utf8",
     ),
     root,
+    path.join(root, "web"),
   );
   assert.deepEqual([...lines.keys()], ["web/src/value.mjs"]);
   assert.match(cobertura(lines).xml, /filename="web\/src\/value.mjs"/u);
@@ -129,6 +130,10 @@ test("coverage is source-relative, merged by line and preserves the Go statement
   assert.throws(
     () => lcovLines("SF:/outside/file.mjs\nDA:1,1", "/repo"),
     /outside/u,
+  );
+  assert.deepEqual(
+    [...lcovLines("SF:src/value.mjs\nDA:1,1", "/repo", "/repo/web").keys()],
+    ["web/src/value.mjs"],
   );
   assert.throws(() => cobertura(new Map()), /no executable/u);
   assert.throws(() => nativeNodeReportArgs("/repo", "../escape"), /invalid/u);

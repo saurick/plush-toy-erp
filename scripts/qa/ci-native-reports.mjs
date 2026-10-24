@@ -56,12 +56,12 @@ function relativeSource(root, file) {
   return relative;
 }
 
-export function lcovLines(source, root) {
+export function lcovLines(source, root, cwd = root) {
   const files = new Map();
   let lines;
   for (const row of source.split(/\r?\n/u)) {
     if (row.startsWith("SF:")) {
-      const file = relativeSource(root, row.slice(3));
+      const file = relativeSource(root, path.resolve(cwd, row.slice(3)));
       lines = files.get(file) || new Map();
       files.set(file, lines);
     } else if (row.startsWith("DA:")) {
@@ -198,7 +198,11 @@ function run() {
       { cwd: path.join(ROOT, "web"), stdio: "inherit" },
     );
     const report = cobertura(
-      lcovLines(readFileSync(`${directory}/coverage/web.lcov`, "utf8"), ROOT),
+      lcovLines(
+        readFileSync(`${directory}/coverage/web.lcov`, "utf8"),
+        ROOT,
+        path.join(ROOT, "web"),
+      ),
     );
     writeFileSync(`${directory}/coverage/web.xml`, report.xml);
     writeFileSync(`${directory}/coverage/web.summary.json`, JSON.stringify({ percent: report.percent }));
