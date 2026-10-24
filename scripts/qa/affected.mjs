@@ -870,6 +870,23 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "T4",
       );
     }
+    if ([
+      "web/src/dev-workbench/components/WorkbenchPattern.jsx",
+      "web/src/dev-workbench/components/DevWorkbenchStandards.jsx",
+      "web/src/dev-workbench/styles/dev-workbench-pattern.css",
+      "web/src/dev-workbench/styles/dev-workbench-standards.css",
+      "web/src/dev-workbench/styles/dev-ui-design.css",
+      "web/src/dev-workbench/pages/DevUIDesignPage.jsx",
+      "web/scripts/style-l1/devWorkbenchPatternScenarios.mjs",
+    ].includes(file)) {
+      addNodeTests(state, [
+        "web/src/dev-workbench/config/devUIDesign.test.mjs",
+        "web/src/dev-workbench/styles/dev-quality-gates.test.mjs",
+      ], file, "T5");
+      addFollowUp(state, "browser-regression", "T5",
+        "运行 STYLE_L1_SCENARIOS=dev-workbench-patterns-desktop-light,dev-testing-report-layout-desktop-light,dev-quality-gates-layout-desktop-light,dev-server-verification-layout-desktop-light pnpm --dir web style:l1，完成统一样板与真实消费者的搜索恢复、失败重试、证据时效及桌面布局验收；设计样板不得调用写接口。",
+        file);
+    }
     if (WORK_CENTER_SAMPLE_SOURCES.has(file)) {
       addNodeTests(
         state,

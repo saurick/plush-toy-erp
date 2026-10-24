@@ -1,41 +1,116 @@
-.erp-dev-verification-evidence {
-  display: grid;
-  gap: 12px;
-  margin-block-end: 20px;
-}
-
-.erp-dev-verification-evidence__heading,
-.erp-dev-verification-evidence__ci {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.erp-dev-verification-evidence__heading {
-  justify-content: space-between;
-}
-
-.erp-dev-verification-evidence__heading h2,
-.erp-dev-verification-evidence__context,
+.erp-dev-verification-evidence__notice,
+.erp-dev-verification-evidence__boundary,
+.erp-dev-verification-evidence__placeholder p,
 .erp-dev-verification-evidence__details p {
   margin: 0;
 }
 
-.erp-dev-verification-evidence__heading h2 {
-  font-size: var(--font-size-lg, 16px);
+.erp-dev-verification-evidence__version-note,
+.erp-dev-verification-evidence__boundary,
+.erp-dev-verification-evidence__placeholder {
+  color: var(--erp-text-muted);
 }
 
 .erp-dev-verification-evidence__context {
-  color: var(--erp-text-muted);
+  padding-block-end: 10px;
+  border-block-end: 1px solid var(--erp-border);
+}
+
+.erp-dev-verification-evidence__body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  align-items: start;
+}
+
+.erp-dev-verification-evidence__placeholder {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-dev-verification-evidence__ci > .erp-dev-quality-server-evidence {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.erp-dev-verification-evidence__ci .erp-dev-quality-server-evidence > .ant-btn {
+  justify-self: start;
+}
+
+.erp-dev-verification-evidence__table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+
+.erp-dev-verification-evidence__target-column {
+  width: 112px;
+}
+
+.erp-dev-verification-evidence__check-column {
+  width: 82px;
+}
+
+.erp-dev-verification-evidence__record-column {
+  width: 100px;
+}
+
+.erp-dev-verification-evidence__table th,
+.erp-dev-verification-evidence__table td {
+  padding: 8px 10px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-verification-evidence__table .ant-tag {
+  margin-inline-end: 0;
+  white-space: nowrap;
+}
+
+.erp-dev-verification-evidence__table .ant-btn-link {
+  height: auto;
+  padding: 0;
+  font-size: inherit;
+}
+
+.erp-dev-verification-evidence__receipt-row > td {
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-dev-verification-evidence__details {
   display: grid;
   gap: 8px;
-  padding-block: 12px;
-  min-width: 280px;
-  max-width: 520px;
+  min-width: 0;
+  padding: 4px;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.erp-dev-verification-evidence__details ul,
+.erp-dev-verification-evidence__details ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 4px 24px;
+  margin: 0;
+  padding-inline-start: 20px;
+}
+
+.erp-dev-verification-evidence__boundary {
+  padding-block-start: 10px;
+  border-block-start: 1px solid var(--erp-border);
+}
+
+@media (min-width: 1600px) {
+  .erp-dev-verification-evidence__body {
+    grid-template-columns: minmax(300px, 1fr) minmax(800px, 2fr);
+    gap: 24px;
+  }
+
+  .erp-dev-verification-evidence__targets {
+    padding-inline-start: 24px;
+    border-inline-start: 1px solid var(--erp-border);
+  }
 }

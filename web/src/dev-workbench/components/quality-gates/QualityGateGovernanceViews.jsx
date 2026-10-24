@@ -13,6 +13,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SearchInput from '@/common/components/SearchInput'
+import { WorkbenchEmpty, WorkbenchNotice, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import { formatQualityGateDuration } from '../../config/devQualityGates.mjs'
 import {
   SECURITY_GUIDE_HREF,
@@ -141,8 +142,8 @@ export function GovernanceView({
   ]
 
   return (
-    <div className="erp-dev-quality-governance-view">
-      <div className="erp-dev-quality-view-tools">
+    <WorkbenchSection flat className="erp-dev-quality-governance-view" aria-label="门禁目录结果">
+      <WorkbenchToolbar className="erp-dev-quality-view-tools">
         <div className="erp-dev-quality-view-search">
           <SearchInput
             allowClear
@@ -158,7 +159,7 @@ export function GovernanceView({
           value={values.filter}
           onChange={onFilter}
         />
-      </div>
+      </WorkbenchToolbar>
       {error ? (
         <Alert
           type="error"
@@ -180,23 +181,16 @@ export function GovernanceView({
             loading || error ? (
               '尚未取得门禁目录'
             ) : (
-              <div className="erp-dev-quality-empty">
-                <Text>
-                  {data?.changedCount === 0 &&
-                  values.filter === 'relevant' &&
-                  !values.q
-                    ? '当前没有待核对的改动'
-                    : '当前筛选下没有相关门禁'}
-                </Text>
-                {values.filter !== 'all' || values.q ? (
-                  <Button
-                    type="link"
-                    onClick={() => (values.q ? onSearch('') : onFilter('all'))}
-                  >
+              <WorkbenchEmpty
+                className="erp-dev-quality-empty"
+                title={data?.changedCount === 0 && values.filter === 'relevant' && !values.q
+                  ? '当前没有待核对的改动' : '当前筛选下没有相关门禁'}
+                action={values.filter !== 'all' || values.q ? (
+                  <Button type="link" onClick={() => values.q ? onSearch('') : onFilter('all')}>
                     {values.q ? '清除搜索' : '查看全部门禁'}
                   </Button>
                 ) : null}
-              </div>
+              />
             ),
         }}
         expandable={{ expandedRowRender: renderGovernanceEvidence }}
@@ -249,7 +243,7 @@ export function GovernanceView({
         ) : null}
         <SecurityGuideLink />
       </div>
-    </div>
+    </WorkbenchSection>
   )
 }
 
@@ -264,8 +258,8 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
       ? '当前筛选下没有高风险匹配项'
       : '当前改动没有匹配门禁'
   return (
-    <div className="erp-dev-quality-gaps-view">
-      <div className="erp-dev-quality-view-tools">
+    <WorkbenchSection flat className="erp-dev-quality-gaps-view" aria-label="改动缺口结果">
+      <WorkbenchToolbar className="erp-dev-quality-view-tools">
         <Segmented
           aria-label="改动范围"
           options={GAP_RANGE_OPTIONS}
@@ -278,7 +272,7 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
           value={values.risk}
           onChange={onRisk}
         />
-      </div>
+      </WorkbenchToolbar>
       {error ? (
         <Alert
           type="error"
@@ -293,11 +287,10 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
         </Spin>
       ) : null}
       {data && !loading && !error && !data.matched ? (
-        <Alert
+        <WorkbenchNotice
           className="erp-dev-quality-gap-empty"
-          type={noChanges || values.risk === 'high' ? 'info' : 'warning'}
-          showIcon
-          message={emptyTitle}
+          tone={noChanges || values.risk === 'high' ? 'info' : 'warning'}
+          title={emptyTitle}
           description={
             noChanges
               ? '此范围暂无需要比对的文件；服务器 CI 与当前执行端的诊断记录可分别查看。'
@@ -375,6 +368,6 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
       <div className="erp-dev-quality-view-footnote">
         <SecurityGuideLink />
       </div>
-    </div>
+    </WorkbenchSection>
   )
 }

@@ -1,9 +1,10 @@
 import React from 'react'
 import { StopOutlined } from '@ant-design/icons'
-import { Alert, Button, Progress, Space, Tag, Typography } from 'antd'
+import { Button, Progress, Space, Tag, Typography } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import DevTimestamp from '../DevTimestamp.jsx'
+import { WorkbenchFacts, WorkbenchNotice, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import {
   DEV_QUALITY_GATE_ACTIVE_STATUSES,
   formatQualityGateDuration,
@@ -40,8 +41,8 @@ export function LocalDiagnosticsActions({
   onStart,
 }) {
   return (
-    <section className="erp-dev-quality-actions" aria-label="本机质量诊断操作">
-      <div className="erp-dev-quality-actions__buttons">
+    <WorkbenchSection className="erp-dev-quality-actions" aria-label="本机质量诊断操作">
+      <WorkbenchToolbar className="erp-dev-quality-actions__buttons">
         <label htmlFor="quality-diagnostic-profile">诊断范围</label>
         <Select
           allowClear={
@@ -85,7 +86,7 @@ export function LocalDiagnosticsActions({
               : '运行环境未就绪'}
           </Tag>
         ) : null}
-      </div>
+      </WorkbenchToolbar>
       <div className="erp-dev-quality-actions__environment">
         <Text type="secondary">
           {profile === 'strict'
@@ -102,7 +103,7 @@ export function LocalDiagnosticsActions({
         ) : null}
       </div>
       <ManagedDatabaseLifecycleGuide />
-    </section>
+    </WorkbenchSection>
   )
 }
 
@@ -178,7 +179,7 @@ export function RunView({
 
   return (
     <div className="erp-dev-quality-run-view">
-      <section className="erp-dev-quality-operation" aria-live="polite">
+      <WorkbenchSection className="erp-dev-quality-operation" aria-live="polite" aria-label="诊断结果与执行轨道">
         {operation ? (
           <>
             <div className="erp-dev-quality-operation__heading">
@@ -218,26 +219,14 @@ export function RunView({
                 </Button>
               ) : null}
             </div>
-            <div className="erp-dev-quality-operation__facts">
-              <div>
-                <Text type="secondary">已运行 / 总耗时</Text>
-                <Text strong>
-                  {formatQualityGateDuration(operationDuration(operation))}
-                </Text>
-              </div>
-              <div>
-                <Text type="secondary">当前阶段</Text>
-                <Text strong>{currentStageLabel(stages, operation)}</Text>
-              </div>
-              <div>
-                <Text type="secondary">
-                  {DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
-                    ? '预计剩余'
-                    : '运行状态'}
-                </Text>
-                <Text strong>{estimatedRemaining(summary, operation)}</Text>
-              </div>
-            </div>
+            <WorkbenchFacts
+              className="erp-dev-quality-operation__facts"
+              items={[
+              { label: '已运行 / 总耗时', value: formatQualityGateDuration(operationDuration(operation)) },
+              { label: '当前阶段', value: currentStageLabel(stages, operation) },
+              { label: DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status) ? '预计剩余' : '运行状态', value: estimatedRemaining(summary, operation) },
+            ]}
+            />
             <Progress
               percent={progress}
               status={
@@ -250,17 +239,10 @@ export function RunView({
               aria-label={`${getQualityGateProfileLabel(operation.profile, standalone)}进度 ${progress}%`}
             />
             {operation.firstFailure ? (
-              <Alert
-                type="error"
-                showIcon
-                message={
-                  <Space size={[12, 2]} wrap>
-                    <Text strong>第一失败：{operation.firstFailure}</Text>
-                    <Text>
-                      请先修复第一失败阶段，再重新运行；页面不会自动重试。
-                    </Text>
-                  </Space>
-                }
+              <WorkbenchNotice
+                tone="error"
+                title={`第一失败：${operation.firstFailure}`}
+                description="请先修复第一失败阶段，再重新运行；页面不会自动重试。"
               />
             ) : null}
           </>
@@ -284,9 +266,9 @@ export function RunView({
           standalone={standalone}
         />
         {operation ? <TechnicalDetails operation={operation} /> : null}
-      </section>
+      </WorkbenchSection>
 
-      <section
+      <WorkbenchSection
         className="erp-dev-quality-history"
         aria-labelledby="quality-history-title"
       >
@@ -311,7 +293,7 @@ export function RunView({
           locale={{ emptyText: '尚无运行记录' }}
           scroll={{ x: 900 }}
         />
-      </section>
+      </WorkbenchSection>
 
       <Text type="secondary" className="erp-dev-quality-action-status">
         {actionProfile

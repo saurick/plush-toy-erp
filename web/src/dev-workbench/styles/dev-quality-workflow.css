@@ -176,23 +176,6 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-testing-coverage-summary {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-}
-
-.erp-dev-testing-coverage-summary > span:first-child {
-  color: var(--erp-text);
-}
-
-.erp-dev-testing-coverage-summary > :last-child {
-  margin-inline-start: auto;
-}
-
 .erp-dev-testing-coverage-last-run {
   display: grid;
   gap: 8px;
@@ -828,19 +811,6 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 10px;
-}
-
-.erp-dev-testing-coverage-toolbar {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.erp-dev-testing-coverage-toolbar .erp-dev-testing-coverage-actions {
-  margin: 0;
 }
 
 .erp-dev-testing-coverage-tabs {

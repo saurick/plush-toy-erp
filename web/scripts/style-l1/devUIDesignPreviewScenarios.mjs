@@ -27,6 +27,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     const popup = page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id=${JSON.stringify(listId)}]`) })
     await popup.getByText(label, { exact: true }).click()
     await popup.waitFor({ state: 'hidden' })
+    if (value === 'workbench') await page.getByText('整体交互预览', { exact: true }).click()
   }
   return [
     {
@@ -108,7 +109,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     },
     {
       name: 'dev-ui-design-workbench-navigation-sync',
-      path: '/__dev/ui-design?page=workbench',
+      path: '/__dev/ui-design?page=workbench&workbenchMode=preview',
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {

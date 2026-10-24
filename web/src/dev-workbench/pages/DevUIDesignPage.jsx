@@ -7,6 +7,7 @@ import Select from '@/common/components/select/AppSelect'
 import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import Tabs from '@/common/components/navigation/SlidingTabs'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
 import DevPageNav from '../components/DevPageNav.jsx'
 import { resolveUIDesignPreviewPage, UI_DESIGN_PREVIEW_PAGES } from '../config/devUIDesign.mjs'
 
@@ -18,6 +19,9 @@ const DevUIDesignReading = lazyWithDynamicImportRetry(
 )
 const DevControlStandards = lazyWithDynamicImportRetry(
   () => import('../components/DevControlStandards.jsx')
+)
+const DevWorkbenchStandards = lazyWithDynamicImportRetry(
+  () => import('../components/DevWorkbenchStandards.jsx')
 )
 
 const VIEWS = [
@@ -37,9 +41,12 @@ export default function DevUIDesignPage() {
     ? requestedView
     : 'preview'
   const controlsVisible = previewPage === 'controls'
-  const showHTMLPreview = view === 'preview' && Boolean(previewPage) && !controlsVisible
+  const workbenchVisible = previewPage === 'workbench'
+  const workbenchMode = searchParams.get('workbenchMode') === 'preview' ? 'preview' : 'patterns'
+  const showHTMLPreview = view === 'preview' && Boolean(previewPage) && !controlsVisible && (!workbenchVisible || workbenchMode === 'preview')
   const [previewOpened, setPreviewOpened] = useState(showHTMLPreview)
   const [controlRevision, setControlRevision] = useState(0)
+  const [workbenchRevision, setWorkbenchRevision] = useState(0)
   const lastHTMLPage = useRef(controlsVisible || !previewPage ? 'workspace' : previewPage)
   const htmlPage = showHTMLPreview ? previewPage : lastHTMLPage.current
 
@@ -85,7 +92,7 @@ export default function DevUIDesignPage() {
   )
 
   return (
-    <div className="erp-dev-ui-design-page erp-dev-workspace-page erp-dev-tool-page">
+    <div className={`erp-dev-ui-design-page erp-dev-workspace-page erp-dev-tool-page${view === 'preview' && workbenchVisible ? ' erp-dev-ui-design-page--workbench' : ''}`}>
       <DevPageNav sourcePath="docs/product/ui-design/README.md" />
       <header className="erp-dev-ui-design-header">
         <Typography.Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_UI_DESIGN_ROUTE]}</Typography.Title>
@@ -95,11 +102,25 @@ export default function DevUIDesignPage() {
           onChange={(key) => updateQuery('view', key === 'preview' ? '' : key)}
         />
       </header>
+      {view === 'preview' && workbenchVisible ? (
+        <div className="erp-dev-ui-design-workbench-toolbar">
+          {pageSelector}
+          <Segmented aria-label="工作台设计内容" value={workbenchMode} onChange={(value) => updateQuery('workbenchMode', value === 'patterns' ? '' : value)} options={[{ value: 'patterns', label: '统一页面样板' }, { value: 'preview', label: '整体交互预览' }]} />
+          {workbenchMode === 'patterns' ? <Button icon={<ReloadOutlined aria-hidden="true" />} onClick={() => { updateQuery('sampleState', ''); setWorkbenchRevision((value) => value + 1) }}>重置演示</Button> : null}
+        </div>
+      ) : null}
       <Suspense fallback={showHTMLPreview ? <Loading title="正在加载交互设计" /> : null}>
         {previewOpened || showHTMLPreview ? (
-          <DevUIDesignPreview active={showHTMLPreview} page={htmlPage} pageSelector={pageSelector} />
+          <DevUIDesignPreview active={showHTMLPreview} page={htmlPage} pageSelector={workbenchVisible ? null : pageSelector} />
         ) : null}
       </Suspense>
+      {view === 'preview' && workbenchVisible && workbenchMode === 'patterns' ? (
+        <section className="erp-dev-ui-design-reader erp-dev-ui-design-reader--patterns" aria-label="最新可交互设计">
+          <Suspense fallback={<Loading title="正在加载工作台统一设计" />}>
+            <DevWorkbenchStandards key={workbenchRevision} />
+          </Suspense>
+        </section>
+      ) : null}
       {view === 'preview' && !previewPage ? (
         <section className="erp-dev-ui-design-reader" aria-label="最新可交互设计">
           <div className="erp-dev-ui-design-toolbar">{pageSelector}</div>
@@ -111,7 +132,7 @@ export default function DevUIDesignPage() {
           <div className="erp-dev-ui-design-toolbar">
             {pageSelector}
             {searchParams.get('control') !== 'components' && (
-              <Button icon={<ReloadOutlined />} onClick={() => setControlRevision((value) => value + 1)}>
+              <Button icon={<ReloadOutlined aria-hidden="true" />} onClick={() => setControlRevision((value) => value + 1)}>
                 重置演示
               </Button>
             )}

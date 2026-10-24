@@ -70,6 +70,8 @@ import { createDevBusinessChainPrintScenarios } from './devBusinessChainPrintSce
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevQualityGateLayoutScenarios } from './devQualityGateLayoutScenarios.mjs'
+import { createDevWorkbenchPatternScenarios } from './devWorkbenchPatternScenarios.mjs'
+import { createDevServerVerificationScenarios } from './devServerVerificationScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
 import { createDevWorkbenchDensityScenarios } from './devWorkbenchDensityScenarios.mjs'
 import { createDevProjectSkillsScenarios } from './devProjectSkillsScenarios.mjs'
@@ -495,6 +497,8 @@ export function createStyleL1Scenarios(deps) {
       path,
     }),
     ...createDevQualityGateLayoutScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
+    ...createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createDevServerVerificationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevVersionCenterScenarios({
       assert,
       assertNoHorizontalOverflow,

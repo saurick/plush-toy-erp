@@ -78,16 +78,13 @@ test('quality gates styles: GitLab CI evidence stays compact and source-backed',
   assert.doesNotMatch(css, /\.erp-dev-quality-server-pipeline__connector/u)
 })
 
-test('quality gates styles: local diagnostics remain visibly secondary', () => {
-  assert.match(css, /\.erp-dev-quality-actions__heading/u)
-  assert.match(
-    css,
-    /\.erp-dev-quality-actions[\s\S]*?background:\s*var\(--erp-surface-bg-soft/u
-  )
-  assert.match(
-    css,
-    /\.erp-dev-quality-context dl\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/u
-  )
+test('quality gates styles: identity and content surfaces use the shared workbench combination', () => {
+  const shared = readFileSync(new URL('./dev-workbench-pattern.css', import.meta.url), 'utf8')
+  const context = readFileSync(new URL('../components/quality-gates/QualityGateContextStrip.jsx', import.meta.url), 'utf8')
+  assert.match(context, /<WorkbenchFacts/u)
+  assert.match(context, /<WorkbenchSection/u)
+  assert.match(shared, /\.erp-workbench-facts\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/u)
+  assert.doesNotMatch(css, /\.erp-dev-quality-context dl\s*\{/u)
 })
 
 test('quality gates styles: use project theme tokens instead of missing Ant CSS variables', () => {

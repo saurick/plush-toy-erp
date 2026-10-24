@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Page Design Governance"
-  short_description: "plush 页面语义、布局与浏览器验证按实际影响面选择流程"
-  default_prompt: "Use $plush-page-design-governance 在当前任务仓库按需核对页面语义或布局交互，复用已有能力完成授权改动并验证受影响场景。"
+  short_description: "plush ERP 与效能工作台页面组合、交互和任务验收"
+  default_prompt: "Use $plush-page-design-governance 在当前任务仓库按需核对页面语义与布局；效能工作台先选统一页面样板并复用共享组合，完成授权改动及真实任务路径验收。"

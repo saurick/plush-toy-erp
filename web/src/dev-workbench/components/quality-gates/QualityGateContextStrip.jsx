@@ -1,10 +1,6 @@
 import React from 'react'
-import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons'
-import { Alert, Button, Tag, Typography } from 'antd'
+import { Button, Tag } from 'antd'
+import { WorkbenchFacts, WorkbenchNotice, WorkbenchSection } from '../WorkbenchPattern.jsx'
 import DevTimestamp from '../DevTimestamp.jsx'
 import { getQualityGateStatusMeta } from '../../config/devQualityGates.mjs'
 import { shortCommit } from '../../config/qualityGatePresentation.mjs'
@@ -22,90 +18,35 @@ export function ContextStrip({
   onReturnLocal,
   standalone = false,
 }) {
-  const Icon =
-    status?.tone === 'success'
-      ? CheckCircleOutlined
-      : status?.tone === 'error'
-        ? CloseCircleOutlined
-        : InfoCircleOutlined
   return (
-    <section
-      className="erp-dev-quality-context"
-      aria-label="当前质量门禁上下文"
-    >
-      {summaryError ? (
-        <Alert
-          className="erp-dev-quality-status-banner"
-          type="error"
-          showIcon
-          message="质量门禁状态读取失败"
-          description={`${summaryError} 请刷新状态；当前数据尚未重新核实。`}
-        />
-      ) : (
-        <div
-          className="erp-dev-quality-status-banner"
-          role="status"
-          data-tone={status?.tone || 'info'}
-        >
-          <div className="erp-dev-quality-status-banner__title">
-            <Icon aria-hidden="true" />
-            <Typography.Text strong>
-              {status?.title || '正在读取当前质量状态'}
-            </Typography.Text>
-          </div>
-          {status?.recommendation ? (
-            <Typography.Text
-              strong
-              className="erp-dev-quality-status-banner__next"
-            >
-              下一步：{status.recommendation}
-            </Typography.Text>
-          ) : null}
-          {status?.description || status?.notProven?.length ? (
-            <details className="erp-dev-quality-status-details">
-              <summary>判断依据与边界</summary>
-              <Typography.Text>{status.description}</Typography.Text>
-              {status.notProven?.length ? (
-                <Typography.Text type="secondary">
-                  尚未证明：{status.notProven.join('、')}
-                </Typography.Text>
-              ) : null}
-            </details>
-          ) : null}
-        </div>
-      )}
+    <WorkbenchSection className="erp-dev-quality-context" aria-label="当前质量门禁上下文">
+      <WorkbenchNotice
+        className="erp-dev-quality-status-banner"
+        tone={summaryError ? 'error' : status?.tone || 'loading'}
+        title={summaryError ? '质量门禁状态读取失败' : status?.title || '正在读取当前质量状态'}
+        description={summaryError
+          ? `${summaryError} 请刷新状态；当前数据尚未重新核实。`
+          : status?.recommendation ? `下一步：${status.recommendation}` : null}
+        details={!summaryError && (status?.description || status?.notProven?.length) ? (
+          <>
+            <span>{status.description}</span>
+            {status.notProven?.length ? <span>尚未证明：{status.notProven.join('、')}</span> : null}
+          </>
+        ) : null}
+      />
       <div className="erp-dev-quality-context__identity">
-        <dl>
-          <div>
-            <dt>{standalone ? '服务端工作区版本' : '本地工作区版本'}</dt>
-            <dd>{shortCommit(summary?.repository?.commit)}</dd>
-          </div>
-          <div>
-            <dt>{standalone ? '服务端改动' : '本地改动'}</dt>
-            <dd>
-              {summary?.repository?.dirty === true
-                ? '有未提交改动'
-                : summary?.repository?.dirty === false
-                  ? '干净'
-                  : '未核实'}
-            </dd>
-          </div>
-          <div>
-            <dt>统计读取于</dt>
-            <dd>
-              <DevTimestamp
-                value={summary?.generatedAt}
-                missing="统计时间未证明"
-              />
-            </dd>
-          </div>
-        </dl>
+        <WorkbenchFacts items={[
+          { label: standalone ? '服务端工作区版本' : '本地工作区版本', value: shortCommit(summary?.repository?.commit) },
+          { label: standalone ? '服务端改动' : '本地改动', value: summary?.repository?.dirty === true ? '有未提交改动' : summary?.repository?.dirty === false ? '干净' : '未核实' },
+          { label: '统计读取于', value: <DevTimestamp value={summary?.generatedAt} missing="统计时间未证明" /> },
+        ]}
+        />
         {view !== 'run' && summary?.currentOperation?.profile === 'strict' ? (
           <Button type="link" onClick={onReturnLocal}>
             {standalone ? '查看服务端诊断历史' : '查看本机运行'}
           </Button>
         ) : null}
       </div>
-    </section>
+    </WorkbenchSection>
   )
 }

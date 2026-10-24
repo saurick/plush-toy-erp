@@ -49,7 +49,7 @@
 .erp-dev-quality-gaps-view {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 8px;
 }
 
 .erp-dev-quality-shell > *,
@@ -58,59 +58,6 @@
 .erp-dev-quality-governance-view > *,
 .erp-dev-quality-gaps-view > * {
   min-width: 0;
-}
-
-.erp-dev-quality-status-banner:not(.ant-alert) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  align-items: baseline;
-  min-width: 0;
-}
-
-.erp-dev-quality-status-banner__title {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.erp-dev-quality-status-banner[data-tone='success'] .anticon {
-  color: var(--erp-primary);
-}
-
-.erp-dev-quality-status-banner[data-tone='warning'] .anticon {
-  color: var(--erp-warning-text);
-}
-
-.erp-dev-quality-status-banner[data-tone='error'] .anticon {
-  color: var(--erp-visual-danger-text);
-}
-
-.erp-dev-quality-status-banner__next {
-  flex: 1 1 420px;
-  min-width: 0;
-}
-
-.erp-dev-quality-status-banner__next strong {
-  font-weight: 400;
-}
-
-.erp-dev-quality-status-details {
-  min-width: 0;
-  color: var(--erp-text-muted);
-}
-
-.erp-dev-quality-status-details[open] {
-  flex-basis: 100%;
-}
-
-.erp-dev-quality-status-details summary {
-  cursor: pointer;
-}
-
-.erp-dev-quality-status-details > .ant-typography {
-  display: block;
-  margin-top: 4px;
 }
 
 .erp-dev-quality-server-evidence {
@@ -709,17 +656,7 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-quality-actions {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: 10px;
-  background: var(--erp-surface-bg-soft);
-}
-
 .erp-dev-quality-actions__heading,
-.erp-dev-quality-actions__buttons,
 .erp-dev-quality-actions__durations,
 .erp-dev-quality-actions__environment {
   display: flex;
@@ -801,16 +738,6 @@
   margin: 0;
 }
 
-.erp-dev-quality-context {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: 8px;
-  background: var(--erp-surface-bg);
-}
-
 .erp-dev-quality-context__identity {
   display: flex;
   gap: 8px 16px;
@@ -818,32 +745,6 @@
   align-items: center;
   justify-content: space-between;
   min-width: 0;
-}
-
-.erp-dev-quality-context dl {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  min-width: 0;
-  margin: 0;
-}
-
-.erp-dev-quality-context :where(dl > div) {
-  display: flex;
-  min-width: 0;
-  gap: 6px;
-}
-
-.erp-dev-quality-context dt {
-  flex: 0 0 auto;
-  color: var(--erp-text-muted);
-}
-
-.erp-dev-quality-context dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 .erp-dev-quality-content {
@@ -861,8 +762,6 @@
   outline-offset: 4px;
 }
 
-.erp-dev-quality-operation,
-.erp-dev-quality-history,
 .erp-dev-quality-complexity,
 .erp-dev-quality-gap-category {
   display: grid;
@@ -893,24 +792,6 @@
 .erp-dev-quality-gap-category h3.ant-typography {
   font-size: var(--erp-font-emphasis);
   line-height: 1.5;
-}
-
-.erp-dev-quality-operation__facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 24px;
-}
-
-.erp-dev-quality-operation__facts > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
-.erp-dev-quality-operation__facts .ant-typography {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .erp-dev-quality-flow {
@@ -1191,14 +1072,6 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-quality-view-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .erp-dev-quality-view-search {
   display: flex;
   gap: 8px;
@@ -1215,14 +1088,6 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 4px 16px;
-}
-
-.erp-dev-quality-empty {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
 }
 
 .erp-dev-quality-loading {
@@ -1457,15 +1322,6 @@
     padding: 5px 4px;
     font-size: var(--erp-font-small);
     line-height: 1.25;
-  }
-
-  .erp-dev-quality-context dl {
-    gap: 6px 10px;
-  }
-
-  .erp-dev-quality-context dl > div {
-    display: grid;
-    gap: 2px;
   }
 
   .erp-dev-quality-context .ant-btn-link {

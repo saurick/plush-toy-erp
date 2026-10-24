@@ -124,7 +124,7 @@ export function createDevQualityGateLayoutScenarios({
         await page.getByRole('tab', { name: '本地检查', exact: true }).waitFor()
         assert.equal(await page.getByRole('tab', { name: '本地检查', exact: true }).getAttribute('aria-selected'), 'true')
         assert.match(await page.locator('[aria-label="执行与报告来源"]').innerText(), /本地开发机/u)
-        await page.locator('.erp-dev-quality-operation .ant-alert').waitFor()
+        await page.locator('.erp-dev-quality-operation [role="alert"]').waitFor()
         for (const viewport of [
           { width: 1280, height: 720 },
           { width: 1024, height: 768 },
@@ -132,7 +132,7 @@ export function createDevQualityGateLayoutScenarios({
         ]) {
           await page.setViewportSize(viewport)
           await inFirstScreen('.erp-dev-quality-actions')
-          await inFirstScreen('.erp-dev-quality-operation .ant-alert')
+          await inFirstScreen('.erp-dev-quality-operation [role="alert"]')
           const flow = await page.locator('.erp-dev-quality-flow').boundingBox()
           assert(
             flow.y < viewport.height - 90,
@@ -164,13 +164,13 @@ export function createDevQualityGateLayoutScenarios({
           )
         }
         await page.setViewportSize({ width: 1280, height: 720 })
-        await page.locator('.erp-dev-quality-status-details summary').click()
+        await page.locator('.erp-dev-quality-context .erp-workbench-notice__details summary').click()
         await page
           .getByText('尚未证明：干净 exact SHA、目标环境发布、客户 UAT', {
             exact: true,
           })
           .waitFor()
-        await page.locator('.erp-dev-quality-status-details summary').click()
+        await page.locator('.erp-dev-quality-context .erp-workbench-notice__details summary').click()
         const stages = page.locator('.erp-dev-quality-flow__step')
         assert.equal(await stages.count(), 13)
         await stages.first().locator('summary').click()
@@ -188,6 +188,10 @@ export function createDevQualityGateLayoutScenarios({
         const toolsBox = await page
           .locator('.erp-dev-quality-view-tools')
           .boundingBox()
+        assert(
+          toolsBox.height <= 44,
+          `directory search and scope should share a row when space is sufficient: ${toolsBox.height}`
+        )
         const search = page.getByRole('textbox', { name: '搜索门禁名称或风险' })
         await search.fill('不存在的门禁布局样例')
         await search.press('Enter')
@@ -251,7 +255,7 @@ export function createDevQualityGateLayoutScenarios({
         await page.getByText('当前没有待核对的改动', { exact: true }).waitFor()
         assert.equal(
           await page
-            .locator('.erp-dev-quality-gap-empty.ant-alert-warning')
+            .locator('.erp-dev-quality-gap-empty[data-tone="warning"]')
             .count(),
           0
         )

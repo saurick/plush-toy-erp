@@ -32,6 +32,7 @@ import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx
 import DevPageNav from '../components/DevPageNav.jsx'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTimestamp from '../components/DevTimestamp.jsx'
+import { WorkbenchEmpty, WorkbenchNotice, WorkbenchSection, WorkbenchToolbar } from '../components/WorkbenchPattern.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
@@ -459,7 +460,7 @@ function CoverageSection({
   children,
 }) {
   return (
-    <section className="erp-dev-testing-coverage-section" aria-label={title}>
+    <WorkbenchSection flat className="erp-dev-testing-coverage-section" aria-label={title}>
       {description ? <Text type="secondary">{description}</Text> : null}
       {matrix ? (
         <div className="erp-dev-testing-coverage-matrix__head" aria-hidden>
@@ -469,7 +470,7 @@ function CoverageSection({
         </div>
       ) : null}
       {children}
-    </section>
+    </WorkbenchSection>
   )
 }
 
@@ -1152,13 +1153,6 @@ function CoverageReportView({
   const shortCommit = repository.commit
     ? repository.commit.slice(0, 12)
     : '未记录'
-  const reportSummary = (
-    <div className="erp-dev-testing-coverage-summary">
-      <span>{loading && !report ? '正在读取报告…' : alert.title}</span>
-      <Text type="secondary">{alert.description}</Text>
-      {report ? <DevTimestamp value={report.generatedAt} action="采集于" missing="采集时间未记录" /> : null}
-    </div>
-  )
 
   return (
     <div
@@ -1167,7 +1161,44 @@ function CoverageReportView({
       aria-busy={loading || operationPresentation.active}
     >
       <div className="erp-dev-testing-coverage-overview">
-        <div className="erp-dev-testing-coverage-toolbar">
+        <WorkbenchToolbar
+          className="erp-dev-testing-coverage-toolbar"
+          actions={(
+            <>
+              <Link to={DEV_BUSINESS_CHAIN_AUDIT_ROUTE} state={{ testingReturnSearch: reportSearch }}>链路实测报告</Link>
+              {!import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
+                <Button
+                  type="primary"
+                  icon={<PlayCircleOutlined aria-hidden="true" />}
+                  loading={operationStarting || operationPresentation.active}
+                  disabled={
+                operationPresentation.active || qaBusy?.active || !qaReady
+              }
+                  onClick={() => {
+                setSource('workspace')
+                onCollect()
+              }}
+                >
+                  {operationPresentation.active
+                ? '采集中…'
+                : qaBusy?.active
+                  ? '已有验证在运行'
+                  : !qaReady
+                    ? '正在核对任务状态'
+                    : '采集本地覆盖基线'}
+                </Button>
+            ) : <Link to="/__dev/testing?view=server">查看 GitLab 测试与覆盖率</Link>}
+              <Button
+                icon={<ReloadOutlined aria-hidden="true" />}
+                loading={loading}
+                onClick={onReload}
+              >
+                重新读取
+              </Button>
+            </>
+          )}
+        >
+
           <Segmented
             aria-label="覆盖报告来源"
             className="erp-dev-testing-coverage-source"
@@ -1178,44 +1209,14 @@ function CoverageReportView({
               { label: '历史隔离验证', value: 'snapshot' },
             ]}
           />
-          <div className="erp-dev-testing-coverage-actions">
-            <Link to={DEV_BUSINESS_CHAIN_AUDIT_ROUTE} state={{ testingReturnSearch: reportSearch }}>链路实测报告</Link>
-            {!import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
-              <Button
-                type="primary"
-                icon={<PlayCircleOutlined aria-hidden="true" />}
-                loading={operationStarting || operationPresentation.active}
-                disabled={
-                operationPresentation.active || qaBusy?.active || !qaReady
-              }
-                onClick={() => {
-                setSource('workspace')
-                onCollect()
-              }}
-              >
-                {operationPresentation.active
-                ? '采集中…'
-                : qaBusy?.active
-                  ? '已有验证在运行'
-                  : !qaReady
-                    ? '正在核对任务状态'
-                    : '采集本地覆盖基线'}
-              </Button>
-            ) : <Link to="/__dev/testing?view=server">查看 GitLab 测试与覆盖率</Link>}
-            <Button
-              icon={<ReloadOutlined aria-hidden="true" />}
-              loading={loading}
-              onClick={onReload}
-            >
-              重新读取
-            </Button>
-          </div>
-        </div>
-        {['stale', 'failed'].includes(activeState?.status) ? (
-          <Alert showIcon type={alert.type} message={reportSummary} />
-        ) : (
-          <div role="status">{reportSummary}</div>
-        )}
+        </WorkbenchToolbar>
+        <WorkbenchNotice
+          className="erp-dev-testing-coverage-summary"
+          tone={loading && !report ? 'loading' : alert.type}
+          title={loading && !report ? '正在读取报告…' : alert.title}
+          description={alert.description}
+          action={report ? <DevTimestamp value={report.generatedAt} action="采集于" missing="采集时间未记录" /> : null}
+        />
         {operationError || (operation && operation.status !== 'completed') ? (
           <CoverageOperationPanel operation={operation} error={operationError} />
         ) : null}
@@ -1262,12 +1263,12 @@ function CoverageReportView({
         ) : null}
 
         {!loading && !report && section !== 'rules' ? (
-          <div className="erp-dev-testing-coverage-empty">
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="尚未采集覆盖报告"
-            />
-          </div>
+          <WorkbenchEmpty
+            className="erp-dev-testing-coverage-empty"
+            title="尚未采集覆盖报告"
+            description={source === 'snapshot' ? '此来源还没有历史隔离报告；可切回当前工作区。' : '采集覆盖基线后，在这里查看分项读数与证据。'}
+            action={source === 'snapshot' ? <Button onClick={() => setSource('workspace')}>查看当前工作区</Button> : null}
+          />
         ) : null}
 
         {report && section !== 'rules' ? (
@@ -1993,7 +1994,7 @@ export default function DevTestingPage() {
             />
           </div>
         </div>
-        <section className="erp-dev-testing-reader">
+        <section className={view === 'server' ? undefined : 'erp-dev-testing-reader'}>
           {view === 'server' ? <DevVerificationEvidence /> : null}
           {view === VIEW_OVERVIEW ? (
             <DevTestingOverview

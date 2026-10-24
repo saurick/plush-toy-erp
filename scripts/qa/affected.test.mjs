@@ -68,6 +68,25 @@ test("sales export growth changes select existing checks and an explicit bounded
   assert(!unrelated.followUps.some((item) => item.id === "growth-capacity-validation"));
 });
 
+test("workbench shared patterns retain task acceptance for the sample and real consumers", () => {
+  for (const file of [
+    "web/src/dev-workbench/components/WorkbenchPattern.jsx",
+    "web/src/dev-workbench/components/DevWorkbenchStandards.jsx",
+    "web/src/dev-workbench/styles/dev-workbench-pattern.css",
+    "web/src/dev-workbench/styles/dev-workbench-standards.css",
+    "web/src/dev-workbench/styles/dev-ui-design.css",
+    "web/src/dev-workbench/pages/DevUIDesignPage.jsx",
+    "web/scripts/style-l1/devWorkbenchPatternScenarios.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const text = plan.followUps.find(({ id }) => id === "browser-regression")?.text || "";
+    for (const scenario of ["dev-workbench-patterns-desktop-light", "dev-testing-report-layout-desktop-light", "dev-quality-gates-layout-desktop-light", "dev-server-verification-layout-desktop-light"]) assert(text.includes(scenario), file);
+    assert(!ids(plan).includes("full"), file);
+  }
+  const unrelated = buildAffectedPlan(["web/src/erp/utils/businessDate.mjs"], { root: ROOT });
+  assert.doesNotMatch(unrelated.followUps.find(({ id }) => id === "browser-regression")?.text || "", /dev-workbench-patterns/u);
+});
+
 test("work-center sample and shared adapter changes retain isolation checks and focused browser coverage", () => {
   for (const file of [
     "web/src/dev-workbench/components/DevWorkCenterDesign.jsx",

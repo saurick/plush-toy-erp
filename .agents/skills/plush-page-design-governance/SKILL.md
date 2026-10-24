@@ -1,6 +1,6 @@
 ---
 name: plush-page-design-governance
-description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP page tasks, fields, actions, layout, and browser regressions; customer print sources and PDF fidelity use print governance.
+description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP and engineering workbench pages, shared page patterns, tasks, fields, actions, layout, and browser acceptance; customer print sources and PDF fidelity use print governance.
 ---
 
 # Plush Page Design Governance
@@ -27,6 +27,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 | 页面任务、字段、动作、状态、密度、交互设计 | [Page Semantics](references/page-semantics.md) |
 | 动作、筛选、页签或页面数据规模增长 | [功能与数据增长](references/page-semantics.md#page-growth) |
 | 布局、主题、弹窗、键盘、运行交互、浏览器验证 | [Page Implementation](references/page-implementation.md) |
+| 效能工作台页面、统一设计、信息密度与复用 | [工作台页面组合](references/page-implementation.md#workbench-patterns)及其正式设计引用 |
 | 纯文档 / Skill 修改 | 文本、metadata、引用和 scoped diff 检查 |
 
 只加载命中的分支。设计同步按 [Design Sync](references/page-semantics.md#design-sync) 判断，按需读取相关章节及 HTML 片段；小改动不强制检查全部页面或固定截图数量，高成本验证遵循 `$plush-test-governance`。

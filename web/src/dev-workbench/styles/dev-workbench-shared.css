@@ -780,11 +780,6 @@
   white-space: normal;
 }
 
-.erp-dev-testing-coverage-section {
-  display: grid;
-  gap: 12px;
-}
-
 .erp-dev-testing-coverage-section__head {
   display: flex;
   min-width: 0;

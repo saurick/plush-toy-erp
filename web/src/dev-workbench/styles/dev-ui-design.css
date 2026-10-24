@@ -4,6 +4,12 @@
   height: 100dvh;
   grid-template-rows: auto minmax(0, 1fr);
 }
+.erp-dev-ui-design-page--workbench {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.erp-dev-ui-design-reader--patterns {
+  overflow-y: auto;
+}
 .erp-dev-ui-design-header {
   display: flex;
   align-items: center;
@@ -1095,4 +1101,15 @@
   .erp-dev-ui-design-page {
     grid-template-rows: auto auto minmax(0, 1fr);
   }
+}
+
+.erp-dev-ui-design-workbench-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
 }

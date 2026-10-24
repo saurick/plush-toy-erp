@@ -141,6 +141,7 @@
 ## 前端、原型与错误
 
 - 页面须简洁、高效、实用、直观；ERP 桌面与手机同权限下的核心信息、动作、追踪和结果一致，布局按设备适配。按 `$plush-page-design-governance` 执行。
+- 效能工作台页面先按[统一页面样板](docs/product/ui-design/交互设计说明.md#workbench-patterns)选择任务组合并复用共享实现；共享变化同步交互设计样板与真实消费者，按任务路径验收。
 - 手机只做任务办理，不跳来源单据；完整单据在电脑查看，仅“切换工作入口”可换端。其余导航保持手机界面，复用 `useBusinessNavigate` / `BusinessLink` 与路由边界。
 - 原型只作设计输入；Draft/To Implement/Current 与代码、测试及 runtime 分别核对。
 - Ant Design 动态表单使用所属 form 实例，不以警告或隐藏实例兜底。
