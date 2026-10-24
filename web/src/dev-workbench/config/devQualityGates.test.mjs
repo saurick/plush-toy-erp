@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { projectCiJobGuides } from '../../../../scripts/qa/ci-job-guide.mjs'
+import { getQualityGateProfileLabel } from './qualityGatePresentation.mjs'
 
 import {
   DEFAULT_SERVER_VIEW,
@@ -13,6 +14,10 @@ import {
   DEV_QUALITY_GATE_SERVER_VIEWS,
   QUERY_KEYS,
   VIEW_ITEMS,
+  WORKSPACE_VIEW_ITEMS,
+  getQualityGateViewGroup,
+  getQualityGateViewGroups,
+  getQualityGateEnvironment,
   VIEW_KEYS,
   VIEW_QUERY_KEYS,
   buildQualityGateCoverageMatrix,
@@ -38,6 +43,30 @@ import {
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222'
 const NOW = '2026-08-09T08:00:00.000Z'
+
+test('diagnostic headings and execution tracks share the same execution-side labels', () => {
+  assert.equal(getQualityGateProfileLabel('full'), '本机完整诊断')
+  assert.equal(getQualityGateProfileLabel('strict'), '本机严格诊断')
+  assert.equal(getQualityGateProfileLabel('full', true), '服务端完整诊断')
+  assert.equal(getQualityGateProfileLabel('strict', true), '服务端严格诊断')
+  assert.equal(getQualityGateProfileLabel('unknown', true), '未登记门禁')
+})
+
+test('quality views separate workspace checks, remote CI and shared rules without changing URLs', () => {
+  assert.deepEqual(WORKSPACE_VIEW_ITEMS.map(({ value }) => value), ['run', 'gaps'])
+  assert.deepEqual(VIEW_KEYS.map(getQualityGateViewGroup), ['server', 'workspace', 'governance', 'workspace'])
+  for (const view of VIEW_KEYS) {
+    assert.equal(parseQualityGateSearch(new URLSearchParams({ view })).view, view)
+  }
+  assert.equal(getQualityGateViewGroups()[0].label, '本地检查')
+  assert.equal(getQualityGateViewGroups(true)[0].label, '服务端检查')
+  for (const standalone of [false, true]) {
+    assert.equal(getQualityGateEnvironment('server', standalone).kind, 'server')
+    assert.equal(getQualityGateEnvironment('governance', standalone).kind, 'reference')
+    assert.equal(getQualityGateEnvironment('run', standalone).kind, standalone ? 'server' : 'local')
+    assert.equal(getQualityGateEnvironment('gaps', standalone).kind, standalone ? 'server' : 'local')
+  }
+})
 
 function operation(overrides = {}) {
   return {

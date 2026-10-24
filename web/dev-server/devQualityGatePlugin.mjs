@@ -557,10 +557,10 @@ function statusProjection({
           : '可以验证当前改动，但结果不能作为固定版本发布证明。',
       releaseEligible: false,
       recommendation: currentPassed
-        ? '完成代码收口后，对干净的固定版本重新运行严格门禁。'
+        ? '完成代码收口后，在本地开发机对干净的固定版本重新运行严格诊断。'
         : strictProof.current
-          ? '先修复当前失败，再重新运行严格门禁。'
-          : '运行严格门禁，先确认当前改动没有质量阻断。',
+          ? '先修复当前失败，再在本地开发机运行严格诊断。'
+          : '在本地开发机运行严格诊断，先确认当前改动没有质量阻断。',
       notProven: ['干净 exact SHA', '目标环境发布', '客户 UAT'],
     }
   }
@@ -615,9 +615,9 @@ function statusProjection({
     if (strictProof.receipt?.status === 'passed') {
       return {
         tone: 'warning',
-        title: '本地严格门禁已通过，仍缺 GitLab CI 证据',
+        title: '当前工作区严格门禁已通过，仍缺 GitLab CI 证据',
         description:
-          '本地回执属于当前干净版本，但不能替代 protected main 的服务器 exact-SHA CI。',
+          '当前执行端的回执属于当前干净版本，但不能替代 protected main 的服务器 exact-SHA CI。',
         releaseEligible: false,
         recommendation: '等待或运行当前 SHA 的 GitLab 普通 push CI。',
         notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
@@ -625,13 +625,13 @@ function statusProjection({
     }
     return {
       tone: 'error',
-      title: '当前版本本地严格门禁未通过',
+      title: '当前工作区严格门禁未通过',
       description:
-        '最近本地失败结果属于当前干净版本，且没有可复用的 GitLab CI 通过证据。',
+        '最近诊断失败结果属于当前干净版本，且没有可复用的 GitLab CI 通过证据。',
       releaseEligible: false,
-      recommendation: '先修复第一失败阶段，再重新运行严格门禁。',
+      recommendation: '先修复第一失败阶段，再在本地开发机运行严格诊断。',
       notProven: [
-        '当前版本本地严格门禁',
+        '当前工作区严格门禁',
         '当前版本 GitLab CI 严格门禁',
         '目标环境发布',
         '客户 UAT',
@@ -645,7 +645,7 @@ function statusProjection({
       description: environment.message,
       releaseEligible: false,
       recommendation:
-        '启动本机 Docker 并准备 postgres:18.6 镜像，或显式登记合规的本机一次性数据库环境。',
+        '如需本地诊断，请在开发机启动 Docker 并准备 postgres:18.6 镜像，或显式登记合规的一次性数据库环境。',
       notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
@@ -655,7 +655,7 @@ function statusProjection({
       title: '最近严格结果属于旧版本',
       description: '该结果不能用于当前版本发布。',
       releaseEligible: false,
-      recommendation: '运行严格门禁，为当前版本生成新的正式验证记录。',
+      recommendation: '在本地开发机运行严格诊断，为当前版本生成新的正式验证记录。',
       notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
@@ -664,7 +664,7 @@ function statusProjection({
     title: '当前版本尚未通过严格门禁',
     description: '尚无可用于当前版本的严格验证记录。',
     releaseEligible: false,
-    recommendation: '运行严格门禁。',
+    recommendation: '在本地开发机运行严格诊断。',
     notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
   }
 }
@@ -952,7 +952,7 @@ export function projectDevQualityGateServerEvidence(
     history,
     message: selected.passed
       ? repository.dirty
-        ? 'GitLab CI 已证明当前提交 SHA；该证据不覆盖本机未提交改动。'
+        ? 'GitLab CI 已证明当前提交 SHA；该证据不覆盖工作区未提交改动。'
         : 'GitLab CI 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。'
       : selected.docsPassed
         ? '当前 exact SHA 的文档检查已通过；只运行范围、敏感信息与文档检查，未产生完整 strict 或发布证据。需要发布时，在 GitLab 新建 main 流水线并设置 QA_MODE=full。'
@@ -960,7 +960,7 @@ export function projectDevQualityGateServerEvidence(
           ? 'GitLab CI 正在验证当前 exact SHA。'
           : 'GitLab 当前 exact SHA 的 CI 未形成完整通过证据。',
     notProven: [
-      ...(repository.dirty ? ['本机未提交改动'] : []),
+      ...(repository.dirty ? ['工作区未提交改动'] : []),
       ...(selected.passed ? [] : ['当前 exact SHA 的完整 CI 严格门禁']),
       '不可变 Release',
       '目标部署',
@@ -1074,7 +1074,7 @@ export function createDevQualityGateService({
         value = await loadServerEvidence({ repository, root })
       } else if (!serverEvidenceEnvironment.PLUSH_GITLAB_TOKEN) {
         value = unavailableServerEvidence(
-          '未登记只读 GitLab 凭据，当前仅显示本机回执。'
+          '未登记只读 GitLab 凭据，当前仅显示本执行端保存的回执。'
         )
       } else {
         const { createGitlabDeliveryProvider } =
@@ -1117,7 +1117,7 @@ export function createDevQualityGateService({
       }
     } catch {
       value = unavailableServerEvidence(
-        'GitLab CI 证据暂时不可读取，本机回执不受影响。'
+        'GitLab CI 证据暂时不可读取，本执行端保存的回执不受影响。'
       )
     }
     serverEvidenceCache = {

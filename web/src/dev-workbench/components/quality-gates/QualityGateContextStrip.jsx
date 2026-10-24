@@ -9,7 +9,7 @@ export function OperationStatusTag({ operation }) {
   return <Tag color={meta.tone}>{meta.label}</Tag>
 }
 
-export function ContextStrip({ summary, view, onReturnLocal }) {
+export function ContextStrip({ summary, view, onReturnLocal, standalone = false }) {
   return (
     <section
       className="erp-dev-quality-context"
@@ -17,11 +17,11 @@ export function ContextStrip({ summary, view, onReturnLocal }) {
     >
       <dl>
         <div>
-          <dt>当前版本</dt>
+          <dt>{standalone ? '服务端工作区版本' : '本地工作区版本'}</dt>
           <dd>{shortCommit(summary?.repository?.commit)}</dd>
         </div>
         <div>
-          <dt>工作区</dt>
+          <dt>{standalone ? '服务端改动' : '本地改动'}</dt>
           <dd>
             {summary?.repository?.dirty === true
               ? '有未提交改动'
@@ -42,7 +42,7 @@ export function ContextStrip({ summary, view, onReturnLocal }) {
       </dl>
       {view !== 'run' && summary?.currentOperation?.profile === 'strict' ? (
         <Button type="link" onClick={onReturnLocal}>
-          查看本机运行
+          {standalone ? '查看服务端诊断历史' : '查看本机运行'}
         </Button>
       ) : null}
     </section>

@@ -1,6 +1,7 @@
 import { installIntegrationWorkspaceMock, verifyIntegrationWorkspace, verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
 import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { DEV_TESTING_FIXED_ACTIONS } from '../../src/dev-workbench/config/devTestingOperation.mjs'
+import { DEV_TESTING_WORKSPACE_VIEWS } from '../../src/dev-workbench/config/devTesting.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, verifyMermaidDarkTheme, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
 import {
@@ -381,11 +382,11 @@ export function createDevWorkbenchDesktopScenarios({
         await stepSearch.fill('采购')
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2, 'typing keeps the current chain results')
         await stepSearch.press('Enter')
-        await page.waitForURL(url => url.searchParams.get('q') === '采购')
-        await stepTable.getByText('1. 出货步骤', {exact:true}).waitFor({state:'hidden'})
+        await page.waitForURL((url) => url.searchParams.get('q') === '采购')
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor({ state: 'hidden' })
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 1)
-        await stepSearch.locator('xpath=..').getByRole('button', {name:'清除搜索',exact:true}).click()
-        await stepTable.getByText('1. 出货步骤', {exact:true}).waitFor()
+        await stepSearch.locator('xpath=..').getByRole('button', { name: '清除搜索', exact: true }).click()
+        await stepTable.getByText('1. 出货步骤', { exact: true }).waitFor()
         assert.equal(await stepTable.locator('tbody > tr.ant-table-row').count(), 2)
 
         await page.getByRole('tab', { name: '问题与复验', exact: true }).click()
@@ -428,18 +429,21 @@ export function createDevWorkbenchDesktopScenarios({
         await fieldTrigger.click()
         assert.equal(await page.locator('.erp-dev-testing-disclosure').count(), 0, '默认执行页不堆放教程折叠区')
         const primaryTabs = page.getByRole('tablist', { name: '测试验证工作区主视图' })
-        assert.deepEqual(await primaryTabs.getByRole('tab').allTextContents(), ['服务器验证', '本地测试总览', '本轮验证', '测试报告', '压力测试', '测试指引'])
+        assert.deepEqual(await primaryTabs.getByRole('tab').allTextContents(), DEV_TESTING_WORKSPACE_VIEWS.map(({ label }) => label))
+        const groups = page.getByRole('tablist', { name: '测试环境与指引' })
+        assert.deepEqual(await groups.getByRole('tab').allTextContents(), ['本地测试', '服务器验证', '测试指引'])
+        const primaryIndex = (value) => DEV_TESTING_WORKSPACE_VIEWS.findIndex((view) => view.value === value)
         assert.equal(await page.getByRole('button', { name: '测试指引', exact: true }).count(), 0)
-        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', 5)
-        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', 1, true)
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true }).click()
+        await verifySlidingMotion(page, assert, '.erp-dev-testing-group-nav > .erp-sliding-tab-list', 2)
+        await verifySlidingMotion(page, assert, '.erp-dev-testing-group-nav > .erp-sliding-tab-list', 0, true)
+        await groups.getByRole('tab', { name: '测试指引', exact: true }).click()
         await page.getByRole('heading', { name: '测试执行', exact: true }).waitFor()
         const guideNav = page.getByRole('tablist', { name: '测试指引主题' })
         await guideNav.getByRole('tab', { name: '真机回归', exact: true }).click()
         await page.getByRole('table', { name: '真机回归场景范围', exact: true }).waitFor()
         assert.equal(await page.getByRole('table', { name: '自动化测试方式', exact: true }).count(), 0)
         await page.reload()
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
+        await groups.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
         await guideNav.getByRole('tab', { name: '真机回归', exact: true, selected: true }).waitFor()
         await guideNav.getByRole('tab', { name: '常用命令', exact: true }).click()
         await page.locator('.erp-dev-testing-presets article').first().waitFor()
@@ -459,6 +463,7 @@ export function createDevWorkbenchDesktopScenarios({
         await assertNoHorizontalOverflow(page, '测试使用指引与命令详情')
         await presetSearch.fill('')
         await presetSearch.press('Enter')
+        await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
         await primaryTabs.getByRole('tab', { name: '本轮验证', exact: true }).click()
         const counts = {
           status: 'passed',
@@ -573,8 +578,9 @@ export function createDevWorkbenchDesktopScenarios({
               : { status: snapshotStatus, message: '隔离验证暂不可用' }
           )
         })
-        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', 3)
-        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', 2, true)
+        await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
+        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', primaryIndex('coverage'))
+        await verifySlidingMotion(page, assert, '.erp-dev-testing-primary-nav > .erp-sliding-tab-list', primaryIndex('tiers'), true)
         await page.getByRole('tab', { name: '测试报告', exact: true }).click()
         const coverage = page.locator('.erp-dev-testing-coverage-view')
         await coverage
@@ -712,17 +718,19 @@ export function createDevWorkbenchDesktopScenarios({
           '切换证据类型和前进后退不得重复请求覆盖报告'
         )
         assert.equal(new URL(page.url()).searchParams.get('coverageDomain'), 'source-documents')
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true }).click()
+        await groups.getByRole('tab', { name: '测试指引', exact: true }).click()
         assert.equal(new URL(page.url()).searchParams.has('returnView'), false)
         await page.reload()
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
+        await groups.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
         await page.getByRole('link', { name: '页面说明检查', exact: true }).click()
         await page.getByRole('heading', { name: '页面说明检查', exact: true }).waitFor()
+        await page.getByLabel('执行与报告来源').getByText('通用资料 · 页面说明目录', { exact: true }).waitFor()
         await page.getByRole('textbox', { name: '搜索页面说明', exact: true }).fill('可用量')
         await page.getByRole('textbox', { name: '搜索页面说明', exact: true }).press('Enter')
         await page.getByText('当前显示 1 个页面', { exact: true }).waitFor()
         await page.reload()
         await page.getByRole('link', { name: '返回测试指引', exact: true }).click()
+        await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
         await primaryTabs.getByRole('tab', { name: '测试报告', exact: true }).click()
         await business.waitFor()
         assert.equal(new URL(page.url()).searchParams.get('coverage'), 'business')
@@ -850,7 +858,7 @@ export function createDevWorkbenchDesktopScenarios({
         await coverage
           .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true }).click()
+        await groups.getByRole('tab', { name: '测试指引', exact: true }).click()
         await page.getByRole('tab', { name: '常用命令', exact: true }).click()
         await page
           .getByRole('button', { name: '查专项命令', exact: true })
@@ -901,7 +909,8 @@ export function createDevWorkbenchDesktopScenarios({
         await commands.first().waitFor()
         await assertNoHorizontalOverflow(page, '专项检查命令分页与空结果恢复')
         await page.getByRole('button', { name: '返回测试指引', exact: true }).click()
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
+        await groups.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
+        await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
         await primaryTabs.getByRole('tab', { name: '测试报告', exact: true }).click()
         await page.getByRole('tab', { name: '测试报告', exact: true, selected: true }).waitFor()
         await coverage.getByText('正在查看历史隔离验证', { exact: true }).waitFor()

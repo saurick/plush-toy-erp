@@ -275,7 +275,9 @@ export default function DevBusinessRulesPanel({ report, reportCurrent, onRunCons
           fuzz 种子随普通测试执行；这些结果各自绑定实际范围，不外推生产容量。
         </p>
         <Space wrap>
-          <Link to={`${DEV_QUALITY_GATES_ROUTE}?view=run`}>运行本机正式门禁</Link>
+          <Link to={`${DEV_QUALITY_GATES_ROUTE}?view=run`}>
+            {import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '查看服务端诊断历史' : '运行本机正式门禁'}
+          </Link>
           <Link to={docsLink('docs/product/自动化测试策略.md')}>
             测试策略与规则维护
           </Link>

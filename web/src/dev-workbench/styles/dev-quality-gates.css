@@ -43,6 +43,7 @@
 }
 
 .erp-dev-quality-shell,
+.erp-dev-quality-group-panel,
 .erp-dev-quality-run-view,
 .erp-dev-quality-governance-view,
 .erp-dev-quality-gaps-view {
@@ -52,6 +53,7 @@
 }
 
 .erp-dev-quality-shell > *,
+.erp-dev-quality-group-panel > *,
 .erp-dev-quality-run-view > *,
 .erp-dev-quality-governance-view > *,
 .erp-dev-quality-gaps-view > * {

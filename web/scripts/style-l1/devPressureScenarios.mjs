@@ -210,6 +210,9 @@ export function createDevPressureScenarios({
         operation = null
         actionRequests = []
         reportReads = 0
+        await page.route('**/__dev/api/qa/coverage{,/snapshot}', (route) =>
+          reply(route, { status: 'missing', report: null })
+        )
         await page.route(
           '**/__dev/api/qa/testing/pressure-reports*',
           async (route) => {
@@ -369,7 +372,7 @@ export function createDevPressureScenarios({
         mode = 'read-error'
         await reload()
         await panel
-          .getByText('压力测试报告读取失败，请重新读取或检查本地开发服务。', {
+          .getByText('压力测试报告读取失败，请重新读取或检查当前工作台服务。', {
             exact: true,
           })
           .waitFor()
@@ -397,9 +400,11 @@ export function createDevPressureScenarios({
         assert.equal(actionRequests.length, 0, '切换档位与刷新只恢复选择，不启动测试')
         const pressureContext = new URL(page.url()).searchParams.toString()
         const primaryTabs = page.getByRole('tablist', { name: '测试验证工作区主视图' })
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true }).click()
+        const groups = page.getByRole('tablist', { name: '测试环境与指引' })
+        await groups.getByRole('tab', { name: '测试指引', exact: true }).click()
         await page.reload()
-        await primaryTabs.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
+        await groups.getByRole('tab', { name: '测试指引', exact: true, selected: true }).waitFor()
+        await groups.getByRole('tab', { name: '本地测试', exact: true }).click()
         await primaryTabs.getByRole('tab', { name: '压力测试', exact: true }).click()
         await panel.getByRole('button', { name: '运行 10 分钟容量', exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.toString(), pressureContext)
@@ -495,7 +500,7 @@ export function createDevPressureScenarios({
         releaseDeferred()
         assert.equal(
           await page
-            .getByText('压力测试报告读取失败，请重新读取或检查本地开发服务。', {
+            .getByText('压力测试报告读取失败，请重新读取或检查当前工作台服务。', {
               exact: true,
             })
             .count(),

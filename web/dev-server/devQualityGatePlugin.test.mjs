@@ -260,7 +260,7 @@ test('quality gate projects GitLab exact-SHA CI separately from local dirty stat
     evidence.topology.jobs.find((job) => job.name === 'CI Gate').needs,
     ['quality_aggregate']
   )
-  assert.match(evidence.message, /不覆盖本机未提交改动/u)
+  assert.match(evidence.message, /不覆盖工作区未提交改动/u)
 })
 
 test('quality gate distinguishes a readable GitLab response from a missing exact-SHA pipeline', () => {
@@ -402,15 +402,33 @@ test('GitLab native reports survive the service and strict browser response cont
     },
   })
   const reports = await provider.readPipelineReports({ pipelineId: 91, sha: repository.commit })
-  const evidence = projectDevQualityGateServerEvidence({ schemaVersion: 'plush.delivery-pipeline-timings/v1', runs: [{
-    id: 91, attempt: 91, workflow: 'ci', event: 'push', gitSha: repository.commit,
-    status: 'completed', conclusion: 'success', createdAt: '2026-10-24T01:00:00.000Z', finishedAt: '2026-10-24T01:01:00.000Z',
-    durationMs: 60_000, queueMs: 0, url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/91',
-    jobs: [{ id: 301, name: 'quality_web_checks', status: 'completed', conclusion: 'success', durationMs: 60_000, queueMs: 0 }],
-  }] }, repository)
+  const evidence = projectDevQualityGateServerEvidence(
+    {
+      schemaVersion: 'plush.delivery-pipeline-timings/v1',
+      runs: [{
+        id: 91,
+        attempt: 91,
+        workflow: 'ci',
+        event: 'push',
+        gitSha: repository.commit,
+        status: 'completed',
+        conclusion: 'success',
+        createdAt: '2026-10-24T01:00:00.000Z',
+        finishedAt: '2026-10-24T01:01:00.000Z',
+        durationMs: 60_000,
+        queueMs: 0,
+        url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/91',
+        jobs: [{ id: 301, name: 'quality_web_checks', status: 'completed', conclusion: 'success', durationMs: 60_000, queueMs: 0 }],
+      }],
+    },
+    repository
+  )
   const service = createDevQualityGateService({
-    projectRoot: root, env: DATABASE_ENV, readRepositoryState: async () => repository,
-    readReceipt: () => null, loadServerEvidence: () => ({ ...evidence, reports }),
+    projectRoot: root,
+    env: DATABASE_ENV,
+    readRepositoryState: async () => repository,
+    readReceipt: () => null,
+    loadServerEvidence: () => ({ ...evidence, reports }),
   })
   const result = normalizeDevQualityGateSummary(await service.summary()).serverEvidence
   assert.deepEqual(result.reports, reports)
@@ -1044,7 +1062,8 @@ test('quality gate summary distinguishes a current failed receipt from an old re
   assert.equal(summary.proofs.strict.status, 'failed')
   assert.equal(summary.proofs.strict.releaseEligible, false)
   assert.equal(summary.proofs.strict.reused, false)
-  assert.match(summary.status.title, /当前版本.*未通过/u)
+  assert.equal(summary.status.title, '当前工作区严格门禁未通过')
+  assert.match(summary.status.recommendation, /在本地开发机运行严格诊断/u)
   assert.doesNotMatch(summary.status.title, /旧版本/u)
 })
 

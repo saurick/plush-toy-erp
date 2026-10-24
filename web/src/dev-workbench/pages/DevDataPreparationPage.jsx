@@ -29,6 +29,7 @@ import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
@@ -43,6 +44,7 @@ import {
   buildDevDataPreparationSearch,
   createDevDataPreparationClient,
   dataPreparationStatusPresentation,
+  getDataPreparationEnvironment,
   resolveDataPreparationAvailability,
   resolveDataPreparationExecutionConfirmation,
   resolveDataPreparationPrepareIntent,
@@ -82,12 +84,12 @@ function shortHash(value) {
 
 function operationTargetLabel(targetKey) {
   if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133) {
-    return 'demo 演练造数'
+    return '服务器 · demo 演练环境'
   }
   if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal) {
     return '本地隔离验收'
   }
-  return '本地开发'
+  return targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment ? '本地开发' : '目标未确认'
 }
 
 function StatusTag({ status }) {
@@ -373,7 +375,7 @@ function DatasetEnvironmentContract({ summary }) {
     },
     {
       key: 'trial',
-      title: 'demo 演练造数',
+      title: '服务器 demo 演练造数',
       target: contract.customerTrial133.databaseName,
       status: trialScenarioReadback ? '已独立读回' : '待目标回执',
       color: trialScenarioReadback ? 'success' : 'default',
@@ -382,7 +384,7 @@ function DatasetEnvironmentContract({ summary }) {
     },
     {
       key: 'isolated',
-      title: '隔离完整验收',
+      title: '本地隔离完整验收',
       target: '每次新建的可丢弃数据库',
       status: fullReadback ? '已通过并清理' : '待新批次',
       color: fullReadback ? 'success' : 'default',
@@ -1400,6 +1402,13 @@ export default function DevDataPreparationPage() {
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-data-shell">
+        <DevTestingEnvironment
+          ariaLabel="数据目标环境"
+          context={getDataPreparationEnvironment(
+            dataView === 'confirm' ? currentOperation?.targetSummary.targetKey : selectedOperationTargetKey,
+            dataView
+          )}
+        />
         <div className="erp-dev-data-context">
           <Text type="secondary">
             <SafetyCertificateOutlined aria-hidden="true" />{' '}
@@ -1564,7 +1573,7 @@ export default function DevDataPreparationPage() {
                         {
                           value:
                             DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133,
-                          label: 'demo 演练环境',
+                          label: '服务器 · demo 演练环境',
                         },
                       ]}
                     />

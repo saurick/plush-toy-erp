@@ -49,6 +49,48 @@ export const VIEW_ITEMS = Object.freeze([
   }),
 ])
 export const VIEW_KEYS = Object.freeze(VIEW_ITEMS.map((item) => item.value))
+export const WORKSPACE_VIEW_ITEMS = Object.freeze(
+  VIEW_ITEMS.filter(({ value }) => value === 'run' || value === 'gaps')
+)
+
+export function getQualityGateViewGroup(view) {
+  return view === 'run' || view === 'gaps' ? 'workspace' : view
+}
+
+export function getQualityGateViewGroups(standalone = false) {
+  return [
+    { value: 'workspace', label: standalone ? '服务端检查' : '本地检查' },
+    { value: 'server', label: '服务器 CI' },
+    { value: 'governance', label: '门禁规则' },
+  ]
+}
+
+export function getQualityGateEnvironment(view, standalone = false) {
+  if (view === 'server') {
+    return {
+      kind: 'server',
+      label: '服务器 · GitLab Runner',
+      detail: 'CI 验证已提交版本；工作区的未提交改动不包含在内。',
+    }
+  }
+  if (view === 'governance') {
+    return {
+      kind: 'reference',
+      label: '通用门禁规则',
+      detail: `查看项目门禁定义；相关范围按${standalone ? '服务端' : '本地'}工作区改动筛选。`,
+    }
+  }
+  return {
+    kind: standalone ? 'server' : 'local',
+    label: standalone ? '服务器工作区' : '本地开发机',
+    detail: view === 'gaps'
+      ? `分析${standalone ? '服务端' : '本地'}工作区的当前或已暂存改动，列出待补证据。`
+      : standalone
+        ? '查看本服务保存的诊断历史；full / strict 请在本地开发机执行。'
+        : 'full / strict 在本机隔离环境执行，结果保存在本机。',
+  }
+}
+
 export const VIEW_QUERY_KEYS = Object.freeze({
   server: Object.freeze(['view', 'serverView']),
   run: Object.freeze(['view', 'profile', 'operation']),

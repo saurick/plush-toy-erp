@@ -14,6 +14,7 @@ import {
   BUSINESS_USABILITY_STATUS_PRESENTATION,
 } from '../../erp/config/businessUsabilityCatalog.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import {
   DEV_BUSINESS_USABILITY_ROUTE,
@@ -198,6 +199,7 @@ export default function DevBusinessUsabilityPage() {
       </header>
 
       <main className="erp-dev-business-usability-shell">
+        <DevTestingEnvironment view="usability" />
         <details className="erp-dev-disclosure erp-dev-business-usability-boundary">
           <summary>检查说明与边界</summary>
           <Paragraph>推荐岗位不是权限，覆盖状态也不是客户验收。</Paragraph>

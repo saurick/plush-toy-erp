@@ -511,8 +511,8 @@ function createServerEvidence(status = 'passed') {
         '依赖来自当前 exact SHA 的 GitLab CI Lint，状态来自本次实际 Pipeline。',
     },
     history: SERVER_CI_HISTORY,
-    message: 'GitLab CI 已证明当前提交 SHA；该证据不覆盖本机未提交改动。',
-    notProven: ['本机未提交改动', '不可变 Release', '目标部署', '客户 UAT'],
+    message: 'GitLab CI 已证明当前提交 SHA；该证据不覆盖工作区未提交改动。',
+    notProven: ['工作区未提交改动', '不可变 Release', '目标部署', '客户 UAT'],
   }
 }
 
@@ -690,7 +690,7 @@ export function createQualityGateStyleSummary(
           : '可以验证当前改动，但结果不能作为固定版本发布证明。',
       recommendation: active
         ? '等待当前运行结束；如确需停止，请使用取消运行。'
-        : '运行本机严格诊断，先确认当前改动没有质量阻断。',
+        : '在本地开发机运行严格诊断，先确认当前改动没有质量阻断。',
       releaseEligible: false,
       notProven: ['干净 exact SHA', '目标环境发布', '客户 UAT'],
     },
@@ -1173,7 +1173,8 @@ export function createDevQualityGateScenarios({
         await assertNoHorizontalOverflow(page, 'dev-quality-gates-desktop-light')
         await drawer.locator('.ant-drawer-close').click()
         await drawer.waitFor({ state: 'hidden' })
-        await page.getByRole('tab', { name: '本机诊断', exact: true }).click()
+        await page.getByRole('tab', { name: '本地检查', exact: true }).click()
+        await page.getByRole('tab', { name: '本机诊断', exact: true }).waitFor()
         const diagnosticActions = page.getByRole('region', { name: '本机质量诊断操作', exact: true })
         await diagnosticActions.getByRole('button', { name: /运行本机/u }).waitFor()
         assert.equal(await diagnosticActions.getByRole('button', { name: /运行本机/u }).count(), 1)

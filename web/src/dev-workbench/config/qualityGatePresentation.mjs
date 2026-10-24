@@ -15,6 +15,13 @@ export const PROFILE_LABELS = Object.freeze({
   strict: '本机严格诊断',
 })
 
+export function getQualityGateProfileLabel(profile, standalone = false) {
+  if (!Object.hasOwn(PROFILE_LABELS, profile)) return '未登记门禁'
+  return standalone
+    ? `服务端${profile === 'full' ? '完整' : '严格'}诊断`
+    : PROFILE_LABELS[profile]
+}
+
 export const STAGE_STATUS = Object.freeze({
   pending: Object.freeze({ label: '等待运行', color: 'default' }),
   running: Object.freeze({ label: '正在运行', color: 'processing' }),
@@ -447,7 +454,7 @@ export function qualityGateViewStatus(summary, view, summaryError) {
           tone: 'error',
           title: 'GitLab CI 页面状态读取失败',
           description: summaryError,
-          recommendation: '确认本机开发服务可用后刷新状态。',
+          recommendation: '确认当前工作台服务可用后刷新状态。',
           notProven: [],
         }
       : {
@@ -467,7 +474,7 @@ export function qualityGateViewStatus(summary, view, summaryError) {
     description: evidence?.message || '正在读取当前提交的 CI 证据。',
     recommendation:
       evidence?.status === 'passed'
-        ? '未提交改动请使用“本机诊断”。'
+        ? '未提交改动请在本地开发机使用“本机诊断”。'
         : evidence?.status === 'docs_passed'
           ? '发布前在 GitLab 新建 main 流水线，设置 QA_MODE=full。'
           : evidence?.status === 'running'

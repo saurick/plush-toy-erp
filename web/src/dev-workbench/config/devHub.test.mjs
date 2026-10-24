@@ -519,7 +519,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     'docs/engineering/研发效能工作台与CI-CD设计.md'
   )
   assert.match(dataPreparationItem?.truthSource || '', /Source \/ Fact API/)
-  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /本机系统边界/)
+  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /本地与服务器 demo 按登记目标区分/)
   assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /只向前补齐/)
   assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /业务场景固定批次/)
   assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /长期保留/)

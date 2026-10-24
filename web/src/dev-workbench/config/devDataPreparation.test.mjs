@@ -27,6 +27,7 @@ import {
   buildDevDataPreparationSearch,
   createDataPreparationIdempotencyKey,
   createDevDataPreparationClient,
+  getDataPreparationEnvironment,
   projectDataPreparationAcceptancePlan,
   resolveDataPreparationAvailability,
   resolveDataPreparationExecutionConfirmation,
@@ -35,6 +36,15 @@ import {
   validateDevDataPreparationOperation,
   validateDevDataPreparationSummary,
 } from './devDataPreparation.mjs'
+
+test('data target labels distinguish local, isolated and remote targets without attributing mixed history to one target', () => {
+  assert.equal(getDataPreparationEnvironment('local-development').kind, 'local')
+  assert.equal(getDataPreparationEnvironment('isolated-local').label, '数据目标：本地隔离环境')
+  assert.equal(getDataPreparationEnvironment('customer-trial-133').kind, 'server')
+  assert.equal(getDataPreparationEnvironment('customer-trial-133', 'confirm').kind, 'server')
+  assert.equal(getDataPreparationEnvironment('local-development', 'receipts').kind, 'reference')
+  assert.equal(getDataPreparationEnvironment(undefined, 'confirm').label, '数据目标尚未确认')
+})
 
 test('data preparation route search keeps profile, target, and customer atomic', () => {
   assert.equal(

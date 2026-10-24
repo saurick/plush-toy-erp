@@ -19,7 +19,7 @@ export function createGrowthValidationScenarios({ assert, path, outputDir }) {
       } }))
     },
     verify: async (page) => {
-      await page.getByRole('tablist', { name: '测试验证工作区主视图' }).getByRole('tab', { name: '测试指引', exact: true }).click()
+      await page.getByRole('tablist', { name: '测试环境与指引' }).getByRole('tab', { name: '测试指引', exact: true }).click()
       await page.getByRole('tab', { name: '增长验证', exact: true }).click()
       const table = page.getByRole('table', { name: '增长、并发与事务验证', exact: true })
       await table.waitFor()

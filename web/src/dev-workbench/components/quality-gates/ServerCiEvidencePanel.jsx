@@ -22,7 +22,7 @@ export function ServerCiEvidencePanel({ summary }) {
   return (
     <section className="erp-dev-quality-server-evidence" aria-label="GitLab CI 质量证据">
       <Space wrap>
-        <Text code>{shortCommit(evidence.gitSha || summary.repository?.commit)}</Text>
+        <Text>CI 对应版本 <Text code>{shortCommit(evidence.gitSha)}</Text></Text>
         <Tag color={evidence.status === 'passed' ? 'success' : evidence.status === 'failed' ? 'error' : 'default'}>{STATUS[evidence.status] || 'CI 尚未证明'}</Tag>
         {evidence.pipeline ? <Text>耗时 {formatQualityGateDuration(evidence.pipeline.durationMs)}</Text> : null}
         <DevTimestamp value={evidence.pipeline?.finishedAt} missing="尚未完成" />

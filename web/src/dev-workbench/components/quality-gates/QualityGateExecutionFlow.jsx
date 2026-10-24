@@ -9,7 +9,7 @@ import {
   getQualityGateFlowSegments,
 } from '../../config/devQualityGates.mjs'
 import {
-  PROFILE_LABELS,
+  getQualityGateProfileLabel,
   STAGE_STATUS,
   MANAGED_DATABASE_STEPS,
   MANAGED_DATABASE_FLOW,
@@ -325,7 +325,8 @@ export function ManagedDatabaseLifecycleGuide() {
   )
 }
 
-export function GateExecutionFlow({ summary, operation, profile }) {
+export function GateExecutionFlow({ summary, operation, profile, standalone = false }) {
+  const trackLabel = standalone ? '服务端诊断执行轨道' : '本机诊断执行轨道'
   const stages = operation
     ? deriveStages(summary, operation)
     : previewStages(summary, profile)
@@ -345,10 +346,10 @@ export function GateExecutionFlow({ summary, operation, profile }) {
   }
 
   return (
-    <section className="erp-dev-quality-flow" aria-label="本机诊断执行轨道">
+    <section className="erp-dev-quality-flow" aria-label={trackLabel}>
       <div className="erp-dev-quality-flow__heading">
         <div>
-          <Text strong>本机诊断执行轨道</Text>
+          <Text strong>{trackLabel}</Text>
           <Text type="secondary">
             {profile === 'strict'
               ? `先运行 ${strictExtraCount} 个 strict 附加检查，再进入 full 共用主路径。`
@@ -356,7 +357,7 @@ export function GateExecutionFlow({ summary, operation, profile }) {
           </Text>
         </div>
         <Tag className={operation ? 'erp-dev-accent-tag' : undefined}>
-          {PROFILE_LABELS[profile]} · {stages.length} 个阶段
+          {getQualityGateProfileLabel(profile, standalone)} · {stages.length} 个阶段
         </Tag>
       </div>
       <div className="erp-dev-quality-flow__segments">

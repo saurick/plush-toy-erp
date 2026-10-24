@@ -322,6 +322,7 @@ export function createDevDataPreparationScenarios({
       },
       verify: async (page) => {
         await expectHeading(page, '选择要准备的数据')
+        await page.getByText('数据目标：本地开发库', { exact: true }).waitFor()
         assert.equal(
           await page
             .getByRole('radio', { name: '长期业务场景数据', exact: true })
@@ -347,6 +348,7 @@ export function createDevDataPreparationScenarios({
         await page
           .getByRole('radio', { name: '按最新业务链完整回归', exact: true })
           .check()
+        await page.getByText('数据目标：本地隔离环境', { exact: true }).waitFor()
         assert.equal(
           await page
             .getByRole('tab', { name: '当前批次', exact: true })
@@ -464,6 +466,7 @@ export function createDevDataPreparationScenarios({
         await page.getByRole('button', { name: '重新检查', exact: true }).click()
         await page.getByRole('region', { name: '本次回执', exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.get('view'), 'receipts')
+        await page.getByText('本地与服务器记录', { exact: true }).waitFor()
         assert.equal(await page.getByRole('tab', { name: '当前批次', exact: true }).count(), 0)
         assert.equal(await page.locator('#dev-data-panel-receipts .erp-dev-data-history-label').count(), 0, '本次回执不在历史列表重复显示')
         assert.equal(fixture.actions.length, 1, '终态转入回执不重复执行')
@@ -481,8 +484,9 @@ export function createDevDataPreparationScenarios({
           .getByRole('radio', { name: '长期业务场景数据', exact: true })
           .check()
         await page
-          .getByRole('radio', { name: 'demo 演练环境', exact: true })
+          .getByRole('radio', { name: '服务器 · demo 演练环境', exact: true })
           .check()
+        await page.getByText('数据目标：服务器 · demo 演练环境', { exact: true }).waitFor()
         const scenarioPrepare = page.getByRole('button', {
           name: '生成业务场景测试数据',
           exact: true,
@@ -495,7 +499,7 @@ export function createDevDataPreparationScenarios({
           )
         )
         assert.equal(await scenarioPrepare.isDisabled(), false)
-        assert.equal(await page.getByRole('radio', { name: 'demo 演练环境', exact: true }).isChecked(), true)
+        assert.equal(await page.getByRole('radio', { name: '服务器 · demo 演练环境', exact: true }).isChecked(), true)
         const targetDispatches = await page.evaluate(() => window.dataPreparationSummaryDispatches)
         const demoDispatch = targetDispatches.find((item) => item.profile === 'scenario-demo' && item.target === 'customer-trial-133')
         assert.ok(demoDispatch, '切换 demo 目标必须发起对应预检')

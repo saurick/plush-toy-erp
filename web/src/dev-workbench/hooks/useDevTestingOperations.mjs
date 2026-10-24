@@ -67,7 +67,7 @@ export default function useDevTestingOperations({ client } = {}) {
         ) {
           return
         }
-        setTestingSummaryError('固定验证状态读取失败，请检查本地开发服务。')
+        setTestingSummaryError('固定验证状态读取失败，请检查当前工作台服务。')
       }
     }
 
@@ -199,7 +199,7 @@ export default function useDevTestingOperations({ client } = {}) {
         '固定验证请求暂时未确认；再次点击会复用同一请求，不会重复启动。'
       )
       message.error({
-        content: '固定验证暂时无法确认，请检查本地开发服务',
+        content: '固定验证暂时无法确认，请检查当前工作台服务',
         key: `dev-testing-${action}`,
       })
     } finally {

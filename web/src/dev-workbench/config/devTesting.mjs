@@ -18,6 +18,64 @@ export const DEV_TESTING_PRIMARY_VIEWS = Object.freeze([
   Object.freeze({ value: 'guide', label: '测试指引' }),
 ])
 
+export const DEV_TESTING_WORKSPACE_VIEWS = Object.freeze(
+  DEV_TESTING_PRIMARY_VIEWS.filter(({ value }) => !['server', 'guide'].includes(value))
+)
+
+export function getDevTestingViewGroup(view) {
+  return ['server', 'guide'].includes(view) ? view : 'workspace'
+}
+
+export function getDevTestingViewGroups(standalone = false) {
+  return [
+    { value: 'workspace', label: standalone ? '服务器专项' : '本地测试' },
+    { value: 'server', label: '服务器验证' },
+    { value: 'guide', label: '测试指引' },
+  ]
+}
+
+export function getDevTestingEnvironment(view, standalone = false) {
+  if (view === 'server') {
+    return {
+      kind: 'server',
+      label: '服务器',
+      detail: 'GitLab CI 与目标环境回执，分别核对测试和部署结果。',
+    }
+  }
+  if (view === 'guide' || view === 'commands') {
+    return {
+      kind: 'reference',
+      label: view === 'guide' ? '通用指引' : '命令参考',
+      detail: view === 'guide' ? '测试方法与判定口径，适用于本地和服务器。' : '复制不会执行；执行环境以各命令说明为准。',
+    }
+  }
+  if (view === 'usability') {
+    return {
+      kind: 'reference',
+      label: '通用资料 · 页面说明目录',
+      detail: '按项目登记核对说明覆盖，不表示本地或服务器测试已通过。',
+    }
+  }
+  if (view === 'coverage' || view === 'chains') {
+    return {
+      kind: standalone ? 'server' : 'local',
+      label: standalone ? '报告来源：服务器工作台' : '报告来源：本地工作台',
+      detail: `读取${standalone ? '本服务' : '本机'}保存的${view === 'chains' ? '链路实跑批次与原始证据' : '当前工作区及历史隔离报告'}；原始执行环境和范围按报告内证据核对。`,
+    }
+  }
+  return {
+    kind: standalone ? 'server' : 'local',
+    label: standalone ? '服务器工作台' : '本地开发机',
+    detail: view === 'pressure'
+      ? `压力测试在${standalone ? '本服务的' : '本机'}隔离环境执行；历史报告按记录的运行条件核对。`
+      : view === 'closeout'
+          ? `核对${standalone ? '服务器' : '本地'}工作区的 Git 接线；复制命令不会提交或推送。`
+          : standalone
+            ? '本服务的项目专项与历史报告；CI 和部署结果见服务器验证。'
+            : '本地执行入口与本机保存的历史报告；服务器结果单独核对。',
+  }
+}
+
 export function resolveDevTestingReturnView(search) {
   const params = new URLSearchParams(search)
   const values = params.getAll('returnView')

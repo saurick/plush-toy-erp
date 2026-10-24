@@ -156,7 +156,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不索引历史参考 / No reference commands',
       '不进生产构建 / No prod build',
     ]),
-    description: '查看各类测试、执行入口与已有报告',
+    description: '按执行端区分本地测试、服务器专项与验证，查看报告和通用指引',
   }),
   Object.freeze({
     key: 'business-chain-audit',
@@ -165,7 +165,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     group: '验证治理 / QA',
     route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
-    truthSource: '本地实跑批次、逐步观察、问题与原始证据清单',
+    truthSource: '当前工作台保存的实跑批次、逐步观察、问题与原始证据清单',
     status: '只读批次报告 / Read-only reports',
     guardrails: Object.freeze([
       '历史证据独立呈现 / Historical evidence stays distinct',
@@ -181,8 +181,8 @@ export const DEV_HUB_ITEMS = Object.freeze([
     group: '验证治理 / QA',
     route: DEV_QUALITY_GATES_ROUTE,
     source: 'scripts/qa/README.md',
-    truthSource: '正式 full / strict runner、门禁回执与本地 operation',
-    status: '本机受控运行 / Local controlled execution',
+    truthSource: 'GitLab CI、正式 full / strict runner、门禁回执与执行端 operation',
+    status: '分端验证 / Environment-specific verification',
     guardrails: Object.freeze([
       '只运行固定 full / strict 动作 / Fixed actions only',
       '门禁回执是唯一结果真源 / Receipt is the only result truth',
@@ -190,7 +190,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不接受命令、路径、凭据或任意目标 / No arbitrary input',
       '不进生产构建 / No prod build',
     ]),
-    description: '固定版本 CI、本机诊断与缺口',
+    description: '区分服务器 CI 与工作区检查；本地运行诊断，服务器查看历史',
   }),
   Object.freeze({
     key: 'data-preparation',
@@ -199,17 +199,17 @@ export const DEV_HUB_ITEMS = Object.freeze([
     route: DEV_DATA_PREPARATION_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
     truthSource: '计划回执、正式 Source / Fact API 与目标读回',
-    status: '本机受控写入 / Local controlled writes',
+    status: '按目标受控写入 / Target-scoped writes',
     guardrails: Object.freeze([
       '固定数据档位 / Fixed profiles',
-      '本机系统边界 / Local OS boundary',
+      '本地与服务器 demo 按登记目标区分 / Registered targets only',
       '不可变计划确认 / Immutable plan confirmation',
       '业务场景固定批次长期保留并复用、只向前补齐；完整回归使用隔离库',
       '禁止任意目标或命令 / No arbitrary target or shell',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '准备与复用模拟数据，核对批次结果',
+      '区分本地开发、隔离回归与服务器 demo，准备数据并核对各自回执',
   }),
   Object.freeze({
     key: 'ui-design',

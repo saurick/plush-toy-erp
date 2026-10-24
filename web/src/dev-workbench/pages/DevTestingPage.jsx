@@ -37,6 +37,7 @@ import DevPressurePanel from '../components/DevPressurePanel.jsx'
 import DevBusinessRulesPanel from '../components/DevBusinessRulesPanel.jsx'
 import DevTestingStrategyGuide from '../components/DevTestingStrategyGuide.jsx'
 import DevTestingOverview from '../components/DevTestingOverview.jsx'
+import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
 import DevVerificationEvidence from '../components/DevVerificationEvidence.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
@@ -49,6 +50,9 @@ import {
   DEV_TESTING_COVERAGE_SECTION_QUERY_KEY,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   DEV_TESTING_PRIMARY_VIEWS,
+  DEV_TESTING_WORKSPACE_VIEWS,
+  getDevTestingViewGroup,
+  getDevTestingViewGroups,
   buildDevTestingViewSearch,
   resolveDevTestingReturnView,
   buildDevTestingDocs,
@@ -716,7 +720,7 @@ function coverageReportAlert(state, source) {
       description:
         state.message && state.message !== '覆盖报告读取失败'
           ? `${state.message}；空值表示未采集，不是 0%。`
-          : '请检查本地只读报告接口；空值表示未采集，不是 0%。',
+          : '请检查当前工作台报告接口；空值表示未采集，不是 0%。',
     }
   }
   if (source === 'snapshot') {
@@ -729,7 +733,7 @@ function coverageReportAlert(state, source) {
   return {
     type: 'info',
     title: '当前工作区尚未验证',
-    description: state?.message || '代码稳定后可采集本地覆盖基线；空值表示未采集，不是 0%。',
+    description: state?.message || (import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '本服务尚未保存覆盖报告；CI 测试与覆盖率见服务器验证。' : '代码稳定后可采集本地覆盖基线；空值表示未采集，不是 0%。'),
   }
 }
 
@@ -828,7 +832,7 @@ function ValidationPlanPanel({ plan, tiers, loading, error, busy, onGenerate, ch
         <Alert
           showIcon
           type="info"
-          message="已有本地 QA 任务正在运行"
+          message="当前执行端已有 QA 任务正在运行"
           description={`当前类型：${
             busy.kind === 'coverage' ? '覆盖基线' : '固定验证'
           } · ${busy.profile}。计划仍可只读生成，但新的执行动作会保持禁用。`}
@@ -1419,15 +1423,21 @@ function CoverageReportView({
           </section>
         </div>
         <Paragraph>
-          空值表示未采集，不是 0%。采集本地覆盖基线固定运行真实本地 baseline
-          测试并自动聚合报告，但不会执行数据库写入、真实业务浏览器、目标环境部署或客户
-          UAT；切换页面不会停止后台任务，“重新读取”只读取本地报告。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
+          空值表示未采集，不是 0%。“重新读取”只读取当前工作台保存的报告，历史报告的执行环境与范围按原始证据核对。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
           和 0 tests executed
-          均不能算通过。应在代码基本稳定的检查点运行，不必每次编辑后执行；备用命令
-          {DEV_TESTING_COVERAGE_COLLECT_COMMAND}{' '}
-          用于开发接口不可用时手工执行同一采集器。
+          均不能算通过。
         </Paragraph>
-        <Button icon={<CopyOutlined />} onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}>复制备用命令</Button>
+        {import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
+          <Paragraph>采集覆盖基线请到本地开发机工作台；服务器 CI 测试与覆盖率在“服务器验证”核对。</Paragraph>
+        ) : (
+          <>
+            <Paragraph>
+              采集本地覆盖基线固定运行真实本地 baseline 测试并聚合报告，不会执行数据库写入、真实业务浏览器、目标环境部署或客户 UAT。
+              切换页面不会停止后台任务。应在代码基本稳定的检查点运行，不必每次编辑后执行；开发接口不可用时，可在本地开发机运行备用命令 {DEV_TESTING_COVERAGE_COLLECT_COMMAND}。
+            </Paragraph>
+            <Button icon={<CopyOutlined />} onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}>复制本地采集命令</Button>
+          </>
+        )}
         {report?.policy.length > 0 ? (
           <div className="erp-dev-testing-coverage-policy-list">
             {report.policy.map((item) => (
@@ -1516,6 +1526,13 @@ export default function DevTestingPage() {
   const isCoverageView = view === VIEW_COVERAGE
   const readsCoverage = isCoverageView || view === VIEW_OVERVIEW
   const isAuxiliaryView = AUXILIARY_VIEW_VALUES.has(view)
+  const viewGroup = getDevTestingViewGroup(view)
+  const lastWorkspaceView = React.useRef(VIEW_OVERVIEW)
+  React.useEffect(() => {
+    if (DEV_TESTING_WORKSPACE_VIEWS.some(({ value }) => value === view)) {
+      lastWorkspaceView.current = view
+    }
+  }, [view])
   const returnView = resolveDevTestingReturnView(searchParams)
   const returnViewLabel = DEV_TESTING_PRIMARY_VIEWS.find(({ value }) => value === returnView).label
   const requestedDocumentRole =
@@ -1592,7 +1609,7 @@ export default function DevTestingPage() {
           : {
               payload: {
                 status: 'failed',
-                message: '覆盖报告读取失败，请检查本地开发接口',
+                message: '覆盖报告读取失败，请检查当前工作台报告接口',
               },
               httpStatus: 500,
             }
@@ -1602,7 +1619,7 @@ export default function DevTestingPage() {
           : {
               payload: {
                 status: 'failed',
-                message: '隔离验证报告读取失败，请检查本地开发接口',
+                message: '隔离验证报告读取失败，请检查当前工作台报告接口',
               },
               httpStatus: 500,
             }
@@ -1882,7 +1899,7 @@ export default function DevTestingPage() {
         '采集请求暂时未确认；再次点击会复用同一请求，不会重复启动测试。'
       )
       message.error({
-        content: '覆盖基线采集暂时无法确认，请检查本地开发服务',
+        content: '覆盖基线采集暂时无法确认，请检查当前工作台服务',
         key: 'coverage-collect',
       })
     } finally {
@@ -1917,14 +1934,14 @@ export default function DevTestingPage() {
           </Space>
         </div>
         <div
-          className="erp-dev-testing-primary-nav"
+          className="erp-dev-testing-group-nav"
           hidden={isAuxiliaryView}
         >
           <SlidingTabList
-            aria-label="测试验证工作区主视图"
-            options={VIEW_OPTIONS.map((item) => item.value === 'overview' ? { ...item, label: import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '项目专项与历史' : '本地测试总览' } : item)}
-            value={isAuxiliaryView ? returnView : view}
-            onChange={selectView}
+            aria-label="测试环境与指引"
+            options={getDevTestingViewGroups(Boolean(import.meta.env.PLUSH_STANDALONE_WORKBENCH))}
+            value={viewGroup}
+            onChange={(group) => selectView(group === 'workspace' ? lastWorkspaceView.current : group)}
           />
         </div>
         <div
@@ -1953,9 +1970,19 @@ export default function DevTestingPage() {
       </header>
 
       <main className="erp-dev-testing-shell">
+        <div className="erp-dev-testing-scope">
+          <DevTestingEnvironment view={view} />
+          <div className="erp-dev-testing-primary-nav" hidden={viewGroup !== 'workspace' || isAuxiliaryView}>
+            <SlidingTabList
+              aria-label="测试验证工作区主视图"
+              options={DEV_TESTING_WORKSPACE_VIEWS}
+              value={viewGroup === 'workspace' && !isAuxiliaryView ? view : lastWorkspaceView.current}
+              onChange={selectView}
+            />
+          </div>
+        </div>
         <section className="erp-dev-testing-reader">
           {view === 'server' ? <DevVerificationEvidence /> : null}
-          {view !== 'server' && !isAuxiliaryView ? <Alert type="info" showIcon message={import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '服务器独立工作台：此处保留本服务的项目专项与历史。CI 和三环境部署记录见“服务器验证”。' : '本地工作区：报告与操作来自当前开发机。CI 和三环境部署记录见“服务器验证”。'} /> : null}
           {view === VIEW_OVERVIEW ? (
             <DevTestingOverview
               source={strategySource}
@@ -1966,7 +1993,7 @@ export default function DevTestingPage() {
             />
           ) : null}
           {view === VIEW_TIERS && import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
-            <Alert type="info" showIcon message="线上入口展示 CI 与目标服务器实跑结果。本机专项检查、覆盖基线与隔离压力测试请在本机工作台执行并查看原始记录。" />
+            <Alert type="info" showIcon message="本轮固定检查与覆盖基线采集在本地开发机执行；CI 结果见“服务器验证”，本服务的压力测试使用隔离环境。" />
           ) : null}
           {view === VIEW_TIERS && !import.meta.env.PLUSH_STANDALONE_WORKBENCH ? (
             <div className="erp-dev-testing-tier-view">

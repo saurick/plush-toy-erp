@@ -11,6 +11,7 @@ import { useSearchParams } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
 import {
   DEFAULT_SERVER_VIEW,
   DEFAULT_VIEW,
@@ -19,7 +20,10 @@ import {
   DEV_QUALITY_GATE_GAP_RANGES,
   DEV_QUALITY_GATE_GAP_RISKS,
   DEV_QUALITY_GATE_PROFILES,
-  VIEW_ITEMS,
+  WORKSPACE_VIEW_ITEMS,
+  getQualityGateViewGroup,
+  getQualityGateViewGroups,
+  getQualityGateEnvironment,
   buildQualityGateViewSearch,
   createDevQualityGateClient,
   createQualityGateIdempotencyKey,
@@ -65,6 +69,7 @@ export default function DevQualityGatesPage() {
   const client = useMemo(() => createDevQualityGateClient(), [])
   const titleRef = useRef(null)
   const cancelButtonRef = useRef(null)
+  const lastWorkspaceView = useRef('run')
   const viewValuesRef = useRef({
     server: { ...EMPTY_VIEW_STATE.server },
     run: { ...EMPTY_VIEW_STATE.run },
@@ -95,6 +100,8 @@ export default function DevQualityGatesPage() {
     [operationIds, searchParams]
   )
   const activeView = parsed.view
+  const activeGroup = getQualityGateViewGroup(activeView)
+  const standalone = Boolean(import.meta.env.PLUSH_STANDALONE_WORKBENCH)
   const activeViewState =
     viewState.view === activeView ? viewState : EMPTY_ASYNC_VIEW_STATE
 
@@ -104,6 +111,9 @@ export default function DevQualityGatesPage() {
 
   useEffect(() => {
     if (!parsed.valid) return
+    if (getQualityGateViewGroup(activeView) === 'workspace') {
+      lastWorkspaceView.current = activeView
+    }
     viewValuesRef.current[activeView] = {
       ...viewValuesRef.current[activeView],
       ...parsed.values,
@@ -381,11 +391,11 @@ export default function DevQualityGatesPage() {
           </Space>
         </div>
         <DevTaskNav
-          idPrefix="quality-gates"
-          ariaLabel="质量门禁视图"
-          items={VIEW_ITEMS.map(({ value, label }) => ({ value, label: value === 'run' && import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '诊断历史' : label }))}
-          value={activeView}
-          onChange={selectView}
+          idPrefix="quality-gates-group"
+          ariaLabel="质量门禁环境与规则"
+          items={getQualityGateViewGroups(standalone)}
+          value={activeGroup}
+          onChange={(group) => selectView(group === 'workspace' ? lastWorkspaceView.current : group)}
           disabled={!parsed.valid}
           compact
           className="erp-dev-quality-tabs"
@@ -420,110 +430,133 @@ export default function DevQualityGatesPage() {
           />
         ) : null}
 
-        <Alert
-          className="erp-dev-quality-status-banner"
-          type={summaryError ? 'error' : displayedStatus?.tone || 'info'}
-          showIcon
-          icon={
-            summaryError ? <CloseCircleOutlined /> : displayedStatus?.tone === 'success' ? (
-              <CheckCircleOutlined />
-            ) : displayedStatus?.tone === 'error' ? (
-              <CloseCircleOutlined />
-            ) : (
-              <InfoCircleOutlined />
-            )
-          }
-          message={summaryError ? '质量门禁状态读取失败' : displayedStatus?.title || '正在读取当前质量状态'}
-          description={
-            <Space direction="vertical" size={4}>
-              <Text>{summaryError || displayedStatus?.description || '正在读取状态。'}</Text>
-              {summaryError ? <Text strong>请刷新状态；当前数据尚未重新核实。</Text> : displayedStatus?.recommendation ? (
-                <Text strong>下一步：{displayedStatus.recommendation}</Text>
-              ) : null}
-              {!summaryError && activeView !== 'server' && displayedStatus?.notProven?.length ? (
-                <details className="erp-dev-disclosure">
-                  <summary>证据边界</summary>
-                  <Text type="secondary">尚未证明：{displayedStatus.notProven.join('、')}</Text>
-                </details>
-              ) : null}
-            </Space>
-          }
-        />
-
-        <ContextStrip
-          summary={summary}
-          view={activeView}
-          summaryError={summaryError}
-          onReturnLocal={() => selectView('run')}
-        />
-
-        <section className="erp-dev-quality-content">
-          <div
-            id={`quality-gates-panel-${activeView}`}
-            role="tabpanel"
-            aria-labelledby={`quality-gates-tab-${activeView}`}
-            tabIndex={0}
-          >
-            {parsed.valid && activeView === 'server' ? (
-              <ServerCiEvidencePanel
-                summary={summary}
-                serverView={parsed.values.serverView}
-                onServerViewChange={(serverView) =>
-                  updateViewValues({ serverView })
-                }
+        <section
+          className="erp-dev-quality-group-panel"
+          id={`quality-gates-group-panel-${activeGroup}`}
+          role="tabpanel"
+          aria-labelledby={`quality-gates-group-tab-${activeGroup}`}
+        >
+          <div className="erp-dev-testing-scope">
+            <DevTestingEnvironment context={getQualityGateEnvironment(activeView, standalone)} />
+            <div hidden={activeGroup !== 'workspace'}>
+              <DevTaskNav
+                idPrefix="quality-gates"
+                ariaLabel={standalone ? '服务端检查内容' : '本地检查内容'}
+                items={WORKSPACE_VIEW_ITEMS.map(({ value, label }) => ({ value, label: value === 'run' && standalone ? '诊断历史' : label }))}
+                value={activeView}
+                onChange={selectView}
+                disabled={!parsed.valid}
+                compact
+                className="erp-dev-quality-workspace-tabs"
               />
-            ) : null}
-            {parsed.valid && activeView === 'run' ? (
-              <>
-                {!import.meta.env.PLUSH_STANDALONE_WORKBENCH ? <LocalDiagnosticsActions
-                  summary={summary}
-                  initialLoading={initialLoading}
-                  canRun={canRun}
-                  actionProfile={actionProfile}
-                  profile={parsed.values.profile || 'strict'}
-                  onProfileChange={(profile) => updateViewValues({ profile })}
-                  onStart={start}
-                /> : <Alert type="info" showIcon message="完整测试由 GitLab CI 执行。此处保留本执行端的诊断历史；本地 full / strict 请在开发机工作台运行。" />}
-                <RunView
-                  summary={summary}
-                  operation={displayedOperation}
-                  previewProfile={parsed.values.profile || 'strict'}
-                  actionProfile={actionProfile}
-                  onCancel={cancel}
-                  cancelButtonRef={cancelButtonRef}
-                />
-              </>
-            ) : null}
-            {parsed.valid && activeView === 'governance' ? (
-              <GovernanceView
-                data={activeViewState.data}
-                loading={activeViewState.loading}
-                error={activeViewState.error}
-                values={parsed.values}
-                onSearch={(q) => updateViewValues({ q })}
-                onFilter={(filter) =>
-                  DEV_QUALITY_GATE_GOVERNANCE_FILTERS.includes(filter) &&
-                  updateViewValues({ filter })
-                }
-              />
-            ) : null}
-            {parsed.valid && activeView === 'gaps' ? (
-              <GapsView
-                data={activeViewState.data}
-                loading={activeViewState.loading}
-                error={activeViewState.error}
-                values={parsed.values}
-                onRange={(range) =>
-                  DEV_QUALITY_GATE_GAP_RANGES.includes(range) &&
-                  updateViewValues({ range })
-                }
-                onRisk={(risk) =>
-                  DEV_QUALITY_GATE_GAP_RISKS.includes(risk) &&
-                  updateViewValues({ risk })
-                }
-              />
-            ) : null}
+            </div>
           </div>
+          <Alert
+            className="erp-dev-quality-status-banner"
+            type={summaryError ? 'error' : displayedStatus?.tone || 'info'}
+            showIcon
+            icon={
+              summaryError ? <CloseCircleOutlined /> : displayedStatus?.tone === 'success' ? (
+                <CheckCircleOutlined />
+              ) : displayedStatus?.tone === 'error' ? (
+                <CloseCircleOutlined />
+              ) : (
+                <InfoCircleOutlined />
+              )
+            }
+            message={summaryError ? '质量门禁状态读取失败' : displayedStatus?.title || '正在读取当前质量状态'}
+            description={
+              <Space direction="vertical" size={4}>
+                <Text>{summaryError || displayedStatus?.description || '正在读取状态。'}</Text>
+                {summaryError ? <Text strong>请刷新状态；当前数据尚未重新核实。</Text> : displayedStatus?.recommendation ? (
+                  <Text strong>下一步：{displayedStatus.recommendation}</Text>
+                ) : null}
+                {!summaryError && activeView !== 'server' && displayedStatus?.notProven?.length ? (
+                  <details className="erp-dev-disclosure">
+                    <summary>证据边界</summary>
+                    <Text type="secondary">尚未证明：{displayedStatus.notProven.join('、')}</Text>
+                  </details>
+                ) : null}
+              </Space>
+            }
+          />
+
+          <ContextStrip
+            summary={summary}
+            view={activeView}
+            summaryError={summaryError}
+            onReturnLocal={() => selectView('run')}
+            standalone={standalone}
+          />
+
+          <section className="erp-dev-quality-content">
+            <div
+              id={`quality-gates-panel-${activeView}`}
+              role={activeGroup === 'workspace' ? 'tabpanel' : undefined}
+              aria-labelledby={activeGroup === 'workspace' ? `quality-gates-tab-${activeView}` : undefined}
+            >
+              {parsed.valid && activeView === 'server' ? (
+                <ServerCiEvidencePanel
+                  summary={summary}
+                  serverView={parsed.values.serverView}
+                  onServerViewChange={(serverView) =>
+                    updateViewValues({ serverView })
+                  }
+                />
+              ) : null}
+              {parsed.valid && activeView === 'run' ? (
+                <>
+                  {!import.meta.env.PLUSH_STANDALONE_WORKBENCH ? <LocalDiagnosticsActions
+                    summary={summary}
+                    initialLoading={initialLoading}
+                    canRun={canRun}
+                    actionProfile={actionProfile}
+                    profile={parsed.values.profile || 'strict'}
+                    onProfileChange={(profile) => updateViewValues({ profile })}
+                    onStart={start}
+                  /> : <Alert type="info" showIcon message="完整测试由 GitLab CI 执行。此处保留本执行端的诊断历史；本地 full / strict 请在开发机工作台运行。" />}
+                  <RunView
+                    summary={summary}
+                    operation={displayedOperation}
+                    previewProfile={parsed.values.profile || 'strict'}
+                    actionProfile={actionProfile}
+                    onCancel={cancel}
+                    cancelButtonRef={cancelButtonRef}
+                    standalone={standalone}
+                  />
+                </>
+              ) : null}
+              {parsed.valid && activeView === 'governance' ? (
+                <GovernanceView
+                  data={activeViewState.data}
+                  loading={activeViewState.loading}
+                  error={activeViewState.error}
+                  values={parsed.values}
+                  onSearch={(q) => updateViewValues({ q })}
+                  onFilter={(filter) =>
+                    DEV_QUALITY_GATE_GOVERNANCE_FILTERS.includes(filter) &&
+                    updateViewValues({ filter })
+                  }
+                />
+              ) : null}
+              {parsed.valid && activeView === 'gaps' ? (
+                <GapsView
+                  data={activeViewState.data}
+                  loading={activeViewState.loading}
+                  error={activeViewState.error}
+                  values={parsed.values}
+                  onRange={(range) =>
+                    DEV_QUALITY_GATE_GAP_RANGES.includes(range) &&
+                    updateViewValues({ range })
+                  }
+                  onRisk={(risk) =>
+                    DEV_QUALITY_GATE_GAP_RISKS.includes(risk) &&
+                    updateViewValues({ risk })
+                  }
+                />
+              ) : null}
+            </div>
+          </section>
         </section>
       </main>
     </div>

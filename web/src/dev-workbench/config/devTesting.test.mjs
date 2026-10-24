@@ -15,6 +15,10 @@ import {
   DEV_TESTING_ROUTE,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   DEV_TESTING_PRIMARY_VIEWS,
+  DEV_TESTING_WORKSPACE_VIEWS,
+  getDevTestingViewGroup,
+  getDevTestingViewGroups,
+  getDevTestingEnvironment,
   buildDevTestingViewSearch,
   resolveDevTestingReturnView,
   buildDevTestingCopyText,
@@ -1363,6 +1367,27 @@ test('devTesting: 主视图与专项命令往返保留查询上下文并拒绝�
   assert.equal(buildDevTestingViewSearch('view=guide&returnView=pressure', 'invalid').get('view'), 'overview')
 })
 
+test('devTesting: 所有执行和报告视图归入真实执行端，服务器证据与通用资料独立', () => {
+  assert.deepEqual(DEV_TESTING_WORKSPACE_VIEWS.map(({ value }) => value), ['overview', 'tiers', 'coverage', 'pressure'])
+  for (const { value } of DEV_TESTING_WORKSPACE_VIEWS) {
+    assert.equal(getDevTestingViewGroup(value), 'workspace')
+    assert.equal(getDevTestingEnvironment(value).kind, 'local')
+    assert.equal(getDevTestingEnvironment(value, true).kind, 'server')
+  }
+  assert.equal(getDevTestingViewGroup('server'), 'server')
+  assert.equal(getDevTestingViewGroup('guide'), 'guide')
+  for (const standalone of [false, true]) {
+    assert.equal(getDevTestingEnvironment('server', standalone).kind, 'server')
+    for (const view of ['guide', 'commands', 'usability']) assert.equal(getDevTestingEnvironment(view, standalone).kind, 'reference')
+    assert.equal(getDevTestingEnvironment('chains', standalone).kind, standalone ? 'server' : 'local')
+    for (const view of ['coverage', 'chains']) {
+      assert.equal(getDevTestingEnvironment(view, standalone).label, standalone ? '报告来源：服务器工作台' : '报告来源：本地工作台')
+      assert.match(getDevTestingEnvironment(view, standalone).detail, /原始执行环境和范围按报告内证据核对/u)
+    }
+    assert.equal(getDevTestingViewGroups(standalone)[0].label, standalone ? '服务器专项' : '本地测试')
+  }
+})
+
 test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () => {
   assert.match(testingPageSource, /const VIEW_CLOSEOUT = 'closeout'/)
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
@@ -1427,7 +1452,7 @@ test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () =>
     /const actionsDisabled =\s*!summary \|\|\s*Boolean\(summaryError\)/
   )
   assert.match(testingPageSource, /采集本地覆盖基线/)
-  assert.match(testingPageSource, /复制备用命令/)
+  assert.match(testingPageSource, /复制本地采集命令/)
   assert.match(testingPageSource, /本页证明/)
   assert.match(testingPageSource, /本页不证明/)
   assert.match(testingPageSource, /buildDevTestingCoverageSectionSummaries\(report\)/u)
@@ -1442,7 +1467,7 @@ test('devTesting: 页面提供独立的固定动作与覆盖基线边界', () =>
     testingPageSource,
     /不会执行数据库写入、真实业务浏览器、目标环境部署或客户\s+UAT/
   )
-  assert.match(testingPageSource, /“重新读取”只读取本地报告/)
+  assert.match(testingPageSource, /“重新读取”只读取当前工作台保存的报告，历史报告的执行环境与范围按原始证据核对/)
   assert.match(testingPageSource, /请勿重复发起采集/)
   assert.match(testingPageSource, /method: 'GET'/)
   assert.doesNotMatch(testingPageSource, /error\?\.message/)

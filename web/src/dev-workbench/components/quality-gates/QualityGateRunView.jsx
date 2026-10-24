@@ -9,7 +9,7 @@ import {
   formatQualityGateDuration,
 } from '../../config/devQualityGates.mjs'
 import {
-  PROFILE_LABELS,
+  getQualityGateProfileLabel,
   shortCommit,
   operationDuration,
   profileDuration,
@@ -104,7 +104,9 @@ export function RunView({
   actionProfile,
   onCancel,
   cancelButtonRef,
+  standalone = false,
 }) {
+  const executionLabel = standalone ? '服务端' : '本机'
   const profile = operation?.profile || previewProfile
   const stages = operation
     ? deriveStages(summary, operation)
@@ -119,7 +121,7 @@ export function RunView({
       title: '门禁',
       dataIndex: 'profile',
       key: 'profile',
-      render: (profile) => PROFILE_LABELS[profile] || '未登记门禁',
+      render: (profile) => getQualityGateProfileLabel(profile, standalone),
     },
     {
       align: 'left',
@@ -173,13 +175,13 @@ export function RunView({
             <div className="erp-dev-quality-operation__heading">
               <div>
                 <Space size={8} wrap>
-                  <Title level={2}>{PROFILE_LABELS[operation.profile]}</Title>
+                  <Title level={2}>{getQualityGateProfileLabel(operation.profile, standalone)}</Title>
                   <OperationStatusTag operation={operation} />
                   {operation.displayContext === 'current-proof' ? (
                     <Tag className="erp-dev-accent-tag">当前正式回执</Tag>
                   ) : null}
                   {operation.displayContext === 'history' ? (
-                    <Tag color="warning">本机历史</Tag>
+                    <Tag color="warning">{executionLabel}历史</Tag>
                   ) : null}
                 </Space>
                 <Paragraph>{operation.message}</Paragraph>
@@ -236,7 +238,7 @@ export function RunView({
                     ? 'success'
                     : 'active'
               }
-              aria-label={`${PROFILE_LABELS[operation.profile]}进度 ${progress}%`}
+              aria-label={`${getQualityGateProfileLabel(operation.profile, standalone)}进度 ${progress}%`}
             />
             {operation.firstFailure ? (
               <Alert
@@ -251,7 +253,7 @@ export function RunView({
           <div className="erp-dev-quality-operation__heading">
             <div>
               <Space size={8} wrap>
-                <Title level={2}>{PROFILE_LABELS[profile]}流程预览</Title>
+                <Title level={2}>{getQualityGateProfileLabel(profile, standalone)}流程预览</Title>
                 <Tag>尚未运行</Tag>
               </Space>
               <Paragraph>
@@ -264,6 +266,7 @@ export function RunView({
           summary={summary}
           operation={operation}
           profile={profile}
+          standalone={standalone}
         />
         {operation ? <TechnicalDetails operation={operation} /> : null}
       </section>
@@ -274,10 +277,10 @@ export function RunView({
       >
         <div className="erp-dev-quality-section-heading">
           <Title id="quality-history-title" level={2}>
-            本机最近诊断
+            {standalone ? '服务端最近诊断' : '本机最近诊断'}
           </Title>
           <Text type="secondary">
-            每种本机诊断最多保留最近 20 次脱敏记录；不混入 GitLab 流水线
+            每种{executionLabel}诊断最多保留最近 20 次脱敏记录；不混入 GitLab 流水线
           </Text>
         </div>
         <QualityGateHistoryTrend
@@ -297,8 +300,10 @@ export function RunView({
 
       <Text type="secondary" className="erp-dev-quality-action-status">
         {actionProfile
-          ? `正在启动${PROFILE_LABELS[actionProfile]}`
-          : '本机诊断完成后不会自动提交、推送、发布或部署，也不替代 GitLab CI Gate。'}
+          ? `正在启动${getQualityGateProfileLabel(actionProfile, standalone)}`
+          : standalone
+            ? '此处展示本服务的诊断记录；固定提交的 CI 结果请到“服务器 CI”核对。'
+            : '本机诊断完成后不会自动提交、推送、发布或部署，也不替代 GitLab CI Gate。'}
       </Text>
     </div>
   )

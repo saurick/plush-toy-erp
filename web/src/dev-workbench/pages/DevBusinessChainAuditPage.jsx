@@ -16,6 +16,7 @@ import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import { MermaidDiagram } from '@/common/components/markdown'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevChainAuditEvidence, {
@@ -529,6 +530,7 @@ export default function DevBusinessChainAuditPage() {
         </Space>
 
       </header>
+      <DevTestingEnvironment view="chains" />
       {catalog.batches.length > 0 || batch || report ? (
         <div className="erp-dev-chain-audit__toolbar">
           {catalog.batches.length > 1 || !batch || !catalog.batches.some((item) => item.id === batch) ? (

@@ -55,6 +55,38 @@ export const DEV_DATA_PREPARATION_TARGET_KEYS = Object.freeze({
 export const DEV_DATA_PREPARATION_PROFILE_QUERY_KEY = 'dataProfile'
 export const DEV_DATA_PREPARATION_TARGET_QUERY_KEY = 'dataTarget'
 
+export function getDataPreparationEnvironment(targetKey, view = 'scope') {
+  if (view === 'receipts') {
+    return {
+      kind: 'reference',
+      label: '本地与服务器记录',
+      detail: '按每条回执的目标环境区分；不同目标的结果分别核对。',
+    }
+  }
+  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133) {
+    return {
+      kind: 'server',
+      label: '数据目标：服务器 · demo 演练环境',
+      detail: '业务场景写入登记的 demo 目标；环境身份与执行结果以批次回执为准。',
+    }
+  }
+  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal) {
+    return {
+      kind: 'local',
+      label: '数据目标：本地隔离环境',
+      detail: '完整回归使用本次新建的可丢弃数据库。',
+    }
+  }
+  if (targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment) {
+    return {
+      kind: 'local',
+      label: '数据目标：本地开发库',
+      detail: '基础数据与业务场景保存在登记的本地开发库。',
+    }
+  }
+  return { kind: 'reference', label: '数据目标尚未确认', detail: '读取批次回执后再核对目标环境。' }
+}
+
 export function resolveDataPreparationAvailability(
   summary,
   profileKey,

@@ -544,7 +544,7 @@ export default function DevPressurePanel({
         if (controller.signal.aborted || sequence.current !== requestSequence) {
           return
         }
-        setError('压力测试报告读取失败，请重新读取或检查本地开发服务。')
+        setError('压力测试报告读取失败，请重新读取或检查当前工作台服务。')
       } finally {
         if (
           !controller.signal.aborted &&
@@ -714,7 +714,7 @@ export default function DevPressurePanel({
       {state?.invalidCount ? (
         <p className="erp-dev-pressure-note">
           {state.invalidCount}{' '}
-          份报告损坏、超限或合同不完整，已跳过；原始文件保留在本地。
+          份报告损坏、超限或合同不完整，已跳过；原始文件保留在当前执行端。
         </p>
       ) : null}
       {loading && !state ? (
