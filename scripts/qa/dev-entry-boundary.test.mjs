@@ -271,8 +271,8 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.match(dataPreparationItem?.title || "", /测试数据/);
   assert.match(
     dataPreparationItem?.status || "",
-    /本机受控写入/,
-    "data preparation must not be described as a read-only page",
+    /按目标受控写入/,
+    "data preparation must describe target-scoped controlled writes",
   );
   assert(
     (dataPreparationItem?.guardrails || []).some((guardrail) =>
