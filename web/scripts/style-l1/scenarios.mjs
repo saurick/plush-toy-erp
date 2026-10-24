@@ -485,7 +485,7 @@ export function createStyleL1Scenarios(deps) {
     ...createDevWorkbenchDensityScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevProjectSkillsScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
     ...createDevPressureScenarios({ assert, assertNoHorizontalOverflow }),
-    ...createDevUIDesignDetailScenarios(deps),
+    ...createDevUIDesignDetailScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDevUIFeedbackScenarios(deps),
     ...createDevUIDesignWorkflowScenarios(deps),
     createDevUIDesignMobileTrackingScenario(deps),

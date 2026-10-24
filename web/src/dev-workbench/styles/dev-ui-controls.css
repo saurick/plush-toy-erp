@@ -161,6 +161,22 @@
   color: var(--erp-primary);
 }
 
+.erp-control-library-checks h3:not(:first-child) {
+  margin-top: 20px;
+}
+
+.erp-control-business-editor:not([hidden]) {
+  display: flex;
+  min-width: 0;
+  height: 500px;
+}
+
+.erp-control-business-editor .erp-business-form-page[data-fullscreen='true'] {
+  position: fixed;
+  z-index: 900;
+  inset: 0;
+}
+
 .erp-control-library-rules {
   margin-top: 26px;
 }

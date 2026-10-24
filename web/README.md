@@ -57,6 +57,8 @@ pnpm install
 
 分页范围与总数文案由 `src/common/utils/pagination.mjs` 提供，表格内通过 `AppTable`、独立分页通过 `AppPagination` 共用外观和窄屏模式；业务页码、查询参数和精确记录分页仍由 `src/erp/utils/businessPagination.mjs` 负责。工作台“控件设计 → 列表与分页”（`/__dev/ui-design?page=controls&control=pagination`）提供可操作示例，可从“组件选用”进入，使用本地虚构数据验证翻页、条数调整、加载和恢复。
 
+同一控件设计入口的“业务表单与明细”（`control=business-form`）与“来源选择”（`control=source-picker`）按需加载正式共享组件，操作校验、离开保护、明细增删、跨页选择和失败恢复。组件选用及各分类提供同源的真实页面入口与核对任务；使用边界统一维护在[组件复用约定](../docs/engineering/前端实现与交互约定.md#组件复用与使用入口--shared-component-entrypoints)。
+
 横向与纵向滚动提示统一由 [`ScrollEdges`](src/common/components/scroll/ScrollEdges.jsx) 管理，ERP 和独立工作台各在入口挂载一次。共享控制器识别实际可滚动的容器及弹窗、抽屉中的动态内容，使用被动滚动监听和按帧合并的测量更新，保留原生滚动、尺寸和焦点。
 
 边缘在对应方向还有内容时出现，到尽头或内容不再溢出时消失；固定列和吸顶／底部控件占用的区域保持清楚。效果集中在 [`scrollEdges.css`](src/common/components/scroll/scrollEdges.css)：模糊 `3px`、横向宽 `24px`、纵向高 `10px`，随主题背景适配，打印隐藏，减少动态效果时取消过渡。

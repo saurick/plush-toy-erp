@@ -1,13 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
+import { getDeploymentTarget } from '../scripts/deploy/deployment-targets.mjs'
+import workbenchTarget from '../server/deploy/workbench/target.json' with { type: 'json' }
 import { createDevDocsMetadataPlugin } from './vite.docs.mjs'
 
 const root = import.meta.dirname
 
 export default defineConfig({
   root,
-  define: { 'import.meta.env.PLUSH_STANDALONE_WORKBENCH': true },
+  define: {
+    'import.meta.env.PLUSH_STANDALONE_WORKBENCH': true,
+    'import.meta.env.PLUSH_WORKBENCH_BUSINESS_ORIGIN': JSON.stringify(
+      new URL(getDeploymentTarget(workbenchTarget.businessTarget).publicEntry.endpoint).origin
+    ),
+  },
   plugins: [react(), createDevDocsMetadataPlugin()],
   resolve: { alias: { '@': path.join(root, 'src') } },
   build: {

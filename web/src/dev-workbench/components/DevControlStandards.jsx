@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react'
+import React, { Suspense, useLayoutEffect, useRef, useState } from 'react'
 import { Button, ConfigProvider, Empty, Popover, theme } from 'antd'
 import {
   ArrowRightOutlined,
@@ -14,10 +14,14 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import NavigationCountBadge from '@/common/components/navigation/NavigationCountBadge'
 import SearchInput from '@/common/components/SearchInput'
+import { Loading } from '@/common/components/loading'
+import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
+import { getBusinessModule } from '@/erp/config/businessModules.mjs'
+import { getCommandCenterView } from '@/erp/config/commandCenter.mjs'
 import { useERPTheme } from '@/common/theme/erpTheme'
 import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
-import DevSharedComponentGuide, { SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
+import DevSharedComponentGuide, { DevUIConsumerLink, SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
 import DevUIPageStateExamples from './DevUIPageStateExamples.jsx'
 import { BasicInputExample, DateInputExample } from './DevUIInputExamples.jsx'
@@ -26,6 +30,14 @@ import {
   progressQueryFromURL,
 } from '../../erp/utils/businessProgress.mjs'
 import '../styles/dev-ui-controls.css'
+
+const DevUIBusinessExamples = lazyWithDynamicImportRetry(
+  () => import('./DevUIBusinessExamples.jsx')
+)
+const PURCHASE_PAGE = getBusinessModule('accessories-purchase')
+const MATERIAL_PAGE = getBusinessModule('materials')
+const taskView = getCommandCenterView('task-board')
+const TASK_PAGE = { title: taskView.label, path: taskView.path }
 
 const TOPICS = [
   {
@@ -55,6 +67,7 @@ const TOPICS = [
       '切换保存结果：分别试重试、查询结果和连续点击。',
     ],
     source: 'BusinessFormModal · AppModal · message / notification',
+    consumer: { ...PURCHASE_PAGE, task: '选中采购单，查看详情或打开局部办理弹窗，核对关闭与焦点恢复。' },
   },
   {
     key: 'components',
@@ -63,6 +76,44 @@ const TOPICS = [
     description: '从当前实现约定查找基础控件、共享交互、业务组合和打印组件，再进入对应样例。',
     rules: [],
     source: SHARED_COMPONENT_SEARCH_TEXT,
+  },
+  {
+    key: 'business-form',
+    title: '业务表单与明细',
+    summary: '整页编辑、校验与离开保护',
+    description: '直接使用整页表单与明细组合，编辑本地草稿，核对增删、长文本、校验、离开保护和保存恢复。',
+    rules: [
+      ['完整单据编辑', 'BusinessFormPage / BusinessFormSection', '保留输入、分区与返回上下文；局部专项动作使用 BusinessFormModal。'],
+      ['草稿明细', 'BusinessLineItemsSection / BusinessLineItemRow', '共享添加、移除、空态与补充信息；来源映射、业务校验和保存由调用方负责。'],
+      ['长文本', 'BusinessTextArea', '随内容增高，不在明细格内截断备注；横向滚动保留在明细容器。'],
+      ['失败与离开', '原表单继续编辑', '失败保留输入；未保存离开须确认。演示保存只更新内存，不代表业务提交或过账。'],
+    ],
+    checks: [
+      '打开草稿，清空名称保存，核对字段错误；添加明细并输入多行备注。',
+      '移除明细查看空态，再添加；修改后返回列表，先继续编辑，再放弃修改。',
+      '选择首次失败后重试，编辑并保存；核对输入保留及重试结果。',
+    ],
+    source: 'BusinessFormPage · BusinessFormSection · BusinessLineItemsSection · BusinessLineItemRow · BusinessTextArea · DateInput',
+    consumer: { ...PURCHASE_PAGE, task: '打开新建或编辑，核对整页表单、材料明细与返回列表；浏览验证无需保存真实单据。' },
+  },
+  {
+    key: 'source-picker',
+    title: '来源选择',
+    summary: '搜索、跨页多选与关闭恢复',
+    description: '使用正式来源选择弹窗操作本地材料清单，核对搜索、跨页选择、停用限制、空态和读取恢复。',
+    rules: [
+      ['批量选择来源', 'SourceImportPickerModal', '只负责搜索、分页、选择与确认；字段映射、去重和业务写入由调用方维护。'],
+      ['大量远程资料', 'RemoteReferencePicker / RemoteReferenceSelect', '沿用正式读取、分页、取消与有效权限；本地小清单不能证明远程加载或授权正确。'],
+      ['停用、加载与失败', '禁用对应选择或确认', '限制说明保持可见；失败保留上次清单，重新加载后才继续。'],
+      ['关闭与清空', '选择草稿与已确认结果分开', '取消不覆盖已确认结果，重新打开清空临时选择；显式清空结果后不自动回选。'],
+    ],
+    checks: [
+      '选择第一页和第二页的材料，核对已选汇总；停用材料不可选。',
+      '输入关键词后搜索，再清空筛选；取消后重新打开，确认临时选择已清空。',
+      '加载时确认不可用；空列表或读取失败时重新加载，再确认并清空结果。',
+    ],
+    source: 'SourceImportPickerModal · BusinessModal · SearchInput · AppTable · AppPagination；远程消费者：RemoteReferencePicker / RemoteReferenceSelect',
+    consumer: { ...PURCHASE_PAGE, task: '进入编辑页的“从材料库添加”，核对远程搜索、跨页选择与清空；取消返回，不提交业务数据。' },
   },
   {
     key: 'pagination',
@@ -83,6 +134,7 @@ const TOPICS = [
       '切换加载中与加载失败，核对禁用、内容保留和重试恢复。',
     ],
     source: 'common/components/pagination/AppPagination · common/components/table/AppTable · common/utils/pagination.mjs',
+    consumer: { ...MATERIAL_PAGE, task: '操作主列表的页码、每页条数和筛选，核对记录范围与读取恢复。' },
   },
   {
     key: 'inputs',
@@ -97,6 +149,7 @@ const TOPICS = [
     ],
     checks: ['修改名称和类别，核对当前结果。', '清空内容，再恢复初始值。', '切换禁用与错误，核对值保留和状态外观。'],
     source: 'antd: Button / Input · common/components/select · src/App.jsx: ConfigProvider · erp/styles/app/control-*.css',
+    consumer: { ...MATERIAL_PAGE, task: '打开新建或编辑，核对字段输入、选择、清空与禁用；取消返回。' },
   },
   {
     key: 'dates',
@@ -111,6 +164,7 @@ const TOPICS = [
     ],
     checks: ['选择日期和分钟，核对下方值即时变化。', '使用截止快捷项，再切换禁用和错误。', '切换日期类型，查看倒置范围并清空、重置。'],
     source: 'erp/components/business-list/BusinessDateInputs.jsx · erp/utils/dateRange.mjs · erp/utils/workflowTaskTiming.mjs',
+    consumer: { ...PURCHASE_PAGE, task: '核对列表日期范围，以及编辑页下单、到货日期的选择和清空。' },
   },
   {
     key: 'navigation',
@@ -134,6 +188,7 @@ const TOPICS = [
       '用方向键切换，核对禁用项与减少动态效果。',
     ],
     source: 'SlidingTabs · SlidingSegmented · SlidingTabList · control-affordance.css',
+    consumer: { ...TASK_PAGE, task: '切换待办、已办和流程跟踪，核对页签保持挂载及当前内容。' },
   },
   {
     key: 'filters',
@@ -165,6 +220,7 @@ const TOPICS = [
       '改变范围再重置：搜索词保持，其他页面条件不变。',
     ],
     source: 'FilterChip · MobileSearchInput · Popover',
+    consumer: { ...TASK_PAGE, task: '组合任务范围与关键词，再清空和返回，核对当前条件及结果。' },
   },
   {
     key: 'actions',
@@ -188,6 +244,7 @@ const TOPICS = [
       '禁用项不触发；加载项保留原按钮尺寸。',
     ],
     source: 'Ant Design Button · control-affordance.css',
+    consumer: { ...PURCHASE_PAGE, task: '比较未选、已选和只读记录的操作入口；动作权限与状态由真实页面决定。' },
   },
   {
     key: 'empty',
@@ -210,6 +267,7 @@ const TOPICS = [
       '选择电脑切页，在等待期间点击另一导航；手机样例可切换宽度和外观。',
     ],
     source: 'MobileTaskListContent · MobileTaskListSkeleton · WorkflowTaskCard · Loading · Ant Design Empty / Alert',
+    consumer: { ...TASK_PAGE, task: '切换任务范围并刷新，核对内容区等待与恢复；手机组件另在岗位任务端核对。' },
   },
   {
     key: 'counts',
@@ -229,6 +287,7 @@ const TOPICS = [
       '切换大数量、读取中和失败，核对显示及重试。',
     ],
     source: 'NavigationCountBadge · 服务端任务管理总数',
+    consumer: { ...TASK_PAGE, task: '比较侧栏任务数字与实际清单范围，不能用演示数字判断真实待办。' },
   },
 ]
 
@@ -711,7 +770,7 @@ export default function DevControlStandards() {
           </div>
         </header>
         {current.key === 'components' ? (
-          <DevSharedComponentGuide />
+          <DevSharedComponentGuide topics={TOPICS} />
         ) : (
           <>
             <div className="erp-control-library-layout">
@@ -756,6 +815,10 @@ export default function DevControlStandards() {
                       <DateInputExample />
                     ) : current.key === 'pagination' ? (
                       <DevUIPaginationExample />
+                    ) : current.key === 'business-form' || current.key === 'source-picker' ? (
+                      <Suspense fallback={<Loading title="正在加载组件示例" />}>
+                        <DevUIBusinessExamples key={current.key} type={current.key} />
+                      </Suspense>
                     ) : (
                       <DevUIPageStateExamples />
                     )}
@@ -769,12 +832,21 @@ export default function DevControlStandards() {
                     <li key={check}>{check}</li>
                   ))}
                 </ol>
-                <Link to={guideLink('specification')}>
-                  查看图解说明 <ArrowRightOutlined aria-hidden="true" />
-                </Link>
-                <Link to={guideLink('rationale')}>
-                  查看设计依据 <ArrowRightOutlined aria-hidden="true" />
-                </Link>
+                {current.guide ? (
+                  <>
+                    <Link to={guideLink('specification')}>
+                      查看图解说明 <ArrowRightOutlined aria-hidden="true" />
+                    </Link>
+                    <Link to={guideLink('rationale')}>
+                      查看设计依据 <ArrowRightOutlined aria-hidden="true" />
+                    </Link>
+                  </>
+                ) : null}
+                <h3>真实页面核对</h3>
+                <DevUIConsumerLink consumer={current.consumer} />
+                <p>{current.consumer.task}</p>
+                <p>在新标签页打开，沿用业务账号权限。</p>
+                <Link to="/__dev/ui-design?page=controls&control=components">查看组件选用与完整边界</Link>
               </aside>
             </div>
             <section className="erp-control-library-rules">

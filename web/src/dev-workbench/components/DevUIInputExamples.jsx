@@ -98,6 +98,7 @@ export function BasicInputExample() {
 export function DateInputExample() {
   const [state, setState] = useState('normal')
   const [values, setValues] = useState(INITIAL_DATES)
+  const [resetKey, setResetKey] = useState(0)
   const update = (key, value) =>
     setValues((current) => ({ ...current, [key]: value }))
   const disabled = state === 'disabled'
@@ -115,6 +116,7 @@ export function DateInputExample() {
         <div className="erp-control-input-field">
           <label htmlFor="control-date">单个日期</label>
           <DateInput
+            key={`date-${resetKey}`}
             id="control-date"
             value={values.date}
             disabled={disabled}
@@ -126,6 +128,7 @@ export function DateInputExample() {
         <div className="erp-control-input-field">
           <label htmlFor="control-deadline">跟进截止时间</label>
           <DateTimeInput
+            key={`deadline-${resetKey}`}
             id="control-deadline"
             value={values.deadline}
             disabled={disabled}
@@ -143,6 +146,7 @@ export function DateInputExample() {
       <section className="erp-control-input-field" aria-label="日期范围示例">
         <h3>日期范围</h3>
         <DateRangeFilter
+          key={`range-${resetKey}`}
           options={[
             { value: 'order', label: '下单日期' },
             { value: 'delivery', label: '交货日期' },
@@ -186,6 +190,8 @@ export function DateInputExample() {
           onClick={() => {
             setValues(INITIAL_DATES)
             setState('normal')
+            // 显式重置同时丢弃控件尚未提交的输入，操作按钮保持挂载。
+            setResetKey((current) => current + 1)
           }}
         >
           重置日期示例

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { createDevPaginationScenarios } from './devPaginationScenarios.mjs'
+import { createDevBusinessComponentScenarios } from './devBusinessComponentScenarios.mjs'
 import {
   findUIDesignChapter,
   readUIDesignChapters,
@@ -8,9 +9,11 @@ import {
 export function createDevSharedComponentScenarios({
   assert,
   assertNoHorizontalOverflow,
+  customerRuntimeEffectiveSession,
 }) {
   return [
     ...createDevPaginationScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createDevBusinessComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     {
       name: 'dev-ui-shared-component-catalog',
       path: '/__dev/ui-design?page=controls&control=components',
@@ -38,7 +41,7 @@ export function createDevSharedComponentScenarios({
           .filter((block) => block.startsWith('| '))
           .flatMap((block) => block.split('\n').filter((line) => line.startsWith('| ')).slice(2))
         assert.equal(
-          await catalog.locator('tbody tr').count(),
+          await catalog.locator('.erp-control-library-reference tbody tr').count(),
           rows.length,
           '选用表直接呈现正式文档全部入口'
         )
@@ -51,6 +54,15 @@ export function createDevSharedComponentScenarios({
         ]) {
           await catalog.locator('tbody td:nth-child(2)').filter({ hasText: name }).waitFor()
         }
+        const sampleLinks = catalog.getByRole('region', { name: '组件样例与真实页面', exact: true })
+        for (const row of await sampleLinks.locator('tbody tr').all()) {
+          const links = row.getByRole('link')
+          assert.equal(await links.count(), 2)
+          assert((await links.nth(0).getAttribute('href')).startsWith('/__dev/ui-design?page=controls&control='))
+          assert(/^\/erp\//u.test(await links.nth(1).getAttribute('href')), '真实入口必须指向正式业务路径')
+        }
+        const designLink = catalog.getByRole('link', { name: '下拉选择与清空', exact: true })
+        assert((await designLink.getAttribute('href')).startsWith('/__dev/docs?path='), '嵌入文档沿用项目阅读器解析相对链接')
         const search = page.getByLabel('搜索控件设计', { exact: true })
         const directory = page.getByRole('navigation', {
           name: '控件设计目录',
@@ -178,7 +190,7 @@ export function createDevSharedComponentScenarios({
           .locator('..')
           .click()
         assert(await name.isDisabled())
-        assert(await stage.getByLabel('产品类别', { exact: true }).isDisabled())
+        assert(await stage.getByRole('combobox', { name: '产品类别', exact: true }).isDisabled())
         assert.equal(await name.inputValue(), '包装挂件')
         await stage
           .getByRole('radio', { name: '错误', exact: true })

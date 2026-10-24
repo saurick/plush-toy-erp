@@ -14,11 +14,12 @@ export function createDevUIDesignDetailScenarios({
   assertNoHorizontalOverflow,
   outputDir,
   path,
+  customerRuntimeEffectiveSession,
 }) {
   return [
     ...createSearchCompositionScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalOverflow }),
-    ...createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     ...createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevUIPageStateScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     {
