@@ -237,7 +237,7 @@ test('mobile task overview, list heading and loaded counts stay concise', () => 
   assert.match(donePanelSource, /data-testid="mobile-role-done-count"/u)
   assert.match(
     listScreenSource,
-    /mobile-role-count-tag mobile-role-task-filter__count">\s*\{countAvailable \? item\.count : '—'\}/u
+    /count=\{countAvailable \? item\.count : '—'\}/u
   )
   assert.match(listScreenSource, /countAvailable \? `共 \$\{item\.count\} 条`/u)
   assert.match(listScreenSource, /'数量暂不可用'/u)
@@ -245,7 +245,7 @@ test('mobile task overview, list heading and loaded counts stay concise', () => 
     listScreenSource.indexOf('const renderRiskFilters'),
     listScreenSource.indexOf('const renderWarningMessages')
   )
-  assert.match(riskFiltersSource, /mobile-role-count-tag mobile-role-task-filter__count/u)
+  assert.match(riskFiltersSource, /count=\{countAvailable \? item\.count : '—'\}/u)
   assert.doesNotMatch(listScreenSource, /\(\{item\.count\}\)/u)
   assert.doesNotMatch(listScreenSource, /const renderTabSummary/u)
   assert.doesNotMatch(listScreenSource, /renderTabSummary\(\)/u)

@@ -166,20 +166,32 @@ export async function assertFilterAffordance(locator, minHeight = 32) {
   const metrics = await locator.evaluateAll((buttons) =>
     buttons.map((button) => {
       const style = getComputedStyle(button)
+      const mobile = Boolean(button.closest('.erp-mobile-controls')) &&
+        !button.closest('.mobile-filter-panel')
+      const visual = mobile ? getComputedStyle(button, '::before') : style
+      const height = button.getBoundingClientRect().height
+      const count = button.querySelector('.erp-filter-chip__count')
       return {
-        border: style.borderColor,
+        mobile,
+        visualContent: mobile ? visual.content : null,
+        visualHeight: mobile
+          ? height - parseFloat(visual.top) - parseFloat(visual.bottom)
+          : height,
+        visualRadius: parseFloat(visual.borderRadius),
+        border: visual.borderColor,
         expectedBorder: style
           .getPropertyValue('--erp-control-tab-border')
           .trim(),
-        borderWidth: parseFloat(style.borderWidth),
-        background: style.backgroundColor,
+        borderWidth: parseFloat(visual.borderWidth),
+        background: visual.backgroundColor,
+        countBackground: count ? getComputedStyle(count).backgroundColor : null,
         text: style.color,
         selected: button.getAttribute('aria-pressed') === 'true',
         hasCheck: Boolean(button.querySelector('.erp-filter-chip__check')),
         boxShadow: style.boxShadow,
         width: button.clientWidth,
         scrollWidth: button.scrollWidth,
-        height: button.getBoundingClientRect().height,
+        height,
         disabled: button.disabled,
       }
     })
@@ -196,6 +208,15 @@ export async function assertFilterAffordance(locator, minHeight = 32) {
       border,
       `同组筛选项必须使用同一边框色: ${JSON.stringify(metrics)}`
     )
+    if (metric.mobile) {
+      assert(metric.height >= 44, `手机筛选保留独立触区：${JSON.stringify(metric)}`)
+      assert.notEqual(metric.visualContent, 'none')
+      assert(Math.abs(metric.visualHeight - 32) <= 1, `快捷项可见高度为 32px：${JSON.stringify(metric)}`)
+      assert.equal(metric.visualRadius, 8, '手机快捷项沿用圆角矩形')
+      if (metric.countBackground) {
+        assert.notEqual(metric.countBackground, 'rgba(0, 0, 0, 0)', '数量保留独立底色')
+      }
+    }
     if (!metric.disabled) {
       assert.deepEqual(
         parseRgb(metric.border),

@@ -835,7 +835,7 @@ async function runMobileAuthScenario(
   await overdueFilter.waitFor({ state: 'visible', timeout: 10_000 })
   assert.equal(
     await overdueFilter
-      .locator('.mobile-role-task-filter__count')
+      .locator('.erp-filter-chip__count')
       .textContent(),
     '1'
   )

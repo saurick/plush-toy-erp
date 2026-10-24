@@ -275,7 +275,7 @@ export function createMobileTaskAssertions(deps) {
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
       const counts = Array.from(
-        document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .mobile-role-task-filter__count')
+        document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .erp-filter-chip__count')
       ).map((count) => count.textContent?.trim() || '')
       return (
         heading?.textContent?.trim() === '风险' &&
@@ -2493,7 +2493,7 @@ export function createMobileTaskAssertions(deps) {
       const rect = filters.getBoundingClientRect()
       const items = Array.from(filters.querySelectorAll('button'))
       const activeFilter = items.find((item) => item.getAttribute('aria-pressed') === 'true')
-      const label = (item) => item?.querySelector('.mobile-role-task-filter__label')?.textContent?.trim() || ''
+      const label = (item) => item?.querySelector('.erp-filter-chip__label')?.textContent?.trim() || ''
       const sectionHeadings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
@@ -2514,7 +2514,7 @@ export function createMobileTaskAssertions(deps) {
         activeFilter: label(activeFilter),
         filterItems: items.map((item) => ({
           label: label(item),
-          count: item.querySelector('.mobile-role-task-filter__count')?.textContent?.trim() || '',
+          count: item.querySelector('.erp-filter-chip__count')?.textContent?.trim() || '',
         })),
         sectionHeadings,
         sectionLabels: sections.map((section) => section.getAttribute('aria-label')),
@@ -2577,11 +2577,9 @@ export function createMobileTaskAssertions(deps) {
       const filterItems = Array.from(
         tabs?.querySelectorAll('.mobile-role-task-filter') || []
       ).map((button) => {
-        const content = button.querySelector(
-          '.mobile-role-task-filter__content'
-        )
-        const label = button.querySelector('.mobile-role-task-filter__label')
-        const count = button.querySelector('.mobile-role-task-filter__count')
+        const content = button.querySelector('.erp-filter-chip__label')
+        const label = button.querySelector('.erp-filter-chip__label')
+        const count = button.querySelector('.erp-filter-chip__count')
         const contentStyle =
           content instanceof HTMLElement
             ? window.getComputedStyle(content)
@@ -2600,8 +2598,8 @@ export function createMobileTaskAssertions(deps) {
           lineHeight: Number.parseFloat(contentStyle?.lineHeight || '0'),
           width: buttonRect.width,
           buttonHeight: buttonRect.height,
-          scrollWidth: content?.scrollWidth || 0,
-          clientWidth: content?.clientWidth || 0,
+          scrollWidth: button.scrollWidth,
+          clientWidth: button.clientWidth,
         }
       })
       return {
@@ -2657,7 +2655,7 @@ export function createMobileTaskAssertions(deps) {
       assert.match(
         item.count,
         /^\d+$/u,
-        `${scenarioName} ${item.label} 筛选应使用纯数字胶囊完整显示数量: ${JSON.stringify(metrics)}`
+        `${scenarioName} ${item.label} 筛选应完整显示纯数字数量: ${JSON.stringify(metrics)}`
       )
       assert(
         item.ariaLabel.includes(item.label) &&
@@ -2669,8 +2667,8 @@ export function createMobileTaskAssertions(deps) {
       )
     })
     const largeCountMetrics = await page.evaluate(() => {
-      const count = document.querySelector('.mobile-role-task-filter__count')
-      const content = count?.closest('.mobile-role-task-filter__content')
+      const count = document.querySelector('.erp-filter-chip__count')
+      const content = count?.closest('.erp-filter-chip')
       if (
         !(count instanceof HTMLElement) ||
         !(content instanceof HTMLElement)

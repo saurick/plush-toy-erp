@@ -1001,13 +1001,13 @@ export function createMobileTaskScenarios({
                 labels: buttons.map(
                   (button) =>
                     button
-                      .querySelector('.mobile-role-task-filter__label')
+                      .querySelector('.erp-filter-chip__label')
                       ?.textContent?.trim() || ''
                 ),
                 counts: buttons.map(
                   (button) =>
                     button
-                      .querySelector('.mobile-role-task-filter__count')
+                      .querySelector('.erp-filter-chip__count')
                       ?.textContent?.trim() || ''
                 ),
                 ariaLabels: buttons.map(
@@ -2900,7 +2900,7 @@ export function createMobileTaskScenarios({
                 key,
                 Number(
                   button
-                    ?.querySelector('.mobile-role-task-filter__count')
+                    ?.querySelector('.erp-filter-chip__count')
                     ?.textContent?.trim()
                 ),
               ]
@@ -2958,7 +2958,7 @@ export function createMobileTaskScenarios({
         await approvalFilter.waitFor({ state: 'visible', timeout: 10_000 })
         const approvalFilterMetrics = await page.evaluate(() => ({
           labels: Array.from(
-            document.querySelectorAll('.mobile-role-task-filter__label')
+            document.querySelectorAll('.mobile-role-task-filter .erp-filter-chip__label')
           ).map((label) => label.textContent?.trim() || ''),
           approvalAriaLabel:
             document

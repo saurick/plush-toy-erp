@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
+import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
 
 async function readScroll(row, assert) {
   await row.waitFor()
@@ -70,14 +71,16 @@ export function createMobileFilterScrollScenarios({
           exact: true,
         })
         const evidence = { progress: await readScroll(progress, assert) }
-        assert.equal(
-          evidence.progress.edgeRight,
-          false,
-          '进度快捷筛选按当前设计换行展示'
-        )
+        assert.equal(evidence.progress.height, 44, '进度快捷项在窄屏保持一行且不叠加垂直内边距')
+        await assertFilterAffordance(progress.getByRole('button'), 44)
+        await progress.evaluate((node) => { node.scrollLeft = node.scrollWidth })
+        evidence.progressEnd = await readScroll(progress, assert)
+        assert(evidence.progressEnd.lastVisible, '末项可以横向滑入视野')
         await page.getByTestId('mobile-role-nav-tasks').click()
         const row = page.getByTestId('mobile-role-task-filters')
         evidence.start = await readScroll(row, assert)
+        assert.equal(evidence.start.height, 44, '任务快捷项保持紧凑行高')
+        await assertFilterAffordance(row.getByRole('button'), 44)
         await row.screenshot({
           path: path.join(outputDir, `${name}-start.png`),
         })
@@ -130,7 +133,7 @@ export function createMobileFilterScrollScenarios({
           evidence[`width${width}`] = await readScroll(row, assert)
         }
         assert.equal(evidence.width800.edgeRight, false)
-        const badge = row.locator('.mobile-role-task-filter__count').first()
+        const badge = row.locator('.erp-filter-chip__count').first()
         const original = await badge.textContent()
         await badge.evaluate((node) => {
           node.textContent = '1234567890'.repeat(20)

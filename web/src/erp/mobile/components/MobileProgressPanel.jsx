@@ -40,6 +40,7 @@ import MobileScrollEdge from './MobileScrollEdge.jsx'
 import MobileFilterPopover from './MobileFilterPopover'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
+import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import { usePageLoadFeedback } from '../../components/PageLoadFeedback.jsx'
 import '../../styles/app/progress-board.css'
 import '../mobileProgress.css'
@@ -418,7 +419,7 @@ export default function MobileProgressPanel({
               />
             </MobileFilterPopover>
           </div>
-          <div
+          <HorizontalScroll
             className="mobile-progress-risks"
             role="group"
             aria-label="进度快捷筛选"
@@ -436,7 +437,7 @@ export default function MobileProgressPanel({
               taskAccess={data?.access.tasks}
               onChange={update}
             />
-          </div>
+          </HorizontalScroll>
           <MobileScrollEdge scrollContainerRef={scrollRef} enabled={active && !selection} />
         </div>
         <MobileTaskPullRefresh

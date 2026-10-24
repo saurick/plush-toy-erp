@@ -1592,7 +1592,7 @@ async function selectMobileTaskFilter(page, filterKey) {
       const button = document.querySelector(
         `[data-testid="mobile-role-filter-${CSS.escape(key)}"]`
       )
-      const count = button?.querySelector('.mobile-role-task-filter__count')
+      const count = button?.querySelector('.erp-filter-chip__count')
       const list = document.querySelector(
         '[data-testid="mobile-role-task-list"]'
       )

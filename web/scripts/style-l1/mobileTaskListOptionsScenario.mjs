@@ -108,20 +108,20 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         assert.equal(await filters.getByRole('tab').count(), 0)
         if (await overdue.getAttribute('aria-pressed') === 'true') await warning.click()
         await page.waitForFunction(() => {
-          const counts = document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .mobile-role-task-filter__count')
+          const counts = document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .erp-filter-chip__count')
           return counts.length === 2 && Array.from(counts).every((item) => /^\d+$/.test(item.textContent.trim())) && document.querySelectorAll('.mobile-role-message-card').length > 0
         })
         const keyword = await page.getByRole('searchbox').inputValue()
         const filterLabel = await filterTrigger.getAttribute('aria-label')
-        const counts = await filters.locator('.mobile-role-task-filter__count').allTextContents()
+        const counts = await filters.locator('.erp-filter-chip__count').allTextContents()
         for (const width of [320, 390, 430]) {
           await page.setViewportSize({ width, height: 844 })
           await assertFilterAffordance(filters.getByRole('button'), 34)
           const geometry = await filters.evaluate((node) => {
             const box = node.getBoundingClientRect()
             const buttons = Array.from(node.querySelectorAll('button')).map((button) => {
-              const label = button.querySelector('.mobile-role-task-filter__label').getBoundingClientRect()
-              const count = button.querySelector('.mobile-role-task-filter__count').getBoundingClientRect()
+              const label = button.querySelector('.erp-filter-chip__label').getBoundingClientRect()
+              const count = button.querySelector('.erp-filter-chip__count').getBoundingClientRect()
               return { box: button.getBoundingClientRect().toJSON(), centerDelta: Math.abs((label.top + label.bottom - count.top - count.bottom) / 2) }
             })
             return { width: node.clientWidth, scrollWidth: node.scrollWidth, edgesVisible: Boolean(node.querySelector(':scope > .app-scroll-edges:not([hidden])[data-left="true"],:scope > .app-scroll-edges:not([hidden])[data-right="true"]')), box: box.toJSON(), buttons, pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }
@@ -147,12 +147,12 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         assert.equal(await warning.getAttribute('aria-pressed'), 'true')
         assert.equal(await overdue.getAttribute('aria-pressed'), 'false')
         await page.waitForFunction((expected) => {
-          const counts = Array.from(document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .mobile-role-task-filter__count'), (node) => node.textContent.trim())
+          const counts = Array.from(document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .erp-filter-chip__count'), (node) => node.textContent.trim())
           return counts.length === expected.length && counts.every((count, index) => count === expected[index].trim())
         }, counts)
         assert.equal(await page.getByRole('searchbox').inputValue(), keyword)
         assert.equal(await filterTrigger.getAttribute('aria-label'), filterLabel)
-        assert.deepEqual(await filters.locator('.mobile-role-task-filter__count').allTextContents(), counts)
+        assert.deepEqual(await filters.locator('.erp-filter-chip__count').allTextContents(), counts)
         const after = await filters.boundingBox()
         assert(Math.abs(before.height - after.height) <= 1, '切换风险筛选后高度稳定')
         if (theme === 'light') {

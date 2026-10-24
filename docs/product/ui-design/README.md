@@ -63,6 +63,8 @@
 
 “日期与时间”（`control=dates`）直接使用 `DateInput`、`DateTimeInput`、`DateRangeFilter`，操作即时选值、清空、快捷截止及倒置范围。基础输入通过 `AppSelect` 演示用途标签、清空和空态；筛选由 `FilterSelect` / `SelectFilter` 统一空条件，规则见[下拉选择与清空](交互设计说明.md#select-controls)。
 
+“筛选与搜索”（`control=filters`）可切换电脑和手机，直接操作共享 `FilterChip`、`HorizontalScroll` 与搜索。手机展示 32px 可见外观、至少 44px 点击区和数量底色，窄屏在同一行滑动；完整手机稿同步相同外观，筛选面板仍保留可换行的 36px 底色选项。
+
 ### 岗位帮助看什么
 
 | 阅读任务 | 展示方式 |

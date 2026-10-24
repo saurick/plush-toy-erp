@@ -11,6 +11,7 @@ import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import NavigationCountBadge from '@/common/components/navigation/NavigationCountBadge'
 import SearchInput from '@/common/components/SearchInput'
@@ -202,6 +203,7 @@ const TOPICS = [
         '带数量的筛选按钮',
         '直接看见队列与当前条件，数量不是第二个按钮。',
       ],
+      ['手机快捷项', '32px 外观 / 至少 44px 触区', '保留字号、圆角矩形与数量底色；上下透明区域可点击，窄屏在同一行横向滑动。'],
       [
         '单号 / 产品 / 负责人',
         '一个主搜索',
@@ -219,7 +221,7 @@ const TOPICS = [
       '输入期间结果不变；提交不存在的关键词后，出现无结果与清除入口。',
       '改变范围再重置：搜索词保持，其他页面条件不变。',
     ],
-    source: 'FilterChip · MobileSearchInput · Popover',
+    source: 'FilterChip · HorizontalScroll · MobileSearchInput · Popover',
     consumer: { ...TASK_PAGE, task: '组合任务范围与关键词，再清空和返回，核对当前条件及结果。' },
   },
   {
@@ -491,6 +493,7 @@ function demoRiskAvailable(risk, scope) {
 }
 
 function FiltersExample() {
+  const [device, setDevice] = useState('desktop')
   const [risk, setRisk] = useState('all')
   const [keyword, setKeyword] = useState('')
   const [scope, setScope] = useState('active')
@@ -506,84 +509,107 @@ function FiltersExample() {
   const scopeLabel = PROGRESS_SCOPE_OPTIONS.find(
     ({ value }) => value === scope
   )?.label
+  const mobile = device === 'mobile'
+  const FilterRow = mobile ? HorizontalScroll : 'div'
+  const quickFilters = (
+    <FilterRow
+      key="filters"
+      className="erp-control-example-row"
+      role="group"
+      aria-label="演示风险筛选"
+    >
+      {['all', 'overdue', 'due', 'blocked'].map((key) => (
+        <FilterChip
+          key={key}
+          selected={risk === key}
+          disabled={
+            !demoRiskAvailable(key, scope)
+          }
+          count={
+            key === 'all'
+              ? matching.length
+              : matching.filter((row) => row.risk === key).length
+          }
+          onClick={() => setRisk(key)}
+        >
+          {key === 'all' ? scopeLabel : RISK_LABELS[key]}
+        </FilterChip>
+      ))}
+      <FilterChip disabled>暂不可用</FilterChip>
+    </FilterRow>
+  )
+  const searchControls = (
+    <div key="search" className="erp-control-example-search erp-mobile-controls erp-mobile-search-row">
+      <MobileSearchInput
+        aria-label="演示搜索"
+        placeholder="单号、产品、负责人"
+        value={keyword}
+        onSearch={setKeyword}
+        onFocus={() => setOpen(false)}
+      />
+      <Popover
+        trigger="click"
+        open={open}
+        onOpenChange={setOpen}
+        placement="bottomRight"
+        arrow={false}
+        classNames={{
+          root: 'erp-control-example-popover erp-mobile-controls',
+        }}
+        content={
+          <div className="erp-control-example-options">
+            <fieldset>
+              <legend>演示记录范围</legend>
+              <SlidingSegmented
+                block
+                aria-label="演示记录范围"
+                value={scope}
+                onChange={(nextScope) => {
+                  setScope(nextScope)
+                  if (
+                    !demoRiskAvailable(risk, nextScope)
+                  ) setRisk('all')
+                }}
+                options={PROGRESS_SCOPE_OPTIONS}
+              />
+            </fieldset>
+            <Button type="text" block onClick={() => setScope('active')}>
+              重置筛选
+            </Button>
+          </div>
+        }
+      >
+        <button
+          type="button"
+          className="erp-control-button"
+          aria-expanded={open}
+          data-active={scope !== 'active'}
+        >
+          <FilterOutlined aria-hidden="true" />
+          筛选
+          {scope !== 'active' && <span className="erp-control-count">1</span>}
+          <DownOutlined aria-hidden="true" />
+        </button>
+      </Popover>
+    </div>
+  )
   return (
     <div className="erp-control-example-stack">
-      <div
-        className="erp-control-example-row"
-        role="group"
-        aria-label="演示风险筛选"
-      >
-        {['all', 'overdue', 'due', 'blocked'].map((key) => (
-          <FilterChip
-            key={key}
-            selected={risk === key}
-            disabled={
-              !demoRiskAvailable(key, scope)
-            }
-            count={
-              key === 'all'
-                ? matching.length
-                : matching.filter((row) => row.risk === key).length
-            }
-            onClick={() => setRisk(key)}
-          >
-            {key === 'all' ? scopeLabel : RISK_LABELS[key]}
-          </FilterChip>
-        ))}
-        <FilterChip disabled>暂不可用</FilterChip>
-      </div>
-      <div className="erp-control-example-search erp-mobile-controls erp-mobile-search-row">
-        <MobileSearchInput
-          aria-label="演示搜索"
-          placeholder="单号、产品、负责人"
-          value={keyword}
-          onSearch={setKeyword}
-          onFocus={() => setOpen(false)}
-        />
-        <Popover
-          trigger="click"
-          open={open}
-          onOpenChange={setOpen}
-          placement="bottomRight"
-          arrow={false}
-          classNames={{
-            root: 'erp-control-example-popover erp-mobile-controls',
-          }}
-          content={
-            <div className="erp-control-example-options">
-              <fieldset>
-                <legend>演示记录范围</legend>
-                <SlidingSegmented
-                  block
-                  aria-label="演示记录范围"
-                  value={scope}
-                  onChange={(nextScope) => {
-                    setScope(nextScope)
-                    if (
-                      !demoRiskAvailable(risk, nextScope)
-                    ) setRisk('all')
-                  }}
-                  options={PROGRESS_SCOPE_OPTIONS}
-                />
-              </fieldset>
-              <Button type="text" block onClick={() => setScope('active')}>
-                重置筛选
-              </Button>
-            </div>
-          }
-        >
-          <button
-            type="button"
-            className="erp-control-button"
-            aria-expanded={open}
-            data-active={scope !== 'active'}
-          >
-            <FilterOutlined aria-hidden="true" />
-            筛选
-            {scope !== 'active' && <span className="erp-control-count">1</span>}
-            <DownOutlined aria-hidden="true" />
-          </button>
-        </Popover>
+      <SlidingSegmented
+        aria-label="筛选样例设备"
+        value={device}
+        onChange={(next) => {
+          setDevice(next)
+          setOpen(false)
+        }}
+        options={[
+          { label: '电脑', value: 'desktop' },
+          { label: '手机', value: 'mobile' },
+        ]}
+      />
+      <div className={`erp-control-filter-preview${mobile ? ' erp-mobile-controls erp-control-filter-preview--mobile' : ''}`}>
+        {mobile ? searchControls : quickFilters}
+        {mobile ? quickFilters : searchControls}
       </div>
       <p role="status">
         样例结果：{rows.length} 条 · 搜索：{keyword || '未输入'} · 范围：

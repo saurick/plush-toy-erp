@@ -282,6 +282,24 @@
   margin: 8px 0;
 }
 
+.erp-control-filter-preview {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-control-filter-preview--mobile {
+  --erp-font-small: 15px;
+  gap: 0;
+  width: 390px;
+  max-width: 100%;
+}
+
+.erp-control-filter-preview--mobile .erp-control-example-row {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
 .erp-control-example-context {
   margin-bottom: 12px;
   color: var(--erp-text-muted);

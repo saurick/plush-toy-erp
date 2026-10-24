@@ -2918,10 +2918,12 @@
     .task-tracking-tabs::before,.rm-tracking-views::before { background:transparent; border-radius:0; box-shadow:inset 0 -2px 0 var(--brand); }
     .rm-view-tabs.rm-tracking-views { margin-top:4px; }
     .rm-tracking-views button { flex:0 0 auto; min-height:44px; }
-    .role-mobile-device .rm-chip { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:5px 10px; font-size:15px; font-weight:500; }
-    .role-mobile-device .rm-chip.active { border-color:var(--line); }
+    .role-mobile-device .rm-quick-filters { padding-block:0; }
+    .role-mobile-device .rm-chip { position:relative; isolation:isolate; display:inline-flex; align-items:center; justify-content:center; gap:4px; min-height:44px; padding:6px 7px; border:0; border-radius:8px; background:transparent; font-size:15px; font-weight:500; }
+    .role-mobile-device .rm-chip::before { position:absolute; z-index:-1; box-sizing:border-box; content:''; inset:6px 0; border:1px solid var(--line); border-radius:inherit; background:var(--surface); pointer-events:none; }
+    .role-mobile-device .rm-chip.active::before { background:var(--brand-soft); }
     .role-mobile-device .rm-chip .icon { width:12px; height:12px; flex-shrink:0; }
-    .role-mobile-device .rm-chip b, .role-mobile-device .rm-chip .filter-chip-count { margin:0; font-size:inherit; font-weight:650; opacity:1; }
+    .role-mobile-device .rm-chip b, .role-mobile-device .rm-chip .filter-chip-count { margin:0; padding:0 4px; border-radius:4px; background:var(--subtle); font-size:inherit; font-weight:650; opacity:1; }
     @media(prefers-reduced-motion:reduce){:root{--erp-tab-motion-duration:0ms;}}
 
     .statistics-design {--erp-primary:var(--brand);--erp-primary-strong:var(--brand-strong);--erp-text:var(--text);--erp-text-muted:var(--text-2);--erp-text-subtle:var(--text-3);--erp-border:var(--line);--erp-border-strong:var(--line-strong);--erp-surface-bg:var(--surface);--erp-surface-bg-muted:var(--surface-muted);--erp-danger:var(--danger);--erp-visual-danger-text:var(--danger);font-size:13px;}

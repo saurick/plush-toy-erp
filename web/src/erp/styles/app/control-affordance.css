@@ -229,6 +229,7 @@
 }
 
 .erp-filter-chip {
+  --erp-filter-chip-background: var(--erp-control-surface);
   position: relative;
   display: inline-flex;
   min-height: 32px;
@@ -239,7 +240,7 @@
   padding: 5px 10px;
   border: 1px solid var(--erp-control-tab-border);
   border-radius: 8px;
-  background: var(--erp-control-surface);
+  background: var(--erp-filter-chip-background);
   color: var(--erp-control-text);
   font: inherit;
   font-size: var(--erp-font-small);
@@ -270,8 +271,8 @@
 }
 
 .erp-filter-chip[aria-pressed='true'] {
+  --erp-filter-chip-background: var(--erp-control-selected);
   border-color: var(--erp-control-tab-border);
-  background: var(--erp-control-selected);
   color: var(--erp-control-selected-text);
   box-shadow: none;
 }
@@ -296,17 +297,33 @@
 
 .erp-mobile-controls .erp-filter-chip {
   min-height: 44px;
-  border-radius: 999px;
+  isolation: isolate;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 7px;
+  gap: 4px;
+  background: transparent;
   font-size: var(--erp-font-small);
+}
+.erp-mobile-controls .erp-filter-chip::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  box-sizing: border-box;
+  inset: 6px 0;
+  border: 1px solid var(--erp-control-tab-border);
+  border-radius: inherit;
+  background: var(--erp-filter-chip-background);
+  pointer-events: none;
 }
 .erp-mobile-controls .erp-filter-chip__count {
   min-width: 0;
-  padding: 0;
-  background: transparent;
+  padding-inline: 4px;
 }
 
 /* 筛选面板保留 44px 触区，用内缩底色减轻密集选项的视觉重量。 */
 .mobile-filter-panel .erp-filter-chip {
+  --erp-filter-chip-background: var(--erp-control-track);
   min-height: 44px;
   border: 0;
   border-radius: 6px;
@@ -318,14 +335,13 @@
   content: '';
   position: absolute;
   inset: 4px 0;
+  border: 0;
   border-radius: 6px;
-  background: var(--erp-control-track);
+  background: var(--erp-filter-chip-background);
 }
 .mobile-filter-panel .erp-filter-chip[aria-pressed='true'] {
+  --erp-filter-chip-background: var(--erp-control-selected);
   background: transparent;
-}
-.mobile-filter-panel .erp-filter-chip[aria-pressed='true']::before {
-  background: var(--erp-control-selected);
 }
 .mobile-filter-panel .erp-filter-chip > span {
   position: relative;
@@ -551,8 +567,8 @@
 }
 
 .erp-filter-chip:disabled {
+  --erp-filter-chip-background: var(--erp-control-disabled-bg);
   border-color: var(--erp-control-tab-border);
-  background: var(--erp-control-disabled-bg);
   color: var(--erp-control-disabled-text);
   box-shadow: none;
   cursor: not-allowed;
@@ -572,8 +588,8 @@
 }
 
 .erp-filter-chip:not(:disabled):hover {
+  --erp-filter-chip-background: var(--erp-control-hover);
   border-color: var(--erp-control-tab-border);
-  background: var(--erp-control-hover);
 }
 
 .erp-control-button:not(:disabled):hover {

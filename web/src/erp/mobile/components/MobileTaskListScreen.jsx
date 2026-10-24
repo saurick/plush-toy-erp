@@ -402,6 +402,7 @@ export default function MobileTaskListScreen({
               key={item.key}
               data-testid={`mobile-role-filter-${item.key}`}
               selected={active}
+              count={countAvailable ? item.count : '—'}
               removable={item.key !== MOBILE_TASK_FILTER_KEYS.ALL}
               aria-label={`${item.ariaLabel || item.label}，${
                 countAvailable ? `共 ${item.count} 条` : '数量暂不可用'
@@ -419,14 +420,7 @@ export default function MobileTaskListScreen({
                 )
               }}
             >
-              <span className="mobile-role-task-filter__content">
-                <span className="mobile-role-task-filter__label">
-                  {item.label}
-                </span>
-                <span className="mobile-role-count-tag mobile-role-task-filter__count">
-                  {countAvailable ? item.count : '—'}
-                </span>
-              </span>
+              {item.label}
             </FilterChip>
           )
         })}
@@ -566,6 +560,7 @@ export default function MobileTaskListScreen({
             <FilterChip
               key={item.key}
               selected={active}
+              count={countAvailable ? item.count : '—'}
               removable={item.key !== MOBILE_MESSAGE_TAB_KEYS.WARNING}
               data-testid={`mobile-role-risk-filter-${item.key}`}
               aria-label={`${item.label}，${
@@ -577,12 +572,7 @@ export default function MobileTaskListScreen({
                 setActiveMessageTabKey(next)
               }}
             >
-              <span className="mobile-role-task-filter__content">
-                <span className="mobile-role-task-filter__label">{item.label}</span>
-                <span className="mobile-role-count-tag mobile-role-task-filter__count">
-                  {item.count}
-                </span>
-              </span>
+              {item.label}
             </FilterChip>
           )
         })}

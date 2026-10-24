@@ -59,12 +59,11 @@
   gap: 6px;
   flex-wrap: nowrap;
   overflow-x: auto;
-  padding: 4px 0;
+  padding: 0;
   scrollbar-width: none;
 }
 .mobile-progress-risks .erp-filter-chip {
   min-height: 44px;
-  padding: 5px 10px;
   font-size: var(--erp-font-small);
 }
 .mobile-progress-risks .erp-progress-due-options {
