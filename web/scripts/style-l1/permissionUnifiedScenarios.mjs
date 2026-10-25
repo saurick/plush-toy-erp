@@ -1547,6 +1547,8 @@ export function createPermissionUnifiedScenarios({
           .getByRole('button', { name: '创建员工账号', exact: true })
           .click()
         await frame.locator('#permission-account-form').waitFor()
+        await frame.getByText('操作记录归属此登录账号。', { exact: false }).waitFor()
+        await frame.getByText('分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。', { exact: true }).waitFor()
         await frame
           .getByRole('textbox', { name: '姓名', exact: true })
           .fill('演示员工')

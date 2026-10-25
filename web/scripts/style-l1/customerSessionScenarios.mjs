@@ -1233,9 +1233,10 @@ export function createCustomerSessionScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '超级管理员')
-        await expectText(page, '进度看板 功能预览')
-        await expectText(page, '功能说明')
-        await expectText(page, '尚未连接客户环境')
+        await expectHeading(page, '进度看板')
+        const preview = page.locator('[data-product-core-capability-review="true"]')
+        await expectText(preview, '功能预览：尚未连接客户环境，不显示客户业务数据。')
+        assert.equal(await preview.getByText('功能预览：尚未连接客户环境，不显示客户业务数据。', { exact: true }).count(), 1)
         await assertTextAbsent(page, '产品核心评审不读取客户业务数据')
         await assertTextAbsent(page, '业务对象')
         await assertTextAbsent(page, '对象总量')

@@ -2012,11 +2012,6 @@
   margin-bottom: 12px;
 }
 
-.erp-permission-account-note.ant-typography {
-  margin: 0 0 10px;
-  font-size: var(--erp-font-caption);
-}
-
 .erp-permission-list-toolbar__filters {
   display: flex;
   flex: 1 1 420px;

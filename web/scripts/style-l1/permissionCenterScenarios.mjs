@@ -1486,6 +1486,7 @@ export function createPermissionCenterScenarios({
         await expectHeading(page, '权限管理')
         await page.getByRole('tab', { name: /员工账号/u }).click()
         await expectText(page, '共 7 个员工账号')
+        assert.equal(await page.getByText('操作记录归属实际登录账号。新账号分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。', { exact: true }).count(), 0)
         assert.equal(
           await page
             .locator('.erp-admin-content')
@@ -1501,6 +1502,8 @@ export function createPermissionCenterScenarios({
           .filter({ hasText: '创建员工账号' })
           .last()
         await expectText(createModal, '初始密码')
+        await expectText(createModal, '操作记录归属此登录账号。')
+        await expectText(createModal, '分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。')
         await assertAdminRoleModalLayout(page, {
           scenarioName: 'permission-center-admin-dialogs-create',
           title: '创建员工账号',
@@ -1543,7 +1546,7 @@ export function createPermissionCenterScenarios({
           .last()
         await expectText(
           roleModal,
-          '选择多个岗位时，账号会合并这些岗位已开放的页面和操作。'
+          '分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。'
         )
         assert.equal(
           await roleModal.locator('.ant-alert').count(),

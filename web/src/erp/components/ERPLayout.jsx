@@ -176,7 +176,6 @@ const productCoreReviewFallbackByPageKey = {
     title: '进度看板',
     description: '进度看板按订单和生产单查看进展、交期与关联任务。',
     currentScope: ['订单交付', '生产执行', '进度追溯', '来源权限'],
-    boundary: '当前只显示看板功能说明；连接客户业务数据后才会显示实际数字。',
   },
 }
 
@@ -194,9 +193,7 @@ function ProductCoreCapabilityReview({ currentEntry }) {
     moduleDefinition.currentScope.length > 0
       ? moduleDefinition.currentScope
       : ['菜单入口', '功能权限', '字段设置', '可用操作']
-  const boundaryText =
-    moduleDefinition?.boundary ||
-    '当前只显示页面功能说明；连接客户业务数据后才能查看和办理实际业务。'
+  const boundaryText = moduleDefinition?.boundary
 
   return (
     <div
@@ -206,38 +203,22 @@ function ProductCoreCapabilityReview({ currentEntry }) {
     >
       <div className="erp-product-core-capability-review__header">
         <div>
-          <Text type="secondary">功能预览</Text>
-          <h2>{pageLabel} 功能预览</h2>
-          <Paragraph>
-            {moduleDefinition?.description ||
-              `${pageLabel} 已配置页面入口、功能权限、字段和可用操作。`}
+          <h2>{pageLabel}</h2>
+          {moduleDefinition?.description ? (
+            <Paragraph>{moduleDefinition.description}</Paragraph>
+          ) : null}
+          <Paragraph type="secondary">
+            功能预览：尚未连接客户环境，不显示客户业务数据。
           </Paragraph>
         </div>
-        <Space size={8} wrap>
-          <Tag color="blue">功能说明</Tag>
-          <Tag color="geekblue">不显示客户数据</Tag>
-          <Tag>尚未连接客户环境</Tag>
-          <ERPPageActions />
-        </Space>
+        <ERPPageActions />
       </div>
 
-      <div className="erp-product-core-capability-review__grid">
+      {boundaryText ? (
         <div className="erp-product-core-capability-review__panel">
-          <Text type="secondary">当前功能</Text>
-          <strong>{pageLabel}</strong>
-          <span>{moduleDefinition?.sectionTitle || '系统功能目录'}</span>
-        </div>
-        <div className="erp-product-core-capability-review__panel">
-          <Text type="secondary">数据状态</Text>
-          <strong>尚未连接客户业务数据</strong>
-          <span>连接后才能查看客户订单、库存、待办任务和财务记录。</span>
-        </div>
-        <div className="erp-product-core-capability-review__panel erp-product-core-capability-review__panel--wide">
-          <Text type="secondary">使用说明</Text>
           <strong>{boundaryText}</strong>
-          <span>要查看实际业务记录，请进入已经连接客户数据的环境。</span>
         </div>
-      </div>
+      ) : null}
 
       <div className="erp-product-core-capability-review__scope">
         <Text type="secondary">可查看内容</Text>

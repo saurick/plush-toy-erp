@@ -1000,8 +1000,12 @@ export function createDevQualityGateScenarios({
           document.activeElement?.textContent?.includes('流程与原理')
         )
         const panel = page.getByRole('region', { name: 'GitLab CI 质量证据' })
-        await panel.getByText('当前提交尚无 CI', { exact: true }).waitFor()
+        await page.getByRole('region', { name: '当前质量门禁上下文' }).getByRole('status').waitFor()
+        assert.equal(await panel.getByRole('status').count(), 0, '当前 CI 空态由页面摘要统一表达')
+        assert.equal(await panel.getByText(/耗时|结束时间|测试报告|覆盖率报告/u).count(), 0, '没有流水线时不展开流水线元数据与报告占位')
         assert.equal(await panel.getByRole('link', { name: '查看 GitLab 测试报告', exact: true }).count(), 0)
+        await panel.locator('summary').click()
+        await panel.getByRole('link', { name: '查看全部历史流水线', exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, 'dev-quality-gates-desktop-light')
 
         await page.unroute('**/__dev/api/qa/quality-gates**')

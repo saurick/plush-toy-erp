@@ -18,6 +18,7 @@ export default function DevTestingOverview({ source, state, snapshotState, loadi
   const { search } = useLocation()
   const methods = useMemo(() => buildDevTestingOverviewMethods(source), [source])
   const reports = buildDevTestingOverviewReports(state)
+  const showReportContext = Boolean(state?.report || snapshotState?.report || (!loading && ['missing', 'stale'].includes(state?.status)))
   const overviewSearch = new URLSearchParams(search)
   overviewSearch.set('view', 'overview')
   const link = (item) => (
@@ -34,7 +35,7 @@ export default function DevTestingOverview({ source, state, snapshotState, loadi
     <div className="erp-dev-testing-overview">
       <section className="erp-dev-testing-overview__reports" aria-label="已有测试报告" aria-busy={loading}>
         <div className="erp-dev-testing-overview__heading">
-          <h2>{import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '服务器专项与历史报告' : '本地工作台报告'}</h2>
+          <h2>{import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '服务器专项与历史报告' : '测试报告'}</h2>
           <div className="erp-dev-testing-overview__links">
             {link({ label: '链路实测报告', to: DEV_BUSINESS_CHAIN_AUDIT_ROUTE })}
             {link({ label: '压力报告', view: 'pressure' })}
@@ -57,15 +58,14 @@ export default function DevTestingOverview({ source, state, snapshotState, loadi
             )
           })}
         </div>
-        <div className="erp-dev-testing-overview__report-context">
-          <span>
-            {import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '本独立服务保存的历史执行结果' : '本地工作台保存的执行报告'}
-            {state?.report ? <> · <DevTimestamp value={state.report.generatedAt} /></> : null}
-            {!loading && state?.status === 'missing' ? (import.meta.env.PLUSH_STANDALONE_WORKBENCH ? ' · 此执行端没有该报告；CI 报告见服务器验证。' : ' · 尚未生成报告，可进入代码覆盖采集基线。') : null}
-            {!loading && state?.status === 'stale' ? ' · 报告已过期，仅供追溯。' : null}
-          </span>
-          {snapshotState?.report ? link({ label: '查看历史隔离报告', view: 'coverage', query: { reportSource: 'snapshot' } }) : null}
-        </div>
+        {showReportContext ? (
+          <div className="erp-dev-testing-overview__report-context">
+            {state?.report ? <span>生成于 <DevTimestamp value={state.report.generatedAt} /></span> : null}
+            {!loading && state?.status === 'missing' ? <span>{import.meta.env.PLUSH_STANDALONE_WORKBENCH ? '此执行端没有该报告；CI 报告见服务器验证。' : '尚未生成报告，可进入代码覆盖采集基线。'}</span> : null}
+            {!loading && state?.status === 'stale' ? <span>报告已过期，仅供追溯。</span> : null}
+            {snapshotState?.report ? link({ label: '查看历史隔离报告', view: 'coverage', query: { reportSource: 'snapshot' } }) : null}
+          </div>
+        ) : null}
         {!loading && state?.status === 'failed' ? (
           <Alert type="error" showIcon message="测试报告读取失败" description="测试入口仍可使用；请重新读取或进入测试报告查看详情。" />
         ) : null}

@@ -1,7 +1,7 @@
-import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
-import { openUIDesignAppearance } from './devUIDesignNavigation.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
+import { openUIDesignAppearance } from './devUIDesignNavigation.mjs'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
 
 const designSource = prepareUIDesignSandboxSource(
@@ -21,7 +21,7 @@ async function assertCompactBounds(table, narrow) {
       ...node.querySelectorAll('tbody > tr:not(.compact-row-details)'),
     ].map((row) => ({
       height: row.getBoundingClientRect().height,
-      fields: [...row.querySelectorAll("input, ui-select")].map((input) => ({
+      fields: [...row.querySelectorAll('input, ui-select')].map((input) => ({
         width: input.getBoundingClientRect().width,
         height: input.getBoundingClientRect().height,
       })),
@@ -72,15 +72,15 @@ export function createFormDensityScenarios({ outputDir }) {
             .click()
         }
         const [module, tab] = {
-          '质量检验': ['quality'],
-          '采购入库': ['warehouse-hub', 'inbound'],
-          '销售订单': ['sales'],
-          '采购订单': ['purchase'],
-          '生产管理': ['production-hub', 'production'],
+          质量检验: ['quality'],
+          采购入库: ['warehouse-hub', 'inbound'],
+          销售订单: ['sales'],
+          采购订单: ['purchase'],
+          生产管理: ['production-hub', 'production'],
           '物料清单（BOM）': ['engineering-hub', 'bom'],
-          '委外订单': ['outsourcing'],
-          '出货管理': ['shipping-hub', 'shipments'],
-          '库存台账': ['warehouse-hub', 'inventory'],
+          委外订单: ['outsourcing'],
+          出货管理: ['shipping-hub', 'shipments'],
+          库存台账: ['warehouse-hub', 'inventory'],
         }[title]
         await frame.locator(`#sidebar [data-action="nav"][data-page="${module}"]`).click()
         if (tab) await frame.locator(`[data-action="module-tab"][data-value="${tab}"]`).click()
@@ -114,14 +114,15 @@ export function createFormDensityScenarios({ outputDir }) {
         const table = modal.locator('.compact-form-table')
         await assertCompactBounds(table, size === 'narrow')
         if (kind === 'quality') {
+          await modal.getByText('全检与抽检分别记录，未检不视为合格。', { exact: true }).waitFor()
           await modal.getByLabel('检查项目 1', { exact: true }).fill('色差复核')
-          await modal.getByLabel('实际情况 1').fill('与确认样一致')
-          await chooseSelectOption(modal.getByLabel('检查范围 1'), '抽检')
-          await modal.getByLabel('说明 / 抽检范围 1').fill('抽取三卷')
+          await modal.getByLabel('实际情况 1', { exact: true }).fill('与确认样一致')
+          await chooseSelectOption(modal.getByLabel('检查范围 1', { exact: true }), '抽检')
+          await modal.getByLabel('说明 / 抽检范围 1', { exact: true }).fill('抽取三卷')
           await modal
             .getByRole('button', { name: '添加检查项', exact: true })
             .click()
-          await modal.getByLabel('检查项目 2').fill('克重')
+          await modal.getByLabel('检查项目 2', { exact: true }).fill('克重')
           await modal.getByRole('button', { name: '移除明细 1' }).click()
           assert.equal(
             await modal.getByLabel('检查项目 1', { exact: true }).inputValue(),
@@ -137,15 +138,15 @@ export function createFormDensityScenarios({ outputDir }) {
             /保存后仍须保留/
           )
           if (kind === 'engineering') {
-            await chooseSelectOption(modal.getByLabel('工程产品 1'), '节庆毛绒礼盒')
-            await chooseSelectOption(modal.getByLabel('打样 BOM 1'), 'V1')
+            await chooseSelectOption(modal.getByLabel('工程产品 1', { exact: true }), '节庆毛绒礼盒')
+            await chooseSelectOption(modal.getByLabel('打样 BOM 1', { exact: true }), 'V1')
             assert.equal(
-              await modal.getByLabel('设计师 1').inputValue(),
+              await modal.getByLabel('设计师 1', { exact: true }).inputValue(),
               '周敏'
             )
-            await chooseSelectOption(modal.getByLabel('工程产品 1'), '毛绒挂件')
-            assert.equal(await readSelectValue(modal.getByLabel('打样 BOM 1')), '')
-            assert.equal(await modal.getByLabel('设计师 1').inputValue(), '')
+            await chooseSelectOption(modal.getByLabel('工程产品 1', { exact: true }), '毛绒挂件')
+            assert.equal(await readSelectValue(modal.getByLabel('打样 BOM 1', { exact: true })), '')
+            assert.equal(await modal.getByLabel('设计师 1', { exact: true }).inputValue(), '')
           } else if (kind === 'arrival') {
             await modal.getByLabel('实点数量 1', { exact: true }).fill('25.6')
             await modal.getByLabel('送货标示数量 1', { exact: true }).fill('26')
@@ -169,14 +170,14 @@ export function createFormDensityScenarios({ outputDir }) {
               .getByLabel(kind === 'return' ? '退货数量 1' : '调整数量 1')
               .fill('2')
             if (kind === 'adjustment') {
-              await chooseSelectOption(modal.getByLabel('调整方式 1'), '仓库更正')
-              await chooseSelectOption(modal.getByLabel('目标仓库 1'), '辅料仓')
-              await chooseSelectOption(modal.getByLabel('调整方式 1'), '批次更正')
+              await chooseSelectOption(modal.getByLabel('调整方式 1', { exact: true }), '仓库更正')
+              await chooseSelectOption(modal.getByLabel('目标仓库 1', { exact: true }), '辅料仓')
+              await chooseSelectOption(modal.getByLabel('调整方式 1', { exact: true }), '批次更正')
               assert.equal(
-                await readSelectValue(modal.getByLabel('目标批次 1')),
+                await readSelectValue(modal.getByLabel('目标批次 1', { exact: true })),
                 ''
               )
-              await chooseSelectOption(modal.getByLabel('目标批次 1'), 'L0918')
+              await chooseSelectOption(modal.getByLabel('目标批次 1', { exact: true }), 'L0918')
             }
           }
         }
@@ -383,12 +384,13 @@ export function createFormDensityScenarios({ outputDir }) {
         await frame.locator('.compact-optional summary').innerText(),
         /盘点补充说明/
       )
-      await chooseSelectOption(frame.getByLabel('操作类型'), '调拨')
+      await chooseSelectOption(frame.getByLabel('操作类型', { exact: true }), '调拨')
       assert.equal(await frame.getByLabel('作业数量').inputValue(), '')
       await frame.getByLabel('作业数量').fill('20')
-      await chooseSelectOption(frame.getByLabel('目标仓库'), '辅料仓')
+      const targetWarehouse = frame.getByRole('combobox', { name: /目标仓库/u })
+      await chooseSelectOption(targetWarehouse, '辅料仓')
       await frame.getByRole('button', { name: '保存草稿', exact: true }).click()
-      assert.equal(await readSelectValue(frame.getByLabel('目标仓库')), '辅料仓')
+      assert.equal(await readSelectValue(targetWarehouse), '辅料仓')
       await frame.locator('.form-view').screenshot({
         path: `${outputDir}/form-density-design-inventory-${size}.png`,
       })

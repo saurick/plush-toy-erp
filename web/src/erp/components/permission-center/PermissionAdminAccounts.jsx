@@ -982,9 +982,6 @@ export default function PermissionAdminAccounts({
           ? createPortal(accountToolbar, toolbarContainer)
           : null
         : accountToolbar}
-      <Paragraph type="secondary" className="erp-permission-account-note">
-        操作记录归属实际登录账号。新账号分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。
-      </Paragraph>
       <Table
         sticky={sticky}
         rowKey="id"
@@ -1058,7 +1055,7 @@ export default function PermissionAdminAccounts({
           <Form.Item
             label="账号"
             name="username"
-            extra={ADMIN_USERNAME_RULE_TEXT}
+            extra={`${ADMIN_USERNAME_RULE_TEXT}；操作记录归属此登录账号。`}
             validateFirst
             rules={[
               { required: true, message: '请输入员工账号' },
@@ -1098,7 +1095,11 @@ export default function PermissionAdminAccounts({
           >
             <Input.Password autoComplete="new-password" />
           </Form.Item>
-          <Form.Item label="岗位" name="role_keys">
+          <Form.Item
+            label="岗位"
+            name="role_keys"
+            extra={canAssignUserRoles ? '分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。' : undefined}
+          >
             <Select
               mode="multiple"
               allowClear
@@ -1138,7 +1139,7 @@ export default function PermissionAdminAccounts({
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Paragraph type="secondary" className="erp-business-inline-note">
-            选择多个岗位时，账号会合并这些岗位已开放的页面和操作。
+            分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。
           </Paragraph>
           <label>
             <Text strong>岗位</Text>

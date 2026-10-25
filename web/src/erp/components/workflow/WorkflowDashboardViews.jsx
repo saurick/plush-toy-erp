@@ -141,28 +141,19 @@ export function ProductCoreDashboard({ onNavigate }) {
     >
       <div className="erp-product-core-dashboard__hero">
         <div>
-          <Text type="secondary">功能预览</Text>
           <Title level={3} className="erp-command-center-hero-title">
             系统功能总览
           </Title>
           <Paragraph className="erp-dashboard-summary">
-            这里用于查看系统已配置的功能和设置。当前尚未连接客户业务数据，因此不会显示订单、库存、待办任务或财务记录。
+            功能预览：尚未连接客户环境，不显示客户业务数据。
           </Paragraph>
         </div>
-        <Space wrap>
-          <Tag color="blue">不显示客户业务数据</Tag>
-          <Tag color="green">功能预览</Tag>
-          <Tag>尚未连接客户环境</Tag>
-        </Space>
       </div>
 
       <div className="erp-product-core-dashboard__grid">
         <section className="erp-product-core-panel">
           <div className="erp-product-core-panel__head">
             <Title level={5}>业务功能</Title>
-            <Text type="secondary">
-              可查看页面说明、填写内容和可用操作；不会读取客户业务记录。
-            </Text>
           </div>
           <div className="erp-product-core-entry-grid">
             {PRODUCT_CORE_REVIEW_ENTRIES.map((entry) => (
@@ -182,9 +173,6 @@ export function ProductCoreDashboard({ onNavigate }) {
         <section className="erp-product-core-panel">
           <div className="erp-product-core-panel__head">
             <Title level={5}>系统设置</Title>
-            <Text type="secondary">
-              这里管理客户业务设置、员工权限和操作记录，不办理具体业务。
-            </Text>
           </div>
           <Space direction="vertical" size={10} className="erp-dashboard-block">
             {PRODUCT_CORE_CONTROL_ENTRIES.map((entry) => (

@@ -20,14 +20,12 @@ export function IncomingCheckItemsForm() {
   }
   return (
     <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
-      <Typography.Paragraph type="secondary">
-        按实际来料保留、移除或补充检查项。全检与抽检分别记录，未检不会视为合格；照片可在下方质检附件中上传。
-      </Typography.Paragraph>
       <Form.List name="check_items">
         {(fields, { add, remove }) => (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             <BusinessLineItemsHeader
               title="检查项目"
+              description="全检与抽检分别记录，未检不视为合格。"
               addLabel="添加检查项"
               addDisabled={fields.length >= 50}
               onAdd={() => appendCheckItem(add, fields.length)}
