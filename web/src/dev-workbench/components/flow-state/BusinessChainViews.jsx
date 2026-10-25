@@ -3,7 +3,6 @@ import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Select from '@/common/components/select/FilterSelect'
 import {
-  buildChainMermaid,
   buildDevBusinessChainProjection,
   buildDevBusinessChainRoleGuide,
   describeDevBusinessChainNode,
@@ -15,7 +14,6 @@ import { useRuntimeContext } from './useFlowRuntime.mjs'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
   formatQueryTime,
-  escapeMermaid,
   Paragraph,
   Text,
   Title,
@@ -26,7 +24,7 @@ import {
   EvidenceDisclosure,
   KeyValue,
 } from './FlowStateShared.jsx'
-import { Markdown } from '@/common/components/markdown'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 
 import { getProcessLabel } from '@/erp/utils/processRuntimePresentation.mjs'
 import { getDevFlowStateTaskRuntimeAssociation } from '../../pages/devFlowStateTaskLookup.mjs'
@@ -117,45 +115,6 @@ function uniqueStrings(values) {
   return [...new Set(asArray(values).filter(Boolean))]
 }
 
-function buildBusinessChainOverviewMermaid(overview, chains, currentChainKey) {
-  if (!overview) return ''
-  const chainByKey = new Map(chains.map((chain) => [chain.key, chain]))
-  const ids = new Map(chains.map((chain, index) => [chain.key, `C${index}`]))
-  const lines = ['flowchart LR']
-
-  overview.lanes.forEach((lane, laneIndex) => {
-    lines.push(`  subgraph L${laneIndex}["${escapeMermaid(lane.label)}"]`)
-    lines.push('    direction LR')
-    lane.chainKeys.forEach((chainKey) => {
-      const chain = chainByKey.get(chainKey)
-      lines.push(
-        `    ${ids.get(chainKey)}["${escapeMermaid(chain?.label || chainKey)}"]`
-      )
-    })
-    lines.push('  end')
-  })
-
-  overview.relations.forEach((relation) => {
-    lines.push(
-      `  ${ids.get(relation.fromChainKey)} -->|"${escapeMermaid(relation.label)}"| ${ids.get(relation.toChainKey)}`
-    )
-  })
-  lines.push(
-    '  classDef primary fill:#f6ffed,stroke:#389e0d,color:#163300',
-    '  classDef supporting fill:#e6f4ff,stroke:#1677ff,color:#102a43',
-    '  classDef exception fill:#fff2e8,stroke:#d4380d,color:#431407',
-    '  classDef rework fill:#f9f0ff,stroke:#722ed1,color:#2d1648',
-    '  classDef reversal fill:#fffbe6,stroke:#d48806,color:#3d2b00',
-    '  classDef overview_runtime_current fill:#fff7e6,stroke:#fa8c16,stroke-width:4px,color:#452500'
-  )
-  chains.forEach((chain) => {
-    const classes = [chain.kind]
-    if (chain.key === currentChainKey) classes.push('overview_runtime_current')
-    lines.push(`  class ${ids.get(chain.key)} ${classes.join(',')}`)
-  })
-  return lines.join('\n')
-}
-
 function BusinessChainSelector({ catalog, value, onChange }) {
   const searchProps = useDefinitionSelectSearch()
   const options = useMemo(
@@ -232,20 +191,10 @@ function BusinessChainOverviewView({
   onSelectChain,
   onOpenView,
 }) {
-  const overview = catalog.businessChainOverview
   const { runtime, matchingChain } = useBusinessChainRuntime(
     catalog,
     taskId,
     selectedTask
-  )
-  const mermaid = useMemo(
-    () =>
-      buildBusinessChainOverviewMermaid(
-        overview,
-        catalog.businessChains,
-        matchingChain?.key
-      ),
-    [catalog.businessChains, matchingChain?.key, overview]
   )
   return (
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
@@ -254,11 +203,15 @@ function BusinessChainOverviewView({
         renderTopics={({ onSelectTopic, selectedTopicKey }) => (
           <BusinessChainTopics
             catalog={catalog}
-            mermaid={mermaid}
             currentChainKey={matchingChain?.key}
             selectedTopicKey={selectedTopicKey}
             onSelectChain={onSelectTopic}
-            onExploreChain={onSelectChain}
+            onExploreChain={(key, nodeKey) =>
+              onOpenView('states', {
+                [QUERY_KEYS.chain]: key,
+                [QUERY_KEYS.node]: nodeKey || null,
+              })
+            }
           />
         )}
       />
@@ -381,10 +334,6 @@ function BusinessChainView({
     (edge) => edge.from === node.key || edge.to === node.key
   )
   const outgoingRelations = chain.edges.filter((edge) => edge.from === node.key)
-  const mermaid = useMemo(
-    () => buildChainMermaid(chain, currentRuntimeNode?.key),
-    [chain, currentRuntimeNode?.key]
-  )
   const flowByKey = useMemo(
     () => new Map(catalog.flows.map((flow) => [flow.key, flow])),
     [catalog.flows]
@@ -578,39 +527,15 @@ function BusinessChainView({
                 ))}
               </Space>
             </div>
-            <ol
-              className="erp-dev-flow-chain-steps"
-              aria-label="业务链分层步骤"
-            >
-              {chain.nodes.map((item, index) => (
-                <li key={item.key}>
-                  <button
-                    type="button"
-                    className={item.key === node.key ? 'is-selected' : ''}
-                    aria-current={item.key === node.key ? 'step' : undefined}
-                    data-chain-node={item.key}
-                    data-chain-layer={item.layer}
-                    data-runtime-current={
-                      item.key === currentRuntimeNode?.key || undefined
-                    }
-                    onClick={() => onSelectNode(item.key)}
-                  >
-                    <span>{index + 1}</span>
-                    <span>
-                      <strong>{item.label}</strong>
-                      <small>
-                        {CHAIN_LAYER_PRESENTATION[item.layer].label}
-                      </small>
-                    </span>
-                    {item.key === currentRuntimeNode?.key ? (
-                      <Tag color="orange">实例所在</Tag>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ol>
-            <div className="erp-dev-flow-chain-graph erp-dev-docs-markdown">
-              <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+            <div className="erp-dev-flow-chain-graph">
+              <BusinessFlowDiagram
+                flow={chain}
+                label={`${chain.label}关系图`}
+                selectedKey={node.key}
+                onSelect={onSelectNode}
+                runtimeKey={currentRuntimeNode?.key}
+                relationships
+              />
             </div>
           </div>
           <aside

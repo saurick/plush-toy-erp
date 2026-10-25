@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Empty, Spin, Tag } from 'antd'
+import { Alert, Button, Empty, Spin, Tag } from 'antd'
+import { WorkbenchEmpty, WorkbenchFacts, WorkbenchSection } from '../WorkbenchPattern.jsx'
 import {
   getProcessOwnerPoolLabel,
   BusinessChainProjectionContext,
@@ -7,8 +8,8 @@ import {
 import {
   formatQueryTime,
   Text,
-  Title,
   KeyValue,
+  EvidenceDisclosure,
 } from './FlowStateShared.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -17,11 +18,10 @@ import { listWorkflowTaskEvents } from '@/erp/api/workflowApi.mjs'
 import { getWorkflowTaskDisplayName } from '@/erp/utils/processRuntimePresentation.mjs'
 import { buildWorkflowTaskEventTrailModel } from '@/erp/utils/workflowTaskEventPresentation.mjs'
 import {
-  getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskStatusMeta,
 } from '@/erp/utils/workflowTaskBoard.mjs'
 
-function useWorkflowEvents(taskId) {
+function useWorkflowEvents(taskId, revision) {
   const [state, setState] = useState({
     status: 'idle',
     items: [],
@@ -76,7 +76,7 @@ function useWorkflowEvents(taskId) {
         })
       })
     return () => controller.abort()
-  }, [taskId])
+  }, [taskId, revision])
   return state
 }
 
@@ -86,26 +86,27 @@ function WorkflowView({
   selectedTask,
   onBackToChain,
   onClearChainContext,
+  onLocateTask,
 }) {
-  const events = useWorkflowEvents(taskId)
+  const [revision, setRevision] = useState(0)
+  const events = useWorkflowEvents(taskId, revision)
   const model = buildWorkflowTaskEventTrailModel({
     events: events.items,
     task: selectedTask || {},
   })
   const status = selectedTask ? getWorkflowTaskStatusMeta(selectedTask) : null
   return (
-    <div className="erp-dev-flow-view-stack">
-
+    <div className="erp-dev-flow-view-stack" data-workflow-task={taskId || undefined}>
       <BusinessChainProjectionContext
         projection={projection}
         onBackToChain={onBackToChain}
         onClearChainContext={onClearChainContext}
       />
-
       {!taskId ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="尚未查询任务；请粘贴后台可见的任务名称、任务编号或来源单号"
+        <WorkbenchEmpty
+          title="先选择要查看的任务"
+          description="按来源单号、任务名称或编号定位后，查看处理人和协同事件。"
+          action={<Button onClick={onLocateTask}>定位任务</Button>}
         />
       ) : null}
       {events.status === 'loading' ? (
@@ -120,106 +121,26 @@ function WorkflowView({
           type="error"
           message="任务协同记录读取失败"
           description={events.error}
+          action={<Button onClick={() => setRevision((value) => value + 1)}>重试</Button>}
         />
       ) : null}
       {events.status === 'ready' ? (
         <>
-          <section className="erp-dev-flow-specialist-summary">
-            <div className="erp-dev-flow-section-heading">
-              <div>
-                <Text className="erp-dev-flow-eyebrow">真实 Workflow 任务</Text>
-                <Title level={2}>
-                  {selectedTask
-                    ? getWorkflowTaskDisplayName(selectedTask)
-                    : `任务 ${taskId}`}
-                </Title>
-              </div>
-              {status ? (
-                <Tag color={status.color}>{status.label}</Tag>
-              ) : (
-                <Tag>状态见事件记录</Tag>
-              )}
-            </div>
-            <dl>
-              <div>
-                <dt>任务类型</dt>
-                <dd>
-                  {selectedTask ? (
-                    <>
-                      <span>{getWorkflowTaskDisplayName(selectedTask)}</span>
-                      <KeyValue value={selectedTask.task_group}>
-                        {selectedTask.task_group}
-                      </KeyValue>
-                    </>
-                  ) : (
-                    '请通过名称或编号查询以显示任务类型'
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>负责岗位</dt>
-                <dd>
-                  {selectedTask
-                    ? getWorkflowTaskOwnerRoleLabel(selectedTask)
-                    : '从可见任务结果确认'}
-                </dd>
-              </div>
-              <div>
-                <dt>处理人</dt>
-                <dd>
-                  {selectedTask?.assignee_id
-                    ? '已指定处理人'
-                    : selectedTask
-                      ? '由岗位人员处理'
-                      : '从可见任务结果确认'}
-                </dd>
-              </div>
-              <div>
-                <dt>来源单号</dt>
-                <dd>{selectedTask?.source_no || '从可见任务结果确认'}</dd>
-              </div>
-              <div>
-                <dt>数据来源</dt>
-                <dd>workflow.list_task_events</dd>
-              </div>
-              <div>
-                <dt>查询时间</dt>
-                <dd>{formatQueryTime(events.queriedAt)}</dd>
-              </div>
-            </dl>
-          </section>
-          <Alert
-            showIcon
-            type="warning"
-            message="Workflow task done ≠ Fact posted"
-            description="即使任务显示“已完成”，仍必须到 Fact / Ledger 的权威真源确认业务结果和凭证。"
-          />
-          <section className="erp-dev-flow-responsibility">
-            <div className="erp-dev-flow-section-heading">
-              <div>
-                <Text strong>当前责任</Text>
-                <Text type="secondary">岗位、承接方式、状态和当前原因。</Text>
-              </div>
-            </div>
-            <dl>
-              {model.responsibilityItems.map((item) => (
-                <div key={item.key}>
-                  <dt>{item.label}</dt>
-                  <dd>{item.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-          <section className="erp-dev-flow-events">
-            <div className="erp-dev-flow-section-heading">
-              <div>
-                <Text strong>协同事件</Text>
-                <Text type="secondary">
-                  只回答这条任务如何被处理，不冒充来源单据完整审批链。
-                </Text>
-              </div>
-              <Tag>{model.summaryLabel}</Tag>
-            </div>
+          <WorkbenchSection
+            flat
+            className="erp-dev-flow-specialist-summary"
+            title={selectedTask ? getWorkflowTaskDisplayName(selectedTask) : `任务 ${taskId}`}
+            description={selectedTask?.source_no || '来源单号未记录'}
+            actions={status ? <Tag color={status.color}>{status.label}</Tag> : <Tag>状态见事件记录</Tag>}
+          >
+            <WorkbenchFacts items={model.responsibilityItems.filter((item) => item.key !== 'status')} />
+          </WorkbenchSection>
+          <WorkbenchSection
+            flat
+            className="erp-dev-flow-events"
+            title="处理记录"
+            actions={<Text type="secondary">{model.summaryLabel}</Text>}
+          >
             {events.truncated ? (
               <Alert showIcon type="warning" message="只显示最近 100 条事件" />
             ) : null}
@@ -229,23 +150,24 @@ function WorkflowView({
                   <li key={item.key} data-event-tone={item.tone}>
                     <span>{item.timeLabel}</span>
                     <strong>{item.label}</strong>
-                    <p>
-                      {item.actorLabel}
-                      {item.transitionLabel ? ` · ${item.transitionLabel}` : ''}
-                    </p>
-                    {item.reason ? (
-                      <blockquote>{item.reason}</blockquote>
-                    ) : null}
+                    <p>{item.actorLabel}{item.transitionLabel ? ` · ${item.transitionLabel}` : ''}</p>
+                    {item.reason ? <blockquote>{item.reason}</blockquote> : null}
                   </li>
                 ))}
               </ol>
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="该任务暂无可见协同事件"
-              />
-            )}
-          </section>
+            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该任务暂无可见协同事件" />}
+          </WorkbenchSection>
+          <Text type="secondary">任务记录不代表库存、出货或财务结果已生效。</Text>
+          <EvidenceDisclosure label="查询依据">
+            <WorkbenchFacts items={[
+              { label: '任务编号', value: selectedTask?.task_code || '未记录' },
+              { label: '内部任务标识', value: <KeyValue value={String(taskId)} /> },
+              { label: '任务类型', value: <KeyValue value={selectedTask?.task_group || '未记录'} /> },
+              { label: '数据来源', value: 'workflow.list_task_events' },
+              { label: '查询时间', value: formatQueryTime(events.queriedAt) },
+            ]}
+            />
+          </EvidenceDisclosure>
         </>
       ) : null}
     </div>

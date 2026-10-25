@@ -400,6 +400,7 @@ test('delivery creates receivable facts but leaves payment and reversal to the f
       'shipment_release_process',
       'shipment_release_task',
       'shipment_release',
+      'shipment_rejected',
       'shipped',
       'receivable_draft',
       'receivable',
@@ -458,7 +459,7 @@ test('business chain steps bind formal responsibility, state, action, process, F
   )
   const roleProfiles = yoyoosunRoleFlowMatrix.roles
 
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 82)
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 84)
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount, 66)
   assert.equal(
     DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepContractComplete,

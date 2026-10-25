@@ -24,7 +24,7 @@ test('compact topic diagrams keep all paths, branch conditions and fact-posting 
   }
   const delivery = DEV_FLOW_STATE_CATALOG.businessChains.find((chain) => chain.key === 'delivery_to_settlement')
   const chart = buildChainMermaid(delivery, null, { compact: true }).replaceAll('<br/>', '')
-  assert(chart.includes('放行后执行出货'))
+  assert(chart.includes('有效放行且发货条件满足'))
   assert(chart.includes('审批决定为拒绝'))
 })
 
@@ -132,8 +132,7 @@ test('business chain node projection keeps only adjacent registered steps and sc
     [
       'shipment_release_task:calls_domain_command:shipment_release',
       'shipment_release:posts_fact:shipped',
-      'shipment_release_task:returns:shipment_release',
-    ]
+      ]
   )
   assert(
     projection.scenarios.some((scenario) => scenario.kind === 'happy_path')
@@ -165,6 +164,35 @@ test('business chain projection fails closed for unknown chain or node', () => {
       }),
     /unknown business chain node projection/u
   )
+})
+
+test('associated views start with the selected object and retain adjacent objects', () => {
+  const material = buildDevBusinessChainProjection({
+    catalog: DEV_FLOW_STATE_CATALOG,
+    chainKey: 'sales_to_production',
+    nodeKey: 'material_request',
+  })
+  assert.equal(material.flows[0].key, 'source.engineering_material_request')
+  assert(material.flows.some((flow) => flow.key === 'source.sales_order_engineering'))
+
+  for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
+    for (const node of chain.nodes) {
+      const projection = buildDevBusinessChainProjection({
+        catalog: DEV_FLOW_STATE_CATALOG,
+        chainKey: chain.key,
+        nodeKey: node.key,
+      })
+      assert.deepEqual(projection.flows.map((flow) => flow.key), projection.machineKeys)
+      assert.deepEqual(
+        projection.processDefinitions.map((definition) => definition.key),
+        projection.processDefinitionKeys
+      )
+      assert.deepEqual(
+        projection.factDefinitions.map((definition) => definition.factKey),
+        projection.factKeys
+      )
+    }
+  }
 })
 
 test('purchase topic reuses role handoffs and retains both payable draft and posting', () => {

@@ -88,16 +88,22 @@ export function buildDevBusinessChainProjection({
       capabilityKeys,
     }),
     flows: Object.freeze(
-      asArray(catalog.flows).filter((flow) => machineKeys.includes(flow.key))
+      machineKeys.flatMap((key) =>
+        asArray(catalog.flows).filter((flow) => flow.key === key)
+      )
     ),
     processDefinitions: Object.freeze(
-      asArray(catalog.processDefinitions).filter((definition) =>
-        processDefinitionKeys.includes(definition.key)
+      processDefinitionKeys.flatMap((key) =>
+        asArray(catalog.processDefinitions).filter(
+          (definition) => definition.key === key
+        )
       )
     ),
     factDefinitions: Object.freeze(
-      asArray(catalog.factDefinitions).filter((definition) =>
-        factKeys.includes(definition.factKey)
+      factKeys.flatMap((key) =>
+        asArray(catalog.factDefinitions).filter(
+          (definition) => definition.factKey === key
+        )
       )
     ),
     readOnly: true,

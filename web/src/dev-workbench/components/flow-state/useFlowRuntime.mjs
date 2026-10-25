@@ -7,7 +7,7 @@ import {
   isDevFlowStateTaskUnlinkedRuntimeError,
 } from '../../pages/devFlowStateTaskLookup.mjs'
 
-function useRuntimeContext(taskId, association) {
+function useRuntimeContext(taskId, association, revision = 0) {
   const [state, setState] = useState({
     status: 'idle',
     context: null,
@@ -71,7 +71,7 @@ function useRuntimeContext(taskId, association) {
         })
       })
     return () => controller.abort()
-  }, [association, taskId])
+  }, [association, taskId, revision])
   return state
 }
 

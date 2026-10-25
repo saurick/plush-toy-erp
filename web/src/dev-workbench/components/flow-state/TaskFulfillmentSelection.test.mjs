@@ -26,7 +26,7 @@ test('清空方案清理其节点并回到可点选的方案图', async (t) => {
   assert.equal(ui.params().has('flow_exception_step'), false)
   assert.equal(ui.params().get('flow_exception_origin'), 'incoming_quality')
   assert.equal(ui.root.querySelector('[data-exception-handling]'), null)
-  assert(ui.root.querySelector('[data-exception-guide] .erp-markdown-mermaid'))
+  assert(ui.root.querySelector('[data-exception-guide] [data-business-flow]'))
 })
 
 test('清空岗位及来源保留方案和明确步骤，不默认另一个来源', async (t) => {

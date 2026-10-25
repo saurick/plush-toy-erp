@@ -38,7 +38,8 @@ export function buildFulfillmentExceptionGraph(guide, { planKey, originStage, pr
     result: guide.source,
   }
   const nodes = [entry, ...steps]
-  const edges = [{ from: entry.key, to: steps[0].key, label: guide.diagram.branch_label }]
+  entry.result = `${guide.diagram.branch_label}；${guide.source}`
+  const edges = [{ from: entry.key, to: steps[0].key, label: guide.diagram.branch_label, kind: 'branches_to' }]
   let reentryStage = null
   let returnStage = null
   if (policy.reentry) {
@@ -58,7 +59,7 @@ export function buildFulfillmentExceptionGraph(guide, { planKey, originStage, pr
     } else edges.push({ from, to })
   }
   if (policy.kind === 'stop') {
-    nodes.push({ key: 'end:result', kind: 'terminal', label: policy.label, result: plan.closure, role_keys: [] })
+    nodes.push({ key: 'end:result', kind: 'terminal', risk: plan.key === 'scrap', label: policy.label, result: plan.closure, role_keys: [] })
     edges.push({ from: steps.at(-1).key, to: 'end:result' })
   } else if (policy.kind === 'return') {
     if (policy.target === 'external') {
@@ -75,7 +76,7 @@ export function buildFulfillmentExceptionGraph(guide, { planKey, originStage, pr
   if (guide.approval && steps.some((step) => step.key === 'approval')) {
     const approvedEdge = edges.find((edge) => edge.from === 'approval')
     if (approvedEdge) approvedEdge.label = '通过'
-    nodes.push({ key: 'end:rejected', kind: 'terminal', label: '审批未通过 · 本次申请结束', result: guide.approval.rejected, role_keys: [] })
+    nodes.push({ key: 'end:rejected', kind: 'terminal', risk: true, label: '审批未通过 · 本次申请结束', result: guide.approval.rejected, role_keys: [] })
     edges.push({ from: 'approval', to: 'end:rejected', label: '未通过' })
   }
   const split = policy.reentry ? steps.findIndex((step) => step.key === policy.reentry.before_step) : steps.length

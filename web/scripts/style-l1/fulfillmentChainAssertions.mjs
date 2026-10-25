@@ -40,6 +40,7 @@ export async function assertFulfillmentDetailGeometry(detail) {
 }
 
 export async function assertFulfillmentChainClickTargets(canvas) {
+  await expect(canvas.locator('[data-chain-stage]')).toHaveCount(17)
   const stages = await canvas.locator('[data-chain-stage]').all()
   assert.equal(stages.length, 17)
   for (const stage of stages) {
@@ -112,6 +113,11 @@ export function fulfillmentWireCollisions({ boxes, paths, source, target }) {
 }
 
 export async function assertFulfillmentChainGeometry(canvas) {
+  await expect.poll(() => canvas.evaluate((root) => {
+    const map = root.querySelector('.erp-dev-chain__map')
+    const svg = map.querySelector('svg')
+    return Number(svg.getAttribute('width')) === map.clientWidth && Number(svg.getAttribute('height')) === map.clientHeight
+  })).toBe(true)
   const geometry = await canvas.evaluate((root) => {
     const map = root.querySelector('.erp-dev-chain__map')
     const base = map.getBoundingClientRect()

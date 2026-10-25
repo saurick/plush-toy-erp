@@ -99,6 +99,8 @@ const chainNode = (key, label, layer, options = {}) => ({
   label,
   layer,
   summary: options.summary || '',
+  terminal: options.terminal === true,
+  risk: options.risk === true,
   machineKeys: options.machineKeys || [],
   factKeys:
     options.factKeys ||
@@ -333,6 +335,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('purchase_task', '采购审批任务', 'workflow_task', {
         sourceRefs: ['server/internal/biz/workflow_source_tasks.go'],
       }),
+      chainNode('purchase_rejected', '采购审批拒绝 · 本次结束', 'derived_result', { terminal: true, risk: true, machineKeys: ['source.purchase_order'], sourceRefs: ['server/internal/biz/purchase_order.go'] }),
       chainNode('purchase_receipt', '分批到货与实点记录', 'fact_ledger', {
         machineKeys: ['fact.purchase_receipt'],
         sourceRefs: ['server/internal/biz/purchase_receipt.go'],
@@ -358,7 +361,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'purchase_order',
         'purchase_approval',
-        '提交后启动审批',
+        '独立人工单提交审批',
         'starts_process',
         {
           action: 'PurchaseOrderUsecase.SubmitPurchaseOrderForProcessCommand',
@@ -402,6 +405,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           sourceRefs: ['server/internal/biz/purchase_receipt.go'],
         }
       ),
+      chainEdge('purchase_order', 'purchase_receipt', '用料生成且已批准，不重复审批', 'creates_fact_draft', { action: 'InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder', condition: '采购订单已批准，来源为工程用料生成', factBoundary: 'purchase_receipt_draft', sourceRefs: ['server/internal/biz/purchase_receipt.go', 'server/internal/biz/engineering_material_request.go'] }),
       chainEdge(
         'purchase_receipt',
         'purchase_quality',
@@ -454,7 +458,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainEdge(
         'purchase_task',
-        'purchase_order',
+        'purchase_rejected',
         '审批拒绝后结束本次办理',
         'returns',
         {
@@ -687,11 +691,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('shipment_release_task', '出货财务审批任务', 'workflow_task', {
         sourceRefs: ['server/internal/biz/workflow_source_tasks.go'],
       }),
-      chainNode('shipment_release', '财务放行结果', 'derived_result', {
+      chainNode('shipment_release', '财务放行已通过', 'derived_result', {
         machineKeys: ['fact.shipment_finance_release'],
         factKeys: ['fact.shipment_finance_release'],
         sourceRefs: ['server/internal/biz/shipment_process_command.go'],
       }),
+      chainNode('shipment_rejected', '财务审批拒绝 · 本次结束', 'derived_result', { terminal: true, risk: true, machineKeys: ['fact.shipment_finance_release'], summary: '拒绝保持禁止实际出货；重新提交仍按正式放行合同办理。', sourceRefs: ['server/internal/biz/shipment_process_command.go'] }),
       chainNode('shipped', '真实出货事实', 'fact_ledger', {
         machineKeys: ['fact.shipment'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
@@ -747,7 +752,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           sourceRefs: ['server/internal/biz/shipment_process_command.go'],
         }
       ),
-      chainEdge('shipment_release', 'shipped', '放行后执行出货', 'posts_fact', {
+      chainEdge('shipment_release', 'shipped', '有效放行且发货条件满足，显式确认实际出货', 'posts_fact', {
         action: 'OperationalFactUsecase.ShipShipmentWithActor',
         factBoundary: 'shipment_and_inventory',
         sourceRefs: ['server/internal/biz/operational_fact.go'],
@@ -788,7 +793,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainEdge(
         'shipment_release_task',
-        'shipment_release',
+        'shipment_rejected',
         '审批拒绝后结束本次办理',
         'returns',
         {
@@ -1205,7 +1210,8 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           ],
         }
       ),
-      chainNode('affected_wip', '受影响在制批次', 'fact_ledger', {
+      chainNode('scrapped_wip', '报废原批 · 终止', 'fact_ledger', { terminal: true, risk: true, machineKeys: ['fact.production_wip_batch'], summary: '报废执行后原批取消，不进入后续正常生产。', sourceRefs: ['server/internal/data/production_exception_decision_repo.go'] }),
+      chainNode('affected_wip', '获批让步原批 / 返工重做新批', 'fact_ledger', { summary: '仅满足后续条件的让步原批或关联新批可继续；不包括报废原批。',
         machineKeys: ['fact.production_wip_batch'],
         sourceRefs: ['server/internal/biz/production_wip.go'],
       }),
@@ -1304,11 +1310,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'production_exception_execution',
         'affected_wip',
-        '报废或让步更新在制状态与事件',
+        '让步或返工重做：核对可继续批次',
         'reworks',
         {
           action:
             'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+          condition: '处置方式不是报废；返工或重做必须使用关联新批',
           factBoundary: 'production_wip_batch_and_event',
           sourceRefs: [
             'server/internal/biz/production_exception_process_command.go',
@@ -1316,10 +1323,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           ],
         }
       ),
+      chainEdge('production_exception_execution', 'scrapped_wip', '报废已执行，原批终止', 'reworks', { action: 'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand', condition: '批准的处理方案为报废且已执行', factBoundary: 'production_wip_batch_and_event', sourceRefs: ['server/internal/data/production_exception_decision_repo.go', 'server/internal/biz/production_exception_process_command.go'] }),
       chainEdge(
         'affected_wip',
         'affected_production_fact',
-        '后续按正常生产路径形成事实',
+        '满足后续工序与检验条件后，另行形成事实',
         'derives',
         {
           action: 'ProductionOrderUsecase.ApplyProductionWIPAction',
@@ -1767,7 +1775,7 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     {
       fromChainKey: 'production_exception',
       toChainKey: 'production_to_inventory',
-      label: '执行结果返回生产',
+      label: '让步原批或返工重做新批按条件继续；报废原批终止',
       kind: 'returns_to',
     },
     {

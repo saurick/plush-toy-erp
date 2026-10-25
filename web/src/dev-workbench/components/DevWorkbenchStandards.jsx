@@ -13,6 +13,9 @@ import {
   WorkbenchToolbar,
 } from './WorkbenchPattern.jsx'
 import '../styles/dev-workbench-standards.css'
+import BusinessFlowDiagram from './flow-state/BusinessFlowDiagram.jsx'
+import { WorkflowTaskDiscoveryCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
+import { buildFulfillmentSubflow } from '../config/devFulfillmentSubflow.mjs'
 
 const PATTERNS = [
   {
@@ -357,6 +360,12 @@ function EvidenceExample({ state, onRecover }) {
 
 function ReadingExample({ state, onRecover }) {
   const [topic, setTopic] = useState('ci')
+  const [graphNode, setGraphNode] = useState('inspect')
+  const businessFlow = buildFulfillmentSubflow(
+    WorkflowTaskDiscoveryCatalog.fulfillment_flow.find(
+      (step) => step.stage === 'shell_quality'
+    )
+  )
   const topics = {
     ci: {
       title: 'CI 证明什么',
@@ -409,6 +418,22 @@ function ReadingExample({ state, onRecover }) {
           >
             关联阅读：{current.next}
           </Button>
+          <details className="erp-dev-disclosure">
+            <summary>共享业务图样板</summary>
+            <BusinessFlowDiagram
+              flow={businessFlow}
+              label="共享皮套检验样板"
+              selectedKey={graphNode}
+              onSelect={setGraphNode}
+            />
+            <p>
+              {businessFlow.nodes.find((node) => node.key === graphNode)?.label}
+              ：节点点击只选中；跨环节查看使用明确入口。
+            </p>
+            <Link to="/__dev/status-flows?view=chain&chain=all&flow_stage=shell_quality">
+              查看实际业务链路
+            </Link>
+          </details>
           <details className="erp-dev-disclosure">
             <summary>查看来源与适用范围</summary>
             样板内容引用工作台设计的证据分层；这里不读取真实服务器状态。

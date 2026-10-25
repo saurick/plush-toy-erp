@@ -1,16 +1,14 @@
 import React, { useMemo } from 'react'
-import { Alert, Button, Empty, Tag } from 'antd'
+import { Button, Empty } from 'antd'
+import { WorkbenchFacts, WorkbenchSection } from '../WorkbenchPattern.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { BusinessChainProjectionContext } from './FlowTaskContext.jsx'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
-  Text,
-  Title,
   useDefinitionSelectSearch,
   renderDefinitionSelectOption,
   EvidenceDisclosure,
   KeyValue,
-  GuidanceDisclosure,
 } from './FlowStateShared.jsx'
 import { createDevFlowDefinitionOptionFilter } from '../../pages/devFlowDefinitionSearch.mjs'
 import { buildFactDefinitionSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
@@ -42,22 +40,10 @@ function FactsView({
   )
   return (
     <div className="erp-dev-flow-view-stack">
-      <GuidanceDisclosure
-        guidanceKey="facts"
-        title="Fact / Ledger 管“账”"
-        summary="流程完成不能替代事实凭证"
-        description="它回答什么业务结果已经正式生效、权威真源在哪里、凭证和纠正方式是什么。Workflow 或 ProcessRuntime 的完成状态都不能替代事实凭证。"
-      />
       <BusinessChainProjectionContext
         projection={projection}
         onBackToChain={onBackToChain}
         onClearChainContext={onClearChainContext}
-      />
-      <Alert
-        showIcon
-        type="warning"
-        message={catalog.factRuntimeQuery.label}
-        description={catalog.factRuntimeQuery.reason}
       />
       <section className="erp-dev-flow-definition-selector">
         <label htmlFor="dev-flow-fact-select">选择事实定义</label>
@@ -72,62 +58,39 @@ function FactsView({
           filterOption={optionFilter}
           notFoundContent="没有匹配的事实定义"
           value={fact?.factKey}
+          labelRender={() => fact?.label}
           options={options}
           optionRender={renderDefinitionSelectOption}
           onChange={onSelectFact}
         />
-        <Text type="secondary">
-          只展示当前代码核实的定义；不提供 mock 运行凭证或伪造凭证搜索。
-        </Text>
       </section>
       {fact ? (
-        <section
+        <WorkbenchSection
+          flat
           className="erp-dev-flow-fact-detail"
           data-selected-fact={fact.factKey}
+          title={fact.label}
+          description="定义说明；当前不支持按凭证查询实际结果。"
+          actions={<Button onClick={() => onOpenState(fact.machineKey)}>查看状态规则</Button>}
         >
-          <div className="erp-dev-flow-section-heading">
-            <div>
-              <Text className="erp-dev-flow-eyebrow">Fact / Ledger 定义</Text>
-              <Title level={2}>{fact.label}</Title>
-              <KeyValue value={fact.factKey} />
-            </div>
-            <Tag color="red">定义证据</Tag>
-          </div>
-          <dl>
-            <div>
-              <dt>正式发生条件</dt>
-              <dd>{fact.occurrenceCondition}</dd>
-            </div>
-            <div>
-              <dt>来源单据</dt>
-              <dd>{fact.sourceDocument}</dd>
-            </div>
-            <div>
-              <dt>权威真源</dt>
-              <dd>{fact.authority}</dd>
-            </div>
-            <div>
-              <dt>业务影响</dt>
-              <dd>{fact.businessImpact}</dd>
-            </div>
-            <div>
-              <dt>事实凭证</dt>
-              <dd>{fact.voucher}</dd>
-            </div>
-            <div>
-              <dt>幂等规则</dt>
-              <dd>{fact.idempotencyRule}</dd>
-            </div>
-            <div>
-              <dt>纠正方式</dt>
-              <dd>{fact.correction}</dd>
-            </div>
-          </dl>
-          <Button onClick={() => onOpenState(fact.machineKey)}>
-            查看对应状态规则
-          </Button>
-          <EvidenceDisclosure value={fact} />
-        </section>
+          <WorkbenchFacts items={[
+            { label: '何时生效', value: fact.occurrenceCondition },
+            { label: '业务影响', value: fact.businessImpact },
+            { label: '来源单据', value: fact.sourceDocument },
+            { label: '结果凭证', value: fact.voucher },
+            { label: '如何纠正', value: fact.correction },
+          ]}
+          />
+          <EvidenceDisclosure value={fact} label="规则与代码依据">
+            <WorkbenchFacts items={[
+              { label: '定义标识', value: <KeyValue value={fact.factKey} /> },
+              { label: '权威真源', value: fact.authority },
+              { label: '幂等规则', value: fact.idempotencyRule },
+              { label: '查询范围', value: catalog.factRuntimeQuery.reason },
+            ]}
+            />
+          </EvidenceDisclosure>
+        </WorkbenchSection>
       ) : <Empty description="请选择事实定义" />}
     </div>
   )

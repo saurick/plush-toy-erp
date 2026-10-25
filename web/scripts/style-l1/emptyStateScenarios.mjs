@@ -175,7 +175,7 @@ export function createEmptyStateScenarios({
     },
     {
       name: 'dev-ui-design-workbench',
-      path: '/__dev/ui-design?page=workbench',
+      path: '/__dev/ui-design?page=workbench&workbenchMode=preview',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
@@ -215,6 +215,7 @@ export function createEmptyStateScenarios({
         await frame
           .getByRole('textbox', { name: '搜索工作台条目' })
           .fill('不存在的条目')
+        await frame.getByRole('textbox', { name: '搜索工作台条目' }).press('Enter')
         await frame.getByText('没有匹配的工具', { exact: true }).waitFor()
         await frame
           .getByRole('button', { name: '清除筛选', exact: true })
@@ -234,7 +235,7 @@ export function createEmptyStateScenarios({
         await observation.locator('summary').filter({ hasText: '导出' }).click()
         await observation.getByRole('button', { name: '客户校对稿', exact: true }).click()
         await observation.getByRole('status').waitFor()
-        await frame.locator('summary').filter({ hasText: '技术详情 · 状态规则示例' }).click()
+        await frame.locator('summary').filter({ hasText: '状态规则与依据示例' }).click()
         const rules = frame.locator('[data-dev-rule-preview]')
         await rules.getByRole('img', { name: '正常推进状态图示' }).waitFor()
         await rules.getByRole('button', { name: '异常与纠正', exact: true }).click()

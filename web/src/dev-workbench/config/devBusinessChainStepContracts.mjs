@@ -260,6 +260,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           processNode(PURCHASE_APPROVAL, 'approve_purchase_order'),
         ],
       }),
+      'purchase_order:creates_fact_draft:purchase_receipt': step({ responsibilityMode: 'human', ownerPoolKeys: ['warehouse'], capabilityKeys: [PermissionCode.PURCHASE_RECEIPT_CREATE], stateRefs: [state('source.purchase_order', 'approved', 'precondition'), state('fact.purchase_receipt', 'DRAFT', 'result')] }),
       'purchase_approval:creates_fact_draft:purchase_receipt': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['warehouse'],
@@ -304,7 +305,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         capabilityKeys: [PermissionCode.FINANCE_PAYABLE_CONFIRM],
         stateTransitionRefs: [transition('fact.finance', 'DRAFT->POSTED')],
       }),
-      'purchase_task:returns:purchase_order': step({
+      'purchase_task:returns:purchase_rejected': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['boss'],
         stateTransitionRefs: [
@@ -321,6 +322,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'purchase_order:starts_process:purchase_approval',
         'purchase_approval:creates_task:purchase_task',
         'purchase_task:calls_domain_command:purchase_approval',
+        'purchase_order:creates_fact_draft:purchase_receipt',
         'purchase_approval:creates_fact_draft:purchase_receipt',
         'purchase_receipt:creates_fact_draft:purchase_quality',
         'purchase_quality:posts_fact:purchase_lot',
@@ -328,7 +330,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'purchase_payable_draft:posts_fact:purchase_payable',
       ],
       interruptionStepKeys: [
-        'purchase_task:returns:purchase_order',
+        'purchase_task:returns:purchase_rejected',
         'purchase_task:calls_domain_command:purchase_approval',
         'purchase_quality:posts_fact:purchase_lot',
       ],
@@ -574,7 +576,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           transition('fact.shipment', 'SHIPPED->CANCELLED'),
         ],
       }),
-      'shipment_release_task:returns:shipment_release': step({
+      'shipment_release_task:returns:shipment_rejected': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['finance'],
         stateTransitionRefs: [transition('workflow.task', 'ready->rejected')],
@@ -596,7 +598,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'receivable_draft:posts_fact:receivable',
       ],
       interruptionStepKeys: [
-        'shipment_release_task:returns:shipment_release',
+        'shipment_release_task:returns:shipment_rejected',
         'shipment_release_task:calls_domain_command:shipment_release',
       ],
       interruptionKinds: ['blocked', 'rejected', 'resume'],
@@ -1004,6 +1006,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
             processNode(PRODUCTION_EXCEPTION_APPROVAL, 'execute_warehouse_production_exception'),
           ],
         }),
+      'production_exception_execution:reworks:scrapped_wip': step({ responsibilityMode: 'human', ownerPoolKeys: ['production', 'warehouse'], capabilityKeys: [PermissionCode.PRODUCTION_EXCEPTION_EXECUTE], stateRefs: [state('source.production_exception_execution', 'APPLIED', 'precondition'), state('fact.production_wip_batch', 'CANCELLED', 'result')] }),
       'production_exception_execution:reworks:affected_wip': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['production', 'warehouse'],
@@ -1045,6 +1048,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       ],
       interruptionStepKeys: [
         'production_exception_task:returns:production_exception_rejected',
+        'production_exception_execution:reworks:scrapped_wip',
       ],
       interruptionKinds: ['blocked', 'rejected', 'resume'],
       correctionStepKeys: [

@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button, Drawer } from 'antd'
 import { CloseOutlined, LeftOutlined } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import SlidingSegmented from '../../../common/components/navigation/SlidingSegmented.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
@@ -42,6 +42,7 @@ export default function TaskFulfillmentGuide({
   renderTopics,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
   const roleLabel = fulfillmentRoleOptions.find(
     (option) => option.value === role
@@ -69,7 +70,9 @@ export default function TaskFulfillmentGuide({
       })
     : null
   const current =
-    steps.find((step) => step.stage === searchParams.get(queryKeys.roleStage)) ||
+    steps.find(
+      (step) => step.stage === searchParams.get(queryKeys.roleStage)
+    ) ||
     (scoped
       ? steps.find((step) => fulfillmentStepMatchesRole(step, role)) || steps[0]
       : null)
@@ -78,7 +81,8 @@ export default function TaskFulfillmentGuide({
     : null
   const canReturn = Boolean(selection && current)
   const detailStep = selection
-    ? steps.find((step) => step.stage === selection.origin?.stage) || selection.origin
+    ? steps.find((step) => step.stage === selection.origin?.stage) ||
+      selection.origin
     : current
   const showDetail = view !== 'topics' && Boolean(current || selection)
   const links = [
@@ -109,11 +113,14 @@ export default function TaskFulfillmentGuide({
       openerRef.current = document.activeElement?.closest('button')
       revealRef.current = true
     }
-    setSearchParams((previous) => {
-      const next = new URLSearchParams(previous)
-      change(next)
-      return next
-    })
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        change(next)
+        return next
+      },
+      { state: location.state }
+    )
   }
   const selectStage = (stage) =>
     update((next) => {
@@ -186,11 +193,11 @@ export default function TaskFulfillmentGuide({
             value={role}
             options={fulfillmentRoleOptions}
             onChange={(value) =>
-              update((next) =>
-                value === 'all'
-                  ? next.delete(queryKeys.role)
-                  : next.set(queryKeys.role, value)
-              )
+              update((next) => {
+                if (value === 'all') next.delete(queryKeys.role)
+                else next.set(queryKeys.role, value)
+                next.delete(queryKeys.roleTopicNode)
+              })
             }
             virtual={false}
           />
@@ -200,7 +207,14 @@ export default function TaskFulfillmentGuide({
         renderTopics({
           selectedTopicKey: searchParams.get(queryKeys.roleTopic),
           onSelectTopic: (key) =>
-            update((next) => next.set(queryKeys.roleTopic, key ?? '')),
+            update((next) => {
+              next.set(queryKeys.roleTopic, key ?? '')
+              ;[
+                queryKeys.roleTopicNode,
+                queryKeys.roleMap,
+                queryKeys.roleMapNode,
+              ].forEach((name) => next.delete(name))
+            }),
         })
       ) : (
         <>
@@ -249,26 +263,27 @@ export default function TaskFulfillmentGuide({
               className="erp-dev-exception-directory"
               aria-label="异常处理目录"
             >
-              <div
-                className="erp-dev-exception-directory__list"
-                role="group"
-                aria-label="异常类型"
-              >
-                {exceptionDirectory.map(({ guide, roleMatch }) => (
-                  <button
-                    key={guide.key}
-                    type="button"
-                    className="erp-dev-directory-item"
-                    data-exception-entry={guide.key}
-                    data-role-match={role === 'all' ? undefined : roleMatch}
-                    aria-pressed={guideKey === guide.key}
-                    onClick={() => openException(guide)}
-                  >
-                    <span>{guide.label}</span>
-                    {role !== 'all' && roleMatch ? <small>本岗位</small> : null}
-                  </button>
-                ))}
-              </div>
+              {!selection ? (
+                <FilterSelect
+                  label="异常类型"
+                  aria-label="异常类型"
+                  placeholder="选择异常类型"
+                  value={guideKey}
+                  options={exceptionDirectory.map(({ guide }) => ({
+                    value: guide.key,
+                    label: guide.label,
+                  }))}
+                  onChange={(key) =>
+                    key &&
+                    openException(
+                      catalog.exception_guides.find(
+                        (guide) => guide.key === key
+                      )
+                    )
+                  }
+                  virtual={false}
+                />
+              ) : null}
               {!selection ? (
                 <p className="erp-dev-fulfillment-guide__empty">
                   选择异常类型，查看处理分支及回接位置。
@@ -312,10 +327,32 @@ export default function TaskFulfillmentGuide({
                 ) : null}
               </div>
               {selection?.invalid ? (
-                <p role="alert">{selection.invalid}，请重新选择异常类型。</p>
+                <div role="alert">
+                  <p>{selection.invalid}，请重新选择异常类型。</p>
+                  <Button
+                    onClick={() =>
+                      update((next) =>
+                        exceptionKeys.forEach((key) => next.delete(key))
+                      )
+                    }
+                  >
+                    清除并重新选择
+                  </Button>
+                </div>
               ) : selection?.guide ? (
                 <FulfillmentExceptionDetails
+                  key={selection.guide.key}
                   selection={selection}
+                  guides={catalog.exception_guides}
+                  onSelectGuide={(key) =>
+                    key
+                      ? openException(
+                          catalog.exception_guides.find(
+                            (guide) => guide.key === key
+                          )
+                        )
+                      : closeDetail()
+                  }
                   role={role}
                   onSelectOrigin={(stage) =>
                     update((next) =>

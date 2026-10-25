@@ -27,25 +27,25 @@ const VIEW_ITEMS = Object.freeze([
   },
   {
     value: 'workflow',
-    label: '查责任与任务',
+    label: '协同记录',
     englishLabel: 'Workflow / Task',
     description: '谁负责、谁接棒、为什么阻塞或退回',
   },
   {
     value: 'runtime',
-    label: '看运行路径',
+    label: '流程轨迹',
     englishLabel: 'ProcessRuntime',
     description: '流程走到哪里、走过什么路径',
   },
   {
     value: 'facts',
-    label: '看已生效结果',
+    label: '事实定义',
     englishLabel: 'Fact / Ledger',
-    description: '什么结果正式生效、凭证和纠正方式是什么',
+    description: '查来源、发生条件、入账与纠正规则',
   },
   {
     value: 'states',
-    label: '查状态规则',
+    label: '单据状态',
     englishLabel: 'State Machine',
     description: '对象有哪些状态、允许怎样转换',
   },
@@ -135,21 +135,24 @@ function evidenceRefs(value) {
   return [...new Set(refs)]
 }
 
-function EvidenceDisclosure({ value, label = '查看代码与文档证据' }) {
+function EvidenceDisclosure({ value, label = '查看代码与文档证据', children }) {
   const refs = evidenceRefs(value)
-  if (refs.length === 0) return null
+  if (refs.length === 0 && !children) return null
   return (
     <details className="erp-dev-disclosure erp-dev-flow-evidence" data-evidence-disclosure>
       <summary>
-        {label}（{refs.length}）
+        {label}{refs.length > 0 ? `（${refs.length}）` : ''}
       </summary>
-      <ul>
-        {refs.map((ref) => (
-          <li key={ref}>
-            <code>{ref}</code>
-          </li>
-        ))}
-      </ul>
+      {children}
+      {refs.length > 0 ? (
+        <ul>
+          {refs.map((ref) => (
+            <li key={ref}>
+              <code>{ref}</code>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </details>
   )
 }

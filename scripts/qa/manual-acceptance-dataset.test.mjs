@@ -1239,8 +1239,36 @@ test("semantic digest is stable across targets and clocks and legacy versions fa
 test("semantic plan locks the nine narrow stage contracts", () => {
   const plan = buildManualAcceptanceSemanticPlan();
   assert.equal(plan.businessChain.chainCount, 11);
-  assert.equal(plan.businessChain.stepCount, 82);
+  assert.equal(plan.businessChain.stepCount, 84);
   assert.equal(plan.businessChain.scenarioCount, 66);
+  const steps = plan.businessChain.dataPlan.chains.flatMap((chain) => chain.steps);
+  const receiptDraft = steps.find(
+    (step) => step.key === "purchase_order:creates_fact_draft:purchase_receipt",
+  );
+  assert.ok(receiptDraft);
+  assert.deepEqual(receiptDraft.preconditionStateRefs, [
+    { machineKey: "source.purchase_order", stateKey: "approved", phase: "precondition" },
+  ]);
+  assert.deepEqual(receiptDraft.resultStateRefs, [
+    { machineKey: "fact.purchase_receipt", stateKey: "DRAFT", phase: "result" },
+  ]);
+  assert.equal(receiptDraft.factBoundary, "purchase_receipt_draft");
+  assert.deepEqual(receiptDraft.responsibility.capabilityKeys, ["purchase.receipt.create"]);
+  assert.deepEqual(receiptDraft.processNodeRefs, []);
+  const scrappedBatch = steps.find(
+    (step) => step.key === "production_exception_execution:reworks:scrapped_wip",
+  );
+  assert.ok(scrappedBatch);
+  assert.deepEqual(scrappedBatch.preconditionStateRefs, [
+    { machineKey: "source.production_exception_execution", stateKey: "APPLIED", phase: "precondition" },
+  ]);
+  assert.deepEqual(scrappedBatch.resultStateRefs, [
+    { machineKey: "fact.production_wip_batch", stateKey: "CANCELLED", phase: "result" },
+  ]);
+  assert.equal(scrappedBatch.toNodeKey, "scrapped_wip");
+  assert.equal(scrappedBatch.factBoundary, "production_wip_batch_and_event");
+  assert.deepEqual(scrappedBatch.responsibility.capabilityKeys, ["production.exception.execute"]);
+  assert(!steps.some((step) => step.fromNodeKey === "scrapped_wip"));
   assert.match(plan.businessChain.chainDataDigest, /^[0-9a-f]{64}$/u);
   assert.deepEqual(plan.stageOrder, [...MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS]);
   assert.deepEqual(

@@ -19,7 +19,7 @@ test('所有环节保留办理规则和受阻处理，有子流程时优先显�
     const rules = root.querySelector('[data-stage-handling]')
     for (const text of [step.handling.issues, step.handling.action, step.handling.resume]) assert(rules.textContent.includes(text))
     assert(!rules.closest('details').open, '一般受阻说明按需展开，不冒充独立异常流程')
-    if (step.subflow) assert(root.querySelector('.erp-dev-fulfillment-guide__subflow .erp-markdown-mermaid'))
+    if (step.subflow) assert(root.querySelector('.erp-dev-fulfillment-guide__subflow [data-business-flow]'))
     for (const key of step.stages) assert(root.querySelector(`a[href="/erp/task-board?stage_key=${key}"]`))
   }
 })
@@ -30,7 +30,7 @@ test('业务专题选定后直接呈现同源交互图，没有文字节点中�
   const chain = businessCatalog.businessChains.find((item) => item.key === 'delivery_to_settlement')
   await harness.render(h(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Topics, { catalog: businessCatalog, selectedTopicKey: chain.key, onSelectChain: () => {} })))
   const root = harness.container
-  assert(root.querySelector('[data-topic-diagram="delivery_to_settlement"] .erp-markdown-mermaid'))
+  assert(root.querySelector('[data-topic-diagram="delivery_to_settlement"] [data-business-flow]'))
   assert(root.querySelector('[aria-label="选择业务专题"]'))
   assert.equal(root.querySelector('.erp-dev-fulfillment-guide__topic-nodes'), null)
 })

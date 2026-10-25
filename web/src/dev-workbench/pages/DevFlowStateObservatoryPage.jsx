@@ -4,9 +4,20 @@ import {
   PartitionOutlined,
   DownOutlined,
   ExportOutlined,
+  LeftOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Dropdown, Empty, Popover, Space, Tag } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import {
+  Alert,
+  Button,
+  Drawer,
+  Dropdown,
+  Empty,
+  Popover,
+  Space,
+  Spin,
+  Tag,
+} from 'antd'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import Modal from '@/common/components/modal/AppModal'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
@@ -31,11 +42,22 @@ import {
 } from '../components/flow-state/FlowStateShared.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import { AUTH_SESSION_CHANGED_EVENT, getToken } from '@/common/auth/auth'
+import { getWorkflowTask } from '@/erp/api/workflowApi.mjs'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
-import { DEV_BUSINESS_CHAIN_AUDIT_ROUTE, DEV_PAGE_TITLE_BY_ROUTE, DEV_STATUS_FLOWS_ROUTE } from '../config/devRoutes.mjs'
+import {
+  DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
+  DEV_PAGE_TITLE_BY_ROUTE,
+  DEV_STATUS_FLOWS_ROUTE,
+} from '../config/devRoutes.mjs'
+import {
+  FLOW_READING_CONTEXT_KEYS,
+  resolveDevFlowViewContext,
+} from './devFlowViewContext.mjs'
 import { buildDevBusinessChainProjection } from '../config/devBusinessChainProjection.mjs'
 import { buildDevBusinessChainCustomerReview } from '../config/devBusinessChainCustomerReview.mjs'
 import { DEV_CUSTOMER_QUERY_KEY } from '../config/devCustomerScope.mjs'
@@ -67,8 +89,12 @@ const KNOWN_QUERY_KEYS = new Set([
 ])
 
 const VIEW_KEYS = new Set(VIEW_ITEMS.map((item) => item.value))
-const PRIMARY_VIEWS = VIEW_ITEMS.filter((item) => ['chain', 'tracking'].includes(item.value)).map(({ value, label }) => ({ value, label }))
-const TECHNICAL_VIEWS = VIEW_ITEMS.filter((item) => !['chain', 'tracking'].includes(item.value))
+const PRIMARY_VIEWS = VIEW_ITEMS.filter((item) =>
+  ['chain', 'tracking'].includes(item.value)
+).map(({ value, label }) => ({ value, label }))
+const TECHNICAL_VIEWS = VIEW_ITEMS.filter(
+  (item) => !['chain', 'tracking'].includes(item.value)
+).map(({ value, label }) => ({ value, label }))
 
 const DEFINITION_SEARCH_GUIDE_GROUPS = Object.freeze([
   {
@@ -253,8 +279,12 @@ function patchParams(searchParams, patch) {
   const next = new URLSearchParams(searchParams)
   for (const [key, value] of Object.entries(patch)) {
     const normalized = cleanText(value)
-    if (value === '' && [QUERY_KEYS.flow, QUERY_KEYS.process, QUERY_KEYS.fact].includes(key)) next.set(key, '')
-    else if (!normalized) next.delete(key)
+    if (
+      value === '' &&
+      [QUERY_KEYS.flow, QUERY_KEYS.process, QUERY_KEYS.fact].includes(key)
+    ) {
+      next.set(key, '')
+    } else if (!normalized) next.delete(key)
     else next.set(key, normalized)
   }
   return next
@@ -435,6 +465,40 @@ function invalidQueryMessages(searchParams, catalog) {
   const processKey = cleanText(searchParams.get(QUERY_KEYS.process))
   const factKey = cleanText(searchParams.get(QUERY_KEYS.fact))
   const taskId = cleanText(searchParams.get(QUERY_KEYS.taskId))
+  const topicKey = searchParams.get(QUERY_KEYS.roleTopic)
+  const topicNodeKey = searchParams.get(QUERY_KEYS.roleTopicNode)
+  const mapKey = searchParams.get(QUERY_KEYS.roleMap)
+  const mapNodeKey = searchParams.get(QUERY_KEYS.roleMapNode)
+  if (
+    topicKey &&
+    !catalog.businessChains.some((item) => item.key === topicKey)
+  ) {
+    messages.push('未登记的业务专题')
+  }
+  if (mapKey && !catalog.businessChains.some((item) => item.key === mapKey)) {
+    messages.push('未登记的系统关联专题')
+  }
+  if (mapNodeKey) {
+    const related = new Set([
+      mapKey,
+      ...catalog.businessChainOverview.relations
+        .filter(
+          (item) => item.fromChainKey === mapKey || item.toChainKey === mapKey
+        )
+        .flatMap((item) => [item.fromChainKey, item.toChainKey]),
+    ])
+    if (!mapKey || !related.has(mapNodeKey)) {
+      messages.push('系统关联节点不属于当前范围')
+    }
+  }
+  if (
+    topicNodeKey &&
+    !catalog.businessChains
+      .find((item) => item.key === topicKey)
+      ?.nodes.some((item) => item.key === topicNodeKey)
+  ) {
+    messages.push('业务专题节点不属于当前专题')
+  }
   const chain = catalog.businessChains.find((item) => item.key === chainKey)
   const overviewSelected = chainKey === catalog.businessChainOverview.key
   const chainNode =
@@ -511,6 +575,14 @@ function invalidQueryMessages(searchParams, catalog) {
   ) {
     messages.push(`Fact 不属于所选业务链：${factKey}`)
   }
+  if (
+    searchParams.get(QUERY_KEYS.taskFilter) &&
+    !['all', 'pending', 'exceptions'].includes(
+      searchParams.get(QUERY_KEYS.taskFilter)
+    )
+  ) {
+    messages.push('无效的任务筛选')
+  }
   if (taskId && !parseDevFlowStateTaskIDReference(taskId)) {
     messages.push('task_id 必须是大于 0 的整数')
   }
@@ -521,6 +593,7 @@ export default function DevFlowStateObservatoryPage() {
   const catalogState = useFlowStateCatalog()
   const { catalog } = catalogState
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const queryCanonicalization = useMemo(
     () => canonicalizeDevFlowStateSearchParams(searchParams),
     [searchParams]
@@ -569,11 +642,14 @@ export default function DevFlowStateObservatoryPage() {
       setSelectedTask(null)
       setTaskDraft('')
       setSessionRevision((value) => value + 1)
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current)
-        next.delete(QUERY_KEYS.taskId)
-        return next
-      }, { replace: true })
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current)
+          next.delete(QUERY_KEYS.taskId)
+          return next
+        },
+        { replace: true }
+      )
     }
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, resetSession)
     window.addEventListener('storage', resetSession)
@@ -605,20 +681,42 @@ export default function DevFlowStateObservatoryPage() {
     (patch, options = {}) => {
       setSearchParams(patchParams(activeSearchParams, patch), {
         replace: options.replace === true,
+        state: options.state || location.state,
       })
     },
-    [activeSearchParams, setSearchParams]
+    [activeSearchParams, setSearchParams, location.state]
   )
 
   const invalidMessages = catalog
     ? invalidQueryMessages(activeSearchParams, catalog)
     : []
   const valid = invalidMessages.length === 0
+  const [taskRead, setTaskRead] = useState(null)
+  const [taskReadRevision, setTaskReadRevision] = useState(0)
+  const needsTaskDetail = Boolean(valid && taskId && !['chain', 'tracking'].includes(view) && String(selectedTask?.id || '') !== taskId)
+
+  useEffect(() => {
+    if (!needsTaskDetail) return undefined
+    const controller = new AbortController()
+    setTaskRead({ taskId, status: 'loading' })
+    getWorkflowTask(Number(taskId), { signal: controller.signal })
+      .then((task) => {
+        if (!controller.signal.aborted) setSelectedTask(task)
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || isRpcAbortError(error)) return
+        setTaskRead({ taskId, status: 'error', error: getActionErrorMessage(error, '读取当前任务', { fallback: '读取失败，请确认当前任务仍可查看后重试' }) })
+      })
+    return () => controller.abort()
+  }, [needsTaskDetail, taskId, taskReadRevision, sessionRevision])
 
   useEffect(() => {
     if (!queryCanonicalization.changed) return
-    setSearchParams(queryCanonicalization.searchParams, { replace: true })
-  }, [queryCanonicalization, setSearchParams])
+    setSearchParams(queryCanonicalization.searchParams, {
+      replace: true,
+      state: location.state,
+    })
+  }, [queryCanonicalization, setSearchParams, location.state])
 
   useEffect(() => {
     if (!catalog || !valid || view !== 'chain') return
@@ -644,43 +742,63 @@ export default function DevFlowStateObservatoryPage() {
     ? chain.nodes.find((item) => item.key === requestedNodeKey) ||
       (!requestedNodeKey ? chain.nodes[0] : null)
     : null
-  const projectionNodeKey = requestedNodeKey && node ? node.key : ''
-  const chainProjection = useMemo(
+  const taskScoped =
+    location.state?.flowTaskContext ??
+    (view === 'tracking' || (view !== 'chain' && Boolean(taskId)))
+  const readingContext = useMemo(
     () =>
-      catalog && chain
-        ? buildDevBusinessChainProjection({
+      catalog
+        ? resolveDevFlowViewContext({
             catalog,
-            chainKey: chain.key,
-            nodeKey: projectionNodeKey,
+            searchParams: activeSearchParams,
+            task: selectedTask,
+            taskScoped,
           })
         : null,
-    [catalog, chain, projectionNodeKey]
+    [catalog, activeSearchParams, selectedTask, taskScoped]
+  )
+  const chainProjection = useMemo(
+    () =>
+      catalog && readingContext
+        ? buildDevBusinessChainProjection({
+            catalog,
+            chainKey: readingContext.chainKey,
+            nodeKey: readingContext.nodeKey,
+          })
+        : null,
+    [catalog, readingContext]
   )
   const availableFlows = chainProjection?.flows || catalog?.flows || []
   const availableProcessDefinitions =
     chainProjection?.processDefinitions || catalog?.processDefinitions || []
   const availableFactDefinitions =
     chainProjection?.factDefinitions || catalog?.factDefinitions || []
-  const flow = activeSearchParams.get(QUERY_KEYS.flow) === '' ? null :
-    availableFlows.find((item) => item.key === requestedFlowKey) ||
-    availableFlows[0] ||
-    null
+  const flow =
+    activeSearchParams.get(QUERY_KEYS.flow) === ''
+      ? null
+      : availableFlows.find((item) => item.key === requestedFlowKey) ||
+        availableFlows[0] ||
+        null
   const state =
     flow && requestedStateKey
       ? flow.states.find((item) => item.key === requestedStateKey)
       : null
-  const definition = activeSearchParams.get(QUERY_KEYS.process) === '' ? null :
-    availableProcessDefinitions.find(
-      (item) => item.key === requestedProcessKey
-    ) ||
-    availableProcessDefinitions[0] ||
-    null
-  const fact = activeSearchParams.get(QUERY_KEYS.fact) === '' ? null :
-    availableFactDefinitions.find(
-      (item) => item.factKey === requestedFactKey
-    ) ||
-    availableFactDefinitions[0] ||
-    null
+  const definition =
+    activeSearchParams.get(QUERY_KEYS.process) === ''
+      ? null
+      : availableProcessDefinitions.find(
+          (item) => item.key === requestedProcessKey
+        ) ||
+        availableProcessDefinitions[0] ||
+        null
+  const fact =
+    activeSearchParams.get(QUERY_KEYS.fact) === ''
+      ? null
+      : availableFactDefinitions.find(
+          (item) => item.factKey === requestedFactKey
+        ) ||
+        availableFactDefinitions[0] ||
+        null
   const customerOverlay = useMemo(() => {
     if (!catalog || !customerReady) return null
     return (
@@ -691,12 +809,17 @@ export default function DevFlowStateObservatoryPage() {
   }, [catalog, customerReady, customerScope.customerKey])
   const customerReviewReady = Boolean(customerReady && customerOverlay)
   const customerReview = useMemo(() => {
-    if (!catalog || !valid || !customerReviewReady) {
+    if (
+      !catalog ||
+      !valid ||
+      !customerReviewReady ||
+      (taskScoped && taskId && !readingContext)
+    ) {
       return null
     }
-    const chainKey = overviewSelected
-      ? catalog.businessChainOverview.key
-      : chain?.key
+    const chainKey =
+      readingContext?.chainKey ||
+      (overviewSelected ? catalog.businessChainOverview.key : chain?.key)
     if (!chainKey) return null
     return buildDevBusinessChainCustomerReview({
       catalog,
@@ -709,13 +832,17 @@ export default function DevFlowStateObservatoryPage() {
     customerOverlay,
     customerReviewReady,
     overviewSelected,
+    readingContext,
+    taskScoped,
+    taskId,
     valid,
   ])
   const customerReviewScopeKey = customerReview
     ? [
         customerScope.customerKey,
         customerReview.releaseVersion,
-        overviewSelected ? catalog.businessChainOverview.key : chain?.key,
+        readingContext?.chainKey ||
+          (overviewSelected ? catalog.businessChainOverview.key : chain?.key),
       ].join(':')
     : ''
   const customerReviewPrint =
@@ -773,14 +900,50 @@ export default function DevFlowStateObservatoryPage() {
   const selectTask = (nextTaskId, task, targetView) => {
     taskSelectionRef.current = String(nextTaskId)
     setSelectedTask(task || null)
-    updateParams({ [QUERY_KEYS.taskId]: String(nextTaskId), ...(targetView ? { [QUERY_KEYS.view]: targetView } : {}) })
+    updateParams({
+      [QUERY_KEYS.taskId]: String(nextTaskId),
+      ...(targetView
+        ? {
+            [QUERY_KEYS.view]: targetView,
+            [QUERY_KEYS.taskFilter]: null,
+            [QUERY_KEYS.taskGroup]: null,
+          }
+        : {}),
+    })
   }
   const clearTask = () => {
     taskSelectionRef.current = ''
     setSelectedTask(null)
     updateParams({ [QUERY_KEYS.taskId]: null })
   }
-  const openView = (nextView, patch = {}) => {
+  const returnFrames = location.state?.flowReturnFrames || []
+  const backToReading = () => {
+    const previous = returnFrames.at(-1)
+    if (!previous) {
+      updateParams({ [QUERY_KEYS.view]: taskScoped ? 'tracking' : 'chain' })
+      return
+    }
+    setSearchParams(new URLSearchParams(previous.search), {
+      state: {
+        ...location.state,
+        flowReturnFrames: returnFrames.slice(0, -1),
+        flowTaskContext: previous.taskScoped,
+      },
+    })
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: previous.scroll, behavior: 'instant' })
+      ;[...document.querySelectorAll('button,a')]
+        .find(
+          (element) =>
+            element.getClientRects().length &&
+            (
+              element.getAttribute('aria-label') || element.textContent
+            ).trim() === previous.focus
+        )
+        ?.focus({ preventScroll: true })
+    })
+  }
+  const openView = (nextView, patch = {}, options = {}) => {
     const allowedSelectionKeys = VIEW_SELECTION_QUERY_KEYS[nextView] || []
     const nextPatch = Object.fromEntries(
       SELECTION_QUERY_KEYS.map((key) => [key, null])
@@ -795,6 +958,7 @@ export default function DevFlowStateObservatoryPage() {
     for (const [key, value] of Object.entries(patch)) {
       if (
         allowedSelectionKeys.includes(key) ||
+        FLOW_READING_CONTEXT_KEYS.includes(key) ||
         key === QUERY_KEYS.taskId ||
         key === QUERY_KEYS.chain ||
         key === QUERY_KEYS.node
@@ -802,19 +966,68 @@ export default function DevFlowStateObservatoryPage() {
         nextPatch[key] = value
       }
     }
-    updateParams(nextPatch)
+    if (options.global) {
+      FLOW_READING_CONTEXT_KEYS.forEach((key) => {
+        nextPatch[key] = null
+      })
+    }
+    const active = document.activeElement
+    const frame = {
+      search: activeSearchParams.toString(),
+      label:
+        view === 'chain'
+          ? '业务结构'
+          : view === 'tracking'
+            ? '实例跟踪'
+            : VIEW_META[view]?.label || '上一层',
+      scroll: window.scrollY,
+      focus: (
+        active?.getAttribute('aria-label') ||
+        active?.textContent ||
+        ''
+      ).trim(),
+      taskScoped,
+    }
+    const frames = options.main
+      ? []
+      : options.replaceTool
+        ? returnFrames
+        : [...returnFrames, frame]
+    updateParams(nextPatch, {
+      state: {
+        ...location.state,
+        flowReturnFrames: frames,
+        flowTaskContext: options.global
+          ? false
+          : options.main
+            ? nextView === 'tracking'
+            : nextView === 'chain'
+              ? false
+              : frame.taskScoped,
+      },
+    })
   }
   const clearChainContext = () =>
-    updateParams({
-      [QUERY_KEYS.chain]: null,
-      [QUERY_KEYS.node]: null,
-    })
+    updateParams(
+      {
+        [QUERY_KEYS.chain]: null,
+        [QUERY_KEYS.node]: null,
+        ...Object.fromEntries(
+          FLOW_READING_CONTEXT_KEYS.map((key) => [key, null])
+        ),
+      },
+      { state: { ...location.state, flowTaskContext: false } }
+    )
   const openGlobalDefinitionView = (nextView, patch = {}) =>
-    openView(nextView, {
-      [QUERY_KEYS.chain]: null,
-      [QUERY_KEYS.node]: null,
-      ...patch,
-    })
+    openView(
+      nextView,
+      {
+        [QUERY_KEYS.chain]: null,
+        [QUERY_KEYS.node]: null,
+        ...patch,
+      },
+      { global: true }
+    )
   useEffect(() => {
     const finishPrint = () => {
       printRequestRef.current += 1
@@ -830,16 +1043,22 @@ export default function DevFlowStateObservatoryPage() {
     setPrintingCurrent(false)
     setPrintingCustomer(false)
     setCustomerReviewPrintSnapshot(null)
-    return () => { printRequestRef.current += 1 }
+    return () => {
+      printRequestRef.current += 1
+    }
   }, [searchParams])
 
   const printCurrentView = async () => {
     const request = ++printRequestRef.current
     setCustomerReviewPrintSnapshot(null)
     setPrintingCurrent(true)
-    await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)))
+    await new Promise((resolve) =>
+      window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
+    )
     if (request !== printRequestRef.current) return
-    const pending = document.querySelector('.erp-dev-flow-main .erp-dev-flow-loading, .erp-dev-flow-main .erp-markdown-mermaid:not([data-mermaid-status="rendered"])')
+    const pending = document.querySelector(
+      '.erp-dev-flow-main .erp-dev-flow-loading, .erp-dev-flow-main .erp-markdown-mermaid:not([data-mermaid-status="rendered"]), .erp-dev-flow-main [data-business-flow]:not([data-graph-status="rendered"])'
+    )
     if (pending) {
       setPrintingCurrent(false)
       message.info('页面内容尚未加载完成，请稍后导出')
@@ -869,9 +1088,21 @@ export default function DevFlowStateObservatoryPage() {
     const diagramStatus = () => {
       const root = document.querySelector('[data-customer-review-print-root]')
       if (!root) return 'pending'
-      const diagrams = [...root.querySelectorAll('[data-customer-review-diagram] .erp-markdown-mermaid')]
-      if (diagrams.some((diagram) => diagram.dataset.mermaidStatus === 'error')) return 'error'
-      return diagrams.every((diagram) => diagram.dataset.mermaidStatus === 'rendered') ? 'rendered' : 'pending'
+      const diagrams = [
+        ...root.querySelectorAll(
+          '[data-customer-review-diagram] .erp-markdown-mermaid'
+        ),
+      ]
+      if (
+        diagrams.some((diagram) => diagram.dataset.mermaidStatus === 'error')
+      ) {
+        return 'error'
+      }
+      return diagrams.every(
+        (diagram) => diagram.dataset.mermaidStatus === 'rendered'
+      )
+        ? 'rendered'
+        : 'pending'
     }
     await new Promise((resolve) => {
       const startedAt = window.performance.now()
@@ -900,7 +1131,9 @@ export default function DevFlowStateObservatoryPage() {
     window.print()
   }
   const specialistSelection =
-    view === 'runtime'
+    ['workflow', 'runtime'].includes(view) && taskId
+      ? selectedTask?.source_no || selectedTask?.task_code
+      : view === 'runtime'
       ? definition?.label
       : view === 'facts'
         ? fact?.label
@@ -912,6 +1145,26 @@ export default function DevFlowStateObservatoryPage() {
     if (!catalog) {
       return null
     }
+    if (needsTaskDetail) {
+      return taskRead?.taskId === taskId && taskRead.status === 'error' ? (
+        <Alert showIcon type="error" message="任务读取失败" description={taskRead.error} action={<Button onClick={() => setTaskReadRevision((value) => value + 1)}>重试</Button>} />
+      ) : <div className="erp-dev-flow-loading" role="status"><Spin />正在读取当前任务…</div>
+    }
+    if (
+      ['states', 'facts'].includes(view) &&
+      taskScoped &&
+      taskId &&
+      !readingContext
+    ) {
+      return (
+        <Empty description="当前任务尚未关联唯一业务定义">
+          <Button onClick={() => openView('tracking', {}, { main: true })}>
+            定位当前任务
+          </Button>
+          <Button onClick={clearChainContext}>查看全部定义</Button>
+        </Empty>
+      )
+    }
     if (view === 'chain') {
       if (overviewSelected) {
         return (
@@ -920,13 +1173,12 @@ export default function DevFlowStateObservatoryPage() {
             taskId={taskId}
             selectedTask={selectedTask}
             onSelectChain={(key) =>
-              updateParams({
+              openView('chain', {
                 [QUERY_KEYS.chain]: key,
                 [QUERY_KEYS.node]: null,
-                [QUERY_KEYS.exception]: null,
-                [QUERY_KEYS.exceptionDecision]: null,
-                [QUERY_KEYS.exceptionStep]: null,
-                [QUERY_KEYS.exceptionOrigin]: null,
+                ...Object.fromEntries(
+                  FLOW_READING_CONTEXT_KEYS.map((name) => [name, null])
+                ),
               })
             }
             onOpenView={openView}
@@ -943,22 +1195,38 @@ export default function DevFlowStateObservatoryPage() {
           taskId={taskId}
           selectedTask={selectedTask}
           onSelectChain={(key) =>
-            updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null, [QUERY_KEYS.exception]: null, [QUERY_KEYS.exceptionDecision]: null, [QUERY_KEYS.exceptionStep]: null, [QUERY_KEYS.exceptionOrigin]: null })
+            openView('chain', {
+              [QUERY_KEYS.chain]: key,
+              [QUERY_KEYS.node]: null,
+              ...Object.fromEntries(
+                FLOW_READING_CONTEXT_KEYS.map((name) => [name, null])
+              ),
+            })
           }
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
           onOpenView={openView}
         />
       )
     }
-    if (view === 'tracking') return <BusinessChainInstanceView taskId={taskId} onSelectTask={selectTask} onTaskLoaded={setSelectedTask} onOpenView={openView} />
+    if (view === 'tracking') {
+      return (
+        <BusinessChainInstanceView
+          taskId={taskId}
+          onSelectTask={selectTask}
+          onTaskLoaded={setSelectedTask}
+          onOpenView={openView}
+        />
+      )
+    }
     if (view === 'workflow') {
       return (
         <WorkflowView
           projection={chainProjection}
           taskId={taskId}
           selectedTask={selectedTask}
-          onBackToChain={() => openView('chain')}
+          onBackToChain={undefined}
           onClearChainContext={clearChainContext}
+          onLocateTask={() => openView('tracking', {}, { main: true })}
         />
       )
     }
@@ -973,8 +1241,10 @@ export default function DevFlowStateObservatoryPage() {
           onSelectDefinition={(key) =>
             updateParams({ [QUERY_KEYS.process]: key ?? '' })
           }
-          onBackToChain={() => openView('chain')}
+          onBackToChain={undefined}
           onClearChainContext={clearChainContext}
+          onLocateTask={() => openView('tracking', {}, { main: true })}
+          onBrowseDefinitions={() => openGlobalDefinitionView('runtime', { [QUERY_KEYS.taskId]: null })}
         />
       )
     }
@@ -991,7 +1261,7 @@ export default function DevFlowStateObservatoryPage() {
               [QUERY_KEYS.state]: null,
             })
           }
-          onBackToChain={() => openView('chain')}
+          onBackToChain={undefined}
           onClearChainContext={clearChainContext}
         />
       )
@@ -1003,11 +1273,14 @@ export default function DevFlowStateObservatoryPage() {
         flow={flow}
         state={state}
         onSelectFlow={(key) =>
-          updateParams({ [QUERY_KEYS.flow]: key ?? '', [QUERY_KEYS.state]: null })
+          updateParams({
+            [QUERY_KEYS.flow]: key ?? '',
+            [QUERY_KEYS.state]: null,
+          })
         }
         onSelectState={(key) => updateParams({ [QUERY_KEYS.state]: key })}
         onOpenView={openView}
-        onBackToChain={() => openView('chain')}
+        onBackToChain={undefined}
         onClearChainContext={clearChainContext}
       />
     )
@@ -1024,8 +1297,14 @@ export default function DevFlowStateObservatoryPage() {
       <header className="erp-dev-flow-header">
         <Space align="center">
           <PartitionOutlined className="erp-dev-flow-header__icon" />
-          <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_STATUS_FLOWS_ROUTE]}</Title>
-          <Link to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}>查看链路实测报告</Link>
+          <Title level={1}>
+            {DEV_PAGE_TITLE_BY_ROUTE[DEV_STATUS_FLOWS_ROUTE]}
+          </Title>
+          <Link
+            to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}
+          >
+            查看链路实测报告
+          </Link>
         </Space>
         <section className="erp-dev-flow-nav erp-dev-flow-workspace-nav">
           <DevTaskNav
@@ -1033,47 +1312,151 @@ export default function DevFlowStateObservatoryPage() {
             level="primary"
             ariaLabel="业务链路方式"
             items={PRIMARY_VIEWS}
-            value={['tracking', 'workflow', 'runtime'].includes(view) ? 'tracking' : 'chain'}
+            value={
+              view === 'tracking' ||
+              (!['chain', 'tracking'].includes(view) && taskScoped)
+                ? 'tracking'
+                : 'chain'
+            }
             disabled={catalogState.status === 'loading'}
-            onChange={(nextView) => openView(nextView)}
+            onChange={(nextView) => openView(nextView, {}, { main: true })}
           />
-          <Tag>{['tracking', 'workflow'].includes(view) ? '运行记录' : view === 'runtime' && taskId ? '流程记录' : '设计结构'}</Tag>
-          {!['chain', 'tracking'].includes(view) ? <span>{VIEW_META[view]?.label}{specialistSelection ? ` · ${specialistSelection}` : ''}</span> : null}
-          {chain ? <span className="erp-dev-flow-context-path">{chain.label}{node && view !== 'chain' ? ` / ${node.label}` : ''}</span> : null}
+          <Tag>
+            {view === 'tracking' || (view === 'workflow' && taskId)
+              ? '运行记录'
+              : view === 'runtime' && taskId
+                ? '流程记录'
+                : '设计结构'}
+          </Tag>
+          {!['chain', 'tracking'].includes(view) ? (
+            <span>
+              {VIEW_META[view]?.label}
+              {specialistSelection ? ` · ${specialistSelection}` : ''}
+            </span>
+          ) : null}
+          {chain ? (
+            <span className="erp-dev-flow-context-path">
+              {chain.label}
+              {node && view !== 'chain' ? ` / ${node.label}` : ''}
+            </span>
+          ) : null}
         </section>
         <Space className="erp-dev-flow-header-actions">
-          <Button onClick={() => setDefinitionSearchOpen(true)}>搜索定义</Button>
-          <Dropdown menu={{ items: TECHNICAL_VIEWS.map((item) => ({ key: item.value, label: item.label })), onClick: ({ key }) => openView(key) }} disabled={!valid || !catalog}>
-            <Button>技术详情 <DownOutlined /></Button>
-          </Dropdown>
-          <Dropdown disabled={!valid || !catalog || printingCustomer} menu={{ items: [{ key: 'current', label: '当前视图 · 打印 / 保存 PDF' }, { key: 'customer', label: '客户校对稿…' }], onClick: ({ key }) => key === 'current' ? printCurrentView() : setCustomerExportOpen(true) }}>
-            <Button aria-label="导出" icon={<ExportOutlined />} loading={printingCustomer}>导出 <DownOutlined /></Button>
+          <Button onClick={() => setDefinitionSearchOpen(true)}>
+            搜索定义
+          </Button>
+          {view === 'chain' ? (
+            <Button disabled={!valid || !catalog} onClick={() => openView('states')}>
+              查看规则
+            </Button>
+          ) : null}
+          <Dropdown
+            disabled={!valid || !catalog || printingCustomer}
+            menu={{
+              items: [
+                { key: 'current', label: '当前视图 · 打印 / 保存 PDF' },
+                { key: 'customer', label: '客户校对稿…' },
+              ],
+              onClick: ({ key }) =>
+                key === 'current'
+                  ? printCurrentView()
+                  : setCustomerExportOpen(true),
+            }}
+          >
+            <Button
+              aria-label="导出"
+              icon={<ExportOutlined />}
+              loading={printingCustomer}
+            >
+              导出 <DownOutlined />
+            </Button>
           </Dropdown>
         </Space>
       </header>
 
-      {valid && catalog && view === 'tracking' ? (
-        <TaskFinder key={`finder-${sessionRevision}`} draft={taskDraft} onDraftChange={setTaskDraft} onClearTask={clearTask} onSelectTask={(id, task) => selectTask(id, task, 'tracking')} taskId={taskId} />
+      {valid &&
+      catalog &&
+      (!['chain', 'tracking'].includes(view) || returnFrames.length > 0) ? (
+        <section className="erp-dev-flow-reading-nav">
+          <Button icon={<LeftOutlined aria-hidden />} onClick={backToReading}>
+            返回 {returnFrames.at(-1)?.label || (taskScoped ? '实例跟踪' : '业务结构')}
+          </Button>
+          {!['chain', 'tracking'].includes(view) ? (
+            <DevTaskNav
+              compact
+              level="secondary"
+              ariaLabel="关联信息类型"
+              items={TECHNICAL_VIEWS}
+              value={view}
+              onChange={(key) => openView(key, {}, { replaceTool: true })}
+            />
+          ) : null}
+        </section>
       ) : null}
-      <Drawer title="搜索定义" width={860} open={definitionSearchOpen} onClose={() => setDefinitionSearchOpen(false)} destroyOnHidden>
-        {catalog ? <DefinitionSearch
-          catalog={catalog}
-          onOpenTaskLookup={(keyword) => { setTaskDraft(cleanText(keyword)); setDefinitionSearchOpen(false); openView('tracking') }}
-          onOpen={(item) => {
-            setDefinitionSearchOpen(false)
-            if (item.type === 'chain') openView('chain', { [QUERY_KEYS.chain]: item.key, [QUERY_KEYS.node]: item.nodeKey || null })
-            else if (item.type === 'runtime') openGlobalDefinitionView('runtime', { [QUERY_KEYS.process]: item.key })
-            else if (item.type === 'facts') openGlobalDefinitionView('facts', { [QUERY_KEYS.fact]: item.key })
-            else if (item.type === 'states') openGlobalDefinitionView('states', { [QUERY_KEYS.flow]: item.key, [QUERY_KEYS.state]: null })
-            else openGlobalDefinitionView('workflow')
-          }}
-        /> : null}
-        <details className="erp-dev-disclosure erp-dev-flow-concepts"><summary>概念与数据边界</summary><MemoryStrip /></details>
+
+      {valid && catalog && view === 'tracking' ? (
+        <TaskFinder
+          key={`finder-${sessionRevision}`}
+          draft={taskDraft}
+          onDraftChange={setTaskDraft}
+          onClearTask={clearTask}
+          onSelectTask={(id, task) => selectTask(id, task, 'tracking')}
+          taskId={taskId}
+        />
+      ) : null}
+      <Drawer
+        title="搜索定义"
+        width={860}
+        open={definitionSearchOpen}
+        onClose={() => setDefinitionSearchOpen(false)}
+        destroyOnHidden
+      >
+        {catalog ? (
+          <DefinitionSearch
+            catalog={catalog}
+            onOpenTaskLookup={(keyword) => {
+              setTaskDraft(cleanText(keyword))
+              setDefinitionSearchOpen(false)
+              openView('tracking')
+            }}
+            onOpen={(item) => {
+              setDefinitionSearchOpen(false)
+              if (item.type === 'chain') {
+                openView('chain', {
+                  [QUERY_KEYS.chain]: item.key,
+                  [QUERY_KEYS.node]: item.nodeKey || null,
+                  ...Object.fromEntries(
+                    FLOW_READING_CONTEXT_KEYS.map((key) => [key, null])
+                  ),
+                })
+              } else if (item.type === 'runtime') {
+                openGlobalDefinitionView('runtime', {
+                  [QUERY_KEYS.process]: item.key,
+                })
+              } else if (item.type === 'facts') {
+                openGlobalDefinitionView('facts', {
+                  [QUERY_KEYS.fact]: item.key,
+                })
+              } else if (item.type === 'states') {
+                openGlobalDefinitionView('states', {
+                  [QUERY_KEYS.flow]: item.key,
+                  [QUERY_KEYS.state]: null,
+                })
+              } else openGlobalDefinitionView('workflow')
+            }}
+          />
+        ) : null}
+        <details className="erp-dev-disclosure erp-dev-flow-concepts">
+          <summary>概念与数据边界</summary>
+          <MemoryStrip />
+        </details>
       </Drawer>
       <Modal
         title="客户校对稿"
         open={customerExportOpen}
-        onCancel={() => { if (!printingCustomer) setCustomerExportOpen(false) }}
+        onCancel={() => {
+          if (!printingCustomer) setCustomerExportOpen(false)
+        }}
         closable={!printingCustomer}
         keyboard={!printingCustomer}
         maskClosable={!printingCustomer}
@@ -1083,7 +1466,16 @@ export default function DevFlowStateObservatoryPage() {
         confirmLoading={printingCustomer}
         okButtonProps={{ disabled: !customerReviewReady || !customerReview }}
       >
-        <p>导出范围：{chain?.label || catalog?.businessChainOverview.label}</p>
+        <p>
+          {taskScoped && taskId && !readingContext
+            ? '当前任务尚未关联唯一业务链，暂不能导出校对稿。'
+            : `导出范围：${
+                customerReview?.documentTitle ||
+                chainProjection?.chain.label ||
+                chain?.label ||
+                catalog?.businessChainOverview.label
+              }`}
+        </p>
         <DevCustomerScopeSelector
           scope={customerScope}
           onChange={customerScope.selectCustomer}
@@ -1091,9 +1483,19 @@ export default function DevFlowStateObservatoryPage() {
           note="按所选客户配置生成设计校对稿；实际运行结果请导出当前视图。"
           invalidDescription="当前客户尚未登记校对预览，请选择已登记客户。"
         />
-        {customerReady && !customerOverlay ? <Alert type="warning" showIcon message="该客户没有业务链配置预览，暂不能导出校对稿" /> : null}
+        {customerReady && !customerOverlay ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="该客户没有业务链配置预览，暂不能导出校对稿"
+          />
+        ) : null}
       </Modal>
-      <main key={`view-${sessionRevision}`} className="erp-dev-flow-main" data-flow-state-view={view}>
+      <main
+        key={`view-${sessionRevision}`}
+        className="erp-dev-flow-main"
+        data-flow-state-view={view}
+      >
         <CatalogState state={catalogState} onRetry={catalogState.reload} />
         {catalogState.status === 'ready' &&
         catalog &&

@@ -3,7 +3,7 @@ import { buildFulfillmentOverview, getFulfillmentStageContext } from './devFulfi
 
 const flow = catalog.fulfillment_flow
 const phases = buildFulfillmentOverview(flow)
-const main = phases.flatMap((phase) => phase.stages)
+const main = phases.filter((phase) => phase.key !== 'unclassified').flatMap((phase) => phase.stages)
 
 export function buildFulfillmentChain() {
   return {

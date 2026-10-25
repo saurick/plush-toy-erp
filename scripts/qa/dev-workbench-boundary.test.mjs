@@ -317,6 +317,10 @@ const allowedERPImportsByFile = new Map([
     new Set(["utils/workflowBusinessChain.mjs", "utils/dashboardTaskDisplay.mjs"]),
   ],
   [
+    "web/src/dev-workbench/pages/devFlowViewContext.mjs",
+    new Set(["utils/workflowBusinessChain.mjs", "utils/workflowFulfillment.mjs"]),
+  ],
+  [
     "web/src/dev-workbench/components/flow-state/TaskFulfillmentGuide.jsx",
     new Set(["utils/workflowFulfillment.mjs"]),
   ],
@@ -627,6 +631,30 @@ test("work-center samples keep direct business actions outside the presentation 
   }
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/components/workflow/WorkflowTaskIdentity.jsx"), false);
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/mobile/mobileProgress.css"), false);
+});
+
+test("business chain reading context retains a closed presentation adapter", () => {
+  const file = "web/src/dev-workbench/pages/devFlowViewContext.mjs";
+  const modules = ["utils/workflowBusinessChain.mjs", "utils/workflowFulfillment.mjs"];
+  for (const prefix of ["@/erp/", "../../erp/"]) {
+    for (const module of modules) {
+      assert.equal(isAllowedERPImport(file, `${prefix}${module}`), true);
+      assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", `${prefix}${module}`), false);
+    }
+    for (const module of ["pages/PurchaseOrdersPage.jsx", "api/masterDataOrderApi.mjs", "config/businessModules.mjs", "config/commandCenter.mjs"]) {
+      assert.equal(isAllowedERPImport(file, `${prefix}${module}`), false);
+    }
+  }
+  const source = read(file);
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+  const imports = [...source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)].map((match) => match[1]);
+  assert.deepEqual(new Set(imports), new Set([
+    "../../common/consts/workflowTaskDiscovery.generated.mjs",
+    "../../erp/utils/workflowBusinessChain.mjs",
+    "../config/devBusinessChainProjection.mjs",
+    "../../erp/utils/workflowFulfillment.mjs",
+    "./devFlowStateQuery.mjs",
+  ]));
 });
 
 test("dev workbench boundary: resolved imports preserve module and file scope", () => {

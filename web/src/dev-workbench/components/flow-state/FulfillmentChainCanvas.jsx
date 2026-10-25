@@ -53,7 +53,7 @@ export default function FulfillmentChainCanvas({ role, selectedStage, selectedGu
   return (
     <div className="erp-dev-chain" data-fulfillment-chain>
       <div className="erp-dev-chain__map" ref={bindMap}>
-        <svg className="erp-dev-chain__wires" width={geometry.width || '100%'} height={geometry.height || '100%'} role="img" aria-label="17环节总链与约定分支">
+        <svg className="erp-dev-chain__wires" width={geometry.width || '100%'} height={geometry.height || '100%'} role="img" aria-label={`${catalog.fulfillment_flow.length}环节总链与约定分支`}>
           <defs><marker id={`${markerID}-main`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path className="erp-dev-chain__arrow--main" d="M 0 0 L 8 4 L 0 8 Z" /></marker></defs>
           {wires.paths.map((wire) => <path key={wire.key} className="erp-dev-chain__wire--main" d={wire.d} markerEnd={`url(#${markerID}-main)`} data-chain-wire={wire.key} data-wire-from={wire.from} data-wire-to={wire.to} data-conditional-wire={wire.conditional || undefined} />)}
         </svg>

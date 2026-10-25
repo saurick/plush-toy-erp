@@ -77,7 +77,14 @@ test('customer review exports only the selected business chain with complete bus
   assert.equal(review.customerBinding, '未绑定客户发布版本')
   assert.equal(review.releaseVersion, '未绑定发布版本')
   assert.equal(review.chain.chainName, '生产异常决策与执行')
-  assert.equal(review.chain.steps.length, 9)
+  assert.equal(review.chain.steps.length, 10)
+  const scrapped = review.chain.steps.find((step) => step.name === '报废原批 · 终止')
+  assert(scrapped, '校对稿必须保留报废原批的独立终点')
+  assert.match(scrapped.next, /本链在此结束/u)
+  assert(!scrapped.next.includes('后续正常生产事实'))
+  assert(scrapped.actionOutcomes.some((action) =>
+    action.results.some((result) => result.includes('已取消'))
+  ))
   assert.equal(Object.hasOwn(review, 'overview'), false)
   assert.equal(
     reviewProjectionText(review).includes('采购下单到合格入库'),

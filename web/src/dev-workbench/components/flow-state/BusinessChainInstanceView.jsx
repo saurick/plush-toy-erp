@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag } from 'antd'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { getDevTaskReadingSelection } from '../../pages/devFlowViewContext.mjs'
+import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
 import Select from '@/common/components/select/AppSelect'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import {
@@ -22,8 +24,22 @@ export default function BusinessChainInstanceView({
 }) {
   const [state, setState] = useState(null)
   const [retry, setRetry] = useState(0)
-  const [filter, setFilter] = useState('all')
-  const [groupKey, setGroupKey] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const filter = searchParams.get(queryKeys.taskFilter) || 'all'
+  const groupKey = searchParams.get(queryKeys.taskGroup) || null
+  const changeFilter = (kind, group) =>
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        if (kind === 'all') next.delete(queryKeys.taskFilter)
+        else next.set(queryKeys.taskFilter, kind)
+        if (group) next.set(queryKeys.taskGroup, group)
+        else next.delete(queryKeys.taskGroup)
+        return next
+      },
+      { replace: true, state: location.state }
+    )
   useEffect(() => {
     setState(null)
     if (!taskId) return undefined
@@ -99,10 +115,15 @@ export default function BusinessChainInstanceView({
   const activeGroupKey = groups.some((group) => group.key === groupKey)
     ? groupKey
     : null
+  const unknownGroup = Boolean(groupKey && !activeGroupKey)
+  const readingTarget = getDevTaskReadingSelection(current.task)
   const pending = (task) => ['ready', 'blocked'].includes(task.task_status_key)
   const filterGroups = (items) =>
     items
-      .filter((group) => !activeGroupKey || group.key === activeGroupKey)
+      .filter(
+        (group) =>
+          !unknownGroup && (!activeGroupKey || group.key === activeGroupKey)
+      )
       .map((group) => ({
         ...group,
         tasks: group.tasks.filter(
@@ -136,9 +157,14 @@ export default function BusinessChainInstanceView({
           <Tag>任务已结束</Tag>
         )}
       </header>
-      <ul>
+      <ul className="erp-dev-flow-instance-records">
         {group.tasks.map((task) => (
-          <li key={task.id}>
+          <li
+            key={task.id}
+            data-task-record={task.id}
+            data-pending={pending(task) || undefined}
+            data-blocked={task.task_status_key === 'blocked' || undefined}
+          >
             <button
               type="button"
               aria-current={task.current ? 'step' : undefined}
@@ -148,9 +174,7 @@ export default function BusinessChainInstanceView({
                 {getWorkflowTaskDisplayName(task)}
                 {task.current ? ' · 当前任务' : ''}
               </strong>
-              <span>
-                {task.roleLabel} · {task.statusLabel}
-              </span>
+              <span>{task.responsibilityLabel}</span>
               <small>
                 {[
                   ...new Set([task.batch_no, task.source_no].filter(Boolean)),
@@ -196,8 +220,7 @@ export default function BusinessChainInstanceView({
               selected={filter === key}
               count={counts[key]}
               onClick={() => {
-                setFilter(key)
-                setGroupKey(null)
+                changeFilter(key, null)
               }}
             >
               {label}
@@ -214,8 +237,7 @@ export default function BusinessChainInstanceView({
           virtual={false}
           value={activeGroupKey}
           onChange={(value) => {
-            setGroupKey(value || null)
-            setFilter('all')
+            changeFilter('all', value || null)
           }}
           options={[
             {
@@ -243,6 +265,27 @@ export default function BusinessChainInstanceView({
           / {counts.all} 项已读取任务
         </span>
       </div>
+      {unknownGroup ? (
+        <Alert
+          type="warning"
+          message="该环节或分支不在当前可见记录中"
+          action={
+            <Button onClick={() => changeFilter('all', null)}>清除筛选</Button>
+          }
+        />
+      ) : null}
+      {readingTarget ? (
+        <div className="erp-dev-flow-instance-reading">
+          <Button
+            type="link"
+            onClick={() => onOpenView('chain', readingTarget)}
+          >
+            {readingTarget[queryKeys.roleTab] === 'exceptions'
+              ? '查看异常处理路径'
+              : '查看对应办理流程'}
+          </Button>
+        </div>
+      ) : null}
       {exceptions.length ? (
         <section
           className="erp-dev-flow-instance-exceptions"

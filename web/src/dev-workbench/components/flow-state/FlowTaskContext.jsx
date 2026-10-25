@@ -35,23 +35,14 @@ function BusinessChainProjectionContext({
       data-chain-projection-context={projection.chain.key}
     >
       <div>
-        <Text className="erp-dev-flow-eyebrow">当前按业务链分类查看</Text>
+        <Text type="secondary">关联业务</Text>
         <strong>
           {projection.chain.label}
           {nodeLabel}
         </strong>
-        <span>
-          {projection.steps.length} 个相关步骤 · {projection.scenarios.length}{' '}
-          个已登记场景
-        </span>
       </div>
       <Space wrap>
-        {projection.responsibility.ownerPoolKeys.slice(0, 4).map((key) => (
-          <Tag key={key}>{getProcessOwnerPoolLabel(key)}</Tag>
-        ))}
-        <Button size="small" onClick={onBackToChain}>
-          回到链路步骤
-        </Button>
+        {onBackToChain ? <Button size="small" onClick={onBackToChain}>回到链路步骤</Button> : null}
         <Button size="small" onClick={onClearChainContext}>
           查看全部定义
         </Button>

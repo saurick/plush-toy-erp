@@ -1,9 +1,8 @@
 import React from 'react'
-import { MermaidDiagram } from '@/common/components/markdown'
-import {
-  buildFulfillmentSubflow,
-  buildSubflowMermaid,
-} from '../../config/devFulfillmentSubflow.mjs'
+import { useLocation } from 'react-router-dom'
+import { Button } from 'antd'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
+import { buildFulfillmentSubflow } from '../../config/devFulfillmentSubflow.mjs'
 import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
 import { selectFulfillmentSubstep } from '../../config/devFulfillmentPresentation.mjs'
 
@@ -14,48 +13,38 @@ export default function FulfillmentSubflow({
   setSearchParams,
   onOpenException,
 }) {
+  const location = useLocation()
   const flow = React.useMemo(() => buildFulfillmentSubflow(step), [step])
-  const graph = React.useMemo(
-    () =>
-      flow &&
-      buildSubflowMermaid(flow, { role, compact: true, direction: 'LR' }),
-    [flow, role]
-  )
   if (!flow) return null
   const selected = selectFulfillmentSubstep(
     flow,
     searchParams.get(queryKeys.roleSubstep),
     role
   )
-  const selectedID = graph.nodes.find((node) => node.key === selected.key)?.id
   const selectNode = (id) => {
-    const node = flow.nodes.find(
-      (item) => item.key === graph.nodes.find((item) => item.id === id)?.key
-    )
+    const node = flow.nodes.find((item) => item.key === id)
     if (!node) return
-    if (node.exception_guide && onOpenException) {
-      onOpenException(node.key, node.exception_guide)
-      return
-    }
-    setSearchParams((previous) => {
-      const next = new URLSearchParams(previous)
-      next.set(queryKeys.roleStage, step.stage)
-      next.set(queryKeys.roleSubstep, node.key)
-      return next
-    })
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        next.set(queryKeys.roleStage, step.stage)
+        next.set(queryKeys.roleSubstep, node.key)
+        return next
+      },
+      { state: location.state }
+    )
   }
   return (
     <section
       className="erp-dev-fulfillment-guide__subflow"
       aria-label="当前环节的子流程"
     >
-      <MermaidDiagram
-        chart={graph.chart}
+      <BusinessFlowDiagram
+        flow={flow}
         label={`${step.label}流程图`}
-        interactiveNodes={graph.nodes}
-        selectedNodeId={selectedID}
-        onNodeSelect={selectNode}
-        showSourceOnError={false}
+        selectedKey={selected.key}
+        onSelect={selectNode}
+        role={role}
       />
       <div
         className="erp-dev-fulfillment-guide__focus"
@@ -69,6 +58,16 @@ export default function FulfillmentSubflow({
         <p data-substep-instruction>
           {selected.details[0]?.text || step.result}
         </p>
+        {selected.exception_guide && onOpenException ? (
+          <Button
+            type="link"
+            onClick={() =>
+              onOpenException(selected.key, selected.exception_guide)
+            }
+          >
+            查看异常处理路径
+          </Button>
+        ) : null}
         {selected.details.length > 1 ? (
           <details className="erp-dev-disclosure erp-dev-fulfillment-guide__instructions">
             <summary>节点规则</summary>

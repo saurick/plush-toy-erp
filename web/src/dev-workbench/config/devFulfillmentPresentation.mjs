@@ -48,12 +48,15 @@ export function getFulfillmentStageCopy(step) {
 // These groups locate the existing stages; they do not add execution edges.
 export function buildFulfillmentOverview(steps) {
   const entries = new Map(steps.map((step, index) => [step.stage, { step, number: index + 1, ...getFulfillmentStageCopy(step) }]))
-  return PHASES.map((phase) => ({
+  const phases = PHASES.map((phase) => ({
     key: phase.key,
     label: phase.label,
     stages: phase.stages.map((key) => entries.get(key)).filter(Boolean),
     branches: phase.branches.map((key) => entries.get(key)).filter(Boolean),
   }))
+  const known = new Set(PHASES.flatMap((phase) => [...phase.stages, ...phase.branches]))
+  const unknown = [...entries.values()].filter((entry) => !known.has(entry.step.stage))
+  return unknown.length ? [...phases, { key: 'unclassified', label: '环节待归类', stages: unknown, branches: [] }] : phases
 }
 
 export function getFulfillmentStageContext(steps, stage) {

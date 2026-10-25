@@ -1,8 +1,7 @@
 import React from 'react'
 import { Button } from 'antd'
-import { MermaidDiagram } from '@/common/components/markdown'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
-import { buildSubflowMermaid } from '../../config/devFulfillmentSubflow.mjs'
 import { getFulfillmentStageCopy } from '../../config/devFulfillmentPresentation.mjs'
 
 export default function FulfillmentExceptionDetails({
@@ -12,6 +11,8 @@ export default function FulfillmentExceptionDetails({
   onSelectStep,
   onSelectOrigin,
   onSelectStage,
+  guides,
+  onSelectGuide,
 }) {
   const { guide, plan, selected, related, origin } = selection
   const origins = related.filter((step) =>
@@ -29,22 +30,31 @@ export default function FulfillmentExceptionDetails({
       },
     [selection.graph, guide]
   )
-  const graph = React.useMemo(
-    () => buildSubflowMermaid(flow, { role, compact: true, direction: 'LR' }),
-    [flow, role]
-  )
-  const onNodeSelect = (id) => {
-    const node = graph.nodes.find((item) => item.id === id)
-    if (!node || node.key === 'source') return
-    if (!plan) onSelectPlan(node.key)
-    else onSelectStep(node.key)
-  }
+  const [previewKey, setPreviewKey] = React.useState(null)
+  const preview = !plan && guide.plans.find((item) => item.key === previewKey)
+  const menuNode = preview || flow.nodes[0]
+  const selectedNode = plan ? selected : menuNode
+  const selectNode = (key) => (plan ? onSelectStep(key) : setPreviewKey(key))
   return (
     <section
       className="erp-dev-fulfillment-guide__exception"
       data-exception-guide={guide.key}
     >
       <div className="erp-dev-fulfillment-guide__choices">
+        {guides && onSelectGuide ? (
+          <FilterSelect
+            label="异常类型"
+            aria-label="异常类型"
+            placeholder="选择异常类型"
+            value={guide.key}
+            onChange={onSelectGuide}
+            options={guides.map((item) => ({
+              value: item.key,
+              label: item.label,
+            }))}
+            virtual={false}
+          />
+        ) : null}
         {origins.length ? (
           <FilterSelect
             label="发生环节"
@@ -78,34 +88,41 @@ export default function FulfillmentExceptionDetails({
           <span>{plan.label}</span>
         )}
       </div>
+      <p className="erp-dev-business-flow-print-scope">{plan ? `处理方案：${plan.label}` : '方案分支总览'}{origins.length && !origin ? ' · 未指定发生环节' : ''}</p>
       <div
         data-exception-handling={plan ? '' : undefined}
         data-exception-plan={plan?.key}
       >
-        <MermaidDiagram
-          chart={graph.chart}
+        <BusinessFlowDiagram
+          flow={flow}
           label={`${guide.label}流程图`}
-          interactiveNodes={graph.nodes}
-          selectedNodeId={
-            graph.nodes.find((node) => node.key === selected?.key)?.id
-          }
-          onNodeSelect={onNodeSelect}
-          showSourceOnError={false}
+          selectedKey={selectedNode?.key}
+          onSelect={selectNode}
+          role={role}
         />
       </div>
-      {selected ? (
+      {selectedNode ? (
         <div
           className="erp-dev-fulfillment-guide__focus"
           aria-live="polite"
-          data-selected-exception-node={selected.key}
+          data-selected-exception-node={plan ? selectedNode.key : undefined}
         >
-          <strong>{selected.label}</strong>
-          <p>{selected.result || selected.condition}</p>
-          {selected.stage ? (
+          <strong>{selectedNode.label}</strong>
+          <p>
+            {plan
+              ? selectedNode.result || selectedNode.condition
+              : preview?.closure || guide.source}
+          </p>
+          {preview ? (
+            <Button type="link" onClick={() => onSelectPlan(preview.key)}>
+              查看此方案
+            </Button>
+          ) : null}
+          {selectedNode.stage ? (
             <Button
               type="link"
               size="small"
-              onClick={() => onSelectStage(selected.stage)}
+              onClick={() => onSelectStage(selectedNode.stage)}
             >
               查看该环节
             </Button>

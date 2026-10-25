@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
-import { Alert, Empty, Spin, Tag } from 'antd'
+import { Alert, Button, Empty, Spin, Tag } from 'antd'
+import { WorkbenchEmpty, WorkbenchFacts, WorkbenchSection } from '../WorkbenchPattern.jsx'
 import Select from '@/common/components/select/AppSelect'
 import {
   getProcessOwnerPoolLabel,
@@ -14,7 +15,6 @@ import { useRuntimeContext } from './useFlowRuntime.mjs'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
   formatQueryTime,
-  escapeMermaid,
   Text,
   Title,
   useDefinitionSelectSearch,
@@ -23,7 +23,7 @@ import {
   EvidenceDisclosure,
   KeyValue,
 } from './FlowStateShared.jsx'
-import { Markdown } from '@/common/components/markdown'
+import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import {
   formatProcessStartedAt,
   getProcessLabel,
@@ -48,90 +48,72 @@ const PROCESS_STATUS_COLORS = Object.freeze({
   waiting: 'default',
 })
 
-function buildProcessMermaid(definition) {
-  if (!definition) return ''
-  const ids = new Map(
-    definition.nodes.map((node, index) => [node.key, `P${index}`])
-  )
-  const nodeByKey = new Map(definition.nodes.map((node) => [node.key, node]))
-  const lines = ['flowchart LR']
-  for (const node of definition.nodes) {
-    lines.push(`  ${ids.get(node.key)}["${escapeMermaid(node.label)}"]`)
-  }
-  for (const edge of definition.edges) {
-    const branchLabel =
-      edge.branchLabel || nodeByKey.get(edge.to)?.label || '结果分支'
-    const connector = edge.branchPolicy
-      ? `-->|"${escapeMermaid(branchLabel)}"|`
-      : '-->'
-    lines.push(`  ${ids.get(edge.from)} ${connector} ${ids.get(edge.to)}`)
-  }
-  return lines.join('\n')
-}
-
 function ProcessDefinitionCard({ definition }) {
   const nodeByKey = new Map(definition.nodes.map((node) => [node.key, node]))
-  const mermaid = buildProcessMermaid(definition)
+  const [selectedKey, select] = useState(definition.initial)
+  const selected = nodeByKey.get(selectedKey) || definition.nodes[0]
+  const flow = useMemo(
+    () => ({
+      entryNodeKeys: [definition.initial],
+      nodes: definition.nodes.map((node) => ({
+        ...node,
+        kind: 'process_runtime',
+        terminal: node.type === 'end',
+        role: node.ownerPool ? getProcessOwnerPoolLabel(node.ownerPool) : null,
+      })),
+      edges: definition.edges.map((edge) => ({
+        ...edge,
+        label: edge.branchLabel,
+        kind: edge.branchPolicy ? 'branches_to' : undefined,
+      })),
+    }),
+    [definition]
+  )
   return (
     <section className="erp-dev-flow-process-definition">
       <div className="erp-dev-flow-section-heading">
         <div>
           <Text className="erp-dev-flow-eyebrow">流程定义与 variant</Text>
           <Title level={2}>{definition.label}</Title>
-          <KeyValue value={definition.key} />
+
         </div>
-        <Tag>{definition.processVersion}</Tag>
+        <Text type="secondary">流程定义</Text>
       </div>
 
-      <div className="erp-dev-flow-process-layout">
-        <div className="erp-dev-flow-process-graph erp-dev-docs-markdown">
-          <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
-        </div>
-        <ol>
-          {definition.nodes.map((node, index) => (
-            <li key={node.key}>
-              <span>{index + 1}</span>
-              <div>
-                <strong>{node.label}</strong>
-                <small>
-                  {node.type === 'human_task' || node.type === 'approval'
-                    ? '人工协同节点'
-                    : node.type === 'domain_command'
-                      ? '领域命令节点'
-                      : '流程结束节点'}
-                </small>
-                {node.ownerPool ? (
-                  <Tag>
-                    负责岗位：
-                    {getProcessOwnerPoolLabel(node.ownerPool)}
-                  </Tag>
-                ) : null}
-                <KeyValue value={node.key} />
-              </div>
-            </li>
-          ))}
-        </ol>
+      <BusinessFlowDiagram
+        flow={flow}
+        label={`${definition.label}定义图`}
+        selectedKey={selected.key}
+        onSelect={select}
+      />
+      <div className="erp-dev-fulfillment-guide__focus" aria-live="polite">
+        <strong>{selected.label}</strong>
+        <p>
+          {selected.type === 'human_task' || selected.type === 'approval'
+            ? '人工协同节点'
+            : selected.type === 'domain_command'
+              ? '领域命令节点'
+              : '流程结束节点'}
+          {selected.ownerPool
+            ? ` · ${getProcessOwnerPoolLabel(selected.ownerPool)}`
+            : ''}
+        </p>
       </div>
-      <details className="erp-dev-disclosure">
-        <summary>查看定义边与代码证据</summary>
+      <EvidenceDisclosure value={definition} label="定义与代码依据">
+        <WorkbenchFacts items={[
+          { label: '流程标识', value: <KeyValue value={definition.key} /> },
+          { label: '流程版本', value: definition.processVersion },
+        ]}
+        />
         <ul>
           {definition.edges.map((edge) => (
             <li key={edge.key}>
-              <strong>
-                {nodeByKey.get(edge.from)?.label || edge.from} →{' '}
-                {nodeByKey.get(edge.to)?.label || edge.to}
-              </strong>
-              <span>
-                {edge.branchPolicy
-                  ? edge.branchLabel ||
-                    `转到${nodeByKey.get(edge.to)?.label || edge.to}`
-                  : '顺序推进'}
-              </span>
+              <strong>{nodeByKey.get(edge.from)?.label || edge.from} → {nodeByKey.get(edge.to)?.label || edge.to}</strong>
+              <span>{edge.branchPolicy ? edge.branchLabel || '结果分支' : '顺序推进'}</span>
             </li>
           ))}
         </ul>
-        <EvidenceDisclosure value={definition} />
-      </details>
+      </EvidenceDisclosure>
     </section>
   )
 }
@@ -160,116 +142,44 @@ function RuntimeResponsibilityEvidence({ model }) {
         )
         .join('；')
     : '当前没有运行中节点'
-  const alignmentWarning =
-    model.definitionAlignment === 'different' ||
-    model.taskAlignment === 'different'
-  const alignmentCopy = alignmentWarning
-    ? '静态责任池、运行实例责任或当前任务岗位存在差异，请回到正式流程配置与任务记录核对。'
-    : model.definitionAlignment === 'aligned' &&
-        model.taskAlignment === 'aligned'
-      ? '静态责任池、运行实例当前责任与当前任务岗位一致。'
-      : '只展示已读到的责任来源；缺失部分保持未确认，不从任务名称或流程名称猜测。'
-
   return (
-    <section
-      className="erp-dev-flow-responsibility"
+    <WorkbenchFacts
       aria-label="流程责任来源核对"
-    >
-      <div className="erp-dev-flow-section-heading">
-        <div>
-          <Text strong>责任来源核对</Text>
-          <Text type="secondary">
-            版本化静态定义、运行实例当前责任和当前任务岗位分开显示。
-          </Text>
-        </div>
-      </div>
-      <dl>
-        <div>
-          <dt>版本化静态定义</dt>
-          <dd>{definitionCopy}</dd>
-        </div>
-        <div>
-          <dt>当前节点定义责任池</dt>
-          <dd>{staticPoolCopy}</dd>
-        </div>
-        <div>
-          <dt>运行实例当前责任</dt>
-          <dd>{runtimeResponsibilityCopy}</dd>
-        </div>
-        <div>
-          <dt>当前任务岗位</dt>
-          <dd>
-            {model.taskRoleKey
-              ? getProcessOwnerPoolLabel(model.taskRoleKey)
-              : '任务未返回负责岗位'}
-          </dd>
-        </div>
-      </dl>
-      <Alert
-        showIcon
-        type={alignmentWarning ? 'warning' : 'info'}
-        message={alignmentCopy}
-        description="责任核对只说明流程与任务由谁承接，不推断具体处理人，也不证明 Source Document 或 Fact / Ledger 已生效。"
-      />
-    </section>
+      items={[
+      { label: '版本化静态定义', value: definitionCopy },
+      { label: '当前节点定义责任池', value: staticPoolCopy },
+      { label: '运行实例当前责任', value: runtimeResponsibilityCopy },
+      { label: '当前任务岗位', value: model.taskRoleKey ? getProcessOwnerPoolLabel(model.taskRoleKey) : '任务未返回负责岗位' },
+    ]}
+    />
   )
 }
 
 function RuntimeUnlinkedTaskBoundary({ task, taskId }) {
   const status = task ? getWorkflowTaskStatusMeta(task) : null
   return (
-    <section
+    <WorkbenchSection
+      flat
       className="erp-dev-flow-unlinked-task"
       data-task-runtime-boundary="unlinked"
+      title={task ? getWorkflowTaskDisplayName(task) : `任务 ${taskId}`}
+      description="已找到任务，但它没有正式流程轨迹"
+      actions={status ? <Tag color={status.color}>{status.label}</Tag> : null}
     >
-      <Alert
-        showIcon
-        type="info"
-        message="已找到任务，但它没有正式流程轨迹"
-        description="任务记录真实存在，但未关联正式 ProcessRuntime。页面不会根据任务名称或 payload 补造流程节点。"
+      <WorkbenchFacts items={[
+        { label: '来源单号', value: task?.source_no || '未记录来源单号' },
+        { label: '负责岗位', value: task ? getWorkflowTaskOwnerRoleLabel(task) : '待确认' },
+      ]}
       />
-      <div className="erp-dev-flow-section-heading">
-        <div>
-          <Text className="erp-dev-flow-eyebrow">已找到的任务</Text>
-          <Title level={2}>
-            {task ? getWorkflowTaskDisplayName(task) : `任务 ${taskId}`}
-          </Title>
-        </div>
-        {status ? (
-          <Tag color={status.color}>{status.label}</Tag>
-        ) : (
-          <Tag>未关联正式流程</Tag>
-        )}
-      </div>
-      <dl>
-        {task ? (
-          <>
-            <div>
-              <dt>任务编号</dt>
-              <dd>{task.task_code}</dd>
-            </div>
-            <div>
-              <dt>来源单号</dt>
-              <dd>{task.source_no || '未记录来源单号'}</dd>
-            </div>
-            <div>
-              <dt>负责岗位</dt>
-              <dd>{getWorkflowTaskOwnerRoleLabel(task)}</dd>
-            </div>
-          </>
-        ) : null}
-        <div>
-          <dt>内部 task_id</dt>
-          <dd>
-            <KeyValue value={taskId} />
-          </dd>
-        </div>
-        <div>
-          <dt>流程轨迹</dt>
-          <dd>未关联正式 ProcessRuntime</dd>
-        </div>
-      </dl>
-    </section>
+      <EvidenceDisclosure label="任务关联依据">
+        <WorkbenchFacts items={[
+          { label: '任务编号', value: task?.task_code || '未记录' },
+          { label: '内部任务标识', value: <KeyValue value={taskId} /> },
+          { label: '流程轨迹', value: '未关联正式 ProcessRuntime' },
+        ]}
+        />
+      </EvidenceDisclosure>
+    </WorkbenchSection>
   )
 }
 
@@ -282,193 +192,104 @@ function RuntimeView({
   onSelectDefinition,
   onBackToChain,
   onClearChainContext,
+  onLocateTask,
+  onBrowseDefinitions,
 }) {
-  const definitions = projection
-    ? projection.processDefinitions
-    : catalog.processDefinitions
-  const scopedCatalog = useMemo(
-    () => ({ ...catalog, processDefinitions: definitions }),
-    [catalog, definitions]
-  )
+  const definitions = projection ? projection.processDefinitions : catalog.processDefinitions
+  const scopedCatalog = useMemo(() => ({ ...catalog, processDefinitions: definitions }), [catalog, definitions])
   const searchProps = useDefinitionSelectSearch()
-  const optionFilter = useMemo(
-    () => createDevFlowDefinitionOptionFilter(scopedCatalog, 'runtime'),
-    [scopedCatalog]
-  )
-  const definitionOptions = useMemo(
-    () => buildProcessDefinitionSelectOptions(scopedCatalog),
-    [scopedCatalog]
-  )
+  const optionFilter = useMemo(() => createDevFlowDefinitionOptionFilter(scopedCatalog, 'runtime'), [scopedCatalog])
+  const definitionOptions = useMemo(() => buildProcessDefinitionSelectOptions(scopedCatalog), [scopedCatalog])
   const association = getDevFlowStateTaskRuntimeAssociation(selectedTask)
-  const runtime = useRuntimeContext(taskId, association)
+  const [revision, setRevision] = useState(0)
+  const runtime = useRuntimeContext(taskId, association, revision)
   const nodes = asArray(runtime.context?.nodes)
-  const runtimeResponsibility = useMemo(
-    () =>
-      buildDevFlowRuntimeResponsibility({
-        definitions: catalog.processDefinitions,
-        context: runtime.context,
-        task: selectedTask,
-      }),
-    [catalog.processDefinitions, runtime.context, selectedTask]
-  )
+  const runtimeResponsibility = useMemo(() => buildDevFlowRuntimeResponsibility({
+    definitions: catalog.processDefinitions,
+    context: runtime.context,
+    task: selectedTask,
+  }), [catalog.processDefinitions, runtime.context, selectedTask])
+  const responsibilityMismatch = runtimeResponsibility.definitionAlignment === 'different' || runtimeResponsibility.taskAlignment === 'different'
+  const currentNodes = asArray(runtime.context?.current_nodes)
   return (
     <div className="erp-dev-flow-view-stack">
-      <BusinessChainProjectionContext
-        projection={projection}
-        onBackToChain={onBackToChain}
-        onClearChainContext={onClearChainContext}
-      />
-      <section className="erp-dev-flow-definition-selector">
-        <label htmlFor="dev-flow-process-select">选择流程定义</label>
-        {definitions.length > 0 ? (
-          <Select
-            placeholder="选择流程定义"
-            id="dev-flow-process-select"
-            aria-label="选择流程定义"
-            showSearch
-            virtual={false}
-            classNames={DEFINITION_SELECT_CLASS_NAMES}
-            {...searchProps}
-            filterOption={optionFilter}
-            notFoundContent="没有匹配的流程定义"
-            value={definition?.key}
-            options={definitionOptions}
-            optionRender={renderDefinitionSelectOption}
-            onChange={onSelectDefinition}
-          />
-        ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="当前业务链步骤没有登记 ProcessRuntime；请到状态或 Fact 视图继续核对。"
-          />
-        )}
-        <Text type="secondary">
-          当前范围登记{' '}
-          {new Set(definitions.map((item) => item.processKey)).size} 个流程
-          key、{definitions.length} 个 variant；客户预览只代表设计选择。
-        </Text>
-      </section>
-      {definition ? <ProcessDefinitionCard definition={definition} /> : definitions.length > 0 ? <Empty description="请选择流程定义" /> : null}
+      <BusinessChainProjectionContext projection={projection} onBackToChain={onBackToChain} onClearChainContext={onClearChainContext} />
       {!taskId ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="无运行数据：尚未选择真实任务，当前只展示流程定义"
-        />
-      ) : null}
-      {runtime.status === 'loading' ? (
-        <div className="erp-dev-flow-loading" role="status">
-          <Spin />
-          <span>正在读取具体运行实例…</span>
-        </div>
-      ) : null}
-      {runtime.status === 'error' ? (
-        <Alert
-          showIcon
-          type="error"
-          message="运行实例读取失败"
-          description={runtime.error}
-        />
-      ) : null}
-      {runtime.status === 'unlinked' ? (
-        <RuntimeUnlinkedTaskBoundary task={selectedTask} taskId={taskId} />
-      ) : null}
-      {runtime.status === 'ready' ? (
-        <section className="erp-dev-flow-runtime-instance">
-          <div className="erp-dev-flow-section-heading">
-            <div>
-              <Text className="erp-dev-flow-eyebrow">具体运行实例</Text>
-              <Title level={2}>
-                {getProcessLabel(runtime.context.process_instance)}
-              </Title>
-            </div>
-            <Tag
-              color={
-                PROCESS_STATUS_COLORS[runtime.context.process_instance.status]
-              }
-            >
-              {getProcessStatusLabel(runtime.context.process_instance)}
-            </Tag>
+        <>
+          <div className="erp-dev-flow-inline-note">
+            <Text type="secondary">当前查看流程定义；实际进度按任务查询。</Text>
+            <Button onClick={onLocateTask}>定位任务</Button>
           </div>
-          <dl>
-            <div>
-              <dt>实例 ID</dt>
-              <dd>
-                <KeyValue value={String(runtime.context.process_instance.id)} />
-              </dd>
-            </div>
-            <div>
-              <dt>流程 key</dt>
-              <dd>
-                <KeyValue
-                  value={runtime.context.process_instance.process_key}
-                />
-              </dd>
-            </div>
-            <div>
-              <dt>流程版本</dt>
-              <dd>{runtime.context.process_instance.process_version}</dd>
-            </div>
-            <div>
-              <dt>来源单号</dt>
-              <dd>{runtime.context.source?.no || '未声明'}</dd>
-            </div>
-            <div>
-              <dt>发起时间</dt>
-              <dd>
-                {formatProcessStartedAt(
-                  runtime.context.process_instance.started_at
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt>数据来源</dt>
-              <dd>workflow.get_task_process_context</dd>
-            </div>
-            <div>
-              <dt>查询时间</dt>
-              <dd>{formatQueryTime(runtime.queriedAt)}</dd>
-            </div>
-          </dl>
-          <Alert
-            showIcon
-            type="warning"
-            message="尚未证明业务事实已落账"
-            description="下面的 completed 只属于 ProcessRuntime 节点；不会把 Workflow 或 Fact / Ledger 节点一并标成完成。"
+          <section className="erp-dev-flow-definition-selector">
+            <label htmlFor="dev-flow-process-select">选择流程定义</label>
+            {definitions.length > 0 ? (
+              <Select
+                placeholder="选择流程定义"
+                id="dev-flow-process-select"
+                aria-label="选择流程定义"
+                showSearch
+                virtual={false}
+                classNames={DEFINITION_SELECT_CLASS_NAMES}
+                {...searchProps}
+                filterOption={optionFilter}
+                notFoundContent="没有匹配的流程定义"
+                value={definition?.key}
+                labelRender={() => definition?.label}
+                options={definitionOptions}
+                optionRender={renderDefinitionSelectOption}
+                onChange={onSelectDefinition}
+              />
+            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前业务没有登记流程定义，可查看单据状态或事实定义。" />}
+          </section>
+          {definition ? <ProcessDefinitionCard key={definition.key} definition={definition} /> : definitions.length > 0 ? <WorkbenchEmpty title="请选择流程定义" /> : null}
+        </>
+      ) : null}
+      {runtime.status === 'loading' ? <div className="erp-dev-flow-loading" role="status"><Spin /><span>正在读取具体运行实例…</span></div> : null}
+      {runtime.status === 'error' ? (
+        <Alert showIcon type="error" message="运行实例读取失败" description={runtime.error} action={<Button onClick={() => setRevision((value) => value + 1)}>重试</Button>} />
+      ) : null}
+      {runtime.status === 'unlinked' ? <RuntimeUnlinkedTaskBoundary task={selectedTask} taskId={taskId} /> : null}
+      {runtime.status === 'ready' ? (
+        <WorkbenchSection
+          flat
+          className="erp-dev-flow-runtime-instance"
+          title={getProcessLabel(runtime.context.process_instance)}
+          actions={<Tag color={PROCESS_STATUS_COLORS[runtime.context.process_instance.status]}>{getProcessStatusLabel(runtime.context.process_instance)}</Tag>}
+        >
+          <WorkbenchFacts items={[
+            { label: '来源单号', value: runtime.context.source?.no || '未声明' },
+            { label: '发起时间', value: formatProcessStartedAt(runtime.context.process_instance.started_at) },
+            { label: '当前环节', value: currentNodes.map(getProcessNodeLabel).join('、') || '无运行中节点' },
+            { label: '负责岗位', value: runtimeResponsibility.currentItems.map((item) => item.runtimeRoleKey ? getProcessOwnerPoolLabel(item.runtimeRoleKey) : '运行实例未返回责任岗位').join('、') || '无运行中节点' },
+            ...(selectedTask?.blocked_reason ? [{ label: '当前原因', value: selectedTask.blocked_reason }] : []),
+          ]}
           />
-          <RuntimeResponsibilityEvidence model={runtimeResponsibility} />
-          <ol className="erp-dev-flow-runtime-nodes">
+          {responsibilityMismatch ? <Alert type="warning" showIcon message="流程与任务的责任岗位存在差异，请核对责任来源。" /> : null}
+          <ol className="erp-dev-flow-runtime-nodes" aria-label="实际流程节点">
             {nodes.map((node) => (
-              <li
-                key={node.id}
-                data-node-status={node.status}
-                aria-current={
-                  ['active', 'blocked'].includes(node.status)
-                    ? 'step'
-                    : undefined
-                }
-              >
-                <span>
-                  {node.status === 'completed' ? (
-                    <CheckCircleOutlined />
-                  ) : node.status === 'blocked' ? (
-                    <ExclamationCircleOutlined />
-                  ) : (
-                    <ClockCircleOutlined />
-                  )}
-                </span>
-                <div>
-                  <strong>{getProcessNodeLabel(node)}</strong>
-                  <KeyValue value={node.node_key} />
-                  <small>尝试次数：{node.attempt || 1}</small>
-                </div>
-                <Tag color={PROCESS_STATUS_COLORS[node.status]}>
-                  {getProcessNodeStatusLabel(node)}
-                </Tag>
+              <li key={node.id} data-node-status={node.status} aria-current={['active', 'blocked'].includes(node.status) ? 'step' : undefined}>
+                <span>{node.status === 'completed' ? <CheckCircleOutlined /> : node.status === 'blocked' ? <ExclamationCircleOutlined /> : <ClockCircleOutlined />}</span>
+                <div><strong>{getProcessNodeLabel(node)}</strong>{node.attempt > 1 ? <small>第 {node.attempt} 次尝试</small> : null}</div>
+                <Tag color={PROCESS_STATUS_COLORS[node.status]}>{getProcessNodeStatusLabel(node)}</Tag>
               </li>
             ))}
           </ol>
-        </section>
+          <Text type="secondary">流程节点完成不代表库存、出货或财务结果已生效。</Text>
+          <EvidenceDisclosure label="运行依据与责任核对">
+            <WorkbenchFacts items={[
+              { label: '实例标识', value: <KeyValue value={String(runtime.context.process_instance.id)} /> },
+              { label: '流程标识', value: <KeyValue value={runtime.context.process_instance.process_key} /> },
+              { label: '流程版本', value: runtime.context.process_instance.process_version },
+              { label: '数据来源', value: 'workflow.get_task_process_context' },
+              { label: '查询时间', value: formatQueryTime(runtime.queriedAt) },
+            ]}
+            />
+            <RuntimeResponsibilityEvidence model={runtimeResponsibility} />
+            <ul>{nodes.map((node) => <li key={node.id}><KeyValue value={node.node_key} /> · 尝试次数：{node.attempt || 1}</li>)}</ul>
+          </EvidenceDisclosure>
+        </WorkbenchSection>
       ) : null}
+      {taskId ? <div className="erp-dev-flow-inline-note"><Button onClick={onBrowseDefinitions}>浏览流程定义</Button></div> : null}
     </div>
   )
 }

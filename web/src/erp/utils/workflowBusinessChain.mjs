@@ -42,6 +42,10 @@ export function supportsWorkflowBusinessChain(task) {
     'outsourcing_order', 'outsourcing_fact', 'production_exception_decision', 'shipment', 'shipments'].includes(task?.source_type)
 }
 
+export function isWorkflowBusinessChainException(task) {
+  return task.exception_id > 0 || ['handoff_production_exception', 'handoff_receipt_exception', 'purchase_quality_exception', 'outsource_quality_exception', 'production_exception', 'finished_goods_rework'].includes(task.task_group) || task.source_type === 'production_exception_decision'
+}
+
 export function buildWorkflowBusinessChain(data, currentTaskID) {
   const main = new Map(catalog.fulfillment_flow.map((step) => [step.stage, { key: step.stage, label: step.label, role: step.role, role_keys: step.role_keys, stages: step.stages, tasks: [] }]))
   const exceptions = new Map()
@@ -52,7 +56,7 @@ export function buildWorkflowBusinessChain(data, currentTaskID) {
     const key = matches.length === 1 ? matches[0].stage : stage?.key || 'unclassified'
     const detail = { ...task, ...taskPresentation(task), stageLabel: stage?.label || '', current: task.id === currentTaskID }
     tasks.push(detail)
-    const isException = task.exception_id > 0 || ['handoff_production_exception', 'handoff_receipt_exception', 'purchase_quality_exception', 'outsource_quality_exception', 'production_exception', 'finished_goods_rework'].includes(task.task_group) || task.source_type === 'production_exception_decision'
+    const isException = isWorkflowBusinessChainException(task)
     if (isException) {
       const branchKey = task.exception_id > 0 ? `decision-${task.exception_id}` : `issue-${task.batch_no || task.id}`
       if (!exceptions.has(branchKey)) exceptions.set(branchKey, { key: branchKey, label: `${task.discovery?.path || '质量异常'}${task.exception_no ? ` · ${task.exception_no}` : ''}`, tasks: [] })
