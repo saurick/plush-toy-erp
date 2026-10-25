@@ -2,6 +2,54 @@ import { openERPAppearance } from './themeAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 
+export async function assertMermaidEdgeLabelContrast(diagram, assert) {
+  const labels = await diagram.evaluate((root) =>
+    [...root.querySelectorAll('.edgeLabels > .edgeLabel')].flatMap((label) => {
+      const html = Boolean(label.querySelector('foreignObject'))
+      const text = label.querySelector(html ? 'p, span.edgeLabel' : 'text')
+      if (!text?.textContent.trim()) return []
+      const backgrounds = []
+      for (let node = text; node; node = node.parentElement) {
+        // SVG groups report background-color but do not paint a background.
+        if (node.namespaceURI === 'http://www.w3.org/1999/xhtml') {
+          backgrounds.unshift(getComputedStyle(node).backgroundColor)
+        }
+      }
+      const rect = !html && label.querySelector('rect')
+      const rectStyle = rect ? getComputedStyle(rect) : null
+      return [{
+        text: text.textContent.trim(),
+        foreground: getComputedStyle(text)[html ? 'color' : 'fill'],
+        backgrounds,
+        rectFill: rectStyle?.fill,
+        rectOpacity: rectStyle
+          ? Number(rectStyle.opacity) * Number(rectStyle.fillOpacity)
+          : 1,
+      }]
+    })
+  )
+  assert(labels.length > 0, '对比度回归必须实际覆盖连线标签')
+  return labels.map((label) => {
+    const layers = label.backgrounds.map(parseRgb)
+    if (label.rectFill) {
+      const fill = parseRgb(label.rectFill)
+      assert(fill, `无法读取连线标签底色：${label.rectFill}`)
+      layers.push([...fill.slice(0, 3), fill[3] * label.rectOpacity])
+    }
+    const background = layers.reduce((surface, color) => {
+      assert(color, `无法读取连线标签背景：${JSON.stringify(label)}`)
+      return color.slice(0, 3).map((channel, index) =>
+        channel * color[3] + surface[index] * (1 - color[3])
+      )
+    }, [255, 255, 255])
+    const foreground = parseRgb(label.foreground)
+    assert(foreground, `无法读取连线标签文字颜色：${JSON.stringify(label)}`)
+    const ratio = getContrastRatio(foreground, background)
+    assert(ratio >= 4.5, `连线标签文字对比度须达到 4.5:1：${JSON.stringify({ ...label, background, ratio })}`)
+    return { text: label.text, ratio }
+  })
+}
+
 export async function assertMermaidDefaultView(page, diagram, assert) {
   await diagram.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
   await waitForMermaidFit(page, diagram)

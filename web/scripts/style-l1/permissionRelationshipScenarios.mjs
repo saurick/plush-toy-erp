@@ -1,4 +1,5 @@
 import { DEV_PERMISSION_RELATIONSHIPS_API } from '../../src/dev-workbench/config/devPermissionRelationshipApi.mjs'
+import { assertMermaidEdgeLabelContrast } from './mermaidViewerAssertions.mjs'
 
 const roles = [
   {
@@ -178,6 +179,7 @@ export function createPermissionRelationshipScenarios({
           )
           .waitFor()
         assert.equal(new URL(page.url()).searchParams.has('tab'), false, '默认关系图使用省略 tab 的规范 URL')
+        await assertMermaidEdgeLabelContrast(page.locator('.erp-permission-relationship .erp-markdown-mermaid'), assert)
         assert.equal(await page.getByRole('tab', { name: '关系图', exact: true }).getAttribute('aria-selected'), 'true')
 
         await page.getByText('按员工', { exact: true }).click()

@@ -1,3 +1,5 @@
+import { assertMermaidEdgeLabelContrast } from './mermaidViewerAssertions.mjs'
+
 async function expectSkillGraphFits(page, diagram) {
   await page.waitForFunction(
     (root) => {
@@ -114,6 +116,7 @@ export function createDevProjectSkillsScenarios({
         )
         await diagram.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
         await expectSkillGraphFits(page, diagram)
+        await assertMermaidEdgeLabelContrast(diagram, assert)
         assert((await diagram.innerText()).includes('引用依据'))
         await disclosures.nth(0).locator('summary').click()
         await page.waitForFunction(

@@ -6,6 +6,7 @@ import { DEV_WORKSPACE_NAV_ITEMS, DEV_SECONDARY_NAV_ITEMS, DEV_VERSION_GUIDE_ROU
 import { renderWorkbenchLoginPage, WORKBENCH_LOGIN_CONTENT_SECURITY_POLICY } from '../../dev-server/workbenchLoginPage.mjs'
 import { selectAppearance, assertPaint } from './devWorkbenchThemeScenarios.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
+import { assertMermaidEdgeLabelContrast, switchMermaidLayout } from './mermaidViewerAssertions.mjs'
 import { installIntegrationWorkspaceMock } from './devProjectGraphAssertions.mjs'
 import { installDatabaseMigrationFixture } from './devDeliveryWorkspaceScenarios.mjs'
 import { installDeliverySummaryRoute } from './devVersionCenterScenarios.mjs'
@@ -75,19 +76,29 @@ export function createDevWorkbenchThemeAuditScenarios({ assertNoHorizontalOverfl
       viewport,
       deviceScaleFactor: 2,
       verify: async (page) => {
+        const evidence = []
         for (const mode of ['light', 'dark']) {
           for (const accent of Object.keys(ERP_ACCENTS)) {
             await selectAppearance(page, mode, accent)
             const diagram = `[data-mermaid-status="rendered"][data-mermaid-theme="${mode}"][data-mermaid-accent="${accent}"]`
             await page.locator(diagram).waitFor()
             await assertPaint(page, `${diagram} g.node .label-container`, { stroke: '--erp-primary' })
+            const labels = await assertMermaidEdgeLabelContrast(page.locator(diagram), assert)
+            evidence.push({ mode, accent, labels: labels.length, minimumContrast: Math.min(...labels.map(({ ratio }) => ratio)) })
             await assertPaint(page, '[data-project-graph-classification]', { color: '--erp-primary-strong', backgroundColor: '--erp-primary-soft' })
+            if (accent === 'blue') await page.screenshot({ path: `${outputDir}/mermaid-label-${mode}.png` })
           }
         }
         await page.getByRole('button', { name: '全屏查看项目关系图', exact: true }).click()
         await page.locator('.erp-markdown-mermaid--fullscreen').waitFor()
         await assertPaint(page, '.erp-markdown-mermaid--fullscreen g.node .label-container', { stroke: '--erp-primary' })
+        const viewer = page.locator('.erp-markdown-mermaid')
+        await assertMermaidEdgeLabelContrast(viewer, assert)
+        await switchMermaidLayout(page, viewer, assert)
+        await assertMermaidEdgeLabelContrast(viewer, assert)
         await page.getByRole('button', { name: '退出项目关系图全屏', exact: true }).click()
+        await assertMermaidEdgeLabelContrast(viewer, assert)
+        await writeFile(`${outputDir}/mermaid-label-contrast.json`, JSON.stringify(evidence, null, 2))
         await assertNoHorizontalOverflow(page, 'mermaid-accent-restored')
       },
     },

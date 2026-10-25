@@ -11,6 +11,8 @@ const fixedThemes = {
     themeVariables: {
       primaryColor: '#eef7ef',
       primaryTextColor: '#173f2a',
+      textColor: '#173f2a',
+      edgeLabelBackground: '#ffffff',
       primaryBorderColor: '#8cc49a',
       lineColor: '#2f6f4e',
       secondaryColor: '#f8fbf8',
@@ -23,6 +25,8 @@ const fixedThemes = {
     themeVariables: {
       primaryColor: '#16351f',
       primaryTextColor: '#e5edf5',
+      textColor: '#e5edf5',
+      edgeLabelBackground: '#111827',
       primaryBorderColor: '#3f7d53',
       lineColor: '#86efac',
       secondaryColor: '#0f172a',
@@ -47,6 +51,9 @@ export function getMermaidTheme({ mode, accent, fixed = false }) {
       darkMode: isDark,
       primaryColor: token.colorPrimaryBg,
       primaryTextColor: token.colorText,
+      textColor: token.colorText,
+      // Mermaid 会重算标签透明度，须传入实色表面，避免半透明黑白填充变成灰底。
+      edgeLabelBackground: token.colorBgContainer,
       primaryBorderColor: accentTokens.colorPrimary,
       lineColor: accentTokens.colorLink,
       secondaryColor: token.colorFillAlter,
