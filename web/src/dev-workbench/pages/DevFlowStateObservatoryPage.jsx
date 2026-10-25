@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   InfoCircleOutlined,
   PartitionOutlined,
@@ -93,6 +93,7 @@ const PRIMARY_VIEWS = [
   ...VIEW_ITEMS.filter((item) => ['chain', 'tracking'].includes(item.value)).map(({ value, label }) => ({ value, label })),
   { value: 'rules', label: '查看规则' },
 ]
+const primaryViewKey = (view) => ['chain', 'tracking'].includes(view) ? view : 'rules'
 const TECHNICAL_VIEWS = VIEW_ITEMS.filter(
   (item) => !['chain', 'tracking'].includes(item.value)
 ).map(({ value, label }) => ({ value, label }))
@@ -629,6 +630,9 @@ export default function DevFlowStateObservatoryPage() {
   const taskSelectionRef = useRef(taskId)
   const sessionTokenRef = useRef(getToken())
   const [sessionRevision, setSessionRevision] = useState(0)
+  const primaryViewsRef = useRef({})
+  const readingRestoreRef = useRef(null)
+  const pageRef = useRef(null)
   const chainReturnRef = useRef({
     [QUERY_KEYS.chain]: requestedChainKey || ALL_BUSINESS_CHAINS_KEY,
     [QUERY_KEYS.node]: requestedNodeKey || null,
@@ -639,6 +643,8 @@ export default function DevFlowStateObservatoryPage() {
       const token = getToken()
       if (sessionTokenRef.current === token) return
       sessionTokenRef.current = token
+      primaryViewsRef.current = {}
+      readingRestoreRef.current = null
       taskSelectionRef.current = ''
       setSelectedTask(null)
       setTaskDraft('')
@@ -918,30 +924,52 @@ export default function DevFlowStateObservatoryPage() {
     updateParams({ [QUERY_KEYS.taskId]: null })
   }
   const returnFrames = location.state?.flowReturnFrames || []
+  useLayoutEffect(() => {
+    const frame = readingRestoreRef.current
+    if (!frame) return undefined
+    readingRestoreRef.current = null
+    // Async task reads and diagrams can grow after navigation has rendered.
+    const observer = new ResizeObserver(restore)
+    const inputs = ['wheel', 'pointerdown', 'keydown']
+    function stop() {
+      observer.disconnect()
+      inputs.forEach((event) => window.removeEventListener(event, stop, true))
+    }
+    function restore() {
+      window.scrollTo({ top: frame.scroll, behavior: 'instant' })
+      if (Math.abs(window.scrollY - frame.scroll) > 1) return
+      ;[...document.querySelectorAll('button,a')]
+        .find((element) => element.getClientRects().length &&
+          (element.getAttribute('aria-label') || element.textContent).trim() === frame.focus)
+        ?.focus({ preventScroll: true })
+      stop()
+    }
+    observer.observe(pageRef.current)
+    inputs.forEach((event) => window.addEventListener(event, stop, true))
+    restore()
+    return stop
+  }, [location.key])
+  const captureReadingFrame = () => {
+    const active = document.activeElement
+    return {
+      search: activeSearchParams.toString(),
+      label: VIEW_META[view]?.label || '上一层',
+      scroll: window.scrollY,
+      focus: (active?.getAttribute('aria-label') || active?.textContent || '').trim(),
+      taskScoped,
+      draft: taskDraft,
+    }
+  }
   const backToReading = () => {
     const previous = returnFrames.at(-1)
-    if (!previous) {
-      updateParams({ [QUERY_KEYS.view]: taskScoped ? 'tracking' : 'chain' })
-      return
-    }
+    if (!previous) return
+    readingRestoreRef.current = previous
     setSearchParams(new URLSearchParams(previous.search), {
       state: {
         ...location.state,
         flowReturnFrames: returnFrames.slice(0, -1),
         flowTaskContext: previous.taskScoped,
       },
-    })
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: previous.scroll, behavior: 'instant' })
-      ;[...document.querySelectorAll('button,a')]
-        .find(
-          (element) =>
-            element.getClientRects().length &&
-            (
-              element.getAttribute('aria-label') || element.textContent
-            ).trim() === previous.focus
-        )
-        ?.focus({ preventScroll: true })
     })
   }
   const openView = (nextView, patch = {}, options = {}) => {
@@ -972,22 +1000,12 @@ export default function DevFlowStateObservatoryPage() {
         nextPatch[key] = null
       })
     }
-    const active = document.activeElement
-    const frame = {
-      search: activeSearchParams.toString(),
-      label:
-        view === 'chain'
-          ? '业务结构'
-          : view === 'tracking'
-            ? '实例跟踪'
-            : VIEW_META[view]?.label || '上一层',
-      scroll: window.scrollY,
-      focus: (
-        active?.getAttribute('aria-label') ||
-        active?.textContent ||
-        ''
-      ).trim(),
-      taskScoped,
+    const frame = captureReadingFrame()
+    if (primaryViewKey(nextView) !== primaryViewKey(view)) {
+      primaryViewsRef.current[primaryViewKey(view)] = {
+        ...frame,
+        focus: PRIMARY_VIEWS.find((item) => item.value === primaryViewKey(view)).label,
+      }
     }
     const frames = options.main
       ? []
@@ -1000,12 +1018,30 @@ export default function DevFlowStateObservatoryPage() {
         flowReturnFrames: frames,
         flowTaskContext: options.global
           ? false
-          : options.main
+          : options.main && ['chain', 'tracking'].includes(nextView)
             ? nextView === 'tracking'
             : nextView === 'chain'
               ? false
               : frame.taskScoped,
       },
+    })
+  }
+  const openPrimaryView = (nextPrimary) => {
+    const currentPrimary = primaryViewKey(view)
+    if (nextPrimary === currentPrimary) return
+    primaryViewsRef.current[currentPrimary] = {
+      ...captureReadingFrame(),
+      focus: PRIMARY_VIEWS.find((item) => item.value === currentPrimary).label,
+    }
+    const previous = primaryViewsRef.current[nextPrimary]
+    if (!previous) {
+      openView(nextPrimary === 'rules' ? 'states' : nextPrimary, {}, { main: true })
+      return
+    }
+    readingRestoreRef.current = previous
+    setTaskDraft(previous.draft)
+    setSearchParams(new URLSearchParams(previous.search), {
+      state: { ...location.state, flowReturnFrames: [], flowTaskContext: previous.taskScoped },
     })
   }
   const clearChainContext = () =>
@@ -1289,6 +1325,7 @@ export default function DevFlowStateObservatoryPage() {
 
   return (
     <div
+      ref={pageRef}
       className="erp-dev-flow-state-page erp-dev-workspace-page"
       data-dev-flow-state-observatory
       data-catalog-status={catalogState.status}
@@ -1313,9 +1350,9 @@ export default function DevFlowStateObservatoryPage() {
             level="primary"
             ariaLabel="业务链路方式"
             items={PRIMARY_VIEWS}
-            value={['chain', 'tracking'].includes(view) ? view : 'rules'}
+            value={primaryViewKey(view)}
             disabled={catalogState.status === 'loading'}
-            onChange={(nextView) => nextView === 'rules' ? openView('states') : openView(nextView, {}, { main: true })}
+            onChange={openPrimaryView}
           />
           <Tag>
             {view === 'tracking' || (view === 'workflow' && taskId)
@@ -1369,9 +1406,11 @@ export default function DevFlowStateObservatoryPage() {
       catalog &&
       (!['chain', 'tracking'].includes(view) || returnFrames.length > 0) ? (
         <section className="erp-dev-flow-reading-nav">
-          <Button icon={<LeftOutlined aria-hidden />} onClick={backToReading}>
-            返回 {returnFrames.at(-1)?.label || (taskScoped ? '实例跟踪' : '业务结构')}
-          </Button>
+          {returnFrames.length > 0 ? (
+            <Button icon={<LeftOutlined aria-hidden />} onClick={backToReading}>
+              返回 {returnFrames.at(-1).label}
+            </Button>
+          ) : null}
           {!['chain', 'tracking'].includes(view) ? (
             <DevTaskNav
               compact

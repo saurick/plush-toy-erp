@@ -78,6 +78,11 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await expect(page.getByRole('button', { name: '技术详情', exact: true })).toHaveCount(0)
       await page.getByRole('tab', { name: '查看规则', exact: true }).click()
       await expect(tabs).toBeVisible()
+      await expect(page.getByRole('button', { name: /^返回 / })).toHaveCount(0)
+      const primary = page.getByRole('tablist', { name: '业务链路方式' })
+      const primaryMotion = await verifyMobileNavigationMotion(page, assert, '[aria-label="业务链路方式"]', 0)
+      const primaryReduced = await verifyMobileNavigationMotion(page, assert, '[aria-label="业务链路方式"]', 2, true)
+      await writeFile(path.join(outputDir, 'flow-primary-navigation-motion.json'), JSON.stringify({ primaryMotion, primaryReduced }, null, 2))
       const strip = await tabs.elementHandle()
       const stripBox = await tabs.boundingBox()
       const fullList = page.locator('[data-all-transitions]')
@@ -136,7 +141,20 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
 
       await expect(page.getByText('数据来源', { exact: true })).toBeHidden()
       await page.screenshot({ path: path.join(outputDir, 'flow-details-workflow.png') })
-      await expect(page.getByRole('button', { name: '返回 实例跟踪', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: /^返回 / })).toHaveCount(0)
+      const primaryStrip = await primary.elementHandle()
+      await page.evaluate(() => window.scrollTo({ top: 420, behavior: 'instant' }))
+      const readingY = await page.evaluate(() => window.scrollY)
+      assert(readingY > 0, '事件列表足够长，可验证异步重新读取后的阅读位置')
+      // Trigger the tab without the test runner first scrolling its header into view.
+      await primary.getByRole('tab', { name: '实例跟踪', exact: true }).evaluate((el) => el.click())
+      await expect(page.locator('#dev-flow-task-search')).toBeVisible()
+      await primary.getByRole('tab', { name: '查看规则', exact: true }).click()
+      await expect(page.locator('.erp-dev-flow-events li')).toHaveCount(100)
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(readingY)
+      await expect(tabs.getByRole('tab', { name: '协同记录', exact: true })).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByRole('button', { name: /^返回 / })).toHaveCount(0)
+      assert(await primaryStrip.evaluate((el) => el.isConnected), '一级页签切换保持同一导航节点')
       sessions.get(page).denyTask = true
       await page.reload()
       await expect(page.getByText('任务读取失败', { exact: true })).toBeVisible()
@@ -184,7 +202,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
         if (query !== 'view=workflow&task_id=21') await assertDefinitionSelectorWidth(page)
         await assertNoHorizontalOverflow(page, `关联信息窄窗口 ${query}`)
       }
-      assert(sessions.get(page).reads.every((method) => ['get_task', 'list_task_events', 'get_task_process_context'].includes(method)), '四个视图只读取正式任务和流程接口')
+      assert(sessions.get(page).reads.every((method) => ['get_task', 'get_task_handling_chain', 'list_task_events', 'get_task_process_context'].includes(method)), '一级切换与四个视图只读取正式任务和流程接口')
     },
   }, {
     name: 'dev-flow-rules-complete',
@@ -337,6 +355,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await frame.getByRole('table', { name: '开发工具对照' }).getByRole('button', { name: '业务链路', exact: true }).click()
       const preview = frame.locator('[data-dev-flow-preview]')
       await preview.getByRole('tab', { name: '查看规则', exact: true }).click()
+      await expect(preview.getByRole('button', { name: /^返回 / })).toHaveCount(0)
       const rules = preview.locator('[data-flow-rules]')
       await expect(rules).toHaveAttribute('open')
       const stateRules = rules.locator('[data-dev-rule-preview]')
@@ -355,6 +374,11 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await task.getByText('协同记录 · 模拟任务', { exact: true }).click()
       await expect(task.getByText('当前责任：IQC · 待处理 · 原因：色差待确认', { exact: true })).toBeVisible()
       await task.getByText('流程轨迹 · 模拟任务', { exact: true }).click()
+      await expect(task.getByText('当前环节：质量处理 · IQC', { exact: true })).toBeVisible()
+      await preview.getByRole('tab', { name: '查看规则', exact: true }).click()
+      await expect(preview.getByRole('button', { name: /^返回 / })).toHaveCount(0)
+      await preview.getByRole('tab', { name: '实例跟踪', exact: true }).click()
+      await expect(task).toBeVisible()
       await expect(task.getByText('当前环节：质量处理 · IQC', { exact: true })).toBeVisible()
       await assertNoHorizontalOverflow(page, '业务链路设计预览')
     },
