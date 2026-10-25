@@ -552,6 +552,11 @@ export function createDevDataPreparationScenarios({
           message:
             '开发数据库迁移尚未到最新版本，请核对当前工作区的迁移、目标身份与运行状态后重新检查。',
         })
+        fixture.summary.issues.push({
+          code: 'unresolved_operation_contract_preserved',
+          severity: 'blocked',
+          message: '有历史批次合同待核对，核对前禁止再次执行。',
+        })
         await installDataPreparationBrowserRoutes(page, fixture)
       },
       verify: async (page) => {
@@ -571,6 +576,15 @@ export function createDevDataPreparationScenarios({
           JSON.stringify(metrics)
         )
         assert(metrics[1].bottom < 1000, '准备按钮应处于首屏内')
+        const notice = page.getByRole('status', { name: '待核对的批次结果', exact: true })
+        await notice.waitFor()
+        for (const viewport of [{ width: 1280, height: 720 }, { width: 1024, height: 768 }, { width: 1920, height: 1080 }]) {
+          await page.setViewportSize(viewport)
+          const action = await page.locator('.erp-dev-data-prepare-actions button').boundingBox()
+          assert(action && action.y >= 0 && action.y + action.height <= viewport.height, `主动作应在 ${viewport.width} 首屏可见：${JSON.stringify(action)}`)
+          assert.equal(await notice.getByRole('button', { name: '查看执行记录', exact: true }).isVisible(), true)
+          await assertNoHorizontalOverflow(page, `data preparation warning ${viewport.width}`)
+        }
         assert.equal(
           await page.locator('.erp-dev-data-disclosure[open]').count(),
           0

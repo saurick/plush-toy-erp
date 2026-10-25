@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { readDevWorkbenchPageSource } from '../../../scripts/test/pageSources.mjs'
 import { DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS } from '../../../dev-server/devDataPreparationPlugin.mjs'
 
 import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from '../../../../scripts/qa/manual-acceptance-target-policy.mjs'
@@ -1042,10 +1043,7 @@ test('client surfaces only a bounded backend message on rejected requests', asyn
 })
 
 test('page defaults to the latest business-chain regression while retaining daily integration profiles', () => {
-  const pageSource = readFileSync(
-    new URL('../pages/DevDataPreparationPage.jsx', import.meta.url),
-    'utf8'
-  )
+  const pageSource = readDevWorkbenchPageSource('DevDataPreparationPage.jsx')
   assert.match(pageSource, /DEV_DATA_PREPARATION_PROFILE_COPY/u)
   assert.match(pageSource, /profiles\.map/u)
   assert.match(pageSource, /确认生成业务场景测试数据/u)

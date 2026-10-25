@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useState } from 'react'
 import {
   DatabaseOutlined,
   FileDoneOutlined,
@@ -22,10 +22,9 @@ import {
   theme,
   Typography,
 } from 'antd'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import Modal from '@/common/components/modal/AppModal'
 import { MermaidDiagram } from '@/common/components/markdown'
-import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
@@ -36,45 +35,16 @@ import {
   DEV_DATA_PREPARATION_MODULE_FLOW,
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
-  DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
-  DEV_DATA_PREPARATION_ROUTE,
   DEV_DATA_PREPARATION_SOURCE_PATH,
   DEV_DATA_PREPARATION_TARGET_KEYS,
-  DEV_DATA_PREPARATION_TARGET_QUERY_KEY,
-  buildDevDataPreparationSearch,
-  createDevDataPreparationClient,
   dataPreparationStatusPresentation,
   getDataPreparationEnvironment,
   resolveDataPreparationAvailability,
-  resolveDataPreparationExecutionConfirmation,
-  resolveDataPreparationPrepareIntent,
-  selectRecoverableDataPreparationOperation,
 } from '../config/devDataPreparation.mjs'
-import useDevCustomerScope from '../hooks/useDevCustomerScope.mjs'
+import { DATA_VIEW_ITEMS, profileTargetKey, useDataPreparation } from './data-preparation/useDataPreparation.jsx'
+import { WorkbenchEmpty, WorkbenchFacts, WorkbenchNotice, WorkbenchSection } from '../components/WorkbenchPattern.jsx'
 
 const { Paragraph, Text, Title } = Typography
-const DATA_VIEW_ITEMS = [
-  { value: 'scope', label: '准备数据' },
-  { value: 'confirm', label: '当前批次' },
-  { value: 'receipts', label: '执行记录' },
-]
-const DATA_PROFILE_ORDER = [
-  DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo,
-  DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo,
-  DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance,
-]
-const POLL_INTERVAL_MS = 1500
-const POLL_RECOVERY_INTERVAL_MS = 3000
-
-function profileTargetKey(profileKey, scenarioTargetKey) {
-  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo) {
-    return DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment
-  }
-  if (profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo) {
-    return scenarioTargetKey
-  }
-  return DEV_DATA_PREPARATION_TARGET_KEYS.isolatedLocal
-}
 
 function shortHash(value) {
   return typeof value === 'string' && value.length >= 12
@@ -105,12 +75,6 @@ function issueText(issues = []) {
   return Array.isArray(issues)
     ? issues.map((issue) => issue.message).join('；')
     : ''
-}
-
-function upsertOperation(operation, operations = []) {
-  if (!operation) return operations
-  const nextOperations = operations.filter((item) => item.id !== operation.id)
-  return [operation, ...nextOperations]
 }
 
 function formatDuration(durationMs) {
@@ -299,18 +263,9 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
 
 function DataSection({ id, title, description, extra, children }) {
   return (
-    <section className="erp-dev-data-section" aria-labelledby={id}>
-      <header className="erp-dev-data-section__head">
-        <div>
-          <Title level={2} id={id}>
-            {title}
-          </Title>
-          {description ? <Paragraph>{description}</Paragraph> : null}
-        </div>
-        {extra}
-      </header>
+    <WorkbenchSection className="erp-dev-data-section" titleId={id} title={title} description={description} actions={extra}>
       {children}
-    </section>
+    </WorkbenchSection>
   )
 }
 
@@ -911,393 +866,15 @@ function OperationDetail({ operation, acceptancePlan, compact = false }) {
 
 export default function DevDataPreparationPage() {
   const { token } = theme.useToken()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const requestedDataView = DATA_VIEW_ITEMS.some(
-    (item) => item.value === searchParams.get('view')
-  )
-    ? searchParams.get('view')
-    : 'scope'
-  const selectDataView = (value) =>
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current)
-      next.set('view', value)
-      return next
-    })
-  const client = useMemo(() => createDevDataPreparationClient(), [])
-  // 视图切换只更新地址；预检随数据范围变化，写地址时保留最新视图。
-  const searchWriterRef = useRef(setSearchParams)
-  useEffect(() => {
-    searchWriterRef.current = setSearchParams
-  }, [setSearchParams])
-  const mountedRef = useRef(false)
-  const requestVersionRef = useRef(0)
-  const refreshAbortRef = useRef(null)
-  const currentOperationIdRef = useRef('')
-  const prepareIntentRef = useRef(null)
-  const [summary, setSummary] = useState(null)
-  const [selectedProfileKey, setSelectedProfileKey] = useState(() => {
-    const requested = searchParams.get(DEV_DATA_PREPARATION_PROFILE_QUERY_KEY)
-    return Object.values(DEV_DATA_PREPARATION_PROFILE_KEYS).includes(requested)
-      ? requested
-      : DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-  })
-  const [selectedScenarioTargetKey, setSelectedScenarioTargetKey] = useState(
-    () =>
-      searchParams.get(DEV_DATA_PREPARATION_TARGET_QUERY_KEY) ===
-      DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
-        ? DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
-        : DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment
-  )
-  const selectedIsScenarioDemo =
-    selectedProfileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-  const customerScope = useDevCustomerScope({
-    searchParams,
-    setSearchParams,
-    normalize: selectedIsScenarioDemo,
-  })
-  const customerReady = customerScope.status === 'ready'
-  const [selectedChainKey, setSelectedChainKey] = useState('')
-  const [currentOperation, setCurrentOperation] = useState(null)
-  const dataView =
-    requestedDataView === 'confirm'
-      ? !currentOperation
-        ? 'scope'
-        : currentOperation.terminal ? 'receipts' : 'confirm'
-      : requestedDataView
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
-  const [actionError, setActionError] = useState('')
-  const [pollError, setPollError] = useState('')
-  const [preparing, setPreparing] = useState(false)
-  const [executing, setExecuting] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [confirmation, setConfirmation] = useState('')
-
-  useEffect(() => {
-    if (requestedDataView !== 'confirm' || !currentOperation?.terminal) return
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current)
-        next.set('view', 'receipts')
-        return next
-      },
-      { replace: true }
-    )
-  }, [requestedDataView, currentOperation?.terminal, setSearchParams])
-
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
-
-  // Lazy route loading can keep this component mounted after the address changes.
-  const isPageActive = () =>
-    mountedRef.current &&
-    window.location.pathname.replace(/\/$/u, '') === DEV_DATA_PREPARATION_ROUTE
-
-  const updateOperation = useCallback((operation) => {
-    currentOperationIdRef.current = operation.id
-    setCurrentOperation(operation)
-    setSummary((current) =>
-      current
-        ? {
-            ...current,
-            currentOperations: upsertOperation(
-              operation,
-              current.currentOperations
-            ),
-          }
-        : current
-    )
-  }, [])
-
-  const refresh = useCallback(
-    async ({ force = false } = {}) => {
-      refreshAbortRef.current?.abort()
-      const controller = new AbortController()
-      refreshAbortRef.current = controller
-      const requestVersion = requestVersionRef.current + 1
-      requestVersionRef.current = requestVersion
-      setLoading(true)
-      setLoadError('')
-      try {
-        const summaryClient = createDevDataPreparationClient({
-          fetchImpl: (input, init) =>
-            globalThis.fetch(input, { ...init, signal: controller.signal }),
-        })
-        const nextSummary = await summaryClient.summary({ force })
-        if (requestVersion !== requestVersionRef.current) return
-        setSummary(nextSummary)
-        const recoveredOperation = selectRecoverableDataPreparationOperation(
-          nextSummary.currentOperations,
-          currentOperationIdRef.current,
-          selectedProfileKey,
-          profileTargetKey(selectedProfileKey, selectedScenarioTargetKey)
-        )
-        currentOperationIdRef.current = recoveredOperation?.id || ''
-        setCurrentOperation(recoveredOperation)
-        if (recoveredOperation) {
-          setSelectedProfileKey(recoveredOperation.profileKey)
-          const recoveredTargetKey = recoveredOperation.targetSummary.targetKey
-          if (
-            recoveredOperation.profileKey ===
-            DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-          ) {
-            setSelectedScenarioTargetKey(recoveredTargetKey)
-          }
-          searchWriterRef.current(
-            (currentSearchParams) =>
-              buildDevDataPreparationSearch(currentSearchParams, {
-                profileKey: recoveredOperation.profileKey,
-                targetKey: recoveredTargetKey,
-                customerKey: customerScope.customerKey,
-              }),
-            { replace: true }
-          )
-          if (
-            prepareIntentRef.current?.profileKey ===
-            recoveredOperation.profileKey
-          ) {
-            prepareIntentRef.current = null
-          }
-        }
-      } catch (error) {
-        if (error?.name === 'AbortError') return
-        if (requestVersion !== requestVersionRef.current) return
-        setLoadError(error?.message || '数据准备预检读取失败')
-      } finally {
-        if (requestVersion === requestVersionRef.current) {
-          setLoading(false)
-        }
-      }
-    },
-    [
-      customerScope.customerKey,
-      selectedProfileKey,
-      selectedScenarioTargetKey,
-    ]
-  )
-
-  useEffect(() => {
-    refresh()
-    return () => {
-      refreshAbortRef.current?.abort()
-      requestVersionRef.current += 1
-    }
-  }, [refresh])
-
-  const activeOperationId = currentOperation?.id || ''
-  const activeOperationTerminal = currentOperation?.terminal === true
-
-  useEffect(() => {
-    if (!activeOperationId || activeOperationTerminal) return undefined
-    let cancelled = false
-    let timerId
-
-    const poll = async () => {
-      try {
-        const operation = await client.operation(activeOperationId)
-        if (cancelled || currentOperationIdRef.current !== activeOperationId) return
-        setPollError('')
-        updateOperation(operation)
-        if (!operation.terminal) {
-          timerId = window.setTimeout(poll, POLL_INTERVAL_MS)
-        }
-      } catch (error) {
-        if (cancelled || currentOperationIdRef.current !== activeOperationId) return
-        setPollError(error?.message || '回执刷新暂时失败')
-        timerId = window.setTimeout(poll, POLL_RECOVERY_INTERVAL_MS)
-      }
-    }
-
-    timerId = window.setTimeout(poll, POLL_INTERVAL_MS)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timerId)
-    }
-  }, [activeOperationId, activeOperationTerminal, client, updateOperation])
-
-  const profiles = [...(summary?.profiles || [])].sort(
-    (left, right) =>
-      DATA_PROFILE_ORDER.indexOf(left.key) - DATA_PROFILE_ORDER.indexOf(right.key)
-  )
-  const selectedProfile = profiles.find(
-    (profile) => profile.key === selectedProfileKey
-  )
-  const selectedProfileCopy =
-    DEV_DATA_PREPARATION_PROFILE_COPY[selectedProfileKey]
-  const selectedOperationTargetKey = profileTargetKey(
-    selectedProfileKey,
-    selectedScenarioTargetKey
-  )
-  const availability = resolveDataPreparationAvailability(
-    summary,
-    selectedProfileKey,
-    selectedOperationTargetKey
-  )
-  const hasActiveOperation = (summary?.currentOperations || []).some(
-    (operation) => ['launching', 'running'].includes(operation.status)
-  )
-  const currentIsScenarioDemo =
-    currentOperation?.profileKey ===
-    DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
-  const canPrepare =
-    Boolean(selectedProfile) &&
-    availability.blockers.length === 0 &&
-    !hasActiveOperation &&
-    (!selectedIsScenarioDemo || customerReady) &&
-    !loading &&
-    !loadError &&
-    !preparing &&
-    !executing
-  const canExecuteCurrent =
-    currentOperation?.status === 'ready' &&
-    currentOperation.profileKey === selectedProfileKey &&
-    currentOperation.targetSummary.targetKey === selectedOperationTargetKey &&
-    !hasActiveOperation &&
-    availability.blockers.length === 0 &&
-    (!currentIsScenarioDemo || customerReady) &&
-    !loading &&
-    !loadError &&
-    !preparing &&
-    !executing
-  const currentExecutionConfirmation = currentOperation
-    ? resolveDataPreparationExecutionConfirmation(
-        currentOperation,
-        confirmation
-      )
-    : ''
-  const invalidateSelectionPreflight = () => {
-    requestVersionRef.current += 1
-    refreshAbortRef.current?.abort()
-    setLoading(true)
-  }
-
-  const selectProfile = (profileKey) => {
-    if (preparing || executing) return
-    invalidateSelectionPreflight()
-    setSelectedProfileKey(profileKey)
-    setSearchParams(
-      (currentSearchParams) =>
-        buildDevDataPreparationSearch(currentSearchParams, {
-          profileKey,
-          targetKey: selectedScenarioTargetKey,
-          customerKey: customerScope.customerKey,
-        }),
-      { replace: true }
-    )
-    currentOperationIdRef.current = ''
-    prepareIntentRef.current = null
-    setCurrentOperation(null)
-    setActionError('')
-    setPollError('')
-    setConfirmOpen(false)
-    setConfirmation('')
-  }
-
-  const selectScenarioTarget = (targetKey) => {
-    if (preparing || executing) return
-    invalidateSelectionPreflight()
-    setSelectedScenarioTargetKey(targetKey)
-    setSearchParams(
-      (currentSearchParams) =>
-        buildDevDataPreparationSearch(currentSearchParams, {
-          profileKey: selectedProfileKey,
-          targetKey,
-          customerKey: customerScope.customerKey,
-        }),
-      { replace: true }
-    )
-    currentOperationIdRef.current = ''
-    prepareIntentRef.current = null
-    setCurrentOperation(null)
-    setActionError('')
-    setPollError('')
-    setConfirmOpen(false)
-    setConfirmation('')
-  }
-
-  const prepareBlockingReason = loading
-    ? '正在检查当前条件…'
-    : loadError
-      ? '预检读取失败，请重新检查后再操作。'
-      : selectedIsScenarioDemo && !customerReady
-        ? '先选择已登记甲方，再准备对应的业务场景。'
-        : hasActiveOperation
-          ? '已有批次正在执行，请先查看当前批次。'
-          : availability.blockers.length
-            ? '请先处理下面列出的条件，再重新检查。'
-            : ''
-
-  const handlePrepare = async () => {
-    if (!canPrepare) return
-    const profileKey = selectedProfileKey
-    setPreparing(true)
-    setActionError('')
-    try {
-      const intent = resolveDataPreparationPrepareIntent(
-        prepareIntentRef.current,
-        profileKey,
-        selectedOperationTargetKey
-      )
-      prepareIntentRef.current = intent
-      const result = await client.prepare(
-        profileKey,
-        selectedOperationTargetKey,
-        intent.idempotencyKey
-      )
-      if (!isPageActive()) return
-      updateOperation(result.operation)
-      selectDataView('confirm')
-      prepareIntentRef.current = null
-      message.success(
-        result.reused ? '已读回复用的不可变计划' : '不可变计划已准备'
-      )
-      if (
-        profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo &&
-        result.operation.status === 'ready'
-      ) {
-        setConfirmation(result.operation.confirmationRequired)
-        setConfirmOpen(true)
-      }
-    } catch (error) {
-      if (isPageActive()) setActionError(error?.message || '计划准备失败')
-    } finally {
-      if (isPageActive()) setPreparing(false)
-    }
-  }
-
-  const handleExecute = async () => {
-    if (
-      !canExecuteCurrent ||
-      !currentOperation ||
-      currentExecutionConfirmation !== currentOperation.confirmationRequired
-    ) {
-      return
-    }
-    setExecuting(true)
-    setActionError('')
-    try {
-      const result = await client.execute(
-        currentOperation.id,
-        currentExecutionConfirmation
-      )
-      if (!isPageActive()) return
-      updateOperation(result.operation)
-      setConfirmOpen(false)
-      setConfirmation('')
-      selectDataView('confirm')
-      message.success('批次已启动，正在跟踪执行结果')
-    } catch (error) {
-      if (isPageActive()) {
-        setActionError(error?.message || '固定计划执行失败')
-      }
-    } finally {
-      if (isPageActive()) setExecuting(false)
-    }
-  }
+  const {
+    actionError, availability, canExecuteCurrent, canPrepare, confirmation, confirmOpen,
+    currentExecutionConfirmation, currentIsScenarioDemo, currentOperation, customerScope,
+    dataView, executing, handleExecute, handlePrepare, loadError, loading, pollError,
+    prepareBlockingReason, preparing, profiles, refresh, selectDataView, selectedChainKey,
+    selectedIsScenarioDemo, selectedOperationTargetKey, selectedProfile, selectedProfileCopy,
+    selectedProfileKey, selectedScenarioTargetKey, selectProfile, selectScenarioTarget,
+    setActionError, setConfirmation, setConfirmOpen, setSelectedChainKey, summary,
+  } = useDataPreparation()
 
   const latestReceipt = currentOperation?.terminal
     ? currentOperation
@@ -1409,26 +986,21 @@ export default function DevDataPreparationPage() {
             dataView
           )}
         />
-        <div className="erp-dev-data-context">
-          <Text type="secondary">
-            <SafetyCertificateOutlined aria-hidden="true" />{' '}
-            仅用于开发与模拟数据
-          </Text>
-          {summary?.repository ? (
-            <Space size={8}>
-              <Text code>{shortHash(summary.repository.commit)}</Text>
-              <Tag color={summary.repository.dirty ? 'default' : 'success'}>
-                {summary.repository.dirty ? '有未提交改动' : '代码已固定'}
-              </Tag>
-            </Space>
-          ) : null}
-        </div>
+        <WorkbenchFacts
+          className="erp-dev-data-context"
+          items={[
+          { label: '用途', value: <><SafetyCertificateOutlined aria-hidden="true" /> 仅用于开发与模拟数据</> },
+          ...(summary?.repository ? [
+            { label: '源码', value: <Text code>{shortHash(summary.repository.commit)}</Text> },
+            { label: '工作区', value: <Tag color={summary.repository.dirty ? 'default' : 'success'}>{summary.repository.dirty ? '有未提交改动' : '代码已固定'}</Tag> },
+          ] : []),
+          ]}
+        />
 
         {loadError ? (
-          <Alert
-            type="error"
-            showIcon
-            message="预检读取失败"
+          <WorkbenchNotice
+            tone="error"
+            title="预检读取失败"
             description={
               <Space direction="vertical" size={8}>
                 <Text>{loadError}</Text>
@@ -1444,21 +1016,18 @@ export default function DevDataPreparationPage() {
         ) : null}
 
         {actionError ? (
-          <Alert
-            type="error"
-            showIcon
-            closable
-            message="本次操作未完成"
+          <WorkbenchNotice
+            tone="error"
+            title="本次操作未完成"
             description={actionError}
-            onClose={() => setActionError('')}
+            action={<Button onClick={() => setActionError('')}>收起提示</Button>}
           />
         ) : null}
 
         {pollError ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="回执刷新暂时中断"
+          <WorkbenchNotice
+            tone="warning"
+            title="回执刷新暂时中断"
             description={`${pollError}；页面会继续自动恢复，也可手动刷新预检。`}
           />
         ) : null}
@@ -1473,22 +1042,22 @@ export default function DevDataPreparationPage() {
           <div className="erp-dev-data-workspace">
 
             {receiptIssues.length > 0 ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="有批次结果需要核对"
+              <WorkbenchNotice
+                tone="warning"
+                aria-label="待核对的批次结果"
+                title="有批次结果需要核对"
                 description={
-                  <Space direction="vertical" size={4}>
+                  <div>
                     {receiptIssues.map((issue) => (
-                      <Text key={issue.code}>{issue.message}</Text>
+                      <div key={issue.code}>{issue.message}</div>
                     ))}
-                    {dataView !== 'receipts' ? (
-                      <Button onClick={() => selectDataView('receipts')}>
-                        查看执行记录
-                      </Button>
-                    ) : null}
-                  </Space>
+                  </div>
                 }
+                action={dataView !== 'receipts' ? (
+                  <Button onClick={() => selectDataView('receipts')}>
+                    查看执行记录
+                  </Button>
+                ) : null}
               />
             ) : null}
             {currentOperation &&
@@ -1769,9 +1338,10 @@ export default function DevDataPreparationPage() {
                 {historyItems.length > 0 ? (
                   <Collapse items={historyItems} />
                 ) : !latestReceipt ? (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="尚无数据准备回执"
+                  <WorkbenchEmpty
+                    title="尚无数据准备回执"
+                    description="选择准备范围并核对条件后，可准备不可变计划。"
+                    action={<Button onClick={() => selectDataView('scope')}>准备数据</Button>}
                   />
                 ) : null}
                 {historicalOperationReferences.length > 0 ? (

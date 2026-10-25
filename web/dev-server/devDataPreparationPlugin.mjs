@@ -1310,9 +1310,9 @@ export function createDevDataPreparationService({
     )
     const classification = classifyDatabaseName(parsed.databaseName)
     if (
-      !['plush_erp', 'plush_erp_simon_dev'].includes(parsed.databaseName) ||
+      parsed.databaseName !== 'plush_erp' ||
       classification.disposable ||
-      !['development', 'legacy-development'].includes(classification.profile)
+      classification.profile !== 'development'
     ) {
       throw new Error(
         'scenario demo requires a registered non-disposable development database'

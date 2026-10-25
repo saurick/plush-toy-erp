@@ -5,6 +5,7 @@ const modules = new Map([
   ['DevDatabaseMigrationPage.jsx', 'delivery/migration'],
   ['DevDrillRecoveryPage.jsx', 'delivery/recovery'],
   ['DevCustomerConfigPage.jsx', 'customer-config'],
+  ['DevDataPreparationPage.jsx', 'data-preparation'],
 ])
 
 // Static contracts follow the actual page modules after presentation and

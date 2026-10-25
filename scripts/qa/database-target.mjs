@@ -34,7 +34,6 @@ export const DATABASE_LIFECYCLE_PROFILES = Object.freeze({
 
 export const LONG_LIVED_DATABASE_NAMES = Object.freeze([
   "plush_erp",
-  "plush_erp_simon_dev",
 ]);
 
 const IDENTITY_QUERY_KEYS = new Set([
@@ -112,7 +111,7 @@ export function classifyDatabaseName(databaseName) {
     return Object.freeze({
       databaseName: normalizedName,
       disposable: false,
-      profile: normalizedName === "plush_erp" ? "development" : "legacy-development",
+      profile: "development",
       runID: "",
     });
   }

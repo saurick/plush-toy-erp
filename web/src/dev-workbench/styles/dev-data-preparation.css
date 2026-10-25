@@ -436,37 +436,10 @@
   }
 }
 
-.erp-dev-data-context,
-.erp-dev-data-section__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px 20px;
-}
-
-.erp-dev-data-workspace,
-.erp-dev-data-section {
+.erp-dev-data-workspace {
   display: grid;
   gap: 16px;
   min-width: 0;
-}
-
-.erp-dev-data-section {
-  padding: 18px;
-  border: 1px solid var(--dev-data-border);
-  border-radius: 10px;
-  background: var(--dev-data-surface);
-}
-
-.erp-dev-data-section__head h2.ant-typography {
-  margin: 0;
-  font-size: 18px;
-}
-
-.erp-dev-data-section__head p.ant-typography {
-  margin: 4px 0 0;
-  color: var(--dev-data-muted);
 }
 
 .erp-dev-data-profile-table th:first-child {

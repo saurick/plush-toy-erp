@@ -1201,7 +1201,7 @@ test("semantic digest is stable across targets and clocks and legacy versions fa
     targetOverrides: {
       [PERSISTENT_SCENARIO_DATASET_TARGET]: {
         backendURL: SCENARIO_DEMO_ORIGIN,
-        databaseName: "plush_erp_simon_dev",
+        databaseName: "plush_erp",
       },
       [CUSTOMER_TRIAL_133_TARGET]: {
         targetAttestation: trialAttestation(

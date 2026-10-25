@@ -186,7 +186,7 @@ export function assertScenarioDemoDatabaseName(value) {
     !databaseName ||
     !LONG_LIVED_DATABASE_NAMES.includes(databaseName) ||
     classification.disposable ||
-    !new Set(["development", "legacy-development"]).has(classification.profile)
+    classification.profile !== "development"
   ) {
     throw new ManualAcceptanceTargetPolicyError(
       `${SCENARIO_DEMO_TARGET} requires a registered non-disposable shared development database`,

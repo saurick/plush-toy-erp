@@ -193,7 +193,7 @@ function assertRegisteredScenarioDatabase(databaseURL) {
     parsed.host !== REGISTERED_DEVELOPMENT_HOST ||
     parsed.port !== REGISTERED_DEVELOPMENT_PORT ||
     classification.disposable ||
-    !new Set(["development", "legacy-development"]).has(classification.profile)
+    classification.profile !== "development"
   ) {
     throw new ScenarioDemoError(
       "scenario-demo requires the registered non-disposable development PostgreSQL target",

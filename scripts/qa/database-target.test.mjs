@@ -41,6 +41,7 @@ test("database target generates one exact name for every lifecycle profile", () 
 test("database target keeps long-lived and unclassified databases non-disposable", () => {
   assert.equal(classifyDatabaseName("plush_erp").disposable, false);
   assert.equal(classifyDatabaseName("plush_erp_simon_dev").disposable, false);
+  assert.equal(classifyDatabaseName("plush_erp_simon_dev").profile, "unclassified");
   assert.equal(classifyDatabaseName("plush_erp_capacity_legacy__bad").disposable, false);
   assert.throws(() => normalizeDatabaseRunID("../../escape"));
   assert.throws(() => databaseNameForRun("capacity", "x"));

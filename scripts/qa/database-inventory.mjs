@@ -120,8 +120,6 @@ export function recommendDatabaseAction({
   let recommendation = "manual_classification_required";
   if (classification.profile === "development") {
     recommendation = "keep_long_term_development";
-  } else if (classification.profile === "legacy-development") {
-    recommendation = "review_long_term_cutover";
   } else if (classification.disposable && blockers.length === 0) {
     recommendation = "review_disposable_cleanup";
   } else if (blockers.includes("active_connections")) {
