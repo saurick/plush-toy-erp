@@ -17,8 +17,7 @@ import NavigationCountBadge from '@/common/components/navigation/NavigationCount
 import SearchInput from '@/common/components/SearchInput'
 import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
-import { getBusinessModule } from '@/erp/config/businessModules.mjs'
-import { getCommandCenterView } from '@/erp/config/commandCenter.mjs'
+import { getBusinessPagePresentation } from '@/erp/config/businessUsabilityCatalog.mjs'
 import { useERPTheme } from '@/common/theme/erpTheme'
 import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
@@ -35,10 +34,9 @@ import '../styles/dev-ui-controls.css'
 const DevUIBusinessExamples = lazyWithDynamicImportRetry(
   () => import('./DevUIBusinessExamples.jsx')
 )
-const PURCHASE_PAGE = getBusinessModule('accessories-purchase')
-const MATERIAL_PAGE = getBusinessModule('materials')
-const taskView = getCommandCenterView('task-board')
-const TASK_PAGE = { title: taskView.label, path: taskView.path }
+const PURCHASE_PAGE = getBusinessPagePresentation('accessories-purchase')
+const MATERIAL_PAGE = getBusinessPagePresentation('materials')
+const TASK_PAGE = getBusinessPagePresentation('task-board')
 
 const TOPICS = [
   {

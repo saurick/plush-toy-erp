@@ -252,7 +252,20 @@ const allowedERPImports = new Set([
   "config/businessUsabilityCatalog.mjs",
   "config/roleHelpContent.mjs",
 ]);
+const businessSamplePresentationImports = new Set([
+  "components/business-list/BusinessFormPage.jsx",
+  "components/business-list/BusinessFormSection.jsx",
+  "components/business-list/BusinessLineItemsSection.jsx",
+  "components/business-list/BusinessLineItemsTable.jsx",
+  "components/business-list/BusinessTextArea.jsx",
+  "components/business-list/BusinessDateInputs.jsx",
+  "components/business-list/SourceImportPickerModal.jsx",
+]);
 const allowedERPImportsByFile = new Map([
+  [
+    "web/src/dev-workbench/components/DevUIBusinessExamples.jsx",
+    businessSamplePresentationImports,
+  ],
   [
     "web/src/dev-workbench/components/DevUIPageStateExamples.jsx",
     new Set([
@@ -426,6 +439,74 @@ test("dev workbench boundary: ERP imports stay on explicit adapters and presenta
         `${file} imports non-approved ERP internals: ${match[1]}`,
       );
     }
+  }
+});
+
+test("shared component consumers read only page presentation metadata", () => {
+  for (const file of [
+    "web/src/dev-workbench/components/DevControlStandards.jsx",
+    "web/src/dev-workbench/components/DevSharedComponentGuide.jsx",
+  ]) {
+    assert.match(read(file), /\bgetBusinessPagePresentation\b/u);
+    for (const prefix of ["@/erp/", "../../erp/"]) {
+      assert.equal(isAllowedERPImport(file, `${prefix}config/businessModules.mjs`), false);
+      assert.equal(isAllowedERPImport(file, `${prefix}config/commandCenter.mjs`), false);
+      assert.equal(isAllowedERPImport(file, `${prefix}config/businessUsabilityCatalog.mjs`), true);
+    }
+  }
+});
+
+test("business component samples retain a closed presentation dependency graph", () => {
+  const dependencies = [
+    ...businessSamplePresentationImports,
+    "components/business-list/BusinessFormBody.jsx",
+    "components/business-list/BusinessFormPageContext.js",
+    "components/business-list/BusinessFormSectionTitle.jsx",
+    "components/business-list/BusinessCompactFieldTable.jsx",
+    "components/business-list/BusinessLineItemsFooter.jsx",
+    "components/business-list/BusinessModal.jsx",
+    "components/business-list/businessCompactFieldTable.css",
+    "components/ERPPageActions.jsx",
+    "utils/businessFormSnapshot.mjs",
+    "utils/businessFormSections.mjs",
+    "utils/dateRange.mjs",
+    "utils/modalSizes.mjs",
+    "styles/app/business-form-page.css",
+  ].map((file) => `web/src/erp/${file}`);
+  const allowed = new Set([
+    ...dependencies,
+    "react", "react-dom", "react-router-dom", "antd", "@ant-design/icons",
+    "dayjs", "dayjs/plugin/customParseFormat.js",
+    "web/src/common/utils/antdApp",
+    "web/src/common/utils/feedbackConfig.mjs",
+    "web/src/common/components/select/AppSelect",
+    "web/src/common/components/modal/AppModal",
+    "web/src/common/components/table/AppTable",
+    "web/src/common/components/table/TableScrollRegion.jsx",
+    "web/src/common/components/pagination/AppPagination",
+    "web/src/common/components/SearchInput",
+    "web/src/common/components/scroll/MobileBackToTop",
+  ]);
+  const sample = "web/src/dev-workbench/components/DevUIBusinessExamples.jsx";
+  for (const file of [sample, ...dependencies]) {
+    const source = read(file);
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+    if (file === sample) continue;
+    for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
+      const specifier = match[1];
+      const resolved = specifier.startsWith("@/")
+        ? path.posix.join("web/src", specifier.slice(2))
+        : specifier.startsWith(".")
+          ? path.posix.join(path.posix.dirname(file), specifier)
+          : specifier;
+      assert(allowed.has(resolved), `${file} imports a non-presentation dependency: ${specifier}`);
+    }
+  }
+  for (const module of businessSamplePresentationImports) {
+    assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", `@/erp/${module}`), false);
+  }
+  for (const module of ["pages/PurchaseOrdersPage.jsx", "api/masterDataOrderApi.mjs", "config/businessModules.mjs", "config/commandCenter.mjs"]) {
+    assert.equal(isAllowedERPImport(sample, `@/erp/${module}`), false);
   }
 });
 

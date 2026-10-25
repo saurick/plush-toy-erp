@@ -10,7 +10,7 @@ import {
   buildDevDocsLocation,
   resolveDevDocsMarkdownHref,
 } from '../pages/devDocsNavigation.mjs'
-import { getBusinessModule } from '@/erp/config/businessModules.mjs'
+import { getBusinessPagePresentation } from '@/erp/config/businessUsabilityCatalog.mjs'
 
 const headingId = '组件复用与使用入口--shared-component-entrypoints'
 const chapter = findUIDesignChapter(readUIDesignChapters(source), headingId)
@@ -69,10 +69,10 @@ export default function DevSharedComponentGuide({ topics }) {
       </section>
       <p>
         附件、流程进度在
-        <DevUIConsumerLink consumer={getBusinessModule('sales-orders')} />
+        <DevUIConsumerLink consumer={getBusinessPagePresentation('sales-orders')} />
         选择记录后核对； 合同打印在
         <DevUIConsumerLink
-          consumer={getBusinessModule('accessories-purchase')}
+          consumer={getBusinessPagePresentation('accessories-purchase')}
         />
         选择记录后进入。 这些组件依赖实际权限与单据，不在样例中模拟业务写入。
       </p>

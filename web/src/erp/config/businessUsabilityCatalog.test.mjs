@@ -4,17 +4,33 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { businessModuleDefinitions } from './businessModules.mjs'
+import { commandCenterViews } from './commandCenter.mjs'
 import {
   BUSINESS_HELP_TYPES,
   BUSINESS_USABILITY_CATALOG,
   BUSINESS_USABILITY_STATUS,
   getBusinessHelpItem,
+  getBusinessPagePresentation,
   getBusinessUsabilityTargetPageKeys,
 } from './businessUsabilityCatalog.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../..')
 const read = (relativePath) =>
   readFileSync(path.join(repoRoot, relativePath), 'utf8')
+
+test('business page presentation projects only canonical titles and paths', () => {
+  for (const entry of [...businessModuleDefinitions, ...commandCenterViews]) {
+    const presentation = getBusinessPagePresentation(entry.key)
+    assert.deepEqual(presentation, {
+      title: entry.title || entry.label,
+      path: entry.path,
+    })
+    assert(Object.isFrozen(presentation), `${entry.key} presentation is read-only`)
+  }
+  for (const key of ['', 'unregistered-page', '/erp/task-board', null]) {
+    assert.equal(getBusinessPagePresentation(key), null)
+  }
+})
 
 const targetPageSources = Object.freeze({
   'sales-orders': 'web/src/erp/pages/SalesOrdersPage.jsx',

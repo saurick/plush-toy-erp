@@ -2,6 +2,7 @@ import {
   businessModuleDefinitions,
   getBusinessModule,
 } from './businessModules.mjs'
+import { getCommandCenterView } from './commandCenter.mjs'
 import { getBusinessPageLineage } from './businessPageLineage.mjs'
 import { ROLE_HELP_GUIDES } from './roleHelpContent.mjs'
 import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
@@ -1197,6 +1198,18 @@ const BUSINESS_USABILITY_BY_KEY = new Map(
 
 export function getBusinessUsabilityEntry(pageKey = '') {
   return BUSINESS_USABILITY_BY_KEY.get(String(pageKey || '').trim()) || null
+}
+
+export function getBusinessPagePresentation(pageKey = '') {
+  const key = String(pageKey || '').trim()
+  const businessPage = getBusinessUsabilityEntry(key)
+  if (businessPage) {
+    return Object.freeze({ title: businessPage.title, path: businessPage.path })
+  }
+  const workEntry = getCommandCenterView(key)
+  return workEntry
+    ? Object.freeze({ title: workEntry.label, path: workEntry.path })
+    : null
 }
 
 export function getBusinessHelpItem(pageKey = '', itemKey = '') {
