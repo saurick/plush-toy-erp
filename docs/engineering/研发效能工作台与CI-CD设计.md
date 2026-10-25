@@ -1133,7 +1133,7 @@ flowchart LR
 自动续办 Mermaid 固定“等待心跳只读重查 → 全部会话与 writer 结束 → 先删除并读回心跳 → 同一次续办进入执行”的交接；删除失败不得开始实现、造数、Git 或部署，执行阶段也不重建同目的心跳，只有用户后来再次要求等待才新建。
 
 Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定、当前 index 备份、旧候选隔离、读回与继续条件；空锁和非空锁走同一证据流程，非空候选不会被直接删除或覆盖当前 index，已有提交 / 锁恢复授权也不会因候选非空重复询问。
-- “发布与部署耗时”中的远端流水线读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面保留状态、SHA 与总耗时，具体 Job、关键路径和日志跳转同一次 GitLab 流水线；不自动并发、重跑或复制 GitLab 状态。目标部署仍以工作台 operation 独立计时和读回。
+- “发布与部署耗时”中的远端流水线读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面保留状态、SHA 与总耗时，具体 Job、关键路径和日志跳转同一次 GitLab 流水线；不自动并发、重跑或复制 GitLab 状态。目标部署仍以工作台 operation 独立计时和读回。 历史 GitHub 流水线保留简短状态与原始记录链接，不再绘制本地性能图或计算关键路径；已有流水线、操作及回执记录不删除。
 #### 发布身份与制品读取
 
 - 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。

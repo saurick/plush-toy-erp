@@ -45,7 +45,6 @@ import {
   resolveDevOperationHistoryState,
   resolveDevVersionCenterView,
   shortGitSha,
-  summarizePipelineTimings,
   summarizePipelineStatus,
   validateDevDeliverySummary,
   validatePipelineTimings,
@@ -975,7 +974,7 @@ test('pipeline jobs and timing stages use Chinese-first presentation labels', ()
   )
 })
 
-test('pipeline timings validate nested stages and identify the measured bottleneck', () => {
+test('pipeline timing contracts validate nested stages and distinguish exact-SHA reuse', () => {
   const timings = {
     schemaVersion: 'plush.delivery-pipeline-timings/v1',
     generatedAt: '2026-08-08T03:00:00.000Z',
@@ -1029,26 +1028,14 @@ test('pipeline timings validate nested stages and identify the measured bottlene
     ],
   }
   assert.strictEqual(validatePipelineTimings(timings), timings)
-  const summary = summarizePipelineTimings(timings)
-  assert.equal(summary.sampleCount, 1)
-  assert.equal(summary.medianDurationMs, 600_000)
-  assert.equal(summary.bottleneck.name, 'Build both images')
-  assert.equal(summary.bottleneck.startedAt, '2026-08-08T02:00:30.000Z')
-  assert.equal(summary.bottleneck.finishedAt, '2026-08-08T02:08:30.000Z')
-  assert.equal(summary.criticalPath.durationMs, 600_000)
-  assert.equal(summary.criticalPath.coveredDurationMs, 580_000)
-  assert.equal(summary.criticalPath.schedulingGapMs, 20_000)
-  assert.deepEqual(
-    summary.criticalPath.jobs.map((job) => job.name),
-    ['Publish immutable release']
-  )
-  assert.equal(summary.failureReason, null)
-  assert.match(summary.optimizationHint, /耗时最长/u)
+  const invalidStage = structuredClone(timings)
+  invalidStage.runs[0].jobs[0].steps[0].startedAt = 'not-a-time'
+  assert.throws(() => validatePipelineTimings(invalidStage), /pipeline/u)
   const reuseRun = {
     ...timings.runs[0],
     id: 320,
     durationMs: 24_000,
-    url: 'https://github.com/saurick/plush-toy-erp/actions/runs/320',
+    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/320',
     jobs: [
       {
         ...timings.runs[0].jobs[0],
@@ -1078,54 +1065,6 @@ test('pipeline timings validate nested stages and identify the measured bottlene
       ],
     }),
     'full_release'
-  )
-  const reuseSummary = summarizePipelineTimings({
-    ...timings,
-    runs: [reuseRun, timings.runs[0]],
-  })
-  assert.equal(reuseSummary.latestMode, 'exact_sha_reuse')
-  assert.strictEqual(reuseSummary.analysisRun, timings.runs[0])
-  assert.equal(reuseSummary.fullReleaseSampleCount, 1)
-  assert.match(reuseSummary.optimizationHint, /不参与完整构建瓶颈判断/u)
-  const mixedSummary = summarizePipelineTimings({
-    ...timings,
-    runs: [
-      timings.runs[0],
-      {
-        ...timings.runs[0],
-        id: 322,
-        workflow: 'ci',
-        durationMs: 60_000,
-        url: 'https://github.com/saurick/plush-toy-erp/actions/runs/322',
-      },
-    ],
-  })
-  assert.equal(mixedSummary.sampleCount, 1)
-  assert.equal(mixedSummary.medianDurationMs, 600_000)
-  const failedRun = {
-    ...timings.runs[0],
-    conclusion: 'failure',
-    jobs: [
-      {
-        ...timings.runs[0].jobs[0],
-        conclusion: 'failure',
-        steps: [
-          {
-            ...timings.runs[0].jobs[0].steps[0],
-            conclusion: 'failure',
-          },
-          timings.runs[0].jobs[0].steps[1],
-        ],
-      },
-    ],
-  }
-  assert.deepEqual(
-    summarizePipelineTimings({ ...timings, runs: [failedRun] }).failureReason,
-    {
-      job: 'Publish immutable release',
-      step: 'Build both images',
-      startedAt: '2026-08-08T02:00:30.000Z',
-    }
   )
   assert.throws(
     () =>

@@ -1018,7 +1018,9 @@ export function createDevQualityGateScenarios({
           await page.getByText('先恢复 GitLab 读取链路', { exact: false }).count(),
           0
         )
-        await page.locator('.erp-dev-quality-status-banner strong').getByText('QA_MODE=full', { exact: false }).waitFor()
+        await page.getByRole('region', { name: '当前质量门禁上下文' })
+          .getByRole('status')
+          .getByText('下一步：发布前在 GitLab 新建 main 流水线，设置 QA_MODE=full。', { exact: true }).waitFor()
         await panel.getByText('文档检查通过', { exact: true }).waitFor()
         assert.equal(
           await panel.getByText('GitLab 普通 CI 已通过', { exact: true }).count(),

@@ -45,23 +45,22 @@ test('manual takeover keeps the Git index lock diagram readable on its guide pag
   )
 })
 
-test('CI/CD timing separates event timestamps from default and deep detail levels', () => {
+test('CI/CD timing keeps source timestamps and native links alongside project operation timing', () => {
   assert.match(component, /DevTimestamp/u)
   assert.match(timestampComponent, /normalizeDevTimestamp/u)
   assert.match(timestampComponent, /<time dateTime=\{timestamp[.]dateTime\} title=\{timestamp[.]dateTime\}>/u)
-  assert.match(component, /value=\{latestRun[.]finishedAt\}/u)
+  assert.match(component, /value=\{latestRun[?][.]finishedAt\}/u)
   assert.match(component, /value=\{release[?][.]publishedAt\}/u)
   assert.match(component, /value=\{deploymentOperation[?][.]updatedAt\}/u)
-  assert.match(
+  assert.doesNotMatch(
     component,
-    /erp-dev-pipeline-timing__analysis[\s\S]*流水线关键路径（可见部分）[\s\S]*耗时最长环节[\s\S]*erp-dev-pipeline-timing__details/u
+    /LegacyPipelineTimingPanel|summarizePipelineTimings|流水线关键路径|查看全部任务与步骤/u
   )
-  assert.match(component, /查看全部任务与步骤/u)
-  assert.match(component, /各任务默认收起/u)
-  assert.match(component, /全部展开/u)
-  assert.match(component, /全部收起/u)
+  assert.match(component, /在 GitLab 查看全部任务与日志/u)
+  assert.match(component, /查看历史流水线记录/u)
+  assert.match(component, /export function DevTimingBars/u)
   assert.match(component, /showTimeRange/u)
-  assert.match(css, /[.]erp-dev-pipeline-timing__jobs-toolbar/u)
+  assert.doesNotMatch(css, /[.]erp-dev-pipeline-timing__/u)
   assert.match(css, /[.]erp-dev-timing-bars__meta/u)
 })
 
@@ -111,7 +110,8 @@ test('version decisions and target evidence remain source-backed', () => {
     versionPage,
     /erp-dev-version-target-selector__boundaries/u
   )
-  assert.match(component, /构建缓存与制品/u)
+  assert.match(component, /构建缓存/u)
+  assert.match(component, /制品总计/u)
   assert.match(versionPage, /制品齐全；部署仍需通过目标预检与演练核验/u)
   assert.match(versionPage, /历史制品仅用于回滚/u)
   assert.match(versionPage, /record\.completeAssets\s*\? record\.promotionEligible\s*\? '保留中 · 制品齐全'\s*: record\.assets\.includes\('release-rehearsal\.json'\)\s*\? '演练证据待补齐'\s*: '仅可回滚'/u)
@@ -138,7 +138,7 @@ test('version decisions and target evidence remain source-backed', () => {
     component,
     /目标部署仍以“操作记录”中的独立回执为准/u
   )
-  assert.match(component, /失败原因/u)
+  assert.match(component, /查看失败 Job/u)
   assert.match(component, /最近发布与部署/u)
   assert.match(component, /查看耗时详情/u)
 })

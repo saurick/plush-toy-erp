@@ -517,24 +517,14 @@
   gap: 20px;
 }
 
-.erp-dev-pipeline-timing__head,
-.erp-dev-pipeline-timing__decision,
 .erp-dev-timing-bars__label {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.erp-dev-timing-bars__label {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-}
-
-.erp-dev-pipeline-timing__head .ant-typography,
-.erp-dev-pipeline-timing__summary .ant-typography {
-  margin: 0;
 }
 
 .erp-dev-timing-bars__meta > .ant-typography:last-child {
@@ -549,35 +539,6 @@
   justify-content: flex-end;
   gap: 12px;
   white-space: nowrap;
-}
-
-.erp-dev-pipeline-timing__summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 16px 0;
-}
-
-.erp-dev-pipeline-timing__summary > div {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  border-radius: 10px;
-  background: var(--ant-color-fill-quaternary, #fafafa);
-}
-
-.erp-dev-pipeline-timing__summary strong {
-  overflow: hidden;
-  font-size: 20px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.erp-dev-pipeline-timing__summary > div > .ant-typography:last-child {
-  overflow-wrap: anywhere;
 }
 
 .erp-dev-operation-metrics {
@@ -627,12 +588,6 @@
   padding-top: 4px;
 }
 
-.erp-dev-pipeline-timing__decision {
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
 .erp-dev-timing-bars {
   display: grid;
   gap: 12px;
@@ -672,66 +627,7 @@
   background: var(--ant-color-error, #ff4d4f);
 }
 
-.erp-dev-pipeline-timing__details {
-  margin-top: 18px;
-}
-
-.erp-dev-pipeline-timing__analysis {
-  display: grid;
-  gap: 14px;
-  margin-top: 18px;
-}
-
-.erp-dev-pipeline-timing__critical-path {
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--erp-border);
-  border-radius: 8px;
-  background: var(--ant-color-primary-bg, #e6f4ff);
-}
-
-.erp-dev-pipeline-timing__slowest-heading,
-.erp-dev-pipeline-timing__jobs-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.erp-dev-pipeline-timing__details > summary {
-  display: flex;
-  align-items: center;
-}
-
-.erp-dev-pipeline-timing__jobs-toolbar {
-  padding: 6px 0 12px;
-}
-
-.erp-dev-pipeline-timing__jobs {
-  display: grid;
-  gap: 16px;
-}
-
-.erp-dev-pipeline-timing__jobs > details {
-  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  border-radius: 10px;
-}
-
-.erp-dev-pipeline-timing__jobs > details > summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.erp-dev-pipeline-timing__job-steps {
-  padding: 4px 14px 14px;
-}
-
 :root[data-erp-theme='dark'] .erp-dev-pipeline-status-strip__metrics > div,
-:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__summary > div,
 :root[data-erp-theme='dark'] .erp-dev-version-next,
 :root[data-erp-theme='dark'] .erp-dev-version-current-operation__item,
 :root[data-erp-theme='dark'] .erp-dev-operation-history-filters,
@@ -748,14 +644,6 @@
 
 :root[data-erp-theme='dark'] .erp-dev-timing-bars__track {
   background: rgba(255, 255, 255, 0.16);
-}
-
-:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__critical-path {
-  background: var(--erp-primary-soft);
-}
-
-:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__jobs > details {
-  border-color: rgba(255, 255, 255, 0.16);
 }
 
 :root[data-erp-theme='dark'] .erp-dev-operation-technical-details {
@@ -790,16 +678,6 @@
     justify-self: start;
   }
 
-  .erp-dev-pipeline-timing__summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .erp-dev-pipeline-timing__head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .erp-dev-pipeline-timing__summary strong,
   .erp-dev-timing-bars__label > span:first-child {
     overflow: visible;
     overflow-wrap: anywhere;
@@ -895,7 +773,6 @@
   }
 
   .erp-dev-pipeline-status-strip__metrics,
-  .erp-dev-pipeline-timing__summary,
   .erp-dev-operation-metrics,
   .erp-dev-version-current-operation__item {
     display: grid;
@@ -947,10 +824,5 @@
   .erp-dev-version-takeover-scope,
   .erp-dev-version-takeover-conditions {
     grid-template-columns: 1fr;
-  }
-
-  .erp-dev-pipeline-timing__jobs-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }

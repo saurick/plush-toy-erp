@@ -319,10 +319,11 @@ export function createVersionCenterSummary() {
           finishedAt: '2026-08-09T01:08:10.000Z',
           queueMs: 10_000,
           durationMs: 480_000,
-          url: 'https://github.com/saurick/plush-toy-erp/actions/runs/9001',
+          url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/9001',
           jobs: [
             {
               id: 9_101,
+              url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/9101',
               name: 'Exact-SHA strict quality',
               status: 'completed',
               conclusion: 'success',
@@ -343,6 +344,7 @@ export function createVersionCenterSummary() {
             },
             {
               id: 9_102,
+              url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/9102',
               name: 'Publish immutable artifact set',
               status: 'completed',
               conclusion: 'success',
@@ -682,6 +684,38 @@ export function createDevVersionCenterScenarios({
   let summaryRequests = 0
 
   return [
+    ...['historical', 'empty'].map((state) => ({
+      name: `dev-version-center-${state}-pipeline-desktop`,
+      path: '/__dev/version-center?view=pipeline&target=demo-133',
+      viewport: { width: 1280, height: 720 },
+      auth: 'admin',
+      mockAdminRpc: true,
+      beforeNavigate: async (page) => {
+        const summary = await installSummaryRoute(page)
+        if (state === 'empty') summary.timings.runs = []
+        else {
+          summary.timings.runs[0].url = 'https://github.com/saurick/plush-toy-erp/actions/runs/9001'
+        }
+      },
+      verify: async (page) => {
+        await waitForView(page, 'pipeline')
+        const panel = page.locator('.erp-dev-pipeline-timing')
+        await panel.waitFor({ state: 'visible' })
+        assert.equal(await panel.locator('.erp-dev-pipeline-timing__details').count(), 0)
+        if (state === 'historical') {
+          const link = panel.getByRole('link', { name: '查看历史流水线记录', exact: true })
+          await link.waitFor({ state: 'visible' })
+          assert.equal(await link.getAttribute('href'), 'https://github.com/saurick/plush-toy-erp/actions/runs/9001')
+          assert.equal(await link.getAttribute('target'), '_blank')
+          assert.match(await link.getAttribute('rel'), /noopener/u)
+          assert.equal(await page.getByRole('link', { name: '查看历史发布记录', exact: true }).getAttribute('href'), await link.getAttribute('href'))
+        } else {
+          await panel.getByText('尚无 GitLab 流水线记录', { exact: true }).waitFor()
+          assert.equal(await panel.getByRole('link').count(), 0)
+        }
+        await assertNoHorizontalOverflow(page, `dev-version-center-${state}-pipeline-desktop`)
+      },
+    })),
     {
       name: 'dev-version-center-tabs-pagination-desktop',
       path: '/__dev/version-center?view=history&view=pipeline&history_action=promote&history_action=release',
@@ -806,17 +840,11 @@ export function createDevVersionCenterScenarios({
         await page.getByRole('tab', { name: '发布与部署耗时' }).click()
         await waitForView(page, 'pipeline')
         assert.equal(await page.locator('.erp-dev-version-current-operation').isVisible(), true)
-        const timingDetails = page.locator('.erp-dev-pipeline-timing__details')
-        await timingDetails.waitFor({ state: 'visible' })
-        assert.equal(
-          await timingDetails.evaluate((element) => element.open),
-          false
-        )
-        await timingDetails.locator(':scope > summary').click()
-        assert.equal(
-          await timingDetails.evaluate((element) => element.open),
-          true
-        )
+        const nativePipeline = page.getByRole('link', { name: '在 GitLab 查看全部任务与日志', exact: true })
+        await nativePipeline.waitFor({ state: 'visible' })
+        assert.equal(await nativePipeline.getAttribute('href'), 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/9001')
+        assert.equal(await nativePipeline.getAttribute('target'), '_blank')
+        assert.equal(await page.locator('.erp-dev-pipeline-timing__details').count(), 0)
 
         await page.getByRole('tab', { name: '版本与部署' }).click()
         await waitForView(page, 'versions')

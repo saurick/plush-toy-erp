@@ -1,4 +1,3 @@
-import React from 'react'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
 
 import DevTimestamp from './DevTimestamp.jsx'
@@ -6,14 +5,11 @@ import { formatDevTimestamp, isDevTimestamp } from '../config/devTimestamp.mjs'
 import {
   deliveryPipelinePresentation,
   deliveryPipelineRunModePresentation,
-  deliveryStatusPresentation,
   deliveryTargetCachePresentation,
   findLatestTransferredPromotion,
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryPercent,
-  shortGitSha,
-  summarizePipelineTimings,
   summarizePipelineStatus,
 } from '../config/devDelivery.mjs'
 
@@ -40,12 +36,6 @@ function formatTimestampRange(startedAt, finishedAt, { compact = false } = {}) {
     return `${formatClockTimestamp(startedAt)}–${formatClockTimestamp(finishedAt)}`
   }
   return `${formatDevTimestamp(startedAt)}–${formatDevTimestamp(finishedAt)}`
-}
-
-function formatJobDuration(job) {
-  if (!job) return '未证明'
-  if (['skipped', 'neutral'].includes(job.conclusion)) return '已复用'
-  return formatDeliveryDuration(job.durationMs)
 }
 
 function isGitLabPipeline(run) {
@@ -141,12 +131,6 @@ export function DevPipelineStatusStrip({
   const targetCache = deliveryTargetCachePresentation(
     deploymentOperation?.metrics
   )
-  const strictJob = latestFullRelease?.jobs.find(
-    (job) => job.name === 'Exact-SHA strict quality'
-  )
-  const publishJob = latestFullRelease?.jobs.find(
-    (job) => job.name === 'Publish immutable artifact set'
-  )
 
   return (
     <section aria-label="最近发布与部署">
@@ -211,14 +195,13 @@ export function DevPipelineStatusStrip({
                 ? formatDeliveryDuration(latestFullRelease.durationMs)
                 : '未证明'}
             </Text>
-            {isGitLabPipeline(latestFullRelease) ? (
+            {latestFullRelease?.url ? (
               <Link href={latestFullRelease.url} target="_blank" rel="noopener noreferrer">
-                查看 GitLab 发布记录
+                {isGitLabPipeline(latestFullRelease) ? '查看 GitLab 发布记录' : '查看历史发布记录'}
               </Link>
             ) : (
               <Text type="secondary">
-                严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
-                {formatJobDuration(publishJob)}
+                尚未取得 GitLab 制品发布回执
               </Text>
             )}
             <DevTimestamp
@@ -268,7 +251,7 @@ export function DevPipelineStatusStrip({
   )
 }
 
-export default function DevPipelineTimingPanel({ timings, versions = [] }) {
+export default function DevPipelineTimingPanel({ timings }) {
   const latestRun = timings?.runs?.[0] || null
   if (isGitLabPipeline(latestRun)) {
     const failed = summarizePipelineStatus(timings).failureJob
@@ -287,264 +270,18 @@ export default function DevPipelineTimingPanel({ timings, versions = [] }) {
     )
   }
 
-  return <LegacyPipelineTimingPanel timings={timings} versions={versions} />
-}
-
-function LegacyPipelineTimingPanel({ timings, versions = [] }) {
-  const summary = summarizePipelineTimings(timings)
-  const { latest: latestRun, analysisRun } = summary
-  const [release = null] = versions
-  const strictJob = summary.latestFullRelease?.jobs.find(
-    (job) => job.name === 'Exact-SHA strict quality'
-  )
-  const publishJob = summary.latestFullRelease?.jobs.find(
-    (job) => job.name === 'Publish immutable artifact set'
-  )
-  const analysisJobs = analysisRun?.jobs || []
-  const [expandedJobIds, setExpandedJobIds] = React.useState([])
-
-  React.useEffect(() => {
-    setExpandedJobIds([])
-  }, [analysisRun?.id])
-
-  const expandedJobIdSet = new Set(expandedJobIds)
-  const expandedJobCount = analysisJobs.filter((job) =>
-    expandedJobIdSet.has(job.id)
-  ).length
-  const allJobsExpanded =
-    analysisJobs.length > 0 && expandedJobCount === analysisJobs.length
-
-  const setJobExpanded = (jobId, open) => {
-    setExpandedJobIds((current) => {
-      const currentlyOpen = current.includes(jobId)
-      if (currentlyOpen === open) return current
-      return open
-        ? [...current, jobId]
-        : current.filter((currentJobId) => currentJobId !== jobId)
-    })
-  }
-
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
-      <div className="erp-dev-pipeline-timing__head">
-        <Title level={2} id="dev-pipeline-timing-title">
-          远端流水线耗时
-        </Title>
-        <Text type="secondary">
-          统计读取：{formatDevTimestamp(timings?.generatedAt)}
-        </Text>
-      </div>
-
-      {!latestRun ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="尚无可计算的远端流水线"
-        />
-      ) : (
-        <section aria-labelledby="dev-pipeline-timing-title">
-          <div className="erp-dev-pipeline-timing__summary">
-            <div>
-              <Text type="secondary">最近一次流水线</Text>
-              <strong>{formatDeliveryDuration(latestRun.durationMs)}</strong>
-              <Text>
-                {deliveryPipelineRunModePresentation(summary.latestMode)} ·{' '}
-                {shortGitSha(latestRun.gitSha)}
-              </Text>
-              <Text type="secondary">
-                同类型中位数 {formatDeliveryDuration(summary.medianDurationMs)}{' '}
-                · {summary.sampleCount} 次
-              </Text>
-              <DevTimestamp
-                value={latestRun.finishedAt}
-                action="完成于"
-                missing="完成时间未证明"
-              />
-            </div>
-            <div>
-              <Text type="secondary">最近一次制品发布</Text>
-              <strong>
-                {formatDeliveryDuration(summary.latestFullRelease?.durationMs)}
-              </strong>
-              <Text>
-                严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
-                {formatJobDuration(publishJob)}
-              </Text>
-              <Text type="secondary">
-                {['skipped', 'neutral'].includes(strictJob?.conclusion)
-                  ? 'CI strict 回执已可信复用；Release 未重复执行门禁'
-                  : `完整发布中位数 ${formatDeliveryDuration(summary.fullReleaseMedianDurationMs)} · ${String(summary.fullReleaseSampleCount)} 次`}
-              </Text>
-              <DevTimestamp
-                action="完成于"
-                missing="完成时间未证明"
-                value={summary.latestFullRelease?.finishedAt}
-              />
-            </div>
-            <div>
-              <Text type="secondary">构建缓存与制品</Text>
-              <strong>
-                {formatDeliveryPercent(
-                  release?.buildPerformance?.cacheHitRateBasisPoints
-                )}
-              </strong>
-              <Text>
-                {release?.buildPerformance
-                  ? `${release.buildPerformance.cacheHitCount} 命中 / ${release.buildPerformance.cacheMissCount} 未命中，共 ${release.buildPerformance.completedVertexCount} 个完成节点`
-                  : '等待构建回执'}
-              </Text>
-              <Text type="secondary">
-                总计 {formatDeliveryBytes(release?.artifactSummary?.totalBytes)}{' '}
-                · Server{' '}
-                {formatDeliveryBytes(
-                  release?.artifactSummary?.serverImageBytes
-                )}{' '}
-                · Web{' '}
-                {formatDeliveryBytes(release?.artifactSummary?.webImageBytes)}
-              </Text>
-              <DevTimestamp
-                value={release?.publishedAt}
-                action="发布于"
-                missing="发布时间未证明"
-              />
-            </div>
-          </div>
-
-          <div className="erp-dev-pipeline-timing__decision" role="status">
-            <Tag
-              color={latestRun.conclusion === 'success' ? 'success' : 'error'}
-            >
-              {latestRun.conclusion === 'success'
-                ? '最近流水线通过'
-                : '最近流水线未通过'}
-            </Tag>
-            <Text>{summary.optimizationHint}</Text>
-            <Text
-              type={summary.failureReason ? 'danger' : 'secondary'}
-              title={
-                summary.failureReason
-                  ? `${summary.failureReason.job} / ${summary.failureReason.step}`
-                  : undefined
-              }
-            >
-              {summary.failureReason
-                ? `失败原因：${deliveryPipelinePresentation(summary.failureReason.job).label} / ${deliveryPipelinePresentation(summary.failureReason.step).label}`
-                : '最近流水线没有失败步骤'}
-            </Text>
-            <Link href={latestRun.url} rel="noopener noreferrer">
-              {latestRun.url.includes('github.com')
-                ? '查看 GitHub 运行'
-                : '查看 GitLab pipeline'}
-            </Link>
-          </div>
-
-          <div className="erp-dev-pipeline-timing__analysis">
-            <div className="erp-dev-pipeline-timing__critical-path">
-              <Text strong>流水线关键路径（可见部分）</Text>
-              <Text>
-                {formatDeliveryDuration(summary.criticalPath?.durationMs)} ·
-                可见环节{' '}
-                {formatDeliveryDuration(
-                  summary.criticalPath?.coveredDurationMs
-                )}{' '}
-                · 调度/等待{' '}
-                {formatDeliveryDuration(summary.criticalPath?.schedulingGapMs)}
-              </Text>
-              <Text type="secondary">
-                {summary.criticalPath?.jobs
-                  .map((job) => deliveryPipelinePresentation(job.name).label)
-                  .join(' → ') || '尚未识别'}
-              </Text>
-            </div>
-            <div className="erp-dev-pipeline-timing__slowest-heading">
-              <Text strong>耗时最长环节</Text>
-              <Text type="secondary">按单环节耗时排序，最多显示 8 项</Text>
-            </div>
-            <DevTimingBars
-              stages={summary.stages}
-              totalDurationMs={analysisRun?.durationMs}
-            />
-          </div>
-
-          {analysisJobs.length > 0 ? (
-            <details className="erp-dev-disclosure erp-dev-pipeline-timing__details">
-              <summary>
-                查看全部任务与步骤（{String(analysisJobs.length)} 个任务）
-              </summary>
-              <div className="erp-dev-pipeline-timing__jobs-toolbar">
-                <Text type="secondary">
-                  各任务默认收起；可逐项查看步骤时间，或统一展开。
-                </Text>
-                <Space wrap>
-                  <Button
-                    onClick={() =>
-                      setExpandedJobIds(analysisJobs.map((job) => job.id))
-                    }
-                    disabled={allJobsExpanded}
-                  >
-                    全部展开
-                  </Button>
-                  <Button
-                    onClick={() => setExpandedJobIds([])}
-                    disabled={expandedJobCount === 0}
-                  >
-                    全部收起
-                  </Button>
-                </Space>
-              </div>
-              <div className="erp-dev-pipeline-timing__jobs">
-                {analysisJobs.map((job) => {
-                  const jobName = deliveryPipelinePresentation(job.name)
-                  const jobStatus = deliveryStatusPresentation(
-                    job.conclusion || job.status
-                  )
-                  return (
-                    <details
-                      className="erp-dev-disclosure"
-                      key={job.id}
-                      open={expandedJobIdSet.has(job.id)}
-                      onToggle={(event) =>
-                        setJobExpanded(job.id, event.currentTarget.open)
-                      }
-                    >
-                      <summary>
-                        <Text strong title={jobName.title}>
-                          {jobName.label}
-                        </Text>
-                        <Tag color={jobStatus.color}>{jobStatus.label}</Tag>
-                        <Text type="secondary">
-                          {formatDeliveryDuration(job.durationMs)}
-                        </Text>
-                        <Text type="secondary">
-                          {formatTimestampRange(job.startedAt, job.finishedAt)}
-                        </Text>
-                      </summary>
-                      <div className="erp-dev-pipeline-timing__job-steps">
-                        <DevTimingBars
-                          stages={job.steps.map((step) => ({
-                            ...step,
-                            id: `${String(job.id)}:${String(step.number)}`,
-                            label: step.name,
-                          }))}
-                          totalDurationMs={
-                            job.durationMs || analysisRun.durationMs
-                          }
-                          limit={100}
-                          showTimeRange
-                        />
-                      </div>
-                    </details>
-                  )
-                })}
-              </div>
-            </details>
-          ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="该次流水线未返回任务或步骤时间"
-            />
-          )}
-        </section>
-      )}
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={latestRun ? '历史流水线的任务与日志在原始平台查看' : '尚无 GitLab 流水线记录'}
+      >
+        {latestRun?.url ? (
+          <Link href={latestRun.url} target="_blank" rel="noopener noreferrer">
+            查看历史流水线记录
+          </Link>
+        ) : null}
+      </Empty>
     </Card>
   )
 }
