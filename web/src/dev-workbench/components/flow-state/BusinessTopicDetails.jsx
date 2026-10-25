@@ -69,7 +69,7 @@ export default function BusinessTopicDetails({
       </ul>
       {onExploreChain ? (
         <Button type="link" onClick={() => onExploreChain(topic.key, node.key)}>
-          查看单据状态与规则
+          查看规则
         </Button>
       ) : null}
     </aside>

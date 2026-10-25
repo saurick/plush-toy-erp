@@ -177,6 +177,14 @@ function flowCandidates(flow) {
     candidate(flow.label, '', {}, 3),
     candidate(flow.summary, '', {}, 2),
     candidate(flow.key, '定义 key', {}, 3),
+    ...asArray(flow.dimensions).flatMap((dimension) => [
+      candidate(dimension.label, `关联维度：${dimension.label}`, {}, 2),
+      candidate(dimension.key, `关联维度：${dimension.label}`),
+      ...asArray(dimension.states).flatMap((state) => [
+        candidate(state.label, `${dimension.label}：${state.label}`),
+        candidate(state.key, `${dimension.label}：${state.label}`),
+      ]),
+    ]),
     ...asArray(flow.states).flatMap((state) => [
       candidate(state.label, `状态：${state.label}`),
       candidate(state.key, `状态 key：${state.key}`),
@@ -319,14 +327,7 @@ function buildDefinitionSearchEntries(catalog) {
       type: 'runtime',
       candidates: processCandidates(definition, flowByBusinessRefType),
     })),
-    states: flows
-      .filter(
-        (flow) =>
-          !flow.key.startsWith('workflow.') &&
-          !flow.key.startsWith('process.') &&
-          flow.scopeKey !== 'fact_ledger'
-      )
-      .map(flowEntry),
+    states: flows.map(flowEntry),
     stateOptions: flows.map(flowEntry),
     facts: factDefinitions.map((definition) => ({
       key: definition.factKey,
@@ -381,7 +382,7 @@ export function buildDevFlowDefinitionSearchGroups(catalog, keyword) {
     },
     {
       key: 'states',
-      label: '状态机',
+      label: '状态与流转规则',
       items: searchEntries(entries.states, normalizedQuery),
     },
     {

@@ -152,12 +152,15 @@ func (r *workflowRepo) ListPendingLinkedWorkflowTaskSettlements(ctx context.Cont
 	return tasks, nil
 }
 
-func (r *workflowRepo) ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int) ([]*biz.WorkflowTaskEvent, error) {
-	if r == nil || r.data == nil || r.data.postgres == nil || taskID <= 0 || limit < 1 || limit > biz.WorkflowTaskEventPageMaxLimit+1 {
+func (r *workflowRepo) ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int, beforeEventID int) ([]*biz.WorkflowTaskEvent, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || taskID <= 0 || limit < 1 || limit > biz.WorkflowTaskEventPageMaxLimit+1 || beforeEventID < 0 {
 		return nil, biz.ErrBadParam
 	}
-	rows, err := r.data.postgres.WorkflowTaskEvent.Query().
-		Where(workflowtaskevent.TaskID(taskID)).
+	query := r.data.postgres.WorkflowTaskEvent.Query().Where(workflowtaskevent.TaskID(taskID))
+	if beforeEventID > 0 {
+		query = query.Where(workflowtaskevent.IDLT(beforeEventID))
+	}
+	rows, err := query.
 		Order(ent.Desc(workflowtaskevent.FieldID)).
 		Limit(limit).
 		All(ctx)

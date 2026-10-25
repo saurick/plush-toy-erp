@@ -82,7 +82,7 @@ const FACT_DEFINITIONS = [
     occurrenceCondition: '检验单由质量领域用例作出并持久化正式判定。',
     sourceDocument: '采购收货、委外回货或生产批次',
     authority: 'quality_inspections',
-    businessImpact: '决定放行、隔离、拒收或返工，并可驱动受控库存/在制动作。',
+    businessImpact: '分别记录合格、不合格或让步接收，决定受控库存/在制动作；检验通过状态不等于判定一定为普通合格。',
     voucher: '质量检验单；Workflow 任务完成不是检验事实凭证。',
     idempotencyRule: '同一检验对象、阶段和版本不得重复确认。',
     correction: '按质量纠正合同创建新的处置或纠正记录，不覆盖审计历史。',
@@ -127,7 +127,7 @@ const FACT_DEFINITIONS = [
     businessImpact: '记录委外材料流出、回货和相应库存变化。',
     voucher: '委外发料/回货记录及库存事务。',
     idempotencyRule: '委外订单行、动作类型和幂等键不得重复生效。',
-    correction: '使用委外处置或反向库存事务纠正，保留原事实。',
+    correction: '正式来源草稿可作废并释放占用，不生成库存冲正；已过账事实使用委外处置或反向库存事务纠正，保留原事实。',
     sourceRefs: [
       'server/internal/biz/operational_fact.go',
       'server/internal/service/jsonrpc_operational_fact.go',
@@ -155,7 +155,7 @@ const FACT_DEFINITIONS = [
     businessImpact: '形成应收、应付等财务义务，不代表已经收付款或核销。',
     voucher: '财务事实记录及来源关联；本观察台不提供跨域凭证查询。',
     idempotencyRule: '来源类型、来源 ID、事实类型和业务唯一键不得重复。',
-    correction: '通过红冲或反向事实纠正，不覆盖已生效财务记录。',
+    correction: '正式来源草稿可作废且不生成财务影响；已生效事实通过红冲或反向事实纠正，保留原记录。',
     sourceRefs: [
       'server/internal/biz/operational_fact.go',
       'server/internal/data/model/schema/finance_fact.go',
@@ -234,12 +234,12 @@ const FACT_DEFINITIONS = [
   fact('fact.finance_payment', '收付款单', {
     displayGroupKey: 'shipping_finance',
     occurrenceCondition: '收付款单批准后由财务领域用例完成正式过账。',
-    sourceDocument: '收付款单与待核销财务事实',
+    sourceDocument: '结算款关联应收/应付；预收预付关联销售、采购或委外订单；退款关联原收付款单',
     authority: 'finance_payments 与不可变核销记录',
-    businessImpact: '记录真实收款或付款，并可减少对应未结金额。',
+    businessImpact: '结算款按核销减少未结；预收预付先记录款项余额，后续独立核销；退款消耗原款可退余额，不能冒充核销或冲正。',
     voucher: '已过账收付款单与核销记录；审批完成不是付款凭证。',
     idempotencyRule: '支付单、来源事实、金额和幂等键必须一致。',
-    correction: '已过账单只能以冲正生成反向核销，不允许取消或改写。',
+    correction: '错账走正式冲正，实际退钱走关联原款的退款；预收预付可在过账后核销或反核销，保留全部关联记录。',
     sourceRefs: [
       'server/internal/biz/finance_payment.go',
       'server/internal/data/operational_fact_finance_payment_repo.go',
@@ -247,7 +247,7 @@ const FACT_DEFINITIONS = [
   }),
   fact('fact.finance_allocation', '财务核销记录', {
     displayGroupKey: 'shipping_finance',
-    occurrenceCondition: '收付款过账时对指定应收/应付生成不可变核销分配。',
+    occurrenceCondition: '结算款过账时核销，或已过账的预收预付通过独立核销动作分配至应收/应付。',
     sourceDocument: '已过账收付款单与待核销财务事实',
     authority: 'finance_allocations',
     businessImpact: '减少未结金额并保留款项与业务事实的对应关系。',
@@ -257,6 +257,7 @@ const FACT_DEFINITIONS = [
     sourceRefs: [
       'server/internal/biz/finance_payment.go',
       'server/internal/data/model/schema/finance_allocation.go',
+      'server/internal/data/finance_payment_balance_repo.go',
     ],
   }),
   fact('fact.finance_credit_note', '财务红冲单', {
@@ -275,13 +276,13 @@ const FACT_DEFINITIONS = [
   }),
   fact('fact.shipment_finance_release', '出货财务放行', {
     displayGroupKey: 'shipping_finance',
-    occurrenceCondition: '出货财务审批节点通过并由出货领域命令记录版本化放行。',
+    occurrenceCondition: '出货财务审批同意或驳回后，由命名出货领域命令记录版本化结论。',
     sourceDocument: '出货单与财务审批任务',
     authority: 'shipment 的版本化财务放行字段与审计记录',
-    businessImpact: '只允许后续出货步骤继续，不代表货物已经 shipped。',
+    businessImpact: '同意才允许后续出货；驳回结束该审批分支。两者均不代表已实际出货或形成应收。',
     voucher: '出货财务放行记录；不是出货或应收凭证。',
     idempotencyRule: '出货单版本和流程节点 attempt 必须匹配。',
-    correction: '通过出货领域拒绝/重新审批合同纠正放行状态。',
+    correction: '按来源单据取消及后续正式业务处理，保留审批结论；当前没有驳回后直接改为放行的通用动作。',
     sourceRefs: [
       'server/internal/biz/shipment_process_command.go',
       'server/internal/data/model/schema/shipment.go',
@@ -289,7 +290,7 @@ const FACT_DEFINITIONS = [
   }),
   fact('fact.inventory_operation', '库存操作单', {
     displayGroupKey: 'production_inventory',
-    occurrenceCondition: '库存操作单批准后由库存领域用例完成正式过账。',
+    occurrenceCondition: '普通库存操作可直接过账；人工调整必须提交、审批通过后，再由库存领域用例正式过账。',
     sourceDocument: '库存操作单',
     authority: 'inventory_operations 与库存事务/余额/批次',
     businessImpact: '按命名操作增加、扣减或调整库存。',

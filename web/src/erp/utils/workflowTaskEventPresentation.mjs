@@ -1,5 +1,8 @@
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from './roleKeys.mjs'
+import { BUSINESS_STATUS_OPTIONS } from '../config/workflowStatus.mjs'
+
+const BUSINESS_STATUS_LABELS = new Map(BUSINESS_STATUS_OPTIONS.map(({ key, label }) => [key, label]))
 
 const TASK_STATUS_LABELS = Object.freeze({
   [WorkflowTaskStatus.READY]: '待处理',
@@ -10,6 +13,16 @@ const TASK_STATUS_LABELS = Object.freeze({
 })
 
 const EVENT_PRESENTATIONS = Object.freeze({
+  source_state_changed: {
+    categoryLabel: '来源进度',
+    label: '来源业务进度已更新',
+    tone: 'info',
+  },
+  process_resumed: {
+    categoryLabel: '恢复',
+    label: '流程已恢复，任务可继续办理',
+    tone: 'info',
+  },
   created: {
     categoryLabel: '进度',
     label: '任务已创建',
@@ -178,6 +191,11 @@ function eventPresentation(event, approvalTask) {
 }
 
 function eventTransitionLabel(event) {
+  if (event?.event_type === 'source_state_changed') {
+    const from = BUSINESS_STATUS_LABELS.get(event.payload?.from_business_status_key)
+    const to = BUSINESS_STATUS_LABELS.get(event.payload?.to_business_status_key)
+    return from && to && from !== to ? `${from} → ${to}` : to || from || ''
+  }
   const fromLabel = getWorkflowTaskEventStatusLabel(event?.from_status_key)
   const toLabel = getWorkflowTaskEventStatusLabel(event?.to_status_key)
   if (fromLabel && toLabel && fromLabel !== toLabel) {

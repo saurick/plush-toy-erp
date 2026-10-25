@@ -89,9 +89,10 @@ const KNOWN_QUERY_KEYS = new Set([
 ])
 
 const VIEW_KEYS = new Set(VIEW_ITEMS.map((item) => item.value))
-const PRIMARY_VIEWS = VIEW_ITEMS.filter((item) =>
-  ['chain', 'tracking'].includes(item.value)
-).map(({ value, label }) => ({ value, label }))
+const PRIMARY_VIEWS = [
+  ...VIEW_ITEMS.filter((item) => ['chain', 'tracking'].includes(item.value)).map(({ value, label }) => ({ value, label })),
+  { value: 'rules', label: '查看规则' },
+]
 const TECHNICAL_VIEWS = VIEW_ITEMS.filter(
   (item) => !['chain', 'tracking'].includes(item.value)
 ).map(({ value, label }) => ({ value, label }))
@@ -1312,14 +1313,9 @@ export default function DevFlowStateObservatoryPage() {
             level="primary"
             ariaLabel="业务链路方式"
             items={PRIMARY_VIEWS}
-            value={
-              view === 'tracking' ||
-              (!['chain', 'tracking'].includes(view) && taskScoped)
-                ? 'tracking'
-                : 'chain'
-            }
+            value={['chain', 'tracking'].includes(view) ? view : 'rules'}
             disabled={catalogState.status === 'loading'}
-            onChange={(nextView) => openView(nextView, {}, { main: true })}
+            onChange={(nextView) => nextView === 'rules' ? openView('states') : openView(nextView, {}, { main: true })}
           />
           <Tag>
             {view === 'tracking' || (view === 'workflow' && taskId)
@@ -1345,11 +1341,6 @@ export default function DevFlowStateObservatoryPage() {
           <Button onClick={() => setDefinitionSearchOpen(true)}>
             搜索定义
           </Button>
-          {view === 'chain' ? (
-            <Button disabled={!valid || !catalog} onClick={() => openView('states')}>
-              查看规则
-            </Button>
-          ) : null}
           <Dropdown
             disabled={!valid || !catalog || printingCustomer}
             menu={{

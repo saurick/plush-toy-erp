@@ -36,7 +36,7 @@ test('专题详情逐条保留关联条件和岗位，点选关联对象不执�
   assert.deepEqual(selected, ['material_request'])
   assert.deepEqual(explored, [])
   const rules = [...harness.container.querySelectorAll('button')]
-    .find((button) => button.textContent === '查看单据状态与规则')
+    .find((button) => button.textContent === '查看规则')
   await harness.act(() => rules.click())
   assert.deepEqual(explored, [['sales_to_production', 'effective_bom']])
 })
@@ -115,7 +115,7 @@ test('图中与相邻详情选取对象共用 URL，查看规则保留专题和�
   assert.equal(params.get('flow_topic_node'), 'material_request')
   assert(root.querySelector('[data-graph-node="material_request"][aria-pressed="true"]'))
   const rules = [...root.querySelectorAll('aside button')]
-    .find((button) => button.textContent === '查看单据状态与规则')
+    .find((button) => button.textContent === '查看规则')
   await harness.act(() => rules.click())
   assert.deepEqual(explored, [['sales_to_production', 'material_request']])
   const map = [...root.querySelectorAll('button')]

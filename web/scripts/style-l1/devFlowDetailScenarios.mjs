@@ -23,13 +23,13 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
     assignee_id: 31,
     ...(id === 21 ? { process_instance_id: 10, process_node_instance_id: 20 } : {}),
   })
-  const node = { id: 20, process_instance_id: 10, node_key: active.key, node_type: 'approval', attempt: 2, version: 1, status: 'blocked' }
+  const node = { id: 20, process_instance_id: 10, node_key: active.key, node_type: 'approval', attempt: 2, version: 1, status: 'blocked', started_at: 1800000005 }
   const context = {
     source: { type: 'sales_order', id: 1001, no: 'SO-QA-DETAIL-001' },
     process_instance: { id: 10, process_key: definition.processKey, process_version: definition.processVersion, status: 'blocked', started_at: 1800000000 },
     linked_node: node,
     approval_form: null,
-    nodes: [node],
+    nodes: [node, { id: 25, process_instance_id: 10, node_key: 'end', node_type: 'end', attempt: 1, version: 1, status: 'waiting' }],
     current_nodes: [node],
     completed_nodes: [],
     current_responsibilities: [{ node_instance_id: node.id, owner_role_key: active.ownerPool }],
@@ -42,14 +42,22 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
     auth: 'admin',
     mockAdminRpc: true,
     beforeNavigate: async (page) => {
-      const state = { denyTask: false, denyEvents: true, denyRuntime: false, reads: [] }
+      const state = { denyTask: false, denyEvents: true, denyRuntime: false, denyOlder: true, reads: [], eventQueries: [] }
       sessions.set(page, state)
       await page.route('**/rpc/workflow', async (route) => {
         const rpc = route.request().postDataJSON()
         state.reads.push(rpc.method)
         let result
         if (rpc.method === 'get_task') result = state.denyTask ? { code: 1, message: '当前任务不可读取' } : { code: 0, data: { task: task(Number(rpc.params.task_id)) } }
-        else if (rpc.method === 'list_task_events') result = state.denyEvents ? { code: 1, message: '当前任务不可读取' } : { code: 0, data: { items: [{ id: 1, event_type: 'status_changed', from_status_key: 'ready', to_status_key: 'blocked', created_at: 1800000010, reason: '补齐审批资料' }], truncated: false } }
+        else if (rpc.method === 'list_task_events') {
+          state.eventQueries.push(rpc.params)
+          const cursor = Number(rpc.params.before_event_id || 0)
+          const events = Array.from({ length: 101 }, (_, index) => ({ id: 101 - index, event_type: index === 100 ? 'source_state_changed' : 'status_changed', from_status_key: 'ready', to_status_key: 'blocked', created_at: 1800000010 - index, reason: index === 0 ? '补齐审批资料' : '', payload: index === 100 ? { from_business_status_key: 'project_pending', to_business_status_key: 'project_approved' } : {} }))
+          const remaining = events.filter((event) => !cursor || event.id < cursor)
+          result = state.denyEvents || (cursor && state.denyOlder)
+            ? { code: 1, message: '当前任务不可读取' }
+            : { code: 0, data: { items: remaining.slice(0, rpc.params.limit), truncated: remaining.length > rpc.params.limit } }
+        }
         else if (rpc.method === 'get_task_process_context') result = state.denyRuntime ? { code: 1, message: '流程暂不可读取' } : { code: 0, data: { process_context: context } }
         else return route.fallback()
         await route.fulfill({ json: { jsonrpc: '2.0', id: rpc.id, result } })
@@ -60,7 +68,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       const tabs = page.getByRole('tablist', { name: '关联信息类型' })
       const choose = async (label) => tabs.getByRole('tab', { name: label, exact: true }).click()
       await expect(page.getByRole('button', { name: '技术详情', exact: true })).toHaveCount(0)
-      await page.getByRole('button', { name: '查看规则', exact: true }).click()
+      await page.getByRole('tab', { name: '查看规则', exact: true }).click()
       await expect(tabs).toBeVisible()
       const strip = await tabs.elementHandle()
       const stripBox = await tabs.boundingBox()
@@ -104,6 +112,17 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await page.getByRole('button', { name: '重试', exact: true }).click()
       await expect(page.getByText('模拟办理人', { exact: true })).toBeVisible()
       await expect(page.locator('.erp-dev-flow-events blockquote')).toHaveText('补齐审批资料')
+      await expect(page.locator('.erp-dev-flow-events li')).toHaveCount(100)
+      await page.getByRole('button', { name: '加载更早记录', exact: true }).click()
+      await expect(page.getByText('更早记录读取失败', { exact: true })).toBeVisible()
+      await expect(page.locator('.erp-dev-flow-events li')).toHaveCount(100)
+      sessions.get(page).denyOlder = false
+      await page.getByRole('button', { name: '重试加载更早记录', exact: true }).click()
+      await expect(page.locator('.erp-dev-flow-events li')).toHaveCount(101)
+      await expect(page.getByText('来源业务进度已更新', { exact: true })).toBeVisible()
+      await expect(page.getByText('已显示该任务全部可见记录', { exact: true })).toBeVisible()
+      assert.equal(sessions.get(page).eventQueries.at(-1).before_event_id, 2)
+
       await expect(page.getByText('数据来源', { exact: true })).toBeHidden()
       await page.screenshot({ path: path.join(outputDir, 'flow-details-workflow.png') })
       await expect(page.getByRole('button', { name: '返回 实例跟踪', exact: true })).toBeVisible()
@@ -121,7 +140,11 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await expect(page.locator('#dev-flow-process-select')).toHaveCount(0)
       await expect(page.locator('.erp-dev-flow-process-definition')).toHaveCount(0)
       await expect(instance.getByText('实例标识', { exact: true })).toBeHidden()
-      await expect(instance.getByText('第 2 次尝试', { exact: true })).toBeVisible()
+      await expect(instance.getByText('第 2 次', { exact: true })).toBeVisible()
+      await expect(instance.locator('[aria-label="实际流程节点"] li')).toHaveCount(1)
+      await expect(instance.getByText(/^开始：/)).toBeVisible()
+      await expect(instance.getByText('尚有待确定的后续路径；未激活分支不列为已发生步骤。', { exact: true })).toBeVisible()
+
       await page.screenshot({ path: path.join(outputDir, 'flow-details-runtime.png') })
       await instance.locator('[data-evidence-disclosure] summary').click()
       await expect(instance.getByText('实例标识', { exact: true })).toBeVisible()
@@ -152,6 +175,70 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       assert(sessions.get(page).reads.every((method) => ['get_task', 'list_task_events', 'get_task_process_context'].includes(method)), '四个视图只读取正式任务和流程接口')
     },
   }, {
+    name: 'dev-flow-rules-complete',
+    path: '/__dev/status-flows?view=states&flow=process.instance',
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    auth: 'admin',
+    mockAdminRpc: true,
+    verify: async (page) => {
+      const visit = async (flow) => page.goto(new URL(`/__dev/status-flows?view=states&flow=${flow}`, page.url()).href)
+      const primary = page.getByRole('tablist', { name: '业务链路方式' })
+      await expect(primary.getByRole('tab', { name: '查看规则', exact: true })).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByRole('tab', { name: '状态与流转规则', exact: true })).toBeVisible()
+      const details = page.locator('[data-selected-flow]')
+      await expect(details.getByRole('heading', { name: '流程结束结果', exact: true })).toBeVisible()
+      await expect(details.getByText('成功结束 / 驳回结束 / 取消结束 / 补偿结束', { exact: true })).toBeVisible()
+      const activeFilterColor = await page.getByRole('button', { name: /^正常推进 / }).evaluate((button) => getComputedStyle(button).backgroundColor)
+      await page.getByRole('button', { name: /^异常与纠正 / }).click()
+      await expect(page.getByRole('button', { name: /^异常与纠正 / })).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByRole('button', { name: /^异常与纠正 / })).toHaveClass(/ant-btn-primary/)
+      await expect(page.getByRole('button', { name: /^正常推进 / })).not.toHaveClass(/ant-btn-primary/)
+      await page.mouse.move(0, 0)
+      await expect(page.getByRole('button', { name: /^异常与纠正 / })).toHaveCSS('background-color', activeFilterColor)
+      await expect(page.getByRole('button', { name: /^正常推进 / })).not.toHaveCSS('background-color', activeFilterColor)
+      await expect(details.locator('[data-business-flow]')).toHaveAttribute('data-graph-status', 'rendered')
+      await expect(details.getByRole('button', { name: /已阻塞.*结束/ })).toHaveCount(0)
+      await page.screenshot({ path: path.join(outputDir, 'flow-rules-process-results.png') })
+      await visit('process.node')
+      await expect(details.getByRole('heading', { name: '领域副作用与补偿', exact: true })).toBeVisible()
+      await expect(details.getByText('影响待确认 / 没有业务副作用 / 业务影响已生效 / 业务影响已补偿', { exact: true })).toBeVisible()
+      await visit('workflow.task')
+      await page.getByRole('button', { name: /^全部 / }).click()
+      await details.locator('[data-all-transitions] > summary').click()
+      await expect(details.locator('[data-all-transitions]').getByText('可执行 → 已撤回', { exact: true })).toBeVisible()
+      await expect(details.locator('[data-all-transitions]').getByText('阻塞 → 已撤回', { exact: true })).toBeVisible()
+      await expect(details.getByText('系统内部触发；入口权限由来源动作校验', { exact: true })).toHaveCount(2)
+      await visit('fact.shipment_finance_release')
+      await page.getByRole('button', { name: /^全部 / }).click()
+      await details.locator('[data-all-transitions] > summary').click()
+      await expect(details.locator('[data-all-transitions]').getByText('待放行 → 已拒绝', { exact: true })).toBeVisible()
+      await expect(details.locator('[data-all-transitions]').getByText('待放行 → 已放行', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: /^全部 / })).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByRole('button', { name: /^全部 / })).toHaveClass(/ant-btn-primary/)
+      await expect(page.getByRole('button', { name: /^正常推进 / })).not.toHaveClass(/ant-btn-primary/)
+      await page.mouse.move(0, 0)
+      await expect(page.getByRole('button', { name: /^全部 / })).toHaveCSS('background-color', activeFilterColor)
+      await expect(page.getByRole('button', { name: /^正常推进 / })).not.toHaveCSS('background-color', activeFilterColor)
+      await page.screenshot({ path: path.join(outputDir, 'flow-rules-shipment-finance.png') })
+      await visit('fact.quality_inspection')
+      await expect(details.getByText('合格 / 不合格 / 让步接收', { exact: true })).toBeVisible()
+      await visit('control.customer_config_revision')
+      await expect(details.getByText('可读写 / 只读 / 停用', { exact: true })).toBeVisible()
+      await page.getByRole('button', { name: '搜索定义', exact: true }).click()
+      const search = page.getByRole('dialog', { name: '搜索定义', exact: true })
+      await search.getByPlaceholder('例如：销售订单、销售 PMC、已提交').fill('domain_command_effect_state')
+      await search.getByPlaceholder('例如：销售订单、销售 PMC、已提交').press('Enter')
+      await search.getByRole('button').filter({ hasText: 'process.node' }).click()
+      await expect(details).toHaveAttribute('data-selected-flow', 'process.node')
+      await expect(details.getByRole('heading', { name: '领域副作用与补偿', exact: true })).toBeVisible()
+      await visit('master.lifecycle')
+      await expect(details.getByText('当前筛选没有登记的转换', { exact: true })).toHaveCount(0)
+      await expect(details.getByText('以上为独立状态分类，不表示办理先后。', { exact: true })).toBeVisible()
+      await page.setViewportSize({ width: 1024, height: 768 })
+      await assertNoHorizontalOverflow(page, '状态分类与规则窄窗口')
+    },
+  }, {
     name: 'dev-flow-details-design-preview',
     path: '/__dev/ui-design?page=workbench&workbenchMode=preview',
     viewport: { width: 1440, height: 900 },
@@ -159,7 +246,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       await frame.getByRole('table', { name: '开发工具对照' }).getByRole('button', { name: '业务链路', exact: true }).click()
       const preview = frame.locator('[data-dev-flow-preview]')
-      await preview.getByRole('button', { name: '查看规则', exact: true }).click()
+      await preview.getByRole('tab', { name: '查看规则', exact: true }).click()
       const rules = preview.locator('[data-flow-rules]')
       await expect(rules).toHaveAttribute('open')
       const stateRules = rules.locator('[data-dev-rule-preview]')

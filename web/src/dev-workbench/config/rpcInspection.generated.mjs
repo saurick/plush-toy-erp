@@ -29644,7 +29644,7 @@ export const RpcInspection = Object.freeze({
         name: 'assignee_id',
         required: '按业务条件',
         source: Object.freeze({
-          line: 463,
+          line: 464,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'integer',
@@ -29655,7 +29655,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 458,
+          line: 459,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29666,7 +29666,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 432,
+          line: 433,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'integer',
@@ -29676,7 +29676,7 @@ export const RpcInspection = Object.freeze({
         name: 'idempotency_key',
         required: '必填',
         source: Object.freeze({
-          line: 417,
+          line: 418,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29687,7 +29687,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 461,
+          line: 462,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29698,7 +29698,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 460,
+          line: 461,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29709,7 +29709,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 424,
+          line: 425,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'object',
@@ -29731,7 +29731,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 462,
+          line: 463,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29741,7 +29741,7 @@ export const RpcInspection = Object.freeze({
         name: 'source_id',
         required: '条件必填',
         source: Object.freeze({
-          line: 439,
+          line: 440,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'integer',
@@ -29752,7 +29752,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 457,
+          line: 458,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29763,7 +29763,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 455,
+          line: 456,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29774,7 +29774,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 452,
+          line: 453,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29785,7 +29785,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 453,
+          line: 454,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29796,7 +29796,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 454,
+          line: 455,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29807,7 +29807,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 459,
+          line: 460,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -29816,7 +29816,7 @@ export const RpcInspection = Object.freeze({
         expression: '"task": workflowTaskToMap(task)',
         name: 'result.data.task',
         source: Object.freeze({
-          line: 474,
+          line: 475,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: '待核对',
@@ -30431,7 +30431,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 371,
+          line: 372,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'integer',
@@ -30440,7 +30440,7 @@ export const RpcInspection = Object.freeze({
         expression: '"process_context": workflowProcessTaskContextToMap(processContext)',
         name: 'result.data.process_context',
         source: Object.freeze({
-          line: 403,
+          line: 404,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: '待核对',
@@ -31134,6 +31134,16 @@ export const RpcInspection = Object.freeze({
         path: 'server/internal/service/jsonrpc_workflow.go',
       }),
       parameters: Object.freeze([Object.freeze({
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "before_event_id", 0, 0)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "before_event_id", 0, 0)',
+        name: 'before_event_id',
+        required: '可选',
+        source: Object.freeze({
+          line: 334,
+          path: 'server/internal/service/jsonrpc_workflow_task.go',
+        }),
+        type: 'integer',
+      }), Object.freeze({
         description: '解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。',
         expression: 'getInt(pm, "limit", 50)',
         name: 'limit',
@@ -31160,7 +31170,7 @@ export const RpcInspection = Object.freeze({
         expression: '"items": workflowTaskEventsToAny(events)',
         name: 'result.data.items',
         source: Object.freeze({
-          line: 361,
+          line: 362,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: '待核对',
@@ -31168,7 +31178,7 @@ export const RpcInspection = Object.freeze({
         expression: '"truncated": truncated',
         name: 'result.data.truncated',
         source: Object.freeze({
-          line: 362,
+          line: 363,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: '待核对',
@@ -32045,7 +32055,7 @@ export const RpcInspection = Object.freeze({
         name: 'action',
         required: '必填',
         source: Object.freeze({
-          line: 529,
+          line: 530,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -32076,7 +32086,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 553,
+          line: 554,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'object',
@@ -32086,7 +32096,7 @@ export const RpcInspection = Object.freeze({
         name: 'reason',
         required: '必填',
         source: Object.freeze({
-          line: 533,
+          line: 534,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: 'string',
@@ -32105,7 +32115,7 @@ export const RpcInspection = Object.freeze({
         expression: '"task": workflowTaskToMap(task)',
         name: 'result.data.task',
         source: Object.freeze({
-          line: 597,
+          line: 598,
           path: 'server/internal/service/jsonrpc_workflow_task.go',
         }),
         type: '待核对',

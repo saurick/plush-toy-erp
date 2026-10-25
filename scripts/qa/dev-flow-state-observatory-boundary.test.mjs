@@ -112,7 +112,8 @@ test("dev flow state observatory: the complete role flow is primary and technica
     [...shared.matchAll(/value:\s*'([^']+)'[\s\S]{0,100}?label:/gu)].map((match) => match[1]),
     ["chain", "tracking", "workflow", "runtime", "facts", "states"],
   );
-  assert.match(page, /const PRIMARY_VIEWS = VIEW_ITEMS\.filter\(\(item\) =>\s*\['chain', 'tracking'\]\.includes\(item\.value\)\s*\)/u);
+  assert.match(page, /value: 'rules', label: '查看规则'/u);
+  assert.match(shared, /label: '状态与流转规则'/u);
   assert.match(page, /items=\{TECHNICAL_VIEWS\}/u);
   assert.match(page, /查看规则/u);
   assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
@@ -186,7 +187,7 @@ test("dev flow state observatory: English anchors stay paired with the concept l
     ["协同记录", "Workflow / Task"],
     ["流程轨迹", "ProcessRuntime"],
     ["事实定义", "Fact / Ledger"],
-    ["单据状态", "State Machine"],
+    ["状态与流转规则", "State Machine"],
   ]) {
     assert(
       page.includes(`label: '${label}',\n    englishLabel: '${englishLabel}',`),
@@ -218,7 +219,7 @@ test("dev flow state observatory: pasted business text search is local, grouped,
     "label: '业务链'",
     "label: 'Workflow'",
     "label: 'ProcessRuntime'",
-    "label: '状态机'",
+    "label: '状态与流转规则'",
     "label: 'Fact / Ledger'",
   ]) {
     assert(helper.includes(group), `missing grouped result: ${group}`);

@@ -45,7 +45,7 @@ const VIEW_ITEMS = Object.freeze([
   },
   {
     value: 'states',
-    label: '单据状态',
+    label: '状态与流转规则',
     englishLabel: 'State Machine',
     description: '对象有哪些状态、允许怎样转换',
   },

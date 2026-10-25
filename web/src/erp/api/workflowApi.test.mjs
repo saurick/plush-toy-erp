@@ -1516,3 +1516,22 @@ test('task handling chain defaults to task scope and keeps order scope explicit'
   for (const view of ['', 'all', null, true]) await assert.rejects(api.getWorkflowTaskHandlingChain(41, { view }), /范围无效/u)
   assert.equal(calls.length, 2)
 })
+
+test('workflowApi: older event cursors are bounded, ordered and never sent as request options', async () => {
+  const calls = []
+  const controller = new AbortController()
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    calls.push({ method, params, options })
+    return { data: { items: [{ id: 9 }, { id: 8 }], truncated: false } }
+  })
+  await api.listWorkflowTaskEvents(42, { limit: 2, beforeEventId: 10, signal: controller.signal })
+  assert.deepEqual(calls[0].params, { task_id: 42, limit: 2, before_event_id: 10 })
+  assert.equal(calls[0].options.signal, controller.signal)
+  for (const beforeEventId of [-1, 1.5, 'invalid']) {
+    await assert.rejects(api.listWorkflowTaskEvents(42, { beforeEventId }), /任务轨迹参数无效/u)
+  }
+  for (const items of [[{ id: 10 }], [{ id: 9 }, { id: 9 }], [{ id: 8 }, { id: 9 }], [{ id: 0 }]]) {
+    const malformed = await loadWorkflowApi(async () => ({ data: { items, truncated: false } }))
+    await assert.rejects(malformed.listWorkflowTaskEvents(42, { beforeEventId: 10 }), /返回格式无效/u)
+  }
+})

@@ -580,8 +580,8 @@ test('devFlowStateCatalog: 工程用料审批保持冻结总需求与采购边�
   assert.equal(financeApproval.factBoundary, 'source_document_only')
 })
 
-test('devFlowStateCatalog: 33 个状态集合与后端 canonical contract 全等', () => {
-  for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
+test('devFlowStateCatalog: 所有生命周期及结果维度与后端 canonical contract 全等', () => {
+  for (const flow of DEV_FLOW_STATE_CATALOG.flows.flatMap((item) => [item, ...item.dimensions])) {
     assert.deepEqual(
       flow.states.map((item) => item.key),
       readCanonicalStatusContract(repoRoot, flow.contractRef),
@@ -627,7 +627,7 @@ test('devFlowStateCatalog: 高风险对象登记完整决策、过账、取消�
   )
   assert.deepEqual(
     getDevFlowStateMachine('fact.finance').transitions.map((item) => item.key),
-    ['DRAFT->POSTED', 'POSTED->SETTLED', 'SETTLED->POSTED', 'POSTED->CANCELLED']
+    ['DRAFT->POSTED', 'DRAFT->CANCELLED', 'POSTED->SETTLED', 'SETTLED->POSTED', 'POSTED->CANCELLED']
   )
   assert.deepEqual(getDevFlowStateMachine('fact.finance').terminalStates, [
     'CANCELLED',
@@ -658,7 +658,7 @@ test('devFlowStateCatalog: 高风险对象登记完整决策、过账、取消�
   )
   assert.equal(
     getDevFlowStateMachine('fact.shipment_finance_release').kind,
-    'taxonomy'
+    'state_machine'
   )
   assert.equal(
     getDevFlowStateMachine('control.customer_config_revision')
@@ -690,7 +690,7 @@ test('devFlowStateCatalog: pathKinds 仅来自受限 registry 且无孤儿边', 
         assert(DEV_FLOW_PATH_KINDS.includes(pathKind))
       }
       if (edge.pathKinds.length === 0) continue
-      assert(edge.permission.length > 0)
+      assert(edge.systemOnly || edge.permission.length > 0)
       assert(edge.guard)
       assert(edge.action)
       assert(edge.factBoundary)
@@ -787,6 +787,11 @@ test('devFlowStateCatalog: 九个语义层与 scope 分离', () => {
 
 test('devFlowStateCatalog: Process variant、节点、命令与分支边精确对照后端 registry', () => {
   const canonicalCatalog = readCanonicalProcessContractCatalog(repoRoot)
+  for (const [flowKey, transitions] of Object.entries(canonicalCatalog.stateTransitions)) {
+    const flow = getDevFlowStateMachine(flowKey)
+    assert.deepEqual(flow.transitions.filter((edge) => !edge.systemOnly).map((edge) => edge.key).sort(), transitions, `${flowKey}: backend transition predicate drift`)
+  }
+
   const canonicalByKey = new Map(
     canonicalCatalog.processDefinitions.map((definition) => [
       `${definition.process_key}/${definition.variant_key}`,
@@ -1111,4 +1116,23 @@ test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源�
     ['批准', '拒绝', '尚未入库的在制批次',
     '已经正式入库的批次', '超领额度']
   )
+})
+
+test('recovery, withdrawal and draft cancellation remain visible without inventing public actions', () => {
+  const instance = getDevFlowStateMachine('process.instance')
+  assert.deepEqual(instance.terminalStates, ['completed'])
+  assert(canDevFlowStateTransition('process.instance', 'blocked', 'active'))
+  assert(canDevFlowStateTransition('process.instance', 'blocked', 'completed'))
+  for (const from of ['ready', 'blocked']) {
+    const edge = getDevFlowStateMachine('workflow.task').transitions.find((item) => item.from === from && item.to === 'withdrawn')
+    assert.equal(edge.systemOnly, true)
+    assert.deepEqual(edge.permission, [])
+  }
+  for (const key of ['fact.production', 'fact.outsourcing', 'fact.finance']) {
+    assert(canDevFlowStateTransition(key, 'DRAFT', 'CANCELLED'))
+  }
+  assert(canDevFlowStateTransition('fact.shipment_finance_release', 'PENDING', 'APPROVED'))
+  assert(canDevFlowStateTransition('fact.shipment_finance_release', 'PENDING', 'REJECTED'))
+  assert.equal(canDevFlowStateTransition('fact.shipment_finance_release', 'REJECTED', 'APPROVED'), false)
+  assert.equal(DEV_FLOW_STATE_CATALOG.flows.flatMap((flow) => flow.dimensions).length, 5)
 })

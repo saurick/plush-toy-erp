@@ -21873,6 +21873,7 @@
     },
     "message": "OK",
     "params": {
+      "before_event_id": 0,
       "limit": 100,
       "task_id": 42
     },

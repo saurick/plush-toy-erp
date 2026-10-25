@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { DEV_FLOW_STATE_CATALOG } from '../config/devFlowStateCatalog.mjs'
 
 import {
   buildDevFlowDefinitionSearchGroups,
@@ -234,4 +235,11 @@ test('definition search does not treat a database id as a definition lookup key'
     groups.reduce((count, item) => count + item.items.length, 0),
     0
   )
+})
+
+test('definition search and object picker discover independent result dimensions', () => {
+  for (const [query, key] of [['让步接收', 'fact.quality_inspection'], ['domain_command_effect_state', 'process.node'], ['模块可用状态', 'control.customer_config_revision']]) {
+    assert(group(buildDevFlowDefinitionSearchGroups(DEV_FLOW_STATE_CATALOG, query), 'states').some((item) => item.key === key), query)
+    assert.equal(createDevFlowDefinitionOptionFilter(DEV_FLOW_STATE_CATALOG, 'states')(query, { value: key }), true, query)
+  }
 })

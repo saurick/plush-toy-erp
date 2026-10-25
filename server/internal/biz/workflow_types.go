@@ -301,7 +301,7 @@ type WorkflowRepo interface {
 }
 
 type WorkflowTaskEventReader interface {
-	ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int) ([]*WorkflowTaskEvent, error)
+	ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int, beforeEventID int) ([]*WorkflowTaskEvent, error)
 }
 
 type WorkflowUsecase struct {

@@ -326,12 +326,13 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownWorkflowTaskParams(pm, method, "task_id", "limit"); res != nil {
+		if res := rejectUnknownWorkflowTaskParams(pm, method, "task_id", "limit", "before_event_id"); res != nil {
 			return id, res, nil
 		}
 		taskID := getInt(pm, "task_id", 0)
 		limit := getInt(pm, "limit", 50)
-		if taskID <= 0 || limit < 1 || limit > biz.WorkflowTaskEventPageMaxLimit {
+		beforeEventID, validCursor := getOptionalWorkflowTaskBoardInteger(pm, "before_event_id", 0, 0)
+		if taskID <= 0 || limit < 1 || limit > biz.WorkflowTaskEventPageMaxLimit || !validCursor {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务轨迹参数不完整"}, nil
 		}
 		admin, adminRes := d.CurrentAdmin(ctx)
@@ -349,7 +350,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !biz.WorkflowTaskVisibilityScopeIncludesTask(visibilityScope, task) {
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
-		events, err := d.workflowUC.ListTaskEvents(ctx, taskID, limit+1)
+		events, err := d.workflowUC.ListTaskEvents(ctx, taskID, limit+1, beforeEventID)
 		if err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
 		}

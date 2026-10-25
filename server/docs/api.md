@@ -416,7 +416,7 @@ HTTP 路由：
 
 无流程锚点的任务显示未关联流程；验收批次不作为业务来源，造数性质只保存在工具回执，不由业务 payload 决定。
 
-`list_task_events` 只接受 `task_id` 和 `1..100` 的 `limit`，按当前任务可见范围校验后返回该任务最近事件，顺序为最新在前。响应保留任务版本、事件类型、状态变化、处理岗位、意见和时间，不返回操作者内部 ID。它只回答一条普通或审批任务如何被处理，不是来源单据的完整审批链；跨节点业务轨迹以 `get_task_process_context` 为准，库存、出货、质检和财务事实仍以各领域读模型为准。
+`list_task_events` 接受 `task_id`、`1..100` 的 `limit` 和可选非负整数 `before_event_id`（默认 0 表示最新页）。每页按当前任务可见范围校验，只返回该任务 ID 小于游标的事件，按事件 ID 倒序；`truncated=true` 时以当前页最后一条 ID 继续读取，新增事件不改变旧页边界。响应保留任务版本、事件类型、状态变化、处理岗位、意见和时间，不返回操作者内部 ID。它只回答一条普通或审批任务如何被处理，不是来源单据的完整审批链；跨节点业务轨迹以 `get_task_process_context` 为准，库存、出货、质检和财务事实仍以各领域读模型为准。
 
 任务转交是独立的归属控制动作，不属于上述普通完成 / 阻塞 / 退回代办。
 
@@ -60069,22 +60069,22 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `assignee_id` | integer | 按业务条件 | 解析器 `getWorkflowPositiveIntPtr`；调用 `getWorkflowPositiveIntPtr(pm, "assignee_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:463`。 |
-| `business_status_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "business_status_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:458`。 |
-| `due_at` | integer &#124; null | 可选 | 解析器 `getWorkflowUnixTimePtr`；调用 `getWorkflowUnixTimePtr(pm, "due_at")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:432`。 |
-| `idempotency_key` | string | 必填 | 拒绝条件：“!ok &#124;&#124; strings.TrimSpace(idempotencyKey) == ""”。 依据：`server/internal/service/jsonrpc_workflow_task.go:417`。 |
-| `owner_pool_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "owner_pool_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:461`。 |
-| `owner_role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:460`。 |
-| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:424`。 |
+| `assignee_id` | integer | 按业务条件 | 解析器 `getWorkflowPositiveIntPtr`；调用 `getWorkflowPositiveIntPtr(pm, "assignee_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:464`。 |
+| `business_status_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "business_status_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:459`。 |
+| `due_at` | integer &#124; null | 可选 | 解析器 `getWorkflowUnixTimePtr`；调用 `getWorkflowUnixTimePtr(pm, "due_at")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:433`。 |
+| `idempotency_key` | string | 必填 | 拒绝条件：“!ok &#124;&#124; strings.TrimSpace(idempotencyKey) == ""”。 依据：`server/internal/service/jsonrpc_workflow_task.go:418`。 |
+| `owner_pool_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "owner_pool_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:462`。 |
+| `owner_role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:461`。 |
+| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:425`。 |
 | `priority` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(m, "priority", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_shared.go:395`。 |
-| `required_capability_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "required_capability_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:462`。 |
-| `source_id` | integer | 条件必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "source_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validSourceID”。 依据：`server/internal/service/jsonrpc_workflow_task.go:439`。 |
-| `source_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "source_no")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:457`。 |
-| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:455`。 |
-| `task_code` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_code")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:452`。 |
-| `task_group` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_group")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:453`。 |
-| `task_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:454`。 |
-| `task_status_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_status_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:459`。 |
+| `required_capability_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "required_capability_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:463`。 |
+| `source_id` | integer | 条件必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "source_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validSourceID”。 依据：`server/internal/service/jsonrpc_workflow_task.go:440`。 |
+| `source_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "source_no")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:458`。 |
+| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:456`。 |
+| `task_code` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_code")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:453`。 |
+| `task_group` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_group")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:454`。 |
+| `task_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:455`。 |
+| `task_status_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_status_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:460`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -60120,7 +60120,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:474`。 |
+| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:475`。 |
 
 **`task`**
 
@@ -61801,7 +61801,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `task_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "task_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:371`。 |
+| `task_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "task_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:372`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -61828,7 +61828,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.process_context` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:403`。 |
+| `result.data.process_context` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:404`。 |
 
 **`process_context`**
 
@@ -63207,6 +63207,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
+| `before_event_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "before_event_id", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task.go:334`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:333`。 |
 | `task_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "task_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:332`。 |
 
@@ -63217,6 +63218,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "jsonrpc": "2.0",
   "method": "list_task_events",
   "params": {
+    "before_event_id": 0,
     "limit": 100,
     "task_id": 42
   },
@@ -63236,7 +63238,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_workflow_task.go:361`。 |
+| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_workflow_task.go:362`。 |
 | `result.data.items[]` | object | 依据：`server/internal/service/jsonrpc_workflow_shared.go:175`。 |
 
 **`items[]`**
@@ -63260,7 +63262,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.truncated` | boolean | 依据：`server/internal/service/jsonrpc_workflow_task.go:362`。 |
+| `result.data.truncated` | boolean | 依据：`server/internal/service/jsonrpc_workflow_task.go:363`。 |
 
 ```json
 {
@@ -64703,11 +64705,11 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `action` | string | 必填 | 拒绝条件：“!actionExists &#124;&#124; !actionIsString &#124;&#124; action != strings.TrimSpace(action) &#124;&#124; !biz.IsValidWorkflowTaskUrgeAction(action)”。 依据：`server/internal/service/jsonrpc_workflow_task.go:529`。 |
+| `action` | string | 必填 | 拒绝条件：“!actionExists &#124;&#124; !actionIsString &#124;&#124; action != strings.TrimSpace(action) &#124;&#124; !biz.IsValidWorkflowTaskUrgeAction(action)”。 依据：`server/internal/service/jsonrpc_workflow_task.go:530`。 |
 | `expected_version` | integer | 必填 | 解析器 `getRequiredWorkflowPositiveInteger`；调用 `getRequiredWorkflowPositiveInteger(pm, "expected_version", "任务版本信息缺失或已失效，请刷新后重试")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task_action.go:393`。 |
 | `idempotency_key` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !ok”。 拒绝条件：“key == "" &#124;&#124; utf8.RuneCountInString(key) > 128”。 依据：`server/internal/service/jsonrpc_workflow_task_action.go:398`。 |
-| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:553`。 |
-| `reason` | string | 必填 | 解析器 `getRequiredWorkflowString`；调用 `getRequiredWorkflowString(pm, "reason", "催办原因不能为空")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:533`。 |
+| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:554`。 |
+| `reason` | string | 必填 | 解析器 `getRequiredWorkflowString`；调用 `getRequiredWorkflowString(pm, "reason", "催办原因不能为空")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:534`。 |
 | `task_id` | integer | 必填 | 解析器 `getRequiredWorkflowPositiveInteger`；调用 `getRequiredWorkflowPositiveInteger(pm, "task_id", "task_id 必须是大于 0 的安全整数")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task_action.go:389`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
@@ -64749,7 +64751,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:581`。 |
+| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:582`。 |
 
 **`task`**
 

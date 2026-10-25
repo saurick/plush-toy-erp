@@ -541,9 +541,25 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 	if len(events) != 4 {
 		t.Fatalf("expected created + blocked + resumed + rejected events only, got %d", len(events))
 	}
-	readEvents, err := repo.ListWorkflowTaskEvents(ctx, task.ID, 10)
+	readEvents, err := repo.ListWorkflowTaskEvents(ctx, task.ID, 10, 0)
 	if err != nil || len(readEvents) != 4 {
 		t.Fatalf("list task events with actor identity: events=%d err=%v", len(readEvents), err)
+	}
+	firstPage, err := repo.ListWorkflowTaskEvents(ctx, task.ID, 2, 0)
+	if err != nil || len(firstPage) != 2 || firstPage[0].ID <= firstPage[1].ID {
+		t.Fatalf("first event page must be newest first: %#v err=%v", firstPage, err)
+	}
+	// A concurrent new event must not shift an older-page cursor.
+	_, err = client.WorkflowTaskEvent.Create().SetTaskID(task.ID).SetEventType("payload_refreshed").SetPayload(map[string]any{}).Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	olderPage, err := repo.ListWorkflowTaskEvents(ctx, task.ID, 2, firstPage[1].ID)
+	if err != nil || len(olderPage) != 2 || olderPage[0].ID != readEvents[2].ID || olderPage[1].ID != readEvents[3].ID {
+		t.Fatalf("older cursor must preserve every earlier event without duplicates: %#v err=%v", olderPage, err)
+	}
+	if _, err := repo.ListWorkflowTaskEvents(ctx, task.ID, 2, -1); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("negative cursor must fail: %v", err)
 	}
 	for _, event := range readEvents {
 		if event.ActorID != nil && *event.ActorID == actor.ID &&

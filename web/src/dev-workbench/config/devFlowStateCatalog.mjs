@@ -233,6 +233,20 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'workflow.task:ready->blocked': pathMetadata(['blocked']),
   'workflow.task:ready->rejected': pathMetadata(['rejected']),
   'workflow.task:blocked->ready': pathMetadata(['resumed']),
+  'workflow.task:ready->withdrawn': pathMetadata(['cancelled']),
+  'workflow.task:blocked->withdrawn': pathMetadata(['cancelled']),
+  'process.instance:active->blocked': pathMetadata(['blocked']),
+  'process.instance:blocked->active': pathMetadata(['resumed']),
+  'process.instance:blocked->completed': pathMetadata(['cancelled']),
+  'process.node:active->blocked': pathMetadata(['blocked']),
+  'process.node:blocked->active': pathMetadata(['resumed']),
+  'process.node:waiting->withdrawn': pathMetadata(['cancelled']),
+  'process.node:active->withdrawn': pathMetadata(['cancelled']),
+  'process.node:blocked->withdrawn': pathMetadata(['cancelled']),
+  'fact.production:DRAFT->CANCELLED': pathMetadata(['cancelled']),
+  'fact.outsourcing:DRAFT->CANCELLED': pathMetadata(['cancelled']),
+  'fact.finance:DRAFT->CANCELLED': pathMetadata(['cancelled']),
+  'fact.shipment_finance_release:PENDING->REJECTED': pathMetadata(['rejected']),
   'fact.purchase_receipt:DRAFT->CANCELLED': pathMetadata(['cancelled']),
   'fact.purchase_receipt:POSTED->CANCELLED': pathMetadata([
     'cancelled',
@@ -337,6 +351,7 @@ const transition = (
     guard,
     action,
     permission = [],
+    systemOnly = false,
     factBoundary,
     sourceRefs = [],
     evidence: transitionEvidence = [],
@@ -349,6 +364,7 @@ const transition = (
   guard,
   action,
   permission,
+  systemOnly,
   factBoundary,
   sourceRefs,
   evidence: transitionEvidence,
@@ -436,6 +452,55 @@ function normalizeEvidence(items = [], ownerKey = '') {
       return Object.freeze({ ...item })
     })
   )
+}
+
+const RULE_DIMENSIONS = Object.freeze({
+  'process.instance': [{
+    key: 'resolution_kind',
+label: '流程结束结果',
+    states: [state('succeeded', '成功结束'), state('rejected', '驳回结束'), state('cancelled', '取消结束'), state('compensated', '补偿结束')],
+    guard: '实例 completed 必须结合结束结果、原因和时间阅读。来源取消或正式补偿可更新已结束实例的结果，不重开或重放领域副作用。',
+    contractRef: entCheckContract('server/internal/data/model/schema/process_instance.go', 'process_instances_resolution_allowed', 'resolution_kind'),
+  }],
+  'process.node': [{
+    key: 'domain_command_result_state',
+label: '领域命令执行结果',
+    states: [state('succeeded', '执行成功'), state('blocked', '执行受阻')],
+    guard: '结果属于一次节点尝试的持久回执；受阻恢复不删除旧回执或假定副作用未发生。',
+    contractRef: goConstContract('server/internal/biz/process_runtime.go', 'ProcessDomainCommandResultState'),
+    schemaStatusRefs: [schemaStatusRef('server/internal/data/model/schema/process_node_instance.go', 'domain_command_result_state')],
+  }, {
+    key: 'domain_command_effect_state',
+label: '领域副作用与补偿',
+    states: [state('unknown', '影响待确认'), state('none', '没有业务副作用'), state('applied', '业务影响已生效'), state('compensated', '业务影响已补偿')],
+    guard: '这些是结果维度，不是顺序步骤。已生效影响经正式取消或冲正、精确回执校验后才能记为已补偿；恢复必须验证下游安全并撤回受影响任务，不能重放原命令。',
+    contractRef: goConstContract('server/internal/biz/process_runtime.go', 'ProcessDomainCommandEffectState'),
+    schemaStatusRefs: [schemaStatusRef('server/internal/data/model/schema/process_node_instance.go', 'domain_command_effect_state')],
+  }],
+  'fact.quality_inspection': [{
+    key: 'result',
+label: '质检判定结果',
+    states: [state('PASS', '合格'), state('REJECT', '不合格'), state('CONCESSION', '让步接收')],
+    guard: '检验生命周期与判定结果分开：PASSED 可对应 PASS 或 CONCESSION，不能把让步接收显示成普通合格；无结论时不推测结果。',
+    contractRef: entCheckContract('server/internal/data/model/schema/quality_inspection.go', 'quality_inspections_result_allowed', 'result'),
+  }],
+  'control.customer_config_revision': [{
+    key: 'module_availability',
+label: '模块可用状态',
+    states: [state('enabled', '可读写'), state('read_only', '只读'), state('disabled', '停用')],
+    guard: '模块可用状态经客户配置发布、切换检查和激活生效，决定入口与动作是否可用；属于配置控制面，不是订单办理步骤。',
+    contractRef: { kind: 'go_comparison_set', path: 'server/internal/biz/customer_config_validation.go', selector: 'item.State' },
+    schemaStatusRefs: [schemaStatusRef('server/internal/data/model/schema/deployment_module_state.go', 'state')],
+  }],
+})
+
+function normalizeRuleDimensions(flowKey) {
+  return Object.freeze((RULE_DIMENSIONS[flowKey] || []).map((dimension) => Object.freeze({
+    ...dimension,
+    states: Object.freeze(dimension.states.map((item) => Object.freeze(item))),
+    contractRef: freezeContractRef(dimension.contractRef, `${flowKey}.${dimension.key}`),
+    schemaStatusRefs: freezeSchemaStatusRefs(`${flowKey}.${dimension.key}`, dimension.schemaStatusRefs),
+  })))
 }
 
 function normalizeFlow(definition) {
@@ -542,6 +607,7 @@ function normalizeFlow(definition) {
       }
       if (
         pathKinds.length > 0 &&
+        !(definition.kind === 'runtime' || item.systemOnly) &&
         (!Array.isArray(item.permission) || item.permission.length === 0)
       ) {
         throw new Error(
@@ -565,6 +631,7 @@ function normalizeFlow(definition) {
         to: item.to,
         guard: item.guard,
         action: item.action,
+        systemOnly: definition.kind === 'runtime' || item.systemOnly,
         permission: freezeStrings(unique(item.permission || [])),
         factBoundary: item.factBoundary,
         pathKinds: freezeStrings(pathKinds),
@@ -636,6 +703,7 @@ function normalizeFlow(definition) {
     unknownStatePolicy: 'fail_closed',
     transitionAuthority,
     terminalPolicy,
+    dimensions: normalizeRuleDimensions(definition.key),
     linearLifecycle: definition.linearLifecycle !== false,
     initialStates: freezeStrings(initialStates),
     terminalStates: freezeStrings(terminalStates),
@@ -1257,7 +1325,7 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'workflow_task',
     kind: 'state_machine',
     label: 'Workflow 协同任务',
-    summary: '任务只表达岗位协同是否可执行、阻塞、完成或退回。',
+    summary: '任务表达可执行、阻塞、完成、退回或系统撤回；任务完成不替代业务事实。',
     states: [
       state('ready', '可执行'),
       state('blocked', '阻塞'),
@@ -1292,6 +1360,14 @@ const FLOW_DEFINITIONS = [
         permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
         factBoundary: 'workflow_only',
       }),
+      ...['ready', 'blocked'].map((from) => transition(from, 'withdrawn', {
+        guard: '仅来源取消、流程终止或上游补偿恢复由系统撤回；校验来源、任务与节点版本，保留撤回原因；无通用人工撤回入口。',
+        action: 'ProcessRuntime internal withdrawal',
+        permission: [],
+        systemOnly: true,
+        factBoundary: 'workflow_only',
+        sourceRefs: ['server/internal/data/process_runtime_source_resolution.go', 'server/internal/data/process_runtime_repo.go'],
+      })),
     ],
     guard:
       'task done 不等于 Fact posted；withdrawn 仅由来源取消、流程终止或上游补偿触发；终态任务不重开。',
@@ -1364,17 +1440,17 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'process_runtime',
     kind: 'runtime',
     label: 'ProcessRuntime 实例',
-    summary: '流程实例只能运行、完成或阻塞。',
+    summary: '流程受阻可恢复；结束时另记成功、驳回、取消或补偿结果。',
     states: [
       state('active', '运行中'),
       state('completed', '已完成'),
       state('blocked', '已阻塞'),
     ],
     initialStates: ['active'],
-    terminalStates: ['completed', 'blocked'],
+    terminalStates: ['completed'],
     transitions: [
       transition('active', 'completed', {
-        guard: '所有节点按冻结流程合同结算后，由 runtime 完成实例。',
+        guard: '选定路径按冻结流程合同结算后结束；来源取消或补偿恢复也可终止。必须同时读取 resolution_kind、原因与时间，completed 不表示一定成功。',
         action: 'ProcessRuntimeUsecase.CompleteProcessInstance',
         permission: [],
         factBoundary: 'orchestration_only',
@@ -1384,6 +1460,19 @@ const FLOW_DEFINITIONS = [
         action: 'ProcessRuntimeUsecase.BlockProcessInstance',
         permission: [],
         factBoundary: 'orchestration_only',
+      }),
+      transition('blocked', 'active', {
+        guard: '仅受控恢复动作，校验实例、节点和任务版本并记录非空恢复原因；保留原 attempt。',
+        action: 'ProcessRuntimeUsecase.ResumeBlockedProcess',
+        permission: [],
+        factBoundary: 'orchestration_only',
+      }),
+      transition('blocked', 'completed', {
+        guard: '仅正式来源取消或已确认补偿的恢复决策可终止；保留结束结果、原因、时间及下游撤回证据，不把阻塞改成成功。',
+        action: 'ProcessRuntime source cancellation / compensation recovery',
+        permission: [],
+        factBoundary: 'orchestration_only',
+        sourceRefs: ['server/internal/data/process_runtime_source_resolution.go', 'server/internal/data/process_runtime_repo.go'],
       }),
     ],
     guard: '实例状态由 runtime 内部推进，外部没有通用 set_status。',
@@ -1450,18 +1539,21 @@ const FLOW_DEFINITIONS = [
         guard: '仅来源取消、流程终止或上游补偿恢复可触发。',
         action: 'ProcessRuntime internal withdrawal',
         permission: [],
+        systemOnly: true,
         factBoundary: 'orchestration_only',
       }),
       transition('active', 'withdrawn', {
         guard: '仅来源取消、流程终止或上游补偿恢复可触发。',
         action: 'ProcessRuntime internal withdrawal',
         permission: [],
+        systemOnly: true,
         factBoundary: 'orchestration_only',
       }),
       transition('blocked', 'withdrawn', {
         guard: '仅来源取消、流程终止或上游补偿恢复可触发。',
         action: 'ProcessRuntime internal withdrawal',
         permission: [],
+        systemOnly: true,
         factBoundary: 'orchestration_only',
       }),
     ],
@@ -1731,6 +1823,13 @@ const FLOW_DEFINITIONS = [
         permission: item.postPermission,
         factBoundary: 'fact_ledger',
       }),
+      transition('DRAFT', 'CANCELLED', {
+        guard: '仅合法生产单或委外订单来源的草稿，校验来源、版本、原因与幂等；不生成库存冲正，释放对应草稿占用并保留审计。',
+        action: item.cancelAction,
+        permission: item.cancelPermission,
+        factBoundary: 'fact_ledger',
+        sourceRefs: ['server/internal/data/operational_fact_draft_cancellation_test.go'],
+      }),
       transition('POSTED', 'CANCELLED', {
         guard: '取消通过对应领域 usecase 保留冲正与审计证据。',
         action: item.cancelAction,
@@ -1829,6 +1928,13 @@ const FLOW_DEFINITIONS = [
           PermissionCode.FINANCE_RECONCILIATION_CONFIRM,
         ],
         factBoundary: 'fact_ledger',
+      }),
+      transition('DRAFT', 'CANCELLED', {
+        guard: '仅正式来源的财务草稿可取消，校验来源、版本、操作者、非空原因与幂等；不产生收付款、核销或库存影响。',
+        action: 'cancel_finance_fact',
+        permission: [PermissionCode.FINANCE_RECEIVABLE_CONFIRM, PermissionCode.FINANCE_PAYABLE_CONFIRM, PermissionCode.FINANCE_INVOICE_CONFIRM, PermissionCode.FINANCE_RECONCILIATION_CONFIRM],
+        factBoundary: 'fact_ledger',
+        sourceRefs: ['server/internal/data/operational_fact_draft_cancellation_test.go'],
       }),
       transition('POSTED', 'SETTLED', {
         guard:
@@ -2312,7 +2418,7 @@ const FLOW_DEFINITIONS = [
   {
     key: 'fact.shipment_finance_release',
     scopeKey: 'fact_ledger',
-    kind: 'taxonomy',
+    kind: 'state_machine',
     label: '出货财务放行',
     summary: '出货单财务放行字段与真实 SHIPPED 状态分开。',
     states: [
@@ -2322,10 +2428,22 @@ const FLOW_DEFINITIONS = [
     ],
     initialStates: ['PENDING'],
     terminalStates: ['APPROVED', 'REJECTED'],
-    transitions: [],
-    transitionAuthority: 'object-specific',
+    transitions: [
+      transition('PENDING', 'APPROVED', {
+        guard: '仅出货审批同意分支的领域命令；校验出货单与财务放行版本、冻结审批节点和幂等回执。',
+        action: 'RecordShipmentFinanceReleaseProcessCommand',
+        permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
+        factBoundary: 'shipment_release_not_shipped',
+      }),
+      transition('PENDING', 'REJECTED', {
+        guard: '仅出货审批驳回分支的领域命令；校验版本与非空原因，保留驳回回执，不产生出库或应收。',
+        action: 'RecordShipmentFinanceRejectionProcessCommand',
+        permission: [PermissionCode.WORKFLOW_TASK_REJECT],
+        factBoundary: 'shipment_release_not_shipped',
+      }),
+    ],
     guard:
-      '商业出货由流程命令把 PENDING 写为 APPROVED；目录不为 REJECTED 猜测通用迁移边。',
+      '财务审批由命名领域命令记录放行或驳回；两者均不等于实际出货，当前没有驳回后直接改成放行的通用动作。',
     factBoundary: 'shipment_release_not_shipped',
     sourceRefs: [
       'server/internal/biz/process_runtime.go',
@@ -2338,7 +2456,7 @@ const FLOW_DEFINITIONS = [
       evidence(
         'code',
         'server/internal/data/operational_fact_shipment_repo.go',
-        '财务放行命令仅在精确门禁下写 APPROVED。'
+        '财务放行与驳回命令按精确版本门禁从 PENDING 写入 APPROVED 或 REJECTED。'
       ),
     ],
   },

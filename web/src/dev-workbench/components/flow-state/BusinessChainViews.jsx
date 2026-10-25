@@ -45,7 +45,7 @@ const CHAIN_LAYER_PRESENTATION = Object.freeze({
     color: 'blue',
     responsibility: '由具有该单据权限的业务经办岗位办理。',
     completion:
-      '完成该单据允许的当前动作后，才按业务链进入下一步；单据状态不等于业务事实已经生效。',
+      '完成该单据允许的当前动作后，才按业务链进入下一步；状态与流转规则不等于业务事实已经生效。',
     exception:
       '单据被退回、取消或关闭时，按该业务对象的状态规则处理，不在本页直接改状态。',
   },

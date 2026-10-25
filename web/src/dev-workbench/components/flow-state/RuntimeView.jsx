@@ -28,7 +28,7 @@ import {
   formatProcessStartedAt,
   getProcessLabel,
   getProcessNodeLabel,
-  getProcessNodeStatusLabel,
+  buildWorkflowProcessStageModel,
   getProcessStatusLabel,
   getWorkflowTaskDisplayName,
 } from '@/erp/utils/processRuntimePresentation.mjs'
@@ -204,6 +204,7 @@ function RuntimeView({
   const [revision, setRevision] = useState(0)
   const runtime = useRuntimeContext(taskId, association, revision)
   const nodes = asArray(runtime.context?.nodes)
+  const stageModel = runtime.status === 'ready' ? buildWorkflowProcessStageModel(runtime.context) : null
   const runtimeResponsibility = useMemo(() => buildDevFlowRuntimeResponsibility({
     definitions: catalog.processDefinitions,
     context: runtime.context,
@@ -239,7 +240,7 @@ function RuntimeView({
                 optionRender={renderDefinitionSelectOption}
                 onChange={onSelectDefinition}
               />
-            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前业务没有登记流程定义，可查看单据状态或事实定义。" />}
+            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前业务没有登记流程定义，可查看状态与流转规则或事实定义。" />}
           </section>
           {definition ? <ProcessDefinitionCard key={definition.key} definition={definition} /> : definitions.length > 0 ? <WorkbenchEmpty title="请选择流程定义" /> : null}
         </>
@@ -259,6 +260,8 @@ function RuntimeView({
           <WorkbenchFacts items={[
             { label: '来源单号', value: runtime.context.source?.no || '未声明' },
             { label: '发起时间', value: formatProcessStartedAt(runtime.context.process_instance.started_at) },
+            ...(runtime.context.process_instance.resolved_at ? [{ label: '结束时间', value: formatProcessStartedAt(runtime.context.process_instance.resolved_at) }] : []),
+            ...(runtime.context.process_instance.resolution_reason ? [{ label: '结束原因', value: runtime.context.process_instance.resolution_reason }] : []),
             { label: '当前环节', value: currentNodes.map(getProcessNodeLabel).join('、') || '无运行中节点' },
             { label: '负责岗位', value: runtimeResponsibility.currentItems.map((item) => item.runtimeRoleKey ? getProcessOwnerPoolLabel(item.runtimeRoleKey) : '运行实例未返回责任岗位').join('、') || '无运行中节点' },
             ...(selectedTask?.blocked_reason ? [{ label: '当前原因', value: selectedTask.blocked_reason }] : []),
@@ -266,14 +269,20 @@ function RuntimeView({
           />
           {responsibilityMismatch ? <Alert type="warning" showIcon message="流程与任务的责任岗位存在差异，请核对责任来源。" /> : null}
           <ol className="erp-dev-flow-runtime-nodes" aria-label="实际流程节点">
-            {nodes.map((node) => (
-              <li key={node.id} data-node-status={node.status} aria-current={['active', 'blocked'].includes(node.status) ? 'step' : undefined}>
-                <span>{node.status === 'completed' ? <CheckCircleOutlined /> : node.status === 'blocked' ? <ExclamationCircleOutlined /> : <ClockCircleOutlined />}</span>
-                <div><strong>{getProcessNodeLabel(node)}</strong>{node.attempt > 1 ? <small>第 {node.attempt} 次尝试</small> : null}</div>
-                <Tag color={PROCESS_STATUS_COLORS[node.status]}>{getProcessNodeStatusLabel(node)}</Tag>
+            {stageModel.items.map((item) => (
+              <li key={item.key} data-node-status={nodes.find((node) => node.id === item.id)?.status} data-node-tone={item.tone} aria-current={item.current ? 'step' : undefined}>
+                <span>{item.tone === 'blocked' || item.tone === 'rejected' ? <ExclamationCircleOutlined /> : item.completed ? <CheckCircleOutlined /> : <ClockCircleOutlined />}</span>
+                <div>
+                  <strong>{item.label}</strong>{item.attemptLabel ? <small>{item.attemptLabel}</small> : null}
+                  {item.startedAtLabel ? <small>开始：{item.startedAtLabel}</small> : null}
+                  {item.completedAtLabel ? <small>结束：{item.completedAtLabel}</small> : null}
+                </div>
+                <Tag color={item.tone === 'blocked' || item.tone === 'rejected' ? 'red' : item.current ? 'orange' : 'default'}>{item.statusLabel}</Tag>
               </li>
             ))}
           </ol>
+          {stageModel.items.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚无已发生的流程步骤" /> : null}
+          {stageModel.hasUndecidedRoute ? <p>尚有待确定的后续路径；未激活分支不列为已发生步骤。</p> : null}
           <Text type="secondary">流程节点完成不代表库存、出货或财务结果已生效。</Text>
           <EvidenceDisclosure label="运行依据与责任核对">
             <WorkbenchFacts items={[

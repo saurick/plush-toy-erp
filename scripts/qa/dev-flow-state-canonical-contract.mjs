@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 const ENT_SCHEMA_DIRECTORY = 'server/internal/data/model/schema'
 const ENT_FIELD_DECLARATION_PATTERN = /field\.(?:String|Enum)\(\s*"([^"]+)"/gu
-const STATUS_OWNER_FIELD_PATTERN = /(?:^status$|_status(?:_key)?$)/u
+const STATUS_OWNER_FIELD_PATTERN = /(?:^status$|_status(?:_key)?$|^state$|_state$|^result$|^resolution_kind$)/u
 const STATUS_SNAPSHOT_FIELD_PATTERN = /^(?:from|to|original|previous)_/u
 
 function escapeRegExp(value) {
@@ -87,7 +87,7 @@ export function collectObservedSchemaStatusOwners(flows) {
     throw new Error('observer flows are required')
   }
   const owners = new Map()
-  for (const flow of flows) {
+  for (const flow of flows.flatMap((item) => [item, ...(item.dimensions || []).map((dimension) => ({ ...dimension, key: `${item.key}.${dimension.key}` }))])) {
     if (!flow || typeof flow.key !== 'string' || flow.key.length === 0) {
       throw new Error('observer flow has no stable key')
     }
@@ -235,6 +235,14 @@ export function readCanonicalStatusContract(repoRoot, contractRef) {
       return readEntCheck(repoRoot, contractRef)
     case 'go_const_prefix':
       return readGoConstants(repoRoot, contractRef)
+    case 'go_comparison_set': {
+      if (!/^[A-Za-z][A-Za-z0-9.]*$/u.test(contractRef.selector || '')) {
+        throw new Error('canonical comparison selector is invalid')
+      }
+      const source = readContractSource(repoRoot, contractRef)
+      const pattern = new RegExp(`${escapeRegExp(contractRef.selector)}\\s*!=\\s*"([^"]+)"`, 'gu')
+      return assertNonEmptyStates([...new Set([...source.matchAll(pattern)].map((item) => item[1]))], contractRef)
+    }
     case 'markdown_inline_set':
       return readMarkdownInlineSet(repoRoot, contractRef)
     case 'ent_check_agreement': {

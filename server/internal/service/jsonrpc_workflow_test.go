@@ -133,12 +133,18 @@ func (s *stubWorkflowJSONRPCRepo) ListWorkflowTasks(_ context.Context, filter bi
 	return nil, 0, nil
 }
 
-func (s *stubWorkflowJSONRPCRepo) ListWorkflowTaskEvents(_ context.Context, _ int, limit int) ([]*biz.WorkflowTaskEvent, error) {
+func (s *stubWorkflowJSONRPCRepo) ListWorkflowTaskEvents(_ context.Context, _ int, limit int, beforeEventID int) ([]*biz.WorkflowTaskEvent, error) {
 	s.taskEventLimit = limit
-	if len(s.events) > limit {
-		return s.events[:limit], nil
+	events := make([]*biz.WorkflowTaskEvent, 0, limit)
+	for _, event := range s.events {
+		if beforeEventID == 0 || event.ID < beforeEventID {
+			events = append(events, event)
+			if len(events) == limit {
+				break
+			}
+		}
 	}
-	return s.events, nil
+	return events, nil
 }
 
 func (s *stubWorkflowJSONRPCRepo) CreateWorkflowTask(_ context.Context, in *biz.WorkflowTaskCreate, actorID int) (*biz.WorkflowTask, error) {
@@ -619,6 +625,29 @@ func TestJsonrpcDispatcher_WorkflowListTaskEventsSignalsTruncation(t *testing.T)
 	}
 	if repo.taskEventLimit != biz.WorkflowTaskEventPageMaxLimit+1 {
 		t.Fatalf("task event page must request one-row lookahead, got %d", repo.taskEventLimit)
+	}
+	cursor := items[len(items)-1].(map[string]any)["id"]
+	olderParams, _ := structpb.NewStruct(map[string]any{"task_id": float64(42), "limit": float64(100), "before_event_id": cursor})
+	_, older, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_task_events", "older", olderParams)
+	if err != nil || older.Code != errcode.OK.Code {
+		t.Fatalf("older events: %#v err=%v", older, err)
+	}
+	olderData := older.Data.AsMap()
+	olderItems := olderData["items"].([]any)
+	if len(olderItems) != 1 || olderData["truncated"] != false || olderItems[0].(map[string]any)["id"] != float64(1) {
+		t.Fatalf("cursor must reach the oldest event: %#v", olderData)
+	}
+	for _, invalidCursor := range []any{float64(-1), 1.5, "2", true, nil, float64(9007199254740992)} {
+		invalidParams, _ := structpb.NewStruct(map[string]any{"task_id": float64(42), "before_event_id": invalidCursor})
+		_, invalid, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_task_events", "invalid-cursor", invalidParams)
+		if err != nil || invalid == nil || invalid.Code != errcode.InvalidParam.Code {
+			t.Fatalf("cursor %#v must be rejected: %#v err=%v", invalidCursor, invalid, err)
+		}
+	}
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead)}
+	_, denied, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_task_events", "older-denied", olderParams)
+	if err != nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("cursor must not bypass task visibility: %#v err=%v", denied, err)
 	}
 }
 

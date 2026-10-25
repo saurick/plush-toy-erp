@@ -168,3 +168,19 @@ test('assignee display follows assignment state even when the name is missing or
     assert.equal(getWorkflowTaskAssigneeLabel({ task_status_key, assignee_id: 0, discovery: { assignee_name: '旧办理人' } }), '未指定办理人')
   }
 })
+
+test('source progress and process recovery retain their actual meaning without exposing unknown payload', () => {
+  const source = presentWorkflowTaskEvent({
+    event_type: 'source_state_changed',
+    payload: { from_business_status_key: 'project_pending', to_business_status_key: 'project_approved', secret: 'must-not-render' },
+  })
+  assert.equal(source.label, '来源业务进度已更新')
+  assert.match(source.transitionLabel, /→/u)
+  assert.doesNotMatch(JSON.stringify(source), /must-not-render/u)
+  const unknown = presentWorkflowTaskEvent({ event_type: 'source_state_changed', payload: { to_business_status_key: 'unknown_internal_key' } })
+  assert.equal(unknown.transitionLabel, '')
+  const resumed = presentWorkflowTaskEvent({ event_type: 'process_resumed', from_status_key: 'blocked', to_status_key: 'ready', reason: '材料已补齐' })
+  assert.equal(resumed.categoryLabel, '恢复')
+  assert.equal(resumed.transitionLabel, '已阻塞 → 待处理')
+  assert.equal(resumed.reason, '材料已补齐')
+})

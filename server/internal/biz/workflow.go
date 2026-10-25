@@ -44,15 +44,15 @@ func (uc *WorkflowUsecase) GetTask(ctx context.Context, id int) (*WorkflowTask, 
 	return uc.repo.GetWorkflowTask(ctx, id)
 }
 
-func (uc *WorkflowUsecase) ListTaskEvents(ctx context.Context, taskID int, limit int) ([]*WorkflowTaskEvent, error) {
-	if uc == nil || uc.repo == nil || taskID <= 0 || limit < 1 || limit > WorkflowTaskEventPageMaxLimit+1 {
+func (uc *WorkflowUsecase) ListTaskEvents(ctx context.Context, taskID int, limit int, beforeEventID int) ([]*WorkflowTaskEvent, error) {
+	if uc == nil || uc.repo == nil || taskID <= 0 || limit < 1 || limit > WorkflowTaskEventPageMaxLimit+1 || beforeEventID < 0 {
 		return nil, ErrBadParam
 	}
 	reader, ok := uc.repo.(WorkflowTaskEventReader)
 	if !ok {
 		return nil, ErrBadParam
 	}
-	return reader.ListWorkflowTaskEvents(ctx, taskID, limit)
+	return reader.ListWorkflowTaskEvents(ctx, taskID, limit, beforeEventID)
 }
 
 func (uc *WorkflowUsecase) CreateTask(ctx context.Context, in *WorkflowTaskCreate, actorID int) (*WorkflowTask, error) {

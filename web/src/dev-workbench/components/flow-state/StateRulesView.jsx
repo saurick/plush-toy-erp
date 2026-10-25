@@ -218,7 +218,7 @@ function StateTransitionCard({
           <div><dt>转换后到哪里</dt><dd>{presentation.destinationSummary}</dd></div>
           <div><dt>action</dt><dd><KeyValue value={transition.action} /></dd></div>
           <div><dt>内部影响边界</dt><dd>{transition.factBoundary}</dd></div>
-          <div><dt>权限</dt><dd>{asArray(transition.permission).join('、') || '无额外权限声明'}</dd></div>
+          <div><dt>权限</dt><dd>{transition.systemOnly ? '系统内部触发；入口权限由来源动作校验' : asArray(transition.permission).join('、') || '见所属领域动作合同'}</dd></div>
         </dl>
       ) : null}
     </li>
@@ -369,15 +369,19 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView }) {
   return (
     <WorkbenchSection flat className="erp-dev-flow-state-rule" data-selected-flow={flow.key} title={flow.label}>
       <Text type="secondary">{flow.guard}</Text>
-      <div className="erp-dev-flow-transition-toolbar">
-        <div className="erp-dev-flow-transition-filters" role="group" aria-label="状态转换筛选">
-          {filterOptions.map((option) => <Button key={option.key} size="small" type={transitionFilter === option.key ? 'primary' : 'default'} aria-pressed={transitionFilter === option.key} onClick={() => setTransitionFilter(option.key)}>{option.label} {option.count}</Button>)}
-        </div>
-        <Text className="erp-dev-flow-transition-result-count" type="secondary" role="status" aria-live="polite">当前显示 {visibleTransitions.length} / {summary.transitionCount} 条</Text>
-      </div>
-      {visibleTransitions.length > 0 || state ? (
-        <BusinessFlowDiagram flow={graph} label={`${flow.label}状态转换图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} />
-      ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />}
+      {flow.transitions.length > 0 ? (
+        <>
+          <div className="erp-dev-flow-transition-toolbar">
+            <div className="erp-dev-flow-transition-filters" role="group" aria-label="状态转换筛选">
+              {filterOptions.map((option) => <Button key={option.key} size="small" type={transitionFilter === option.key ? 'primary' : 'default'} aria-pressed={transitionFilter === option.key} onClick={() => setTransitionFilter(option.key)}>{option.label} {option.count}</Button>)}
+            </div>
+            <Text className="erp-dev-flow-transition-result-count" type="secondary" role="status" aria-live="polite">当前显示 {visibleTransitions.length} / {summary.transitionCount} 条</Text>
+          </div>
+          {visibleTransitions.length > 0 || state ? (
+            <BusinessFlowDiagram flow={graph} label={`${flow.label}状态转换图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} />
+          ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />}
+        </>
+      ) : <WorkbenchFacts items={flow.states.map((item) => ({ label: item.label, value: item.summary || '独立状态维度，不表示办理先后' }))} />}
       <div className="erp-dev-flow-inline-note">
         <label htmlFor="dev-flow-state-focus">聚焦状态</label>
         <Select id="dev-flow-state-focus" aria-label="聚焦状态" allowClear placeholder="在图中点选或选择状态" value={state?.key} options={flow.states.map((item) => ({ value: item.key, label: item.label }))} onChange={(key) => onSelectState(key || null)} />
@@ -385,20 +389,35 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView }) {
       {state ? (
         <section className="erp-dev-flow-selected-state" aria-live="polite">
           <div><h3>{state.label}</h3><Text type="secondary">{selectedStateSummary?.positionLabel}</Text></div>
-          <div className="erp-dev-flow-selected-state__meaning"><p>{state.summary || '查看下面允许进入和离开的转换。'}</p></div>
-          <section className="erp-dev-flow-transitions" aria-label="当前状态的转换条件">
-            {renderTransitions(focusedTransitions)}
-          </section>
+          <div className="erp-dev-flow-selected-state__meaning"><p>{state.summary || (flow.transitions.length > 0 ? '查看下面允许进入和离开的转换。' : flow.guard)}</p></div>
+          {flow.transitions.length > 0 ? (
+            <section className="erp-dev-flow-transitions" aria-label="当前状态的转换条件">
+              {renderTransitions(focusedTransitions)}
+            </section>
+          ) : null}
         </section>
-      ) : <Text type="secondary">点选状态，查看进入、离开条件和转换结果。</Text>}
+      ) : <Text type="secondary">{flow.transitions.length > 0 ? '点选状态，查看进入、离开条件和转换结果。' : '以上为独立状态分类，不表示办理先后。'}</Text>}
+      {flow.dimensions.length > 0 ? (
+        <section aria-label="关联状态与结果" className="erp-dev-flow-rule-dimensions">
+          {flow.dimensions.map((dimension) => (
+            <div key={dimension.key}>
+              <h3>{dimension.label}</h3>
+              <p>{dimension.states.map((item) => item.label).join(' / ')}</p>
+              <Text type="secondary">{dimension.guard}</Text>
+            </div>
+          ))}
+        </section>
+      ) : null}
       <StateRuleRelatedViews relatedViews={relatedViews} onOpenView={onOpenView} />
-      <details className="erp-dev-disclosure erp-dev-flow-transitions" data-all-transitions>
-        <summary>完整转换清单（{visibleTransitions.length}）</summary>
-        {renderTransitions(visibleTransitions, true)}
-      </details>
+      {flow.transitions.length > 0 ? (
+        <details className="erp-dev-disclosure erp-dev-flow-transitions" data-all-transitions>
+          <summary>完整转换清单（{visibleTransitions.length}）</summary>
+          {renderTransitions(visibleTransitions, true)}
+        </details>
+      ) : null}
       <EvidenceDisclosure
         value={{
-          sourceRefs: [...asArray(flow.sourceRefs), ...asArray(state?.sourceRefs), ...visibleTransitions.flatMap((item) => asArray(item.sourceRefs))],
+          sourceRefs: [...asArray(flow.sourceRefs), ...flow.dimensions.map((item) => item.contractRef.path), ...asArray(state?.sourceRefs), ...visibleTransitions.flatMap((item) => asArray(item.sourceRefs))],
           evidence: [...asArray(flow.evidence), ...asArray(state?.evidence), ...visibleTransitions.flatMap((item) => asArray(item.evidence))],
         }}
         label="状态与规则依据"

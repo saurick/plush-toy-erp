@@ -1,5 +1,5 @@
-import { WorkCenterPaginationPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { setTimeout as delay } from 'node:timers/promises'
+import { WorkCenterPaginationPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { getAllowedMobileRoleKeys } from '../../src/erp/utils/mobileRolePermissions.mjs'
 import { requireWorkflowTaskExplainParams } from '../../src/erp/utils/workflowTaskActionAccess.mjs'
 import { isWorkflowApprovalTask } from '../../src/erp/utils/workflowTaskActionContract.mjs'
@@ -2366,8 +2366,10 @@ export async function installFactRpcMocks(page, context) {
           fail('当前账号不能查看该任务轨迹')
           break
         }
+        const beforeEventID = Object.hasOwn(params, 'before_event_id') ? params.before_event_id : 0
+        if (!Number.isSafeInteger(beforeEventID) || beforeEventID < 0) { fail('任务轨迹参数无效'); break }
         data = {
-          items: [
+          items: beforeEventID && taskID * 10 >= beforeEventID ? [] : [
             {
               id: taskID * 10,
               task_id: taskID,
