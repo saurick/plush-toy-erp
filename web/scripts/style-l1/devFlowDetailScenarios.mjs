@@ -4,6 +4,14 @@ import { DEV_FLOW_STATE_CATALOG as catalog } from '../../src/dev-workbench/confi
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 
 export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }) {
+  const assertDefinitionSelectorWidth = async (page) => {
+    const selector = page.locator('.erp-dev-flow-definition-selector > .ant-select')
+    await expect(selector).toBeVisible()
+    const bounds = await selector.boundingBox()
+    const label = await page.locator('.erp-dev-flow-definition-selector > label').boundingBox()
+    assert(bounds.width >= 240 && bounds.width <= 480, '定义选择器应保留可读宽度，不随桌面整行拉伸')
+    assert(bounds.x - label.x - label.width >= 0 && bounds.x - label.x - label.width <= 16, '标签与选择器紧邻，不用空白列填满页面')
+  }
   const sessions = new WeakMap()
   const definition = catalog.processDefinitions.find((item) => item.processKey === 'sales_order_acceptance')
   const active = definition.nodes.find((item) => item.type === 'approval')
@@ -77,6 +85,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await expect(page.locator('.erp-dev-flow-state-list')).toHaveCount(0)
       const graph = page.locator('.erp-dev-flow-state-rule [data-business-flow]')
       await expect(graph).toHaveAttribute('data-graph-status', 'rendered')
+      await assertDefinitionSelectorWidth(page)
       await graph.locator('[data-graph-node]').first().click()
       await expect(page.getByRole('region', { name: '当前状态的转换条件' })).toBeVisible()
       await page.getByRole('button', { name: /^全部 / }).click()
@@ -86,6 +95,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await page.screenshot({ path: path.join(outputDir, 'flow-details-state.png') })
       await choose('事实定义')
       await expect(page.getByText('何时生效', { exact: true })).toBeVisible()
+      await assertDefinitionSelectorWidth(page)
       await expect(page.getByText('权威真源', { exact: true })).toBeHidden()
       await page.screenshot({ path: path.join(outputDir, 'flow-details-fact.png') })
       const factsEvidence = page.locator('[data-selected-fact] [data-evidence-disclosure]')
@@ -95,6 +105,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await expect(page.locator('.erp-dev-flow-process-definition')).toBeVisible()
       await expect(page.locator('.erp-dev-flow-runtime-instance')).toHaveCount(0)
       await expect(page.getByText('当前查看流程定义；实际进度按任务查询。', { exact: true })).toBeVisible()
+      await assertDefinitionSelectorWidth(page)
       await choose('协同记录')
       await expect(page.getByRole('button', { name: '定位任务', exact: true })).toBeVisible()
       const motion = await verifyMobileNavigationMotion(page, assert, '[aria-label="关联信息类型"]', 2)
@@ -170,6 +181,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       for (const query of ['view=states', 'view=facts', 'view=runtime', 'view=workflow&task_id=21']) {
         await visit(query)
         await expect(page.locator('[data-catalog-status="ready"]')).toBeVisible()
+        if (query !== 'view=workflow&task_id=21') await assertDefinitionSelectorWidth(page)
         await assertNoHorizontalOverflow(page, `关联信息窄窗口 ${query}`)
       }
       assert(sessions.get(page).reads.every((method) => ['get_task', 'list_task_events', 'get_task_process_context'].includes(method)), '四个视图只读取正式任务和流程接口')

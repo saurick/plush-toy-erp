@@ -797,6 +797,14 @@ export function createDevQualityGateScenarios({
         const jobGuideButton = serverPanel.getByRole('button', {
           name: '流程与原理',
         })
+        const originalViewport = page.viewportSize()
+        for (const width of [1024, 1920, 3840]) {
+          await page.setViewportSize({ ...originalViewport, width })
+          const bounds = await jobGuideButton.boundingBox()
+          assert(bounds.width >= 80 && bounds.width <= 240, `流程与原理按钮应按内容宽度排列，${width}px 视口实际为 ${bounds.width}px`)
+          await assertNoHorizontalOverflow(page, `质量门禁 ${width}px`)
+        }
+        await page.setViewportSize(originalViewport)
         await jobGuideButton.click()
         const jobGuideDrawer = page.locator('.erp-dev-quality-job-guide-drawer')
         await jobGuideDrawer.locator('.ant-drawer-content').waitFor()

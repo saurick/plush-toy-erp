@@ -70,6 +70,10 @@
   background: var(--erp-surface-bg-soft);
 }
 
+.erp-dev-quality-server-evidence > .ant-btn {
+  justify-self: start;
+}
+
 .erp-dev-quality-server-evidence__heading-copy,
 .erp-dev-quality-server-evidence__facts > div {
   display: grid;

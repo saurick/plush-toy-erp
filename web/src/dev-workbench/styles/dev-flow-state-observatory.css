@@ -1099,7 +1099,7 @@
 
 .erp-dev-flow-definition-selector {
   display: grid;
-  grid-template-columns: minmax(160px, 280px) minmax(240px, 1fr);
+  grid-template-columns: max-content minmax(0, 420px);
   gap: 7px 12px;
   align-items: center;
   padding: 12px;

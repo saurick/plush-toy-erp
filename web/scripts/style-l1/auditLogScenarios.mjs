@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const events = Array.from({ length: 201 }, (_, index) => ({
   id: index + 1,
@@ -120,6 +121,37 @@ export function createAuditLogScenarios({
         await page.locator('.ant-table-tbody tr[data-row-key]').count(),
         50
       )
+      const filters = page.locator('.erp-business-filter-popover__content')
+      const operation = filters.locator('.ant-select')
+      const originalViewport = page.viewportSize()
+      for (const width of [1024, 1920, 3840]) {
+        await page.setViewportSize({ ...originalViewport, width })
+        await page.getByRole('button', { name: '筛选', exact: true }).click()
+        await operation.waitFor({ state: 'visible' })
+        await waitForFiniteAnimations(page)
+        const bounds = await operation.boundingBox()
+        assert(bounds.width >= 220 && bounds.width <= 280, `操作类型筛选不应拉满面板，${width}px 视口实际为 ${bounds.width}px`)
+        const choices = await filters.locator('.erp-business-filter-field--choices').boundingBox()
+        assert(choices.width > bounds.width + 200, '整行筛选选项保留可用空间')
+        await assertNoHorizontalOverflow(page, `操作记录筛选 ${width}px`)
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.waitFor({ state: 'hidden' })
+      }
+      await page.setViewportSize(originalViewport)
+      await page.getByRole('button', { name: '筛选', exact: true }).click()
+      await operation.waitFor({ state: 'visible' })
+      const filteredRead = page.waitForResponse((response) => {
+        if (!response.url().endsWith('/rpc/admin')) return false
+        const body = response.request().postDataJSON()
+        return body?.method === 'audit_logs' && body.params?.event_key
+      })
+      await operation.getByRole('combobox').press('ArrowDown')
+      await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
+      await filteredRead
+      assert(page.auditRequests.some((params) => params.event_key), '选择操作类型应提交筛选条件')
+      await operation.locator('.ant-select-clear').click()
+      await page.waitForFunction(() => document.querySelector('.ant-pagination-total-text')?.textContent?.includes('201'))
+      await filters.getByRole('button', { name: '完成', exact: true }).click()
       const pager = page.locator('.ant-pagination')
       const readAuditPage = (limit, offset) => page.waitForResponse((response) => {
         if (!response.url().endsWith('/rpc/admin')) return false
@@ -291,6 +323,17 @@ export function createAuditLogScenarios({
           .first()
           .waitFor()
         await verifyDrawer(page, width >= 768 ? 640 : width)
+        if (width < 768) {
+          await page.getByRole('button', { name: '筛选', exact: true }).click()
+          const filters = page.locator('.erp-business-filter-popover__content')
+          const operation = filters.locator('.ant-select')
+          await operation.waitFor({ state: 'visible' })
+          await waitForFiniteAnimations(page)
+          const panelBounds = await filters.boundingBox()
+          const fieldBounds = await operation.boundingBox()
+          assert(Math.abs(panelBounds.width - fieldBounds.width) <= 1, '窄屏筛选保留整行可用宽度')
+          await filters.getByRole('button', { name: '完成', exact: true }).click()
+        }
         await assertNoHorizontalOverflow(page, `audit-${name}`)
       },
     })),

@@ -1,7 +1,11 @@
 .workflow-task-discovery { min-width: 0; display: grid; gap: 8px; }
-.workflow-task-discovery__person { display: grid; min-width: 0; gap: 4px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
+.workflow-task-discovery__person { display: grid; width: min(100%, 260px); min-width: 0; gap: 4px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
 .workflow-task-discovery__person .ant-select { width: 100%; min-width: 0; }
 .workflow-task-discovery__context { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--erp-font-caption); color: var(--erp-text-muted); overflow-wrap: anywhere; }
 .workflow-task-discovery__summary { color: var(--erp-text-muted); font-size: var(--erp-font-caption); line-height: 1.6; overflow-wrap: anywhere; }
 .workflow-task-discovery__auxiliary { display: grid; gap: 4px; font-size: var(--erp-font-caption); color: var(--erp-text-muted); }
 .erp-business-filter-popover .workflow-task-discovery { flex: 1 1 180px; }
+
+@media (max-width: 768px) {
+  .workflow-task-discovery__person { width: 100%; }
+}

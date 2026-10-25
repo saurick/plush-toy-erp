@@ -302,6 +302,18 @@ export function createDevPressureScenarios({
         await panel
           .getByText('历史候选 · 源码已变化', { exact: true })
           .waitFor()
+        const originalViewport = page.viewportSize()
+        for (const width of [1024, 1920, 3840]) {
+          await page.setViewportSize({ ...originalViewport, width })
+          const selectors = panel.locator('.erp-dev-pressure-report-select .ant-select')
+          assert.equal(await selectors.count(), 2)
+          for (const selector of await selectors.all()) {
+            const bounds = await selector.boundingBox()
+            assert(bounds.width >= 240 && bounds.width <= 560, `报告选择框在 ${width}px 视口应有合理上限：${bounds.width}`)
+          }
+          await assertNoHorizontalOverflow(page, `压力报告 ${width}px`)
+        }
+        await page.setViewportSize(originalViewport)
         await panel.locator('.erp-dev-pressure-report-select .ant-select-clear').click()
         await panel.getByText('请选择运行报告', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.get('report'), '')

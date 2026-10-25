@@ -37,10 +37,6 @@
   background: transparent;
 }
 
-.erp-dev-verification-evidence__ci .erp-dev-quality-server-evidence > .ant-btn {
-  justify-self: start;
-}
-
 .erp-dev-verification-evidence__table {
   min-width: 760px;
   table-layout: fixed;

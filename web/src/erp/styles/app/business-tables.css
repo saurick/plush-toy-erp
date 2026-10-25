@@ -2087,12 +2087,21 @@
 }
 
 .erp-business-filter-popover .erp-business-operation-panel__filters > * {
-  flex: 1 1 220px;
+  flex: 0 1 260px;
   min-width: 0;
+  max-width: 100%;
 }
 
-.erp-business-filter-popover .erp-business-date-range-filter {
+.erp-business-filter-popover .erp-business-date-range-filter,
+.erp-business-filter-popover .erp-business-operation-panel__filters > .ant-select-multiple,
+.erp-business-filter-popover .erp-business-filter-field:has(> .ant-select-multiple) {
   flex-basis: 100%;
+}
+
+@media (max-width: 768px) {
+  .erp-business-filter-popover .erp-business-operation-panel__filters > * {
+    flex-basis: 100%;
+  }
 }
 
 .erp-business-page-layout > .erp-business-data-table-card.ant-card {

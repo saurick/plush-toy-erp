@@ -56,14 +56,16 @@
 
 .erp-dev-pressure-report-select {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   min-width: 0;
 }
 
 .erp-dev-pressure-report-select .ant-select {
-  flex: 1;
+  flex: 0 1 560px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .erp-dev-pressure-identity > details {
