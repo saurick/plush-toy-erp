@@ -36,7 +36,7 @@ flowchart LR
   W["DEV-only version center"] -->|development same-origin fixed API| B["Delivery Bridge"]
   B -->|read/dispatch| G
   B -->|download exact assets| P
-  B -->|confirmed operation| T["demo-133 / customer-test-133"]
+  B -->|confirmed operation| T["demo-133 / customer-test-133 / production-133"]
   C --> T
 ```
 
@@ -48,7 +48,7 @@ flowchart LR
 | GHCR | 保存按 digest 固定的 Server/Web 镜像 | tag 不能替代 manifest digest |
 | Delivery Bridge | 固定 Provider、固定动作、operation 与目标执行器 | 浏览器不能传 repo、host、path、shell、SQL、Docker 或 secret |
 | 研发效能工作台 | 展示证据、选择固定版本、显式确认 | 不成为 CI、部署、数据库或凭据真源 |
-| demo / test 目标 | load/pull 制品、migration、运行与 readback | 不从源码构建，不共用持久数据，不把 smoke 冒充客户验收 |
+| demo / test / erp 目标 | load/pull 制品、migration、运行与 readback | 不从源码构建，不共用持久数据，不把 smoke 冒充客户验收 |
 
 ## GitLab 宿主存储与进程隔离
 
@@ -222,19 +222,19 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 ## 目标环境与真实数据
 
-当前可执行 target 只有 `demo-133` 与 `customer-test-133`。显式版本提升（Explicit Promotion）只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回；它必须由使用者明确发起，`main` push 不会自动部署。失败、blocked 或 `not_proven` 不自动重试。
+当前登记启用的 target 为 `demo-133`、`customer-test-133` 与 `production-133`，唯一清单为 `scripts/deploy/deployment-targets.json`；登记启用不证明目标此刻运行正常。显式版本提升（Explicit Promotion）只 load/pull 已发布 digest，随后执行固定 preflight、backup、migration、Compose、health/ready、公网 SHA 和资源读回；它必须由使用者明确发起，`main` push 不会自动部署。失败、blocked 或 `not_proven` 不自动重试。
 
 | 环境 | 公网入口 | 数据与用途 | 重建边界 |
 | --- | --- | --- | --- |
 | demo / `demo-133` | `demo.yoyoosun.net` | 项目方造数、演练、培训和回归；允许 seed/fixture/模拟业务事实 | 只走受控重建，必须保留自己的备份与回滚点 |
 | test / `customer-test-133` | `test.yoyoosun.net` | 甲方测试/验收；普通部署不 rebuild、不 seed 并保留数据；基础单位 / 仓库只走显式一次性 bootstrap | 清理与 promotion 分开；重建前必须有可恢复备份、恢复验证和精确回滚点 |
-| erp | `erp.yoyoosun.net` | 未来正式生产 | 当前未登记、未启用，不能从工作台执行 |
+| erp / `production-133` | `erp.yoyoosun.net` | 正式业务，必须显式选择；独立数据与凭据 | 支持受控初始化、部署与代码回滚，不提供测试数据重建 |
 
-demo 与 test 必须使用同一 release digest，但数据库、上传目录、Compose project、宿主端口、运行 env、备份、回滚点、target registry、preflight、operation 和 smoke 全部独立。demo 造数不得进入 test；test 普通 promotion 保留现有数据且不调用任何 seed，显式重建不得影响 demo。
+demo 与 test 使用同一候选时须核对相同 release digest；三个目标的数据库、上传目录、Compose project、宿主端口、运行 env、备份、回滚点、preflight、operation 和 smoke 全部独立。demo 造数不得进入 test 或 erp；test 普通 promotion 保留现有数据且不调用任何 seed，显式重建不得影响其他目标。
 
 test 的一次性 core bootstrap 只写精确 allowlist 的 8 个标准单位和 4 个仓库，要求当前任务明确授权、fresh backup、实时 target 身份、exact release / migration 和写后读回，不构成真实客户导入。
 
-根域 `yoyoosun.net` 临时 `302` 跳转到 `erp.yoyoosun.net` 只是导航行为，不把未来生产域名加入 target registry。`admin.yoyoosun.net` 退役后绝不进入 CI/CD 环境矩阵、数据清理、健康检查、发布验证或回滚流程。
+根域 `yoyoosun.net` 临时 `302` 跳转到 `erp.yoyoosun.net` 只是导航行为，不能证明生产启用或健康；目标身份仍由 registry 与实际回执证明。`admin.yoyoosun.net` 退役后绝不进入 CI/CD 环境矩阵、数据清理、健康检查、发布验证或回滚流程。
 
 真实资料进入客户 Private 仓或经确认的受控存储，不进入 Product Core、CI artifacts 或公开 GitHub 镜像。
 
@@ -289,12 +289,14 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 
 工作台验收还要覆盖只读令牌缺失、写令牌缺失、非法时间 / SHA、未知版本资产、Provider 显式选择和 production build 排除 DEV / Bridge。只读令牌缺失不能制造绿色证据；仅写令牌缺失时仍可浏览已有发布。发布操作要求 clean HEAD 与 GitLab main 精确匹配，只创建不可变版本，目标部署仍由独立 operation 执行。
 
-demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；test 重建与未来生产发布各自核对范围和授权。安装顺序、前置证据、故障停止和恢复见 [GitLab 与隔离 Runner](../../server/deploy/gitlab/README.md)。
+demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；test 重建与生产发布各自核对范围和授权。安装顺序、前置证据、故障停止和恢复见 [GitLab 与隔离 Runner](../../server/deploy/gitlab/README.md)。
 
 
 ## 本地开发入口 Dev-only surfaces
 
 效能工作台也支持[独立测试部署](../../server/deploy/workbench/README.md)：使用单独的前端制品、Node 工具 Bridge 与 HTTPS 域名，登录会话覆盖页面、资源和所有工具 API。它与 ERP 业务构建、业务账号和本地 Vite 生命周期分离；本地 `private-network` 开发继续免工作台登录。独立服务不会自动执行发版、迁移或造数，工具继续沿用各自目标、确认与预检合同。
+
+独立工作台的封装、传输、维护静止、历史保全、原子切换与恢复统一使用[工作台发布入口](../../server/deploy/workbench/README.md#workbench-release)。构建身份绑定固定源码、Node 与依赖锁；停止结果不确定或新版本失败时核对旧制品恢复，恢复未证明保留维护锁。入口与隔离测试不替代目标部署回执。
 
 开发工作台页面、会话、状态读取和全部执行 / 取消 API 先检查访问模式。默认 `local` 只允许本机 loopback，无工作台登录；显式 `operator` 使用独立运维身份，身份缺失失败关闭，远程仅通过受控 SSH 隧道、真实 TLS 私网连接或显式配置的本机 HTTPS 代理。
 
@@ -1118,7 +1120,7 @@ flowchart LR
 
   “生成发布制品”仅在版本清单与发布检查视图显示，不等于服务器部署；发布范围在确认弹窗直接说明，不再另设发布说明浮层。“发布检查”集中展示本地候选、不可变版本、目标与公网摘要、严格门禁和 test 数据管理；已通过项目的容量、健康细节及历史时间集中按需查看，失败和未完成项仍直接显示；“发布与部署耗时”展示 CI、制品发布与目标部署的状态轨道与时间；“操作记录”独立筛选回执。读取失败明确显示读取失败，不解释为版本不存在。
 
-- 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitLab 不可变版本，以及 `demo-133`、`customer-test-133`、`production-133` 的当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或验收合并成一个绿色结论；退役的 `admin.yoyoosun.net` 不是部署 target。
+- 页面在本地 development serve 与独立工作台制品中存在，展示执行端当前 HEAD/dirty、GitLab 不可变版本，以及三个登记目标的当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或验收合并成一个绿色结论；退役的 `admin.yoyoosun.net` 不是部署 target。
 - 四个视图通过 `view=versions|overview|pipeline|history` 恢复；切换只改变内容，当前目标的未结束 operation 始终可见；制品发布属于共享操作，全局写入互斥仍核对所有目标。目标切换只展示当前目标的数据边界，写请求进行中锁定客户与目标。版本目录当前读取最近最多 100 个不可变版本、每页 6 条；已结束操作通过独立只读接口查询所有留存记录、每页 10 条，不受摘要最近 200 条窗口限制。切换视图不重新请求摘要，也不会停止未结束 operation 的轮询；进入历史或改变筛选 / 页码时读取对应历史页。
 
   历史默认当前操作目标；demo / test / erp 的列表、总数、统计、详情请求与缓存严格隔离，制品发布另列为共享证据。环境写入 `target` URL 参数，目标切换取消旧请求并关闭旧详情。历史计数和成功操作耗时中位数覆盖当前目标与筛选的全部匹配记录，明确包含准备与等待；列表及详情独立于远端摘要读取，失败保留同条件旧结果并标明过期，不串用不同目标或筛选的数据。损坏记录须显示完整性告警，不把部分统计标为完整。详情按原始回执显示检查、迁移和数据库恢复证据，并链接源码、同 SHA 的 CI/CD、不可变制品及已记录的发布 pipeline ID。旧回执未记录的字段不推断，范围与保留策略遵循[部署留痕合同](../部署约定.md#devops-records)。

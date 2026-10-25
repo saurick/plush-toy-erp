@@ -85,6 +85,8 @@ pnpm install
 
 效能工作台另有独立部署入口：`pnpm build:workbench` 构建 `workbench.html` 与 `src/dev-workbench/standalone.jsx`，输出 ignored `build-workbench/`；`pnpm serve:workbench` 运行带专用登录会话的 Node 服务。
 
+独立构建同时生成绑定源码、Node 和依赖锁的 `workbench-build.json`；正式制品通过[工作台发布入口](../server/deploy/workbench/README.md#workbench-release)校验、保全运行记录并切换，默认命令不写远端。本地 Vite 继续运行当前源码与热更新。
+
 工作台登录页与全部页面统一使用 `src/dev-workbench/assets/favicon-dev.svg` 的紫底白色闪电图标。独立构建将它输出为 `/favicon-dev.svg`，供登录前读取；图标不放入公共资源目录，也不进入 ERP `build/`。本地免登录配置保持不变。部署身份、凭据与 HTTPS 入口见 [独立工作台部署](../server/deploy/workbench/README.md)。
 
 ## 启动命令

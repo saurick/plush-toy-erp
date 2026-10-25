@@ -4,6 +4,7 @@ import path from 'node:path'
 import { getDeploymentTarget } from '../scripts/deploy/deployment-targets.mjs'
 import workbenchTarget from '../server/deploy/workbench/target.json' with { type: 'json' }
 import { createDevDocsMetadataPlugin } from './vite.docs.mjs'
+import { workbenchBuildIdentityPlugin } from './vite.workbench-identity.mjs'
 
 const root = import.meta.dirname
 
@@ -15,7 +16,7 @@ export default defineConfig({
       new URL(getDeploymentTarget(workbenchTarget.businessTarget).publicEntry.endpoint).origin
     ),
   },
-  plugins: [react(), createDevDocsMetadataPlugin()],
+  plugins: [react(), createDevDocsMetadataPlugin(), workbenchBuildIdentityPlugin(path.resolve(root, '..'))],
   resolve: { alias: { '@': path.join(root, 'src') } },
   build: {
     outDir: 'build-workbench',

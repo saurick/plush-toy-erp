@@ -1,6 +1,6 @@
 import http from 'node:http'
-import { createReadStream } from 'node:fs'
-import { lstat, realpath } from 'node:fs/promises'
+import { createReadStream, existsSync } from 'node:fs'
+import { lstat, readFile, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
@@ -45,11 +45,15 @@ export async function createStandaloneWorkbenchServer({
   trustedProxyAddress = target.trustedProxyAddress,
   credentials = {},
   plugins,
+  maintenanceFile = path.join(target.root, 'runtime/release.lock'),
   writeEvent = (event) => process.stdout.write(`${JSON.stringify(event)}\n`),
 } = {}) {
   const origin = normalizeDevHttpsOrigin(httpsOrigin)
   if (!origin) throw new Error('PLUSH_WORKBENCH_ORIGIN must be configured')
   const publicRoot = await realpath(staticRoot)
+  const artifactFile = path.join(publicRoot, '.workbench-artifact.json')
+  const artifact = existsSync(artifactFile) ? JSON.parse(await readFile(artifactFile, 'utf8')) : null
+  let activeWrites = 0
   const entry = path.join(publicRoot, 'workbench.html')
   if (!(await lstat(entry)).isFile()) throw new Error('Workbench artifact is missing')
   const proxy = createDevHttpsProxyMiddleware(origin, { allowPublicClients: true, trustedProxyAddress })
@@ -59,9 +63,17 @@ export async function createStandaloneWorkbenchServer({
   })
   const apiOrigin = getDeploymentTarget(target.businessTarget).endpoints.server
   const middlewares = []
+  middlewares.push((request, response, next) => {
+    if (request.method === 'POST' && new URL(request.url, origin).pathname.startsWith('/__dev/api/') && existsSync(maintenanceFile)) {
+      response.writeHead(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+      response.end(JSON.stringify({ message: '工作台正在升级，请稍后重新核对状态；本次操作未开始' }))
+      return
+    }
+    return next()
+  })
   // Generic CI is owned by GitLab. Keep reads, cancellation and project actions.
   middlewares.push((request, response, next) => {
-    const pathname = new URL(request.url, origin).pathname
+    const { pathname } = new URL(request.url, origin)
     if (request.method === 'POST' && ['/__dev/api/qa/quality-gates/actions', '/__dev/api/qa/coverage/actions'].includes(pathname)) {
       response.writeHead(403, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       response.end(JSON.stringify({ status: 'blocked', message: '完整测试与代码覆盖由 GitLab CI 执行；本地诊断请使用开发机工作台。' }))
@@ -170,7 +182,22 @@ export async function createStandaloneWorkbenchServer({
     }
     if (request.method === 'GET' && request.url === '/healthz') {
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
-      response.end(JSON.stringify({ status: 'ok', service: 'engineering-workbench' })); return
+      response.end(JSON.stringify({
+        status: 'ok',
+        service: 'engineering-workbench',
+        maintenance: existsSync(maintenanceFile),
+        activeWrites,
+        artifactId: artifact?.artifactId || null,
+        sourceSha: artifact?.repository?.commit || null,
+        nodeVersion: process.versions.node,
+      })); return
+    }
+    if (request.method === 'POST' && request.url.startsWith('/__dev/api/')) {
+      activeWrites += 1
+      let finished = false
+      const finishWrite = () => { if (!finished) { finished = true; activeWrites -= 1 } }
+      response.once('finish', finishWrite)
+      response.once('close', finishWrite)
     }
     let index = 0
     const next = () => {

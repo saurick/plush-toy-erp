@@ -36,6 +36,7 @@
 | `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、健康与目标身份；验收档追加 SMS、PDF、Chromium | 默认只读；`--runtime` 仍只核对 |
 | `release-artifact-bundle.mjs` | 从 clean committed archive 构建一次 `linux/amd64` Server/Web 制品、SBOM 与 manifest | `--execute` 才构建本机制品 |
 | `release-artifact-verify.mjs` | 校验 manifest、SBOM、image tar 与内置 release identity | 默认只读；`--load` 会加载本地镜像 |
+| `workbench-release.mjs` / `workbench-artifact.mjs` | 独立研发工作台的制品封装校验、传输、状态保全、切换与回滚 | 默认只读；`seal --execute` 仅写本机制品清单，`deploy/rollback --execute` 才操作固定工作台目标；见[独立工作台发布](../../server/deploy/workbench/README.md#workbench-release) |
 | `local-release-rehearsal.mjs` | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留 | `--execute` 才启动隔离环境 |
 | `promotion-controller.mjs` | 校验 v2 七资产、rehearsal、即时 target preflight；工作台在最终传输资格核对后才创建 ready operation | 不写目标 |
 | `promotion-executor.mjs` | 执行已确认的固定 target promotion 并读回公网 exact SHA | 写单一目标；失败按 operation 回滚 |

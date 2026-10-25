@@ -27,9 +27,10 @@ async function fixture(t, options = {}) {
   const server = await createStandaloneWorkbenchServer({
     staticRoot: root,
     httpsOrigin: origin,
+    maintenanceFile: options.maintenanceFile,
     credentials: { username, passwordHash, ...options },
-    plugins: [{ configureServer: ({ middlewares }) => middlewares.use((request, response, next) => {
-      if (request.url.startsWith('/__dev/api/test')) { calls++; response.end('protected sink') }
+    plugins: [{ configureServer: ({ middlewares }) => middlewares.use(async (request, response, next) => {
+      if (request.url.startsWith('/__dev/api/test')) { calls++; await options.holdWrite?.(request); response.end('protected sink') }
       else return next()
     }) }],
     writeEvent: (event) => events.push(event),
@@ -73,6 +74,34 @@ async function fixture(t, options = {}) {
 test('standalone requires a valid operator identity and an immutable frontend artifact', async () => {
   await assert.rejects(createStandaloneWorkbenchServer({ httpsOrigin: '' }), /ORIGIN/u)
   await assert.rejects(createStandaloneWorkbenchServer({ staticRoot: '/nonexistent', httpsOrigin: origin }), /ENOENT/u)
+})
+
+test('release maintenance blocks new tool writes, retains reads and proves existing requests have drained', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'plush-workbench-maintenance-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const maintenanceFile = path.join(root, 'release.lock')
+  let started
+  let finish
+  const entered = new Promise((resolve) => { started = resolve })
+  const held = new Promise((resolve) => { finish = resolve })
+  const { request, login, calls } = await fixture(t, { maintenanceFile, holdWrite: async (incoming) => {
+    if (incoming.method === 'POST') { started(); await held }
+  } })
+  const cookie = (await login()).headers.get('set-cookie').split(';')[0]
+  const pending = request('/__dev/api/test/action', { method: 'POST', headers: { cookie, origin } })
+  await entered
+  await mkdir(maintenanceFile)
+  const health = await (await request('/healthz')).json()
+  assert.equal(health.maintenance, true)
+  assert.equal(health.activeWrites, 1)
+  const refused = await request('/__dev/api/test/action', { method: 'POST', headers: { cookie, origin } })
+  assert.equal(refused.status, 503)
+  assert.match(await refused.text(), /本次操作未开始/u)
+  assert.equal((await request('/__dev/api/test/session', { headers: { cookie } })).status, 200)
+  finish()
+  assert.equal((await pending).status, 200)
+  assert.equal((await (await request('/healthz')).json()).activeWrites, 0)
+  assert.equal(calls(), 2)
 })
 
 test('unauthenticated pages, assets, encoded paths, API sessions and actions cannot reach any sink', async (t) => {

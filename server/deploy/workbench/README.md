@@ -44,39 +44,61 @@ env 文件必须由服务用户持有、权限 `0600`，放在部署根目录的
 
 本地开发默认 `local` 模式，本机 loopback 无需工作台登录；受控内网共享可在 ignored `web/.env.development.local` 中显式设置 `PLUSH_DEV_WORKBENCH_ACCESS=private-network`。这些模式只作用于本地 Vite，不会关闭独立部署的登录保护。
 
+<a id="workbench-release"></a>
+
 ## 构建、发布与回滚
 
-1. 在拥有授权的源码范围内固定源版本。正式发布使用已提交版本；未提交改动的测试预览另记录基础 SHA、精确文件内容摘要和源码包 SHA-256，不冒充正式产品 Release。共享脏工作区使用一次性独立验证副本，只覆盖本轮精确路径；不打包 ignored env、客户 Private、依赖目录或其他任务改动。
+日常升级使用仓库入口 `scripts/deploy/workbench-release.mjs`，接收在构建机准备的完整目录。目标固定为 `target.json` 登记的独立工作台；业务版本发布继续沿用 Delivery Service。默认命令只读，只有显式 `--execute` 才写入。命令从该源码根目录执行。
 
-   源码包若需携带 Git ancestry，须同时排除客户反馈文件及该路径的历史 blob，并在关闭 lazy fetch 时核对对象库；不能只从工作树删文件而保留其历史正文。
-2. 在构建机的 `web/` 执行：
+### 准备与封装
+
+1. 固定拥有授权的 clean committed source。制品携带自包含 `.git`，不能使用指向原 checkout 的 alternates、关联工作树或凭据配置；客户 Private、客户反馈及其可读历史 blob、运行 env 和运行状态不进入制品。未提交预览使用本地 Vite，不经正式制品入口。
+2. 按 `.n-node-version` 和 `web/pnpm-lock.yaml` 准备目标 OS / 架构的运行依赖。`web/node_modules/` 必须完整，pnpm symlink 只能相对引用包内依赖；`toolchain/bin/node` 和 `toolchain/bin/dev-permission-relationships` 必须是预编译的 `linux/amd64` 可执行文件。只读权限工具的构建命令为：
 
    ```bash
-   GIT_OPTIONAL_LOCKS=0 pnpm build:workbench
+   (cd server && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /path/to/prepared-release/toolchain/bin/dev-permission-relationships ./cmd/dev-permission-relationships)
    ```
 
-3. 运行工作台认证、网络及源码边界检查。另执行 ERP 正式构建和 `dev-workbench-production-boundary.mjs`，确认独立制品不会进入 ERP 产物。
+3. 在同一固定源码的 `web/` 执行 `GIT_OPTIONAL_LOCKS=0 pnpm build:workbench`。构建生成 `workbench-build.json`，绑定构建前后的源码身份、Node 与依赖锁摘要；源码在构建期间变化会失败。运行工作台认证与边界回归，并以 ERP 正式构建和 `dev-workbench-production-boundary.mjs` 核对产物隔离。目标机不安装依赖或构建源码。
+4. 将固定源码、已构建页面、运行依赖与工具链放在同一准备目录，依赖和构建产物通过本包 `.gitignore` / `.git/info/exclude` 排除；`output/` 为空或不存在。在该目录源码对应的构建机入口封装并复核：
 
-   在构建机的 `server/` 以目标 OS / 架构执行 `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o <制品目录>/toolchain/bin/dev-permission-relationships ./cmd/dev-permission-relationships`，将固定只读工具纳入制品文件清单与 SHA-256 校验。源码根的 `toolchain/` 沿用 Node 运行依赖的 Git 排除边界；缺少工具时权限读取失败关闭，不自动改用编译器。
+   ```bash
+   WORKBENCH_RELEASE_DIR=/path/to/prepared-release
+   node scripts/deploy/workbench-release.mjs seal --input "$WORKBENCH_RELEASE_DIR"
+   node scripts/deploy/workbench-release.mjs seal --input "$WORKBENCH_RELEASE_DIR" --execute
+   node scripts/deploy/workbench-release.mjs verify --input "$WORKBENCH_RELEASE_DIR"
+   ```
 
-   将源码工具与已构建的 `web/build-workbench/` 打成固定包，记录 SHA-256；运行依赖另在目标 OS/架构准备为固定制品，绑定 `web/package.json`、`pnpm-lock.yaml`、仓库 Node 与 pnpm 版本，核对文件清单及 pnpm 内部 symlink。
+   第一条只读检查源码；第二条写入唯一 `.workbench-artifact.json`，返回 `artifactId`，绑定全部文件内容、权限、依赖 symlink、源码与构建身份；已有清单不覆盖。第三条重新计算完整清单。清单生成后不再修改目录；变化时重新准备制品。
 
-   目标机只校验、解包和运行，不 install/build；package 或 lock 改变后重新准备匹配依赖。
+### 升级与回滚
 
-   Node 必须匹配制品的 `.n-node-version`。需要随工作台升级时，将固定 Linux Node 放入制品 `toolchain/bin/node`，通过本服务的 systemd drop-in 设置 `ExecStart` 和子进程 `PATH`；该运行依赖在 `.git/info/exclude` 排除，保持源码身份核对只覆盖已提交文件。保留 drop-in 的前态，不替换宿主机共享 Node。
-4. 目标机先核对主机名、登记的私网地址、端口、旧 `current` 与 systemd 状态。将包放入 `releases/<content-id>/`，核对源身份、所有文件、运行 env 与 Node 版本，不得覆盖远端日常开发 checkout。
+目标必须已有经同一清单校验的旧版本、`releases/`、`current` 和服务用户持有的 `0600 runtime/workbench.env`。systemd 使用本目录 service 单元：主进程及子进程 `PATH` 都优先指向 `current/toolchain/bin`，不替换宿主共享 Node。旧版本缺少制品清单、维护状态读回或固定工具链时先阻断；首次接入须在另获授权的维护窗口核清旧版本与状态、保全原配置并安装对应服务，不能补造身份绕过检查。
 
-   操作者须先确认工作台空闲，按现有 store root 与引用关系盘点并保存 operation store 及必要证据；运行中操作、执行锁、外部 store override 或未知非空 output 未查明时停止切换。
+1. 只读核对制品和固定目标计划，明确审批的 `artifactId`；获得本次目标升级授权后才执行第二条：
 
-   在维护窗口停止本工作台服务后保留这些状态，保留旧 `current`、output 与 runtime env 作为回滚点，再原子切换并启动 `plush-workbench-test`，读回历史记录仍可访问。依赖和状态保全不通过时不切换，不批量复制镜像或缓存。
+   ```bash
+   node scripts/deploy/workbench-release.mjs deploy --input "$WORKBENCH_RELEASE_DIR"
+   WORKBENCH_ARTIFACT_ID=填入封装返回的artifactId
+   node scripts/deploy/workbench-release.mjs deploy --input "$WORKBENCH_RELEASE_DIR" --artifact "$WORKBENCH_ARTIFACT_ID" --execute
+   ```
 
-   将已有执行器历史接入独立工作台时，仅一次性导入已结束操作及其回执、计划、请求索引和 GitLab 引用，按 operation ID 与逐文件 SHA-256 核对；同 ID 内容冲突须先查明。原库和未结束操作保留在原执行端，账号凭据及取件缓存不混入记录包。后续工作台操作由本服务记录并沿既有协议登记 GitLab，不另建定时复制任务。
-5. 香港入口先备份已有同名配置，再安装本目录 Nginx 配置。`nginx -t` 通过后 reload，读回 HTTPS 登录页、未登录 API 拒绝、真实登录、页面/工具只读请求、退出与健康状态；Cloudflare 只添加或精确更新工作台记录，不覆盖其他域名。
-6. 回滚时先保全切换后的新增操作，再把 `current`、本次改动的 runtime 配置和 systemd drop-in 恢复到记录的前态；执行 `daemon-reload` 后重启，重新核对登录、健康与记录。首次部署无旧版本时停用本服务与其精确域名入口；保留 runtime、日志和发布证据。业务 Compose、数据库、上传、证书和本地开发进程不在回滚删除范围内。
+2. 执行器校验固定 SSH 主机身份、上传内容与 Node，再取得本次维护锁。锁期间拒绝新工具 POST，保留只读访问；有在途写请求、未结束或未知操作、执行锁、外部 store override、未知 `output/` 时不停止服务。只传输代码和依赖，不传输本机运行状态。
+3. 校验候选后停止本工作台服务，逐文件保全当前 `output/dev-workbench`、`output/qa`、`output/playwright`，核对内容、权限与清单完全一致，再原子切换 `current`。成功须读回 exact artifact / source SHA、固定 Node、空闲状态、HTTPS 登录页和未登录 API 拒绝；历史记录与原回执继续保留。
+4. 停服结果不确定或新版本读回失败时，保留候选和旧版本，主动恢复旧服务并核对旧制品身份和公网边界。恢复未证明时保留维护锁；不自动重复发布、删除历史或重新启动数据操作。结果、第一失败阶段及恢复失败原因写入私有 `runtime/release-<operation-id>.json`，失败按该回执人工处理，不能仅因服务进程存在就宣称恢复。
+5. 显式回滚使用已保留的精确 release key；先执行只读计划，获得授权后再加 `--execute`：
 
-本节为手工 SOP。`build:workbench` 与独立服务启动入口不会自动完成源码封装、依赖传输、状态保全或 current 切换；操作者须逐项核验并留证，不能把一次性操作脚本当成仓库长期发布入口。
+   ```bash
+   WORKBENCH_ROLLBACK_RELEASE=填入已保留的精确release-key
+   node scripts/deploy/workbench-release.mjs rollback --release "$WORKBENCH_ROLLBACK_RELEASE"
+   node scripts/deploy/workbench-release.mjs rollback --release "$WORKBENCH_ROLLBACK_RELEASE" --execute
+   ```
 
-操作回执与日志放 ignored `output/` 或目标私有部署目录。源码版本、制品摘要、配置、目标运行和客户验收分别记录；工作台可访问不等于执行器全部就绪，也不等于甲方业务验收通过。
+   回滚同样先保全当前最新记录，再切回所选代码与依赖；不回退数据、丢弃新增回执或复制旧状态覆盖当前记录。
+
+首次安装 HTTPS / Nginx / Cloudflare、凭据、服务单元与历史导入仍需各自授权。变更前保留对应配置前态；Nginx 检查通过后才重载，登录、读取、退出及访问边界分别验证。一次性历史导入只接收已结束操作和相应回执、计划、请求索引及 GitLab 引用，按 operation ID 与 SHA-256 核对，未结束操作及原库保留原执行端，不建定时复制任务。
+
+操作回执与日志放 ignored `output/` 或目标私有部署目录。该入口的代码和隔离测试不等于已完成真实目标升级；源码、制品、配置、运行、恢复与客户验收分别记录。业务 Compose、数据库、上传和证书不在此入口的切换或删除范围内。
 
 ## 发布状态刷新与故障定位
 
