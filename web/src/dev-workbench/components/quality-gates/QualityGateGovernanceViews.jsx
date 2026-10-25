@@ -1,6 +1,5 @@
 import React from 'react'
 import {
-  Alert,
   Button,
   Descriptions,
   List,
@@ -88,7 +87,9 @@ export function GovernanceView({
   values,
   onSearch,
   onFilter,
+  onRetry,
 }) {
+  const stale = Boolean(data && (loading || error))
   const columns = [
     {
       align: 'left',
@@ -123,8 +124,8 @@ export function GovernanceView({
       key: 'result',
       width: 132,
       render: (_, row) => (
-        <Tag color={row.current ? 'success' : 'warning'}>
-          {row.current
+        <Tag color={stale ? 'default' : row.current ? 'success' : 'warning'}>
+          {stale ? '上次读取 · 待核对' : row.current
             ? '属于当前改动'
             : row.recentResult === 'missing'
               ? '尚未运行'
@@ -160,18 +161,12 @@ export function GovernanceView({
           onChange={onFilter}
         />
       </WorkbenchToolbar>
-      {error ? (
-        <Alert
-          type="error"
-          showIcon
-          message="门禁目录读取失败"
-          description={error}
-        />
-      ) : null}
+      {loading && data ? <WorkbenchNotice tone="loading" title="正在刷新；以下为上次读取的门禁目录。" /> : null}
+      {error ? <WorkbenchNotice tone="error" title="门禁目录读取失败" description={data ? '以下为上次读取，当前状态尚未核实。' : error} action={<Button onClick={onRetry}>重新读取</Button>} /> : null}
       <Table
         rowKey="key"
         size="small"
-        loading={loading}
+        loading={loading && !data}
         pagination={false}
         dataSource={data?.rows || []}
         columns={columns}
@@ -196,7 +191,7 @@ export function GovernanceView({
         expandable={{ expandedRowRender: renderGovernanceEvidence }}
       />
 
-      {!loading && !error && data?.complexity?.length ? (
+      {data?.complexity?.length ? (
         <section
           className="erp-dev-quality-complexity"
           aria-labelledby="quality-complexity-title"
@@ -247,7 +242,8 @@ export function GovernanceView({
   )
 }
 
-export function GapsView({ data, loading, error, values, onRange, onRisk }) {
+export function GapsView({ data, loading, error, values, onRange, onRisk, onRetry }) {
+  const stale = Boolean(data && (loading || error))
   const categories = data?.categories || []
   const noChanges = data?.changedCount === 0
   const emptyTitle = noChanges
@@ -273,24 +269,18 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
           onChange={onRisk}
         />
       </WorkbenchToolbar>
-      {error ? (
-        <Alert
-          type="error"
-          showIcon
-          message="改动缺口读取失败"
-          description={error}
-        />
-      ) : null}
-      {loading ? (
+      {loading && data ? <WorkbenchNotice tone="loading" title="正在刷新；以下为上次读取的改动缺口。" /> : null}
+      {error ? <WorkbenchNotice tone="error" title="改动缺口读取失败" description={data ? '以下为上次读取，当前状态尚未核实。' : error} action={<Button onClick={onRetry}>重新读取</Button>} /> : null}
+      {loading && !data ? (
         <Spin tip="正在核对改动缺口">
           <div className="erp-dev-quality-loading" />
         </Spin>
       ) : null}
-      {data && !loading && !error && !data.matched ? (
+      {data && !data.matched ? (
         <WorkbenchNotice
           className="erp-dev-quality-gap-empty"
           tone={noChanges || values.risk === 'high' ? 'info' : 'warning'}
-          title={emptyTitle}
+          title={stale ? `上次读取：${emptyTitle}` : emptyTitle}
           description={
             noChanges
               ? '此范围暂无需要比对的文件；服务器 CI 与当前执行端的诊断记录可分别查看。'
@@ -309,9 +299,9 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
           }
         />
       ) : null}
-      {!loading && !error && categories.length ? (
+      {categories.length ? (
         <>
-          <QualityGateCoverageMatrix categories={categories} />
+          <QualityGateCoverageMatrix categories={categories} stale={stale} />
           <div className="erp-dev-quality-gap-categories">
             {categories.map((category) => (
               <section
@@ -326,10 +316,10 @@ export function GapsView({ data, loading, error, values, onRange, onRisk }) {
                     </Tag>
                     <Tag
                       color={
-                        category.status === 'covered' ? 'success' : 'warning'
+                        stale ? 'default' : category.status === 'covered' ? 'success' : 'warning'
                       }
                     >
-                      {category.status === 'covered'
+                      {stale ? '上次读取 · 待核对' : category.status === 'covered'
                         ? '当前证据齐全'
                         : '仍缺必需门禁'}
                     </Tag>

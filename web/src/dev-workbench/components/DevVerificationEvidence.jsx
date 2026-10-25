@@ -112,8 +112,9 @@ function ReceiptDetails({ target }) {
   )
 }
 
-function TargetRow({ target, loading, failed, initial }) {
+function TargetRow({ target, loading, failed }) {
   const [expanded, setExpanded] = useState(false)
+  const initial = !target.runtimeSha && loading
   return (
     <>
       <tr>
@@ -123,6 +124,8 @@ function TargetRow({ target, loading, failed, initial }) {
           <div className="erp-dev-verification-evidence__version-note">
             {initial
               ? '等待读取运行版本'
+              : !target.runtimeSha
+                ? '运行版本未读回'
               : loading || failed
                 ? '上次读取版本 · 本次待核对'
                 : target.current
@@ -191,10 +194,20 @@ export default function DevVerificationEvidence() {
     const controller = new AbortController()
     setLoading(true)
     setFailed(false)
-    readDevVerificationEvidence({ signal: controller.signal })
-      .then((value) => {
-        if (!controller.signal.aborted) setState(value)
-      })
+    setState((current) => current ? { ...current, pending: { ci: true, targets: DEV_DELIVERY_TARGETS.map(({ key }) => key) } } : current)
+    readDevVerificationEvidence({
+      signal: controller.signal,
+      onUpdate: (next) => {
+        if (controller.signal.aborted) return
+        setState((current) => ({
+          ...next,
+          ci: (next.pending.ci || next.failed.ci) && current?.ci.evidence ? current.ci : next.ci,
+          ciRepository: (next.pending.ci || next.failed.ci) && current?.ci.evidence ? current.ciRepository : next.ciRepository,
+          targets: next.targets.map((target) => next.pending.targets.includes(target.key) || next.failed.targets.includes(target.key)
+            ? current?.targets.find((previous) => previous.key === target.key) || target : target),
+        }))
+      },
+    })
       .catch(() => {
         if (!controller.signal.aborted) setFailed(true)
       })
@@ -203,7 +216,8 @@ export default function DevVerificationEvidence() {
       })
     return () => controller.abort()
   }, [reload])
-  const stale = Boolean(state && (loading || failed))
+  const ciLoading = loading && (!state || state.pending?.ci)
+  const stale = Boolean(state?.ci.evidence && (ciLoading || failed || state?.failed?.ci))
   return (
     <WorkbenchSection
       className="erp-dev-verification-evidence"
@@ -224,9 +238,7 @@ export default function DevVerificationEvidence() {
         <WorkbenchNotice
           className="erp-dev-verification-evidence__notice"
           tone="loading"
-          title={state
-            ? '正在重新核对；以下 CI 记录来自上次读取，当前状态尚未核实。'
-            : '正在读取 GitLab CI、目标运行版本与执行回执…'}
+          title="正在读取 GitLab CI、目标运行版本与执行回执…"
         />
       ) : null}
       {failed ? (
@@ -239,7 +251,7 @@ export default function DevVerificationEvidence() {
           }
         />
       ) : null}
-      {!loading && !failed && state?.errors?.length ? (
+      {!failed && state?.errors?.length ? (
         <WorkbenchNotice
           tone="error"
           title={
@@ -263,19 +275,19 @@ export default function DevVerificationEvidence() {
           {state?.ci.evidence ? (
             <ServerCiEvidencePanel
               summary={{
-                repository: state.repository,
+                repository: state.ciRepository || state.repository,
                 serverEvidence: state.ci.evidence,
               }}
             />
           ) : (
             <div className="erp-dev-verification-evidence__placeholder">
               <p>
-                {loading
+                {ciLoading
                   ? '正在核对流水线、测试报告与覆盖率。'
                   : '尚未取得 GitLab CI 证据。'}
               </p>
               <p>CI 对应已提交版本；工作区改动与目标部署分别核对。</p>
-              {!loading ? (
+              {!ciLoading ? (
                 <Link to="/__dev/quality-gates?view=server">前往质量门禁</Link>
               ) : null}
             </div>
@@ -323,9 +335,8 @@ export default function DevVerificationEvidence() {
                   <TargetRow
                     key={target.key}
                     target={target}
-                    loading={loading}
-                    failed={failed}
-                    initial={!state}
+                    loading={loading && (!state || state.pending?.targets.includes(target.key))}
+                    failed={failed || state?.failed?.targets.includes(target.key)}
                   />
                 ))}
               </tbody>

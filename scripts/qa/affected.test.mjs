@@ -80,7 +80,7 @@ test("workbench shared patterns retain task acceptance for the sample and real c
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const text = plan.followUps.find(({ id }) => id === "browser-regression")?.text || "";
-    for (const scenario of ["dev-workbench-patterns-desktop-light", "dev-testing-report-layout-desktop-light", "dev-quality-gates-layout-desktop-light", "dev-server-verification-layout-desktop-light"]) assert(text.includes(scenario), file);
+    for (const scenario of ["dev-workbench-patterns-desktop-light", "dev-testing-report-layout-desktop-light", "dev-quality-gates-layout-desktop-light", "dev-server-verification-layout-desktop-light", "dev-data-preparation-workflow-desktop", "dev-data-preparation-4k", "dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete", "dev-project-skills-guidance-desktop-light"]) assert(text.includes(scenario), file);
     assert(!ids(plan).includes("full"), file);
   }
   const unrelated = buildAffectedPlan(["web/src/erp/utils/businessDate.mjs"], { root: ROOT });
@@ -1493,4 +1493,20 @@ test("affected: explicit full can only escalate a focused plan", () => {
   assert.equal(selection.requiresFullConfirmation, false);
   assert.equal(selection.requiresManagedDatabase, true);
   assert(selection.reasons.includes("explicit_full"));
+});
+
+test('workbench consumers select task regressions directly and independent builds retain artifact acceptance', () => {
+  for (const [file, scenario] of [
+    ['components/DevVerificationEvidence.jsx', 'dev-server-verification-layout-desktop-light'],
+    ['components/quality-gates/QualityGateGovernanceViews.jsx', 'dev-quality-gates-layout-desktop-light'],
+    ['pages/DevDataPreparationPage.jsx', 'dev-data-preparation-workflow-desktop'],
+    ['components/flow-state/RuntimeView.jsx', 'dev-flow-state-details-desktop-light'],
+    ['pages/DevProjectSkillsPage.jsx', 'dev-project-skills-guidance-desktop-light'],
+  ]) {
+    const plan = buildAffectedPlan([`web/src/dev-workbench/${file}`], { root: ROOT });
+    assert(plan.followUps.find(({ id }) => id === 'browser-regression')?.text.includes(scenario), file);
+  }
+  for (const file of ['web/vite.workbench.config.mjs', 'web/src/dev-workbench/pages/DevQualityGatesPage.jsx', 'web/scripts/standaloneWorkbenchSmoke.mjs']) {
+    assert(buildAffectedPlan([file], { root: ROOT }).followUps.some(({ id }) => id === 'workbench-artifact-browser'), file);
+  }
 });

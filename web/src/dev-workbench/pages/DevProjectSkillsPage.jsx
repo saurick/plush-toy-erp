@@ -9,6 +9,8 @@ import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
+import { WorkbenchNotice } from '../components/WorkbenchPattern.jsx'
+import { requestWorkbenchJson } from '../config/devWorkbenchRequest.mjs'
 import { buildDevDocsLocation } from './devDocsNavigation.mjs'
 import {
   DEV_PROJECT_SKILLS_API,
@@ -34,16 +36,12 @@ export default function DevProjectSkillsPage() {
     const controller = new AbortController()
     setLoading(true)
     setError(false)
-    setSnapshot(null)
-    fetch(DEV_PROJECT_SKILLS_API, {
+    requestWorkbenchJson(globalThis.fetch, DEV_PROJECT_SKILLS_API, {
+      method: 'GET',
       signal: controller.signal,
       credentials: 'same-origin',
       cache: 'no-store',
     })
-      .then((response) => {
-        if (!response.ok) throw new Error('Project skills unavailable')
-        return response.json()
-      })
       .then((data) => {
         if (
           !Array.isArray(data.skills) ||
@@ -103,8 +101,8 @@ export default function DevProjectSkillsPage() {
         <Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_PROJECT_SKILLS_ROUTE]}</Title>
         {snapshot ? (
           <div className="erp-dev-skills__health" role="status">
-            <Tag color={snapshot.health.status === 'ok' ? 'success' : 'error'}>
-              {snapshot.health.status === 'ok'
+            <Tag color={loading || error ? 'default' : snapshot.health.status === 'ok' ? 'success' : 'error'}>
+              {loading || error ? '上次检查 · 待核实' : snapshot.health.status === 'ok'
                 ? '结构检查通过'
                 : '结构检查需处理'}
             </Tag>
@@ -119,7 +117,8 @@ export default function DevProjectSkillsPage() {
           刷新与检查
         </Button>
       </header>
-      {loading ? (
+      {loading && snapshot ? <WorkbenchNotice tone="loading" title="正在刷新；以下为上次读取的项目 Skill。" /> : null}
+      {loading && !snapshot ? (
         <div className="erp-dev-skills__state">
           <Spin tip="正在读取项目 Skill 与结构检查结果">
             <div />
@@ -131,7 +130,7 @@ export default function DevProjectSkillsPage() {
           type="error"
           showIcon
           message="项目 Skill 暂时无法读取"
-          description="请检查工作区文件或开发服务后重试。"
+          description={snapshot ? '以下为上次读取，当前文件状态尚未核实；请重新读取。' : '请检查工作区文件或开发服务后重试。'}
           action={
             <Button onClick={() => setReload((value) => value + 1)}>
               重新读取

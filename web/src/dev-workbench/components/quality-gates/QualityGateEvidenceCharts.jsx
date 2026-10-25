@@ -67,7 +67,7 @@ export function QualityGateHistoryTrend({ operations, operation }) {
   )
 }
 
-export function QualityGateCoverageMatrix({ categories }) {
+export function QualityGateCoverageMatrix({ categories, stale = false }) {
   const matrix = buildQualityGateCoverageMatrix(categories)
   if (matrix.gates.length === 0 || matrix.rows.length === 0) return null
   return (
@@ -87,7 +87,7 @@ export function QualityGateCoverageMatrix({ categories }) {
       </div>
       <div className="erp-dev-quality-coverage__table-wrap">
         <table data-table-lines="appearance">
-          <caption>当前筛选范围内的风险与门禁覆盖关系</caption>
+          <caption>{stale ? '上次读取的风险与门禁覆盖关系，当前状态待核实' : '当前筛选范围内的风险与门禁覆盖关系'}</caption>
           <thead>
             <tr>
               <th scope="col">风险</th>
@@ -115,9 +115,9 @@ export function QualityGateCoverageMatrix({ categories }) {
                     <td key={cell.gateKey}>
                       <span
                         className="erp-dev-quality-coverage__status"
-                        data-tone={status.tone}
+                        data-tone={stale ? 'neutral' : status.tone}
                       >
-                        {status.label}
+                        {stale && cell.status !== 'not_applicable' ? `上次：${status.label}` : status.label}
                       </span>
                     </td>
                   )

@@ -100,3 +100,56 @@ test('partial read failures preserve independently available evidence and expose
   assert.equal(result.errors.length, 2)
   assert.doesNotMatch(JSON.stringify(result), /private error|private token/u)
 })
+
+test('ready target receipts are published while CI is pending, and cancellation suppresses late publications', async () => {
+  const input = fixture()
+  let finishCI
+  let targetsReady
+  const ready = new Promise((resolve) => { targetsReady = resolve })
+  const updates = []
+  const controller = new AbortController()
+  const pending = readDevVerificationEvidence({ signal: controller.signal,
+    qualityClient: { summary: () => new Promise((resolve) => { finishCI = resolve }) },
+    deliveryClient: {
+      summary: async () => input.delivery,
+      history: async ({ target }) => ({ operations: input.delivery.operations.filter((item) => item.target === target) }),
+      operation: async (id) => input.operations[id],
+    },
+    onUpdate: (value) => { updates.push(value); if (!value.pending.targets.length) targetsReady(value) },
+  })
+  const visible = await ready
+  assert.equal(visible.pending.ci, true)
+  assert(visible.targets.every((target) => target.passed))
+  controller.abort()
+  const count = updates.length
+  finishCI(input.quality)
+  await assert.rejects(pending, { name: 'AbortError' })
+  assert.equal(updates.length, count)
+})
+
+test('CI and a ready target remain available while another target history is delayed', async () => {
+  const input = fixture()
+  let releaseHistory
+  let visible
+  const ready = new Promise((resolve) => { visible = resolve })
+  const delayed = new Promise((resolve) => { releaseHistory = resolve })
+  const slow = input.delivery.targets[0].key
+  const request = readDevVerificationEvidence({
+    qualityClient: { summary: async () => input.quality },
+    deliveryClient: {
+      summary: async () => input.delivery,
+      history: async ({ target }) => {
+        if (target === slow) await delayed
+        return { operations: input.delivery.operations.filter((item) => item.target === target) }
+      },
+      operation: async (id) => input.operations[id],
+    },
+    onUpdate: (value) => { if (value.ci.passed && value.targets[1].passed) visible(value) },
+  })
+  const partial = await ready
+  assert(partial.pending.targets.includes(slow))
+  assert.equal(partial.targets[0].passed, false)
+  assert.equal(partial.targets[1].passed, true)
+  releaseHistory()
+  assert.equal((await request).passed, true)
+})

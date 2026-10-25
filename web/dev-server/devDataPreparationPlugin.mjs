@@ -1125,6 +1125,8 @@ function publicOperationReference(operation) {
     id: operation.id,
     profileKey: operation.profileKey,
     status: operation.status,
+    targetKey: [LOCAL_DEVELOPMENT_TARGET, ISOLATED_LOCAL_TARGET, CUSTOMER_TRIAL_133_TARGET].includes(operation.targetSummary?.targetKey)
+      ? operation.targetSummary.targetKey : null,
     updatedAt: operation.updatedAt,
     terminal: DATA_PREPARATION_TERMINAL_STATUSES.includes(operation.status),
     contract: operationContract(operation),
@@ -1153,11 +1155,12 @@ function laterScenarioReadbackResolves(operation, operations) {
   )
 }
 
-export function unresolvedDataPreparationOutcomeBlocksExecution(
-  operation,
-  operations
-) {
-  return operations.some((candidate) => {
+export function unresolvedDataPreparationOutcomeBlocksExecution(operation, operations) {
+  return blockingDataPreparationOperations(operation, operations).length > 0
+}
+
+function blockingDataPreparationOperations(operation, operations) {
+  return operations.filter((candidate) => {
     if (operationContract(candidate).classification === 'historical') {
       return false
     }
@@ -1616,6 +1619,8 @@ export function createDevDataPreparationService({
     }
     const operations = listDataPreparationOperations(store, { limit: 100 })
     const currentOperations = operations.filter(isCurrentPublicOperation)
+    const executionHistory = currentOperations.some((operation) => operation.status === 'ready')
+      ? listDataPreparationOperations(store, { limit: 200 }) : []
     const historicalOperations = operations.filter(
       (operation) =>
         operationContract(operation).classification === 'historical'
@@ -1644,7 +1649,7 @@ export function createDevDataPreparationService({
             : 'warning',
         message:
           blockingUnresolvedContractOperations.length > 0
-            ? `存在 ${blockingUnresolvedContractOperations.length} 条合同版本无法判定且结果未收口的操作，核对前禁止再次执行`
+            ? `存在 ${blockingUnresolvedContractOperations.length} 条合同版本无法判定且结果未收口的操作；请核对原记录，能否执行以所选目标的准备计划为准`
             : `另有 ${unresolvedContractOperations.length} 条无法判定版本合同的旧回执，仅供历史核对`,
       })
     }
@@ -1682,7 +1687,7 @@ export function createDevDataPreparationService({
         MANUAL_ACCEPTANCE_REVIEW_PLAN
       ),
       profiles: DEV_DATA_PREPARATION_PROFILES,
-      currentOperations: currentOperations.slice(0, 50).map(publicOperation),
+      currentOperations: currentOperations.slice(0, 50).map((operation) => operationForPage(operation, executionHistory)),
       historicalOperations: historicalOperations
         .slice(0, 50)
         .map(publicOperationReference),
@@ -1727,6 +1732,19 @@ export function createDevDataPreparationService({
     return pending
   }
 
+  function operationForPage(operation, executionHistory) {
+    const projection = publicOperation(operation)
+    if (operation.status !== 'ready') return projection
+    const blockers = blockingDataPreparationOperations(operation, executionHistory || listDataPreparationOperations(store, { limit: 200 }))
+    if (!blockers.length) return projection
+    return { ...projection,
+issues: [...projection.issues, {
+      code: 'unresolved_operation_outcome',
+severity: 'blocked',
+      message: `本计划仍受 ${blockers.length} 条未收口记录阻断：${blockers.slice(0, 3).map(({ id }) => id).join('、')}${blockers.length > 3 ? '等' : ''}。请在执行记录中核对目标和原始结果。`,
+    }] }
+  }
+
   async function prepare(payload) {
     const existing = readDataPreparationOperationByIdempotencyKey(
       store,
@@ -1742,7 +1760,7 @@ export function createDevDataPreparationService({
       return {
         kind: 'plush.dev-data-preparation-action-result',
         action: 'prepare',
-        operation: publicOperation(existing),
+        operation: operationForPage(existing),
         reused: true,
       }
     }
@@ -1774,7 +1792,7 @@ export function createDevDataPreparationService({
           return {
             kind: 'plush.dev-data-preparation-action-result',
             action: 'prepare',
-            operation: publicOperation(completed),
+            operation: operationForPage(completed),
             reused: true,
           }
         }
@@ -1811,7 +1829,7 @@ export function createDevDataPreparationService({
         return {
           kind: 'plush.dev-data-preparation-action-result',
           action: 'prepare',
-          operation: publicOperation(completed),
+          operation: operationForPage(completed),
           reused: true,
         }
       }
@@ -1854,7 +1872,7 @@ export function createDevDataPreparationService({
       return {
         kind: 'plush.dev-data-preparation-action-result',
         action: 'prepare',
-        operation: publicOperation(created.operation),
+        operation: operationForPage(created.operation),
         reused: created.reused,
       }
     } finally {
@@ -2177,7 +2195,7 @@ export function createDevDataPreparationService({
     return {
       kind: 'plush.dev-data-preparation-action-result',
       action: 'execute',
-      operation: publicOperation(operation),
+      operation: operationForPage(operation),
     }
   }
 
@@ -2185,7 +2203,7 @@ export function createDevDataPreparationService({
     summary: getSummary,
     readOperation(operationId) {
       recoverOrphanedOperations()
-      return publicOperation(readDataPreparationOperation(store, operationId))
+      return operationForPage(readDataPreparationOperation(store, operationId))
     },
     async act(value) {
       const request = validateDevDataPreparationAction(value)

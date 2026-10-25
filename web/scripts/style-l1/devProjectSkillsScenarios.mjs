@@ -246,16 +246,23 @@ export function createDevProjectSkillsScenarios({
         await page.getByText('结构检查需处理', { exact: true }).waitFor()
         await page.getByText('Skill 引用章节不存在', { exact: true }).waitFor()
         await page.unroute(endpoint)
-        await page.route(endpoint, (route) =>
-          route.fulfill({
+        let releaseRefresh
+        const refreshWait = new Promise((resolve) => { releaseRefresh = resolve })
+        await page.route(endpoint, async (route) => {
+          await refreshWait
+          return route.fulfill({
             status: 503,
             contentType: 'application/json',
             body: '{}',
           })
-        )
+        })
         await page
           .getByRole('button', { name: '刷新与检查', exact: true })
           .click()
+        await page.getByText('正在刷新；以下为上次读取的项目 Skill。', { exact: true }).waitFor()
+        assert.equal(await page.getByRole('link', { name: '查看原文', exact: true }).count(), 1)
+        await page.getByText('上次检查 · 待核实', { exact: true }).waitFor()
+        releaseRefresh()
         await page
           .getByText('项目 Skill 暂时无法读取', { exact: true })
           .waitFor()
@@ -263,6 +270,9 @@ export function createDevProjectSkillsScenarios({
           await page.getByText('结构检查通过', { exact: true }).count(),
           0
         )
+        assert.equal(await page.locator('.erp-dev-skills__item').count(), snapshot.skills.length)
+        assert.equal(await page.getByRole('link', { name: '查看原文', exact: true }).count(), 1)
+        await page.getByText('上次检查 · 待核实', { exact: true }).waitFor()
         await page.unroute(endpoint)
         await page
           .getByRole('button', { name: '重新读取', exact: true })

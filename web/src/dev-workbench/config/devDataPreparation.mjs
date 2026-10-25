@@ -1213,7 +1213,7 @@ export function validateDevDataPreparationOperation(operation) {
 function validateOperationReference(operation) {
   assertExactKeys(
     operation,
-    ['contract', 'id', 'profileKey', 'status', 'terminal', 'updatedAt'],
+    ['contract', 'id', 'profileKey', 'status', 'targetKey', 'terminal', 'updatedAt'],
     'data preparation operation reference'
   )
   if (
@@ -1223,6 +1223,9 @@ function validateOperationReference(operation) {
     operation.terminal !== TERMINAL_OPERATION_STATUSES.has(operation.status)
   ) {
     throw new Error('data preparation operation reference is invalid')
+  }
+  if (operation.targetKey !== null && !Object.values(DEV_DATA_PREPARATION_TARGET_KEYS).includes(operation.targetKey)) {
+    throw new Error('data preparation operation reference target is invalid')
   }
   assertIsoTimestamp(
     operation.updatedAt,

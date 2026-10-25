@@ -858,7 +858,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(sources.page, /idPrefix="quality-gates"/u)
   assert.equal((sources.page.match(/setInterval\(/gu) || []).length, 1)
   assert.match(sources.page, /AbortController/u)
-  assert.match(sources.page, /viewState\.view === activeView/u)
+  assert.match(sources.page, /viewState\.key === viewKey/u)
   assert.match(sources.page, /data=\{activeViewState\.data\}/u)
   assert.match(sources.page, /selectDisplayedQualityGateOperation/u)
   assert.match(sources.presentation, /getQualityGateFlowSegments/u)
@@ -944,4 +944,18 @@ test('server Job timestamp contract accepts missing records and rejects reversed
   assert.equal(normalizeDevQualityGateSummary(payload).serverEvidence.jobs[0].finishedAt, null)
   job.startedAt = 'invalid'
   assert.throws(() => normalizeDevQualityGateSummary(payload), /quality server evidence job is invalid/u)
+})
+
+test('quality reads and session acquisition have bounded deadlines, and a stalled session cannot launch a run', async () => {
+  const calls = []
+  const client = createDevQualityGateClient({ timeoutMs: 5, fetchImpl: (url, options) => {
+    calls.push({ url, method: options.method })
+    return new Promise(() => {})
+  } })
+  for (const read of [() => client.summary(), () => client.governance(), () => client.gaps(),
+    () => client.start('strict', createQualityGateIdempotencyKey('strict'))]) {
+    await assert.rejects(read(), { name: 'TimeoutError' })
+  }
+  assert.equal(calls.length, 4)
+  assert(calls.every(({ method }) => method === 'GET'))
 })

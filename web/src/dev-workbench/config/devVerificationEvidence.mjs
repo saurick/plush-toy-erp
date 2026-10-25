@@ -67,39 +67,75 @@ export function buildDevVerificationEvidence({ quality, delivery, operations = {
   }
 }
 
-export async function readDevVerificationEvidence({ signal,
+export async function readDevVerificationEvidence({ signal, onUpdate,
   deliveryClient = createDevDeliveryClient(), qualityClient = createDevQualityGateClient(),
 } = {}) {
-  const [deliveryResult, qualityResult] = await Promise.allSettled([
-    deliveryClient.summary({ signal }), qualityClient.summary({ signal }),
-  ])
-  if (signal?.aborted) throw signal.reason
-  const delivery = deliveryResult.status === 'fulfilled' ? deliveryResult.value : null
-  const quality = qualityResult.status === 'fulfilled' ? qualityResult.value : null
-  const errors = []
-  if (!delivery) errors.push('目标服务器状态读取失败，请重新读取。')
-  if (!quality) errors.push('GitLab CI 状态读取失败，请重新读取。')
-  const histories = await Promise.allSettled((delivery?.targets || []).map(async (target) => {
-    const sha = target.preflight?.remote?.runtime?.serverSha
-    if (!SHA.test(sha || '')) return null
-    return deliveryClient.history({ target: target.key, keyword: sha, pageSize: 10, signal })
-  }))
-  if (signal?.aborted) throw signal.reason
-  // Query each target's indexed history instead of relying on the summary's
-  // bounded recent window, which can omit an infrequently deployed environment.
-  const candidates = histories.flatMap((result, index) => {
-    if (result.status === 'fulfilled') return result.value?.operations || []
-    errors.push(`${delivery.targets[index].key} 的交付历史读取失败，不能选择当前版本回执。`)
-    return []
-  })
-  const scopedDelivery = delivery ? { ...delivery, operations: candidates } : null
-  const selected = (scopedDelivery?.targets || []).map((target) => selectTargetVerificationOperation(scopedDelivery, target)).filter(Boolean)
-  const details = await Promise.allSettled(selected.map((item) => deliveryClient.operation(item.id, { target: item.target, signal })))
-  if (signal?.aborted) throw signal.reason
+  let delivery = null
+  let quality = null
+  let ciPending = true
+  let ciFailed = false
+  const pendingTargets = new Set(DEV_DELIVERY_TARGETS.map(({ key }) => key))
+  const failedTargets = new Set()
   const operations = {}
-  details.forEach((result, index) => {
-    if (result.status === 'fulfilled') operations[selected[index].id] = result.value
-    else errors.push(`${selected[index].target} 的执行回执读取失败，实时运行状态不能替代执行证据。`)
+  const errors = []
+  const snapshot = () => ({
+    ...buildDevVerificationEvidence({ quality, delivery, operations, errors: [...errors] }),
+    ciRepository: quality?.repository || null,
+    pending: { ci: ciPending, targets: [...pendingTargets] },
+    failed: { ci: ciFailed, targets: [...failedTargets] },
   })
-  return buildDevVerificationEvidence({ quality, delivery: scopedDelivery, operations, errors })
+  const publish = () => { if (!signal?.aborted) onUpdate?.(snapshot()) }
+  const readCI = async () => {
+    try {
+      quality = await qualityClient.summary({ signal })
+    } catch {
+      ciFailed = true
+      errors.push('GitLab CI 状态读取失败，请重新读取。')
+    } finally {
+      ciPending = false
+      publish()
+    }
+  }
+  const readTargets = async () => {
+    try {
+      const summary = await deliveryClient.summary({ signal })
+      signal?.throwIfAborted()
+      delivery = { ...summary, operations: [] }
+      publish()
+      await Promise.all((summary.targets || []).map(async (target) => {
+        try {
+          const sha = target.preflight?.remote?.runtime?.serverSha
+          if (!SHA.test(sha || '')) return
+          // Each target resolves independently; a slow target cannot hide other receipts.
+          const history = await deliveryClient.history({ target: target.key, keyword: sha, pageSize: 10, signal })
+          signal?.throwIfAborted()
+          delivery.operations.push(...history.operations)
+          const selected = selectTargetVerificationOperation(delivery, target)
+          if (selected) {
+            try {
+              operations[selected.id] = await deliveryClient.operation(selected.id, { target: target.key, signal })
+            } catch {
+              failedTargets.add(target.key)
+              errors.push(`${target.key} 的执行回执读取失败，实时运行状态不能替代执行证据。`)
+            }
+          }
+        } catch {
+          failedTargets.add(target.key)
+          errors.push(`${target.key} 的交付历史读取失败，不能选择当前版本回执。`)
+        } finally {
+          pendingTargets.delete(target.key)
+          publish()
+        }
+      }))
+    } catch {
+      DEV_DELIVERY_TARGETS.forEach(({ key }) => failedTargets.add(key))
+      errors.push('目标服务器状态读取失败，请重新读取。')
+    } finally {
+      pendingTargets.clear()
+      publish()
+    }
+  }
+  await Promise.all([readCI(), readTargets()])
+  signal?.throwIfAborted()
+  return snapshot()
 }

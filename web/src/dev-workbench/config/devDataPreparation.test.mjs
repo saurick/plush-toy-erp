@@ -530,6 +530,25 @@ test('summary contract requires three fixed profiles and fail-closed boundaries'
   )
 })
 
+test('unresolved references preserve explicit and missing target identities without accepting invented targets', () => {
+  const summary = summaryFixture()
+  const operation = operationFixture()
+  const reference = { id: operation.id,
+profileKey: operation.profileKey,
+status: 'not_proven',
+    terminal: true,
+targetKey: null,
+updatedAt: operation.updatedAt,
+    contract: { ...operation.contract, classification: 'unresolved' },
+  }
+  summary.unresolvedOperations = [reference]
+  assert.equal(validateDevDataPreparationSummary(summary).unresolvedOperations[0].targetKey, null)
+  reference.targetKey = 'customer-trial-133'
+  assert.equal(validateDevDataPreparationSummary(summary).unresolvedOperations[0].targetKey, 'customer-trial-133')
+  reference.targetKey = 'guessed-production'
+  assert.throws(() => validateDevDataPreparationSummary(summary), /reference target/u)
+})
+
 test('operation contract binds lowercase run identity and exact confirmation to the immutable plan', () => {
   assert.equal(
     validateDevDataPreparationOperation(operationFixture()).status,

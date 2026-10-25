@@ -44,6 +44,21 @@ env 文件必须由服务用户持有、权限 `0600`，放在部署根目录的
 
 本地开发默认 `local` 模式，本机 loopback 无需工作台登录；受控内网共享可在 ignored `web/.env.development.local` 中显式设置 `PLUSH_DEV_WORKBENCH_ACCESS=private-network`。这些模式只作用于本地 Vite，不会关闭独立部署的登录保护。
 
+<a id="artifact-browser-acceptance"></a>
+
+## 独立工作台制品浏览器验收
+
+在固定源码的 `web/` 执行以下命令；共享工作区仍有其他任务写入时，先在具有独立 Git 元数据的一次性验证副本中只应用本轮候选差异：
+
+```bash
+GIT_OPTIONAL_LOCKS=0 pnpm build:workbench
+GIT_OPTIONAL_LOCKS=0 pnpm test:workbench
+```
+
+`test:workbench` 核对构建身份与当前源码一致，启动真实独立服务并加载 `build-workbench` 静态制品。浏览器通过 loopback HTTPS fixture 代理访问真实登录和会话合同，仅在本次独立浏览器进程信任临时证书的公钥指纹，不修改系统信任或用户浏览器设置；工具 API 使用隔离样例，不连接业务服务器、不执行诊断或部署。覆盖登录深链恢复、独立模式的服务端检查 / 诊断历史、服务器验证分项读取、三个桌面宽度、本地动作隐藏及服务端拒绝、会话失效重新登录和退出。结果、构建身份摘要与原生 3840×2160 截图写入 `output/qa/workbench-artifact-browser/`。
+
+该检查可用于未提交候选的隔离验证，但不是可发布制品，也不替代正式 TLS / 反向代理、目标凭据、实际目标执行或部署后读回。正式封装仍要求下文的 clean committed source。单元层服务端认证检查、普通 Vite 页面与本制品路径各证明自己的边界。
+
 <a id="workbench-release"></a>
 
 ## 构建、发布与回滚

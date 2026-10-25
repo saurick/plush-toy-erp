@@ -872,7 +872,7 @@ export default function DevDataPreparationPage() {
     dataView, executing, handleExecute, handlePrepare, loadError, loading, pollError,
     prepareBlockingReason, preparing, profiles, refresh, selectDataView, selectedChainKey,
     selectedIsScenarioDemo, selectedOperationTargetKey, selectedProfile, selectedProfileCopy,
-    selectedProfileKey, selectedScenarioTargetKey, selectProfile, selectScenarioTarget,
+    selectedProfileKey, selectedScenarioTargetKey, selectProfile, selectScenarioTarget, selectScope,
     setActionError, setConfirmation, setConfirmOpen, setSelectedChainKey, summary,
   } = useDataPreparation()
 
@@ -920,9 +920,10 @@ export default function DevDataPreparationPage() {
       'scenario_demo_explicit_resume_available',
     ].includes(issue.code)
   )
+  const pendingOperationReferences = (summary?.unresolvedOperations || []).filter((operation) => ['launching', 'running', 'not_proven'].includes(operation.status))
   const historicalOperationReferences = [
     ...(summary?.historicalOperations || []),
-    ...(summary?.unresolvedOperations || []),
+    ...(summary?.unresolvedOperations || []).filter((operation) => !pendingOperationReferences.includes(operation)),
   ]
 
   return (
@@ -1170,7 +1171,7 @@ export default function DevDataPreparationPage() {
                       loading={preparing}
                       onClick={handlePrepare}
                     >
-                      {selectedProfileCopy.prepareButtonLabel}
+                      {pendingOperationReferences.length ? '核对准备计划' : selectedProfileCopy.prepareButtonLabel}
                     </Button>
                   </div>
                   {availability.blockers.length > 0 ? (
@@ -1284,7 +1285,7 @@ export default function DevDataPreparationPage() {
                     acceptancePlan={summary.acceptancePlan}
                     compact
                   />
-                  {currentOperation.status === 'ready' && !canExecuteCurrent ? (
+                  {currentOperation.status === 'ready' && !canExecuteCurrent && !currentOperation.issues.some((issue) => issue.severity === 'blocked') ? (
                     <Alert
                       type="warning"
                       showIcon
@@ -1312,6 +1313,7 @@ export default function DevDataPreparationPage() {
                 extra={
                   <Tag>
                     {summary.currentOperations.length} 条当前回执
+                    {pendingOperationReferences.length > 0 ? ` · ${pendingOperationReferences.length} 条待核对` : ''}
                     {historicalOperationReferences.length > 0
                       ? ` · ${historicalOperationReferences.length} 条旧合同记录`
                       : ''}
@@ -1337,24 +1339,71 @@ export default function DevDataPreparationPage() {
                 ) : null}
                 {historyItems.length > 0 ? (
                   <Collapse items={historyItems} />
-                ) : !latestReceipt ? (
+                ) : !latestReceipt && !pendingOperationReferences.length && !historicalOperationReferences.length ? (
                   <WorkbenchEmpty
                     title="尚无数据准备回执"
                     description="选择准备范围并核对条件后，可准备不可变计划。"
                     action={<Button onClick={() => selectDataView('scope')}>准备数据</Button>}
                   />
                 ) : null}
+                {pendingOperationReferences.length > 0 ? (
+                  <WorkbenchSection
+                    flat
+                    title="待核对记录"
+                    headingLevel={3}
+                    aria-label="待核对记录"
+                    description="这些记录的执行结果尚未确认。先定位目标和原始依据，再核对新计划；原记录保留。"
+                  >
+                    <List
+                      dataSource={pendingOperationReferences}
+                      renderItem={(operation) => (
+                        <List.Item>
+                          <div>
+                            <Space wrap>
+                              <Text strong>{DEV_DATA_PREPARATION_PROFILE_COPY[operation.profileKey].title}</Text>
+                              <Tag>{operation.targetKey ? operationTargetLabel(operation.targetKey) : '目标未记录'}</Tag>
+                              <StatusTag status={operation.status} />
+                              <DevTimestamp value={operation.updatedAt} action="最后记录于" />
+                            </Space>
+                            <details className="erp-dev-disclosure">
+                              <summary>核对依据与处理</summary>
+                              <p>操作编号：<Text code copyable>{operation.id}</Text></p>
+                              <p>合同：{operation.contract.dataVersion || '未记录'}；批次：{operation.contract.datasetRunId || '未记录'}。</p>
+                              <p>按操作编号核对原执行日志、目标运行状态及实际数据结果；未确认前不要重跑或改写原回执。</p>
+                              <Space wrap>
+                                {operation.targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment ? <Link to="/__dev/database-migration">核对本地数据库状态</Link> : null}
+                                {operation.targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133 ? <Link to="/__dev/version-center?target=demo-133&view=history">查看 demo 环境记录</Link> : null}
+                                <Link to="/__dev/docs?path=docs%2Fengineering%2F研发效能工作台与CI-CD设计.md#data-preparation-recovery">查看核对与恢复说明</Link>
+                                {operation.targetKey ? (
+                                  <Button
+                                    onClick={() => {
+                                      selectScope(operation.profileKey, operation.targetKey)
+                                      selectDataView('scope')
+                                    }}
+                                  >
+                                    核对该目标的准备条件
+                                  </Button>
+                                ) : null}
+                              </Space>
+                              {!operation.targetKey ? <p>目标未记录：由维护人员按上述编号核对原回执和登记环境，不能按当前选择猜测目标。</p> : null}
+                            </details>
+                          </div>
+                        </List.Item>
+                    )}
+                    />
+                  </WorkbenchSection>
+                ) : null}
                 {historicalOperationReferences.length > 0 ? (
                   <details className="erp-dev-disclosure erp-dev-data-history">
                     <summary>
-                      展开旧合同与未识别合同记录（
+                      展开只读历史记录（
                       {historicalOperationReferences.length}）
                     </summary>
                     <Alert
                       type="info"
                       showIcon
                       message="这些记录只用于追溯"
-                      description="旧数据合同和无法识别版本的历史记录不会参与当前数据合同的执行、恢复选择或环境就绪判断。"
+                      description="这里保留旧合同及已结束的未识别记录；需要处理的未收口记录单独列在上方。历史记录不能作为当前计划通过的证据。"
                     />
                     <List
                       size="small"

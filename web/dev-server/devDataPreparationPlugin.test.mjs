@@ -1143,6 +1143,7 @@ test('summary keeps legacy scenario receipts on disk but omits them from the cur
   writeFileSync(operationPath, `${JSON.stringify(persisted)}\n`, {
     mode: 0o600,
   })
+  const originalReceipt = readFileSync(operationPath)
 
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
@@ -1175,6 +1176,7 @@ test('summary keeps legacy scenario receipts on disk but omits them from the cur
     readDataPreparationOperation(fixture.store, created.operation.id).status,
     'passed'
   )
+  assert.deepEqual(readFileSync(operationPath), originalReceipt, 'summary preserves the complete historical receipt')
 })
 
 test('summary isolates an unregistered operation contract and rejects its execution', async (t) => {
@@ -1220,6 +1222,7 @@ test('summary isolates an unregistered operation contract and rejects its execut
     ),
     true
   )
+  assert.equal(summary.unresolvedOperations.find((operation) => operation.id === created.operation.id).targetKey, 'local-development')
   assert.equal(
     summary.currentOperations.some(
       (operation) => operation.id === created.operation.id
@@ -1764,6 +1767,48 @@ test('a later authoritative scenario readback releases the resolved unknown outc
       ]),
       true
     )
+  }
+})
+
+test('ready-plan projection uses the execution guard and never rewrites unresolved evidence', async (t) => {
+  for (const targetKey of ['local-development', null]) {
+    const fixture = createFixture(t)
+    const targetSummary = {
+      safeTarget: 'local-development:plush_erp', targetFingerprint: 'c'.repeat(64),
+      preflightFingerprint: 'd'.repeat(64), disposable: false, automaticCleanup: false,
+      ...(targetKey ? { targetKey } : {}),
+    }
+    const input = { profileKey: 'scenario-demo', repository: REPOSITORY, runId: 'unregistered', targetSummary }
+    const { operation } = createOrReuseDataPreparationOperation(fixture.store, {
+      ...input, planHash: hashDataPreparationPlan(input), idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
+      operationId: '623e4567-e89b-42d3-a456-426614174000', now: '2026-07-29T02:00:00.000Z',
+    })
+    transitionDataPreparationOperation(fixture.store, operation.id, { status: 'launching', message: 'started', now: '2026-07-29T02:01:00.000Z' })
+    transitionDataPreparationOperation(fixture.store, operation.id, { status: 'not_proven', message: 'outcome unknown', now: '2026-07-29T02:02:00.000Z' })
+    const recordPath = path.join(fixture.store, 'operations', `${operation.id}.json`)
+    const original = readFileSync(recordPath)
+    const service = createDevDataPreparationService({
+      projectRoot: fixture.root, operationStore: fixture.store, commandRunner: successfulRunner([]),
+      readRepositoryState: async () => REPOSITORY, environment: {},
+      now: () => new Date('2026-07-29T02:07:04.000Z'), random: fixedRandom,
+    })
+    const prepared = await service.act({ action: 'prepare', payload: {
+      profileKey: 'core-demo', targetKey: 'local-development', idempotencyKey: IDEMPOTENCY_KEY,
+    } })
+    assert.equal(prepared.operation.status, 'ready')
+    const blocker = prepared.operation.issues.find(({ code }) => code === 'unresolved_operation_outcome')
+    assert.equal(blocker?.severity, 'blocked')
+    assert.match(blocker.message, new RegExp(operation.id))
+    assert.deepEqual(service.readOperation(prepared.operation.id).issues, prepared.operation.issues)
+    const summary = await service.summary({ force: true })
+    validateDevDataPreparationSummary(summary)
+    assert.equal(summary.unresolvedOperations.find(({ id }) => id === operation.id).targetKey, targetKey)
+    await assert.rejects(service.act({ action: 'execute', payload: {
+      operationId: prepared.operation.id, confirmation: prepared.operation.confirmationRequired,
+    } }), /unresolved|not proven/iu)
+    assert.deepEqual(readFileSync(recordPath), original, 'reads and rejected execution preserve the original receipt byte for byte')
+    const persisted = readDataPreparationOperation(fixture.store, prepared.operation.id)
+    assert(!persisted.issues.some(({ code }) => code === 'unresolved_operation_outcome'), 'blocking is a live projection, not an edit to the frozen plan')
   }
 })
 

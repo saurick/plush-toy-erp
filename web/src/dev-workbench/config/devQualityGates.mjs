@@ -1,3 +1,4 @@
+import { requestWorkbenchJson } from './devWorkbenchRequest.mjs'
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { DEV_QUALITY_GATES_ROUTE } from './devRoutes.mjs'
 
@@ -1484,29 +1485,21 @@ function requestError() {
   return new Error('质量门禁接口暂时不可用')
 }
 
-async function readJsonResponse(response) {
-  let payload
-  try {
-    payload = await response.json()
-  } catch {
-    throw requestError()
-  }
-  if (!response.ok) throw requestError()
-  return payload
-}
-
 export function createDevQualityGateClient({
   fetchImpl = (...args) => globalThis.fetch(...args),
+  timeoutMs = 30_000,
 } = {}) {
+  const requestJson = (url, options) => requestWorkbenchJson(fetchImpl, url, {
+    ...options, timeoutMs, failureMessage: '质量门禁接口暂时不可用',
+  })
   async function readSession(signal) {
-    const response = await fetchImpl(DEV_QUALITY_GATE_SESSION_API_PATH, {
+    const payload = await requestJson(DEV_QUALITY_GATE_SESSION_API_PATH, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
       credentials: 'same-origin',
       signal,
     })
-    const payload = await readJsonResponse(response)
     assertExactKeys(
       payload,
       ['apiPath', 'csrfToken', 'kind'],
@@ -1526,19 +1519,19 @@ export function createDevQualityGateClient({
 
   return {
     async summary({ signal } = {}) {
-      const response = await fetchImpl(DEV_QUALITY_GATE_API_PATH, {
+      const payload = await requestJson(DEV_QUALITY_GATE_API_PATH, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         cache: 'no-store',
         credentials: 'same-origin',
         signal,
       })
-      return normalizeDevQualityGateSummary(await readJsonResponse(response))
+      return normalizeDevQualityGateSummary(payload)
     },
     async governance({ filter = 'relevant', q = '', signal } = {}) {
       const query = new URLSearchParams({ filter })
       if (q) query.set('q', q)
-      const response = await fetchImpl(
+      const payload = await requestJson(
         `${DEV_QUALITY_GATE_GOVERNANCE_API_PATH}?${query.toString()}`,
         {
           method: 'GET',
@@ -1548,11 +1541,11 @@ export function createDevQualityGateClient({
           signal,
         }
       )
-      return normalizeDevQualityGateGovernance(await readJsonResponse(response))
+      return normalizeDevQualityGateGovernance(payload)
     },
     async gaps({ range = 'current', risk = 'all', signal } = {}) {
       const query = new URLSearchParams({ range, risk })
-      const response = await fetchImpl(
+      const payload = await requestJson(
         `${DEV_QUALITY_GATE_GAPS_API_PATH}?${query.toString()}`,
         {
           method: 'GET',
@@ -1562,7 +1555,7 @@ export function createDevQualityGateClient({
           signal,
         }
       )
-      return normalizeDevQualityGateGaps(await readJsonResponse(response))
+      return normalizeDevQualityGateGaps(payload)
     },
     async start(profile, idempotencyKey, { signal } = {}) {
       const match = IDEMPOTENCY_PATTERN.exec(String(idempotencyKey || ''))
@@ -1573,7 +1566,7 @@ export function createDevQualityGateClient({
         throw new Error('质量门禁运行请求无效')
       }
       const csrfToken = await readSession(signal)
-      const response = await fetchImpl(DEV_QUALITY_GATE_ACTION_API_PATH, {
+      const payload = await requestJson(DEV_QUALITY_GATE_ACTION_API_PATH, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -1588,8 +1581,7 @@ export function createDevQualityGateClient({
         credentials: 'same-origin',
         signal,
       })
-      const payload = await readJsonResponse(response)
-      assertExactKeys(
+        assertExactKeys(
         payload,
         ['operation', 'profile', 'reused', 'kind'],
         'quality gate action result'
@@ -1611,7 +1603,7 @@ export function createDevQualityGateClient({
         throw new Error('质量门禁运行记录无效')
       }
       const csrfToken = await readSession(signal)
-      const response = await fetchImpl(
+      const payload = await requestJson(
         `${DEV_QUALITY_GATE_OPERATION_API_PREFIX}/${operationId}/cancel`,
         {
           method: 'POST',
@@ -1626,8 +1618,7 @@ export function createDevQualityGateClient({
           signal,
         }
       )
-      const payload = await readJsonResponse(response)
-      assertExactKeys(
+        assertExactKeys(
         payload,
         ['operation', 'kind'],
         'quality gate cancel result'

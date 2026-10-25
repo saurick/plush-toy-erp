@@ -717,6 +717,11 @@ function devBrowserScenarioNames(file) {
       /FlowState|BusinessChain|FactLedger|status-flows|flow-state-observatory/u,
       ["dev-flow-state-observatory-desktop-light"],
     ],
+    [/DevVerificationEvidence|devVerificationEvidence|dev-verification-evidence/u, ["dev-server-verification-layout-desktop-light"]],
+    [/QualityGateGovernanceViews|QualityGateEvidenceCharts|QualityGateRunView|DevQualityGatesPage/u, ["dev-quality-gates-layout-desktop-light", "dev-quality-gates-desktop-light"]],
+    [/DevProjectSkills|devProjectSkills|dev-project-skills/u, ["dev-project-skills-guidance-desktop-light"]],
+    [/DevDataPreparationPage|devDataPreparation|useDataPreparation/u, ["dev-data-preparation-workflow-desktop", "dev-data-preparation-4k"]],
+    [/flow-state\/(?:FactsView|RuntimeView|WorkflowView|StateRulesView)/u, ["dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete"]],
     [/QualityGate|quality-gates/u, ["dev-quality-gates-desktop-light"]],
     [
       /VersionCenter|version-center/u,
@@ -884,8 +889,19 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "web/src/dev-workbench/styles/dev-quality-gates.test.mjs",
       ], file, "T5");
       addFollowUp(state, "browser-regression", "T5",
-        "运行 STYLE_L1_SCENARIOS=dev-workbench-patterns-desktop-light,dev-testing-report-layout-desktop-light,dev-quality-gates-layout-desktop-light,dev-server-verification-layout-desktop-light pnpm --dir web style:l1，完成统一样板与真实消费者的搜索恢复、失败重试、证据时效及桌面布局验收；设计样板不得调用写接口。",
+        "运行 STYLE_L1_SCENARIOS=dev-workbench-patterns-desktop-light,dev-testing-report-layout-desktop-light,dev-quality-gates-layout-desktop-light,dev-server-verification-layout-desktop-light,dev-data-preparation-workflow-desktop,dev-data-preparation-4k,dev-flow-state-details-desktop-light,dev-flow-state-observatory-instance,dev-flow-rules-complete,dev-project-skills-guidance-desktop-light pnpm --dir web style:l1，完成统一样板与真实消费者的搜索恢复、失败重试、证据时效及桌面布局验收；设计样板不得调用写接口。",
         file);
+    }
+    if (/devWorkbenchRequest|devQualityGates|DevQualityGatesPage|DevVerificationEvidence|devVerificationEvidence/u.test(file)) {
+      addNodeTests(state, [
+        "web/src/dev-workbench/config/devWorkbenchRequest.test.mjs",
+        "web/src/dev-workbench/config/devQualityGates.test.mjs",
+        "web/src/dev-workbench/config/devVerificationEvidence.test.mjs",
+      ], file, "T5");
+    }
+    if (/standaloneWorkbench|standalone\.jsx|vite\.workbench|workbench\.html|DevTestingPage|DevQualityGatesPage|DevVerificationEvidence/u.test(file)) {
+      addFollowUp(state, "workbench-artifact-browser", "T5",
+        "在固定候选目录先运行 pnpm --dir web build:workbench，再运行 pnpm --dir web test:workbench；用独立制品核对登录、深链接、服务器验证、诊断历史与禁用动作。测试仅使用回环服务和隔离夹具，不连接目标环境。", file);
     }
     if (WORK_CENTER_SAMPLE_SOURCES.has(file)) {
       addNodeTests(

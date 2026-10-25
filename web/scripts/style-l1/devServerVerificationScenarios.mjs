@@ -91,6 +91,7 @@ export function createDevServerVerificationScenarios({
         })
         await page.route('**/__dev/api/qa/quality-gates', async (route) => {
           await state.pending
+          await state.qualityPending
           await route.fulfill({
             status: state.failQuality ? 503 : 200,
             contentType: 'application/json',
@@ -151,12 +152,16 @@ export function createDevServerVerificationScenarios({
             'loading cannot manufacture successful evidence'
           )
           await assertNoHorizontalOverflow(page, 'server-verification-loading')
+          state.qualityPending = new Promise((resolve) => { state.releaseQuality = resolve })
           state.release()
-          await ci.getByText('完整 CI 通过', { exact: true }).waitFor()
           await table
             .getByRole('button', { name: '查看回执', exact: true })
             .first()
             .waitFor()
+          assert.equal(await ci.getByText('完整 CI 通过', { exact: true }).count(), 0, 'CI 尚未返回时目标结果先可用')
+          assert.equal(await region.getAttribute('aria-busy'), 'true')
+          state.releaseQuality()
+          await ci.getByText('完整 CI 通过', { exact: true }).waitFor()
           assert.equal(
             await table
               .locator('tbody tr')
@@ -275,9 +280,8 @@ export function createDevServerVerificationScenarios({
           await region
             .getByText('GitLab CI 状态读取失败，请重新读取。', { exact: true })
             .waitFor()
-          await ci
-            .getByText('尚未取得 GitLab CI 证据。', { exact: true })
-            .waitFor()
+          await ci.getByText('上次读取', { exact: true }).waitFor()
+          assert.equal(await ci.getByRole('link', { name: '查看 GitLab 测试报告', exact: true }).count(), 1, 'CI 刷新失败保留原证据用于追溯')
           assert.equal(
             await table
               .locator('tbody tr')
@@ -300,6 +304,7 @@ export function createDevServerVerificationScenarios({
           state.failDelivery = false
           await refresh()
           await ci.getByText('完整 CI 通过', { exact: true }).waitFor()
+          await region.getByRole('alert').waitFor({ state: 'detached' })
           assert.equal(await region.getByRole('alert').count(), 0)
           const gap = table
             .getByRole('button', { name: '查看缺口', exact: true })
@@ -341,6 +346,7 @@ export function createDevServerVerificationScenarios({
           )
         } finally {
           state.release()
+          state.releaseQuality?.()
         }
       },
     },

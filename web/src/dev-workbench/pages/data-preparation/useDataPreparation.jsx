@@ -173,7 +173,7 @@ export function useDataPreparation() {
   const currentIsScenarioDemo = currentOperation?.profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo
   const canPrepare = Boolean(selectedProfile) && !availability.blockers.length && !hasActiveOperation &&
     (!selectedIsScenarioDemo || customerReady) && !loading && !loadError && !preparing && !executing
-  const canExecuteCurrent = currentOperation?.status === 'ready' && currentOperation.profileKey === selectedProfileKey &&
+  const canExecuteCurrent = currentOperation?.status === 'ready' && !currentOperation.issues.some((issue) => issue.severity === 'blocked') && currentOperation.profileKey === selectedProfileKey &&
     currentOperation.targetSummary.targetKey === selectedOperationTargetKey && !hasActiveOperation &&
     !availability.blockers.length && (!currentIsScenarioDemo || customerReady) && !loading && !loadError && !preparing && !executing
   const currentExecutionConfirmation = currentOperation ? resolveDataPreparationExecutionConfirmation(currentOperation, confirmation) : ''
@@ -284,6 +284,7 @@ export function useDataPreparation() {
     selectedProfileKey,
     selectedScenarioTargetKey,
     selectProfile,
+    selectScope: changeSelection,
     selectScenarioTarget,
     setActionError,
     setConfirmation,

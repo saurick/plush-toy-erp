@@ -460,6 +460,12 @@ export function createDevDataPreparationScenarios({
             .isDisabled(),
           false
         )
+        fixture.operation.issues = [{ code: 'unresolved_operation_outcome', severity: 'blocked', message: '本计划受未收口记录阻断，请核对原始结果。' }]
+        fixture.summary.currentOperations = [fixture.operation]
+        await page.getByRole('button', { name: '重新检查', exact: true }).click()
+        await page.getByText('本计划受未收口记录阻断，请核对原始结果。', { exact: true }).waitFor()
+        assert.equal(await page.getByRole('button', { name: '确认执行', exact: true }).isDisabled(), true, 'ready 状态也必须服从服务端实时阻断')
+        assert.equal(fixture.actions.length, 1)
         fixture.operation = operationFixture({ status: 'failed', terminal: true, confirmationRequired: '' })
         validateDevDataPreparationOperation(fixture.operation)
         fixture.summary.currentOperations = [fixture.operation]
@@ -555,8 +561,19 @@ export function createDevDataPreparationScenarios({
         fixture.summary.issues.push({
           code: 'unresolved_operation_contract_preserved',
           severity: 'blocked',
-          message: '有历史批次合同待核对，核对前禁止再次执行。',
+          message: '有历史批次结果未收口，请核对原记录及所选目标的准备计划。',
         })
+        const reference = {
+          id: '22222222-2222-4222-8222-222222222222',
+profileKey: 'scenario-demo',
+          targetKey: 'local-development',
+status: 'not_proven',
+updatedAt: UPDATED_AT,
+terminal: true,
+          contract: { ...operationFixture().contract, classification: 'unresolved' },
+        }
+        fixture.summary.unresolvedOperations = [reference, { ...reference, id: '33333333-3333-4333-8333-333333333333', targetKey: null }]
+        fixture.summary.historicalOperations = [{ ...reference, id: '44444444-4444-4444-8444-444444444444', status: 'passed', contract: { ...reference.contract, classification: 'historical' } }]
         await installDataPreparationBrowserRoutes(page, fixture)
       },
       verify: async (page) => {
@@ -590,6 +607,26 @@ export function createDevDataPreparationScenarios({
           0
         )
         await assertNoHorizontalOverflow(page, 'dev-data-preparation-4k')
+        const originalRecords = JSON.stringify([fixture.summary.unresolvedOperations, fixture.summary.historicalOperations])
+        await notice.getByRole('button', { name: '查看执行记录', exact: true }).click()
+        const pending = page.getByRole('region', { name: '待核对记录', exact: true })
+        await pending.waitFor()
+        assert.equal(await pending.locator('.ant-list-item').count(), 2)
+        assert.equal(await page.getByText('尚无数据准备回执', { exact: true }).count(), 0)
+        await pending.getByText('目标未记录', { exact: true }).waitFor()
+        await pending.locator('summary').first().click()
+        await pending.getByText('22222222-2222-4222-8222-222222222222', { exact: true }).waitFor()
+        assert.match(await pending.getByRole('link', { name: '查看核对与恢复说明', exact: true }).first().getAttribute('href'), /#data-preparation-recovery$/u)
+        assert.equal(await page.getByText('展开只读历史记录（1）', { exact: true }).isVisible(), true)
+        for (const width of [1024, 1280, 1920]) {
+          await page.setViewportSize({ width, height: 1080 })
+          await assertNoHorizontalOverflow(page, `pending data records ${width}`)
+        }
+        await pending.getByRole('button', { name: '核对该目标的准备条件', exact: true }).first().click()
+        assert.equal(new URL(page.url()).searchParams.get('view'), 'scope')
+        assert.equal(await page.getByRole('radio', { name: '本地开发', exact: true }).isChecked(), true)
+        assert.equal(fixture.actions.length, 0, '核对入口只恢复选择，不执行准备或历史重放')
+        assert.equal(JSON.stringify([fixture.summary.unresolvedOperations, fixture.summary.historicalOperations]), originalRecords)
       },
     },
   ]

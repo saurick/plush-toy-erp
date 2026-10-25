@@ -1,5 +1,5 @@
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
-import { requestDeliveryJson } from './devDeliveryRequest.mjs'
+import { requestWorkbenchJson } from './devWorkbenchRequest.mjs'
 import { DEV_VERSION_CENTER_ROUTE } from './devRoutes.mjs'
 
 export { DEV_VERSION_CENTER_ROUTE }
@@ -1204,19 +1204,21 @@ export function createDevDeliveryClient({
   }
   let csrfToken = ''
 
-  const readOperationJson = (url, signal) => requestDeliveryJson(fetchImpl, url, {
+  const readOperationJson = (url, signal) => requestWorkbenchJson(fetchImpl, url, {
     method: 'GET',
     headers: { accept: 'application/json' },
     timeoutMs: readTimeoutMs,
+    exposeResponseMessage: true,
     attempts: 2,
     signal,
   })
 
   async function session() {
     if (csrfToken) return csrfToken
-    const payload = await requestDeliveryJson(fetchImpl, DEV_DELIVERY_SESSION_API_PATH, {
+    const payload = await requestWorkbenchJson(fetchImpl, DEV_DELIVERY_SESSION_API_PATH, {
       method: 'GET',
       timeoutMs: readTimeoutMs,
+    exposeResponseMessage: true,
       headers: { accept: 'application/json' },
     })
     if (
@@ -1287,9 +1289,10 @@ export function createDevDeliveryClient({
     },
     async summary({ signal } = {}) {
       return validateDevDeliverySummary(
-        await requestDeliveryJson(fetchImpl, DEV_DELIVERY_SUMMARY_API_PATH, {
+        await requestWorkbenchJson(fetchImpl, DEV_DELIVERY_SUMMARY_API_PATH, {
           method: 'GET',
           timeoutMs: summaryTimeoutMs,
+          exposeResponseMessage: true,
           headers: { accept: 'application/json' },
           signal,
         })
@@ -1312,9 +1315,10 @@ export function createDevDeliveryClient({
     },
     async action(action, payload) {
       const token = await session()
-      return requestDeliveryJson(fetchImpl, DEV_DELIVERY_ACTION_API_PATH, {
+      return requestWorkbenchJson(fetchImpl, DEV_DELIVERY_ACTION_API_PATH, {
           method: 'POST',
           timeoutMs: actionTimeoutMs,
+          exposeResponseMessage: true,
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',

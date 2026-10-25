@@ -98,8 +98,9 @@ export default function DevQualityGatesPage() {
   const activeView = parsed.view
   const activeGroup = getQualityGateViewGroup(activeView)
   const standalone = Boolean(import.meta.env.PLUSH_STANDALONE_WORKBENCH)
+  const viewKey = JSON.stringify([activeView, parsed.values.filter, parsed.values.q, parsed.values.range, parsed.values.risk])
   const activeViewState =
-    viewState.view === activeView ? viewState : EMPTY_ASYNC_VIEW_STATE
+    viewState.key === viewKey ? viewState : EMPTY_ASYNC_VIEW_STATE
 
   useEffect(() => {
     window.requestAnimationFrame(() => titleRef.current?.focus())
@@ -195,12 +196,13 @@ export default function DevQualityGatesPage() {
     const controller = new AbortController()
     const requestId = viewRequestRef.current + 1
     viewRequestRef.current = requestId
-    setViewState({
+    setViewState((current) => ({
       view: activeView,
-      data: null,
+      key: viewKey,
+      data: current.key === viewKey ? current.data : null,
       loading: true,
       error: '',
-    })
+    }))
     const request =
       activeView === 'governance'
         ? client.governance({
@@ -252,6 +254,7 @@ export default function DevQualityGatesPage() {
     parsed.values.range,
     parsed.values.risk,
     viewRefresh,
+    viewKey,
   ])
 
   const selectView = useCallback(
@@ -276,10 +279,10 @@ export default function DevQualityGatesPage() {
   )
 
   const refresh = useCallback(async () => {
-    await loadSummary()
     if (['governance', 'gaps'].includes(activeView)) {
       setViewRefresh((value) => value + 1)
     }
+    await loadSummary()
   }, [activeView, loadSummary])
 
   const start = useCallback(
@@ -398,7 +401,7 @@ export default function DevQualityGatesPage() {
         />
         <Button
           icon={<ReloadOutlined />}
-          loading={refreshing}
+          loading={refreshing || activeViewState.loading}
           onClick={refresh}
         >
           刷新状态
@@ -495,6 +498,7 @@ export default function DevQualityGatesPage() {
                   data={activeViewState.data}
                   loading={activeViewState.loading}
                   error={activeViewState.error}
+                  onRetry={refresh}
                   values={parsed.values}
                   onSearch={(q) => updateViewValues({ q })}
                   onFilter={(filter) =>
@@ -508,6 +512,7 @@ export default function DevQualityGatesPage() {
                   data={activeViewState.data}
                   loading={activeViewState.loading}
                   error={activeViewState.error}
+                  onRetry={refresh}
                   values={parsed.values}
                   onRange={(range) =>
                     DEV_QUALITY_GATE_GAP_RANGES.includes(range) &&

@@ -49,6 +49,7 @@ export function createDevQualityGateLayoutScenarios({
             : url.pathname.endsWith('/gaps')
               ? 'gaps'
               : 'summary'
+          if (view === 'governance') await state.governanceWait
           if (state.error === view) {
             return route.fulfill({ status: 503, body: '{}' })
           }
@@ -235,9 +236,24 @@ export function createDevQualityGateLayoutScenarios({
           .locator('.erp-dev-quality-governance-view .ant-table-row')
           .first()
           .waitFor()
+        let releaseGovernance
+        state.governanceWait = new Promise((resolve) => { releaseGovernance = resolve })
+        await page.getByRole('button', { name: /刷新状态/u }).click()
+        await page.getByText('正在刷新；以下为上次读取的门禁目录。', { exact: true }).waitFor()
+        assert(await page.locator('.erp-dev-quality-governance-view .ant-table-row').count() > 0)
+        state.governanceWait = null
+        await page.getByText('与当前改动有关', { exact: true }).click()
+        await page.getByText('当前筛选下没有相关门禁', { exact: true }).waitFor()
+        releaseGovernance()
+        await page.waitForTimeout(100)
+        assert.equal(await page.locator('.erp-dev-quality-governance-view .ant-table-row').count(), 0, '迟到的全部门禁结果不能覆盖已切换的相关范围')
+        await page.getByRole('button', { name: '查看全部门禁', exact: true }).click()
+        await page.locator('.erp-dev-quality-governance-view .ant-table-row').first().waitFor()
         state.error = 'governance'
         await refresh()
         await page.getByText('门禁目录读取失败', { exact: true }).waitFor()
+        assert(await page.locator('.erp-dev-quality-governance-view .ant-table-row').count() > 0, '刷新失败保留当前筛选的上次门禁目录')
+        await page.getByText('上次读取 · 待核对', { exact: true }).first().waitFor()
         state.error = ''
         await refresh()
         await page
@@ -303,7 +319,7 @@ export function createDevQualityGateLayoutScenarios({
         state.error = 'gaps'
         await refresh()
         await page.getByText('改动缺口读取失败', { exact: true }).waitFor()
-        assert.equal(await page.locator('.erp-dev-quality-coverage').count(), 0)
+        assert.equal(await page.locator('.erp-dev-quality-coverage').count(), 1, '刷新失败保留已有矩阵，不能把缺少新数据当成没有缺口')
         state.error = ''
         await refresh()
         await page.locator('.erp-dev-quality-coverage').waitFor()
