@@ -173,6 +173,7 @@ export default function DevUIDesignPreview({ active, page, pageSelector }) {
               className="erp-dev-ui-design-state-select"
               disabled={previewStatus !== 'ready'}
               value={simulationValue}
+              virtual={false}
               options={stateOptions.map(({ key, label }) => ({ value: key, label }))}
               getPopupContainer={(trigger) => trigger.parentElement}
               onChange={(value) => {

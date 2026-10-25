@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { runInNewContext } from 'node:vm'
+import { runInNewContext, Script } from 'node:vm'
 import standardUnits from '../../../../server/internal/unitpolicy/units.json' with { type: 'json' }
 import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCatalog.mjs'
 import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
@@ -30,6 +30,32 @@ import {
 
 const root = path.resolve(import.meta.dirname, '../../../..')
 const read = (file) => readFileSync(path.join(root, file), 'utf8')
+
+test('boundary preview uses legal field extremes and every standalone script parses', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const definition = html.match(/const UI_BOUNDARY_LIMITS = Object\.freeze\((\{[\s\S]*?\})\);/u)
+  assert(definition, '压力档位必须有明确上限')
+  const limits = runInNewContext(`(${definition[1]})`)
+  const fields = [
+    ['orderNo', 'sales_order', 'order_no'],
+    ['customerOrderNo', 'sales_order', 'customer_order_no'],
+    ['owner', 'sales_order', 'sales_owner'],
+    ['note', 'sales_order', 'note'],
+    ['party', 'customer', 'name'],
+    ['item', 'product', 'name'],
+  ]
+  for (const [key, schema, field] of fields) {
+    const source = read(`server/internal/data/model/schema/${schema}.go`)
+    const constraint = source.match(new RegExp(`field\\.String\\("${field}"\\)[\\s\\S]*?MaxLen\\((\\d+)\\)`))
+    assert(constraint, `${schema}.${field} 缺少正式长度约束`)
+    assert.equal(limits[key], Number(constraint[1]), `${key} 使用正式字段上限`)
+  }
+  assert.match(read('server/internal/data/model/schema/decimal.go'), /numeric\(20,6\)/u)
+  assert(BigInt(limits.amount.replace('.', '')) * 10000n < 10n ** 20n, '大金额仍在正式精度范围内')
+  const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gu)]
+  assert(scripts.length > 0)
+  for (const [, source] of scripts) assert.doesNotThrow(() => new Script(source))
+})
 const helpDefinition = (name) => {
   const match = read(UI_DESIGN_ASSET.path).match(
     new RegExp(`const ${name} = ([\\s\\S]*?);\\n`)

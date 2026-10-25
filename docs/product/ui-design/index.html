@@ -481,12 +481,17 @@
     th:first-child, td:first-child { position: sticky; left: 0; z-index: 4; width: 42px; background: inherit; }
     th:first-child { z-index: 7; background: var(--surface-muted); }
     td .cell-content { min-width: 0; }
+    td.cell-no { min-width:320px; }
     td.cell-party { min-width: 220px; max-width: 340px; }
+    td.cell-no .cell-content { max-width:420px; }
+    td.cell-party .cell-content { max-width:340px; }
+    td.cell-owner .cell-content { max-width:160px; }
+    td.cell-progress .cell-content { max-width:250px; }
     td.cell-party .cell-content, td.cell-owner .cell-content, td.cell-progress .cell-content { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     td.cell-owner { max-width: 160px; }
     td.cell-progress { min-width: 150px; max-width: 250px; }
     td.cell-metric { font-variant-numeric: tabular-nums; }
-    td.cell-party .strong, td.cell-party .subline, td.cell-party .product-cell > span:last-child > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    td.cell-party .strong, td.cell-party .subline, td.cell-party .product-cell > span:last-child > span { display:block; max-width:100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sort-btn { padding: 0; border: 0; background: transparent; color: inherit; display: inline-flex; align-items: center; gap: 4px; font-weight: inherit; }
     .sort-btn.active { color: var(--brand-strong); }
     .sort-glyph { font-size: 10px; line-height: 1; }
@@ -499,6 +504,8 @@
     td.cell-composite { text-align: left; }
     td.cell-composite .cell-content, td.cell-composite .strong, td.cell-composite .subline { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
     td.cell-composite .subline { margin-top: 0; font-size: inherit; }
+    td.cell-composite .strong, td.cell-party.cell-composite .subline, td.cell-status.cell-composite .subline, td.cell-no .subline .copy-value > span { display:-webkit-box; max-width:100%; overflow:hidden; white-space:normal; overflow-wrap:anywhere; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+    td.cell-no .entity-link { display:block; max-width:100%; white-space:normal; overflow-wrap:anywhere; word-break:break-all; }
     td.cell-sales-amount { text-align: right; }
     .badge {
       min-height: 22px;
@@ -645,6 +652,18 @@
     .detail-modal-body { padding: 12px; display: grid; gap: 10px; overflow: auto; }
     .detail-line-table { overflow: auto; border: 1px solid var(--line); border-radius: 9px; }
     .detail-line-table table { min-width: 680px; }
+    .record-collection-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-block:10px; min-width:0; }
+    .record-collection-controls .search { flex:1 1 220px; min-width:180px; }
+    .record-collection-controls .control { width:140px; }
+    .record-long-copy, .business-detail-modal .detail-grid dd, .business-detail-modal .related-card strong, .business-detail-modal .related-card span { overflow-wrap:anywhere; }
+    .record-long-copy { white-space:pre-wrap; }
+    .detail-line-table td { max-width:300px; overflow-wrap:anywhere; white-space:normal; }
+    .preview-read-feedback { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+    .preview-read-feedback.is-error { border-color:var(--danger); }
+    .attachment-full-preview img:not([hidden]) { display:block; max-width:100%; max-height:55vh; margin:auto; object-fit:contain; }
+    .attachment-text-preview { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; line-height:1.6; }
+    .attachment-image-fallback { color:var(--text-2); }
+
     .related-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     .related-card { min-height: 84px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
     .related-card strong, .related-card span { display: block; }
@@ -1794,11 +1813,11 @@
     .attachment-preview img { width: 100%; height: 100%; object-fit: cover; }
     .attachment-preview svg { width: 20px; height: 20px; }
     .attachment-copy { min-width: 0; }
-    .attachment-copy strong, .attachment-copy span { display: block; }
+    .attachment-copy strong, .attachment-copy span:not(.badge) { display: block; }
     .attachment-name { width: 100%; padding: 0; display: block; overflow: hidden; border: 0; color: var(--text); background: transparent; font: inherit; font-size: 12px; font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
     .attachment-name:hover, .attachment-name:focus-visible { color: var(--brand-strong); }
     .attachment-name.expanded { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
-    .attachment-copy span { margin-top: 3px; color: var(--text-3); font-size: 10px; }
+    .attachment-copy span:not(.badge) { margin-top: 3px; color: var(--text-3); font-size: 10px; }
     .attachment-copy .attachment-error { color: var(--danger); line-height: 1.45; }
     .attachment-row-actions { display: flex; align-items: center; gap: 4px; }
     .attachment-progress { margin-top: 5px; height: 4px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }
@@ -1810,14 +1829,7 @@
     .batch-dialog-row strong { min-width: 155px; }
     .batch-dialog-row span { color: var(--text-2); }
 
-    .boundary-more-wrap { position: relative; }
-    .boundary-action-menu { position: absolute; right: 0; bottom: calc(100% + 7px); z-index: 5; width: 180px; padding: 5px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); box-shadow: var(--shadow); }
-    .boundary-action-menu button { min-height: 34px; padding: 0 9px; border: 0; border-radius: 6px; background: transparent; text-align: left; }
-    .boundary-action-menu button:hover { background: var(--surface-muted); }
-    .boundary-modal-copy { display: grid; gap: 10px; }
-    .boundary-modal-copy section { padding: 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
-    .boundary-modal-copy h3 { margin: 0 0 5px; font-size: 13px; }
-    .boundary-modal-copy p { margin: 0; color: var(--text-2); line-height: 1.7; overflow-wrap: anywhere; }
+
 
     /* 任务来源与上下文 */
     .task-context-chain { display: grid; grid-template-columns: 1fr 28px 1fr 28px 1fr; align-items: stretch; gap: 4px; }
@@ -4751,7 +4763,6 @@
       previewState: 'data', detailTab: 'basic', businessAction: 'primary', businessActionLabel: '', batchAction: '', summaryOpen: false, permissionRole: 'warehouse', permissionTab: 'roles', permissionDirty: false, permissionFullscreen: false,
       permissionNavigationView: 'menu', permissionSelectedOnly: false, permissionAccountStatus: '全部', permissionAccountSearch: '', permissionAccountEditor: null, permissionAccountDirty: false, permissionApprovalDirty: false, permissionSaved: null, permissionSearch: '', permissionOpenGroups: new Set(permissionGroupsData.map(([key])=>key)),
       permissionValues: {}, approvalRuleStatus: {}, permissionScopeType: {warehouse:'warehouses'}, permissionScopeValue: {warehouse:['finished','raw']},
-      boundaryMoreOpen: false,
       moduleTabs: { 'master-hub': 'customers', 'engineering-hub': 'bom', 'warehouse-hub': 'inbound','production-hub':'production','shipping-hub':'shipments','finance-hub':'receivables'}, sidebarCollapsed: false,
       salesView: 'list', deliveryFilter: 'all', deliverySearch: '',
       inventoryView: 'balances', inventoryDisplay: 'list',
@@ -5039,12 +5050,15 @@
       const attrs=`data-page="${config.key}" data-id="${row?.id||''}"`;
       if(rows.length>1)return `<div class="business-record-actions"><button class="btn" data-action="batch-action" data-value="export">导出所选</button>${businessRecordActions[config.key].filter(spec=>spec.batch).map(spec=>`<button class="btn" data-action="business-record-action" data-operation="${spec.id}" data-page="${config.key}" ${rows.every(item=>!businessActionBlock(config,item,spec))?'':'disabled title="所选记录中包含不可执行的状态"'}>${spec.label}（${rows.length}）</button>`).join('')}<span class="data-note">其余操作请选择一条记录</span><button class="text-btn" data-action="clear-selection">清除选择</button></div>`;
       const pending=businessRecordTasks(config,row).filter(task=>task.lane!=='done').length;
-      const tasksVisible=supportsTaskCreation(config)||['bom','inbound','quality'].includes(config.key);
+      const tasksVisible=!row?.previewOnly&&(supportsTaskCreation(config)||['bom','inbound','quality'].includes(config.key));
       const disabled=row?'':'disabled title="请先选择一条记录"';
       const group=(html,priority,category='业务办理',pinned=false)=>`<div class="business-action-group" data-action-priority="${priority}" data-action-group="${category}" ${pinned?'data-action-pinned':''}>${html}</div>`;
       const basics=`${detail?'':group(`<button class="btn" data-action="open-selected" ${disabled}>查看详情</button>`,60,'查看与关联')}${!row||canEditRecord(config,row)||(config.key==='bom'&&row.status==='active')?group(`<button class="btn" data-action="business-record-action" data-operation="edit" ${attrs} ${disabled}>${config.key==='bom'?(row?.status==='active'?bomRevisionActionLabel(row):'编辑 BOM'):'编辑'}</button>`,80):''}`;
       const collaboration=tasksVisible?group(`<button class="btn task-collaboration-entry" data-action="open-related-tasks" ${attrs} ${disabled}>${pending?`任务协作 ${pending}`:'任务协作'}</button>`,120,'任务协作',true):'';
-      const related=row?group(`<button class="btn" data-action="business-record-action" data-operation="related" ${attrs}>相关单据</button>`,30,'查看与关联'):'';
+      const related=row?group(`<button class="btn" data-action="${row.previewOnly?'inspect-record':'business-record-action'}" ${row.previewOnly?'data-value="related"':'data-operation="related"'} ${attrs}>相关单据</button>`,30,'查看与关联'):'';
+      const inspections=row?.previewOnly?[
+        ['lines','查看完整产品明细与数量'],['related','查看来源与下游关联单据'],['history','查看全部操作记录与反馈'],['attachments','查看包装资料及客户确认附件'],['copy','复制完整业务编号与客户单号']
+      ].map(([key,label])=>group(`<button class="btn" data-action="inspect-record" data-value="${key}" ${attrs}>${label}</button>`,25,'查看与关联')).join(''):'';
       const specs=businessRecordActions[config.key].filter(spec=>(!row||!spec.states||spec.states.includes(row.status))&&!(config.key==='bom'&&spec.id==='copy-version'&&row?.status==='active'));
       const auxiliary=spec=>['cancel','close','archive','copy-version','records','reverse'].includes(spec.id)||spec.template;
       const candidates=specs.filter(spec=>!auxiliary(spec));
@@ -5052,7 +5066,7 @@
       const button=spec=>{const reason=businessActionBlock(config,row,spec);const label=config.key==='bom'&&spec.id==='activate'&&row?.status==='obsolete'?'重新启用':spec.label;return `<button class="btn ${spec===primary?'primary':''}" data-action="business-record-action" data-operation="${spec.id}" ${attrs} ${reason?`disabled title="${escapeHTML(reason)}"`:''}>${label}</button>`;};
       const paired=config.key==='quality'&&row?.status==='submitted'?specs.filter(spec=>['pass','reject'].includes(spec.id)):[];
       const actions=specs.filter(spec=>!paired.includes(spec)).map(spec=>group(button(spec),spec===primary?100:['cancel','reverse','close','archive'].includes(spec.id)?10:auxiliary(spec)?20:40,spec.template?'打印与输出':['cancel','reverse','close','archive'].includes(spec.id)?'单据处理':'业务办理')).join('');
-      return `<div class="business-record-actions" data-adaptive-actions><div class="business-action-visible">${collaboration}${basics}${related}${paired.length?group(paired.map(button).join(''),100):''}${actions}</div><details class="task-copy-menu business-action-menu" hidden><summary class="btn" role="button" aria-label="更多操作">更多操作 ▾</summary><div class="task-copy-options"></div></details><div class="business-action-measure" aria-hidden="true"><div></div></div></div>`;
+      return `<div class="business-record-actions" data-adaptive-actions><div class="business-action-visible">${collaboration}${basics}${related}${inspections}${paired.length?group(paired.map(button).join(''),100):''}${actions}</div><details class="task-copy-menu business-action-menu" hidden><summary class="btn" role="button" aria-label="更多操作">更多操作 ▾</summary><div class="task-copy-options"></div></details><div class="business-action-measure" aria-hidden="true"><div></div></div></div>`;
     }
     const adaptiveActionBars=new Set();
     const adaptiveActionObserver=new ResizeObserver(syncBusinessActionSpace);
@@ -5114,7 +5128,7 @@
     }
     function businessLinks(row) {
       const links=[...(row.businessLinks||[])];if(row.taskSource)links.unshift(row.taskSource);
-      return links.map(link=>({page:link.page,row:listConfig[link.page]?.rows.find(item=>item.id===link.id)})).filter(link=>link.row);
+      return links.map(link=>({page:link.page,row:listPreviewConfig(listConfig[link.page])?.rows.find(item=>item.id===link.id)})).filter(link=>link.row);
     }
     function linkBusinessRecords(page,row,targetPage,target) {
       row.businessLinks=row.businessLinks||[];target.businessLinks=target.businessLinks||[];
@@ -6079,7 +6093,7 @@ active = new Set()
       return row.item ?? (config.item === '产品' ? row.product : row.material) ?? '—';
     }
 
-    function rowDate(row) { return row.date ?? row.delivery ?? '—'; }
+    function rowDate(row) { return row.date || row.delivery || '—'; }
     function rowMetric(row, config) {
       if (row.metric) return row.metric;
       if (config.metricType === 'quantity') return row.amount===null||row.amount===undefined?'待核对':`${row.amount} ${config.unit || '个'}`;
@@ -6358,17 +6372,17 @@ active = new Set()
 
     const taskCreatePeople={销售:['何敏','林晓'],产品工程:['周敏'],采购:['李倩'],PMC:['王宁'],质量:['陈洁'],仓库:['赵强'],财务:['刘芳']};
 
-    function renderDataState(config) {
-      if (state.previewState === 'loading') {
+    function renderDataState(config, kind=state.previewState) {
+      if (kind === 'loading') {
         return `<section class="state-surface" aria-busy="true"><div class="skeleton-stack"><div class="skeleton-line" style="width:42%"></div>${Array.from({length:6},(_,index)=>`<div class="skeleton-line" style="opacity:${1-index*.08}"></div>`).join('')}</div></section>`;
       }
-      if (state.previewState === 'empty') return `<section class="surface"><div class="empty"><span>当前筛选没有记录</span><button class="btn" data-action="state-reset">重置筛选</button></div></section>`;
+      if (kind === 'empty') return `<section class="surface"><div class="empty"><span>当前筛选没有记录</span><button class="btn" data-action="state-reset">重置筛选</button></div></section>`;
       const copy = {
         empty: ['当前筛选没有记录', '可以重置筛选，或在有权限时新建记录。', '重置筛选', 'state-reset'],
         error: [`${config.title}暂时无法读取`, '页面上下文和查询条件已保留，请稍后重新读取。', '重新读取', 'state-retry'],
         forbidden: ['当前账号无权查看此页面', '菜单可见不代表拥有数据或动作权限，请联系管理员核对岗位授权。', '返回工作台', 'state-home']
-      }[state.previewState] || ['暂无数据', '当前范围没有可展示的内容。', '返回', 'state-reset'];
-      return `<section class="state-surface"><div class="state-card"><span class="state-icon">${icon(state.previewState === 'forbidden' ? 'lock' : state.previewState === 'error' ? 'info' : 'search')}</span><h2>${copy[0]}</h2><p>${copy[1]}</p><button class="btn ${state.previewState === 'error' ? 'primary' : ''}" data-action="${copy[3]}">${copy[2]}</button></div></section>`;
+      }[kind] || ['暂无数据', '当前范围没有可展示的内容。', '返回', 'state-reset'];
+      return `<section class="state-surface"><div class="state-card"><span class="state-icon">${icon(kind === 'forbidden' ? 'lock' : kind === 'error' ? 'info' : 'search')}</span><h2>${copy[0]}</h2><p>${copy[1]}</p><button class="btn ${kind === 'error' ? 'primary' : ''}" data-action="${copy[3]}">${copy[2]}</button></div></section>`;
     }
 
     function pagerItems(pageCount, currentPage) {
@@ -6387,60 +6401,122 @@ active = new Set()
       return `<button data-action="page-prev" ${currentPage===1?'disabled':''} aria-label="上一页">${icon('left')}</button>${pagerItems(pageCount,currentPage).map(item=>item==='gap'?'<span class="pager-gap" aria-hidden="true">…</span>':`<button class="${currentPage===item?'active':''}" data-action="page-number" data-value="${item}" aria-label="第 ${item} 页">${item}</button>`).join('')}<button data-action="page-next" ${currentPage===pageCount?'disabled':''} aria-label="下一页">${icon('chevron')}</button>`;
     }
 
+    const UI_BOUNDARY_LIMITS = Object.freeze({
+      records: 1500, pageSize: 500, details: 250, related: 120, attachments: 60, history: 120,
+      orderNo: 64, customerOrderNo: 128, party: 255, item: 255, owner: 128, note: 255,
+      amount: '99999999999999.99'
+    });
     const boundaryPreviewConfigs = new Map();
     let boundaryPreviewContext = null;
+    let boundaryRead = {version:0, key:'', status:'ready', readyKey:'', mode:'ready', timer:null};
+    const detailCollectionQueries = new Map();
+
+    function boundaryText(value, length) { return String(value).repeat(Math.ceil(length / String(value).length)).slice(0,length); }
+    function boundaryStateValue() { return state.previewState==='stress' && boundaryRead.mode!=='ready' ? `stress-${boundaryRead.mode}` : state.previewState; }
 
     function listPreviewConfig(config) {
       if (!config || state.previewState !== 'stress' || !config.rows.length) return config;
       if (boundaryPreviewConfigs.has(config.key)) return {...config, rows: boundaryPreviewConfigs.get(config.key)};
-      const customers = [
-        '华东国际文化创意礼品供应链管理（深圳）有限公司',
-        '北辰乐园主题娱乐项目运营管理股份有限公司华南采购中心',
-        '远山博物文化传播与国际教育交流发展有限公司',
-        '海岸城市商业综合体节庆活动项目联合采购办公室'
-      ];
-      const products = [
-        '2026 圣诞限定可拆洗发光音乐互动毛绒礼盒套装（海外多语言版）',
-        '大型主题乐园周年庆联名吉祥物公仔 80cm 含服装与展示底座',
-        '海洋动物系列双面刺绣午睡抱枕及可替换外套组合装',
-        '博物馆文创考古主题毛绒盲盒第二季全套十二款'
-      ];
-      const progresses = [
-        '等待客户确认最终包装唛头、条码规则及多语言洗水唛资料',
-        '生产已完成 8,760 件，剩余返工批次等待质量负责人复核',
-        '采购到货分三批进行，第二批数量差异等待供应商书面确认',
-        '出货资料已齐，等待仓库复核箱唛与承运车辆信息'
-      ];
-      const owners = ['欧阳晨曦（华南大区）','上官雨桐（重点客户组）','林晓 / 周敏','仓库主管值班组'];
-      const rows = Array.from({length: 500}, (_, index) => {
-        const source = config.rows[index % config.rows.length], seq = index + 1;
-        const party = config.key === 'sales' ? customers[index % customers.length] : `${rowParty(source,config)}（跨部门协同与长名称样例）`;
-        const item = config.key === 'sales' ? products[index % products.length] : `${rowItem(source,config)} · 加长规格与包装资料样例`;
-        return {
-          ...source,
-          id: `EDGE-${config.key}-${seq}`,
-          no: `${source.no.split('-')[0]}-20260926-${String(seq).padStart(9,'0')}`,
-          customerOrderNo: config.key === 'sales' ? `2026-INTL-${seq}` : source.customerOrderNo,
-          customer: source.customer === undefined ? undefined : party,
-          party,
-          supplier: source.supplier === undefined ? undefined : party,
-          product: source.product === undefined ? undefined : item,
-          item,
-          lines: 18,
-          amount: 12345678901.99 + seq * 9876.54,
-          metric: config.metricType === 'quantity' ? `12,345,678.123456 ${config.unit || '个'}` : '',
-          progress: progresses[index % progresses.length],
-          owner: owners[index % owners.length],
-          previewOnly: true,
-        };
+      const rows = Array.from({length:UI_BOUNDARY_LIMITS.records}, (_, index) => {
+        const source=config.rows[index%config.rows.length],seq=index+1,variant=index%8;
+        const prefix=source.no.split('-')[0];
+        const no=variant<2?`${prefix}-${'9'.repeat(UI_BOUNDARY_LIMITS.orderNo-prefix.length-8)}-${String(seq).padStart(6,'0')}`:`${prefix}-20260926-${String(seq).padStart(9,'0')}`;
+        const party=variant<2?boundaryText('INTERNATIONAL_CUSTOMER_',UI_BOUNDARY_LIMITS.party):`${rowParty(source,config)}（跨部门协同资料核对）`;
+        const item=variant<2?boundaryText('PRODUCT_SPECIFICATION_',UI_BOUNDARY_LIMITS.item):`${rowItem(source,config)} · 加长规格与包装资料`;
+        const amount=variant===3?null:variant===4?0:variant<2?UI_BOUNDARY_LIMITS.amount:String(12345678901+seq);
+        const row={...source,id:`EDGE-${config.key}-${seq}`,no,customerOrderNo:variant<2?boundaryText('CUSTOMER-ORDER-',UI_BOUNDARY_LIMITS.customerOrderNo):`2026-INTL-${seq}`,
+          customer:source.customer===undefined?undefined:party,party,supplier:source.supplier===undefined?undefined:party,
+          product:source.product===undefined?undefined:item,item,lines:index===0?UI_BOUNDARY_LIMITS.details:1+index%18,
+          amount,metric:config.metricType==='quantity'?`${new Intl.NumberFormat('zh-CN').format('99999999999999')} ${config.unit||'个'}`:'',
+          owner:variant===3?'':variant<2?boundaryText('RESPONSIBLE_TEAM_',UI_BOUNDARY_LIMITS.owner):source.owner,
+          progress:variant===3?'':boundaryText('等待核对包装资料、交付批次与岗位反馈。',UI_BOUNDARY_LIMITS.note),
+          date:index===3?'':source.date,delivery:index===3?'':source.delivery,
+          note:variant===3?'':boundaryText('Packaging confirmation pending\nBatch delivery requested\n',UI_BOUNDARY_LIMITS.note),previewOnly:true};
+        if(index===0){
+          const relatedPage=config.key==='purchase'?'sales':'purchase';
+          row.businessLinks=Array.from({length:UI_BOUNDARY_LIMITS.related},(_,i)=>({page:relatedPage,id:`EDGE-${relatedPage}-${i+1}`}));
+          row.taskSource=null;
+          row.operations=Array.from({length:UI_BOUNDARY_LIMITS.history},(_,i)=>({label:`第 ${i+1} 次资料核对`,note:`包装批次 ${i+1}：已核对长名称、交付要求与缺失资料。`,time:`2026/09/${String(1+i%28).padStart(2,'0')} 09:00 · 本地样例`}));
+        } else { row.businessLinks=[];row.taskSource=null;row.operations=[]; }
+        return row;
       });
-      boundaryPreviewConfigs.set(config.key, rows);
-      return {...config, rows};
+      boundaryPreviewConfigs.set(config.key,rows);
+      return {...config,rows};
+    }
+
+    function boundaryReadKey() {
+      return JSON.stringify([state.page,state.moduleTabs,state.salesView,state.purchaseView,state.financeDueView,state.productionView,state.search,state.status,state.pageNo,state.businessPageSize,state.sortKey,state.sortDir,state.filterParty,state.filterOwner,state.filterRisk,state.filterDateFrom,state.filterDateTo,state.filterIncludeEnded]);
+    }
+    function startBoundaryRead(key, succeed=false) {
+      clearTimeout(boundaryRead.timer);
+      const version=++boundaryRead.version;
+      boundaryRead.key=key;boundaryRead.status='loading';
+      boundaryRead.timer=setTimeout(()=>{
+        if(version!==boundaryRead.version||state.previewState!=='stress'||boundaryReadKey()!==key)return;
+        boundaryRead.status=boundaryRead.mode==='error'&&!succeed?'error':'ready';
+        if(boundaryRead.status==='ready'){boundaryRead.readyKey=key;if(succeed)boundaryRead.mode='ready';}
+        renderView();
+      },boundaryRead.mode==='slow'?1200:450);
+    }
+    function boundaryReadFeedback(config) {
+      if(state.previewState!=='stress')return null;
+      const key=boundaryReadKey();
+      if(boundaryRead.mode==='ready'&&!(boundaryRead.key===key&&boundaryRead.status==='loading')){boundaryRead.status='ready';boundaryRead.key=key;boundaryRead.readyKey=key;return null;}
+      if(boundaryRead.key!==key)startBoundaryRead(key);
+      if(boundaryRead.status==='ready')return null;
+      const retained=boundaryRead.readyKey===key;
+      if(!retained)return {blocking:renderDataState(config,boundaryRead.status)};
+      return {inline:`<div class="preview-read-feedback ${boundaryRead.status==='error'?'is-error':''}" role="${boundaryRead.status==='error'?'alert':'status'}" ${boundaryRead.status==='loading'?'aria-busy="true"':''}><span>${boundaryRead.status==='loading'?'正在重新读取，保留上次成功内容':'本次读取失败，保留上次成功内容与选择'}</span>${boundaryRead.status==='error'?'<button class="btn" data-action="state-retry">重新读取</button>':''}</div>`};
+    }
+
+    function recordDetailItems(row,config) {
+      const count=row.lines??0;
+      return Array.from({length:count},(_,index)=>({id:`${row.id}-LINE-${index+1}`,no:index+1,
+        item:row.previewOnly?`${rowItem(row,config).slice(0,UI_BOUNDARY_LIMITS.item-9)}_LINE_${String(index+1).padStart(3,'0')}`:rowItem(row,config),
+        source:index===0?'当前有效版本':`关联明细 ${index+1}`,quantity:row.previewOnly?index+1:[1200,860,320,96,48,24][index%6],unit:config.unit||'个',
+        metric:rowMetric(row,config),status:row.statusText}));
+    }
+    function collectionQuery(kind,owner) {
+      const key=`${kind}:${owner}`;
+      if(!detailCollectionQueries.has(key)){
+        detailCollectionQueries.set(key,{query:'',page:1,size:50});
+      }
+      return detailCollectionQueries.get(key);
+    }
+    function collectionSlice(kind,owner,rows) {
+      const query=collectionQuery(kind,owner),needle=query.query.trim().toLowerCase();
+      const filtered=needle?rows.filter(row=>JSON.stringify(row).toLowerCase().includes(needle)):rows;
+      const pages=Math.max(1,Math.ceil(filtered.length/query.size));query.page=Math.min(query.page,pages);
+      return {rows:filtered.slice((query.page-1)*query.size,query.page*query.size),total:filtered.length,pages,query};
+    }
+    function collectionControls(kind,owner,page,label) {
+      const attrs=`data-collection="${kind}" data-owner="${escapeHTML(owner)}"`;
+      return `<div class="record-collection-controls"><label class="search">${icon('search')}<input ${attrs} data-collection-search aria-label="搜索${label}" placeholder="搜索${label}" value="${escapeHTML(page.query.query)}" /></label><span>${page.total} 条</span><label class="control"><span>每页</span><ui-select ${attrs} data-collection-size aria-label="${label}每页条数" data-required-selection>${[50,100,250].map(size=>`<option value="${size}" ${size===page.query.size?'selected':''}>${size}</option>`).join('')}</ui-select></label><button class="btn" ${attrs} data-action="collection-page" data-value="-1" ${page.query.page===1?'disabled':''} aria-label="${label}上一页">${icon('left')}</button><span>${page.query.page} / ${page.pages}</span><button class="btn" ${attrs} data-action="collection-page" data-value="1" ${page.query.page===page.pages?'disabled':''} aria-label="${label}下一页">${icon('chevron')}</button></div>`;
+    }
+    function boundaryAttachments(row) {
+      if(row.previewAttachments)return row.previewAttachments;
+      const count=row.lines===UI_BOUNDARY_LIMITS.details?UI_BOUNDARY_LIMITS.attachments:3;
+      row.previewAttachments=Array.from({length:count},(_,index)=>{
+        const image=index%3===0,validURL=`data:image/svg+xml;charset=utf-8,${encodeURIComponent(renderProductArt(index,'包装确认图').replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" '))}`;
+        return {id:`${row.id}-ATT-${index+1}`,name:boundaryText(`PACKAGING-${String(index+1).padStart(3,'0')}-`,251)+(image?'.svg':'.txt'),kind:image?'image':'file',size:'12 KB',
+          status:index===1?'failed':'done',error:index===1?'上次上传未完成，请重试':'',progress:index===1?40:100,uploader:'本地样例',time:'2026/09/26 09:00',
+          url:image?(index===3?'data:image/svg+xml,broken':validURL):'',validURL:image?validURL:'',
+          previewText:`包装确认 ${index+1}\n订单：${row.no}\n产品：${rowItem(row,listConfig.sales)}\n分批交付：第一批 100 个，第二批 200 个。\n${row.note||'无补充备注'}`};
+      });
+      return row.previewAttachments;
     }
 
     function applyBusinessPreviewState(value) {
+      releaseAttachmentRecord();
+      state.attachmentReturnOverlay=null;state.attachmentReturnDrawer=null;state.attachmentOwner='';
+      const toasts=document.querySelector('#toasts');
+      for(const toast of toasts.children)clearTimeout(toast.dismissTimer);
+      toasts.replaceChildren();
+      const mode=value==='stress-slow'?'slow':value==='stress-error'?'error':'ready';
+      if(value==='stress-slow'||value==='stress-error')value='stress';
+      clearTimeout(boundaryRead.timer);boundaryRead.version++;boundaryRead.key='';boundaryRead.mode=mode;
       if (value === 'stress' && state.previewState !== 'stress') {
-        boundaryPreviewConfigs.clear();
+        boundaryPreviewConfigs.clear();detailCollectionQueries.clear();boundaryRead.readyKey='';
         for (const key of entityContexts.keys()) if (key.startsWith('stress:')) entityContexts.delete(key);
         rememberEntity();
         const fields = ['page','businessPageSize',...sharedContextFields,...new Set(Object.values(viewFields).flat())];
@@ -6449,16 +6525,25 @@ active = new Set()
         values.visibleColumns = new Set(state.visibleColumns);
         values.columnOrder = [...state.columnOrder];
         values.moduleTabs = {...state.moduleTabs};
+        values.attachmentFiles=state.attachmentFiles;values.attachmentPrimary=state.attachmentPrimary;
         if (!currentPageConfig()) state.page = 'sales';
         boundaryPreviewContext = {key:currentPageConfig().key, values};
         Object.assign(state,{status:'all',search:'',pageNo:1,filterParty:'',filterOwner:'all',filterRisk:'all',filterIncludeEnded:true,filterDateFrom:'',filterDateTo:''});
+        state.businessPageSize=UI_BOUNDARY_LIMITS.pageSize;
         state.selected = new Set();
       } else if (value !== 'stress' && boundaryPreviewContext) {
         const key = currentPageConfig()?.key;
+        state.attachmentFiles=boundaryPreviewContext.values.attachmentFiles;
+        state.attachmentPrimary=boundaryPreviewContext.values.attachmentPrimary;
         state.previewState = value;
         if (key === boundaryPreviewContext.key) Object.assign(state,boundaryPreviewContext.values);
-        else if (key) restoreEntity(key);
-        boundaryPreviewContext = null;
+        else if (key) {
+          state.businessPageSize=boundaryPreviewContext.values.businessPageSize;
+          state.visibleColumns=new Set(boundaryPreviewContext.values.visibleColumns);
+          state.columnOrder=[...boundaryPreviewContext.values.columnOrder];
+          restoreEntity(key);
+        }
+        boundaryPreviewContext = null;boundaryPreviewConfigs.clear();detailCollectionQueries.clear();
       }
       state.previewState = value;
       state.overlay = null;
@@ -6561,16 +6646,18 @@ active = new Set()
             ${renderFilterTrigger(activeFilterCount(),'open-filter','clear-filter')}
             ${config.key === 'inventory' ? '<button class="btn" data-action="warehouse-settings">仓库设置</button>' : ''}
             ${renderBusinessActionMenu(`<button class="btn" data-action="export">${icon('export')}导出筛选结果</button><button class="btn" data-action="open-columns">${icon('columns')}列设置</button>${state.previewState==='stress'?'<button class="btn" data-action="boundary-open-modal">弹窗边界</button>':''}`,'表格工具')}
-            ${config.primary ? `<button class="btn ${selectedRows.length?'':'primary'}" data-action="new-record">${icon('plus')}<span>${config.primary}</span></button>` : ''}
+            ${config.primary ? `<button class="btn ${selectedRows.length?'':'primary'}" data-action="new-record" ${state.previewState==='stress'?'disabled title="压力样例只供查看"':''}>${icon('plus')}<span>${config.primary}</span></button>` : ''}
           </div>
         </div>
         ${selectedRows.length===0?(showUnselectedActions?`<div class="record-row business-record-row record-row--empty"><div class="record-state"><strong>当前操作</strong><span>请选择一条记录</span></div>${businessRecordActions[config.key]?renderBusinessRecordActions(config,[]):''}</div>`:''):businessRecordActions[config.key] ? `<div class="record-row business-record-row"><div class="record-state"><span title="${escapeHTML(selectedLabel)}">${selectedLabel}</span>${selectedRows.length===1?`<button class="btn ghost icon-btn" data-action="clear-selection" aria-label="清空已选" title="清空已选">${icon('close')}</button>`:''}</div>${renderBusinessRecordActions(config,selectedRows)}</div>` : selectedRows.length > 1 ? `<div class="record-row batch-mode"><div class="batch-summary"><strong>已选择 ${selectedRows.length} 条</strong><span>${selectedRows.map(row=>row.no).slice(0,3).join('、')}${selectedRows.length>3?'…':''}</span><button class="text-btn" data-action="clear-selection">清除选择</button></div><div class="batch-actions"><button class="btn" data-action="batch-action" data-value="export">${icon('export')}导出所选</button>${supportsBatchPrint(config)?`<button class="btn" data-action="batch-action" data-value="print">${icon('printer')}批量打印</button>`:''}<button class="btn" data-action="batch-action" data-value="assign">分配负责人</button>${commonBatchAction?`<button class="btn primary" data-action="batch-action" data-value="primary" data-label="${commonBatchAction.label}">批量${commonBatchAction.label}</button>`:`<span class="batch-hint">状态不同，不提供批量状态变更</span>`}</div></div>` : `<div class="record-row"><div class="record-state"><strong>当前操作</strong><span>${selectedLabel}</span></div><div class="record-actions"><button class="btn desktop-only" ${selectedRows.length !== 1 ? 'disabled' : ''} data-action="open-selected">查看详情</button>${config.readOnly ? '' : `<button class="btn" ${canEditSelected ? '' : 'disabled'} title="${selectedRows.length===1&&!canEditSelected?'当前状态不可直接编辑':''}" data-action="edit-selected">编辑</button>${supportsTaskCreation(config)?`<button class="btn" ${selectedRows.length!==1?'disabled':''} data-action="open-related-tasks">相关任务</button>`:''}${singleAction?`<button class="btn primary" data-action="submit-selected" data-label="${singleAction.label}">${singleAction.label}</button>`:''}<button class="btn icon-btn" ${selectedRows.length === 0 ? 'disabled' : ''} data-action="more-selected" aria-label="更多操作">${icon('more')}</button>`}</div></div>`}
       </section>`;
       if (!['data','stress'].includes(state.previewState)) return `${operation}${renderDataState(config)}`;
+      const readFeedback=boundaryReadFeedback(config);
+      if(readFeedback?.blocking)return `${operation}${readFeedback.blocking}`;
       if (config.key === 'inventory' && state.inventoryView === 'balances' && state.inventoryDisplay === 'distribution') {
         return `${operation}<section class="surface inventory-distribution-preview" aria-label="仓库库存分布">${config.sampleParties.map(warehouse=>`<button class="btn" data-action="inventory-warehouse" data-value="${escapeHTML(warehouse)}"><strong>${escapeHTML(warehouse)}</strong><span>${rows.filter(row=>row.party===warehouse).length} 个样例库存项</span><span>查看明细 →</span></button>`).join('')}</section>`;
       }
-      return `${operation}<section class="surface data-surface" data-list-scroll>
+      return `${operation}${readFeedback?.inline||''}<section class="surface data-surface" data-list-scroll aria-busy="${boundaryRead.status==='loading'&&state.previewState==='stress'}">
         <div class="table-wrap"><table><thead><tr><th><input class="checkbox" type="checkbox" data-action="select-all" ${allVisibleSelected ? 'checked' : ''} aria-label="选择当前页全部记录" /></th>${cols.map(([key, label, sortKey]) => `<th><button class="sort-btn ${state.sortKey === sortKey ? 'active' : ''}" data-action="sort" data-key="${sortKey}">${label}<span class="sort-glyph">${state.sortKey === sortKey ? (state.sortDir === 'asc' ? '▲' : '▼') : '↕'}</span></button></th>`).join('')}</tr></thead><tbody>${pageRows.length ? pageRows.map(row => renderTableRow(row, config, cols)).join('') : `<tr><td colspan="${cols.length + 1}"><div class="empty"><div><strong>没有匹配的记录</strong><span>调整搜索或筛选条件后重试</span></div></div></td></tr>`}</tbody></table></div>
         <div class="mobile-card-list">${pageRows.length ? pageRows.map(row => renderMobileRow(row, config)).join('') : '<div class="empty"><div><strong>没有匹配的记录</strong><span>调整搜索或筛选条件后重试</span></div></div>'}</div>
         <footer class="table-footer"><span>${hasLocalFilter?'筛选结果':'业务总数'} ${resultTotal} 条 · 样例展示 ${pageRows.length ? `${page.start+1}–${page.start+pageRows.length} / ${rows.length}` : '0'}</span><span>已选 ${state.selected.size} 条</span><div class="pager"><ui-select id="business-page-size" aria-label="每页条数" data-required-selection>${[50, 100, 200, 300, 500].map(value=>`<option value="${value}" ${state.businessPageSize===value?'selected':''}>${value} 条/页</option>`).join('')}</ui-select>${renderPagerButtons(page.pageCount,state.pageNo)}</div></footer>
@@ -6630,8 +6717,8 @@ active = new Set()
         status: `<span class="badge ${badgeClass(row)}">${row.statusText}</span>`,
         date: `<span class="mono">${rowDate(row)}</span>`,
         metric: `<span class="mono">${rowMetric(row, config)}</span>`,
-        owner: row.owner,
-        progress: row.progress,
+        owner: escapeHTML(row.owner||'—'),
+        progress: escapeHTML(row.progress||'—'),
         risk: `<span class="badge ${row.risk === '已逾期' ? 'danger' : row.risk === '临近交付' ? 'warning' : ''}">${row.risk}</span>`
       };
       if (config.key === 'sales') {
@@ -17023,7 +17110,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (window.parent !== window) window.parent.postMessage({
         type: 'ui-design-data-state-change',
         previewId: window.__ERP_UI_DESIGN_PREVIEW_ID__,
-        value: state.page === 'mobile-tasks' ? state.mobilePreviewState : state.previewState,
+        value: state.page === 'mobile-tasks' ? state.mobilePreviewState : boundaryStateValue(),
       }, '*');
       if (state.page !== 'entity-form') { formFullscreen = false; syncFormFullscreen(); }
       if(state.page!=='permissions'&&state.permissionFullscreen){state.permissionFullscreen=false;syncPermissionFullscreen();}
@@ -17454,9 +17541,24 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       renderFloating();
     }
 
-    function openAttachmentManager(context = 'business', owner = '') {
+    function releaseAttachmentRecord() {
+      if(state.attachmentRecord){
+        state.attachmentRecord.previewAttachments=state.attachmentFiles;
+        state.attachmentRecord.previewAttachmentPrimary=state.attachmentPrimary;
+        state.attachmentFiles=state.attachmentReturnFiles;
+        state.attachmentPrimary=state.attachmentReturnPrimary;
+      }
+      state.attachmentRecord=null;state.attachmentReturnFiles=null;state.attachmentReturnPrimary=null;
+    }
+
+    function openAttachmentManager(context = 'business', owner = '', record = state.drawer?.row) {
       state.attachmentReturnOverlay = state.overlay && state.overlay !== 'attachments' ? state.overlay : null;
       state.attachmentReturnDrawer = state.drawer || null;
+      if(record?.previewOnly){
+        state.attachmentReturnFiles=state.attachmentFiles;state.attachmentReturnPrimary=state.attachmentPrimary;state.attachmentRecord=record;
+        state.attachmentFiles=boundaryAttachments(record);
+        state.attachmentPrimary=record.previewAttachmentPrimary||state.attachmentFiles.find(file=>file.kind==='image')?.id||'';
+      }
       state.attachmentContext = context;
       state.attachmentOwner = owner || state.drawer?.row?.no || [...state.selected][0] || (state.page === 'entity-form' ? '当前编辑草稿' : '当前业务对象');
       state.attachmentMode = 'all';
@@ -17471,6 +17573,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         toast('附件正在上传，请等待完成后关闭');
         return;
       }
+      releaseAttachmentRecord();
       state.overlay = state.attachmentReturnOverlay;
       state.drawer = state.attachmentReturnDrawer;
       state.attachmentReturnOverlay = null;
@@ -17535,6 +17638,15 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       document.querySelector('[data-delivery-region]')?.addEventListener('change', () => { captureFormDraft(); state.formDirty=true; renderView(); });
     }
     function bindFloatingInputs() {
+      document.querySelectorAll('[data-collection-search]').forEach(input=>bindSubmittedSearch(input,event=>{
+        const query=collectionQuery(input.dataset.collection,input.dataset.owner);query.query=event.target.value;query.page=1;renderFloating();
+        const next=document.querySelector(`[data-collection-search][data-collection="${input.dataset.collection}"]`);next?.focus();setCaretEnd(next);
+      }));
+      document.querySelectorAll('[data-collection-size]').forEach(input=>input.addEventListener('change',event=>{
+        const size=Number(event.target.value);if(![50,100,250].includes(size))return;
+        Object.assign(collectionQuery(input.dataset.collection,input.dataset.owner),{size,page:1});renderFloating();
+      }));
+
       document.querySelector('#permission-scope-type')?.addEventListener('change',event=>{
         capturePermissionDraft();state.permissionScopeType[state.permissionRole]=event.target.value;
         if(event.target.value!=='warehouses')delete state.permissionScopeValue[state.permissionRole];
@@ -17597,7 +17709,6 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (state.overlay === 'task-create-confirm') html += renderTaskCreateConfirm();
       if (state.overlay === 'import-preview') html += renderImportPreviewModal();
       if (state.overlay === 'media-sort') html += renderMediaSortModal();
-      if (state.overlay === 'boundary-modal') html += renderBoundaryModal();
       if (state.overlay === 'permission-scope') html += renderPermissionDataScopeModal();
       if (state.overlay === 'info') html += renderInfoModal();
       if (state.overlay === 'product-image-preview') html += renderProductImagePreview();
@@ -17815,10 +17926,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     function renderAttachmentModal() {
       const isProduct = state.attachmentContext === 'product';
-      const files = state.attachmentFiles.filter(file=>state.attachmentMode==='all' || file.kind===state.attachmentMode);
+      const matchingFiles=state.attachmentFiles.filter(file=>state.attachmentMode==='all'||file.kind===state.attachmentMode);
+      const attachmentPage=collectionSlice('attachments',state.attachmentOwner,matchingFiles),files=attachmentPage.rows;
       const pending = state.attachmentFiles.filter(file=>['pending','failed'].includes(file.status)).length;
       const statusCopy = { done:['success','已上传'], pending:['warning','待上传'], uploading:['info','上传中'], failed:['danger','上传失败'] };
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal attachment-modal" role="dialog" aria-modal="true" aria-label="${isProduct?'产品图片与附件':'业务附件'}"><header class="modal-head"><strong>${isProduct?'产品图片与附件':'业务附件'}</strong><span class="data-note">${state.attachmentOwner||'当前业务对象'}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><details class="compact-field-help"><summary aria-label="查看附件使用范围">附件说明</summary><p>附件仅作为业务证据，不代表任务完成，也不会改变对应业务状态。</p></details><div class="attachment-toolbar"><div class="segment" role="tablist">${[['all','全部'],['image','图片'],['file','文件']].map(([key,label])=>`<button class="${state.attachmentMode===key?'active':''}" data-action="attachment-mode" data-value="${key}">${label}<b>${state.attachmentFiles.filter(file=>key==='all'||file.kind===key).length}</b></button>`).join('')}</div><button class="btn ghost" data-action="attachment-refresh" aria-label="刷新列表">${icon('refresh')}刷新</button></div><input id="attachment-input" type="file" multiple hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip"/><div class="upload-dropzone"><button class="btn primary" data-action="attachment-pick">${icon('paperclip')}选择附件</button><span class="upload-desktop-hint">或将文件拖拽到此处</span><span class="upload-mobile-hint">选择照片或文件</span><span>支持图片、PDF、Office 与压缩包；单个文件不超过 100 MB</span></div><div class="attachment-list">${files.length?files.map(file=>{const [badge,label]=statusCopy[file.status]||statusCopy.pending;const preview=file.url?`<img src="${file.url}" alt="${escapeHTML(file.name)}"/>`:file.kind==='image'?renderProductArt(file.art||0,file.name):icon('paperclip');const expanded=state.attachmentExpanded.has(file.id);return `<article class="attachment-row ${file.status==='failed'?'failed':''}"><div class="attachment-preview">${preview}</div><div class="attachment-copy"><button class="attachment-name ${expanded?'expanded':''}" data-action="attachment-name" data-id="${file.id}" aria-expanded="${expanded}" title="${escapeHTML(file.name)}">${escapeHTML(file.name)}</button><span>${file.size}</span><details class="compact-field-help"><summary aria-label="查看${escapeHTML(file.name)}上传记录">上传记录</summary><p>${file.uploader} · ${file.time}</p></details><span class="badge ${badge}" style="margin-top:5px">${label}${file.id===state.attachmentPrimary?' · 主图':''}</span>${file.error?`<span class="attachment-error">${escapeHTML(file.error)}</span>`:''}${file.status==='uploading'||file.status==='failed'?`<div class="attachment-progress"><i style="width:${file.progress||0}%"></i></div>`:''}</div><div class="attachment-row-actions">${file.status==='failed'?`<button class="btn" data-action="attachment-retry" data-id="${file.id}">重试</button>`:`<button class="btn" data-action="attachment-preview" data-id="${file.id}">预览</button>`}${isProduct&&file.kind==='image'&&file.id!==state.attachmentPrimary?`<button class="btn" data-action="attachment-set-primary" data-id="${file.id}">设为主图</button>`:''}<button class="btn" data-action="attachment-remove" data-id="${file.id}">移除</button></div></article>`}).join(''):'<div class="empty" style="min-height:160px"><div><strong>当前分类没有文件</strong><span>选择文件后会先进入待上传队列</span></div></div>'}</div></div><footer class="modal-foot"><button class="btn" data-action="close-overlay">完成</button>${pending?`<button class="btn primary" data-action="attachment-upload">上传 ${pending} 个文件</button>`:''}</footer></section></div>`;
+      return `<div class="overlay" data-action="overlay-bg"><section class="modal attachment-modal" role="dialog" aria-modal="true" aria-label="${isProduct?'产品图片与附件':'业务附件'}"><header class="modal-head"><div class="compact-field-label"><strong>${isProduct?'产品图片与附件':'业务附件'}</strong><details class="compact-field-help"><summary aria-label="查看附件使用范围">?</summary><p>附件仅作为业务证据，不代表任务完成，也不会改变对应业务状态。</p></details></div><span class="data-note">${state.attachmentOwner||'当前业务对象'}</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="attachment-toolbar"><div class="segment" role="tablist">${[['all','全部'],['image','图片'],['file','文件']].map(([key,label])=>`<button class="${state.attachmentMode===key?'active':''}" data-action="attachment-mode" data-value="${key}">${label}<b>${state.attachmentFiles.filter(file=>key==='all'||file.kind===key).length}</b></button>`).join('')}</div><button class="btn ghost" data-action="attachment-refresh" aria-label="刷新列表">${icon('refresh')}刷新</button></div><input id="attachment-input" type="file" multiple hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip"/><div class="upload-dropzone"><button class="btn primary" data-action="attachment-pick">${icon('paperclip')}选择附件</button><span class="upload-desktop-hint">或将文件拖拽到此处</span><span class="upload-mobile-hint">选择照片或文件</span><span>支持图片、PDF、Office 与压缩包；单个文件不超过 100 MB</span></div>${state.attachmentFiles.length>50||attachmentPage.query.query?collectionControls('attachments',state.attachmentOwner,attachmentPage,'附件'):''}<div class="attachment-list">${files.length?files.map(file=>{const [badge,label]=statusCopy[file.status]||statusCopy.pending;const preview=file.url?`<img src="${file.url}" alt="${escapeHTML(file.name)}"/><span class="attachment-image-fallback" hidden>图片暂不可用</span>`:file.kind==='image'?renderProductArt(file.art||0,file.name):icon('paperclip');const expanded=state.attachmentExpanded.has(file.id);return `<article class="attachment-row ${file.status==='failed'?'failed':''}"><div class="attachment-preview">${preview}</div><div class="attachment-copy"><button class="attachment-name ${expanded?'expanded':''}" data-action="attachment-name" data-id="${file.id}" aria-expanded="${expanded}" title="${escapeHTML(file.name)}">${escapeHTML(file.name)}</button><span>${file.size}</span><details class="compact-field-help"><summary aria-label="查看${escapeHTML(file.name)}上传记录">?</summary><p>${file.uploader} · ${file.time}</p></details><span class="badge ${badge}" style="margin-top:5px">${label}${file.id===state.attachmentPrimary?' · 主图':''}</span>${file.error?`<span class="attachment-error">${escapeHTML(file.error)}</span>`:''}${file.status==='uploading'||file.status==='failed'?`<div class="attachment-progress"><i style="width:${file.progress||0}%"></i></div>`:''}</div><div class="attachment-row-actions">${file.status==='failed'?`<button class="btn" data-action="attachment-retry" data-id="${file.id}">重试</button>`:`<button class="btn" data-action="attachment-preview" data-id="${file.id}">预览</button>`}${isProduct&&file.kind==='image'&&file.id!==state.attachmentPrimary?`<button class="btn" data-action="attachment-set-primary" data-id="${file.id}">设为主图</button>`:''}<button class="btn" data-action="attachment-remove" data-id="${file.id}">移除</button></div></article>`}).join(''):'<div class="empty" style="min-height:160px"><div><strong>当前分类没有文件</strong><span>选择文件后会先进入待上传队列</span></div></div>'}</div></div><footer class="modal-foot"><button class="btn" data-action="close-overlay">完成</button>${pending?`<button class="btn primary" data-action="attachment-upload">上传 ${pending} 个文件</button>`:''}</footer></section></div>`;
     }
 
     function renderTaskCreateModal() {
@@ -17863,7 +17975,6 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       state.overlay = null;
       state.pendingNav = null;
       state.permissionPending = null;
-      state.boundaryMoreOpen = false;
       renderFloating();
     }
 
@@ -17929,23 +18040,6 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       return `<div class="overlay" data-action="overlay-bg"><section class="modal product-image-preview" role="dialog" aria-modal="true" aria-label="${escapeHTML(preview.label)}图片预览"><header class="modal-head"><strong>${escapeHTML(preview.label)}</strong><span class="data-note">产品图片预览</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭图片预览">${icon('close')}</button></header><div class="modal-body"><div class="product-image-preview-stage" style="--preview-scale:${scale}">${renderProductArt(preview.seed,preview.label)}</div></div><footer class="modal-foot product-image-preview-tools"><button class="btn" data-action="product-image-zoom" data-value="out" ${scale<=1?'disabled':''}>缩小</button><button class="btn" data-action="product-image-zoom" data-value="reset">适应屏幕</button><button class="btn" data-action="product-image-zoom" data-value="in" ${scale>=3?'disabled':''}>放大</button><span class="data-note">滚轮或双指缩放 · 放大后拖动查看</span></footer></section></div>`;
     }
 
-    function renderBoundaryModal() {
-      const title = '编辑销售订单并核对海外客户多语言包装、分批交付、付款条件与跨岗位协同资料（超长标题边界）';
-      const sections = [
-        ['客户与交付说明','客户要求分三批交付，并分别使用简体中文、英文和日文包装资料。字段内容允许自然换行，完整值不会只存在于悬浮提示中。'],
-        ['产品与包装资料','2026 圣诞限定可拆洗发光音乐互动毛绒礼盒套装（海外多语言版），关联十二个 SKU、三种包装方式及七份客户确认附件。'],
-        ['保存前校验','系统只在正文区域滚动，标题栏和操作栏保持可见；错误会定位到具体字段，已录入内容不会因切换资料页签而丢失。'],
-        ['大量明细处理','明细表格使用单一横向滚动容器并固定关键身份列；服务端分页或分段加载，避免一次渲染数千行造成页面卡顿。'],
-        ['权限与动作收口','常用动作保留在底部，低频动作统一进入“更多 4”；危险动作独立确认，不因按钮空间不足而缩成无文字图标。'],
-        ['附件与失败恢复','超长文件名会截断但可进入附件管理查看全名；上传失败保留已选文件、失败原因和重试入口。'],
-        ['超长备注与历史内容','客户历史备注可能来自邮件或 Excel，允许多段换行并显示字符数量；正文默认折叠到合理高度，用户主动展开后仍可复制完整内容。'],
-        ['多处校验失败','提交时若客户、交期、币种和明细同时有问题，顶部先显示错误摘要，再将焦点移到第一个错误字段；修正一项不会清空其他已填内容。'],
-        ['并发修改与恢复','若他人已更新同一订单，保存前展示冲突字段与最新值，由用户决定刷新或另存草稿；不会静默覆盖服务端新版本。'],
-        ['审计与敏感动作','批量、导出、取消和跨岗位转交保留操作者、时间、范围与结果；无权限的动作不展示，权限刚失效时服务端仍会拒绝并说明如何恢复。']
-      ];
-      return `<div class="overlay" data-action="overlay-bg"><section class="modal boundary-modal" style="width:min(760px,100%)" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong title="${title}">${title}</strong><span class="badge info">边界预览</span><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="boundary-modal-copy">${sections.map(([heading,copy])=>`<section><h3>${heading}</h3><p>${copy}</p></section>`).join('')}</div></div><footer class="modal-foot"><span class="data-note">正文独立滚动；底部只保留高频动作，当前还有 4 个低频动作。</span><button class="btn" data-action="boundary-modal-action" data-value="attachments">${icon('paperclip')}附件</button><div class="boundary-more-wrap"><button class="btn" data-action="boundary-modal-more" aria-expanded="${state.boundaryMoreOpen}">${icon('more')}更多 4</button>${state.boundaryMoreOpen?`<div class="boundary-action-menu" role="menu"><button data-action="boundary-modal-action" data-value="copy">复制单据</button><button data-action="boundary-modal-action" data-value="print">打印预览</button><button data-action="boundary-modal-action" data-value="task">新建跟进任务</button><button data-action="boundary-modal-action" data-value="cancel">取消单据</button></div>`:''}</div><button class="btn primary" data-action="boundary-modal-action" data-value="save">保存并继续</button></footer></section></div>`;
-    }
-
     function renderThemeModal() {
       return `<div class="overlay" data-action="overlay-bg"><section class="modal" style="width:min(470px,100%)"><header class="modal-head"><strong>${state.authenticated ? '外观与密度' : '外观设置'}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><div class="field"><label>主题色</label><div class="theme-grid">${Object.entries(accents).map(([key,a]) => `<button class="swatch ${state.accent===key?'active':''}" data-action="set-accent" data-value="${key}"><i style="background:${a[4]}"></i><span>${a[3]}</span></button>`).join('')}</div></div><div class="field" style="margin-top:16px"><label>明暗模式</label><div class="theme-mode"><button class="${state.mode==='system'?'active':''}" data-action="set-mode" data-value="system">${icon('theme')} 跟随系统</button><button class="${state.mode==='light'?'active':''}" data-action="set-mode" data-value="light">${icon('sun')} 浅色</button><button class="${state.mode==='dark'?'active':''}" data-action="set-mode" data-value="dark">${icon('moon')} 深色</button></div></div>${state.authenticated ? `<div class="field" style="margin-top:16px"><label>表格密度</label><div class="theme-mode theme-density"><button class="${state.density==='standard'?'active':''}" data-action="set-density" data-value="standard">标准 · 52px</button><button class="${state.density==='compact'?'active':''}" data-action="set-density" data-value="compact">紧凑 · 42px</button></div></div>` : ''}${state.authenticated ? `<div class="field" style="margin-top:16px"><label>表格线条</label><div class="theme-mode theme-table-lines"><button class="${state.tableLines==='simple'?'active':''}" data-action="set-table-lines" data-value="simple">简洁</button><button class="${state.tableLines==='grid'?'active':''}" data-action="set-table-lines" data-value="grid">网格</button></div></div>` : ''}${state.authenticated ? '<p class="data-note" style="margin:16px 0 0">主题色影响导航、焦点与主要操作；业务状态色保持独立。</p>' : ''}</div><footer class="modal-foot"><button class="btn primary" data-action="close-overlay">关闭</button></footer></section></div>`;
     }
@@ -17959,7 +18053,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const tabs = [['basic','基本信息'],['lines','明细'],...(config.key==='products'?[['media','图片与附件']]:[]),['related','关联单据'],['history','操作记录']];
       let body = '';
       if (state.detailTab === 'lines') {
-        body = `<section class="detail-section"><h3 class="section-title">${config.item}明细</h3><div class="detail-line-table"><table><thead><tr><th>序号</th><th>${config.item}</th><th>规格 / 来源</th><th>数量</th><th>单位</th><th>${config.metricLabel}</th><th>状态</th></tr></thead><tbody>${Array.from({length:Math.min(row.lines||3,6)},(_,index)=>`<tr><td>${index+1}</td><td>${rowItem(row,config)}</td><td>${index===0?'当前有效版本':'关联明细 '+(index+1)}</td><td>${[1200,860,320,96,48,24][index]}</td><td>${config.unit||'个'}</td><td>${rowMetric(row,config)}</td><td><span class="badge ${badgeClass(row)}">${row.statusText}</span></td></tr>`).join('')}</tbody></table></div></section>`;
+        const items=recordDetailItems(row,config),page=collectionSlice('lines',row.id,items);
+        body=`<section class="detail-section"><h3 class="section-title">${config.item}明细 · ${items.length} 条</h3>${items.length>50||page.query.query?collectionControls('lines',row.id,page,'明细'):''}<div class="detail-line-table"><table aria-label="${config.item}明细"><thead><tr><th>序号</th><th>${config.item}</th><th>规格 / 来源</th><th>数量</th><th>单位</th><th>${config.metricLabel}</th><th>状态</th></tr></thead><tbody>${page.rows.map(item=>`<tr data-detail-line="${item.id}"><td>${item.no}</td><td>${escapeHTML(item.item)}</td><td>${escapeHTML(item.source)}</td><td>${item.quantity}</td><td>${escapeHTML(item.unit)}</td><td>${escapeHTML(item.metric)}</td><td><span class="badge ${badgeClass(row)}">${escapeHTML(item.status)}</span></td></tr>`).join('')||'<tr><td colspan="7"><div class="empty">没有符合条件的明细</div></td></tr>'}</tbody></table></div></section>`;
       } else if (state.detailTab === 'media') {
         body = `<section class="detail-section"><div class="product-detail-hero"><div class="product-main-image">${renderProductArt(Math.max(0,['正面图','侧面图','包装图','细节图'].indexOf(state.productMediaPrimary)),rowParty(row,config))}</div><div><span class="badge success">主图 · ${state.productMediaPrimary}</span><h3 style="margin:9px 0 5px">${rowParty(row,config)}</h3><p class="data-note" style="line-height:1.65">图片用于产品识别、订单选款和打印资料；原图与业务附件分开保留上传人、时间和替换记录。</p><button class="btn primary" style="margin-top:10px" data-action="open-attachments" data-context="product" data-owner="${row.no}">${icon('paperclip')}管理图片与附件</button></div></div></section><section class="detail-section"><h3>图片资料</h3><div class="media-gallery">${state.productMediaOrder.map(label=>{const index=['正面图','侧面图','包装图','细节图'].indexOf(label);return `<article class="media-card"><div class="media-card-visual">${renderProductArt(index,rowParty(row,config)+' '+label)}</div><div class="media-card-meta"><span>${label}</span>${state.productMediaPrimary===label?'<span class="badge success">主图</span>':'<button class="text-btn" data-action="media-set-main" data-value="'+label+'">设为主图</button>'}</div></article>`}).join('')}</div></section>`;
       } else if (state.detailTab === 'related') {
@@ -17967,14 +18062,21 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       } else if (state.detailTab === 'history') {
         body = `<section class="detail-section"><h3>操作记录</h3><div class="timeline">${(row.operations||[]).map(item=>`<div class="timeline-item"><strong>${escapeHTML(item.label)}</strong><p>${escapeHTML(item.note)}</p><small>${item.time}</small></div>`).join('')}<div class="timeline-item"><strong>${row.progress}</strong><small>今天 09:42 · ${row.owner}</small></div><div class="timeline-item"><strong>状态更新为 ${row.statusText}</strong><small>昨天 16:08 · 系统记录</small></div><div class="timeline-item"><strong>${config.entity}已创建</strong><small>2026/09/22 08:16 · ${row.owner}</small></div></div></section>`;
       } else {
-        const details = `<dl class="detail-grid"><dt>${config.entity}号</dt><dd>${copyValue(row.no)}</dd><dt>${config.party}</dt><dd>${copyValue(rowParty(row,config))}</dd><dt>负责人</dt><dd>${row.owner}</dd><dt>${config.item}</dt><dd>${copyValue(rowItem(row,config))}</dd><dt>明细数量</dt><dd>${row.lines} 条</dd><dt>${config.dateLabel}</dt><dd>${rowDate(row)}</dd><dt>${config.metricLabel}</dt><dd>${rowMetric(row,config)}</dd><dt>当前进度</dt><dd>${row.progress}</dd><dt>业务提醒</dt><dd><span class="badge ${row.risk==='已逾期'?'danger':row.risk==='临近交付'?'warning':''}">${row.risk}</span></dd></dl>`;
+        const details = `<dl class="detail-grid"><dt>${config.entity}号</dt><dd>${copyValue(row.no)}</dd><dt>${config.party}</dt><dd>${copyValue(rowParty(row,config))}</dd>${config.key==='sales'?`<dt>客户单号</dt><dd>${row.customerOrderNo?copyValue(row.customerOrderNo):'—'}</dd>`:''}<dt>负责人</dt><dd>${escapeHTML(row.owner||'—')}</dd><dt>${config.item}</dt><dd>${copyValue(rowItem(row,config))}</dd><dt>明细数量</dt><dd>${row.lines} 条</dd><dt>${config.dateLabel}</dt><dd>${rowDate(row)}</dd><dt>${config.metricLabel}</dt><dd>${rowMetric(row,config)}</dd><dt>备注</dt><dd class="record-long-copy">${escapeHTML(row.note||'—')}</dd><dt>当前进度</dt><dd>${escapeHTML(row.progress||'—')}</dd><dt>业务提醒</dt><dd><span class="badge ${row.risk==='已逾期'?'danger':row.risk==='临近交付'?'warning':''}">${row.risk}</span></dd></dl>`;
         body = `<section class="detail-section">${config.key==='products'?`<div class="product-detail-hero"><div class="product-main-image">${renderProductArt(config.rows.indexOf(row),rowParty(row,config))}</div><div><h3 style="margin:0 0 12px">${rowParty(row,config)}</h3>${details}</div></div>`:`<h3>${row.no}</h3>${details}`}</section><section class="detail-section"><h3>业务边界</h3><p style="margin:0;color:var(--text-2);line-height:1.7">${config.boundary}</p></section>`;
       }
-      if(state.detailTab==='related'&&businessRecordActions[config.key])body=`<section class="detail-section"><h3>关联单据与任务</h3><div class="related-grid">${businessLinks(row).map(link=>`<button class="related-card" data-action="open-linked-record" data-page="${link.page}" data-id="${link.row.id}"><strong>${listConfig[link.page].title}</strong><span>${link.row.no} · ${link.row.statusText}</span></button>`).join('')||'<p class="data-note">暂无关联单据</p>'}</div><p><button class="btn" data-action="open-related-tasks" data-page="${config.key}" data-id="${row.id}">相关任务 ${businessRecordTasks(config,row).length}</button></p></section>`;
+      if(state.detailTab==='related'&&businessRecordActions[config.key]){
+        const links=businessLinks(row),page=collectionSlice('related',row.id,links);
+        body=`<section class="detail-section"><h3>关联单据与任务 · ${links.length} 张单据</h3>${links.length>50||page.query.query?collectionControls('related',row.id,page,'关联单据'):''}<div class="related-grid">${page.rows.map(link=>`<button class="related-card" data-action="open-linked-record" data-page="${link.page}" data-id="${link.row.id}"><strong>${listConfig[link.page].title}</strong><span>${escapeHTML(link.row.no)} · ${escapeHTML(link.row.statusText)}</span></button>`).join('')||'<p class="data-note">暂无符合条件的关联单据</p>'}</div>${row.previewOnly?'':`<p><button class="btn" data-action="open-related-tasks" data-page="${config.key}" data-id="${row.id}">相关任务 ${businessRecordTasks(config,row).length}</button></p>`}</section>`;
+      }
+      if(state.detailTab==='history'&&row.previewOnly){
+        const page=collectionSlice('history',row.id,row.operations||[]);
+        body=`<section class="detail-section"><h3>操作记录 · ${(row.operations||[]).length} 条</h3>${collectionControls('history',row.id,page,'操作记录')}<div class="timeline">${page.rows.map(item=>`<div class="timeline-item"><strong>${escapeHTML(item.label)}</strong><p>${escapeHTML(item.note)}</p><small>${escapeHTML(item.time)}</small></div>`).join('')||'<div class="empty">没有符合条件的操作记录</div>'}</div></section>`;
+      }
       if(state.detailTab==='basic')body+=renderVisualRecordFacts(row,config);
       const printable = ['purchase','outsourcing','bom','products','production'].includes(config.key);
       const editable = !row.previewOnly && canEditRecord(config, row);
-      return `<div class="overlay" data-action="detail-bg"><section class="modal business-detail-modal" role="dialog" aria-modal="true" aria-label="${config.entity}详情"><header class="modal-head"><div class="compact-field-label"><strong>${config.entity}详情</strong><details class="compact-field-help"><summary aria-label="查看${config.entity}详情说明">?</summary><p>查看摘要与完整明细；业务操作仍从原操作区办理。</p></details></div><span class="badge ${badgeClass(row)}">${config.key==='bom'&&row.status==='active'?'已启用 · 只读':row.statusText}</span><span class="data-note">${row.no}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><nav class="detail-tabs">${tabs.map(([key,label])=>`<button class="${state.detailTab===key?'active':''}" data-action="detail-tab" data-value="${key}">${label}</button>`).join('')}</nav><div class="detail-modal-body">${body}</div><footer class="modal-foot"><button class="btn" data-action="open-attachments" data-context="${config.key==='products'?'product':'business'}" data-owner="${row.no}">${icon('paperclip')}${config.key==='products'?'图片与附件':'附件 2'}</button>${businessRecordActions[config.key]?renderBusinessRecordActions(config,[row],true):`${printable?`<button class="btn" data-action="business-print" data-value="${config.key}" data-id="${row.no}">${icon('printer')}打印</button>`:''}${supportsTaskCreation(config)&&!row.previewOnly?`<button class="btn" data-action="open-related-tasks" data-id="${row.id}">相关任务</button>`:''}${config.readOnly||config.workflow?'':`<button class="btn" ${editable?'':'disabled title="当前状态不可直接编辑"'} data-action="edit-record" data-id="${row.id}">编辑</button>`}${config.readOnly||row.previewOnly?'':`<button class="btn primary" data-action="detail-primary">${config.workflow?config.rowAction:'更多操作'}</button>`}`}<button class="btn" data-action="close-drawer">返回原视图</button></footer></section></div>`;
+      return `<div class="overlay" data-action="detail-bg"><section class="modal business-detail-modal" role="dialog" aria-modal="true" aria-label="${config.entity}详情"><header class="modal-head"><div class="compact-field-label"><strong>${config.entity}详情</strong><details class="compact-field-help"><summary aria-label="查看${config.entity}详情说明">?</summary><p>查看摘要与完整明细；业务操作仍从原操作区办理。</p></details></div><span class="badge ${badgeClass(row)}">${config.key==='bom'&&row.status==='active'?'已启用 · 只读':row.statusText}</span><span class="data-note">${row.no}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><nav class="detail-tabs">${tabs.map(([key,label])=>`<button class="${state.detailTab===key?'active':''}" data-action="detail-tab" data-value="${key}">${label}</button>`).join('')}</nav><div class="detail-modal-body">${body}</div><footer class="modal-foot"><button class="btn" data-action="open-attachments" data-context="${config.key==='products'?'product':'business'}" data-owner="${row.no}">${icon('paperclip')}${config.key==='products'?'图片与附件':`附件 ${row.previewOnly?(row.previewAttachments?.length??(row.lines===UI_BOUNDARY_LIMITS.details?UI_BOUNDARY_LIMITS.attachments:3)):state.attachmentFiles.length}`}</button>${businessRecordActions[config.key]?renderBusinessRecordActions(config,[row],true):`${printable?`<button class="btn" data-action="business-print" data-value="${config.key}" data-id="${row.no}">${icon('printer')}打印</button>`:''}${supportsTaskCreation(config)&&!row.previewOnly?`<button class="btn" data-action="open-related-tasks" data-id="${row.id}">相关任务</button>`:''}${config.readOnly||config.workflow?'':`<button class="btn" ${editable?'':'disabled title="当前状态不可直接编辑"'} data-action="edit-record" data-id="${row.id}">编辑</button>`}${config.readOnly||row.previewOnly?'':`<button class="btn primary" data-action="detail-primary">${config.workflow?config.rowAction:'更多操作'}</button>`}`}<button class="btn" data-action="close-drawer">返回原视图</button></footer></section></div>`;
     }
 
     // These examples describe presentation only; they never query or advance a business process.
@@ -18176,6 +18278,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       });
     }
 
+    document.addEventListener('error',event=>{
+      const image=event.target;if(image.tagName!=='IMG'||!image.closest('.attachment-preview, .attachment-full-preview'))return;
+      image.hidden=true;const fallback=image.nextElementSibling;if(fallback)fallback.hidden=false;
+    },true);
+
     document.addEventListener('click', event => {
       const dateInput = event.target.closest(
         'input[type="date"], input[type="datetime-local"]'
@@ -18201,12 +18308,22 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(handleLoginAction(action,target,event))return;
       if(handleRevisionAction(action,target))return;
 
+      if(action==='collection-page'){
+        const query=collectionQuery(target.dataset.collection,target.dataset.owner);query.page=Math.max(1,query.page+Number(target.dataset.value));renderFloating();return;
+      }
+      if(action==='inspect-record'){
+        const config=listPreviewConfig(listConfig[target.dataset.page]),row=config?.rows.find(item=>item.id===target.dataset.id);if(!row)return;
+        if(target.dataset.value==='copy'){copyPrototypeValue(`${row.no}\n${row.customerOrderNo||''}`);return;}
+        if(target.dataset.value==='attachments'){openAttachmentManager('business',row.no,row);return;}
+        if(state.drawer?.row?.id!==row.id)state.drawer={type:'detail',row,page:config.key};
+        state.overlay=null;state.detailTab=target.dataset.value;renderFloating();return;
+      }
       if (action === 'nav') { if (target.dataset.page==='tasks' && target.closest('#sidebar')) {state.boardMode='todo';state.boardStatus='all';state.boardSearch='';state.boardRole='all';state.boardPage=1;} if (target.dataset.page==='print') state.printTab='samples'; navigate(target.dataset.page); }
       else if (action === 'toggle-sidebar') { state.sidebarCollapsed = !state.sidebarCollapsed; renderSidebar(); document.querySelector('[data-action="toggle-sidebar"]')?.focus(); }
       else if (action === 'module-tab') { rememberEntity();state.moduleTabs[state.page]=target.dataset.value;restoreEntity(target.dataset.value);if(state.page==='production-hub')state.productionRecordsView=target.dataset.value==='production-execution'?'route':'list';state.overlay=null;state.drawer=null;renderAll(); }
       else if (action === 'open-route-view') navigate(target.dataset.page);
-      else if (action === 'state-reset') { applyBusinessPreviewState('data'); state.status = 'all'; state.search = ''; state.pageNo = 1; state.selected.clear(); state.boundaryMoreOpen = false; resetListFilters(); renderAll(); }
-      else if (action === 'state-retry') { state.previewState = 'data'; renderAll(); toast('已重新读取当前页面'); }
+      else if (action === 'state-reset') { applyBusinessPreviewState('data'); state.status = 'all'; state.search = ''; state.pageNo = 1; state.selected.clear(); resetListFilters(); renderAll(); }
+      else if (action === 'state-retry') { if(state.previewState==='stress'){startBoundaryRead(boundaryReadKey(),true);renderView();}else{state.previewState='data';renderAll();toast('已重新读取当前页面');} }
       else if (action === 'state-home') { state.previewState = 'data'; navigate('dashboard'); }
       else if (action === 'open-mobile-tasks') {
         state.mobileMain = 'tasks'; state.mobileTab = 'todo'; state.mobileQuick = 'all'; state.mobileScreen = 'list';
@@ -18404,14 +18521,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       else if (action === 'select-all') { const config = currentPageConfig(); if (!config) return; const rows = getPageSlice(getFilteredRows(config)).rows; if (target.checked) rows.forEach(row=>state.selected.add(row.id)); else rows.forEach(row=>state.selected.delete(row.id)); renderView(); }
       else if (action === 'clear-selection') { state.selected.clear(); renderView(); }
-      else if (action === 'boundary-open-modal') { state.boundaryMoreOpen = false; state.overlay = 'boundary-modal'; renderFloating(); }
-      else if (action === 'boundary-modal-more') { state.boundaryMoreOpen = !state.boundaryMoreOpen; renderFloating(); }
-      else if (action === 'boundary-modal-action') {
-        state.boundaryMoreOpen = false;
-        if (target.dataset.value === 'attachments') { openAttachmentManager('business','SO-20260926-000000001 · 长文本与附件边界'); return; }
-        toast(`已触发“${target.textContent.trim()}”边界样例`);
-        if (target.dataset.value === 'save') { state.overlay=null; renderFloating(); } else renderFloating();
-      }
+      else if (action === 'boundary-open-modal') { const config=currentPageConfig();if(config?.rows[0]){state.drawer={type:'detail',page:config.key,row:config.rows[0]};state.detailTab='lines';renderFloating();} }
       else if (action === 'batch-action') { state.batchAction = target.dataset.value; state.businessActionLabel = target.dataset.label || ''; state.overlay = 'batch-action'; renderFloating(); }
       else if (action === 'confirm-batch-action') {
         const config=currentPageConfig()||listConfig.sales;
@@ -18420,6 +18530,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         const assignee=document.querySelector('#batch-assignee')?.value||'';
         if(state.batchAction==='assign'&&assignee) selectedRows.forEach(row=>{row.owner=assignee;});
         const result=state.batchAction==='assign'?`负责人已更新为 ${assignee}`:state.batchAction==='primary'?'已通过同状态与权限前置校验，进入受控状态动作':state.batchAction==='print'?'已建立逐张打印队列':'已按当前授权范围准备导出';
+        if(state.batchAction==='export')downloadCSV(`${config.title}-所选.csv`,[['单号',config.party,config.item,'日期','状态','负责人'],...selectedRows.map(row=>[row.no,rowParty(row,config),rowItem(row,config),rowDate(row),row.statusText,row.owner])]);
         const list=selectedRows.map(row=>row.no).join('、');
         state.selected.clear();state.infoModal={title:`${title}回执`,html:`<section class="task-receipt"><div class="task-receipt-row"><strong>处理范围</strong><span>${selectedRows.length} 条 · ${list}</span></div><div class="task-receipt-row"><strong>处理结果</strong><span>${result}</span></div><div class="task-receipt-row"><strong>边界</strong><span>${state.batchAction==='primary'?'每条记录仍按自身状态、权限和依赖条件独立提交；失败项不会被静默跳过。':'批量操作不会扩大数据授权或合并业务事实。'}</span></div></section>`};state.overlay='info';renderView();renderFloating();
       }
@@ -18489,16 +18600,27 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'attachment-name') { const id=target.dataset.id; state.attachmentExpanded.has(id)?state.attachmentExpanded.delete(id):state.attachmentExpanded.add(id); renderFloating(); }
       else if (action === 'attachment-refresh') { renderFloating(); toast('已刷新附件列表（本地交互演示）'); }
       else if (action === 'attachment-pick') document.querySelector('#attachment-input')?.click();
-      else if (action === 'attachment-preview') { const file = state.attachmentFiles.find(item=>item.id===target.dataset.id); toast(`${file?.name || '附件'}预览已打开（本地演示）`); }
+      else if (action === 'attachment-preview') {
+        const file=state.attachmentFiles.find(item=>item.id===target.dataset.id);if(!file)return;
+        pushBusinessContext();state.infoModal={title:file.name,returnContext:true,html:file.kind==='image'&&file.url?`<div class="attachment-full-preview"><img src="${file.url}" alt="${escapeHTML(file.name)}"/><div class="attachment-image-fallback" hidden><p>图片暂不可用</p>${file.validURL?`<button class="btn" data-action="attachment-image-retry" data-id="${file.id}">重新读取图片</button>`:''}</div></div>`:`<pre class="attachment-text-preview">${escapeHTML(file.previewText||`${file.name}\n${file.size}\n上传人：${file.uploader||'—'}`)}</pre>`};state.overlay='info';renderFloating();
+      }
+      else if(action==='attachment-image-retry'){const file=state.attachmentFiles.find(item=>item.id===target.dataset.id);if(file?.validURL){file.url=file.validURL;state.infoModal.html=`<div class="attachment-full-preview"><img src="${file.url}" alt="${escapeHTML(file.name)}"/></div>`;renderFloating();}}
       else if (action === 'attachment-set-primary') { state.attachmentPrimary = target.dataset.id; renderFloating(); toast('主图已更新'); }
       else if (action === 'attachment-remove') { const file = state.attachmentFiles.find(item=>item.id===target.dataset.id); if (file?.url) URL.revokeObjectURL(file.url); state.attachmentFiles = state.attachmentFiles.filter(item=>item.id!==target.dataset.id); state.attachmentExpanded.delete(target.dataset.id); if (state.attachmentPrimary===target.dataset.id) state.attachmentPrimary = state.attachmentFiles.find(item=>item.kind==='image')?.id || ''; renderFloating(); }
       else if (action === 'attachment-retry') { const file = state.attachmentFiles.find(item=>item.id===target.dataset.id); if (file) { file.status='pending'; file.progress=0; file.error=''; } renderFloating(); }
-      else if (action === 'attachment-upload') { state.attachmentFiles.filter(file=>['pending','failed'].includes(file.status)).forEach(file=>{ file.status='uploading'; file.progress=42; file.error=''; }); renderFloating(); setTimeout(()=>{ state.attachmentFiles.filter(file=>file.status==='uploading').forEach(file=>{ file.status='done'; file.progress=100; file.time='刚刚'; }); if(state.overlay==='attachments') renderFloating(); toast('附件已上传（本地交互演示）'); },650); }
+      else if (action === 'attachment-upload') {
+        const files=state.attachmentFiles,batch=files.filter(file=>['pending','failed'].includes(file.status));
+        batch.forEach(file=>{file.status='uploading';file.progress=42;file.error='';});renderFloating();
+        setTimeout(()=>{
+          batch.forEach(file=>{file.status='done';file.progress=100;file.time='刚刚';});
+          if(state.overlay==='attachments'&&state.attachmentFiles===files){renderFloating();toast('附件已上传（本地交互演示）');}
+        },650);
+      }
       else if (action === 'copy-value') { copyPrototypeValue(target.dataset.value || ''); const menu=target.closest('.task-copy-menu');if(menu){menu.open=false;menu.querySelector('summary')?.focus();} }
       else if (action === 'media-set-main') { state.productMediaPrimary=target.dataset.value||'正面图';if(state.page==='entity-form')renderView();renderFloating();toast(`${state.productMediaPrimary}已设为主图`); }
       else if (action === 'media-sort') { state.overlay='media-sort';renderFloating(); }
       else if (action === 'media-move') { const from=Number(target.dataset.index);const delta=target.dataset.value==='up'?-1:1;const to=Math.max(0,Math.min(state.productMediaOrder.length-1,from+delta));if(from!==to){const next=[...state.productMediaOrder];[next[from],next[to]]=[next[to],next[from]];state.productMediaOrder=next;renderFloating();} }
-      else if (action === 'refresh') toast('当前页面数据已刷新');
+      else if (action === 'refresh') { if(state.previewState==='stress'){startBoundaryRead(boundaryReadKey(),boundaryRead.mode==='ready');renderView();}else toast('当前页面数据已刷新'); }
       else if (action === 'open-detail') { const config = currentPageConfig(); const row = config?.rows.find(item=>item.id===target.dataset.id); if (row) { state.detailTab = 'basic'; state.drawer = {type:'detail',row,page:config.key}; renderFloating(); } }
       else if (action === 'open-selected') { const config = currentPageConfig(); const row = config?.rows.find(item=>state.selected.has(item.id)); if (row) { state.detailTab = 'basic'; state.drawer = {type:'detail',row,page:config.key}; renderFloating(); } }
       else if (action === 'detail-tab') { state.detailTab = target.dataset.value; renderFloating(); }
@@ -18727,7 +18849,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         if(['data','loading','switching','refreshing','empty','filtered','error','refresh-error'].includes(value)) applyMobilePreviewState(value);
         return;
       }
-      if (!['data','route-loading','loading','empty','error','forbidden','stress'].includes(value)) return;
+      if (!['data','route-loading','loading','empty','error','forbidden','stress','stress-slow','stress-error'].includes(value)) return;
       applyBusinessPreviewState(value);
       renderAll();
     });
@@ -18924,7 +19046,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function findVisualRecord(key,id) {return visualRecords.get(`${key}:${id}`)||visualBaseRows(key).find(row=>row.id===id);}
     function openLinkedRecord(key,record) {
       if(!record)return;rememberScroll();
-      if(state.overlay||state.drawer)state.floatingStack.push({overlay:state.overlay,drawer:state.drawer,infoModal:state.infoModal,detailTab:state.detailTab,actionContext:state.actionContext,returnFocus:document.activeElement?.dataset?{...document.activeElement.dataset}:null});
+      if(state.overlay||state.drawer)state.floatingStack.push({overlay:state.overlay,drawer:state.drawer,infoModal:state.infoModal,detailTab:state.detailTab,actionContext:state.actionContext,returnFocus:document.activeElement?.dataset?{...document.activeElement.dataset}:null,taskScroll:document.querySelector('.detail-modal-body, .drawer-body, .rm-flow-scroll')?.scrollTop});
       state.overlay=null;state.drawer={type:'detail',row:record,page:key};state.detailTab='basic';state.actionContext={page:key,recordId:record.id};renderFloating();
     }
     function closeLinkedDrawer() {
@@ -18933,7 +19055,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(previous){const {returnFocus:ignored,taskScroll:ignoredScroll,businessOperation:operation,...context}=previous;Object.assign(state,context);if(operation)businessOperation=operation;}
       else{state.drawer=null;state.overlay=null;state.taskStep=1;state.actionContext=null;}
       renderFloating();
-      if(previous?.taskScroll!==undefined){const body=document.querySelector('.drawer-body, .rm-flow-scroll');if(body)body.scrollTop=previous.taskScroll;}
+      if(previous?.taskScroll!==undefined){const body=document.querySelector('.detail-modal-body, .drawer-body, .rm-flow-scroll');if(body)body.scrollTop=previous.taskScroll;}
       if(returnFocus?.action){const trigger=[...document.querySelectorAll('#floating [data-action], .role-mobile-device [data-action]')].find(node=>Object.entries(returnFocus).every(([key,value])=>node.dataset[key]===value));trigger?.focus({preventScroll:true});}
     }
     function showProcessDetail(id,index,milestone) {
@@ -19000,7 +19122,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(action==='overview-open'){openLinkedRecord('production',findVisualRecord('production',target.dataset.id)?.record);return true;}
       if(action==='overview-process'){rememberEntity();state.moduleTabs['production-hub']='production-execution';restoreEntity('production-records');state.productionRouteOrder=target.dataset.value;state.productionRecordsView='route';renderAll();return true;}
       if(action==='route-open-order'){openLinkedRecord('production',listConfig.production.rows.find(row=>row.no===state.productionRouteOrder));return true;}
-      if(action==='open-linked-record'){const config=listConfig[target.dataset.page];openLinkedRecord(config.key,config.rows.find(row=>row.id===target.dataset.id));return true;}
+      if(action==='open-linked-record'){const config=listPreviewConfig(listConfig[target.dataset.page]);openLinkedRecord(config.key,config.rows.find(row=>row.id===target.dataset.id));return true;}
       if(action==='production-milestone-open'){showProcessDetail(target.dataset.id,0,target.dataset.value);return true;}
       if(action==='delivery-open'){openLinkedRecord('sales',findVisualRecord('sales',target.dataset.id)?.record);return true;}
       if(action==='arrival-open'){openLinkedRecord('purchase',findVisualRecord('purchase',target.dataset.id)?.record);return true;}

@@ -28,6 +28,7 @@ export function getUIDesignStateOptions(page) {
     ['data', '正常'], ['route-loading', '切页等待'], ['loading', '加载中'],
     ['empty', '空结果'], ['error', '读取失败'],
     ['forbidden', '无权限'], ['stress', '边界压力'],
+    ['stress-slow', '压力 · 读取较慢'], ['stress-error', '压力 · 读取失败'],
   ].map(([key, label]) => ({ key, label }))
 }
 

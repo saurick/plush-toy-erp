@@ -5,6 +5,7 @@ import { getContrastRatio } from './colorAssertions.mjs'
 import { createDevWorkCenterDesignScenarios } from './devWorkCenterDesignScenarios.mjs'
 import { createDevSharedComponentScenarios } from './devSharedComponentScenarios.mjs'
 import { createDevUIDesignPreviewScenarios } from './devUIDesignPreviewScenarios.mjs'
+import { createDevUIDesignPressureScenarios } from './devUIDesignPressureScenarios.mjs'
 import { createDevUIPageStateScenarios } from './devUIPageStateScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createSearchCompositionScenarios } from './searchCompositionScenarios.mjs'
@@ -21,6 +22,7 @@ export function createDevUIDesignDetailScenarios({
     ...createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevSharedComponentScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     ...createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
+    ...createDevUIDesignPressureScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevUIPageStateScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     {
       name: 'dev-ui-design-directory',
