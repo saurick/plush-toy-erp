@@ -6,7 +6,6 @@ import { RETENTION_STATES } from '../../../config/devRetention.mjs'
 import {
   createDeliveryIdempotencyKey,
   deliveryVersionActionKind,
-  formatDeliveryBytes,
   isDevInitialCustomerConfigActivationReady,
   shortGitSha,
 } from '../../../config/devDelivery.mjs'
@@ -40,29 +39,12 @@ export function buildVersionColumns({
             <Text type="secondary" code>{shortGitSha(record.gitSha)}</Text>
           </Space>
           <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
-            <summary>制品信息</summary>
-            <DevTimestamp
-              value={record.publishedAt}
-              action="发布于"
-              missing="发布时间未证明"
-              className="erp-dev-version-published-at"
-            />
-            <Text>总大小 {formatDeliveryBytes(record.artifactSummary.totalBytes)}</Text>
-            <Text type="secondary">
-              Server {formatDeliveryBytes(record.artifactSummary.serverImageBytes)}
-              {' · '}Web {formatDeliveryBytes(record.artifactSummary.webImageBytes)}
-            </Text>
-            <Text type="secondary">
-              BuildKit{' '}
-              {record.buildPerformance
-                ? `${(record.buildPerformance.cacheHitRateBasisPoints / 100).toFixed(1)}% 命中`
-                : '命中率未证明'}
-            </Text>
+            <summary>保留与可用性说明</summary>
             <Text type="secondary">
               {record.retention?.state === 'cleaned' ? '制品文件已清理，版本和部署记录保留' : record.completeAssets
                 ? record.assets.includes('release-rehearsal.json')
-                  ? 'v2 · 7 项制品'
-                  : 'v1 · 6 项制品'
+                  ? '制品齐全；部署仍需通过目标预检与演练核验'
+                  : '历史制品仅用于回滚'
                 : '制品不完整'}
             </Text>
             {record.retention?.reasons?.map((reason) => <Text key={reason}>{reason}</Text>)}

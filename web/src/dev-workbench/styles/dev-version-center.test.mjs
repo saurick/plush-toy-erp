@@ -65,13 +65,10 @@ test('CI/CD timing separates event timestamps from default and deep detail level
   assert.match(css, /[.]erp-dev-timing-bars__meta/u)
 })
 
-test('version rows expose one complete published timestamp without changing version identity', () => {
-  assert.match(versionPage, /erp-dev-version-published-at/u)
-  assert.match(versionPage, /发布于/u)
-  assert.match(
-    versionPage,
-    /<DevTimestamp[\s\S]*value=\{record[.]publishedAt\}[\s\S]*action="发布于"/u
-  )
+test('version rows keep retention decisions and link the immutable version to native detail', () => {
+  assert.match(versionPage, /保留与可用性说明/u)
+  assert.match(versionPage, /href=\{record.url\} target="_blank"/u)
+  assert.match(versionPage, /shortGitSha\(record.gitSha\)/u)
 })
 
 test('version center exposes source-backed decision timestamps at every operation level', () => {
@@ -115,8 +112,8 @@ test('version decisions and target evidence remain source-backed', () => {
     /erp-dev-version-target-selector__boundaries/u
   )
   assert.match(component, /构建缓存与制品/u)
-  assert.match(versionPage, /v2 · 7 项制品/u)
-  assert.match(versionPage, /v1 · 6 项制品/u)
+  assert.match(versionPage, /制品齐全；部署仍需通过目标预检与演练核验/u)
+  assert.match(versionPage, /历史制品仅用于回滚/u)
   assert.match(versionPage, /record\.completeAssets\s*\? record\.promotionEligible\s*\? '保留中 · 制品齐全'\s*: record\.assets\.includes\('release-rehearsal\.json'\)\s*\? '演练证据待补齐'\s*: '仅可回滚'/u)
   assert.match(versionPage, /RETENTION_STATES\[record\.retention\.state\]\.label/u)
   assert.match(versionPage, /制品文件已清理，版本和部署记录保留/u)

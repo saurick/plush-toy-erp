@@ -146,7 +146,7 @@ Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标�
 
 仓库不保留 GitHub Actions workflow、发布 publisher 或 strict 复用 writer；adapter 的发布方法在调用 `gh` 前固定拒绝。恢复 GitHub 写路径必须重新专项评审 canonical v2 七资产、同一演练回执、Provider 并发与凭据边界。浏览器不知道 token，也不能选择 Provider。
 
-GitLab Jobs API 的 job `duration` 和 `queued_duration` 是运行与等待真源。工作台读取当前流水线与最近 20 次 push / 手动完整 CI 的全部 job，同名重试保留最新 attempt；工作台只显示摘要与原生报告入口，详细性能、排队和趋势跳转 GitLab，不另存一份 CI 历史库。
+GitLab Jobs API 是 Job 运行事实真源。质量门禁只为当前提交读取完整 Pipeline / Job，核对全部必要分片、聚合、零跳过与 CI Gate，同名重试取最新 attempt。最近 20 条 main 流水线仅从列表接口读取编号、SHA、原生结果和链接，不抓取历史 Job；历史“成功”不等于已证明完整门禁。原生测试报告复用同次选中的 Pipeline / Job，并发页面请求共用一次读取；历史列表或报告失败单独提示，不覆盖已取得的当前 CI 证据。详细性能、排队、依赖和趋势跳转 GitLab，不另存 CI 历史库。
 
 目标部署与回滚通过原有执行器登记 GitLab Environments / Deployments，三环境名称和 tier 从 target registry 派生。项目 operation / receipt 是执行事实，GitLab 原生状态是自动投影；本地仅新增可恢复的远端引用缓存，不建第二套 CI 库。工作台“操作记录”提供同环境汇总、原始时间、项目检查、GitLab 跳转和仅登记的补录入口；已有迁移、回滚、数据库重建、准备与显式执行保持原合同。历史补录、状态映射、未知创建结果、归档与凭据详见 [部署登记协议](../../scripts/deploy/README.md#gitlab-部署登记与回执归档)。
 
@@ -864,14 +864,14 @@ Go、Web、T0–T8、PostgreSQL、浏览器、readiness、目标与 UAT 分开�
 
 1. 当前提交的 CI、JUnit 报告与覆盖率从 GitLab 读取；首屏保留 SHA、通过/失败、总耗时、首个失败、测试计数及 Web/Go 分类覆盖率。完整 DAG、Job 性能、排队、原始日志直接跳转同一 Pipeline / Job。
 2. 测试报告未产生、解析失败、读取失败与覆盖率制品过期分别提示；不补造历史报告、不用本机结果或旧 SHA 替代当前证据。JUnit 是同次执行的展示投影，不替代 exact SHA、零 skip、完整分片与清理门禁。
-3. GitLab 链接在新标签打开，绑定实际 Pipeline、Job、Release、环境或部署记录，保留工作台当前筛选与记录位置。历史 CI 保留简短结果、SHA 和链接；部署、备份、迁移与恢复仍保留项目专有步骤和回执。
+3. GitLab 链接在新标签打开，绑定实际 Pipeline、Job、Release、环境或部署记录，保留工作台当前筛选与记录位置。历史流水线保留简短原生结果、SHA 和链接，并提供全部历史入口；单条部署优先跳登记的回执 Package，环境链接明确标为“环境部署列表”，不把环境总览冒充某次部署详情。部署、备份、迁移与恢复仍保留项目专有步骤和回执。
 4. “服务器验证”明确区分 GitLab Runner 测试与 demo / test / erp 部署验证。本地工作区与独立执行端的专项和历史报告各自标明来源，不互相复制或混算。独立服务禁止新建通用 full / strict 和覆盖基线，开发机 Vite 保留本地诊断，历史查询、取消及项目专有操作不删除。
 
 只有干净当前 SHA 的合格 GitLab 完整 CI 才令 `releaseEligible=true`。门禁目录保留项目检查职责，`scripts/qa/ci-job-guide.mjs` 仍作固定职责解释；CI 事实以 GitLab 为准。
 
 #### 项目说明与本机诊断
 
-项目“流程与原理”说明继续提供触发、门禁、并行、发布与故障排查合同，并关联当前提交和 Job。运行时间轴、依赖图和完整 Job 明细跳转 GitLab；本地诊断仍以本机正式回执为依据。
+项目“流程与原理”说明继续提供触发、门禁、并行、发布与故障排查合同，并关联当前提交和 Job。单个 Job 保留本次简短结果、检查目的、包含检查、结果用途、环境要求和排障来源；运行时间、排队、重试、依赖与日志由对应 GitLab Job / Pipeline 展示。退役的 CI 子视图参数、性能／依赖图／历史展示及其计算不再维护；本地诊断仍以本机正式回执为依据。
 
 本机诊断统一使用范围选择器与一个运行按钮，所选 `profile` 同步预览轨道和 URL；只接受 `full / strict + idempotencyKey`。显式 loopback 数据库 base 可用，否则从本机固定 `postgres:18.6` 创建专用容器、随机凭据与动态 loopback 端口；浏览器不传 DSN、凭据、镜像、命令或路径，不清理外部容器。正式回执与数据库、容器、进程组零残留都读回才可通过。
 
@@ -1142,7 +1142,7 @@ Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定�
 - 命令行发布入口为 `scripts/deploy/gitlab-release-cli.mjs`，复用同一 Delivery Service 与 operation store；默认计划不读凭据、不触网，显式执行才按当前 clean SHA、完整 CI 与版本目录发起流水线。
 
   CLI 从独立 Keychain / 受控文件读取带到期日的项目发布身份，不把只读 token 当作写凭据，不调整既有 CI 机器人的权限；命令及凭据来源见 [部署脚本](../../scripts/deploy/README.md#命令行发起-gitlab-发布)。此入口只发布制品，目标提升仍独立执行。
-- 版本列表不改写不可变版本号；GitLab adapter 提供带时区的 `publishedAt`，每行在版本号和 short SHA 下显示本地完整日期时间，并用 HTML `time/dateTime` 保留原始值。
+- 版本列表保留不可变版本号、short SHA、当前运行、制品可用性、保留／清理／保护说明和操作资格。版本名精确跳对应 Release，发布时间、文件大小、镜像大小与构建缓存等原始元数据在 GitLab 查看；保留状态与清理时间仍在工作台展示。GitLab adapter 继续核验 `publishedAt`、制品完整性、演练证明与镜像身份，不因显示精简而省略校验。
 
   Provider 拒绝缺失或非法发布时间，前端摘要合同进一步拒绝无时区值；比 133 当前 manifest 新的版本只允许准备部署，旧版本只允许检查回滚，当前 manifest、migration 序列或客户配置源指纹不能证明时按钮禁用并说明原因。
 

@@ -15,7 +15,6 @@ import {
   GITLAB_DELIVERY_PACKAGE,
   GITLAB_LEGACY_RELEASE_ASSETS,
   GITLAB_DELIVERY_PROJECT,
-  GITLAB_PIPELINE_TOPOLOGY_CONTRACT,
   GITLAB_RELEASE_ASSETS,
   GITLAB_SOURCE_PACKAGE,
   createGitlabDeliveryProvider,
@@ -490,64 +489,6 @@ test("GitLab provider normalizes pipeline and job timings", async () => {
   );
 });
 
-test("GitLab provider reads exact-SHA CI needs without copying the DAG", async () => {
-  let topologyUrl;
-  const provider = createGitlabDeliveryProvider({
-    projectRoot: process.cwd(),
-    env: { PLUSH_GITLAB_TOKEN: TOKEN },
-    request: async (url) => {
-      topologyUrl = new URL(url);
-      return json({
-        valid: true,
-        jobs: [
-          { name: "plan", stage: "plan", needs: null },
-          {
-            name: "prepare",
-            stage: "prepare",
-            needs: [{ name: "plan", optional: false, artifacts: true }],
-          },
-          {
-            name: "quality_node_core",
-            stage: "quality",
-            needs: ["plan", { name: "prepare" }],
-          },
-          {
-            name: "CI Gate",
-            stage: "gate",
-            needs: [
-              { name: "quality_node_core" },
-              { name: "quality_affected", optional: true },
-            ],
-          },
-        ],
-      });
-    },
-  });
-
-  const topology = await provider.readPipelineTopology({ sha: SHA });
-
-  assert.equal(topology.schemaVersion, GITLAB_PIPELINE_TOPOLOGY_CONTRACT);
-  assert.equal(topology.gitSha, SHA);
-  assert.deepEqual(topology.jobs, [
-    { name: "plan", stage: "plan", needs: [] },
-    { name: "prepare", stage: "prepare", needs: ["plan"] },
-    {
-      name: "quality_node_core",
-      stage: "quality",
-      needs: ["plan", "prepare"],
-    },
-    { name: "CI Gate", stage: "gate", needs: ["quality_node_core"] },
-  ]);
-  assert.equal(topologyUrl.pathname.endsWith("/ci/lint"), true);
-  assert.equal(topologyUrl.searchParams.get("content_ref"), SHA);
-  assert.equal(topologyUrl.searchParams.get("dry_run"), "false");
-  assert.equal(topologyUrl.searchParams.get("dry_run_ref"), "main");
-  assert.equal(topologyUrl.searchParams.get("include_jobs"), "true");
-  await assert.rejects(
-    provider.readPipelineTopology({ sha: "not-a-sha" }),
-    /topology query is invalid/u,
-  );
-});
 
 test("GitLab provider dispatches only the exact current main SHA", async () => {
   let dispatchOptions;
@@ -985,4 +926,51 @@ test("GitLab native reports bind counts, coverage and deep links to the exact pi
     provider.readPipelineReports({ pipelineId: 91, sha: SHA }),
     /mismatch/u,
   );
+});
+
+
+test("GitLab history reads one bounded native list without fetching historical jobs", async () => {
+  const calls = [];
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(), env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      calls.push(url);
+      assert.match(url, /\/pipelines\?ref=main&order_by=id&sort=desc&per_page=20$/u);
+      return json(Array.from({ length: 20 }, (_, index) => ({
+        id: 100 - index, sha: SHA, status: index === 0 ? "running" : "success",
+        web_url: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/pipelines/${100 - index}`,
+      })));
+    },
+  });
+  const history = await provider.listPipelineHistory();
+  assert.equal(calls.length, 1);
+  assert.equal(history.length, 20);
+  assert.equal(history[0].status, "in_progress");
+  assert.equal(history[1].conclusion, "success");
+  assert(history.every((run) => !("jobs" in run)));
+  await assert.rejects(provider.listPipelineHistory({ limit: 21 }), /limit/u);
+});
+
+test("GitLab reports reuse the selected observed pipeline and reject identity drift", async () => {
+  const calls = [];
+  const pipeline = {
+    id: 91, gitSha: SHA,
+    url: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/pipelines/91`,
+    jobs: [{ id: 301, name: "quality_web_checks", coverage: 81.25, hasArtifacts: true,
+      url: `${GITLAB_DELIVERY_BASE_URL}/${GITLAB_DELIVERY_PROJECT}/-/jobs/301` }],
+  };
+  const provider = createGitlabDeliveryProvider({
+    projectRoot: process.cwd(), env: { PLUSH_GITLAB_TOKEN: TOKEN },
+    request: async (url) => {
+      calls.push(url);
+      assert.match(url, /\/pipelines\/91\/test_report_summary$/u);
+      return json({ total: { count: 1, success: 1, failed: 0, skipped: 0, error: 0 } });
+    },
+  });
+  const reports = await provider.readPipelineReports({ pipelineId: 91, sha: SHA, pipeline });
+  assert.equal(calls.length, 1);
+  assert.equal(reports.coverage[0].percent, 81.25);
+  for (const changed of [{ ...pipeline, id: 92 }, { ...pipeline, gitSha: "b".repeat(40) }]) {
+    await assert.rejects(provider.readPipelineReports({ pipelineId: 91, sha: SHA, pipeline: changed }), /mismatch/u);
+  }
 });

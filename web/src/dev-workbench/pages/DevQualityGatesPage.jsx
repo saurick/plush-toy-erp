@@ -10,7 +10,6 @@ import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
 import {
-  DEFAULT_SERVER_VIEW,
   DEFAULT_VIEW,
   DEV_QUALITY_GATE_ACTIVE_STATUSES,
   DEV_QUALITY_GATE_GOVERNANCE_FILTERS,
@@ -49,7 +48,7 @@ const { Title } = Typography
 const POLL_INTERVAL_MS = 1500
 
 const EMPTY_VIEW_STATE = Object.freeze({
-  server: Object.freeze({ serverView: DEFAULT_SERVER_VIEW }),
+  server: Object.freeze({}),
   run: Object.freeze({ profile: '', operation: '' }),
   governance: Object.freeze({ q: '', filter: 'relevant' }),
   gaps: Object.freeze({ range: 'current', risk: 'all' }),
@@ -466,10 +465,6 @@ export default function DevQualityGatesPage() {
               {parsed.valid && activeView === 'server' ? (
                 <ServerCiEvidencePanel
                   summary={summary}
-                  serverView={parsed.values.serverView}
-                  onServerViewChange={(serverView) =>
-                    updateViewValues({ serverView })
-                  }
                 />
               ) : null}
               {parsed.valid && activeView === 'run' ? (
