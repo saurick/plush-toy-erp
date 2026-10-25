@@ -7,6 +7,7 @@ import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
 import { BUSINESS_STATUS_OPTIONS } from '../../erp/config/workflowStatus.mjs'
 import { buildDevBusinessChainCatalog } from './devBusinessChainCatalog.mjs'
 import { buildDevFactLedgerCatalog } from './devFactLedgerCatalog.mjs'
+import { getDevFlowActionRules, DEV_FLOW_MASTER_LIFECYCLE_RULES } from './devFlowActionRules.mjs'
 
 export const DEV_FLOW_STATE_ROUTE = DEV_STATUS_FLOWS_ROUTE
 const STATUS_BOUNDARY_DOC = 'docs/architecture/状态工作流事实边界.md'
@@ -100,7 +101,7 @@ export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
   'master.lifecycle': Object.freeze({
     kind: 'markdown_inline_set',
     path: STATUS_INDEX_DOC,
-    marker: 'other objects: object-specific',
+    marker: 'activation vocabulary:',
   }),
   'workflow.task': entCheckContract(
     'server/internal/data/model/schema/workflow_task.go',
@@ -704,6 +705,8 @@ function normalizeFlow(definition) {
     transitionAuthority,
     terminalPolicy,
     dimensions: normalizeRuleDimensions(definition.key),
+    actionRules: getDevFlowActionRules(definition),
+    lifecycleRules: definition.key === 'master.lifecycle' ? DEV_FLOW_MASTER_LIFECYCLE_RULES : Object.freeze([]),
     linearLifecycle: definition.linearLifecycle !== false,
     initialStates: freezeStrings(initialStates),
     terminalStates: freezeStrings(terminalStates),
@@ -1205,7 +1208,7 @@ const FLOW_DEFINITIONS = [
     key: 'source.order_item',
     scopeKey: 'source_document',
     kind: 'taxonomy',
-    label: '销售 / 采购订单行',
+    label: '销售 / 采购 / 委外订单行',
     summary: '订单行共享开放、关闭、取消词汇，但不存在跨源单的通用迁移器。',
     states: [
       state('open', '开放'),
@@ -1222,6 +1225,7 @@ const FLOW_DEFINITIONS = [
     sourceRefs: [
       'server/internal/core/status/sales_order.go',
       'server/internal/core/status/purchase_order.go',
+      'server/internal/biz/outsourcing_order.go',
     ],
     evidence: [
       ...sourceDocumentEvidence,
@@ -1301,19 +1305,18 @@ const FLOW_DEFINITIONS = [
     key: 'master.lifecycle',
     scopeKey: 'masterdata_lifecycle',
     kind: 'taxonomy',
-    label: '通用主数据生命周期词汇',
-    summary: '启用、停用、归档只是跨对象词汇，不构成统一状态机。',
+    label: '主数据启停规则',
+    summary: '材料、产品、客户、供应商与仓库按各自后端规则启停；BOM 归档见 BOM 版本规则。',
     states: [
       state('active', '启用'),
       state('inactive', '停用'),
-      state('archived', '归档'),
     ],
     initialStates: [],
     terminalStates: [],
     transitions: [],
     transitionAuthority: 'object-specific',
     linearLifecycle: false,
-    guard: '每个主数据对象使用自己的 usecase 和引用门禁，目录只读。',
+    guard: '启停保留历史引用；仓库另查库存与默认仓依赖。下表说明现有规则，不提供启停操作。',
     factBoundary: 'master_data_only',
     sourceRefs: [STATUS_INDEX_DOC],
     evidence: [

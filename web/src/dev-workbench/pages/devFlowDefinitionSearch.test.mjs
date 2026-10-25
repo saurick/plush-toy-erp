@@ -92,6 +92,18 @@ const catalog = {
   ],
 }
 
+test('规则内容可通过定义搜索和对象选择器找到，结果归属准确', () => {
+  const search = (query) => buildDevFlowDefinitionSearchGroups(DEV_FLOW_STATE_CATALOG, query)
+  const allResults = (query) => search(query).flatMap((group) => group.items)
+  const filter = createDevFlowDefinitionOptionFilter(DEV_FLOW_STATE_CATALOG, 'stateOptions')
+  assert.equal(filter('退回责任池', { value: 'workflow.task' }), true)
+  assert.equal(filter('退回责任池', { value: 'fact.shipment' }), false)
+  assert.equal(filter('默认仓引用', { value: 'master.lifecycle' }), true)
+  assert.equal(filter('关联退款', { value: 'fact.finance_payment' }), true)
+  assert(allResults('退回责任池').some((item) => item.key === 'workflow.task'))
+  assert(allResults('默认仓引用').some((item) => item.key === 'master.lifecycle'))
+})
+
 function group(groups, key) {
   return groups.find((item) => item.key === key)?.items || []
 }

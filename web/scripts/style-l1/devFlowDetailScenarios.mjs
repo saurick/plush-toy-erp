@@ -234,9 +234,87 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await expect(details.getByRole('heading', { name: '领域副作用与补偿', exact: true })).toBeVisible()
       await visit('master.lifecycle')
       await expect(details.getByText('当前筛选没有登记的转换', { exact: true })).toHaveCount(0)
-      await expect(details.getByText('以上为独立状态分类，不表示办理先后。', { exact: true })).toBeVisible()
+      await expect(details.getByRole('heading', { name: '逐对象启停规则', exact: true })).toBeVisible()
+      await expect(details.locator('[data-master-lifecycle-rules] tbody tr.ant-table-row')).toHaveCount(5)
       await page.setViewportSize({ width: 1024, height: 768 })
       await assertNoHorizontalOverflow(page, '状态分类与规则窄窗口')
+    },
+  }, {
+    name: 'dev-flow-action-rules-desktop-light',
+    path: '/__dev/status-flows?view=states&flow=workflow.task',
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    auth: 'admin',
+    mockAdminRpc: true,
+    verify: async (page) => {
+      const calls = []
+      page.on('request', (request) => {
+        if (request.method() === 'POST' && request.url().includes('jsonrpc')) calls.push(request.postDataJSON()?.method)
+      })
+      const detail = page.locator('[data-selected-flow]')
+      const rules = detail.locator('[data-action-rules]')
+      const select = page.getByRole('combobox', { name: '选择状态对象', exact: true })
+      const choose = async (label) => {
+        const { key } = catalog.flows.find((flow) => flow.label === label)
+        await select.fill(label)
+        await page.getByRole('option').filter({ has: page.getByText(key, { exact: true }) }).click()
+        await expect(detail.getByRole('heading', { name: label, exact: true })).toBeVisible()
+      }
+      await expect(rules.locator('tbody tr.ant-table-row')).toHaveCount(2)
+      await expect(rules.getByText('指定或改派办理人', { exact: true })).toBeVisible()
+      await expect(rules.getByText('退回责任池', { exact: true })).toBeVisible()
+      await rules.locator('summary').first().click()
+      await expect(rules.locator('tbody tr.ant-table-row').first().getByText('workflow.task.assign', { exact: true })).toBeVisible()
+      for (const cell of await rules.locator('tbody tr.ant-table-row').first().locator('td').all()) {
+        await expect(cell).toHaveCSS('vertical-align', 'top')
+      }
+      await rules.scrollIntoViewIfNeeded()
+      await page.screenshot({ path: path.join(outputDir, 'action-rules-assignment.png') })
+
+      await choose('出货单')
+      await expect(rules.locator('tbody tr.ant-table-row')).toHaveCount(2)
+      await expect(rules.getByText(/没有有效成品质检时可继续/u)).toBeVisible()
+      await expect(rules.getByText('退回责任池', { exact: true })).toHaveCount(0)
+      await rules.scrollIntoViewIfNeeded()
+      await assertNoHorizontalOverflow(page, '出货办理条件')
+      await page.screenshot({ path: path.join(outputDir, 'action-rules-shipment.png') })
+
+      for (const key of ['source.sales_order', 'source.purchase_order', 'source.outsourcing_order', 'source.production_order', 'fact.purchase_receipt', 'fact.production', 'fact.outsourcing', 'fact.finance', 'fact.finance_payment', 'source.production_exception_execution']) {
+        const flow = catalog.flows.find((item) => item.key === key)
+        await choose(flow.label)
+        await expect(rules.locator('tbody tr.ant-table-row')).toHaveCount(flow.actionRules.length)
+        await expect(rules.getByText(flow.actionRules[0].blocked, { exact: false })).toBeVisible()
+      }
+
+      await page.getByRole('button', { name: '搜索定义', exact: true }).click()
+      const search = page.getByRole('dialog', { name: '搜索定义', exact: true })
+      await search.getByPlaceholder('例如：销售订单、销售 PMC、已提交').fill('默认仓引用')
+      await search.getByPlaceholder('例如：销售订单、销售 PMC、已提交').press('Enter')
+      await search.getByRole('button').filter({ hasText: 'master.lifecycle' }).click()
+      const master = detail.locator('[data-master-lifecycle-rules]')
+      await expect(master.locator('tbody tr.ant-table-row')).toHaveCount(5)
+      await expect(rules).toHaveCount(0)
+      await expect(detail.locator('[data-business-flow]')).toHaveCount(0)
+      await expect(detail.getByRole('combobox', { name: '聚焦状态', exact: true })).toHaveCount(0)
+      await master.getByText('仓库', { exact: true }).scrollIntoViewIfNeeded()
+      await expect(master.getByText(/停用时仍有正数库存或材料默认仓引用/u)).toBeVisible()
+      await master.locator('tbody tr.ant-table-row').last().locator('summary').click()
+      await expect(master.getByText('update_warehouse', { exact: true })).toBeVisible()
+      for (const cell of await master.locator('tbody tr.ant-table-row').last().locator('td').all()) {
+        await expect(cell).toHaveCSS('vertical-align', 'top')
+      }
+      await page.screenshot({ path: path.join(outputDir, 'action-rules-master-lifecycle.png') })
+      for (const width of [1440, 1024]) {
+        await page.setViewportSize({ width, height: 900 })
+        await assertNoHorizontalOverflow(page, `主数据规则 ${width}px`)
+        const metrics = await master.locator('.ant-table-content').evaluate((element) => ({ width: element.clientWidth, scrollWidth: element.scrollWidth, overflowX: getComputedStyle(element).overflowX }))
+        assert(metrics.width > 0 && (metrics.scrollWidth <= metrics.width + 1 || ['auto', 'scroll'].includes(metrics.overflowX)), '宽表在局部容器内滚动')
+      }
+      await choose('销售订单')
+      await expect(master).toHaveCount(0)
+      await expect(rules.getByText('正常关单或短结', { exact: true })).toBeVisible()
+      const mutations = calls.filter((method) => /^(?:reassign|set|update|create|delete|post|cancel|close|execute|reverse|approve|reject|submit)_/u.test(method || ''))
+      assert.deepEqual(mutations, [], '规则查阅、搜索和对象切换不调用业务写接口')
     },
   }, {
     name: 'dev-flow-details-design-preview',
@@ -255,6 +333,8 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       await expect(complete).not.toHaveAttribute('open')
       await complete.locator('summary').click()
       await expect(complete.locator('li')).toHaveCount(3)
+      await expect(stateRules.getByRole('table', { name: '办理条件与影响样例', exact: true })).toBeVisible()
+      await expect(stateRules.getByRole('table', { name: '逐对象启停规则样例', exact: true })).toBeVisible()
       await expect(rules.getByText('事实定义 · 采购入库', { exact: true })).toBeVisible()
       await preview.getByRole('tab', { name: '实例跟踪', exact: true }).click()
       await preview.getByRole('button', { name: '定位', exact: true }).click()

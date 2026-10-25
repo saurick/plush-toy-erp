@@ -9,6 +9,8 @@ import {
   listCustomerPackageKeys,
 } from '../../../../config/customers/index.mjs'
 import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
+import { DEV_FLOW_ACTION_RULES, getDevFlowActionRules } from './devFlowActionRules.mjs'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   DEV_FLOW_PATH_KINDS,
   DEV_FLOW_PATH_KIND_REGISTRY,
@@ -1021,6 +1023,64 @@ test('devFlowStateCatalog: 所有 sourceRefs 与 evidence 路径真实存在', (
       `missing source ref: ${ref}`
     )
   }
+})
+
+test('devFlowStateCatalog: 动作规则不能脱离真实对象、权限与合法状态', () => {
+  const { flows } = DEV_FLOW_STATE_CATALOG
+  const knownPermissions = new Set(Object.values(PermissionCode))
+  for (const key of Object.keys(DEV_FLOW_ACTION_RULES)) {
+    assert(flows.some((flow) => flow.key === key), `unknown action owner ${key}`)
+  }
+  for (const flow of flows) {
+    assert.equal(new Set(flow.actionRules.map((rule) => rule.key)).size, flow.actionRules.length)
+    for (const rule of flow.actionRules) {
+      assert(Object.isFrozen(rule))
+      assert(rule.sourceRefs.some((path) => path.startsWith('server/internal/')))
+      for (const permission of rule.permission) assert(knownPermissions.has(permission))
+      for (const state of rule.states) assert(flow.states.some((item) => item.key === state))
+      for (const field of ['authority', 'condition', 'blocked', 'effect', 'recovery']) assert(rule[field].trim())
+    }
+    if (/^source\.(sales_order|purchase_order|outsourcing_order|production_order)$/u.test(flow.key)) {
+      for (const action of ['close', 'cancel']) {
+        const rule = flow.actionRules.find((item) => item.key === action)
+        const allowed = flow.transitions.filter((edge) => edge.action.startsWith(`${action}_`)).map((edge) => edge.from)
+        assert.deepEqual([...rule.states].sort(), [...new Set(allowed)].sort(), `${flow.key} ${action} must agree with canonical transitions`)
+      }
+    }
+  }
+  const task = flows.find((flow) => flow.key === 'workflow.task')
+  for (const rule of task.actionRules) {
+    assert.deepEqual([...rule.states].sort(), task.states.filter((state) => !task.terminalStates.includes(state.key)).map((state) => state.key).sort())
+    assert.deepEqual(rule.permission, [PermissionCode.WORKFLOW_TASK_ASSIGN])
+  }
+  assert.throws(() => getDevFlowActionRules({ ...task, states: [] }), /unknown states/u)
+})
+
+test('devFlowStateCatalog: 主数据启停逐项绑定布尔字段和后端实际入口', () => {
+  const master = DEV_FLOW_STATE_CATALOG.flows.find((flow) => flow.key === 'master.lifecycle')
+  assert.deepEqual(master.transitions, [])
+  assert.deepEqual(master.states.map((state) => state.key), ['active', 'inactive'])
+  assert.deepEqual(master.lifecycleRules.map((rule) => rule.key).sort(), ['customer', 'material', 'product', 'supplier', 'warehouse'])
+  for (const rule of master.lifecycleRules) {
+    const schema = readFileSync(resolve(repoRoot, `server/internal/data/model/schema/${rule.key}.go`), 'utf8')
+    assert.match(schema, /field\.Bool\("is_active"\)/u)
+    assert.deepEqual(rule.states, [true, false])
+    const servicePath = rule.sourceRefs.find((path) => path.startsWith('server/internal/service/'))
+    const service = readFileSync(resolve(repoRoot, servicePath), 'utf8')
+    assert(service.includes(`"${rule.action}"`), `${rule.key} action must exist in its handler`)
+    const permissionConstant = Object.entries(PermissionCode).find(([, value]) => value === rule.permission[0])[0]
+    const goPermission = `Permission${permissionConstant.toLowerCase().split('_').map((word) => word[0].toUpperCase() + word.slice(1)).join('')}`
+    const actionCase = rule.key === 'warehouse' ? service : service.split(`case "${rule.action}":`)[1].split('default:')[0]
+    assert(actionCase.includes(goPermission), `${rule.key} permission must match the actual action`)
+    assert(rule.effect && rule.recovery && rule.blocked)
+  }
+})
+
+test('devFlowStateCatalog: 分页说明不退回接口尚未实现的旧边界', () => {
+  const doc = readFileSync(resolve(repoRoot, 'docs/architecture/业务链与运行轨迹边界.md'), 'utf8')
+  assert.doesNotMatch(doc, /继续翻页的 cursor(?: 合同)?尚未实现/u)
+  assert.match(doc, /before_event_id/u)
+  assert.match(doc, /消费者.*最近记录/u)
 })
 
 test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', () => {

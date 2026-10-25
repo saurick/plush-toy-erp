@@ -20,6 +20,7 @@ import {
   KeyValue,
 } from './FlowStateShared.jsx'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
+import { FlowActionRules, MasterLifecycleRules } from './FlowRuleTables.jsx'
 import { createDevFlowDefinitionOptionFilter } from '../../pages/devFlowDefinitionSearch.mjs'
 import { buildStateDefinitionSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
 import {
@@ -381,22 +382,28 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView }) {
             <BusinessFlowDiagram flow={graph} label={`${flow.label}状态转换图`} selectedKey={state?.key} onSelect={(key) => onSelectState(key === state?.key ? null : key)} />
           ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />}
         </>
-      ) : <WorkbenchFacts items={flow.states.map((item) => ({ label: item.label, value: item.summary || '独立状态维度，不表示办理先后' }))} />}
-      <div className="erp-dev-flow-inline-note">
-        <label htmlFor="dev-flow-state-focus">聚焦状态</label>
-        <Select id="dev-flow-state-focus" aria-label="聚焦状态" allowClear placeholder="在图中点选或选择状态" value={state?.key} options={flow.states.map((item) => ({ value: item.key, label: item.label }))} onChange={(key) => onSelectState(key || null)} />
-      </div>
-      {state ? (
-        <section className="erp-dev-flow-selected-state" aria-live="polite">
-          <div><h3>{state.label}</h3><Text type="secondary">{selectedStateSummary?.positionLabel}</Text></div>
-          <div className="erp-dev-flow-selected-state__meaning"><p>{state.summary || (flow.transitions.length > 0 ? '查看下面允许进入和离开的转换。' : flow.guard)}</p></div>
-          {flow.transitions.length > 0 ? (
-            <section className="erp-dev-flow-transitions" aria-label="当前状态的转换条件">
-              {renderTransitions(focusedTransitions)}
+      ) : flow.lifecycleRules.length === 0 ? <WorkbenchFacts items={flow.states.map((item) => ({ label: item.label, value: item.summary || '独立状态维度，不表示办理先后' }))} /> : null}
+      {flow.lifecycleRules.length === 0 ? (
+        <>
+          <div className="erp-dev-flow-inline-note">
+            <label htmlFor="dev-flow-state-focus">聚焦状态</label>
+            <Select id="dev-flow-state-focus" aria-label="聚焦状态" allowClear placeholder="在图中点选或选择状态" value={state?.key} options={flow.states.map((item) => ({ value: item.key, label: item.label }))} onChange={(key) => onSelectState(key || null)} />
+          </div>
+          {state ? (
+            <section className="erp-dev-flow-selected-state" aria-live="polite">
+              <div><h3>{state.label}</h3><Text type="secondary">{selectedStateSummary?.positionLabel}</Text></div>
+              <div className="erp-dev-flow-selected-state__meaning"><p>{state.summary || (flow.transitions.length > 0 ? '查看下面允许进入和离开的转换。' : flow.guard)}</p></div>
+              {flow.transitions.length > 0 ? (
+                <section className="erp-dev-flow-transitions" aria-label="当前状态的转换条件">
+                  {renderTransitions(focusedTransitions)}
+                </section>
+              ) : null}
             </section>
-          ) : null}
-        </section>
-      ) : <Text type="secondary">{flow.transitions.length > 0 ? '点选状态，查看进入、离开条件和转换结果。' : '以上为独立状态分类，不表示办理先后。'}</Text>}
+          ) : <Text type="secondary">{flow.transitions.length > 0 ? '点选状态，查看进入、离开条件和转换结果。' : '以上为独立状态分类，不表示办理先后。'}</Text>}
+        </>
+      ) : null}
+      <FlowActionRules flow={flow} />
+      <MasterLifecycleRules flow={flow} />
       {flow.dimensions.length > 0 ? (
         <section aria-label="关联状态与结果" className="erp-dev-flow-rule-dimensions">
           {flow.dimensions.map((dimension) => (
@@ -417,7 +424,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView }) {
       ) : null}
       <EvidenceDisclosure
         value={{
-          sourceRefs: [...asArray(flow.sourceRefs), ...flow.dimensions.map((item) => item.contractRef.path), ...asArray(state?.sourceRefs), ...visibleTransitions.flatMap((item) => asArray(item.sourceRefs))],
+          sourceRefs: [...asArray(flow.sourceRefs), ...flow.actionRules.flatMap((item) => item.sourceRefs), ...flow.lifecycleRules.flatMap((item) => item.sourceRefs), ...flow.dimensions.map((item) => item.contractRef.path), ...asArray(state?.sourceRefs), ...visibleTransitions.flatMap((item) => asArray(item.sourceRefs))],
           evidence: [...asArray(flow.evidence), ...asArray(state?.evidence), ...visibleTransitions.flatMap((item) => asArray(item.evidence))],
         }}
         label="状态与规则依据"

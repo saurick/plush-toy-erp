@@ -9,6 +9,19 @@
   box-sizing: border-box;
 }
 
+.erp-dev-flow-rule-table {
+  min-width: 0;
+}
+
+.erp-dev-flow-rule-table .app-table.ant-table-wrapper .ant-table-tbody > tr > .ant-table-cell {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-flow-rule-table .ant-table-cell p {
+  margin: 6px 0 0;
+}
+
 .erp-dev-flow-state-page :where(h1, h2, h3, p, ul, ol, dl) {
   overflow-wrap: anywhere;
 }

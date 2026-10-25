@@ -722,6 +722,7 @@ function devBrowserScenarioNames(file) {
     [/DevProjectSkills|devProjectSkills|dev-project-skills/u, ["dev-project-skills-guidance-desktop-light"]],
     [/DevDataPreparationPage|devDataPreparation|useDataPreparation/u, ["dev-data-preparation-workflow-desktop", "dev-data-preparation-4k"]],
     [/flow-state\/(?:FactsView|RuntimeView|WorkflowView|StateRulesView)/u, ["dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete"]],
+    [/devFlowActionRules|flow-state\/FlowRuleTables/u, ["dev-flow-rules-complete", "dev-flow-action-rules-desktop-light"]],
     [/QualityGate|quality-gates/u, ["dev-quality-gates-desktop-light"]],
     [
       /VersionCenter|version-center/u,
