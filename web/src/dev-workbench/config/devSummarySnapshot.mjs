@@ -58,25 +58,54 @@ export function updateDevSummarySnapshot(key, update) {
 export function loadDevSummarySnapshot(
   key,
   load,
-  { now = () => new Date().toISOString() } = {}
+  { now = () => new Date().toISOString(), signal } = {}
 ) {
   const normalizedKey = requireSnapshotKey(key)
   if (typeof load !== 'function') {
     return Promise.reject(new Error('开发台摘要读取器无效'))
   }
-  const inFlight = inFlightLoads.get(normalizedKey)
-  if (inFlight) return inFlight
-
-  const request = Promise.resolve()
-    .then(load)
-    .then((summary) => writeDevSummarySnapshot(normalizedKey, summary, now()))
-    .finally(() => {
-      if (inFlightLoads.get(normalizedKey) === request) {
-        inFlightLoads.delete(normalizedKey)
+  if (signal?.aborted) return Promise.reject(signal.reason)
+  let entry = inFlightLoads.get(normalizedKey)
+  if (!entry) {
+    const controller = new AbortController()
+    entry = { controller, subscribers: 0, retained: false }
+    entry.request = Promise.resolve()
+      .then(() => load({ signal: controller.signal }))
+      .then((summary) => {
+        controller.signal.throwIfAborted()
+        return writeDevSummarySnapshot(normalizedKey, summary, now())
+      })
+      .finally(() => {
+        if (inFlightLoads.get(normalizedKey) === entry) inFlightLoads.delete(normalizedKey)
+      })
+    inFlightLoads.set(normalizedKey, entry)
+  }
+  if (!signal) {
+    entry.retained = true
+    return entry.request
+  }
+  // One page leaving must not cancel another page's shared read.
+  entry.subscribers += 1
+  return new Promise((resolve, reject) => {
+    const release = () => {
+      signal.removeEventListener('abort', abort)
+      entry.subscribers -= 1
+    }
+    const abort = () => {
+      release()
+      if (!entry.subscribers && !entry.retained) {
+        if (inFlightLoads.get(normalizedKey) === entry) inFlightLoads.delete(normalizedKey)
+        entry.controller.abort()
       }
+      reject(signal.reason)
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    entry.request.then((value) => {
+      if (!signal.aborted) { release(); resolve(value) }
+    }, (error) => {
+      if (!signal.aborted) { release(); reject(error) }
     })
-  inFlightLoads.set(normalizedKey, request)
-  return request
+  })
 }
 
 export function formatDevSummaryCheckedAt(value) {
@@ -89,5 +118,8 @@ export function formatDevSummaryCheckedAt(value) {
 }
 
 export function clearDevSummarySnapshot(key) {
-  snapshots.delete(requireSnapshotKey(key))
+  const normalizedKey = requireSnapshotKey(key)
+  snapshots.delete(normalizedKey)
+  inFlightLoads.get(normalizedKey)?.controller.abort()
+  inFlightLoads.delete(normalizedKey)
 }

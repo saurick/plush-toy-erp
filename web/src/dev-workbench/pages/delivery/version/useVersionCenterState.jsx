@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useVersionCenterRoute } from './useVersionCenterRoute.jsx'
-import { deliveryReadErrorMessage } from '../readError.mjs'
+import { deliveryActionErrorMessage, deliveryReadErrorMessage } from '../readError.mjs'
 import { OPERATION_DETAIL_FOCUS_RESTORE_FALLBACK_MS } from './shared.jsx'
 import { message } from '@/common/utils/antdApp'
 
@@ -64,6 +64,7 @@ export function useVersionCenterState() {
   const [qualityGateError, setQualityGateError] = useState('')
   const mutationInFlightRef = useRef(false)
   const refreshRequestRef = useRef(0)
+  const refreshAbortRef = useRef(null)
   const qualityGateRequestRef = useRef(0)
   const operationDetailRequestRef = useRef(0)
   const operationDetailAbortRef = useRef(null)
@@ -215,11 +216,16 @@ export function useVersionCenterState() {
     setRefreshing(hasVisibleSummary)
     setStoredSummaryFresh(false)
     setLoadError('')
+    refreshAbortRef.current?.abort()
+    const controller = new AbortController()
+    refreshAbortRef.current = controller
     try {
-      const snapshot = await loadDevSummarySnapshot(requestedSnapshotKey, () =>
-        client.summary()
+      const snapshot = await loadDevSummarySnapshot(requestedSnapshotKey,
+        ({ signal }) => client.summary({ signal }),
+        { signal: controller.signal }
       )
       if (
+        controller.signal.aborted ||
         refreshRequestRef.current !== requestId ||
         activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
       ) {
@@ -234,6 +240,7 @@ export function useVersionCenterState() {
       return true
     } catch (error) {
       if (
+        controller.signal.aborted ||
         refreshRequestRef.current !== requestId ||
         activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
       ) {
@@ -282,6 +289,7 @@ export function useVersionCenterState() {
     }
     refresh()
     return () => {
+      refreshAbortRef.current?.abort()
       refreshRequestRef.current += 1
       qualityGateRequestRef.current += 1
       operationDetailRequestRef.current += 1
@@ -301,6 +309,7 @@ export function useVersionCenterState() {
         return false
       }
       mutationInFlightRef.current = true
+      setStoredSummaryFresh(false)
       setActionKey(key)
       try {
         await client.action(action, payload)
@@ -330,7 +339,7 @@ export function useVersionCenterState() {
         if (activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey) {
           return false
         }
-        message.error(error?.message || '操作未完成')
+        message.error(deliveryActionErrorMessage(error))
         await refresh()
         return false
       } finally {

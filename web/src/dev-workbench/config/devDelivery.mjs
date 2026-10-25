@@ -1,4 +1,5 @@
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
+import { requestDeliveryJson } from './devDeliveryRequest.mjs'
 import { DEV_VERSION_CENTER_ROUTE } from './devRoutes.mjs'
 
 export { DEV_VERSION_CENTER_ROUTE }
@@ -1192,77 +1193,32 @@ export function validateDevDeliverySummary(summary) {
   return summary
 }
 
-async function readJson(response) {
-  let payload
-  try {
-    payload = await response.json()
-  } catch {
-    const error = new Error('版本中心返回了无效响应')
-    error.status = response.status
-    throw error
-  }
-  if (!response.ok) {
-    const error = new Error(
-      typeof payload?.message === 'string'
-        ? payload.message
-        : '版本中心操作失败'
-    )
-    error.status = response.status
-    throw error
-  }
-  return payload
-}
-
 export function createDevDeliveryClient({
   fetchImpl = globalThis.fetch,
   readTimeoutMs = 8000,
+  summaryTimeoutMs = 90_000,
+  actionTimeoutMs = 90_000,
 } = {}) {
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is unavailable')
   }
   let csrfToken = ''
 
-  async function readOperationJson(url, signal) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const controller = new AbortController()
-      const abort = () => controller.abort(signal.reason)
-      signal?.addEventListener('abort', abort, { once: true })
-      if (signal?.aborted) abort()
-      const timer = setTimeout(() => controller.abort(
-        new DOMException('记录读取超时，请重试', 'TimeoutError')
-      ), readTimeoutMs)
-      try {
-        return await readJson(await fetchImpl(url, {
-          method: 'GET',
-cache: 'no-store',
-credentials: 'same-origin',
-          headers: { accept: 'application/json' },
-signal: controller.signal,
-        }))
-      } catch (error) {
-        if (signal?.aborted) throw signal.reason
-        const reason = controller.signal.aborted ? controller.signal.reason : error
-        if (attempt === 1 || !(
-          reason?.name === 'TypeError' || reason?.name === 'TimeoutError' ||
-          [408, 429, 502, 503, 504].includes(reason?.status)
-        )) throw reason
-      } finally {
-        clearTimeout(timer)
-        signal?.removeEventListener('abort', abort)
-      }
-    }
-  }
+  const readOperationJson = (url, signal) => requestDeliveryJson(fetchImpl, url, {
+    method: 'GET',
+    headers: { accept: 'application/json' },
+    timeoutMs: readTimeoutMs,
+    attempts: 2,
+    signal,
+  })
 
   async function session() {
     if (csrfToken) return csrfToken
-    const payload = await readJson(
-      await fetchImpl(DEV_DELIVERY_SESSION_API_PATH, {
-        method: 'GET',
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: { accept: 'application/json' },
-      })
-    )
+    const payload = await requestDeliveryJson(fetchImpl, DEV_DELIVERY_SESSION_API_PATH, {
+      method: 'GET',
+      timeoutMs: readTimeoutMs,
+      headers: { accept: 'application/json' },
+    })
     if (
       payload?.kind !== 'plush.dev-delivery-session' ||
       typeof payload.csrfToken !== 'string' ||
@@ -1331,15 +1287,12 @@ signal: controller.signal,
     },
     async summary({ signal } = {}) {
       return validateDevDeliverySummary(
-        await readJson(
-          await fetchImpl(DEV_DELIVERY_SUMMARY_API_PATH, {
-            method: 'GET',
-            cache: 'no-store',
-            credentials: 'same-origin',
-            headers: { accept: 'application/json' },
-            signal,
-          })
-        )
+        await requestDeliveryJson(fetchImpl, DEV_DELIVERY_SUMMARY_API_PATH, {
+          method: 'GET',
+          timeoutMs: summaryTimeoutMs,
+          headers: { accept: 'application/json' },
+          signal,
+        })
       )
     },
     async operation(operationId, { target, signal } = {}) {
@@ -1359,11 +1312,9 @@ signal: controller.signal,
     },
     async action(action, payload) {
       const token = await session()
-      return readJson(
-        await fetchImpl(DEV_DELIVERY_ACTION_API_PATH, {
+      return requestDeliveryJson(fetchImpl, DEV_DELIVERY_ACTION_API_PATH, {
           method: 'POST',
-          cache: 'no-store',
-          credentials: 'same-origin',
+          timeoutMs: actionTimeoutMs,
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',
@@ -1371,7 +1322,6 @@ signal: controller.signal,
           },
           body: JSON.stringify({ action, payload }),
         })
-      )
     },
     clearSession() {
       csrfToken = ''

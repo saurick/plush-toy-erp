@@ -447,7 +447,7 @@ test('devRecovery: 新增目标后只消费当前目标自己的演练证据', (
 test('devRecovery: 页面只读消费版本摘要，不创建第二套写动作', () => {
   const source = readDevWorkbenchPageSource('DevDrillRecoveryPage.jsx')
   assert.match(source, /createDevDeliveryClient/u)
-  assert.match(source, /client\.summary\(\)/u)
+  assert.match(source, /client\.summary\(\{ signal \}\)/u)
   assert.doesNotMatch(source, /client\.action|fetch\(|WebSocket|EventSource/u)
   assert.match(source, /DevCustomerScopeSelector/u)
   assert.match(source, /useDevCustomerScope/u)

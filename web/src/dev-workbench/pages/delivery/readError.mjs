@@ -9,3 +9,9 @@ export function deliveryReadErrorMessage(error, action) {
     suffix: '请重试，持续失败时查看工作台服务日志',
   })
 }
+
+export function deliveryActionErrorMessage(error) {
+  return getActionErrorMessage(error, '提交操作', {
+    suffix: '请先刷新操作记录核对结果，系统没有自动重试',
+  })
+}

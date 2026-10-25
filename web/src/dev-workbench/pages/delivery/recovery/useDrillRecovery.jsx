@@ -69,6 +69,7 @@ export function useDrillRecovery() {
   const [storedSummaryFresh, setStoredSummaryFresh] = useState(false)
   const [loadError, setLoadError] = useState('')
   const requestRef = useRef(0)
+  const refreshAbortRef = useRef(null)
   const summaryInCurrentScope =
     customerReady && summarySnapshotKey === deliverySnapshotKey
   const summary = summaryInCurrentScope ? storedSummary : null
@@ -93,9 +94,13 @@ export function useDrillRecovery() {
     setRefreshing(hasVisibleSummary)
     setStoredSummaryFresh(false)
     setLoadError('')
+    refreshAbortRef.current?.abort()
+    const controller = new AbortController()
+    refreshAbortRef.current = controller
     try {
-      const snapshot = await loadDevSummarySnapshot(requestedSnapshotKey, () =>
-        client.summary()
+      const snapshot = await loadDevSummarySnapshot(requestedSnapshotKey,
+        ({ signal }) => client.summary({ signal }),
+        { signal: controller.signal }
       )
       if (
         requestRef.current !== requestId ||
@@ -112,6 +117,7 @@ export function useDrillRecovery() {
       return true
     } catch (error) {
       if (
+        controller.signal.aborted ||
         requestRef.current !== requestId ||
         activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey
       ) {
@@ -150,6 +156,7 @@ export function useDrillRecovery() {
     }
     refresh()
     return () => {
+      refreshAbortRef.current?.abort()
       requestRef.current += 1
     }
   }, [customerReady, deliverySnapshotKey, refresh])

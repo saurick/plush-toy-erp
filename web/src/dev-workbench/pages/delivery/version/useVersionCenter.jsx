@@ -14,6 +14,7 @@ import {
   upsertOperation,
 } from './shared.jsx'
 import { message } from '@/common/utils/antdApp'
+import { deliveryReadErrorMessage } from '../readError.mjs'
 import {
   DEV_VERSION_CENTER_VIEW_HISTORY,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
@@ -174,10 +175,11 @@ export function useVersionCenter() {
     }
 
     let cancelled = false
+    const controller = new AbortController()
     let timer = 0
     const poll = async () => {
       try {
-        const operation = await client.operation(pollingOperationId)
+        const operation = await client.operation(pollingOperationId, { signal: controller.signal })
         if (cancelled) return
         setOperationPollError('')
         updateSummary((current) =>
@@ -197,7 +199,7 @@ export function useVersionCenter() {
         }
       } catch (error) {
         if (cancelled) return
-        setOperationPollError(error?.message || '操作状态读取暂时失败')
+        setOperationPollError(deliveryReadErrorMessage(error, '读取操作状态'))
       }
       if (!cancelled) {
         timer = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS)
@@ -207,6 +209,7 @@ export function useVersionCenter() {
     timer = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS)
     return () => {
       cancelled = true
+      controller.abort()
       window.clearTimeout(timer)
     }
   }, [
@@ -270,7 +273,7 @@ export function useVersionCenter() {
       ) {
         return
       }
-      message.error(error?.message || '操作详情读取失败')
+      message.error(deliveryReadErrorMessage(error, '读取操作详情'))
     } finally {
       if (
         operationDetailRequestRef.current === requestId &&
