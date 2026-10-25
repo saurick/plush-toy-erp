@@ -69,6 +69,112 @@ function coordination(result) {
   return records[0]
 }
 
+function mergeFixture(t, { conflict = false } = {}) {
+  const f = fixture(t)
+  const index = path.join(f.root, '.git', 'published-index')
+  const call = (args, input) => execFileSync('git', args, {
+    cwd: f.root, env: { ...environment, GIT_INDEX_FILE: index }, input, encoding: 'utf8',
+  }).trim()
+  call(['read-tree', f.base])
+  const blob = call(['hash-object', '-w', '--stdin'], 'published\nkeep\n')
+  call(['update-index', '--cacheinfo', '100644', blob, conflict ? 'a.txt' : 'b.txt'])
+  const parent = call(['commit-tree', call(['write-tree']), '-p', f.base, '-m', 'test: 已发布内容'])
+  writeFileSync(path.join(f.root, 'a.txt'), 'local\nkeep\n')
+  assert.equal(f.run('--', 'a.txt').status, 0)
+  const local = f.git('rev-parse', 'HEAD')
+  const merge = spawnSync('git', ['merge-tree', '--write-tree', local, parent], {
+    cwd: f.root, env: environment, encoding: 'utf8',
+  })
+  const patch = path.join(f.root, '.git', 'merge.patch')
+  if (merge.status === 0) writeFileSync(patch, f.git('diff', '--binary', '--full-index', local, merge.stdout.trim()) + '\n')
+  return { ...f, parent, local, merge, mergePatch: patch,
+    mergeRun: (...args) => f.run('--base', local, '--merge-parent', parent, '--patch', patch, ...args) }
+}
+
+test('reviewed merge preserves original parents, hooks and unrelated working content', t => {
+  const f = mergeFixture(t)
+  writeFileSync(path.join(f.root, 'b.txt'), 'published\nforeign remainder\n')
+  f.setHook('echo checked >> .git/merge-hook-runs')
+  const result = f.mergeRun()
+  assert.equal(result.status, 0, result.stderr + result.stdout)
+  assert.equal(f.git('show', '-s', '--format=%P', 'HEAD'), `${f.local} ${f.parent}`)
+  assert.equal(f.git('rev-parse', 'HEAD^{tree}'), f.merge.stdout.trim())
+  assert.equal(f.git('rev-list', '--count', `${f.local}..HEAD`), '2')
+  assert.equal(f.git('show', 'HEAD:a.txt'), 'local\nkeep')
+  assert.equal(f.git('show', 'HEAD:b.txt'), 'published\nkeep')
+  assert.equal(readFileSync(path.join(f.root, 'b.txt'), 'utf8'), 'published\nforeign remainder\n')
+  assert.equal(readFileSync(path.join(f.root, '.git', 'merge-hook-runs'), 'utf8'), 'checked\n')
+  assert.equal(f.git('diff', '--cached'), '')
+  assert.throws(() => readFileSync(path.join(f.root, '.git', 'MERGE_HEAD')), { code: 'ENOENT' })
+})
+
+test('merge rejects extra candidate content and an advanced base before staging', t => {
+  const f = mergeFixture(t)
+  const wrong = f.patch('b.txt', 'published\nforeign\n', 'extra', f.local)
+  let result = f.mergeRun('--patch', wrong)
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /候选不等于标准合并树/u)
+  result = f.mergeRun('--base', f.base)
+  assert.notEqual(result.status, 0)
+  assert.equal(coordination(result).reason, 'head_changed')
+  assert.equal(f.git('rev-parse', 'HEAD'), f.local)
+  assert.equal(f.git('diff', '--cached'), '')
+  assert.throws(() => readFileSync(path.join(f.root, '.git', 'MERGE_HEAD')), { code: 'ENOENT' })
+})
+
+test('pre-existing Git operation metadata remains untouched', t => {
+  const f = mergeFixture(t)
+  for (const name of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD']) {
+    const file = path.join(f.root, '.git', name)
+    writeFileSync(file, `${f.parent}\n`)
+    const result = f.mergeRun()
+    assert.notEqual(result.status, 0)
+    assert.equal(coordination(result).reason, 'git_operation_active')
+    assert.equal(readFileSync(file, 'utf8'), `${f.parent}\n`)
+    assert.equal(f.git('diff', '--cached'), '')
+    rmSync(file)
+  }
+})
+
+test('failed merge hooks remove only owned state and preserve adopted staging', t => {
+  const f = mergeFixture(t)
+  f.setHook('exit 1')
+  let result = f.mergeRun()
+  assert.notEqual(result.status, 0)
+  assert.equal(f.git('diff', '--cached'), '')
+  assert.throws(() => readFileSync(path.join(f.root, '.git', 'MERGE_HEAD')), { code: 'ENOENT' })
+  f.git('apply', '--cached', f.mergePatch)
+  const staged = f.git('diff', '--cached', '--binary')
+  result = f.mergeRun()
+  assert.notEqual(result.status, 0)
+  assert.equal(f.git('diff', '--cached', '--binary'), staged)
+  assert.throws(() => readFileSync(path.join(f.root, '.git', 'MERGE_HEAD')), { code: 'ENOENT' })
+  f.setHook()
+  assert.equal(f.mergeRun().status, 0)
+})
+
+test('merge parent drift during hooks preserves the unknown state', t => {
+  const f = mergeFixture(t)
+  f.setHook(`printf '%s\\n' '${f.base}' > .git/MERGE_HEAD`)
+  const result = f.mergeRun()
+  assert.notEqual(result.status, 0)
+  assert.equal(coordination(result).reason, 'merge_changed')
+  assert.equal(f.git('rev-parse', 'HEAD'), f.local)
+  assert.equal(readFileSync(path.join(f.root, '.git', 'MERGE_HEAD'), 'utf8'), `${f.base}\n`)
+  assert.equal(f.git('diff', '--cached', '--name-only'), 'b.txt')
+})
+
+test('conflicting histories cannot be submitted as a reviewed clean merge', t => {
+  const f = mergeFixture(t, { conflict: true })
+  assert.equal(f.merge.status, 1)
+  const patch = f.patch('a.txt', 'manual resolution\n', 'conflict', f.local)
+  const result = f.mergeRun('--patch', patch)
+  assert.notEqual(result.status, 0)
+  assert.equal(f.git('rev-parse', 'HEAD'), f.local)
+  assert.equal(f.git('diff', '--cached'), '')
+  assert.throws(() => readFileSync(path.join(f.root, '.git', 'MERGE_HEAD')), { code: 'ENOENT' })
+})
+
 async function expectOutput(job, pattern) {
   if (pattern.test(job.output())) return
   await new Promise((resolve, reject) => {

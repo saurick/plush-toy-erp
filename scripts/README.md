@@ -82,6 +82,8 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 3. 回读提交 SHA、提交文件 / hunk 和剩余差异。脚本不推送，不省略项目 hooks；推送继续使用独立授权和原有门禁。
 
+已有明确历史衔接授权，且双方已提交历史分叉时，先在一次性副本审查 `git merge-tree --write-tree <本地HEAD> <第二父提交>` 的无冲突结果，导出本地 HEAD 到该合并树的精确补丁。通过同一入口传入 `--merge-parent <第二父提交完整SHA> --patch <补丁>`，保留已发布提交的原 SHA，不 cherry-pick 或重复提交其内容。入口只接受与标准合并树完全一致的候选，基线前移、已有 merge / cherry-pick / revert / rebase 现场或冲突时停止；不自动解决冲突。暂存、双父身份、hooks 和失败保全仍在同一次互斥中，工作文件保持不变。
+
 | 情况 | 入口行为与后续 |
 | --- | --- |
 | 另一提交正在运行 | 使用同一 OS 文件锁等待一次，默认 45 秒，`--wait-seconds` 允许 0–60 秒；超时退出，不暂存、不重试。进程退出自动释放锁，无后台队列 |
@@ -102,6 +104,7 @@ pre-commit 与 commit-msg 检查持锁身份、分支、HEAD、完整候选和�
 | `commit_busy` | 本轮等待结束仍有提交占用；核对当前操作者，不循环重试 |
 | `native_index_lock` | 先按 Git 锁恢复门禁核验，再决定是否联系实际操作者 |
 | `head_changed` / `branch_changed` | hooks 期间仓库身份变化；重读现场，不能直接换基线重试 |
+| `merge_changed` / `git_operation_active` | 合并父提交变化或已有 Git 操作现场；保留现场，核清原操作者，不覆盖或自动继续 |
 
 按需协调只覆盖当前已授权目标及必要依赖，明确暂缓的批次继续保留，不推送。相关会话通过现有聊天工具交接，进展通过有界事件等待取得；无后台队列、广播、定时扫描或常驻进程。
 

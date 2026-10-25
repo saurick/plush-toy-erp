@@ -82,6 +82,11 @@ def repository():
     return root, index
 
 
+def merge_head():
+    path = Path(value("rev-parse", "--path-format=absolute", "--git-path", "MERGE_HEAD"))
+    return path.read_text() if path.exists() else None
+
+
 def verify_context():
     source = os.environ.get("PLUSH_COMMIT_CONTEXT")
     if not source:
@@ -105,6 +110,8 @@ def verify_context():
         raise Refused("HEAD 在提交期间变化，保留现场", reason="head_changed", paths=context["worktree"])
     if value("symbolic-ref", "-q", "HEAD", ok=(0, 1)) != context["branch"]:
         raise Refused("分支在提交期间变化，保留现场", reason="branch_changed", paths=context["worktree"])
+    if merge_head() != context.get("merge_head"):
+        raise Refused("合并父提交在提交期间变化，保留现场", reason="merge_changed", paths=context["worktree"])
     if not unchanged(context["tree"]):
         raise Refused("暂存内容偏离已核对的候选，保留现场", reason="index_changed",
                       paths=[*context["worktree"], *index_paths(context["tree"])])
@@ -141,6 +148,7 @@ def commit(args):
     patch_file = Path(args.patch).resolve() if args.patch else None
     root, index = repository()
     base = value("rev-parse", "--verify", f"{args.base}^{{commit}}")
+    parent = value("rev-parse", "--verify", f"{args.merge_parent}^{{commit}}") if args.merge_parent else None
     if value("config", "--get", "core.hooksPath", ok=(0, 1)) != ".githooks":
         raise Refused("项目 hooks 未启用；先运行 bash scripts/setup-git-hooks.sh")
     with tempfile.TemporaryDirectory(prefix="plush-commit-scope-") as temporary:
@@ -169,6 +177,12 @@ def commit(args):
                               reason="native_index_lock", paths=paths)
             head = value("rev-parse", "HEAD")
             branch = value("symbolic-ref", "-q", "HEAD", ok=(0, 1))
+            for name in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply"):
+                if Path(value("rev-parse", "--path-format=absolute", "--git-path", name)).exists():
+                    raise Refused(f"已有 Git 操作现场 {name}；未修改暂存区", reason="git_operation_active", paths=paths)
+            if parent and head != base:
+                raise Refused("合并基线已变化；请重新核对标准合并树，未修改暂存区",
+                              reason="head_changed", paths=paths)
             if head != base:
                 git("merge-base", "--is-ancestor", base, head)
                 changed = [os.fsdecode(p) for p in git(
@@ -184,18 +198,29 @@ def commit(args):
             git("read-tree", head, env=candidate_env)
             git("apply", "--cached", "--whitespace=error-all", "-", env=candidate_env, data=patch)
             tree = value("write-tree", env=candidate_env)
+            if parent:
+                for left, right in ((head, parent), (parent, head)):
+                    if git("merge-base", left, right).decode().strip() == left:
+                        raise Refused("只接受已核对的分叉历史合并；祖先关系无需双父提交")
+                merged_tree = value("merge-tree", "--write-tree", head, parent).splitlines()[0]
+                if tree != merged_tree:
+                    raise Refused("候选不等于标准合并树；未修改暂存区")
             staged_here = unchanged(head)
             if not staged_here and not unchanged(tree):
                 raise Refused("暂存区含其他内容；未清空或覆盖，请先由原提交完成收口",
                               reason="foreign_staging", paths=[*paths, *index_paths(head)])
             context = {"root": root, "fd": mutex.fileno(), "head": head, "branch": branch,
-                       "tree": tree, "worktree": scope_state}
+                       "tree": tree, "worktree": scope_state, "merge_head": f"{parent}\n" if parent else None}
             context_path = temp / "context.json"
             context_path.write_text(json.dumps(context))
             env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "PLUSH_COMMIT_CONTEXT": str(context_path)}
             if staged_here:
                 git("-c", "core.lockfilePid=true", "apply", "--cached", "--whitespace=error-all", "-", data=patch)
             try:
+                if parent:
+                    merge_path = Path(value("rev-parse", "--path-format=absolute", "--git-path", "MERGE_HEAD"))
+                    with merge_path.open("x") as stream:
+                        stream.write(context["merge_head"])
                 # Check again after staging, then let the real project hooks check the same candidate.
                 subprocess.run(
                     [sys.executable, str(Path(__file__).resolve()), "--verify"],
@@ -207,18 +232,24 @@ def commit(args):
                 )
                 if result.returncode:
                     raise Refused(f"提交或 hook 未通过（退出码 {result.returncode}）")
-            except (Refused, subprocess.CalledProcessError, KeyboardInterrupt):
+            except (Refused, subprocess.CalledProcessError, KeyboardInterrupt, OSError):
                 # Only undo staging made by this invocation, and only if the complete tree is intact.
-                if (staged_here and value("rev-parse", "HEAD") == head
+                if (value("rev-parse", "HEAD") == head
                         and value("symbolic-ref", "-q", "HEAD", ok=(0, 1)) == branch
-                        and unchanged(tree) and not Path(str(index) + ".lock").exists()):
-                    git("-c", "core.lockfilePid=true", "restore", "--staged", "--", *paths)
-                    print("[commit-scope] 已撤销本次暂存，工作文件保留", file=sys.stderr)
+                        and unchanged(tree) and not Path(str(index) + ".lock").exists()
+                        and merge_head() == context["merge_head"]):
+                    if staged_here:
+                        git("-c", "core.lockfilePid=true", "restore", "--staged", "--", *paths)
+                    if parent:
+                        merge_path.unlink()
+                    print("[commit-scope] 已撤销本次暂存，工作文件保留" if staged_here
+                          else "[commit-scope] 原有暂存已保留", file=sys.stderr)
                 else:
                     print("[commit-scope] 已保留暂存现场，请核对后继续", file=sys.stderr)
                 raise
             committed = value("rev-parse", "HEAD")
-            if value("rev-parse", "HEAD^{tree}") != tree or value("rev-parse", "HEAD^") != head:
+            parents = value("show", "-s", "--format=%P", "HEAD").split()
+            if value("rev-parse", "HEAD^{tree}") != tree or parents != [head, *([parent] if parent else [])]:
                 raise Refused("提交后身份与候选不一致；保留现场，需人工核对")
             print(f"[commit-scope] committed {committed}; 未推送", flush=True)
 
@@ -229,6 +260,7 @@ def main():
     parser.add_argument("--base", help="已审查补丁/文件对应的完整 HEAD SHA")
     parser.add_argument("--message", help="提交说明")
     parser.add_argument("--patch", help="已审查的 Git 补丁（支持混合文件和 binary diff）")
+    parser.add_argument("--merge-parent", help="已授权合并的第二父提交完整 SHA；须配合 --patch 且等于无冲突标准合并树")
     parser.add_argument("--wait-seconds", type=float, default=45, help="操作系统互斥等待上限，0–60 秒，默认 45")
     parser.add_argument("files", nargs="*", help="整文件提交时，在 -- 后列出精确路径；与 --patch 互斥")
     args = parser.parse_args()
@@ -239,6 +271,8 @@ def main():
         parser.error("需要 --base、--message，以及 --patch 或 -- 后的精确文件")
     if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", args.base):
         parser.error("--base 必须是已审查的完整 commit SHA，不能使用会变化的 HEAD 或分支名")
+    if args.merge_parent and (not args.patch or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", args.merge_parent)):
+        parser.error("--merge-parent 必须是已审查的完整 commit SHA，并与 --patch 一起使用")
     if not 0 <= args.wait_seconds <= 60:
         parser.error("--wait-seconds 必须在 0–60 之间")
     commit(args)
