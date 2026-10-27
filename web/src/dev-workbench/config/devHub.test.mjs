@@ -156,6 +156,7 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
     [
       ['product-engineering', '产品能力'],
       ['product-engineering', '业务链路'],
+      ['product-engineering', '任务办理'],
       ['product-engineering', '权限关系'],
       ['product-engineering', '交互设计'],
       ['development-resources', '接口与集成'],
@@ -215,7 +216,7 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
     false,
     '页面说明检查保留登记和深链，通过测试执行按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 4)
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 5)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'development-resources')
   assert.deepEqual(
     getDevSecondaryNavItems('quality').map((item) => item.key),
@@ -390,6 +391,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     [
       '/__dev/product-core',
       '/__dev/status-flows',
+      '/__dev/task-handling',
       '/__dev/permission-relationships',
       '/__dev/ui-design',
       '/__dev/integration',
@@ -551,7 +553,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 16)
+  assert.equal(summary.entryCount, 17)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

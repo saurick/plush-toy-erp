@@ -344,7 +344,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['fact.quality_inspection'],
         sourceRefs: ['server/internal/biz/quality_inspection.go'],
       }),
-      chainNode('purchase_lot', '合格库存批次', 'fact_ledger', {
+      chainNode('purchase_accepted', '合格行待入库', 'fact_ledger', {
+        summary: '逐行检验通过后等待仓库确认；此时尚未增加库存。',
+        machineKeys: ['fact.quality_inspection'],
+        sourceRefs: ['server/internal/biz/quality_inspection.go'],
+      }),
+      chainNode('purchase_lot', '已入库的合格批次', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
         sourceRefs: ['server/internal/biz/inventory.go'],
       }),
@@ -419,19 +424,25 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainEdge(
         'purchase_quality',
-        'purchase_lot',
-        '检验通过并过账入库',
+        'purchase_accepted',
+        'IQC 确认本行检验通过',
         'posts_fact',
         {
-          action:
-            'InventoryUsecase.PassQualityInspection / PostPurchaseReceipt',
-          factBoundary: 'inventory_txn_and_lot',
+          action: 'InventoryUsecase.PassQualityInspection',
+          condition: '按实收数量记录检验结果；通过只确认品质，库存由仓库另行入账',
+          factBoundary: 'quality_inspection_fact',
           sourceRefs: [
             'server/internal/biz/quality_inspection.go',
             'server/internal/biz/purchase_receipt.go',
           ],
         }
       ),
+      chainEdge('purchase_accepted', 'purchase_lot', '仓库确认本次合格行入库', 'posts_fact', {
+        action: 'InventoryUsecase.PostPurchaseReceipt',
+        condition: '仅过账已检验通过且尚未入库的行；待检与不合格行保留后续处理，后续合格行可继续入库，已入库行重复请求只读回',
+        factBoundary: 'inventory_txn_and_lot',
+        sourceRefs: ['server/internal/biz/purchase_receipt.go', 'server/internal/data/purchase_receipt_repo.go'],
+      }),
       chainEdge(
         'purchase_lot',
         'purchase_payable_draft',

@@ -262,6 +262,9 @@ const businessSamplePresentationImports = new Set([
   "components/business-list/SourceImportPickerModal.jsx",
 ]);
 const allowedERPImportsByFile = new Map([
+  ["web/src/dev-workbench/config/devTaskHandling.mjs", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs"])],
+  ["web/src/dev-workbench/config/devTaskHandlingResponsibilities.test.mjs", new Set(["utils/roleKeys.mjs"])],
+  ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs"])],
   [
     "web/src/dev-workbench/components/DevUIBusinessExamples.jsx",
     businessSamplePresentationImports,
@@ -730,4 +733,27 @@ test("dev workbench boundary: resolved imports preserve module and file scope", 
     ),
     false,
   );
+});
+
+test("task handling projections keep pure classification helpers consumer scoped", () => {
+  for (const file of ["web/src/dev-workbench/config/devTaskHandling.mjs", "web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx"]) {
+    assert.equal(isAllowedERPImport(file, "@/erp/utils/taskHandlingPolicy.mjs"), true);
+    assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
+  }
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/taskHandlingPolicy.mjs"), false);
+  const pending = ["web/src/erp/utils/taskHandlingPolicy.mjs"];
+  const visited = new Set();
+  while (pending.length) {
+    const file = pending.pop();
+    if (visited.has(file)) continue;
+    visited.add(file);
+    assert(file.startsWith("web/src/erp/utils/") || file.startsWith("web/src/common/consts/") || file === "server/internal/unitpolicy/units.json", `${file} is outside the presentation dependency graph`);
+    const source = read(file);
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+    for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
+      const specifier = match[1];
+      assert(specifier.startsWith("."), `${file} imports a non-local dependency: ${specifier}`);
+      pending.push(path.posix.join(path.posix.dirname(file), specifier));
+    }
+  }
 });

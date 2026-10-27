@@ -97,6 +97,7 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-business-usability-desktop-light",
   "dev-drill-recovery-desktop-light",
   "dev-flow-state-observatory-desktop-light",
+  "dev-page-task-handling-desktop-light",
   "dev-quality-gates-desktop-light",
   "dev-version-center-tabs-pagination-desktop",
   "dev-page-overview-desktop-light",
@@ -700,6 +701,7 @@ function devBrowserScenarioNames(file) {
     ? [GROWTH_VALIDATION_SCENARIO]
     : [];
   const mappings = [
+    [/TaskHandling|taskHandlingMatrix|devTaskHandling/u, ["dev-page-task-handling-desktop-light"]],
     [
       /BusinessChainCustomerReview|devBusinessChainPrint/u,
       ["dev-business-chain-customer-review-print"],

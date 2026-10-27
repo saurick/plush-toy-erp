@@ -1,3 +1,20 @@
+export const SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS = Object.freeze([
+  Object.freeze({
+    pool_key: "engineering_data",
+    source_pool_key: "engineering",
+    module_key: "products",
+    display_name: "销售订单工程资料责任池",
+    description: "derived from customer sales order acceptance process definition",
+  }),
+  Object.freeze({
+    pool_key: "order_review",
+    source_pool_key: "pmc",
+    module_key: "workflow_tasks",
+    display_name: "销售订单 PMC 评审责任池",
+    description: "derived from sales order acceptance process definition",
+  }),
+]);
+
 export const customerPackageCatalog = Object.freeze({
   catalogKey: "customer-package-catalog",
   status: "draft_catalog",

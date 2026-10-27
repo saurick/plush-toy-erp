@@ -15,6 +15,7 @@ export function WorkbenchSection({
   headingLevel = 2,
   description,
   actions,
+  tools,
   footer,
   flat = false,
   className = '',
@@ -30,7 +31,7 @@ export function WorkbenchSection({
       {...props}
       className={`erp-workbench-section${flat ? ' erp-workbench-section--flat' : ''} ${className}`}
     >
-      {title || actions ? (
+      {title || actions || tools ? (
         <header className="erp-workbench-section__heading">
           <div className="erp-workbench-section__title">
             {title ? <Heading id={id}>{title}</Heading> : null}
@@ -42,6 +43,9 @@ export function WorkbenchSection({
           </div>
           {actions ? (
             <div className="erp-workbench-section__actions">{actions}</div>
+          ) : null}
+          {tools ? (
+            <div className="erp-workbench-section__tools">{tools}</div>
           ) : null}
         </header>
       ) : description ? (

@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
+import { customerPackageCatalog, SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS } from "../../config/catalog/customerPackageCatalog.mjs";
 import { customerPackageSchema } from "../../config/schemas/customerPackageSchema.mjs";
 import {
   getCustomerPackage,
@@ -358,22 +358,6 @@ const APPROVAL_SETTING_POOLS = Object.freeze({
   }),
 });
 
-const SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS = Object.freeze([
-  Object.freeze({
-    pool_key: "engineering_data",
-    source_pool_key: "engineering",
-    module_key: "products",
-    display_name: "销售订单工程资料责任池",
-    description: "derived from customer sales order acceptance process definition",
-  }),
-  Object.freeze({
-    pool_key: "order_review",
-    source_pool_key: "pmc",
-    module_key: "workflow_tasks",
-    display_name: "销售订单 PMC 评审责任池",
-    description: "derived from sales order acceptance process definition",
-  }),
-]);
 
 const MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS = Object.freeze([
   Object.freeze({

@@ -71,6 +71,7 @@ test('public contracts: generated strings escape tabs without changing source ex
   const inspection = { sample: { read: { expression: excerpts[0], 'guard\tname': excerpts } } }
   const catalog = {
     permissions: { SAMPLE_READ: 'sample.read' },
+    permissionLabels: { 'sample.read': '查看示例' },
     states: { SampleStatus: { READY: 'ready' } },
     attachments: { maximum: 1 },
     numeric: { Precision: 20, Scale: 6 },

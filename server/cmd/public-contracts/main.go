@@ -19,17 +19,18 @@ import (
 )
 
 type catalog struct {
-	TaskDiscovery map[string]any                            `json:"taskDiscovery"`
-	Permissions   map[string]string                         `json:"permissions"`
-	States        map[string]map[string]string              `json:"states"`
-	Attachments   map[string]any                            `json:"attachments"`
-	Numeric       map[string]int64                          `json:"numeric"`
-	Policies      map[string]map[string]int64               `json:"policies"`
-	RPC           map[string]map[string]string              `json:"rpc"`
-	RPCTransport  map[string]string                         `json:"rpcTransport"`
-	RPCInspection map[string]map[string]rpcSourceInspection `json:"rpcInspection"`
-	RPCCalls      map[string]map[string]rpcCallContract     `json:"rpcCalls"`
-	RPCIssues     []rpcExampleIssue                         `json:"rpcIssues,omitempty"`
+	PermissionLabels map[string]string                         `json:"permissionLabels"`
+	TaskDiscovery    map[string]any                            `json:"taskDiscovery"`
+	Permissions      map[string]string                         `json:"permissions"`
+	States           map[string]map[string]string              `json:"states"`
+	Attachments      map[string]any                            `json:"attachments"`
+	Numeric          map[string]int64                          `json:"numeric"`
+	Policies         map[string]map[string]int64               `json:"policies"`
+	RPC              map[string]map[string]string              `json:"rpc"`
+	RPCTransport     map[string]string                         `json:"rpcTransport"`
+	RPCInspection    map[string]map[string]rpcSourceInspection `json:"rpcInspection"`
+	RPCCalls         map[string]map[string]rpcCallContract     `json:"rpcCalls"`
+	RPCIssues        []rpcExampleIssue                         `json:"rpcIssues,omitempty"`
 }
 
 var wordBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
@@ -504,6 +505,10 @@ func collectCatalog(root string, review bool) (catalog, error) {
 	})
 	if err != nil || len(out.Permissions) == 0 {
 		return out, fmt.Errorf("permissions: %v", err)
+	}
+	out.PermissionLabels, err = permissionLabels(rbac)
+	if err != nil {
+		return out, err
 	}
 	workflow, err := parse(root, "server/internal/biz/workflow_metadata.go")
 	if err != nil {

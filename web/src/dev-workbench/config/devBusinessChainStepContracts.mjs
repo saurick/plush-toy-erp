@@ -277,18 +277,25 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           state('fact.quality_inspection', 'SUBMITTED', 'result'),
         ],
       }),
-      'purchase_quality:posts_fact:purchase_lot': step({
+      'purchase_quality:posts_fact:purchase_accepted': step({
         responsibilityMode: 'human',
-        ownerPoolKeys: ['quality', 'warehouse'],
+        ownerPoolKeys: ['quality'],
+        capabilityKeys: [PermissionCode.QUALITY_INSPECTION_UPDATE],
+        stateTransitionRefs: [transition('fact.quality_inspection', 'SUBMITTED->PASSED')],
+      }),
+      'purchase_accepted:posts_fact:purchase_lot': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
         capabilityKeys: [
-          PermissionCode.QUALITY_INSPECTION_UPDATE,
           PermissionCode.WAREHOUSE_INBOUND_CONFIRM,
         ],
         stateTransitionRefs: [
-          transition('fact.quality_inspection', 'SUBMITTED->PASSED'),
           transition('fact.purchase_receipt', 'DRAFT->POSTED'),
         ],
-        stateRefs: [state('fact.inventory_lot', 'ACTIVE', 'result')],
+        stateRefs: [
+          state('fact.quality_inspection', 'PASSED', 'precondition'),
+          state('fact.inventory_lot', 'ACTIVE', 'result'),
+        ],
       }),
       'purchase_lot:creates_fact_draft:purchase_payable_draft': step({
         responsibilityMode: 'human',
@@ -325,22 +332,23 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         'purchase_order:creates_fact_draft:purchase_receipt',
         'purchase_approval:creates_fact_draft:purchase_receipt',
         'purchase_receipt:creates_fact_draft:purchase_quality',
-        'purchase_quality:posts_fact:purchase_lot',
+        'purchase_quality:posts_fact:purchase_accepted',
+        'purchase_accepted:posts_fact:purchase_lot',
         'purchase_lot:creates_fact_draft:purchase_payable_draft',
         'purchase_payable_draft:posts_fact:purchase_payable',
       ],
       interruptionStepKeys: [
         'purchase_task:returns:purchase_rejected',
         'purchase_task:calls_domain_command:purchase_approval',
-        'purchase_quality:posts_fact:purchase_lot',
+        'purchase_accepted:posts_fact:purchase_lot',
       ],
       interruptionKinds: ['blocked', 'rejected', 'resume'],
       correctionStepKeys: [
         'purchase_receipt:creates_fact_draft:purchase_quality',
       ],
-      protectedStepKey: 'purchase_quality:posts_fact:purchase_lot',
-      wrongStateStepKey: 'purchase_quality:posts_fact:purchase_lot',
-      idempotentStepKey: 'purchase_quality:posts_fact:purchase_lot',
+      protectedStepKey: 'purchase_accepted:posts_fact:purchase_lot',
+      wrongStateStepKey: 'purchase_accepted:posts_fact:purchase_lot',
+      idempotentStepKey: 'purchase_accepted:posts_fact:purchase_lot',
       dataStageKeys: ['source', 'facts', 'readiness'],
       interruptionTransitionRefs: [
         transition('workflow.task', 'ready->blocked'),

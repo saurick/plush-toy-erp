@@ -1,0 +1,64 @@
+.erp-dev-task-matrix {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.erp-dev-task-matrix__scope {
+  margin: 0;
+  color: var(--erp-text-muted);
+}
+.erp-dev-task-matrix .erp-workbench-toolbar__controls > .app-select {
+  flex: 0 1 180px;
+  width: 180px;
+  max-width: 100%;
+}
+.erp-dev-task-matrix .ant-table-cell {
+  overflow-wrap: anywhere;
+}
+.erp-dev-task-matrix .ant-tag {
+  max-width: 100%;
+  margin-inline-end: 0;
+  white-space: normal;
+}
+.erp-dev-task-matrix .ant-table-cell small {
+  display: block;
+  color: var(--erp-text-muted);
+}
+.erp-dev-task-matrix .erp-dev-task-matrix__stage-group {
+  padding-inline: 15px;
+}
+.erp-dev-task-matrix .ant-table-cell .ant-btn-link {
+  max-width: 100%;
+  white-space: normal;
+  height: auto;
+  text-align: start;
+}
+@media (max-width: 640px) {
+  .erp-dev-task-matrix .ant-table-cell {
+    padding: 8px 4px;
+  }
+  .erp-dev-task-matrix .ant-table-cell .ant-btn-link {
+    padding-inline: 0;
+    white-space: normal;
+    height: auto;
+    text-align: start;
+  }
+  .erp-dev-task-matrix .erp-dev-task-matrix__stage-group {
+    padding-inline: 0;
+  }
+}
+
+.erp-dev-task-handling__header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 12px;
+  background: var(--erp-surface-bg);
+}
+.erp-dev-task-handling__header h1.ant-typography {
+  margin: 0;
+  font-size: 20px;
+}

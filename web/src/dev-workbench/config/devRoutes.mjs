@@ -13,6 +13,7 @@ export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 export const DEV_DOCS_ROUTE = '/__dev/docs'
 export const DEV_PROJECT_SKILLS_ROUTE = '/__dev/project-skills'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
+export const DEV_TASK_HANDLING_ROUTE = '/__dev/task-handling'
 export const DEV_BUSINESS_USABILITY_ROUTE = '/__dev/business-usability'
 export const DEV_UI_DESIGN_ROUTE = '/__dev/ui-design'
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
@@ -80,6 +81,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_STATUS_FLOWS_ROUTE,
     label: '业务链路',
+  }),
+  Object.freeze({
+    key: 'task-handling',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_TASK_HANDLING_ROUTE,
+    label: '任务办理',
   }),
   Object.freeze({
     key: 'permission-relationships',

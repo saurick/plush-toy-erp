@@ -353,6 +353,7 @@ const transition = (
     action,
     permission = [],
     systemOnly = false,
+    responsibilityMode,
     factBoundary,
     sourceRefs = [],
     evidence: transitionEvidence = [],
@@ -366,6 +367,7 @@ const transition = (
   action,
   permission,
   systemOnly,
+  responsibilityMode,
   factBoundary,
   sourceRefs,
   evidence: transitionEvidence,
@@ -626,6 +628,11 @@ function normalizeFlow(definition) {
           `${definition.key} cannot expose generic status mutation`
         )
       }
+      const responsibilityMode = item.responsibilityMode ??
+        (definition.kind === 'runtime' || item.systemOnly ? 'system' : 'human')
+      if (!['human', 'system', 'derived'].includes(responsibilityMode)) {
+        throw new Error(`${definition.key}:${key} has an unknown responsibility mode`)
+      }
       return Object.freeze({
         key,
         from: item.from,
@@ -633,6 +640,7 @@ function normalizeFlow(definition) {
         guard: item.guard,
         action: item.action,
         systemOnly: definition.kind === 'runtime' || item.systemOnly,
+        responsibilityMode,
         permission: freezeStrings(unique(item.permission || [])),
         factBoundary: item.factBoundary,
         pathKinds: freezeStrings(pathKinds),
@@ -2128,14 +2136,16 @@ const FLOW_DEFINITIONS = [
         }),
       ]),
       transition('WAITING_QUALITY', 'ACCEPTED', {
-        guard: '所有冻结质量关口均已正式 PASS。',
+        guard: '品质完成全部适用的冻结质量关口并正式判定 PASS 后，由质检事务自动回写为已接收；没有额外的手工接收步骤。',
         action: 'updateProductionWIPBatchQualityStatus',
+        responsibilityMode: 'system',
         permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'quality_fact_updates_wip',
       }),
       transition('WAITING_QUALITY', 'REJECTED', {
-        guard: '当前冻结质量关口已正式 REJECT。',
+        guard: '品质对当前冻结质量关口正式判定 REJECT 后，由质检事务自动回写为不合格。',
         action: 'updateProductionWIPBatchQualityStatus',
+        responsibilityMode: 'system',
         permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'quality_fact_updates_wip',
       }),

@@ -1,6 +1,8 @@
 import { installIntegrationWorkspaceMock, verifyIntegrationWorkspace, verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
 import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { DEV_TESTING_FIXED_ACTIONS } from '../../src/dev-workbench/config/devTestingOperation.mjs'
+import { TASK_HANDLING_ROWS } from '../../src/dev-workbench/config/devTaskHandling.mjs'
+import { ROLE_DISPLAY_NAMES } from '../../src/erp/utils/roleKeys.mjs'
 import { DEV_TESTING_WORKSPACE_VIEWS } from '../../src/dev-workbench/config/devTesting.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, verifyMermaidDarkTheme, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
@@ -20,6 +22,7 @@ import {
   DEV_QUALITY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
   DEV_STATUS_FLOWS_ROUTE,
+  DEV_TASK_HANDLING_ROUTE,
   DEV_TESTING_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
@@ -105,6 +108,56 @@ export function createDevWorkbenchDesktopScenarios({
         item.expectedRoute.replace(/\/+$/u, '') || '/',
         `${item.route} 桌面 smoke 必须落到登记页面`
       )
+      if (item.route === DEV_TASK_HANDLING_ROUTE) {
+        const header = page.locator('.erp-dev-task-handling__header')
+        const before = await header.boundingBox()
+        const filterControl = (name) => page.locator('.erp-dev-task-matrix .ant-select')
+          .filter({ has: page.getByRole('combobox', { name, exact: true }) })
+          .locator('.ant-select-selector')
+        assert.equal(await page.getByRole('tab').count(), 0)
+        assert.deepEqual(await page.locator('.erp-dev-task-matrix th').allTextContents(),
+          ['办理事项', '办理岗位', '本次办理', '审批与交接', '电脑', '手机'])
+        for (const [key, label] of Object.entries(ROLE_DISPLAY_NAMES)) {
+          await filterControl('办理岗位').click()
+          await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: new RegExp(`^${label}$`, 'u') }).click()
+          await page.waitForFunction(({ roleKey, roleLabel }) => {
+            const rows = [...document.querySelectorAll('.erp-dev-task-matrix .ant-table-row')]
+            return new URL(window.location.href).searchParams.get('role') === roleKey &&
+              rows.length > 0 && rows.every((row) => row.children[1]?.textContent.startsWith(roleLabel))
+          }, { roleKey: key, roleLabel: label })
+          const keys = await page.locator('.erp-dev-task-matrix .ant-table-row').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')))
+          assert.deepEqual(keys, TASK_HANDLING_ROWS.filter((row) => row.roleKeys.includes(key)).map((row) => row.key), `${label} 办理事项缺失或混入其他岗位`)
+          await assertNoHorizontalOverflow(page)
+          if (key === 'engineering') {
+            assert.equal(keys.length, 2)
+            const text = await page.locator('.erp-dev-task-matrix').innerText()
+            assert.match(text, /工程用料提交与修订/u)
+            assert.match(text, /老板审核.*另一位财务复核/u)
+            assert.doesNotMatch(text, /销售订单编制与提交|订单审批/u)
+          }
+        }
+        await filterControl('办理岗位').click()
+        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^业务$/u }).click()
+        await page.reload()
+        await expectHeading(page, '任务办理')
+        assert.equal(new URL(page.url()).searchParams.get('role'), 'sales')
+        assert.equal(await page.getByRole('alert').count(), 0)
+        await page.getByRole('button', { name: '重置', exact: true }).click()
+        assert.equal(new URL(page.url()).searchParams.has('role'), false)
+        await filterControl('办理类型').click()
+        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^审核决策$/u }).click()
+        const rows = page.locator('.ant-table-row')
+        for (const role of ['老板', 'PMC', '财务']) assert((await rows.allTextContents()).some((text) => text.includes(role)), `审核清单缺少 ${role}`)
+        await filterControl('办理岗位').click()
+        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^PMC$/u }).click()
+        await page.reload()
+        await page.getByRole('button', { name: '订单评审', exact: true }).waitFor()
+        assert.equal(await rows.count(), 1)
+        assert.equal(await page.getByRole('alert').count(), 0)
+        await page.getByRole('button', { name: '重置', exact: true }).click()
+        const after = await header.boundingBox()
+        for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `任务办理页头 ${key} 不应跳动`)
+      }
       if (item.route === '/__dev') {
         const nav = page.locator('.erp-dev-workspace-nav')
         for (const entry of DEV_SECONDARY_NAV_ITEMS.filter(
