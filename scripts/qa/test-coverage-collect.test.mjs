@@ -141,6 +141,16 @@ test("native coverage measures repository code without external tools or node_mo
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const projectRoot = path.join(temporary, "project");
   const webRoot = path.join(projectRoot, "web");
+  await mkdir(path.join(projectRoot, "scripts/qa/lib"), { recursive: true });
+  await writeFile(
+    path.join(projectRoot, "scripts/qa/lib/node-test-process.mjs"),
+    readFileSync(path.join(ROOT, "scripts/qa/lib/node-test-process.mjs")),
+  );
+  await mkdir(path.join(projectRoot, "scripts/qa/native"), { recursive: true });
+  for (const file of ["node-test-guard.c", "node-test-bootstrap.cjs"]) {
+    await writeFile(path.join(projectRoot, "scripts/qa/native", file),
+      readFileSync(path.join(ROOT, "scripts/qa/native", file)));
+  }
   await mkdir(path.join(webRoot, "scripts"), { recursive: true });
   await writeFile(
     path.join(webRoot, "scripts/runUnitTests.mjs"),

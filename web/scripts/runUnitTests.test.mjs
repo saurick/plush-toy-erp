@@ -10,7 +10,7 @@ import { discoverWebUnitTests } from './runUnitTests.mjs'
 const execFileAsync = promisify(execFile)
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
 const passingSources = {
-  'root.test.mjs': "import test from 'node:test'; test('ROOT_TEST', () => {});",
+  'root.test.mjs': "import test from 'node:test'; import assert from 'node:assert/strict'; import v8 from 'node:v8'; test('ROOT_TEST', () => assert(v8.getHeapStatistics().heap_size_limit < 1100 * 1024 * 1024));",
   'src/feature/deep/page.test.mjs': "import test from 'node:test'; test('SOURCE_TEST', () => {});",
   'scripts/tool.test.cjs': "require('node:test')('SCRIPT_TEST', () => {});",
   'dev-server/bridge.test.js': "import test from 'node:test'; test('SERVER_TEST', () => {});",
@@ -27,8 +27,15 @@ const ignoredPaths = [
 const poison = "import { writeFileSync } from 'node:fs'; writeFileSync('poison-ran', 'executed'); throw new Error('ARTIFACT_EXECUTED');"
 
 async function fixture(t, sources = passingSources) {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'plush-web-test discovery-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
+  const repo = await mkdtemp(path.join(os.tmpdir(), 'plush-web-test discovery-'))
+  const root = path.join(repo, 'web')
+  t.after(() => rm(repo, { recursive: true, force: true }))
+  await mkdir(path.join(repo, 'scripts/qa/lib'), { recursive: true })
+  await copyFile(new URL('../../scripts/qa/lib/node-test-process.mjs', import.meta.url), path.join(repo, 'scripts/qa/lib/node-test-process.mjs'))
+  await mkdir(path.join(repo, 'scripts/qa/native'), { recursive: true })
+  for (const file of ['node-test-guard.c', 'node-test-bootstrap.cjs']) {
+    await copyFile(new URL(`../../scripts/qa/native/${file}`, import.meta.url), path.join(repo, 'scripts/qa/native', file))
+  }
   await mkdir(path.join(root, 'scripts'), { recursive: true })
   await copyFile(new URL('./runUnitTests.mjs', import.meta.url), path.join(root, 'scripts/runUnitTests.mjs'))
   await writeFile(path.join(root, 'package.json'), JSON.stringify({

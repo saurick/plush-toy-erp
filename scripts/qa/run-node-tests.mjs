@@ -13,6 +13,7 @@ import {
 } from "./node-test-groups.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
 import { nativeNodeReportArgs } from "./ci-native-reports.mjs";
+import { nodeTestProcessArgs, NODE_TEST_SUITE_TIMEOUT_MS } from "./lib/node-test-process.mjs";
 
 const DEFAULT_REPO_ROOT = path.resolve(import.meta.dirname, "..", "..");
 const DEFAULT_TEST_ROOT = path.resolve(import.meta.dirname, "..");
@@ -440,7 +441,7 @@ async function main() {
   );
   const result = spawnSync(
     process.execPath,
-    buildNodeTestArgs(tests, options.gitlabReport),
+    nodeTestProcessArgs(buildNodeTestArgs(tests, options.gitlabReport), { timeoutMs: NODE_TEST_SUITE_TIMEOUT_MS }),
     {
       cwd: path.resolve(options.rootDir, ".."),
       encoding: "utf8",

@@ -16,6 +16,12 @@ description: 按改动选择最小充分验证（plush-toy-erp）。Use when val
 - 修改 CI 依赖、分片、缓存或 Runner 并发时，读 [CI 变更与提速](../../../scripts/qa/README.md#ci-变更与提速--ci-change-safety)，据此选择合同检查、真实 CI 证据和停止条件。
 - 代码行为：当前代码、schema/migration 和对应测试；历史报告或聊天不能覆盖当前树。
 
+## Node Test Safety / Node 测试运行保护
+
+Node 测试使用项目统一门禁取得完整摘要：按需检查由 `affected` 选择；单文件或具名集合使用 `node scripts/qa/run-test-gate.mjs --kind node --label focused -- node --test --test-reporter=tap <测试路径>`；完整 Web 和分组脚本测试继续使用 `pnpm --dir web test` 与 `run-node-tests.mjs`。macOS 的[原生启动保护](../../../scripts/qa/native/README.md)同时接住裸命令，共享单机预算和跨会话准入；源码与已安装版本不一致时停止依赖测试并协调维护会话，冻结副本同步相同的 C / Bootstrap / 通用保护器。修改原生保护后，先隔离验证，再在已授权范围内安装并读回。资源阈值、外部超时、清理及失败诊断以[测试资源保护](../../../scripts/qa/README.md#node-test-resource-limits)为准。
+
+DOM 测试比较存在性、文本、属性、数量或节点身份的布尔结果，不把 DOM / Window / React Fiber 等运行对象传给相等或深比较断言，也不序列化完整运行对象作为日志。失败路径同样须有界；只让成功路径通过不能证明断言输出安全。故障注入仅在资源受限的隔离子进程夹具中制造这些错误。资源超限、超时或检查失败均保留失败，不通过放宽断言、移除用例或原样重跑绕过保护。
+
 ## 工作流
 
 1. 先看 `GIT_OPTIONAL_LOCKS=0 git status --short`，确认本轮路径、其他 writer 和当前 repository identity。

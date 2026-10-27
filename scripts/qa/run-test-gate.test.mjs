@@ -21,6 +21,22 @@ const passingNodeSummary = [
   "# todo 0",
 ].join("\n");
 
+test("direct Node gates enforce an external deadline for a blocked test", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-gate-deadline-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, "blocked.test.mjs");
+  writeFileSync(file, "import test from 'node:test'; test('blocked', () => { while (true) {} });");
+  const result = spawnSync(process.execPath, [
+    new URL("./run-test-gate.mjs", import.meta.url).pathname,
+    "--kind", "node", "--label", "blocked-fixture", "--timeout-ms", "400",
+    "--", process.execPath, "--test", file,
+  ], { encoding: "utf8", timeout: 6000, env: { ...process.env, NODE_TEST_CONTEXT: undefined } });
+  assert.equal(result.error, undefined);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /qa:node-process.*reason=timeout/u);
+  assert.match(result.stderr, /label=blocked-fixture status=incomplete/u);
+});
+
 test('formal business gate options reject wrong kinds, unknown gates and duplicates', () => {
   const valid = ['--kind', 'go', '--label', 'focused', '--business-rules', 'server', '--', 'go', 'test']
   assert.equal(parseArgs(valid).businessRules, 'server')

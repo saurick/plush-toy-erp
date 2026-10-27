@@ -8,6 +8,7 @@
 | --- | --- |
 | 业务手册同步、三册离线 HTML / PDF 导出 | [手册脚本](docs/README.md) |
 | 选择验证、fast / full / strict、CI 与推送门禁 | [QA 脚本](qa/README.md) |
+| macOS Node 测试内存、跨会话排队与回滚 | [原生测试保护](qa/native/README.md) |
 | 模拟账号、长期场景与隔离完整验收 | [QA 数据准备](qa/README.md#全页面试用验收数据)、[岗位登录核验](qa/README.md#角色演示账号与登录核验) |
 | 核心业务隔离压力测试、容量与恢复 | [压力测试](qa/README.md#pressure-testing) |
 | 发布、目标 preflight、客户配置、回滚与 evidence | [部署脚本](deploy/README.md) |

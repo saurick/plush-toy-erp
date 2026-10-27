@@ -24,13 +24,13 @@
 
 任意层级的 `output/`、`node_modules/` 都不参与发现；根目录的构建产物及辅助模块也不作为测试入口。发现过程只读，不删除或修补验证副本。空集合返回失败，真实测试的输出和失败状态由 Node 原样传回。
 
-`pnpm test` 与 Web 原生覆盖率采集共用该入口，保持 4 路文件并发。Node 筛选选项会在测试路径前传入；指定单个文件时直接使用原生命令：
+`pnpm test` 与 Web 原生覆盖率采集共用该入口，经过[共享测试资源保护](../../scripts/qa/README.md#node-test-resource-limits)。Linux / CI 保持 4 路文件并发；macOS 原生启动器固定单文件并发，多个会话按单机预算排队。Node 筛选选项会在测试路径前传入；指定单个文件时使用同样受保护的测试门禁：
 
 ```bash
 cd web
 pnpm test
 pnpm test --test-name-pattern=关键词
-node --test scripts/runUnitTests.test.mjs
+node ../scripts/qa/run-test-gate.mjs --kind node --label web-test-runner -- node --test --test-reporter=tap scripts/runUnitTests.test.mjs
 ```
 
 ## 常用命令

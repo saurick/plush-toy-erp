@@ -64,6 +64,9 @@ function installHookFixture(root) {
   for (const file of [
     "scripts/git-hooks/pre-commit.sh",
     "scripts/qa/gate-profiles.mjs",
+    "scripts/qa/lib/node-test-process.mjs",
+    "scripts/qa/native/node-test-guard.c",
+    "scripts/qa/native/node-test-bootstrap.cjs",
     "scripts/lib/rpc-contract-review.mjs",
   ]) {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });

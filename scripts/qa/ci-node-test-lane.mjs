@@ -17,6 +17,7 @@ import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
 import { buildNodeTestArgs, catalogNodeTests } from "./run-node-tests.mjs";
+import { nodeTestProcessArgs, NODE_TEST_SUITE_TIMEOUT_MS } from "./lib/node-test-process.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
 
 export const CI_NODE_TEST_LANE_SCHEMA = "plush.ci-node-test-lane/v1";
@@ -506,7 +507,9 @@ export function runCiNodeTestLane({
         }));
     for (const { profile, args } of runs) {
       const profileStarted = Date.now();
-      const result = spawnSync(process.execPath, args, {
+      const protectedArgs = args.includes("--test")
+        ? nodeTestProcessArgs(args, { timeoutMs: NODE_TEST_SUITE_TIMEOUT_MS }) : args;
+      const result = spawnSync(process.execPath, protectedArgs, {
         cwd: root,
         env: childEnv,
         encoding: "utf8",

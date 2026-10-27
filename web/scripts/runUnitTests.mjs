@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { globSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { nodeTestProcessArgs, NODE_TEST_SUITE_TIMEOUT_MS } from '../../scripts/qa/lib/node-test-process.mjs'
 
 const webRoot = fileURLToPath(new URL('../', import.meta.url))
 
@@ -20,7 +21,7 @@ function runUnitTests(args) {
   if (tests.length === 0) {
     throw new Error('未发现前端源码测试，请检查测试目录与文件命名')
   }
-  const result = spawnSync(process.execPath, ['--test', ...args, ...tests], {
+  const result = spawnSync(process.execPath, nodeTestProcessArgs(['--test', ...args, ...tests], { timeoutMs: NODE_TEST_SUITE_TIMEOUT_MS }), {
     cwd: webRoot,
     stdio: 'inherit',
   })

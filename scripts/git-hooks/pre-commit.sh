@@ -127,7 +127,7 @@ done
 
 if [[ "$RUN_DEV_PAGE_GOVERNANCE" -eq 1 ]]; then
   echo "[pre-commit] 检查 DEV 菜单与页面治理合同"
-  node --test "$INDEX_ROOT/scripts/qa/dev-page-governance.test.mjs"
+  node "$INDEX_ROOT/scripts/qa/lib/node-test-process.mjs" --timeout-ms 120000 -- --test "$INDEX_ROOT/scripts/qa/dev-page-governance.test.mjs"
 fi
 
 if [[ "${#SHELL_TARGETS[@]}" -gt 0 ]]; then

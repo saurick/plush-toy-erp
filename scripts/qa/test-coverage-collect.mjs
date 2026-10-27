@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { nodeTestProcessArgs, NODE_TEST_SUITE_TIMEOUT_MS } from "./lib/node-test-process.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import {
@@ -805,7 +806,9 @@ export async function assertProjectNodeRuntime(
 }
 
 export function runCommand({ command, args = [], cwd, env = process.env }) {
-  const result = spawnSync(command, args, {
+  const directNodeTest = ["node", process.execPath].includes(command) && args.includes("--test");
+  const result = spawnSync(directNodeTest ? process.execPath : command,
+    directNodeTest ? nodeTestProcessArgs(args, { timeoutMs: NODE_TEST_SUITE_TIMEOUT_MS }) : args, {
     cwd,
     encoding: "utf8",
     env,

@@ -2,7 +2,7 @@
 
 本文是 `scripts/qa/` 的目录入口。仓库级脚本总览仍在 [scripts/README.md](../README.md)；测试选择和验证层级真源仍在 [docs/product/自动化测试策略.md](../../docs/product/自动化测试策略.md)。
 
-本地和 CI 辅助工具使用现有 Node.js，数据库测试入口共用 `postgres-target-contract.mjs` 校验一次性目标；无需 Python。独立的 Git 提交入口使用 Python 3 标准库，属于已授权的本地 Git 收口工具，不进入业务运行或目标部署链路。目标宿主机继续使用已有 Shell、jq 和系统工具，部署前检及回执不依赖宿主 Node.js 或 Go，见[部署脚本](../deploy/README.md)。
+普通本地与 CI 辅助工具使用现有 Node.js，数据库测试入口共用 `postgres-target-contract.mjs` 校验一次性目标。macOS 的[原生测试保护](native/README.md)安装与故障验证使用 Python 3 和本机 SDK；独立 Git 提交入口使用 Python 3 标准库。两者均不进入业务运行或目标部署链路。目标宿主机继续使用已有 Shell、jq 和系统工具，部署前检及回执不依赖宿主 Node.js 或 Go，见[部署脚本](../deploy/README.md)。
 
 macOS 原生启动器的编译、退出、凭据清理和信号转发用例仅在 Mac 注册并实际执行；Linux CI 运行直接进程生命周期合同。两类结果按执行平台保留，不用跳过的 macOS 原生用例代表 Linux 验证通过，也不把 Linux 合同写成已执行 Mac 原生检查。
 
@@ -25,6 +25,7 @@ macOS 原生启动器的编译、退出、凭据清理和信号转发用例仅�
 | 当前任务 | 入口 |
 | --- | --- |
 | 本次改动要测什么 | [按影响面选择](#按影响面选择--affected-tests) |
+| Node 测试占用异常或卡死 | [测试资源保护](#node-test-resource-limits) |
 | 准备试用数据与页面验收 | [全页面试用验收数据](#全页面试用验收数据) |
 | 核对数量、事务与并发 | [领域事务验证](#postgresql-领域事务验证) |
 | 检查打印输出 | [打印引擎验证](#打印引擎验证--pdf-runtime) |
@@ -42,6 +43,36 @@ macOS 原生启动器的编译、退出、凭据清理和信号转发用例仅�
 `scripts/qa/` 只放本地验收、静态守卫、边界扫描和测试编排脚本。它可以读取代码、配置、文档和本地输出，必要时生成 ignored evidence；它不负责生产发布、不直接导入真实客户数据、不替代后端 RBAC / Workflow / Fact usecase。
 
 `affected` 的 Web 源码依赖扫描排除各层 `output/` 和 `node_modules/`。当计划已经包含完整 Web 测试时，复用 [源码测试发现](../../web/scripts/runUnitTests.mjs) 的实际集合，移除已被覆盖的单独测试命令；源码、脚本和开发服务测试遵循同一发现范围。其他 Node 检查仍保留，无法识别覆盖关系的源码继续选择完整 Web 测试。
+
+<a id="node-test-resource-limits"></a>
+
+## Node 测试资源保护 / Node Test Resource Limits
+
+Node 分组、Web 源码测试、按需测试门禁、CI Node / resource lane、原生覆盖采集和提交 hook 共用 [进程保护器](lib/node-test-process.mjs)。macOS 还必须经过已安装且源码匹配的[原生启动保护](native/README.md)：裸命令、绝对路径启动、`process.execPath` 及清空环境变量后的 Node 后代均进入同一单机预算。
+
+| 保护 | 默认边界 |
+| --- | --- |
+| macOS 共享预算 | 全部受保护 Node 共享最多 6144 MiB，且不超过物理内存四分之一；独立原生 guardian 持有预留直到 Node 实际退出 |
+| macOS 内核限额 | 编排 / runner / worker 分别为 256 / 512 / 1024 MiB，超限由系统终止；不依赖 RSS 采样或测试事件循环 |
+| 跨会话准入 | macOS 一个活动作业，其他会话在内核锁上排队；本机测试文件固定单并发，Linux / CI 保持其原有文件并发配置 |
+| 外部超时 | 裸命令 2 分钟、QA 编排 30 分钟、排队 15 分钟；正式门禁另有每文件 worker 5 分钟等细分时限 |
+| 通用辅助保护 | V8 heap、每 100ms 的单进程 / 进程树 RSS 检查保留早期失败和诊断；它们不单独构成内核硬配额 |
+| 输出 | stdout / stderr 合计最多捕获 32 MiB，超量立即失败 |
+| 终止与结果 | 超限、超时、中断、父进程退出、源码 / 内核版本不匹配或限额读回失败均返回非零；原生退出事件回收 Node 后代与额度，通用门禁保留完整执行摘要 |
+
+从仓库根目录运行单文件或具名集合：
+
+```bash
+node scripts/qa/run-test-gate.mjs --kind node --label focused -- node --test --test-reporter=tap web/scripts/test/nodeTestProcess.test.mjs
+```
+
+已知慢测试可在门禁命令中显式指定 `--timeout-ms <毫秒>`（位于 `--` 前）；不为卡死或内存异常提高资源上限。本机裸 `node --test` 已由原生入口接管；正式验证继续使用门禁取得非零执行数和零 skip 证据。输出截断和 V8 堆上限都无法单独阻止断言格式化中的内存膨胀。
+
+需要多个 Node 子进程同时存活的小负载夹具，可按[子进程额度声明](native/README.md#bounded-child-memory)为每个子进程下调预留与内核限额。声明不增加机器预算，也不提高任何角色的默认上限。
+
+DOM 断言只输出有界值：存在性用 `Boolean(container.querySelector(...))`，身份用 `actualNode === expectedNode`，内容用文本、属性或数量。不要把 DOM / Window / React Fiber 整体交给相等、深比较或日志格式化；修复必须保留原来的失败条件。资源保护强制终止时，子进程清理钩子可能无法执行；涉及数据库或容器的测试仍按原 fixture 生命周期核对现场，不把被终止写成通过。
+
+故障回归位于 [Node 进程保护测试](../../web/scripts/test/nodeTestProcess.test.mjs)，其 macOS 分支实际执行[原生内核回归](native/test_node_test_guard.py)。覆盖失败 DOM 格式化、死循环、跨会话预算、裸入口、清空环境变量、退出回收和真实安装 / 回滚；Linux 不注册 macOS 专属用例。本轮主机级验证不替代 Linux Runner 的资源合同或远端 CI。
 
 ## 主要脚本分组
 
@@ -371,7 +402,7 @@ Chromium 整页切换可能不发送网络终止事件，此时还必须收到�
 
   Go 执行数按最末级用例去重，父用例独立失败、跳过或未结束时单列；本域场景全部通过但整体 Go 基线未通过时标为受阻，场景自身的失败、缺失和跳过保留，整体门禁继续阻断。Go / Web 执行计数、业务规则、失败用例与数据库 / 浏览器场景可分别展开，支持“仅看未通过场景”。专项通过不补成完整 gate、真实前后端闭环、exact-SHA CI 或 UAT 通过；来源的范围说明必须随结果保留。
 
-Web 原生覆盖基线与 `pnpm test` 共用[源码测试入口](../../web/scripts/runUnitTests.mjs)，保持相同的 4 路文件并发，避免启动与停服夹具争用进程检查资源。发现范围、产物隔离和筛选见[前端脚本说明](../../web/scripts/README.md#源码测试--unit-tests)；覆盖统计、进程检查超时及归属保护保持原合同。
+Web 原生覆盖基线与 `pnpm test` 共用[源码测试入口](../../web/scripts/runUnitTests.mjs)；Linux / CI 保持 4 路文件并发，macOS 原生启动保护固定单文件并发并按共享预算排队。发现范围、产物隔离和筛选见[前端脚本说明](../../web/scripts/README.md#源码测试--unit-tests)；覆盖统计、进程检查超时及归属保护保持原合同。
 - 隔离归档必须显式列出项目内的 `--artifact` JSON，且全部携带相同的完整 repository identity；不能混入当前工作区身份、裸 coverage 或 `--write`。写入器与 DEV 读取器共用 `lib/coverage-report-contract.mjs` 的 schema / 身份 / 脱敏校验；归档不参与默认当前报告扫描。
 
   后续业务规则变化只维护采集器原有场景登记、中文标签和对应测试，页面按统一场景结构渲染；失败明细只保留测试标识及安全诊断，不透传原始日志。

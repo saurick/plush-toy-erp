@@ -24,10 +24,14 @@ import {
 const SHA = "a".repeat(40);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 const IDEMPOTENCY_KEY = "deploy:customer-test-133:123e4567-e89b-42d3-a456-426614174000";
+const CHILD_MEMORY_MIB = 256;
 
 function runChild(moduleUrl, store, key) {
   const source = `
     import { createOrReuseDeliveryOperation } from ${JSON.stringify(moduleUrl)};
+    if (process.platform === "darwin" && Number(process.env.PLUSH_NODE_KERNEL_LIMIT_MIB) !== ${CHILD_MEMORY_MIB}) {
+      throw new Error("operation fixture requires its declared native memory limit");
+    }
     const result = createOrReuseDeliveryOperation(${JSON.stringify(store)}, {
       action: "release",
       target: "github-release",
@@ -44,6 +48,7 @@ function runChild(moduleUrl, store, key) {
       process.execPath,
       ["--input-type=module", "--eval", source, key],
       {
+        env: { ...process.env, PLUSH_NODE_GUARD_MEMORY_MIB: String(CHILD_MEMORY_MIB) },
         stdio: ["ignore", "pipe", "pipe"],
       },
     );

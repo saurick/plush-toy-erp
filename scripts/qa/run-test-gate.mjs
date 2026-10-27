@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { verifyGoTestJson } from "./verify-go-test-json.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
 import { businessRuleTests } from "./lib/business-rule-catalog.mjs";
+import { nodeTestProcessArgs } from "./lib/node-test-process.mjs";
 
 export function evaluateTestGate({
   kind,
@@ -220,7 +221,13 @@ function runWithDeadline(options) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const child = options.timeoutMs ? await runWithDeadline(options) : spawnSync(options.command, options.args, {
+  const directNodeTest = options.kind === "node" &&
+    ["node", process.execPath].includes(options.command) && options.args.includes("--test");
+  if (directNodeTest) {
+    options.command = process.execPath;
+    options.args = nodeTestProcessArgs(options.args, options.timeoutMs ? { timeoutMs: options.timeoutMs } : {});
+  }
+  const child = options.timeoutMs && !directNodeTest ? await runWithDeadline(options) : spawnSync(options.command, options.args, {
     cwd: process.cwd(),
     encoding: "utf8",
     env: process.env,
