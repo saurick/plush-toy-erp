@@ -115,8 +115,8 @@ export function createDevWorkbenchDesktopScenarios({
           .filter({ has: page.getByRole('combobox', { name, exact: true }) })
           .locator('.ant-select-selector')
         assert.equal(await page.getByRole('tab').count(), 0)
-        assert.deepEqual(await page.locator('.erp-dev-task-matrix th').allTextContents(),
-          ['办理事项', '办理岗位', '本次办理', '审批与交接', '电脑', '手机'])
+        assert.deepEqual(await page.locator('.erp-dev-task-matrix').getByRole('columnheader').allTextContents(),
+          ['办理事项', '办理岗位', '办理类型', '本次办理', '审批与交接', '电脑', '手机'])
         for (const [key, label] of Object.entries(ROLE_DISPLAY_NAMES)) {
           await filterControl('办理岗位').click()
           await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: new RegExp(`^${label}$`, 'u') }).click()

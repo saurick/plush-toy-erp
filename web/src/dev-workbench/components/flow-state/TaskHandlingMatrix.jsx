@@ -205,11 +205,12 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
           expandedRowRender: () => details,
         }}
         tableLayout="fixed"
+        scroll={{ x: 1000 }}
         columns={[
           {
             title: '办理事项',
             key: 'stage',
-            width: '22%',
+            width: '19%',
             render: (_, row) => (
               <>
                 <Button
@@ -226,7 +227,7 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
           {
             title: '办理岗位',
             key: 'roles',
-            width: '12%',
+            width: '9%',
             render: (_, row) => (
               <>
                 {row.roleKeys.map((key) => getRoleDisplayName(key)).join('、') || '按任务分派'}
@@ -235,16 +236,21 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
             ),
           },
           {
+            title: '办理类型',
+            dataIndex: 'kindLabel',
+            key: 'kind',
+            width: 128,
+          },
+          {
             title: '本次办理',
             dataIndex: 'input',
             key: 'input',
-            width: '26%',
           },
-          { title: '审批与交接', dataIndex: 'handoff', key: 'handoff', width: '20%' },
+          { title: '审批与交接', dataIndex: 'handoff', key: 'handoff' },
           {
             title: '电脑',
             key: 'desktop',
-            width: '8%',
+            width: 84,
             render: (_, row) => (
               <Tag>{row.kind === 'automatic' ? '仅查看结果' : '可办理'}</Tag>
             ),
@@ -252,7 +258,7 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
           {
             title: '手机',
             key: 'mobile',
-            width: '12%',
+            width: 112,
             render: (_, row) => <Tag>{MOBILE_HANDLING_LABELS[row.mobile]}</Tag>,
           },
         ]}
