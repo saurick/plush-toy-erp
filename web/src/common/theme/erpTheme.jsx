@@ -96,6 +96,19 @@ function readBrowserAppearance(browserStorageKey) {
   }
 }
 
+function cacheGuestAppearance(value) {
+  try {
+    const storage = getBrowserStorage()
+    storage?.setItem(ERP_THEME_STORAGE_KEY, value.theme_mode)
+    storage?.setItem(
+      ERP_APPEARANCE_STORAGE_KEY,
+      JSON.stringify(normalizeERPAppearance(value))
+    )
+  } catch {
+    /* 浏览器无法保存时仍保留当前显示。 */
+  }
+}
+
 function accountAppearanceStorageKey(userID) {
   return `${ERP_APPEARANCE_STORAGE_KEY}:admin:${userID}`
 }
@@ -188,6 +201,14 @@ function ERPThemeState({ children, browserStorageKey }) {
   useEffect(() => {
     const syncStoredThemeMode = () => {
       const session = getAppearanceSession(browserStorageKey)
+      const signedOutAppearance = !session && sessionRef.current
+        ? {
+            ...readBrowserAppearance(browserStorageKey),
+            theme_mode: preferencesRef.current.theme_mode,
+            accent: preferencesRef.current.accent,
+          }
+        : null
+      if (signedOutAppearance) cacheGuestAppearance(signedOutAppearance)
       if (!sameAppearanceSession(session, sessionRef.current)) {
         sessionRef.current = session
         pendingPatchRef.current = {}
@@ -201,7 +222,7 @@ function ERPThemeState({ children, browserStorageKey }) {
       ) {
         return
       }
-      const next = readSessionAppearance(session, browserStorageKey)
+      const next = signedOutAppearance || readSessionAppearance(session, browserStorageKey)
       preferencesRef.current = next
       setDisplayPreferences(next)
       if (session) cacheAccountAppearance(session, next)
@@ -362,15 +383,7 @@ function ERPThemeState({ children, browserStorageKey }) {
         savePendingAppearance()
         return
       }
-      try {
-        getBrowserStorage()?.setItem(ERP_THEME_STORAGE_KEY, next.theme_mode)
-        getBrowserStorage()?.setItem(
-          ERP_APPEARANCE_STORAGE_KEY,
-          JSON.stringify(normalizeERPAppearance(next))
-        )
-      } catch {
-        /* 未登录时仍可即时调整外观。 */
-      }
+      cacheGuestAppearance(next)
     },
     [browserStorageKey, saveBrowserAppearance, savePendingAppearance]
   )

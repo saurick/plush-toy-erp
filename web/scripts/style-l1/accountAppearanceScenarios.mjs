@@ -5,6 +5,8 @@ import { ERP_ACCENTS, WORKBENCH_APPEARANCE_STORAGE_KEY } from '../../src/common/
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
+import { installAdminRpcMocks } from './adminRpcMocks.mjs'
+import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
 
 async function waitForSavedAppearance(page, expected) {
   await page.waitForFunction((expected) => {
@@ -130,6 +132,120 @@ export function createAccountAppearanceScenarios({
   const desktopSave = holdAppearanceSaves()
   const mobileSave = holdAppearanceSaves()
   return [
+    ...[false, true].map((mobile) => ({
+      name: `account-appearance-logout-${mobile ? 'mobile' : 'desktop'}`,
+      path: '/admin-login',
+      mockAdminRpc: true,
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: mobile ? { width: 390, height: 844 } : desktop.viewport,
+      deviceScaleFactor: 1,
+      beforeNavigate: async (page) => {
+        await page.addInitScript((mobile) => {
+          if (localStorage.getItem('plush_erp_theme_mode') === null) {
+            localStorage.setItem('plush_erp_theme_mode', 'light')
+            localStorage.setItem('plush_erp_appearance', JSON.stringify({ accent: 'orange' }))
+          }
+          localStorage.setItem('erp:last_entry_target', mobile ? 'mobileTasks' : 'desktop')
+        }, mobile)
+      },
+      verify: async (page) => {
+        const saves = []
+        page.on('request', (request) => {
+          if (request.url().endsWith('/rpc/admin') && request.method() === 'POST') {
+            const body = request.postDataJSON()
+            if (body.method === 'set_erp_appearance') saves.push(body.params)
+          }
+        })
+        const expectTheme = async (theme_mode, accent) => {
+          await page.waitForFunction(
+            (expected) => document.documentElement.dataset.erpThemeMode === expected.theme_mode &&
+              document.documentElement.dataset.erpAccent === expected.accent,
+            { theme_mode, accent }
+          )
+        }
+        const login = async (id, appearance) => {
+          const profile = {
+            id,
+            user_id: id,
+            username: `style-l1-appearance-${id}`,
+            display_name: '外观测试',
+            is_super_admin: true,
+            roles: [{ role_key: 'boss', name: '老板' }],
+            permissions: ['workflow.task.read', 'mobile.boss.access'],
+            menus: [{ path: '/erp/dashboard' }],
+            erp_preferences: { appearance },
+          }
+          await installAdminRpcMocks(page, {
+            baseURL: new URL(page.url()).origin,
+            adminProfileOverride: profile,
+            effectiveSessionOverride: customerRuntimeEffectiveSession,
+          })
+          await page.route('**/rpc/auth', async (route) => {
+            const body = route.request().postDataJSON()
+            if (body.method !== 'admin_login') return route.fallback()
+            assert.equal(body.params.username, profile.username)
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0', id: body.id,
+                result: { code: 0, message: 'OK', data: {
+                  ...profile,
+                  access_token: createMockAdminSessionToken({ userID: id }),
+                } },
+              }),
+            })
+          })
+          await page.getByLabel('账号').fill(profile.username)
+          await page.getByLabel('密码', { exact: true }).fill('style-l1-password')
+          await page.getByRole('button', { name: '登录', exact: true }).click()
+          await page.locator(mobile ? '.mobile-role-tasks-page' : '.erp-admin-shell').waitFor()
+          await waitForFiniteAnimations(page)
+        }
+        const logout = async () => {
+          if (mobile) {
+            await page.getByTestId('mobile-role-nav-mine').click()
+            await page.getByRole('button', { name: '退出登录', exact: true }).click()
+          } else {
+            await page.getByTestId('desktop-account-menu-trigger').click()
+            await page.getByRole('menuitem', { name: /退出登录$/u }).click()
+          }
+          await page.locator('.erp-login-page').waitFor()
+          assert.equal(await page.evaluate(() => localStorage.getItem('admin_access_token')), null)
+        }
+        const firstAppearance = { theme_mode: 'dark', accent: 'purple', density: 'standard', tableLines: 'simple' }
+        await expectTheme('light', 'orange')
+        await login(1, firstAppearance)
+        await expectTheme('dark', 'purple')
+        await logout()
+        await expectTheme('dark', 'purple')
+        await page.reload()
+        await page.getByLabel('账号').waitFor({ state: 'visible' })
+        await expectTheme('dark', 'purple')
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: `${outputDir}/account-appearance-logout-${mobile ? 'mobile' : 'desktop'}-login.png` })
+        await openERPAppearance(page)
+        const dialog = page.getByRole('dialog', { name: '外观设置' })
+        await dialog.getByText('浅色', { exact: true }).click()
+        await dialog.getByRole('button', { name: ERP_ACCENTS.teal.label, exact: true }).click()
+        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+        await expectTheme('light', 'teal')
+        await login(2, { theme_mode: 'system', accent: 'pink' })
+        await expectTheme('system', 'pink')
+        await logout()
+        await expectTheme('system', 'pink')
+        for (const colorScheme of ['dark', 'light']) {
+          await page.emulateMedia({ colorScheme })
+          await page.waitForFunction((scheme) => document.documentElement.dataset.erpTheme === scheme, colorScheme)
+        }
+        await login(3, {})
+        await expectTheme('system', 'blue')
+        await logout()
+        await login(1, firstAppearance)
+        await expectTheme('dark', 'purple')
+        assert.deepEqual(saves, [], '登录页调整和切换账号不能改写账号外观')
+      },
+    })),
     ...[false, true].map((standalone) => {
       const saves = []
       return {

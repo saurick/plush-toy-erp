@@ -285,10 +285,11 @@ test('appearance: switching to browser preferences isolates pending ERP response
   }
 })
 
-test('appearance: guest preferences remain local; login loads the account and logout restores the guest', async () => {
+test('appearance: logout retains the last theme locally and login restores each account', async () => {
   localStorage.clear()
   localStorage.setItem('plush_erp_theme_mode', 'light')
-  const runtime = await mount()
+  let runtime = await mount()
+  const firstAppearance = { ...savedAppearance, theme_mode: 'dark', accent: 'purple' }
   try {
     await settle(() =>
       runtime.theme.setAppearance({
@@ -298,19 +299,34 @@ test('appearance: guest preferences remain local; login loads the account and lo
       })
     )
     assert.equal(runtime.requests.length, 0)
-    await settle(() => signIn(1, { ...savedAppearance, accent: 'purple' }))
+    await settle(() => signIn(1, firstAppearance))
     assert.deepEqual(runtime.theme.appearance, {
       accent: 'purple',
       density: 'standard',
       tableLines: 'simple',
     })
-    assert.equal(runtime.theme.themeMode, 'system')
+    assert.equal(runtime.theme.themeMode, 'dark')
     await settle(() => logout())
     assert.deepEqual(runtime.theme.appearance, {
-      accent: 'orange',
+      accent: 'purple',
       density: 'compact',
       tableLines: 'grid',
     })
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(getToken(AUTH_SCOPE.ADMIN), '')
+    assert.equal(getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences'), null)
+    assert.equal(localStorage.getItem('plush_erp_theme_mode'), 'dark')
+    assert.deepEqual(JSON.parse(localStorage.getItem('plush_erp_appearance')), {
+      accent: 'purple',
+      density: 'compact',
+      tableLines: 'grid',
+    })
+    await runtime.close()
+    runtime = await mount()
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(runtime.theme.appearance.accent, 'purple')
+    await settle(() => runtime.theme.setThemeMode('light'))
+    await settle(() => runtime.theme.setAppearance({ accent: 'teal' }))
     assert.equal(runtime.theme.themeMode, 'light')
     await settle(() => signIn(2))
     assert.deepEqual(runtime.theme.appearance, {
@@ -318,6 +334,58 @@ test('appearance: guest preferences remain local; login loads the account and lo
       density: 'standard',
       tableLines: 'simple',
     })
+    assert.equal(runtime.theme.themeMode, 'system')
+    await settle(() => logout())
+    assert.equal(runtime.theme.themeMode, 'system')
+    assert.equal(runtime.theme.appearance.accent, 'blue')
+    await settle(() => signIn(1, firstAppearance))
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(runtime.theme.appearance.accent, 'purple')
+    assert.deepEqual(getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences').appearance, firstAppearance)
+    assert.equal(runtime.requests.length, 0, 'login and logout cannot write account preferences')
+  } finally {
+    await runtime.close()
+  }
+})
+
+test('appearance: logout retains the displayed preview and ignores a late save response', async () => {
+  localStorage.clear()
+  signIn(1)
+  const runtime = await mount()
+  try {
+    await settle(() => runtime.theme.setThemeMode('dark'))
+    await settle(() => runtime.theme.setAppearance({ accent: 'teal' }))
+    await settle(() => logout())
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(runtime.theme.appearance.accent, 'teal')
+    await settle(() => runtime.requests[0].reply({ ...savedAppearance, theme_mode: 'dark' }))
+    await settle(() => window.dispatchEvent(new Event('focus')))
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(runtime.theme.appearance.accent, 'teal')
+    assert.equal(runtime.theme.appearanceSaving, false)
+    assert.equal(runtime.requests.length, 1, 'logout discards queued account saves')
+    assert.equal(getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences'), null)
+  } finally {
+    await runtime.close()
+  }
+})
+
+test('appearance: logout in another tab retains the current theme', async () => {
+  localStorage.clear()
+  signIn(1, { ...savedAppearance, theme_mode: 'dark', accent: 'pink' })
+  const runtime = await mount()
+  try {
+    await settle(() => {
+      localStorage.removeItem('admin_access_token')
+      localStorage.removeItem('admin_erp_preferences')
+      window.dispatchEvent(new window.StorageEvent('storage', { key: 'admin_access_token' }))
+    })
+    assert.equal(runtime.theme.themeMode, 'dark')
+    assert.equal(runtime.theme.appearance.accent, 'pink')
+    assert.equal(runtime.theme.appearance.density, 'compact')
+    assert.equal(runtime.theme.appearance.tableLines, 'grid')
+    assert.equal(localStorage.getItem('plush_erp_theme_mode'), 'dark')
+    assert.equal(runtime.requests.length, 0)
   } finally {
     await runtime.close()
   }
