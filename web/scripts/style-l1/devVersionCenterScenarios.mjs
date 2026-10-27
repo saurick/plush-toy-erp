@@ -44,7 +44,7 @@ function operationMetrics({ transferred = false } = {}) {
   }
 }
 
-function operationIdempotency(
+export function operationIdempotency(
   operationId,
   { attempt = 1, retryOfOperationId = null, requestCount = 1 } = {}
 ) {
@@ -405,7 +405,7 @@ export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
     )
     const all = summary.operations.filter((operation) =>
       operation.target === (query.target || 'demo-133') &&
-      ['passed', 'failed', 'blocked', 'not_proven'].includes(operation.status)
+      ['passed', 'failed', 'blocked', 'not_proven', 'abandoned', 'invalidated'].includes(operation.status)
     )
     const matches = filterDevOperationHistory(all, query)
     const pageSize = Number(query.pageSize || 10)
@@ -414,7 +414,7 @@ export async function installDeliverySummaryRoute(page, onRequest = () => {}) {
       Math.max(1, Math.ceil(matches.length / pageSize))
     )
     const counts = Object.fromEntries(
-      ['passed', 'failed', 'blocked', 'not_proven'].map((status) => [
+      ['passed', 'failed', 'blocked', 'not_proven', 'abandoned', 'invalidated'].map((status) => [
         status,
         matches.filter((operation) => operation.status === status).length,
       ])
@@ -516,7 +516,7 @@ export async function installSummaryRoute(page, onRequest = () => {}) {
   return summary
 }
 
-async function waitForView(page, view) {
+export async function waitForView(page, view) {
   await page.waitForURL((url) => url.searchParams.get('view') === view, {
     timeout: 10_000,
   })
@@ -784,6 +784,7 @@ export function createDevVersionCenterScenarios({
         await targetSelector
           .getByText('test 甲方测试验收', { exact: true })
           .click()
+        await waitForView(page, 'versions')
         await verifySlidingMotion(page, assert, '.erp-dev-version-workspace .ant-tabs-nav-list', 1)
         await waitForView(page, 'overview')
         await page.getByText('test 数据方式', { exact: true }).waitFor()

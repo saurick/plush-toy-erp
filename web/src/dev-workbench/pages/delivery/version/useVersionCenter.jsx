@@ -391,6 +391,8 @@ export function useVersionCenter() {
     isMutationRunning,
     loadError,
     openOperations,
+    openOperationDetail,
+    unprovenOperations: operations.filter((operation) => operation.status === 'not_proven'),
     operationCachePresentation,
     operationDetail,
     operationDetailIdempotency,

@@ -1316,7 +1316,9 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.match(versionCenterPageSource, /retry-operation/u)
   assert.match(versionCenterPageSource, /再次尝试/u)
   assert.doesNotMatch(versionCenterPageSource, /label: '幂等/u)
-  assert.match(versionCenterPageSource, /openOperations[.]map/u)
+  assert.match(versionCenterPageSource, /<CurrentDeliveryOperations[\s\S]*operations=\{openOperations\}/u)
+  assert.match(versionCenterPageSource, /compact=\{activeView !== 'versions'\}/u)
+  assert.match(versionCenterPageSource, /放弃计划/u)
   assert.match(
     versionCenterPageSource,
     /operationHistoryState === 'failure' \? null : \([\s\S]*?<Table/u
@@ -1332,7 +1334,7 @@ test('version center keeps critical state visible and uses stable tab pagination
     versionCenterPageSource,
     /value=\{versions\[0\][?][.]publishedAt\}/u
   )
-  assert.match(versionCenterPageSource, /value=\{operation[.]createdAt\}/u)
+  assert.match(versionCenterPageSource, /operation.status === 'ready' \? '准备完成于'/u)
   assert.match(versionCenterPageSource, /value=\{operation[.]updatedAt\}/u)
   assert.match(
     versionCenterPageSource,
@@ -1353,7 +1355,7 @@ test('version center keeps critical state visible and uses stable tab pagination
   )
   assert.match(
     versionCenterPageSource,
-    /erp-dev-version-current-operation[\s\S]*openOperations[.]map[\s\S]*<Tabs/u
+    /<CurrentDeliveryOperations[\s\S]*<Tabs/u
   )
 })
 
@@ -1459,7 +1461,7 @@ pageSize: 10,
 total: 231,
 matched: 231,
     operations: Array.from({ length: 10 }, () => operation),
-    statistics: { counts: { passed: 231, failed: 0, blocked: 0, not_proven: 0 }, passedDurationSamples: 231, passedDurationMedianMs: 1000 },
+    statistics: { counts: { passed: 231, failed: 0, blocked: 0, not_proven: 0, abandoned: 0, invalidated: 0 }, passedDurationSamples: 231, passedDurationMedianMs: 1000 },
   }
   let requested
   const client = createDevDeliveryClient({ fetchImpl: async (url) => { requested = new URL(url, 'http://localhost'); return response(data) } })
@@ -1530,7 +1532,7 @@ pageSize: 10,
 total: 1,
 matched: 1,
 operations: [operation],
-    statistics: { counts: { passed: 1, failed: 0, blocked: 0, not_proven: 0 }, passedDurationSamples: 1, passedDurationMedianMs: 10 },
+    statistics: { counts: { passed: 1, failed: 0, blocked: 0, not_proven: 0, abandoned: 0, invalidated: 0 }, passedDurationSamples: 1, passedDurationMedianMs: 10 },
   }
   const historyClient = createDevDeliveryClient({ fetchImpl: async () => response(data) })
   await assert.rejects(historyClient.history({ target: wrongTarget }), /环境不匹配/u)

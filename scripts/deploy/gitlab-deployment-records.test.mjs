@@ -25,6 +25,19 @@ import {
 import { runDeploymentRecordsCLI } from "./gitlab-deployment-records-cli.mjs";
 
 const SHA = "a".repeat(40);
+for (const status of ['abandoned', 'invalidated']) {
+  test(`closed ${status} plans archive evidence without creating a deployment`, async t => {
+    const f = fixture(t);
+    transitionDeliveryOperation(f.store, f.id, { status, message: 'plan closed', now: '2026-10-22T00:00:03.000Z' });
+    const client = fakeClient();
+    const recorder = createGitlabDeploymentRecorder({ store: f.store, client });
+    const record = await recorder.register(f.id, { historical: true });
+    assert.equal(record.status, 'recorded');
+    assert.equal(client.calls.includes('create'), false);
+    assert.equal(client.calls.includes('environment'), false);
+    assert.equal(client.deployments.size, 0);
+  });
+}
 function fixture(t, target = "demo-133", action = "promote") {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-gitlab-deploy-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));

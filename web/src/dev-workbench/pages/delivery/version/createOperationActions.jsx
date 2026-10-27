@@ -22,8 +22,8 @@ export function createOperationActions({
   setConfirmationText,
   summaryFresh,
 }) {
-  return (record) => {
-    const { status, action, retry, promotionMode, id, gitlabRecord } = record
+  return (record, { detail = false } = {}) => {
+    const { status, action, retry, promotionMode, id, gitlabRecord, target } = record
     const readyToExecute =
       status === 'ready' &&
       ['promote', 'rollback', 'rebuild-database'].includes(action)
@@ -33,11 +33,11 @@ export function createOperationActions({
       summaryFresh && retryable && !isMutationRunning && !hasOpenOperation
     return (
       <Space wrap>
-        <Button
-          onClick={(event) => openOperationDetail(record, event.currentTarget)}
-        >
-          查看详情
-        </Button>
+        {!detail ? (
+          <Button onClick={(event) => openOperationDetail(record, event.currentTarget)}>
+            查看详情
+          </Button>
+        ) : null}
         {['passed', 'failed', 'blocked', 'not_proven'].includes(status) && gitlabRecord?.status !== 'recorded' ? (
           <Tooltip title="仅登记原始记录和项目回执，不执行部署或回滚">
             <Button
@@ -50,11 +50,12 @@ export function createOperationActions({
           </Tooltip>
         ) : null}
         {executable ? (
-          <Button
-            type="primary"
-            danger={['rollback', 'rebuild-database'].includes(action)}
-            disabled={isMutationRunning}
-            icon={
+          <>
+            <Button
+              type="primary"
+              danger={['rollback', 'rebuild-database'].includes(action)}
+              disabled={isMutationRunning}
+              icon={
               action === 'rollback' ? (
                 <RollbackOutlined aria-hidden="true" />
               ) : action === 'rebuild-database' ? (
@@ -63,19 +64,30 @@ export function createOperationActions({
                 <DeploymentUnitOutlined aria-hidden="true" />
               )
             }
-            onClick={() => {
+              onClick={() => {
               setConfirmOperation(record)
               setConfirmationText('')
             }}
-          >
-            {action === 'rollback'
+            >
+              {action === 'rollback'
               ? '确认回滚'
               : action === 'rebuild-database'
                 ? '确认清空重建'
                 : promotionMode === 'initialize'
                   ? '确认首次部署'
                   : '确认部署'}
-          </Button>
+            </Button>
+            <Button
+              disabled={isMutationRunning}
+              loading={actionKey === `abandon:${id}`}
+              onClick={() => performAction(`abandon:${id}`, 'abandon-plan', {
+              operationId: id,
+              target,
+            })}
+            >
+              放弃计划
+            </Button>
+          </>
         ) : retryable ? (
           <Tooltip
             title={
@@ -99,7 +111,7 @@ export function createOperationActions({
                 })
               }
             >
-              再次尝试
+              {['abandoned', 'invalidated'].includes(status) ? '重新准备' : '再次尝试'}
             </Button>
           </Tooltip>
         ) : status !== 'passed' ? (

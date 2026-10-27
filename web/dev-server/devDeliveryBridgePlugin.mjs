@@ -8,6 +8,7 @@ import { readGitlabDeploymentRecord, syncGitlabDeploymentRecord } from '../../sc
 
 import {
   consumeDeliveryOperationStore,
+  DELIVERY_OPERATION_TERMINAL_STATUSES,
   createOrReuseDeliveryOperation,
   createDeliveryOperationReadIndex,
   DELIVERY_OPERATION_STORE_REPO_ROOT_ENV,
@@ -20,6 +21,7 @@ import {
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
 } from '../../scripts/deploy/delivery-operation-store.mjs'
+import { closeReadyDeliveryPlan, deliveryPlanInvalidation } from '../../scripts/deploy/delivery-plan-lifecycle.mjs'
 import { createGithubDeliveryProvider } from '../../scripts/deploy/github-delivery-provider.mjs'
 import {
   createGitlabDeliveryProvider,
@@ -77,7 +79,7 @@ const OPERATION_PATH_PATTERN = new RegExp(
   `^${DEV_DELIVERY_API_PREFIX}/operations/([0-9a-f-]{36})$`,
   'u'
 )
-const TERMINAL_STATUSES = new Set(['passed', 'failed', 'blocked', 'not_proven'])
+const TERMINAL_STATUSES = new Set(DELIVERY_OPERATION_TERMINAL_STATUSES)
 const DELIVERY_TARGET_KEYS = Object.freeze([
   ...SUPPORTED_DEPLOYMENT_TARGET_KEYS,
 ])
@@ -332,6 +334,11 @@ export function validateDevDeliveryAction(value) {
       value.payload.confirmation.length > 240
     ) {
       throw new Error('rollback execution payload is invalid')
+    }
+  } else if (action === 'abandon-plan') {
+    assertExactKeys(value.payload, ['operationId', 'target'], 'plan abandonment payload')
+    if (!UUID_V4_PATTERN.test(String(value.payload.operationId || '')) || !isDeliveryTarget(value.payload.target)) {
+      throw new Error('plan abandonment payload is invalid')
     }
   } else if (action === 'sync-gitlab-record') {
     assertExactKeys(value.payload, ['operationId'], 'GitLab recording payload')
@@ -1207,6 +1214,16 @@ transport: diagnostic.transport } : {}),
         })
       }
     }
+    for (const candidate of readAllDeliveryOperations(store).filter(operation => operation.status === 'ready')) {
+      // Re-read after asynchronous probes: a confirmed plan may now be running.
+      const operation = readDeliveryOperation(store, candidate.id)
+      const evidence = targetEvidence.get(operation.target)
+      const invalidation = deliveryPlanInvalidation(operation, {
+        now: generatedAt, ...evidence,
+        versions: versionsResult.status === 'fulfilled' ? versionsResult.value : null,
+      })
+      if (invalidation) closeReadyDeliveryPlan(store, operation.id, { target: operation.target, invalidation, now: generatedAt })
+    }
     return {
       kind: 'plush.dev-delivery-summary',
       status: issues.length === 0 ? 'success' : 'partial',
@@ -1703,7 +1720,7 @@ transport: diagnostic.transport } : {}),
     if (previous.action !== 'release' && !isDeliveryTarget(previous.target)) {
       throw new Error('historical deployment target is read-only')
     }
-    if (!['failed', 'blocked'].includes(previous.status)) {
+    if (!['failed', 'blocked', 'abandoned', 'invalidated'].includes(previous.status)) {
       if (previous.status === 'not_proven') {
         throw new Error('target outcome must be read back before retry')
       }
@@ -1864,6 +1881,14 @@ transport: diagnostic.transport } : {}),
     })
   }
 
+  function assertUnexpiredPlan(operation) {
+    const invalidation = deliveryPlanInvalidation(operation, { now: now() })
+    if (invalidation) {
+      closeReadyDeliveryPlan(store, operation.id, { target: operation.target, invalidation, now: now() })
+      throw new Error('delivery plan expired; prepare a new plan')
+    }
+  }
+
   async function executeFixedPromotion(payload) {
     if (children.size > 0) {
       throw new Error('another delivery target action is already running')
@@ -1880,6 +1905,7 @@ transport: diagnostic.transport } : {}),
     if (payload.confirmation !== expected) {
       throw new Error('explicit promotion confirmation does not match')
     }
+    assertUnexpiredPlan(operation)
     if (operation.metadata?.promotionMode === 'upgrade') {
       const currentGitSha = operation.metadata?.currentGitSha
       if (
@@ -1939,6 +1965,7 @@ transport: diagnostic.transport } : {}),
         throw new Error('current release rollback transport is unavailable')
       }
     }
+    assertUnexpiredPlan(readDeliveryOperation(store, operation.id))
     operation = transitionDeliveryOperation(store, operation.id, {
       status: 'launching',
       message: 'promotion executor child is launching',
@@ -1998,6 +2025,7 @@ transport: diagnostic.transport } : {}),
     if (payload.confirmation !== expected) {
       throw new Error('explicit rollback confirmation does not match')
     }
+    assertUnexpiredPlan(operation)
     try {
       if (
         readDeliveryProvider.provider !== 'gitlab' ||
@@ -2051,6 +2079,7 @@ transport: diagnostic.transport } : {}),
       })
       throw new Error('rollback release transport is unavailable')
     }
+    assertUnexpiredPlan(readDeliveryOperation(store, operation.id))
     operation = transitionDeliveryOperation(store, operation.id, {
       status: 'launching',
       message: 'rollback executor child is launching',
@@ -2118,6 +2147,7 @@ transport: diagnostic.transport } : {}),
     if (payload.confirmation !== expected) {
       throw new Error('explicit database rebuild confirmation does not match')
     }
+    assertUnexpiredPlan(operation)
     operation = transitionDeliveryOperation(store, operation.id, {
       status: 'launching',
       message: 'database rebuild executor child is launching',
@@ -2284,6 +2314,10 @@ transport: diagnostic.transport } : {}),
           const operation = readDeliveryOperation(store, validated.payload.operationId)
           if (!TERMINAL_STATUSES.has(operation.status)) throw new Error('only terminal operations can be archived')
           await syncDeploymentRecord({ store, operationId: operation.id })
+          return { kind: 'plush.dev-delivery-action-result', action: validated.action, operation: presentOperation(operation) }
+        }
+        if (validated.action === 'abandon-plan') {
+          const operation = closeReadyDeliveryPlan(store, validated.payload.operationId, { target: validated.payload.target, now: now() })
           return { kind: 'plush.dev-delivery-action-result', action: validated.action, operation: presentOperation(operation) }
         }
         if (validated.action === 'dispatch-release') {

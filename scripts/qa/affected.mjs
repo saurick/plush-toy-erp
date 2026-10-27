@@ -725,8 +725,8 @@ function devBrowserScenarioNames(file) {
     [/devFlowActionRules|flow-state\/FlowRuleTables/u, ["dev-flow-rules-complete", "dev-flow-action-rules-desktop-light"]],
     [/QualityGate|quality-gates/u, ["dev-quality-gates-desktop-light"]],
     [
-      /VersionCenter|version-center/u,
-      ["dev-version-center-tabs-pagination-desktop"],
+      /VersionCenter|version-center|pages\/delivery\/version|devDelivery(?:BridgePlugin|PlanLifecycle)|delivery-plan-lifecycle/u,
+      ["dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"],
     ],
     [/ProductCore|product-core/u, ["dev-page-product-core-desktop-light"]],
     [/DevIntegration|devIntegration|dev-integration/u, ["dev-page-integration-desktop-light"]],

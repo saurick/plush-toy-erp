@@ -46,6 +46,11 @@ const SPECIALIZED_DESKTOP_CONTRACTS = Object.freeze([
     scenarioFile: "web/scripts/style-l1/devVersionCenterScenarios.mjs",
     scenarioName: "dev-version-center-tabs-pagination-desktop",
   }),
+  Object.freeze({
+    route: "/__dev/version-center",
+    scenarioFile: "web/scripts/style-l1/devVersionCenterPlanLifecycleScenarios.mjs",
+    scenarioName: "dev-version-center-plan-lifecycle-desktop",
+  }),
 ]);
 
 function read(relativePath) {
@@ -108,7 +113,7 @@ test("ordinary DEV routes use one generated desktop-only smoke module", () => {
   );
 });
 
-test("specialized DEV pages keep one exact desktop smoke contract", () => {
+test("specialized DEV modules keep one exact desktop contract", () => {
   for (const contract of SPECIALIZED_DESKTOP_CONTRACTS) {
     const source = read(contract.scenarioFile);
     const scenarioNames = [...source.matchAll(/name:\s*'(dev-[^']+)'/gu)].map(

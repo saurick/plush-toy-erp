@@ -77,6 +77,7 @@ import { createDevWorkbenchDensityScenarios } from './devWorkbenchDensityScenari
 import { createDevProjectSkillsScenarios } from './devProjectSkillsScenarios.mjs'
 import { createDevPressureScenarios } from './devPressureScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
+import { createDevVersionCenterPlanLifecycleScenarios } from './devVersionCenterPlanLifecycleScenarios.mjs'
 import { createDevDataPreparationScenarios } from './devDataPreparationScenarios.mjs'
 import { createDevDeliveryWorkspaceScenarios } from './devDeliveryWorkspaceScenarios.mjs'
 import { createFinanceAdvanceScenarios } from './financeAdvanceScenarios.mjs'
@@ -507,6 +508,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
+    ...createDevVersionCenterPlanLifecycleScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevDataPreparationScenarios({
       assert,
       assertNoHorizontalOverflow,

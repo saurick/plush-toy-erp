@@ -315,27 +315,29 @@ export function buildVersionWorkspace({
             ) : null}
             {operationHistoryState === 'failure' ? null : (
               <>
-                {historyResult ? (
+                {historyResult?.matched > 0 ? (
                   <Space
                     wrap
                     size={[16, 4]}
                     style={{ marginBottom: 12 }}
                     aria-label="当前筛选的操作统计"
                   >
-                    <Text>通过 {historyResult.statistics.counts.passed}</Text>
-                    <Text>失败 {historyResult.statistics.counts.failed}</Text>
-                    <Text>阻断 {historyResult.statistics.counts.blocked}</Text>
-                    <Text>
-                      未证明 {historyResult.statistics.counts.not_proven}
-                    </Text>
-                    <Text type="secondary">
-                      成功操作耗时中位数{' '}
-                      {formatDeliveryDuration(
-                        historyResult.statistics.passedDurationMedianMs
-                      )}
-                      （{historyResult.statistics.passedDurationSamples}{' '}
-                      次，含等待）
-                    </Text>
+                    {[
+                      ['passed', '通过'], ['failed', '失败'], ['blocked', '阻断'],
+                      ['not_proven', '未证明'], ['abandoned', '已放弃'], ['invalidated', '已失效'],
+                    ].filter(([status]) => historyResult.statistics.counts[status] > 0).map(([status, label]) => (
+                      <Text key={status}>{label} {historyResult.statistics.counts[status]}</Text>
+                    ))}
+                    {historyResult.statistics.passedDurationSamples > 0 ? (
+                      <Text type="secondary">
+                        成功操作耗时中位数{' '}
+                        {formatDeliveryDuration(
+                          historyResult.statistics.passedDurationMedianMs
+                        )}
+                        （{historyResult.statistics.passedDurationSamples}{' '}
+                        次，含等待）
+                      </Text>
+                    ) : null}
                   </Space>
                 ) : null}
                 <Table

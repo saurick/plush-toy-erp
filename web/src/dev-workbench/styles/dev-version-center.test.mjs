@@ -17,10 +17,10 @@ const timestampComponent = readFileSync(
 )
 const versionPage = readDevWorkbenchPageSource('DevVersionCenterPage.jsx')
 
-test('version center keeps strict quality evidence as a compact summary and deep link', () => {
+test('version center keeps strict quality evidence as a compact timestamped summary', () => {
   assert.match(versionPage, /当前发布 SHA 严格门禁/u)
   assert.match(versionPage, /formatQualityGateDuration/u)
-  assert.match(versionPage, /view=run&profile=strict/u)
+  assert.match(versionPage, /value=\{strictProof[?][.]receipt[?][.]finishedAt\}/u)
   assert.doesNotMatch(
     versionPage,
     /qualityGateSummary[\s\S]{0,80}(?:stageTimings|complexity|categories)/u
@@ -121,15 +121,11 @@ test('version decisions and target evidence remain source-backed', () => {
     versionPage,
     /if \(\['cleaned', 'cleaning'\]\.includes\(record\.retention\?\.state\)\) return <Text type="secondary">文件已清理，记录可查<\/Text>\s*const actionKind = deliveryVersionActionKind\(record\)/u
   )
-  assert.match(versionPage, /CI\/CD 证据分两处查看/u)
-  assert.match(
-    versionPage,
-    /发布与部署耗时汇总 GitLab 的 CI[\s\S]*检查、构建和制品发布耗时/u
-  )
-  assert.match(
-    versionPage,
-    /操作记录看工作台发起的发布、目标部署、回滚和数据重建结果/u
-  )
+  assert.match(versionPage, /GitLab 环境部署列表/u)
+  assert.match(versionPage, /此处保留项目检查、原始时间和恢复操作/u)
+  assert.match(versionPage, /检查结果与追溯/u)
+  assert.match(versionPage, /href=\{trace[.]pipelinesUrl\}/u)
+  assert.match(versionPage, /href=\{trace[.]releaseUrl\}/u)
   assert.match(css, /[.]erp-dev-version-workspace__evidence-note/u)
   assert.doesNotMatch(component, /展示远端流水线、制品发布和构建耗时/u)
   assert.doesNotMatch(component, /最近真实部署与传输/u)

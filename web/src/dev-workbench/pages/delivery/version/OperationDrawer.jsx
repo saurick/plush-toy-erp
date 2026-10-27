@@ -33,6 +33,7 @@ export function OperationDrawer({
   operationTargetMetricItems,
   operationWebDigest,
   restoreOperationDetailTriggerFocus,
+  renderOperationActions,
 }) {
   return (
     <Drawer
@@ -67,6 +68,7 @@ export function OperationDrawer({
             <Tag>{deliveryTargetLabel(operationDetail.target)}</Tag>
             <Text code>{shortGitSha(operationDetail.gitSha)}</Text>
           </Space>
+          {renderOperationActions(operationDetail, { detail: true })}
           <Space wrap size={[12, 4]}>
             <DevTimestamp
               value={operationDetail.createdAt}
@@ -167,9 +169,9 @@ export function OperationDrawer({
           ) : null}
           {operationDetail.issues.length > 0 ? (
             <Alert
-              type="error"
+              type={operationDetail.status === 'abandoned' ? 'info' : operationDetail.status === 'invalidated' ? 'warning' : 'error'}
               showIcon
-              message="已记录问题"
+              message={['abandoned', 'invalidated'].includes(operationDetail.status) ? '计划收口记录' : '已记录问题'}
               description={issueDescription(operationDetail.issues)}
             />
           ) : null}

@@ -82,7 +82,10 @@ export function useVersionCenterState() {
     summary?.boundaries?.provider === 'github' ? 'GitHub 历史只读' : 'GitLab'
 
   const restoreOperationDetailTriggerFocus = useCallback(() => {
-    const trigger = operationDetailTriggerRef.current
+    const originalTrigger = operationDetailTriggerRef.current
+    const trigger = originalTrigger?.isConnected
+      ? originalTrigger
+      : originalTrigger && workspaceRef.current?.querySelector('[role="tab"][aria-selected="true"]')
     const { activeElement } = document
     if (
       !trigger?.isConnected ||
@@ -235,6 +238,14 @@ export function useVersionCenterState() {
       summaryRef.current = snapshot.summary
       setSummarySnapshotKey(requestedSnapshotKey)
       setStoredSummary(snapshot.summary)
+      setConfirmOperation((current) => {
+        const next = snapshot.summary.operations.find((operation) => operation.id === current?.id)
+        return next?.status === 'ready' ? next : null
+      })
+      setOperationDetail((current) => {
+        const next = snapshot.summary.operations.find((operation) => operation.id === current?.id)
+        return current && next ? { ...current, ...next, evidence: current.evidence } : current
+      })
       setCheckedAt(snapshot.checkedAt)
       setStoredSummaryFresh(true)
       return true
@@ -311,16 +322,22 @@ export function useVersionCenterState() {
       mutationInFlightRef.current = true
       setStoredSummaryFresh(false)
       setActionKey(key)
+      operationDetailRequestRef.current += 1
+      operationDetailAbortRef.current?.abort()
+      setOperationDetailLoading(false)
       try {
-        await client.action(action, payload)
+        const result = await client.action(action, payload)
         if (activeDeliverySnapshotKeyRef.current !== requestedSnapshotKey) {
           return false
         }
+        setOperationDetail((current) => current?.id === result.operation?.id ? result.operation : current)
         message.success(
           action === 'sync-gitlab-record'
             ? 'GitLab 记录已补齐，未执行部署'
             : action === 'dispatch-release'
             ? `${deliveryProviderName}发布任务已登记`
+            : action === 'abandon-plan'
+              ? '已放弃待确认计划，未写入目标环境'
             : action === 'retry-operation'
               ? '已创建关联的新尝试'
               : action === 'prepare-promotion'

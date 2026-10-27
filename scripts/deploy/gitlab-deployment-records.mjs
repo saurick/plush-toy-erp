@@ -62,6 +62,7 @@ export function gitlabDeploymentEnvironment(targetKey) {
 
 function nativeEnvironment(operation) {
   if (
+    ["abandoned", "invalidated"].includes(operation.status) ||
     !["promote", "rollback"].includes(operation.action) ||
     !SUPPORTED_DEPLOYMENT_TARGET_KEYS.includes(operation.target)
   )

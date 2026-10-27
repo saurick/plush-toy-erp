@@ -187,6 +187,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/database-rebuild-manifest.test.mjs",
     "scripts/deploy/database-roles-script.test.mjs",
     "scripts/deploy/delivery-operation-store.test.mjs",
+    "scripts/deploy/delivery-plan-lifecycle.test.mjs",
     "scripts/deploy/deployment-package-lint.test.mjs",
     "scripts/deploy/deployment-targets.test.mjs",
     "scripts/deploy/fixed-target-rsync.test.mjs",

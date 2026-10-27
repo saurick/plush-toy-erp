@@ -79,6 +79,7 @@ const DEV_VERSION_CENTER_HISTORY_ATTENTION_STATUSES = new Set([
   'failed',
   'blocked',
   'not_proven',
+  'invalidated',
 ])
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
@@ -97,6 +98,8 @@ const OPERATION_STATUSES = new Set([
   'failed',
   'blocked',
   'not_proven',
+  'abandoned',
+  'invalidated',
 ])
 const DELIVERY_OPERATION_ACTIONS = new Set([
   'release',
@@ -673,12 +676,12 @@ export function deliveryOperationRetryPolicy(operation) {
     operation.action
   )
   const allowed =
-    retryableAction && ['failed', 'blocked'].includes(operation.status)
+    retryableAction && ['failed', 'blocked', 'abandoned', 'invalidated'].includes(operation.status)
   const reason = allowed
     ? 'explicit_retry_available'
     : operation.status === 'not_proven'
       ? 'target_readback_required'
-      : ['failed', 'blocked'].includes(operation.status)
+      : ['failed', 'blocked', 'abandoned', 'invalidated'].includes(operation.status)
         ? 'action_not_retryable'
         : ['passed', 'failed', 'blocked', 'not_proven'].includes(
               operation.status
@@ -1264,7 +1267,7 @@ export function createDevDeliveryClient({
         !Array.isArray(payload.operations) ||
         payload.operations.length > pageSize ||
         !payload.statistics ||
-        !['passed', 'failed', 'blocked', 'not_proven'].every(
+        !['passed', 'failed', 'blocked', 'not_proven', 'abandoned', 'invalidated'].every(
           (key) =>
             Number.isSafeInteger(payload.statistics.counts?.[key]) &&
             payload.statistics.counts[key] >= 0
@@ -1566,6 +1569,8 @@ export function deliveryStatusPresentation(status) {
     queued: ['已排队', 'default'],
     running: ['执行中', 'processing'],
     ready: ['待确认', 'blue'],
+    abandoned: ['已放弃', 'default'],
+    invalidated: ['已失效', 'default'],
     launching: ['正在启动', 'processing'],
     waiting: ['等待 CI', 'processing'],
     requested: ['已请求', 'blue'],

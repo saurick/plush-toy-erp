@@ -37,6 +37,8 @@ export const DELIVERY_OPERATION_TERMINAL_STATUSES = Object.freeze([
   "failed",
   "blocked",
   "not_proven",
+  "abandoned",
+  "invalidated",
 ]);
 
 const STATUS_TRANSITIONS = Object.freeze({
@@ -49,13 +51,15 @@ const STATUS_TRANSITIONS = Object.freeze({
     "blocked",
     "not_proven",
   ]),
-  ready: new Set(["launching", "running", "blocked", "failed"]),
+  ready: new Set(["launching", "running", "blocked", "failed", "abandoned", "invalidated"]),
   launching: new Set(["running", "blocked", "failed", "not_proven"]),
   waiting: new Set(["running", "passed", "failed", "not_proven"]),
   passed: new Set(),
   failed: new Set(),
   blocked: new Set(),
   not_proven: new Set(),
+  abandoned: new Set(),
+  invalidated: new Set(),
 });
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -874,9 +878,14 @@ export function createOrReuseDeliveryOperation(
   });
   const existingKeyIndex = readIdempotencyIndex(store, idempotencyKey);
   if (existingKeyIndex) {
+    const implicitReprepareReplay = retryOfOperationId === null &&
+      existingKeyIndex.retryOfOperationId !== null &&
+      ["abandoned", "invalidated"].includes(
+        readDeliveryOperation(store, existingKeyIndex.retryOfOperationId).status,
+      );
     if (
       existingKeyIndex.requestFingerprint !== requestFingerprint ||
-      existingKeyIndex.retryOfOperationId !== retryOfOperationId
+      (existingKeyIndex.retryOfOperationId !== retryOfOperationId && !implicitReprepareReplay)
     ) {
       throw new Error("idempotency key was already used for another request");
     }
@@ -893,6 +902,9 @@ export function createOrReuseDeliveryOperation(
   }
   const intentOwner = readIntentOwner(store, requestFingerprint);
   const latestOperation = intentOwner?.operation || null;
+  if (retryOfOperationId === null && ["abandoned", "invalidated"].includes(latestOperation?.status)) {
+    retryOfOperationId = latestOperation.id;
+  }
   if (retryOfOperationId === null && latestOperation) {
     claimIdempotencyIndex(store, {
       idempotencyKey,
@@ -929,7 +941,7 @@ export function createOrReuseDeliveryOperation(
     if (retryParent.status === "not_proven") {
       throw new Error("unknown target outcome must be read back before retry");
     }
-    if (!["failed", "blocked"].includes(retryParent.status)) {
+    if (!["failed", "blocked", "abandoned", "invalidated"].includes(retryParent.status)) {
       throw new Error("only failed or blocked operations can be retried");
     }
     const parentLineage = normalizedOperationLineage(retryParent);
@@ -1024,6 +1036,10 @@ export function transitionDeliveryOperation(
   { status, message, issues, metadata, now = new Date().toISOString() },
 ) {
   const current = readDeliveryOperation(store, operationId);
+  if (["abandoned", "invalidated"].includes(status) &&
+      !["promote", "rollback", "rebuild-database"].includes(current.action)) {
+    throw new Error("only a delivery plan can be closed");
+  }
   if (!STATUS_TRANSITIONS[current.status].has(status)) {
     throw new Error(
       `operation transition is invalid: ${current.status} -> ${status}`,

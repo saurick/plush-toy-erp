@@ -5,21 +5,18 @@ import {
   ReloadOutlined,
   ToolOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Card, Space, Tooltip, Typography } from 'antd'
+import { Alert, Button, Space, Tooltip, Typography } from 'antd'
+import { CurrentDeliveryOperations } from './delivery/version/CurrentDeliveryOperations.jsx'
 import { useVersionCenter } from './delivery/version/useVersionCenter.jsx'
 import { ExecutionModal } from './delivery/version/ExecutionModal.jsx'
 import { OperationDrawer } from './delivery/version/OperationDrawer.jsx'
 import { ReleaseModal } from './delivery/version/ReleaseModal.jsx'
 import {
-  StatusTag,
   issueDescription,
-  operationActionLabel,
-  operationUpdateAction,
 } from './delivery/version/shared.jsx'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
-import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import { buildDevCustomerScopedRoute } from '../config/devCustomerScope.mjs'
@@ -27,9 +24,6 @@ import { DEV_VERSION_GUIDE_ROUTE } from '../config/devRoutes.mjs'
 import {
   DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_TARGETS,
-  deliveryOperationMessagePresentation,
-  formatDeliveryDuration,
-  shortGitSha,
 } from '../config/devDelivery.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -50,6 +44,8 @@ export default function DevVersionCenterPage() {
     isMutationRunning,
     loadError,
     openOperations,
+    openOperationDetail,
+    unprovenOperations,
     operationCachePresentation,
     operationDetail,
     operationDetailIdempotency,
@@ -117,69 +113,20 @@ export default function DevVersionCenterPage() {
           description={`${operationPollError}；页面会继续有界重试，也可手动刷新状态。`}
         />
       ) : null}
-      {openOperations.length > 0 ? (
-        <Card
-          title="当前操作"
-          className="erp-dev-version-table-card erp-dev-version-current-operation"
-        >
-          <div className="erp-dev-version-current-operation__list">
-            {openOperations.map((operation) => {
-              const statusMessage = deliveryOperationMessagePresentation(
-                operation.events.at(-1)?.message
-              )
-              return (
-                <article
-                  key={operation.id}
-                  className="erp-dev-version-current-operation__item"
-                  aria-label={`当前操作 ${operation.version}`}
-                >
-                  <div className="erp-dev-version-current-operation__detail">
-                    <Text strong>
-                      {operationActionLabel(
-                        operation.action,
-                        operation.promotionMode,
-                        operation.target
-                      )}
-                    </Text>
-                    <DevTimestamp
-                      value={operation.createdAt}
-                      action="开始于"
-                      missing="开始时间未证明"
-                      className="erp-dev-current-operation-time"
-                    />
-                  </div>
-                  <div className="erp-dev-version-current-operation__detail">
-                    <Text>{operation.version}</Text>
-                    <Text type="secondary" code>
-                      {shortGitSha(operation.gitSha)}
-                    </Text>
-                  </div>
-                  <div className="erp-dev-version-current-operation__detail">
-                    <Space size={6} wrap>
-                      <StatusTag status={operation.status} />
-                      <Text>
-                        {formatDeliveryDuration(operation.durationMs)}
-                      </Text>
-                    </Space>
-                    <Text type="secondary" title={statusMessage.title}>
-                      {statusMessage.label}
-                    </Text>
-                    <DevTimestamp
-                      value={operation.updatedAt}
-                      action={operationUpdateAction(operation)}
-                      missing="更新时间未证明"
-                      className="erp-dev-current-operation-time"
-                    />
-                  </div>
-                  <div className="erp-dev-version-current-operation__actions">
-                    {renderOperationActions(operation)}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </Card>
+      {unprovenOperations.length > 0 ? (
+        <Alert
+          type="warning"
+          showIcon
+          message={`有 ${unprovenOperations.length} 条操作结果未证明，请先核对目标与原始回执`}
+          action={<Button onClick={(event) => openOperationDetail(unprovenOperations[0], event.currentTarget)}>核对结果</Button>}
+        />
       ) : null}
+      <CurrentDeliveryOperations
+        operations={openOperations}
+        compact={activeView !== 'versions'}
+        openOperationDetail={openOperationDetail}
+        renderOperationActions={renderOperationActions}
+      />
 
     </div>
   )
@@ -311,6 +258,7 @@ export default function DevVersionCenterPage() {
       />
 
       <OperationDrawer
+        renderOperationActions={renderOperationActions}
         clearOperationDetailFocusRestoreTimer={
           clearOperationDetailFocusRestoreTimer
         }

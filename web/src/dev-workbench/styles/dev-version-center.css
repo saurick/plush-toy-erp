@@ -227,9 +227,7 @@
 
 .erp-dev-version-current-operation__item {
   display: grid;
-  grid-template-columns:
-    minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(220px, 1.5fr)
-    auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(200px, 1fr) auto;
   gap: 16px;
   align-items: center;
   min-width: 0;
@@ -252,6 +250,20 @@
 .erp-dev-version-current-operation__actions {
   justify-self: end;
 }
+
+.erp-dev-version-current-operation--compact {
+  display: grid;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--erp-business-card-radius);
+}
+
+.erp-dev-version-current-operation--compact .erp-dev-version-current-operation__item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 0;
+}
+
 
 .erp-dev-version-guide-page.erp-dev-hub-page {
   display: grid;
