@@ -376,9 +376,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   })
 
   useEffect(() => {
+    if (calendarView || shouldShowProductCoreDashboard) return outletContext?.registerPageRefresh?.(null)
     return outletContext?.registerPageRefresh?.(() => {
       if (summaryOpen) setSummaryRefreshRevision((value) => value + 1)
-      if (trackingScope || exceptionsView || calendarView)
+      if (trackingScope || exceptionsView)
         { setTrackingRefresh((value) => value + 1) }
       return reloadTaskData()
     })
@@ -389,6 +390,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     trackingScope,
     exceptionsView,
     calendarView,
+    shouldShowProductCoreDashboard,
   ])
 
   useEffect(() => {

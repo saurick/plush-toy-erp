@@ -31,6 +31,7 @@ export function isBusinessFormPageTitle(title) {
 }
 
 export async function assertBusinessFormPage(page, editor) {
+  assert.equal(await editor.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0, '整页表单不提供会丢弃编辑内容的常驻刷新')
   const fullscreen = editor.getByRole('button', { name: /^(全屏编辑|全屏查看|退出全屏)$/u })
   const desktop = page.viewportSize().width >= 768 && !new URL(page.url()).pathname.startsWith('/m/')
   await fullscreen.waitFor({ state: desktop ? 'visible' : 'hidden' })

@@ -229,10 +229,11 @@ export function createCustomerSessionScenarios({
         })
         await assertShellRefreshButton(page, {
           scenarioName: 'erp-dashboard-desktop',
-          expectVisible: true,
+          expectVisible: false,
         })
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-dashboard-desktop',
+          expectRefresh: false,
         })
         const productCoreMetrics = await page.evaluate(() => {
           const dashboard = document.querySelector(
@@ -286,7 +287,9 @@ export function createCustomerSessionScenarios({
         )
         await page.getByRole('button', { name: /^销售订单/ }).click()
         await waitForPath(page, '/erp/sales/project-orders/sales-orders')
-        await expectText(page, '销售订单 功能预览')
+        await expectHeading(page, '销售订单')
+        await expectText(page, '功能预览：尚未连接客户环境，不显示客户业务数据。')
+        await assertShellRefreshButton(page, { scenarioName: 'sales-order-capability-preview', expectVisible: false })
         await page.goBack({ waitUntil: 'domcontentloaded' })
         await expectHeading(page, '系统功能总览')
       },

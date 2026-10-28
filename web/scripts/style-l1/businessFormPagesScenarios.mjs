@@ -1076,7 +1076,7 @@ export function createBusinessFormPagesScenarios(deps) {
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.getByRole('status').getByText('尚未修改').waitFor()
         const attachmentInput = editor.locator(
-          '.business-attachment-panel input[type="file"]'
+          '.business-attachment-panel input[type="file"][accept*="application/pdf"]'
         )
         const file = {
           name: '未保存附件.txt',
@@ -1140,8 +1140,10 @@ export function createBusinessFormPagesScenarios(deps) {
         await openModule('物料清单（BOM）')
         await page.getByRole('button', { name: '新建 BOM' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await assertBusinessFormPage(page, editor)
+        await page.waitForFunction(() => document.querySelector('.erp-business-form-page:not([hidden])')?.getAttribute('aria-busy') === 'false')
         await editor.locator('textarea').fill('导航保护测试')
-        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await editor.getByRole('button', { name: '返回列表', exact: true }).click()
         await page
           .getByRole('button', { name: '继续编辑', exact: true })
           .click()
@@ -1171,12 +1173,14 @@ export function createBusinessFormPagesScenarios(deps) {
           .waitFor()
         await openModule('物料清单（BOM）')
         await page.getByRole('button', { name: '新建 BOM' }).click()
-        await editor.locator('textarea').fill('刷新放弃测试')
-        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await page.waitForFunction(() => document.querySelector('.erp-business-form-page:not([hidden])')?.getAttribute('aria-busy') === 'false')
+        await editor.locator('textarea').fill('返回放弃测试')
+        await editor.getByRole('button', { name: '返回列表', exact: true }).click()
         await page
           .getByRole('button', { name: '放弃修改', exact: true })
           .click()
         await editor.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '刷新当前页', exact: true }).click()
         await page
           .locator('.erp-business-module-tabs')
           .getByRole('tab', { name: '物料清单（BOM）', exact: true, selected: true })

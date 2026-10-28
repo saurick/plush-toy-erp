@@ -297,6 +297,7 @@ revision,
         assert.equal(await refreshSuccess.count(), 0, 'initial loads, date changes and automatic updates do not announce manual refresh success')
         tasks[0].task_status_key = 'ready'
         const refreshButton = calendar.getByRole('button', { name: '刷新待办日历', exact: true })
+        assert.equal(await page.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0, '日历已有独立刷新，页头不重复提供')
         const refreshing = { expectedSelection: today, expectedKeyword: '', started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = refreshing
         await refreshButton.click()

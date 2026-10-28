@@ -792,7 +792,8 @@ export function createBOMMaterialGroupsScenarios(deps) {
           true
         )
         await save.click({ force: true })
-        await page.getByRole('button', { name: '刷新当前页' }).click()
+        deps.assert.equal(await editor.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0)
+        await editor.getByRole('button', { name: '返回列表', exact: true }).click({ force: true })
         deps.assert.equal(saveAttempts, 1)
         deps.assert.equal(
           await editor

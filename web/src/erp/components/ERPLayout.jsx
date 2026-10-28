@@ -1204,15 +1204,10 @@ export default function ERPLayout({ legalNotice }) {
   }
 
   const handleRefreshCurrentPage = useCallback(async () => {
-    if (refreshingCurrentPageRef.current) {
+    if (!pageRefreshHandler || refreshingCurrentPageRef.current) {
       return
     }
     if (pageLeaveGuard && !(await pageLeaveGuard({ intent: 'refresh' }))) return
-
-    if (!pageRefreshHandler) {
-      window.location.reload()
-      return
-    }
 
     refreshingCurrentPageRef.current = true
     setRefreshingCurrentPage(true)
@@ -1232,10 +1227,10 @@ export default function ERPLayout({ legalNotice }) {
   }, [pageLeaveGuard, pageRefreshHandler, taskCount])
 
   const pageActions = useMemo(() => ({
-    onRefresh: handleRefreshCurrentPage,
+    onRefresh: pageRefreshHandler ? handleRefreshCurrentPage : null,
     refreshing: refreshingCurrentPage,
     onOpenNavigation: () => setMobileNavOpen(true),
-  }), [handleRefreshCurrentPage, refreshingCurrentPage])
+  }), [handleRefreshCurrentPage, pageRefreshHandler, refreshingCurrentPage])
 
   const handleNavigate = async (nextPath, navigateOptions) => {
     if (!nextPath) {

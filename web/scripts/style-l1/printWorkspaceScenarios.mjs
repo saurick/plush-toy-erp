@@ -795,6 +795,7 @@ export function createPrintWorkspaceScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '模板打印中心')
+        assert.equal(await page.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0, '静态模板目录不提供整页重载')
         await expectText(page, '打开编辑与打印')
         await expectText(page, '模板')
         await expectText(page, '采购合同')

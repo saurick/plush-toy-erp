@@ -305,6 +305,7 @@ export function createHelpCenterScenarios({
         const root = page.locator('.erp-help-center-page')
         const article = page.locator('[data-help-reference="manual:operations:overview"]')
         await article.waitFor()
+        assert.equal(await page.getByRole('button', { name: '刷新当前页', exact: true }).count(), 0, '帮助阅读不提供整页重载')
         await page.getByRole('button', { name: '维护补充与纠错', exact: true }).waitFor()
         await assertHelpNavigationGeometry(page, assert)
         const metrics = await root.evaluate((node) => {

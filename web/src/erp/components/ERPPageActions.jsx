@@ -5,7 +5,7 @@ import { Button } from 'antd'
 export const ERPPageActionsContext = createContext(null)
 
 // 模块页头和独立页面共用壳层的刷新及离开保护，手机任务页不提供此上下文。
-export default function ERPPageActions() {
+export default function ERPPageActions({ showRefresh = true }) {
   const actions = useContext(ERPPageActionsContext)
   if (!actions) return null
 
@@ -17,14 +17,16 @@ export default function ERPPageActions() {
         aria-label="打开导航菜单"
         onClick={actions.onOpenNavigation}
       />
-      <Button
-        icon={<ReloadOutlined />}
-        loading={actions.refreshing}
-        onClick={actions.onRefresh}
-        aria-label="刷新当前页"
-      >
-        刷新
-      </Button>
+      {showRefresh && actions.onRefresh ? (
+        <Button
+          icon={<ReloadOutlined />}
+          loading={actions.refreshing}
+          onClick={actions.onRefresh}
+          aria-label="刷新当前页"
+        >
+          刷新
+        </Button>
+      ) : null}
     </div>
   )
 }

@@ -448,7 +448,7 @@ export default function BusinessFormPage({
       ) : null}
       <header className="erp-business-form-page__header">
         <h1 tabIndex={-1}>{title}</h1>
-        {open ? <ERPPageActions /> : null}
+        {open ? <ERPPageActions showRefresh={false} /> : null}
         {canFullscreen ? (
           <Button
             size="small"

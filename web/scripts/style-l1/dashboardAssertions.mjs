@@ -52,7 +52,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
 
   async function assertNoDashboardCenterLocalRefreshButton(
     page,
-    { scenarioName }
+    { scenarioName, expectRefresh = true }
   ) {
     const metrics = await page.evaluate(() => {
       const forbiddenLabels = new Set(['刷新', '刷新任务', '刷新业务数据'])
@@ -89,7 +89,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       }
     })
 
-    assert.equal(metrics.pageRefreshButtonCount, 1, `${scenarioName} 当前页面应只保留一个共享刷新入口`)
+    assert.equal(metrics.pageRefreshButtonCount, expectRefresh ? 1 : 0, `${scenarioName} 只在当前页面有数据查询时保留一个共享刷新入口`)
     assert.equal(
       metrics.forbiddenButtonCount,
       0,
