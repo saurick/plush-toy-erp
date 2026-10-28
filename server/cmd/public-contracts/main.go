@@ -521,6 +521,7 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		}
 	}
 	for _, source := range []struct{ path, prefix, export string }{
+		{"biz/bom_source_snapshot.go", "BOMLossSource", "BOMLossSource"},
 		{"core/status/sales_order.go", "SalesOrder", "SalesOrderStatus"},
 		{"core/status/sales_order.go", "SalesOrderItem", "SalesOrderItemStatus"},
 		{"core/status/purchase_order.go", "PurchaseOrder", "PurchaseOrderStatus"},
@@ -575,7 +576,7 @@ func collectCatalog(root string, review bool) (catalog, error) {
 	if err != nil {
 		return out, err
 	}
-	limits := map[string]string{"BusinessAttachmentMaxBytes": "maxBytes", "BusinessAttachmentProductImageMaxBytes": "productImageMaxBytes", "BusinessAttachmentProductImageMaxWidth": "productImageMaxWidth", "BusinessAttachmentProductImageMaxHeight": "productImageMaxHeight"}
+	limits := map[string]string{"BusinessAttachmentMaxBytes": "maxBytes", "BusinessAttachmentMaxJSONRPCBodyBytes": "maxJSONRPCBodyBytes", "BusinessAttachmentRequestTimeoutSeconds": "requestTimeoutSeconds", "BusinessAttachmentProductImageMaxBytes": "productImageMaxBytes", "BusinessAttachmentProductImageMaxWidth": "productImageMaxWidth", "BusinessAttachmentProductImageMaxHeight": "productImageMaxHeight"}
 	err = declarations(attachment, token.CONST, func(name string, expr ast.Expr) error {
 		label, ok := limits[name]
 		if !ok {
@@ -634,6 +635,9 @@ func collectCatalog(root string, review bool) (catalog, error) {
 	}{
 		{"biz/business_pagination.go", "BusinessPaginationPolicy", map[string]string{
 			"BusinessListDefaultLimit": "defaultPageSize", "BusinessListMaxLimit": "maxPageSize",
+		}},
+		{"biz/bom_source_snapshot.go", "BOMSourcePolicy", map[string]string{
+			"BOMSourceMaxNumberCharacters": "numberCharacters", "BOMSourceMaxScale": "scale", "BOMSourceMaxTextCharacters": "textCharacters", "BOMSourceMaxFormulaCharacters": "formulaCharacters", "BOMSourceMaxRow": "maxRow",
 		}},
 		{"biz/work_center_pagination.go", "WorkCenterPaginationPolicy", map[string]string{
 			"WorkCenterDefaultLimit": "defaultPageSize", "WorkCenterMaxLimit": "maxPageSize",

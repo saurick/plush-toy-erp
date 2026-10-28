@@ -56,6 +56,16 @@ function aggregate() {
   }
 }
 
+test('production snapshots accept full BOM coefficient precision while executable quantities retain their unit contract', () => {
+  const data = aggregate()
+  const item = data.production_material_requirements[0]
+  item.unit_quantity_snapshot = '0.0123456789012345'
+  item.loss_rate_snapshot = '0.1234567890123456789'
+  assert.equal(validateProductionOrderAggregate(data).materialRequirements[0].unit_quantity_snapshot, item.unit_quantity_snapshot)
+  item.planned_quantity = '10.2000001'
+  assert.throws(() => validateProductionOrderAggregate(data))
+})
+
 test('production order aggregate response binds order, status and every item', () => {
   assert.equal(
     validateProductionOrderAggregate(aggregate(), {
@@ -72,6 +82,12 @@ test('production order aggregate response binds order, status and every item', (
   const malformed = aggregate()
   malformed.production_order_items[0].production_order_id = 8
   assert.throws(() => validateProductionOrderAggregate(malformed))
+
+  for (const route of [undefined, null, '', 'UNKNOWN_ROUTE']) {
+    const invalidRoute = aggregate()
+    invalidRoute.production_order_items[0].route_code = route
+    assert.throws(() => validateProductionOrderAggregate(invalidRoute))
+  }
 
   const invalidCustomerGate = aggregate()
   invalidCustomerGate.production_order_items[0].route_code = null

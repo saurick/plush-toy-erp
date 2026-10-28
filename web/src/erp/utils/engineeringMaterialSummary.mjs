@@ -3,6 +3,7 @@ import {
   numeric20Scale6TextFromUnits,
   addNumeric20Scale6Units,
 } from './numeric20Scale6.mjs'
+import { normalizeBOMSourceNumber, formatBOMSourceNumber } from './bomSourceValues.mjs'
 
 export const materialRowKey = (item) => `${item.material_id}:${item.unit_id}`
 
@@ -36,13 +37,17 @@ export function materialSummaryRows(request) {
 
 export function formatMaterialQuantity(value) {
   if (value === null || value === undefined || value === '') return '—'
-  const units = numeric20Scale6Units(value)
-  if (units === null) return '—'
-  const [integer, fraction] = numeric20Scale6TextFromUnits(units).split('.')
+  const text = normalizeBOMSourceNumber(value, { calculated: true })
+  if (!text) return '—'
+  const [integer, fraction] = text.split('.')
   return (
     integer.replace(/\B(?=(\d{3})+(?!\d))/gu, ',') +
     (fraction ? `.${fraction}` : '')
   )
+}
+
+export function formatMaterialSourceQuantity(value, numberFormat) {
+  return numberFormat ? formatBOMSourceNumber(value, numberFormat) || '—' : formatMaterialQuantity(value)
 }
 
 export function materialSummaryTotals(items = []) {

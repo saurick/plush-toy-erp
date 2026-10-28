@@ -13,7 +13,7 @@ const selectedAttachment = (overrides = {}) => ({
   uid: 'selected',
   file_name: '采购订单.csv',
   file_size: 7,
-  content_base64: 'Y29udGVudA==',
+  file_digest: 'sha256-content',
   attachment_type: 'evidence',
   upload_status: 'pending',
   ...overrides,
@@ -38,7 +38,7 @@ test('attachment selection: repeated files in one selection or later selections 
 
 test('attachment selection: same-name revisions with the same size and different attachment purposes remain distinct', () => {
   const original = selectedAttachment()
-  const revision = selectedAttachment({ content_base64: 'cmV2aXNpbw==' })
+  const revision = selectedAttachment({ file_digest: 'sha256-revision' })
   const printImage = selectedAttachment({ attachment_type: 'print_appendix' })
   const result = mergeBusinessAttachmentSelection(
     [original],

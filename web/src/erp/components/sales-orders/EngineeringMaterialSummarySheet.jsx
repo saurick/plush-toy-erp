@@ -15,6 +15,7 @@ import {
 import { bomLossRateToPercent } from '../../utils/bomMaterialGroups.mjs'
 import {
   formatMaterialQuantity as quantity,
+  formatMaterialSourceQuantity,
   materialRowKey,
   materialStockQuantity,
   materialSummaryProducts,
@@ -52,7 +53,7 @@ function MaterialParts({ parts }) {
           dataIndex: 'unit_usage',
           width: 110,
           align: 'right',
-          render: (value) => quantity(value, true),
+          render: (value, part) => <span title={value}>{formatMaterialSourceQuantity(value, part.unit_usage_format)}</span>,
         },
         {
           title: '损耗 %',
@@ -73,7 +74,7 @@ function MaterialParts({ parts }) {
           dataIndex: 'total_usage',
           width: 115,
           align: 'right',
-          render: (value) => quantity(value, true),
+          render: (value, part) => <span title={value}>{formatMaterialSourceQuantity(value, part.total_usage_format)}</span>,
         },
         {
           align: 'left',

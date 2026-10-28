@@ -21,6 +21,7 @@ import {
   Typography,
 } from 'antd'
 import {
+  CameraOutlined,
   DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
@@ -53,6 +54,7 @@ import {
   resolveBusinessAttachmentWithdrawalMeta,
 } from '../../utils/businessAttachmentPresentation.mjs'
 import { settleBusinessAttachmentBatchUpload } from '../../utils/businessAttachmentBatchUpload.mjs'
+import { BUSINESS_ATTACHMENT_PHOTO_ACCEPT, fingerprintBusinessAttachmentFile } from '../../utils/businessAttachmentFiles.mjs'
 import {
   isBusinessAttachmentImage,
   mergeBusinessAttachmentSelection,
@@ -110,12 +112,10 @@ function createAttachmentPanelMessageKey() {
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = () =>
-      resolve(
-        String(reader.result || '')
-          .split(',')
-          .pop()
-      )
+    reader.onload = () => {
+      const value = String(reader.result || '')
+      resolve(value.slice(value.indexOf(',') + 1))
+    }
     reader.onerror = () => reject(new Error('read file failed'))
     reader.readAsDataURL(file)
   })
@@ -160,7 +160,7 @@ function base64ToBlob(attachment) {
 }
 
 function createAttachmentObjectURL(attachment) {
-  return URL.createObjectURL(base64ToBlob(attachment))
+  return URL.createObjectURL(attachment.file || base64ToBlob(attachment))
 }
 
 function downloadBlob(attachment) {
@@ -268,6 +268,8 @@ const BusinessAttachmentPanel = forwardRef(
   ) => {
     const contentId = useId()
     const inputRef = useRef(null)
+    const photoInputRef = useRef(null)
+    const cameraInputRef = useRef(null)
     const printAppendixInputRef = useRef(null)
     const withdrawalReasonRef = useRef(null)
     const pendingAttachmentsRef = useRef([])
@@ -480,7 +482,7 @@ const BusinessAttachmentPanel = forwardRef(
           file_name: item.file_name,
           mime_type: item.mime_type,
           file_size: item.file_size,
-          content_base64: item.content_base64,
+          content_base64: await readFileAsBase64(item.file),
           ...(ownerType === 'workflow_task'
             ? { expected_version: Number(ownerVersion || 0) }
             : {}),
@@ -665,7 +667,9 @@ const BusinessAttachmentPanel = forwardRef(
       const validFiles = []
       for (const file of files) {
         const mimeType = inferMimeType(file)
-        if (file.size > MAX_ATTACHMENT_SIZE) {
+        if (String(file.type || '').startsWith('video/')) {
+          message.warning(`${file.name} 格式暂不支持，请选择照片或文件`)
+        } else if (file.size > MAX_ATTACHMENT_SIZE) {
           message.warning(
             `${file.name} 超过 ${MAX_ATTACHMENT_SIZE_LABEL}，请压缩后再上传`
           )
@@ -693,14 +697,15 @@ const BusinessAttachmentPanel = forwardRef(
         const preparedItems = []
         for (const file of validFiles) {
           try {
-            const content = await readFileAsBase64(file)
+            const digest = await fingerprintBusinessAttachmentFile(file)
             if (selectionScope !== scopeRef.current) return
             preparedItems.push({
               uid: createPendingAttachmentID(),
               file_name: file.name,
               mime_type: inferMimeType(file),
               file_size: file.size,
-              content_base64: content,
+              file,
+              file_digest: digest,
               attachment_type: requestedAttachmentType,
               upload_status: 'pending',
             })
@@ -971,7 +976,7 @@ const BusinessAttachmentPanel = forwardRef(
             ? item
             : await downloadBusinessAttachment({ id: item.id })
         if (previewScope !== scopeRef.current) return
-        if (!attachment?.content_base64) {
+        if (!attachment?.file && !attachment?.content_base64) {
           message.warning('附件内容为空，无法预览')
           return
         }
@@ -1350,6 +1355,21 @@ const BusinessAttachmentPanel = forwardRef(
                   >
                     {uploadButtonText}
                   </Button>
+                  <Button
+                    className="business-attachment-panel__mobile-action"
+                    disabled={uploadDisabled}
+                    onClick={() => photoInputRef.current?.click()}
+                  >
+                    选照片
+                  </Button>
+                  <Button
+                    className="business-attachment-panel__mobile-action"
+                    icon={<CameraOutlined aria-hidden="true" />}
+                    disabled={uploadDisabled}
+                    onClick={() => cameraInputRef.current?.click()}
+                  >
+                    拍照
+                  </Button>
                   {enablePrintAppendixUpload ? (
                     <Button
                       icon={<UploadOutlined aria-hidden="true" />}
@@ -1363,12 +1383,9 @@ const BusinessAttachmentPanel = forwardRef(
                 <span className="business-attachment-panel__drop-hint">
                   或将文件拖拽到此处
                 </span>
-                <span className="business-attachment-panel__mobile-hint">
-                  选择照片或文件
-                </span>
                 <span className="business-attachment-panel__upload-limit">
                   支持图片、PDF、Office、WPS、邮件、文本与压缩包；单个文件不超过
-                  100 MB
+                  {' '}{MAX_ATTACHMENT_SIZE_LABEL}
                 </span>
               </div>
               <input
@@ -1377,6 +1394,24 @@ const BusinessAttachmentPanel = forwardRef(
                 multiple
                 type="file"
                 accept={ACCEPTED_ATTACHMENT_TYPES}
+                onChange={handleFileChange}
+              />
+              <input
+                ref={photoInputRef}
+                aria-label="选择照片"
+                hidden
+                multiple
+                type="file"
+                accept={BUSINESS_ATTACHMENT_PHOTO_ACCEPT}
+                onChange={handleFileChange}
+              />
+              <input
+                ref={cameraInputRef}
+                aria-label="拍照"
+                hidden
+                type="file"
+                accept={BUSINESS_ATTACHMENT_PHOTO_ACCEPT}
+                capture="environment"
                 onChange={handleFileChange}
               />
               {enablePrintAppendixUpload ? (

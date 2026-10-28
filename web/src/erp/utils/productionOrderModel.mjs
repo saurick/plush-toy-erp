@@ -1,5 +1,6 @@
 import { ProductionOrderStatus } from '../../common/consts/statuses.generated.mjs'
 import { PRODUCTION_WIP_ROUTE_CODE } from './productionWipModel.mjs'
+import { isBOMDecimalText } from './bomSourceValues.mjs'
 import {
   addNumeric20Scale6Units,
   isPositiveNumeric20Scale6Units,
@@ -82,11 +83,8 @@ export function validateProductionOrderAggregate(data, expected = {}) {
       !positiveSafeInteger(item.unit_id) ||
       typeof item.planned_quantity !== 'string' ||
       !item.planned_quantity.trim() ||
-      (item.route_code != null &&
-        item.route_code !== PRODUCTION_WIP_ROUTE_CODE) ||
-      typeof item.customer_inspection_required !== 'boolean' ||
-      (item.customer_inspection_required &&
-        item.route_code !== PRODUCTION_WIP_ROUTE_CODE)
+      item.route_code !== PRODUCTION_WIP_ROUTE_CODE ||
+      typeof item.customer_inspection_required !== 'boolean'
     ) {
       throw invalidResponse()
     }
@@ -146,6 +144,8 @@ export function validateProductionMaterialRequirements(
       !positiveSafeInteger(requirement.bom_item_id) ||
       !positiveSafeInteger(requirement.material_id) ||
       !positiveSafeInteger(requirement.unit_id) ||
+      !isBOMDecimalText(requirement.unit_quantity_snapshot, { positive: true }) ||
+      !isBOMDecimalText(requirement.loss_rate_snapshot) ||
       seen.has(requirement.id) ||
       (positiveSafeInteger(productionOrderID) &&
         requirement.production_order_id !== productionOrderID) ||

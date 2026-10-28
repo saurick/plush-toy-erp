@@ -8,6 +8,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
+import { AttachmentPolicy } from '../src/common/consts/attachments.generated.mjs'
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -73,7 +74,8 @@ const shutdownTimeoutMs = resolvePositiveInteger(
   process.env.SHUTDOWN_TIMEOUT_MS,
   10_000
 )
-const attachmentProxyBodyLimitBytes = 140 * 1024 * 1024
+const attachmentProxyBodyLimitBytes = AttachmentPolicy.maxJSONRPCBodyBytes
+const attachmentProxyTimeoutMs = Math.max(proxyTimeoutMs, AttachmentPolicy.requestTimeoutSeconds * 1000)
 const httpAgent = new http.Agent({
   keepAlive: true,
   maxFreeSockets: 4,
@@ -157,7 +159,7 @@ function upstreamFailureReason(error, timedOut) {
 }
 
 server.headersTimeout = 15_000
-server.requestTimeout = proxyTimeoutMs + 5_000
+server.requestTimeout = attachmentProxyTimeoutMs + 5_000
 server.keepAliveTimeout = 5_000
 server.maxRequestsPerSocket = 1_000
 server.maxHeadersCount = 100
@@ -431,12 +433,13 @@ function proxyRequest(request, response, requestUrl) {
   let timedOut = false
   let bodyTooLarge = false
   const bodyLimit = proxyBodyLimit(requestUrl.pathname)
+  const requestTimeoutMs = requestUrl.pathname === '/rpc/attachment' ? attachmentProxyTimeoutMs : proxyTimeoutMs
   const proxy = client.request(
     targetUrl,
     {
       method: request.method,
       headers,
-      timeout: proxyTimeoutMs,
+      timeout: requestTimeoutMs,
       agent: targetUrl.protocol === 'https:' ? httpsAgent : httpAgent,
     },
     (proxyResponse) => {
@@ -460,7 +463,7 @@ function proxyRequest(request, response, requestUrl) {
     timedOut = true
     request.observation.reason ||= 'dependency_timeout'
     proxy.destroy(new Error('proxy deadline exceeded'))
-  }, proxyTimeoutMs)
+  }, requestTimeoutMs)
   proxyDeadline.unref()
   proxy.once('close', () => {
     clearTimeout(proxyDeadline)

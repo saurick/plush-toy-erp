@@ -1589,6 +1589,10 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 	}
 	copiedItems := make([]*biz.BOMItem, 0, len(sourceItems))
 	for _, sourceItem := range sourceItems {
+		totalUsage := sourceItem.TotalUsageSnapshot
+		if !biz.BOMSourceTotalIsCurrent(biz.BOMItemUpdate{Quantity: sourceItem.Quantity, LossRate: sourceItem.LossRate, SourceSnapshot: sourceItem.SourceSnapshot}, quantityText) {
+			totalUsage = nil
+		}
 		item, err := tx.BOMItem.Create().
 			SetBomHeaderID(target.ID).
 			SetMaterialID(sourceItem.MaterialID).
@@ -1597,7 +1601,8 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 			SetLossRate(sourceItem.LossRate).
 			SetNillablePosition(sourceItem.Position).
 			SetNillablePieceCount(sourceItem.PieceCount).
-			SetNillableTotalUsageSnapshot(sourceItem.TotalUsageSnapshot).
+			SetNillableTotalUsageSnapshot(totalUsage).
+			SetSourceSnapshot(sourceItem.SourceSnapshot).
 			SetNillableProcessBase(sourceItem.ProcessBase).
 			SetNillableProcessMethod(sourceItem.ProcessMethod).
 			SetNillableNote(sourceItem.Note).
@@ -1886,6 +1891,7 @@ func entBOMItemToBiz(row *ent.BOMItem) *biz.BOMItem {
 		Position:           row.Position,
 		PieceCount:         row.PieceCount,
 		TotalUsageSnapshot: row.TotalUsageSnapshot,
+		SourceSnapshot:     row.SourceSnapshot,
 		ProcessBase:        row.ProcessBase,
 		ProcessMethod:      row.ProcessMethod,
 		Note:               row.Note,

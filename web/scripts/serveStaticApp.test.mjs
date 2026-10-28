@@ -265,7 +265,7 @@ test(
       port,
       pathname: '/rpc/attachment',
       method: 'POST',
-      headers: { 'content-length': String(140 * 1024 * 1024 + 1) },
+      headers: { 'content-length': String(280 * 1024 * 1024 + 1) },
       body: 'small',
     })
     assert.equal(knownOversizedAttachment.statusCode, 413)
@@ -290,7 +290,11 @@ test(
   async (t) => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'serve-static-timeout-'))
     const port = await reservePort()
-    const backend = http.createServer(() => {})
+    const backend = http.createServer((request, response) => {
+      if (request.url === '/rpc/attachment') {
+        setTimeout(() => response.end('attachment complete'), 200)
+      }
+    })
     await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve))
     await writeFile(
       path.join(root, 'index.html'),
@@ -302,7 +306,7 @@ test(
         API_ORIGIN: `http://127.0.0.1:${backend.address().port}`,
         HOST: '127.0.0.1',
         PORT: String(port),
-        PROXY_PREFIXES: '/templates',
+        PROXY_PREFIXES: '/templates,/rpc',
         PROXY_TIMEOUT_MS: '100',
         STATIC_ROOT: root,
       },
@@ -325,6 +329,9 @@ test(
     const timedOut = await requestServer({ port, pathname: '/templates/slow' })
     assert.equal(timedOut.statusCode, 504)
     assert.equal(timedOut.body, 'Gateway Timeout')
+    const attachment = await requestServer({ port, pathname: '/rpc/attachment', method: 'POST', body: '{}' })
+    assert.equal(attachment.statusCode, 200, '附件请求应使用独立超时，普通请求仍按原设置超时')
+    assert.equal(attachment.body, 'attachment complete')
   }
 )
 

@@ -209,13 +209,21 @@ func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflic
 	))
 	adminCtx := workflowJSONRPCAdminContext()
 	baseParams := map[string]any{
-		"product_id": float64(fixtures.productID),
-		"version":    "CAS-V1",
+		"product_id":    float64(fixtures.productID),
+		"version":       "CAS-V1",
+		"quantity_text": "100",
 		"items": []any{map[string]any{
-			"material_id": float64(fixtures.materialID),
-			"quantity":    "1",
-			"unit_id":     float64(fixtures.unitID),
-			"loss_rate":   "0",
+			"material_id":          float64(fixtures.materialID),
+			"quantity":             "1.000000000001",
+			"unit_id":              float64(fixtures.unitID),
+			"loss_rate":            "0",
+			"total_usage_snapshot": "100.0000000001",
+			"source_snapshot": map[string]any{
+				"file_name": "教学材料.xlsx", "sheet_name": "材料分析明细表", "row_number": 6,
+				"quantity_value": "1.000000000001", "quantity_label": "单位用量", "quantity_format": "0.000",
+				"total_value": "100.0000000001", "total_label": "总用量", "total_format": "0.00",
+				"loss_source": biz.BOMLossSourceExplicit, "loss_value": "0", "loss_rate": "0", "order_quantity": "100",
+			},
 		}},
 	}
 	_, createResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "create", mustJSONRPCStruct(t, baseParams))
@@ -223,6 +231,12 @@ func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflic
 		t.Fatalf("create aggregate BOM result=%#v err=%v", createResult, err)
 	}
 	created := jsonRPCNestedMap(t, createResult, "bom_version")
+	createdItems := created["items"].([]any)
+	createdItem := createdItems[0].(map[string]any)
+	createdSource, ok := createdItem["source_snapshot"].(map[string]any)
+	if !ok || createdSource["quantity_value"] != "1.000000000001" || createdSource["quantity_format"] != "0.000" || createdItem["quantity"] != "1.000000000001" || createdItem["total_usage_snapshot"] != "100.0000000001" {
+		t.Fatal("BOM RPC lost source precision, format or the canonical saved quantity")
+	}
 	headerID := jsonRPCInt(t, created, "id")
 	expectedVersion := created["edit_version"]
 
@@ -252,6 +266,18 @@ func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflic
 	_, staleResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "stale", mustJSONRPCStruct(t, updateParams))
 	if err != nil || staleResult == nil || staleResult.Code != errcode.ResourceVersionConflict.Code || staleResult.Message != errcode.ResourceVersionConflict.Message {
 		t.Fatalf("stale aggregate BOM result=%#v err=%v", staleResult, err)
+	}
+}
+
+func TestBOMPrecisionTransportRequiresExactDecimalStrings(t *testing.T) {
+	for _, tc := range []struct {
+		quantity any
+		valid    bool
+	}{{"0.0123456789012345", true}, {"1e-324", true}, {"0.12345678901234567890123456789", true}, {float64(0.1), false}, {"1e-325", false}, {"-1", false}, {"NaN", false}} {
+		item, ok := bomItemUpdateFromParams(map[string]any{"quantity": tc.quantity, "loss_rate": "0.0000001234567890123456789"})
+		if ok != tc.valid || ok && item.LossRate.String() != "0.0000001234567890123456789" {
+			t.Fatalf("BOM transport %v accepted=%v, want %v", tc.quantity, ok, tc.valid)
+		}
 	}
 }
 

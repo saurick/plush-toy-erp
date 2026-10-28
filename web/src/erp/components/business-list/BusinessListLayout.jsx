@@ -169,7 +169,9 @@ function deEmphasizeCreation(action) {
     return action.props.type === 'primary' ? React.cloneElement(action, { type: 'default' }) : action
   }
   return action.props.children
-    ? React.cloneElement(action, undefined, React.Children.map(action.props.children, deEmphasizeCreation))
+    ? React.cloneElement(action, undefined, React.isValidElement(action.props.children)
+      ? deEmphasizeCreation(action.props.children)
+      : React.Children.map(action.props.children, deEmphasizeCreation))
     : action
 }
 

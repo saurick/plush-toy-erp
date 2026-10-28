@@ -23,7 +23,8 @@ export const AttachmentPolicy = Object.freeze({
     '.xlsx': Object.freeze(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
     '.zip': Object.freeze(['application/zip', 'application/x-zip-compressed']),
   }),
-  maxBytes: 104857600,
+  maxBytes: 209715200,
+  maxJSONRPCBodyBytes: 293601280,
   printAppendixFileTypes: Object.freeze({
     '.gif': Object.freeze(['image/gif']),
     '.jpeg': Object.freeze(['image/jpeg']),
@@ -40,4 +41,5 @@ export const AttachmentPolicy = Object.freeze({
   productImageMaxBytes: 5242880,
   productImageMaxHeight: 8192,
   productImageMaxWidth: 8192,
+  requestTimeoutSeconds: 300,
 })

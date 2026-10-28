@@ -52,7 +52,7 @@ export function renderCatalog(catalog) {
     'statuses.generated.mjs': moduleSource('server/internal/core/status 及 server/cmd/public-contracts 登记的 biz 领域声明', catalog.states),
     'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go', { AttachmentPolicy: catalog.attachments }),
     'numeric.generated.mjs': moduleSource('server/internal/core/value/numeric.go', { NumericContract: numeric }),
-    'policies.generated.mjs': moduleSource('server/internal/biz/business_pagination.go、server/internal/biz/work_center_pagination.go、server/internal/biz/admin_password.go、server/internal/biz/help_content.go、server/internal/biz/sales_order_export.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
+    'policies.generated.mjs': moduleSource('server/internal/biz/business_pagination.go、server/internal/biz/work_center_pagination.go、server/internal/biz/admin_password.go、server/internal/biz/bom_source_snapshot.go、server/internal/biz/help_content.go、server/internal/biz/sales_order_export.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
     'rpcMethods.generated.mjs': moduleSource('server/api/jsonrpc/v1/jsonrpc.pb.go 消息描述、HTTP binding、Swagger 及 server/internal/service 的实际分发', { RpcTransport: catalog.rpcTransport, RpcDomain: domains, RpcMethod: catalog.rpc }),
     'rpcInspection.generated.mjs': moduleSource('server/internal/service 实际分支与参数读取点；仅供 DEV 工作台核对，不是完整 Schema 或授权结论', { RpcInspection: catalog.rpcInspection }),
   }

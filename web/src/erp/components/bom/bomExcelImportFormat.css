@@ -1,0 +1,39 @@
+.erp-bom-excel-guide__preview {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--erp-border, #dce6df);
+  border-radius: 4px;
+  background: #fff;
+  color-scheme: light;
+}
+
+.erp-bom-excel-guide__preview > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.erp-bom-excel-guide__preview > .erp-image-placeholder {
+  display: flex;
+  min-height: 80px;
+}
+
+.erp-bom-excel-guide__marker {
+  position: absolute;
+  display: none;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  transform: translate(-50%, -50%);
+}
+
+.erp-bom-excel-guide__preview > img ~ .erp-bom-excel-guide__marker {
+  display: inline-flex;
+}
+
+.erp-bom-excel-guide__requirements {
+  margin-top: 20px;
+  color: var(--erp-text-muted, #62736a);
+  font-size: var(--erp-font-small);
+  line-height: 1.7;
+}

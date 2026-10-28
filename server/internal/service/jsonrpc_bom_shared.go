@@ -87,12 +87,33 @@ func bomVersionMutationFromParams(pm map[string]any) (*biz.BOMVersionMutation, b
 	}, true
 }
 
+func getOptionalJSONRPCBOMSourceSnapshot(pm map[string]any, key string) (map[string]any, bool) {
+	raw, present := pm[key]
+	if !present || raw == nil {
+		return nil, true
+	}
+	snapshot, ok := raw.(map[string]any)
+	return snapshot, ok
+}
+
 func bomItemUpdateFromParams(pm map[string]any) (*biz.BOMItemUpdate, bool) {
-	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	sourceSnapshot, ok := getOptionalJSONRPCBOMSourceSnapshot(pm, "source_snapshot")
 	if !ok {
 		return nil, false
 	}
-	lossRate, ok := getRequiredJSONRPCNumeric20Scale6(pm, "loss_rate")
+	quantityText, ok := pm["quantity"].(string)
+	if !ok {
+		return nil, false
+	}
+	quantity, ok := biz.ParseBOMDecimal(quantityText)
+	if !ok {
+		return nil, false
+	}
+	lossText, ok := pm["loss_rate"].(string)
+	if !ok {
+		return nil, false
+	}
+	lossRate, ok := biz.ParseBOMDecimal(lossText)
 	if !ok {
 		return nil, false
 	}
@@ -104,6 +125,7 @@ func bomItemUpdateFromParams(pm map[string]any) (*biz.BOMItemUpdate, bool) {
 		Position:           getWorkflowStringPtr(pm, "position"),
 		PieceCount:         getWorkflowStringPtr(pm, "piece_count"),
 		TotalUsageSnapshot: getWorkflowStringPtr(pm, "total_usage_snapshot"),
+		SourceSnapshot:     sourceSnapshot,
 		ProcessBase:        getWorkflowStringPtr(pm, "process_base"),
 		ProcessMethod:      getWorkflowStringPtr(pm, "process_method"),
 		Note:               getWorkflowStringPtr(pm, "note"),
@@ -262,6 +284,7 @@ func bomItemToAny(item *biz.BOMItem) map[string]any {
 		"position":             optionalStringToAny(item.Position),
 		"piece_count":          optionalStringToAny(item.PieceCount),
 		"total_usage_snapshot": optionalStringToAny(item.TotalUsageSnapshot),
+		"source_snapshot":      item.SourceSnapshot,
 		"process_base":         optionalStringToAny(item.ProcessBase),
 		"process_method":       optionalStringToAny(item.ProcessMethod),
 		"note":                 optionalStringToAny(item.Note),

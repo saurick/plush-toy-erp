@@ -89,7 +89,7 @@ function createSheetXml(rows, merges) {
           if (value === null || value === undefined || value === '') return ''
           const reference = `${columnLetters(columnIndex + 1)}${rowIndex + 1}`
           if (typeof value === 'object') {
-            return `<c r="${reference}"><f>${escapeXml(value.formula)}</f><v>${escapeXml(value.value)}</v></c>`
+            return `<c r="${reference}"${value.style ? ` s="${value.style}"` : ''}>${value.formula ? `<f>${escapeXml(value.formula)}</f>` : ''}<v>${escapeXml(value.value)}</v></c>`
           }
           return `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`
         })
@@ -104,6 +104,7 @@ export function createBOMImportWorkbookFixture({
   grouped = false,
   mergedNotes = false,
   unmatchedProduct = false,
+  highPrecision = false,
 } = {}) {
   const merges = ['H5:I5']
   const rows = [
@@ -205,11 +206,21 @@ export function createBOMImportWorkbookFixture({
     )
     rows[6].splice(7, 3, '布底贴12g衬', '长度61mm，每端留一个孔', null)
   }
+  if (highPrecision) {
+    const [materialName, supplierItemNo] = rows[5]
+    rows[5][5] = { value: '0.0123456789012345', style: 1 }
+    rows[5][6] = { value: '1.358024679135795', style: 2, formula: 'F6*G$3*1.1' }
+    rows[6][0] = materialName
+    rows[6][1] = supplierItemNo
+    rows[6][5] = { value: '0.02', style: 1 }
+    rows[6][6] = { value: '2.2', style: 2, formula: 'F7*G$3*1.1' }
+  }
   return createStoredZip({
     'xl/workbook.xml':
       '<?xml version="1.0"?><workbook xmlns:r="relationships"><sheets><sheet name="材料分析明细表" sheetId="1" r:id="rId1"/></sheets></workbook>',
     'xl/_rels/workbook.xml.rels':
       '<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
     'xl/worksheets/sheet1.xml': createSheetXml(rows, merges),
+    ...(highPrecision ? { 'xl/styles.xml': '<styleSheet><numFmts count="2"><numFmt numFmtId="164" formatCode="0.000"/><numFmt numFmtId="165" formatCode="0.00"/></numFmts><cellXfs count="3"><xf numFmtId="0"/><xf numFmtId="164"/><xf numFmtId="165"/></cellXfs></styleSheet>' } : {}),
   })
 }

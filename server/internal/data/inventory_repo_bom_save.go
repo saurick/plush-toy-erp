@@ -148,6 +148,10 @@ func (r *inventoryRepo) SaveBOMWithItems(ctx context.Context, id int, in *biz.BO
 				}
 				continue
 			}
+			previous := existingByID[item.ID]
+			if !biz.BOMQuantityTextMatches(current.QuantityText, in.QuantityText) || previous.MaterialID != item.MaterialID || previous.UnitID != item.UnitID || !previous.Quantity.Equal(item.Quantity) || !previous.LossRate.Equal(item.LossRate) {
+				item.TotalUsageSnapshot = nil
+			}
 			update := tx.BOMItem.Update().
 				Where(bomitem.ID(item.ID), bomitem.BomHeaderID(id)).
 				SetMaterialID(item.MaterialID).
@@ -314,6 +318,7 @@ func createBOMSaveItem(ctx context.Context, tx *ent.Tx, headerID int, item *biz.
 		SetNillablePosition(item.Position).
 		SetNillablePieceCount(item.PieceCount).
 		SetNillableTotalUsageSnapshot(item.TotalUsageSnapshot).
+		SetSourceSnapshot(item.SourceSnapshot).
 		SetNillableProcessBase(item.ProcessBase).
 		SetNillableProcessMethod(item.ProcessMethod).
 		SetNillableNote(item.Note).
@@ -321,6 +326,11 @@ func createBOMSaveItem(ctx context.Context, tx *ent.Tx, headerID int, item *biz.
 }
 
 func applyBOMItemOptionalUpdate(update *ent.BOMItemUpdate, in *biz.BOMItemUpdate) {
+	if in.SourceSnapshot == nil {
+		update.ClearSourceSnapshot()
+	} else {
+		update.SetSourceSnapshot(in.SourceSnapshot)
+	}
 	if in.Position == nil {
 		update.ClearPosition()
 	} else {

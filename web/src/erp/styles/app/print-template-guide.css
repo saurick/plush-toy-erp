@@ -16,7 +16,6 @@
 .erp-template-center .erp-print-center-preview-panel {
   padding-left: var(--erp-panel-padding-inline, 28px);
   border-left: 1px solid var(--erp-border, #dce6df);
-  container: template-guide / inline-size;
 }
 
 .erp-template-center__nav-title {
@@ -77,18 +76,6 @@
   line-height: 1.7;
 }
 
-.erp-template-guide__body {
-  display: grid;
-  grid-template-columns: minmax(220px, 380px) minmax(170px, 1fr);
-  gap: 24px;
-  align-items: center;
-}
-
-.erp-template-guide__figure {
-  min-width: 0;
-  margin: 0;
-}
-
 .erp-template-guide__thumbnail {
   position: relative;
   max-width: calc(100% - 36px);
@@ -114,79 +101,14 @@
   box-shadow: none;
 }
 
-.erp-template-guide__marker,
-.erp-template-guide__number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--erp-primary);
-  color: var(--erp-on-accent);
-  font-size: var(--erp-font-body);
-  font-weight: 600;
-  line-height: 1;
-}
-
 .erp-template-guide__marker {
   position: absolute;
   left: calc(100% + 8px);
   transform: translateY(-50%);
 }
 
-.erp-template-guide__figure figcaption {
-  margin: 12px 36px 0 0;
-  color: var(--erp-text-muted, #62736a);
-  font-size: var(--erp-font-caption);
-  text-align: center;
-}
-
-.erp-template-guide__parts {
-  display: grid;
-  gap: 32px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.erp-template-guide__parts li {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.erp-template-guide__parts h4 {
-  margin: 0 0 6px;
-  color: var(--erp-text, #24352d);
-  font-size: var(--erp-font-emphasis);
-  font-weight: 600;
-  line-height: 26px;
-}
-
-.erp-template-guide__parts p {
-  margin: 0;
-  color: var(--erp-text-muted, #62736a);
-  line-height: 1.7;
-  overflow-wrap: anywhere;
-}
-
-@container template-guide (max-width: 540px) {
-  .erp-template-guide__body {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
-  }
-
-  .erp-template-guide__figure {
-    width: min(100%, 360px);
-    margin-inline: auto;
-  }
-
-  .erp-template-guide__parts {
-    gap: 18px;
-  }
+.erp-template-guide .erp-document-guide__figure figcaption {
+  margin-inline-end: 36px;
 }
 
 @media screen and (min-width: 721px) and (max-width: 1100px) {

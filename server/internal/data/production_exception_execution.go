@@ -258,7 +258,7 @@ func productionWIPFabricRequirementQuantity(ctx context.Context, client *ent.Cli
 	if err != nil {
 		return decimal.Zero, err
 	}
-	return biz.RoundRequiredUnitQuantity(batch.Quantity.Mul(requirement.UnitQuantitySnapshot).Mul(decimal.NewFromInt(1).Add(requirement.LossRateSnapshot)), unit.Precision)
+	return biz.RoundRequiredUnitQuantity(biz.MaterialPartUsage(batch.Quantity, requirement.UnitQuantitySnapshot, requirement.LossRateSnapshot), unit.Precision)
 }
 
 func validateProductionExceptionBatchDestination(ctx context.Context, client *ent.Client, batch *ent.ProductionWIPBatch, supplierID *int) error {

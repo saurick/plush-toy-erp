@@ -72,11 +72,11 @@ test('imported totals retain Excel precision until an input changes', () => {
 })
 test('BOM totals include loss once; piece count does not multiply recorded unit usage again', () => {
   assert.equal(calculateBOMUsage('0.125', '0.1', '1012'), '139.15')
-  assert.equal(calculateBOMUsage('0.000001', '0.1', '1'), '0.000001')
+  assert.equal(calculateBOMUsage('0.000001', '0.1', '1'), '0.0000011')
   assert.equal(calculateBOMUsage('0.125', '0.1', ''), '')
   assert.equal(bomLossRateToPercent('0.1'), '10')
   assert.equal(bomPercentToLossRate('10'), '0.1')
-  assert.equal(bomPercentToLossRate('1.00001'), null)
+  assert.equal(bomPercentToLossRate('1.00001'), '0.0100001')
 })
 test('Excel parts paste parses percent, preserves text and rejects missing or invalid numeric results', () => {
   const rows = parseBOMPartsPaste(

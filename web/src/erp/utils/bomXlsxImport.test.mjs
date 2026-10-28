@@ -2,15 +2,93 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { deflateRawSync } from 'node:zlib'
-import { groupBOMMaterials } from './bomMaterialGroups.mjs'
+import { groupBOMMaterials, getBOMUsage } from './bomMaterialGroups.mjs'
+import { readXlsxWorkbook } from './xlsxWorkbook.mjs'
 
 import {
   BOMXlsxImportError,
   buildBOMImportDraft,
   describeBOMImportIssues,
   getBOMImportDraftIssues,
+  mergeBOMImportedValues,
+  describeBOMImportQuantity,
   parseBOMXlsx,
 } from './bomXlsxImport.mjs'
+
+test('detail import appends rows while preserving current identities and header values', () => {
+  const current = { product_id: 7, version: '打样版', quantity_text: '50', note: '保留备注', items: [{ id: 91, material_id: 2, quantity: '0.5', total_usage_snapshot: '26' }] }
+  const draft = { values: { product_id: 8, quantity_text: '100', items: [{ id: 5, bom_header_id: 6, material_id: 3, quantity: '1', loss_rate: '0.1', total_usage_snapshot: '110', _import_source: { rowNumber: 6 } }] } }
+  const before = structuredClone({ current, draft })
+  const values = mergeBOMImportedValues(current, draft)
+  const { items } = values
+  assert.equal(values.quantity_text, '50')
+  assert.deepEqual(Object.keys(values).sort(), ['items', 'quantity_text'])
+  assert.equal(items.length, 2)
+  assert.deepEqual(items[0], current.items[0])
+  assert.equal(items[1].id, undefined)
+  assert.equal(items[1].bom_header_id, undefined)
+  assert.equal(items[1].total_usage_snapshot, undefined)
+  assert.deepEqual(items[1]._import_source, { rowNumber: 6 })
+  assert.deepEqual({ current, draft }, before)
+})
+
+test('detail import retains Excel total precision only for the same valid order quantity', () => {
+  const draft = { values: { quantity_text: '100', items: [{ total_usage_snapshot: '55.000001', quantity: '0.5' }] } }
+  const equivalent = mergeBOMImportedValues({ quantity_text: '100.000000' }, draft)
+  assert.equal(equivalent.quantity_text, '100.000000')
+  assert.equal(equivalent.items[0].total_usage_snapshot, '55.000001')
+  for (const quantity of ['0', '99', '100 PCS']) {
+    const merged = mergeBOMImportedValues({ quantity_text: quantity }, draft)
+    assert.equal(merged.quantity_text, quantity)
+    assert.equal(merged.items[0].total_usage_snapshot, undefined)
+  }
+  assert.equal(mergeBOMImportedValues({}, { values: { items: draft.values.items } }).items[0].total_usage_snapshot, undefined)
+  assert.equal(mergeBOMImportedValues({ quantity_text: '0' }, { values: { ...draft.values, quantity_text: '0' } }).items[0].total_usage_snapshot, undefined)
+})
+
+test('empty editor imports source order quantity and calculates exact totals without changing other headers', () => {
+  const source = { order_quantity: '100', quantity_value: '0.0123456789012345', total_value: '1.358024679135795' }
+  const draft = { values: { product_id: 8, quantity_text: '100', items: [{ quantity: source.quantity_value, loss_rate: '0.1', total_usage_snapshot: source.total_value, source_snapshot: source }] } }
+  for (const quantity of ['', undefined, null, '   ']) {
+    const current = { product_id: 7, version: '核对版', quantity_text: quantity, items: [] }
+    const before = structuredClone({ current, draft })
+    const values = mergeBOMImportedValues(current, draft)
+    assert.equal(values.quantity_text, '100')
+    assert.equal(values.items[0].total_usage_snapshot, source.total_value)
+    assert.deepEqual(values.items[0].source_snapshot, source)
+    assert.equal(getBOMUsage(values.items[0], values.quantity_text), '1.358024679135795')
+    assert.equal(({ ...current, ...values }).product_id, 7)
+    assert.equal(({ ...current, ...values }).version, '核对版')
+    assert.deepEqual({ current, draft }, before)
+  }
+  const existing = { quantity: '0.5', loss_rate: '0.1', total_usage_snapshot: '999' }
+  const values = mergeBOMImportedValues({ items: [existing] }, draft)
+  assert.equal(values.items[0].total_usage_snapshot, undefined, 'filling order quantity invalidates totals on existing parts too')
+  assert.equal(getBOMUsage(values.items[0], values.quantity_text), '55')
+  for (const sourceQuantity of ['', '0', '-1', '100 PCS', '1e999']) {
+    const missing = mergeBOMImportedValues({}, { values: { ...draft.values, quantity_text: sourceQuantity } })
+    assert.equal(missing.quantity_text, '')
+    assert.equal(missing.items[0].total_usage_snapshot, undefined)
+    assert.equal(missing.items[0].source_snapshot.total_value, source.total_value)
+  }
+})
+
+test('order quantity notices distinguish fill, difference, equivalent values and a later clear', () => {
+  assert.equal(describeBOMImportQuantity('', '100', { pending: true }), '同时带入原表订单数量 100。')
+  assert.equal(describeBOMImportQuantity('50', '100'), '保留当前订单数量 50（原表 100），总用量按当前数量计算。')
+  assert.equal(describeBOMImportQuantity('100.000', '1e2'), '')
+  assert.equal(describeBOMImportQuantity('', '100'), '请填写订单数量（原表 100），以计算总用量。')
+  assert.equal(describeBOMImportQuantity('invalid', '100'), '请填写有效订单数量，以计算总用量。')
+})
+
+test('replacement removes current rows and bounds the resulting draft to 1000 parts', () => {
+  const draft = { values: { quantity_text: '1', items: [{ material_id: 3, quantity: '1' }, { material_id: 3, quantity: '2' }] } }
+  const current = { quantity_text: '1', items: [{ id: 91, material_id: 2 }] }
+  assert.deepEqual(mergeBOMImportedValues(current, draft, 'replace'), draft.values)
+  assert.equal(mergeBOMImportedValues({ ...current, items: Array.from({ length: 998 }, () => current.items[0]) }, draft).items.length, 1000)
+  assert.throws(() => mergeBOMImportedValues({ ...current, items: Array.from({ length: 999 }, () => current.items[0]) }, draft), /超过 1000 行/u)
+  assert.equal(mergeBOMImportedValues({ ...current, items: Array.from({ length: 1000 }, () => current.items[0]) }, draft, 'replace').items.length, 2)
+})
 
 test('supplier reference participates in material matching without inventing master data', () => {
   const supplierItemNo = '示例织造AB-001#-02#米白'
@@ -156,7 +234,7 @@ function createSheetXml(rows, merges = []) {
   return `<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>${rowXml}</sheetData>${mergeXml}</worksheet>`
 }
 
-function createWorkbook(sheets, styles) {
+function createWorkbook(sheets, styles, extraEntries = {}) {
   const workbookSheets = sheets
     .map(
       (sheet, index) =>
@@ -180,7 +258,7 @@ function createWorkbook(sheets, styles) {
       sheet.merges
     )
   })
-  return createZip(entries)
+  return createZip({ ...entries, ...extraEntries })
 }
 
 function firstFormatWorkbook(styleHeader = '厂商料号') {
@@ -789,7 +867,7 @@ test('BOM import accepts the confirmed style-number label and original workbook 
   assert.deepEqual(current.context, original.context)
 })
 
-test('BOM import preserves excess precision for correction and keeps fractional per-piece usage', async () => {
+test('BOM import retains exact source numbers and reviews six-place quantities before saving', async () => {
   const parsed = await parseBOMXlsx(
     createWorkbook([
       {
@@ -816,9 +894,10 @@ test('BOM import preserves excess precision for correction and keeps fractional 
     ],
   })
   const issues = getBOMImportDraftIssues(draft.values)
-  assert.ok(
-    issues.some((issue) => issue.field === 'quantity' && issue.itemIndex === 0)
-  )
+  assert.equal(draft.values.items[0].quantity, parsed.rows[0].quantity)
+  assert.equal(draft.values.items[0].source_snapshot.quantity_value, parsed.rows[0].quantity)
+  assert.equal(draft.values.items[0].source_snapshot.total_value, parsed.rows[0].totalUsageSnapshot)
+  assert.equal(issues.filter((issue) => issue.field === 'quantity').length, 0)
   assert.ok(
     !issues.some((issue) => issue.field === 'quantity' && issue.itemIndex === 1)
   )
@@ -842,8 +921,8 @@ test('business data consistency: BOM percentage headers and excess precision ret
   assert.equal(result.rows[0].lossRate, '0.005')
   assert.equal(result.rows[1].lossRate, '0.01')
   assert.equal(result.rows[2].lossRate, '0.0000001')
-  assert.equal(result.rows[2].lossSource, 'unresolved')
-  assert.match(result.rows[2].lossIssue, /0.00001%.*六位精度/u)
+  assert.equal(result.rows[2].lossSource, 'explicit')
+  assert.equal(result.rows[2].lossIssue, '')
   const ratio = await parseBOMXlsx(
     createWorkbook([
       {
@@ -890,6 +969,20 @@ test('business data consistency: BOM percentage headers and excess precision ret
   ], '<styleSheet><cellXfs><xf numFmtId="0"/><xf numFmtId="10"/></cellXfs></styleSheet>'))
   assert.deepEqual(scientific.rows.slice(0, 3).map((row) => row.lossRate), ['0.005', '0.005', '0.000001'])
   assert(scientific.rows.slice(0, 3).every((row) => !row.lossIssue))
-  assert.equal(scientific.rows[3].lossSource, 'unresolved')
-  assert.match(scientific.rows[3].lossIssue, /六位精度/u)
+  assert.equal(scientific.rows[3].lossSource, 'explicit')
+  assert.equal(scientific.rows[3].lossIssue, '')
+})
+
+test('parsing budgets skip unrelated sheets and media while still bounding selected content', async () => {
+  const sheets = [{ name: '材料分析明细表-1', rows: [['物料名称', '组装部位', '单位用量', '单位'], ['示例短毛绒', '身体', '1', '米']] }, { name: '其他工作表', rows: [] }]
+  const largeXML = `<worksheet>${' '.repeat(17 * 1024 * 1024)}</worksheet>`
+  const file = createWorkbook(sheets, undefined, {
+    'xl/worksheets/sheet2.xml': largeXML,
+    'xl/media/unused.jpg': 'x'.repeat(17 * 1024 * 1024),
+  })
+  const parsed = await parseBOMXlsx(file)
+  assert.equal(parsed.rows.length, 1, '未读取的工作表和图片不占用材料明细解析预算')
+  await assert.rejects(readXlsxWorkbook(file), (error) => error.code === 'xlsx_too_large', '读取大工作表时仍须执行单项解析预算')
+  const oversizedDetail = createWorkbook(sheets.slice(0, 1), undefined, { 'xl/worksheets/sheet1.xml': largeXML })
+  await assert.rejects(parseBOMXlsx(oversizedDetail), (error) => error.code === 'xlsx_too_large')
 })

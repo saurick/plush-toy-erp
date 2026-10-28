@@ -1,4 +1,4 @@
-h1:kFMin34RsFfLM0WpatWzDMYkp91yZKAT6S/JAQ12FXg=
+h1:IYp7HF/3/VAhHJ5oTg3LBy3jtx4pmfUrPBcG9HAN/LA=
 20260315161316_migrate.sql h1:aW9ynfMUR5IdFF5E6zkq5zQdgTv9YEtXjRiZTSF6f+I=
 20260421140457_migrate.sql h1:Znvhutjs+bPceNgWeN7W2TxKXHUQtyBH+Yr1b5kmXwE=
 20260423081607_migrate.sql h1:ZXYJO5Kvb2GkCOhWtMP/2nIV3stabZ5wFouUxOPbzhM=
@@ -160,3 +160,6 @@ h1:kFMin34RsFfLM0WpatWzDMYkp91yZKAT6S/JAQ12FXg=
 20261021142304_normalize_task_business_copy.sql h1:VHye8X3PJBzSCSDnNbxIiY3MtxhL4DgEC1eWisnW1Vk=
 20261023044446_migrate.sql h1:NxSJJ59XLiMf7C2P4JWHRcyDRMklzmfK0dN8wMb+tyc=
 20261023044447_freeze_shipment_commercial_snapshots.sql h1:OJzMhQTHX9VBfySIohn3RjN2jaI1/8Wn2Y/b8lw7yWc=
+20261027153728_migrate.sql h1:Ux63kfSJ0UNtgpQYdIDKUbbod1LjLgjo+Gz4NASGd/c=
+20261028034351_migrate.sql h1:VafwdDitquaJYcxp6IYgfP5PFPtZimXDvJakmlb0Alo=
+20261028064311_migrate.sql h1:L8vfG1zxdJnl2cgzAvfdTIX+b/4Mcl9v+8vgArHenyg=

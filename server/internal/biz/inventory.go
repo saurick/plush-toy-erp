@@ -326,6 +326,7 @@ type BOMItem struct {
 	Position           *string
 	PieceCount         *string
 	TotalUsageSnapshot *string
+	SourceSnapshot     map[string]any
 	ProcessBase        *string
 	ProcessMethod      *string
 	Note               *string
@@ -373,6 +374,7 @@ type BOMItemUpdate struct {
 	Position           *string
 	PieceCount         *string
 	TotalUsageSnapshot *string
+	SourceSnapshot     map[string]any
 	ProcessBase        *string
 	ProcessMethod      *string
 	Note               *string
@@ -850,6 +852,9 @@ func (uc *InventoryUsecase) SaveBOMWithItems(ctx context.Context, id int, in *BO
 		if err != nil {
 			return nil, err
 		}
+		if !BOMSourceTotalIsCurrent(normalizedItem, normalized.QuantityText) {
+			normalizedItem.TotalUsageSnapshot = nil
+		}
 		if err := uc.validateBOMItemActiveReferences(ctx, normalizedItem.MaterialID, normalizedItem.UnitID); err != nil {
 			return nil, err
 		}
@@ -1243,9 +1248,25 @@ func normalizeBOMItemUpdate(in BOMItemUpdate) (BOMItemUpdate, error) {
 	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
 	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
 	in.Note = normalizeOptionalString(in.Note)
+	var err error
+	in.SourceSnapshot, err = normalizeBOMSourceSnapshot(in.SourceSnapshot)
+	if err != nil {
+		return BOMItemUpdate{}, err
+	}
+	if in.TotalUsageSnapshot != nil {
+		if _, ok := ParseBOMDecimal(*in.TotalUsageSnapshot); !ok {
+			return BOMItemUpdate{}, ErrBadParam
+		}
+	}
 	if in.MaterialID <= 0 ||
 		in.UnitID <= 0 ||
 		in.LossRate.Cmp(decimal.Zero) < 0 {
+		return BOMItemUpdate{}, ErrBadParam
+	}
+	if _, ok := ParseBOMDecimal(in.Quantity.String()); !ok {
+		return BOMItemUpdate{}, ErrBadParam
+	}
+	if _, ok := ParseBOMDecimal(in.LossRate.String()); !ok {
 		return BOMItemUpdate{}, ErrBadParam
 	}
 	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {

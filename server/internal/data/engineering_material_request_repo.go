@@ -167,7 +167,7 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 			if supplierID == 0 || !m.Edges.Supplier.IsActive {
 				result.Issues = append(result.Issues, fmt.Sprintf("材料 %s 尚未选择有效厂商", m.Name))
 			}
-			usage := productionQuantity.Mul(part.Quantity).Mul(decimal.NewFromInt(1).Add(part.LossRate))
+			usage := biz.MaterialPartUsage(productionQuantity, part.Quantity, part.LossRate)
 			if !usage.IsPositive() || usage.GreaterThanOrEqual(decimal.New(1, 14)) {
 				result.Issues = append(result.Issues, fmt.Sprintf("材料 %s 的用量不在有效范围", m.Name))
 			}
@@ -179,7 +179,7 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 				result.Items = append(result.Items, group)
 			}
 			group.RequiredQuantity = group.RequiredQuantity.Add(usage)
-			result.Sources = append(result.Sources, map[string]any{"sales_order_item_id": line.ID, "line_no": line.LineNo, "product_id": line.ProductID, "product_name": line.ProductNameSnapshot, "product_code": line.ProductCodeSnapshot, "customer_product_no": line.CustomerProductNo, "order_date": order.OrderDate.Format("2006-01-02"), "ordered_quantity": line.OrderedQuantity.String(), "pre_shipment_sample_quantity": line.PreShipmentSampleQuantity.String(), "product_unit_name": productUnit.Name, "process_requirement": line.ProcessRequirement, "product_sku_id": line.ProductSkuID, "bom_id": header.ID, "bom_version": header.Version, "bom_edit_version": header.UpdatedAt.UnixMicro(), "sample_image_attachment_id": imageID, "bom_item_id": part.ID, "material_id": m.ID, "unit_id": u.ID, "position": part.Position, "piece_count": part.PieceCount, "unit_usage": part.Quantity.String(), "loss_rate": part.LossRate.String(), "production_quantity": productionQuantity.String(), "total_usage": usage.Round(6).String(), "process_base": part.ProcessBase, "process_method": part.ProcessMethod, "material_note": part.Note})
+			result.Sources = append(result.Sources, map[string]any{"sales_order_item_id": line.ID, "line_no": line.LineNo, "product_id": line.ProductID, "product_name": line.ProductNameSnapshot, "product_code": line.ProductCodeSnapshot, "customer_product_no": line.CustomerProductNo, "order_date": order.OrderDate.Format("2006-01-02"), "ordered_quantity": line.OrderedQuantity.String(), "pre_shipment_sample_quantity": line.PreShipmentSampleQuantity.String(), "product_unit_name": productUnit.Name, "process_requirement": line.ProcessRequirement, "product_sku_id": line.ProductSkuID, "bom_id": header.ID, "bom_version": header.Version, "bom_edit_version": header.UpdatedAt.UnixMicro(), "sample_image_attachment_id": imageID, "bom_item_id": part.ID, "material_id": m.ID, "unit_id": u.ID, "position": part.Position, "piece_count": part.PieceCount, "unit_usage": part.Quantity.String(), "unit_usage_format": part.SourceSnapshot["quantity_format"], "total_usage_format": part.SourceSnapshot["total_format"], "loss_rate": part.LossRate.String(), "production_quantity": productionQuantity.String(), "total_usage": usage.String(), "process_base": part.ProcessBase, "process_method": part.ProcessMethod, "material_note": part.Note})
 		}
 	}
 	if len(result.Items) > 2000 {
@@ -217,13 +217,14 @@ func engineeringMaterialSourceHash(in *biz.EngineeringMaterialRequest) string {
 	})
 	// Header annotations do not add procurement inputs. Their source changes are
 	// guarded by the order version and the confirmed BOM version/fingerprint.
-	// Keep the digest tied to manufacturing inputs as the read model grows.
+	// Calculated display totals do not change manufacturing inputs. This also
+	// keeps an existing approval valid when decimal presentation gains precision.
 	sources := make([]map[string]any, len(in.Sources))
 	for index, source := range in.Sources {
 		entry := make(map[string]any, len(source))
 		for key, value := range source {
 			switch key {
-			case "product_code", "customer_product_no", "order_date", "ordered_quantity", "pre_shipment_sample_quantity", "product_unit_name", "process_requirement", "material_note":
+			case "product_code", "customer_product_no", "order_date", "ordered_quantity", "pre_shipment_sample_quantity", "product_unit_name", "process_requirement", "material_note", "total_usage", "unit_usage_format", "total_usage_format":
 				continue
 			}
 			entry[key] = value

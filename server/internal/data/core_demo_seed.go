@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/shopspring/decimal"
 	"server/internal/biz"
 	"server/internal/manualacceptance"
 )
@@ -791,9 +790,10 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 			if strings.TrimSpace(item.Quantity) == "" || strings.TrimSpace(item.LossRate) == "" {
 				return fmt.Errorf("%w: bom item quantity and loss_rate are required", ErrCoreDemoSeedInvalidRecord)
 			}
-			quantity, err := decimal.NewFromString(item.Quantity)
-			if err != nil || !quantity.IsPositive() || biz.ValidateUnitQuantity(quantity, 6) != nil {
-				return fmt.Errorf("%w: bom item quantity must be positive with at most six decimal places", ErrCoreDemoSeedInvalidRecord)
+			quantity, quantityOK := biz.ParseBOMDecimal(item.Quantity)
+			_, lossOK := biz.ParseBOMDecimal(item.LossRate)
+			if !quantityOK || !quantity.IsPositive() || !lossOK {
+				return fmt.Errorf("%w: bom coefficients must be valid decimal strings and quantity must be positive", ErrCoreDemoSeedInvalidRecord)
 			}
 			if err := biz.ValidateSeedBusinessText(item.MaterialCode, item.UnitCode, item.Position, item.Note); err != nil {
 				return fmt.Errorf("%w: bom item naming: %v", ErrCoreDemoSeedInvalidRecord, err)

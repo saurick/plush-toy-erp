@@ -2,7 +2,7 @@ import React, { useCallback } from 'react'
 import { Button, Form, Input, Space } from 'antd'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
-import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
+import { parseBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
 import ProductIdentity, {
@@ -71,6 +71,7 @@ export function buildItemParams(values = {}, extra = {}) {
     total_usage_snapshot: values.total_usage_snapshot
       ? String(values.total_usage_snapshot).trim()
       : undefined,
+    source_snapshot: values.source_snapshot || undefined,
     process_base: values.process_base
       ? String(values.process_base).trim()
       : undefined,
@@ -348,7 +349,7 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         name="quantity"
         rules={[
           { required: true, message: '请填写材料用量' },
-          unitQuantityRule(6),
+          { validator: async (_, value) => { if (!parseBOMSourceNumber(value)?.units) throw new Error('填写有效正数用量') } },
         ]}
       >
         <Input autoComplete="off" />

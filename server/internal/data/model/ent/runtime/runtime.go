@@ -470,23 +470,23 @@ func init() {
 	// bomitem.TotalUsageSnapshotValidator is a validator for the "total_usage_snapshot" field. It is called by the builders before save.
 	bomitem.TotalUsageSnapshotValidator = bomitemDescTotalUsageSnapshot.Validators[0].(func(string) error)
 	// bomitemDescProcessBase is the schema descriptor for process_base field.
-	bomitemDescProcessBase := bomitemFields[8].Descriptor()
+	bomitemDescProcessBase := bomitemFields[9].Descriptor()
 	// bomitem.ProcessBaseValidator is a validator for the "process_base" field. It is called by the builders before save.
 	bomitem.ProcessBaseValidator = bomitemDescProcessBase.Validators[0].(func(string) error)
 	// bomitemDescProcessMethod is the schema descriptor for process_method field.
-	bomitemDescProcessMethod := bomitemFields[9].Descriptor()
+	bomitemDescProcessMethod := bomitemFields[10].Descriptor()
 	// bomitem.ProcessMethodValidator is a validator for the "process_method" field. It is called by the builders before save.
 	bomitem.ProcessMethodValidator = bomitemDescProcessMethod.Validators[0].(func(string) error)
 	// bomitemDescNote is the schema descriptor for note field.
-	bomitemDescNote := bomitemFields[10].Descriptor()
+	bomitemDescNote := bomitemFields[11].Descriptor()
 	// bomitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	bomitem.NoteValidator = bomitemDescNote.Validators[0].(func(string) error)
 	// bomitemDescCreatedAt is the schema descriptor for created_at field.
-	bomitemDescCreatedAt := bomitemFields[11].Descriptor()
+	bomitemDescCreatedAt := bomitemFields[12].Descriptor()
 	// bomitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	bomitem.DefaultCreatedAt = bomitemDescCreatedAt.Default.(func() time.Time)
 	// bomitemDescUpdatedAt is the schema descriptor for updated_at field.
-	bomitemDescUpdatedAt := bomitemFields[12].Descriptor()
+	bomitemDescUpdatedAt := bomitemFields[13].Descriptor()
 	// bomitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	bomitem.DefaultUpdatedAt = bomitemDescUpdatedAt.Default.(func() time.Time)
 	// bomitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -9,7 +9,7 @@ import (
 )
 
 // Every business client, including clients backed by an existing SQL
-// transaction, installs the same guards. BOM coefficients retain scale six;
+// transaction, installs the same guards. BOM coefficients retain full precision;
 // executable quantities use the persisted unit scale.
 func newBusinessEntClient(options ...ent.Option) *ent.Client {
 	client := ent.NewClient(options...)
@@ -47,12 +47,25 @@ func unitQuantityGuard(next ent.Mutator) ent.Mutator {
 		if mutation.Op().Is(ent.OpDelete | ent.OpDeleteOne) {
 			return next.Mutate(ctx, mutation)
 		}
-		if mutation.Type() == "BOMItem" {
-			if raw, changed := mutation.Field("quantity"); changed {
-				if err := biz.ValidateUnitQuantity(raw.(decimal.Decimal), 6); err != nil {
-					return nil, err
+		var coefficients []string
+		switch mutation.Type() {
+		case "BOMItem":
+			coefficients = []string{"quantity", "loss_rate"}
+		case "ProductionOrderMaterialRequirement":
+			coefficients = []string{"unit_quantity_snapshot", "loss_rate_snapshot"}
+		}
+		for _, field := range coefficients {
+			if raw, changed := mutation.Field(field); changed {
+				coefficient, ok := raw.(decimal.Decimal)
+				if !ok {
+					return nil, biz.ErrBadParam
+				}
+				if _, valid := biz.ParseBOMDecimal(coefficient.String()); !valid {
+					return nil, biz.ErrBadParam
 				}
 			}
+		}
+		if mutation.Type() == "BOMItem" {
 			return next.Mutate(ctx, mutation)
 		}
 		fields := unitQuantityFields[mutation.Type()]

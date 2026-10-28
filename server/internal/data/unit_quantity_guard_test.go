@@ -127,10 +127,15 @@ func TestUnitQuantityGuardUsesTransactionUnitAndKeepsBOMCoefficients(t *testing.
 	if !errors.As(err, &precisionErr) {
 		t.Fatalf("transaction guard missing: %v", err)
 	}
-	mutation := tx.client.BOMItem.Create().SetUnitID(u.ID).SetQuantity(decimal.RequireFromString("0.000001")).Mutation()
+	mutation := tx.client.BOMItem.Create().SetUnitID(u.ID).SetQuantity(decimal.RequireFromString("0.0123456789012345")).SetLossRate(decimal.RequireFromString("0.1234567890123456789")).Mutation()
 	called := false
 	_, err = unitQuantityGuard(ent.MutateFunc(func(context.Context, ent.Mutation) (ent.Value, error) { called = true; return nil, nil })).Mutate(ctx, mutation)
 	if err != nil || !called {
 		t.Fatalf("BOM coefficient was rounded or rejected: %v", err)
+	}
+	quantity, _ := mutation.Quantity()
+	loss, _ := mutation.LossRate()
+	if quantity.String() != "0.0123456789012345" || loss.String() != "0.1234567890123456789" {
+		t.Fatal("BOM guard changed full coefficient precision")
 	}
 }

@@ -32,10 +32,10 @@ func (BOMItem) Fields() []ent.Field {
 			Positive(),
 		field.Int("material_id").
 			Positive(),
-		decimalQuantityField("quantity"),
+		bomDecimalField("quantity"),
 		field.Int("unit_id").
 			Positive(),
-		decimalRateField("loss_rate"),
+		bomDecimalField("loss_rate"),
 		field.String("position").
 			Optional().
 			Nillable().
@@ -47,7 +47,9 @@ func (BOMItem) Fields() []ent.Field {
 		field.String("total_usage_snapshot").
 			Optional().
 			Nillable().
-			MaxLen(64),
+			MaxLen(384),
+		// Source values and formats remain evidence when a business input is edited.
+		field.JSON("source_snapshot", map[string]any{}).Optional(),
 		field.String("process_base").
 			Optional().
 			Nillable().

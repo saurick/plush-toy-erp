@@ -5,12 +5,25 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
 
 type materialNoteTestRepo struct{ SalesOrderRepo }
 
 func (*materialNoteTestRepo) GetEngineeringMaterialRequest(context.Context, int, bool) (*EngineeringMaterialRequest, error) {
 	return nil, nil
+}
+
+func TestMaterialPartUsageKeepsCoefficientPrecisionUntilUnitRounding(t *testing.T) {
+	got := MaterialPartUsage(decimal.NewFromInt(100), decimal.RequireFromString("0.009090909090909"), decimal.RequireFromString("0.1"))
+	if got.String() != "0.99999999999999" {
+		t.Fatalf("usage rounded before the unit boundary: %s", got)
+	}
+	rounded, err := RoundRequiredUnitQuantity(got, 0)
+	if err != nil || rounded.String() != "1" {
+		t.Fatalf("unit-rounded demand = %s, %v", rounded, err)
+	}
 }
 func (*materialNoteTestRepo) SubmitEngineeringMaterialRequest(context.Context, *EngineeringMaterialSubmit) (*EngineeringMaterialRequest, error) {
 	return nil, nil

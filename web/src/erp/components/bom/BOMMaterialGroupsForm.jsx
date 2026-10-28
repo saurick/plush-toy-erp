@@ -7,6 +7,8 @@ import React, {
   useState,
 } from 'react'
 import { Button, Form, Input, Space } from 'antd'
+import { BOMQuantityInput, BOMSourceValueInfo } from './BOMSourceValue.jsx'
+import { bomSourceColumnLabel, formatBOMSourceNumber, sumBOMSourceNumbers, parseBOMSourceNumber } from '../../utils/bomSourceValues.mjs'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
@@ -17,15 +19,13 @@ import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import {
   BOM_PART_FIELDS,
   groupBOMMaterials,
+  bindBOMMaterialReference,
   getBOMUsage,
+  calculateBOMUsage,
   bomLossRateToPercent,
   bomPercentToLossRate,
   parseBOMPartsPaste,
 } from '../../utils/bomMaterialGroups.mjs'
-import {
-  numeric20Scale6Units,
-  sumNumeric20Scale6Values,
-} from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import { getBOMImportLineIssues } from '../../utils/bomXlsxImport.mjs'
 import '../../styles/app/bom-editor.css'
@@ -115,7 +115,7 @@ function BOMMaterialSelect({ canCreateMaterial, onCreateMaterial, ...props }) {
   )
 }
 
-function LossRateInput({ value, onChange, ...props }) {
+function LossRateInput({ value, onChange, source, index, ...props }) {
   const [text, setText] = useState(() => bomLossRateToPercent(value))
   const emitted = useRef()
   useEffect(() => {
@@ -126,12 +126,13 @@ function LossRateInput({ value, onChange, ...props }) {
       {...props}
       value={text}
       onChange={(event) => {
-        const raw = event.target.value
-        setText(raw)
-        const rate = bomPercentToLossRate(raw)
-        emitted.current = rate ?? `invalid:${raw}`
-        onChange(emitted.current)
-      }}
+          const raw = event.target.value
+          setText(raw)
+          const rate = bomPercentToLossRate(raw)
+          emitted.current = rate ?? `invalid:${raw}`
+          onChange(emitted.current)
+        }}
+      suffix={<BOMSourceValueInfo source={source} kind="loss" value={text} index={index} />}
     />
   )
 }
@@ -155,12 +156,12 @@ function BOMUsageCell({ index }) {
           usageChanged(previous, current, index)
         }
       >
-        {({ getFieldValue }) =>
-          getBOMUsage(
-            getFieldValue(['items', index]),
-            getFieldValue('quantity_text')
-          ) || '—'
-        }
+        {({ getFieldValue }) => {
+          const item = getFieldValue(['items', index]) || {}
+          const usage = getBOMUsage(item, getFieldValue('quantity_text'))
+          const calculated = calculateBOMUsage(item.quantity, item.loss_rate, getFieldValue('quantity_text'))
+          return <span className="erp-bom-source-value"><span>{formatBOMSourceNumber(usage, item.source_snapshot?.total_format) || '—'}</span><BOMSourceValueInfo source={item.source_snapshot} kind="total" value={usage} calculatedValue={calculated} index={index} /></span>
+        }}
       </Form.Item>
     </td>
   )
@@ -183,11 +184,11 @@ function BOMMaterialTotals({ indexes, unit }) {
           <span>
             {indexes.length} 个部位
             {' · '}单位用量合计：
-            {sumNumeric20Scale6Values(items.map((item) => item?.quantity)) ||
+            {sumBOMSourceNumbers(items.map((item) => item?.quantity)) ||
               '—'}
             {' · '}总用量：
             {usages.every(Boolean)
-              ? `${sumNumeric20Scale6Values(usages)} ${unit}`
+              ? `${formatBOMSourceNumber(sumBOMSourceNumbers(usages), items[0]?.source_snapshot?.total_format)} ${unit}`
               : '填写生产数量和用量后计算'}
           </span>
         )
@@ -234,6 +235,8 @@ export default function BOMMaterialGroupsForm({
   onMaterialCreated,
   registerLineItemRow,
   requestLineItemScroll,
+  actions,
+  onItemsChange,
 }) {
   // Group structure changes on material/unit selection or row insertion/removal.
   Form.useWatch(
@@ -264,6 +267,7 @@ export default function BOMMaterialGroupsForm({
   }, [focusRequest, items.length, requestLineItemScroll])
 
   const updateMaterialGroup = (indexes, changes = {}) => {
+    onItemsChange?.()
     const next = [...(form.getFieldValue('items') || [])]
     // Preserve draft/source groups when adding parts or clearing material.
     const groupKey =
@@ -280,12 +284,13 @@ export default function BOMMaterialGroupsForm({
     return next
   }
 
-  const changeMaterial = (indexes, material) =>
-    updateMaterialGroup(indexes, {
-      material_id: material?.id,
-      unit_id: material?.default_unit_id,
-      total_usage_snapshot: undefined,
+  const changeMaterial = (indexes, material) => {
+    onItemsChange?.()
+    const all = form.getFieldValue('items') || []
+    indexes.forEach((index) => {
+      form.setFieldValue(['items', index], bindBOMMaterialReference(all[index], material))
     })
+  }
 
   const pasteParts = (event, index, column, add) => {
     const text = event.clipboardData.getData('text/plain')
@@ -322,7 +327,7 @@ export default function BOMMaterialGroupsForm({
     <section className="erp-bom-material-groups" aria-label="材料分析明细表">
       <div className="erp-bom-material-groups__heading">
         <h2>材料分析明细表</h2>
-        {canEdit ? <span>Tab 换格 · 支持粘贴部位数据</span> : null}
+        {actions || (canEdit ? <span>Tab 换格 · 支持粘贴部位数据</span> : null)}
       </div>
       <Form.List name="items">
         {(fields, { add, remove }) => (
@@ -338,7 +343,7 @@ export default function BOMMaterialGroupsForm({
                 aria-label="物料和部位明细"
                 tabIndex={0}
               >
-                <table className="erp-bom-parts-table" data-table-lines="fixed">
+                <table className={`erp-bom-parts-table${items.some((item) => item?.source_snapshot) ? ' erp-bom-parts-table--source' : ''}`} data-table-lines="fixed">
                   <colgroup>
                     <col className="erp-bom-col-material" />
                     <col className="erp-bom-col-supplier-item" />
@@ -363,9 +368,9 @@ export default function BOMMaterialGroupsForm({
                         '单位',
                         '组装部位',
                         '片数',
-                        '单位用量',
+                        bomSourceColumnLabel(items, 'quantity', '单位用量'),
                         '损耗 %',
-                        '总用量含损耗',
+                        bomSourceColumnLabel(items, 'total', '总用量含损耗'),
                         '加工基础',
                         '加工方式',
                         '备注',
@@ -523,6 +528,7 @@ export default function BOMMaterialGroupsForm({
                                         placeholder="单位"
                                         popupMatchSelectWidth={180}
                                         onChange={(unitID) => {
+                                          onItemsChange?.()
                                           const next = [
                                             ...form.getFieldValue('items'),
                                           ]
@@ -563,11 +569,11 @@ export default function BOMMaterialGroupsForm({
                                               {
                                                 validator: async (_, value) => {
                                                   if (
-                                                    numeric20Scale6Units(
+                                                    parseBOMSourceNumber(
                                                       value
                                                     ) === null ||
                                                     (key === 'quantity' &&
-                                                      Number(value) <= 0)
+                                                      !parseBOMSourceNumber(value)?.units)
                                                   ) {
                                                     throw new Error(
                                                       key === 'quantity'
@@ -583,6 +589,8 @@ export default function BOMMaterialGroupsForm({
                                     >
                                       {key === 'loss_rate' ? (
                                         <LossRateInput
+                                          source={items[itemIndex]?.source_snapshot}
+                                          index={itemIndex}
                                           disabled={!canEdit}
                                           aria-label={`${PART_LABELS[column]} ${
                                             itemIndex + 1
@@ -596,6 +604,15 @@ export default function BOMMaterialGroupsForm({
                                               add
                                             )
                                           }
+                                        />
+                                      ) : key === 'quantity' ? (
+                                        <BOMQuantityInput
+                                          source={items[itemIndex]?.source_snapshot}
+                                          index={itemIndex}
+                                          disabled={!canEdit}
+                                          aria-label={`${PART_LABELS[column]} ${itemIndex + 1}`}
+                                          inputMode="decimal"
+                                          onPaste={(event) => pasteParts(event, itemIndex, column, add)}
                                         />
                                       ) : key === 'position' || column >= 4 ? (
                                         <BusinessTextArea
@@ -683,6 +700,7 @@ export default function BOMMaterialGroupsForm({
                                       }
                                       delete copy.id
                                       delete copy._import_source
+                                      delete copy.source_snapshot
                                       delete copy.total_usage_snapshot
                                       add(copy, itemIndex + 1)
                                       setFocusRequest({ index: itemIndex + 1 })

@@ -1,4 +1,5 @@
 import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+import { isBOMDecimalText } from './bomSourceValues.mjs'
 import { OperationalFactStatus, OutsourcingOrderItemStatus, OutsourcingOrderStatus, ProductionOrderStatus, ProductionPackagingConfirmationStatus, ProductionWIPStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   addNumeric20Scale6Units,
@@ -405,8 +406,8 @@ function validateMaterialRequirement(value, productionOrderID) {
     !positiveSafeInteger(value.bom_item_id) ||
     !positiveSafeInteger(value.material_id) ||
     !positiveSafeInteger(value.unit_id) ||
-    !canonicalQuantity(value.unit_quantity_snapshot) ||
-    !canonicalNonNegativeQuantity(value.loss_rate_snapshot) ||
+    !isBOMDecimalText(value.unit_quantity_snapshot, { positive: true }) ||
+    !isBOMDecimalText(value.loss_rate_snapshot) ||
     !canonicalQuantity(value.planned_quantity) ||
     !canonicalNonNegativeQuantity(value.approved_over_issue_quantity) ||
     !canonicalQuantity(value.effective_limit_quantity) ||

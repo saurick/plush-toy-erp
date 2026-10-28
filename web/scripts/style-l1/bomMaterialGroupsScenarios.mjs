@@ -6,6 +6,13 @@ import { styleRpcResult } from './rpcMockResult.mjs'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
 
+async function chooseImportedReference(page, control, query, label) {
+  await control.click()
+  await control.fill(query)
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option')
+    .filter({ hasText: label }).first().click()
+}
+
 async function waitForMaterialDropdown(page) {
   const dropdown = page.locator('.ant-select-dropdown:visible')
   await dropdown.waitFor({ state: 'visible' })
@@ -394,8 +401,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         assert.equal(await parts.count(), 6)
 
         const product = editor.locator('input#product_id')
-        await product.fill('PROD-STYLE-L1')
-        await product.press('Enter')
+        await chooseImportedReference(page, product, 'PROD-STYLE-L1', '样式产品')
         await editor
           .getByLabel('BOM 版本', { exact: true })
           .fill('V-PARTS-FIRST')
@@ -429,15 +435,18 @@ export function createBOMMaterialGroupsScenarios(deps) {
       effectiveSession: deps.customerRuntimeEffectiveSession,
       viewport: { width: 1920, height: 1080 },
       verify: async (page) => {
-        await page
-          .locator('button[data-business-action-key="import-bom-xlsx"]:enabled')
-          .waitFor()
-        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        const [chooser] = await Promise.all([
+          page.waitForEvent('filechooser'),
+          page.getByRole('menuitem', { name: /从 Excel 新建/u }).click(),
+        ])
+        await chooser.setFiles({
           name: 'BOM-MERGED-REMARKS.xlsx',
           mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           buffer: createBOMImportWorkbookFixture({ mergedNotes: true }),
         })
+        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入并核对', exact: true }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.waitFor({ state: 'visible' })
         deps.assert.equal(
@@ -498,10 +507,12 @@ export function createBOMMaterialGroupsScenarios(deps) {
           await route.fallback()
         })
         await deps.expectHeading(page, '物料清单（BOM）')
-        await page
-          .locator('button[data-business-action-key="import-bom-xlsx"]:enabled')
-          .waitFor()
-        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        const [chooser] = await Promise.all([
+          page.waitForEvent('filechooser'),
+          page.getByRole('menuitem', { name: /从 Excel 新建/u }).click(),
+        ])
+        await chooser.setFiles({
           name: 'BOM-UNMATCHED-GROUPED.xlsx',
           mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -510,6 +521,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
             unmatchedProduct: true,
           }),
         })
+        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入并核对', exact: true }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         const review = editor.locator('.erp-bom-import-review')
         await review.waitFor()
@@ -529,8 +541,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         })
 
         const product = editor.locator('input#product_id')
-        await product.fill('PROD-STYLE-L1')
-        await product.press('Enter')
+        await chooseImportedReference(page, product, 'PROD-STYLE-L1', '样式产品')
         await editor.locator('[data-bom-import-product-status="matched"]').waitFor()
         assert.ok((await review.innerText()).includes('已关联：PROD-STYLE-L1'))
         assert.equal((await review.innerText()).includes('尚未关联'), false)
@@ -548,8 +559,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         )
         assert.equal(saves.length, 0)
         const material = editor.getByRole('combobox', { name: '物料名称 2', exact: true })
-        await material.fill('MAT-STYLE-L1')
-        await material.press('Enter')
+        await chooseImportedReference(page, material, 'MAT-STYLE-L1', '样式材料')
         await editor.locator('[data-bom-import-issue-count="2"]').waitFor()
         assert.equal(
           await editor.locator('.erp-bom-material-group').first()
@@ -558,8 +568,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
           '关联一次应补齐同一物料的全部部位'
         )
         const lastMaterial = editor.getByRole('combobox', { name: '物料名称 4', exact: true })
-        await lastMaterial.fill('MAT-STYLE-L1')
-        await lastMaterial.press('Enter')
+        await chooseImportedReference(page, lastMaterial, 'MAT-STYLE-L1', '样式材料')
         await editor.locator('[data-bom-import-issue-count="1"]').waitFor()
 
         await editor.getByLabel('单位用量 3', { exact: true }).fill('0')
@@ -595,15 +604,18 @@ export function createBOMMaterialGroupsScenarios(deps) {
       verify: async (page) => {
         const { assert } = deps
         await deps.expectHeading(page, '物料清单（BOM）')
-        await page
-          .locator('button[data-business-action-key="import-bom-xlsx"]:enabled')
-          .waitFor()
-        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        const [chooser] = await Promise.all([
+          page.waitForEvent('filechooser'),
+          page.getByRole('menuitem', { name: /从 Excel 新建/u }).click(),
+        ])
+        await chooser.setFiles({
           name: 'BOM-GROUPED-IMPORT.xlsx',
           mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           buffer: createBOMImportWorkbookFixture({ grouped: true }),
         })
+        await page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true }).getByRole('button', { name: '带入并核对', exact: true }).click()
         const editor = page
           .locator('.erp-business-form-page:not([hidden])')
           .last()
@@ -703,8 +715,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
           name: '物料名称 2',
           exact: true,
         })
-        await materialSelect.fill('MAT-STYLE-L1')
-        await materialSelect.press('Enter')
+        await chooseImportedReference(page, materialSelect, 'MAT-STYLE-L1', '样式材料')
         await page.waitForFunction(
           () =>
             document.querySelectorAll('.erp-bom-material-group').length === 2

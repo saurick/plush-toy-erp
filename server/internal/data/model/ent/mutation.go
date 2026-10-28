@@ -5593,6 +5593,7 @@ type BOMItemMutation struct {
 	position                                      *string
 	piece_count                                   *string
 	total_usage_snapshot                          *string
+	source_snapshot                               *map[string]interface{}
 	process_base                                  *string
 	process_method                                *string
 	note                                          *string
@@ -6038,6 +6039,55 @@ func (m *BOMItemMutation) ResetTotalUsageSnapshot() {
 	delete(m.clearedFields, bomitem.FieldTotalUsageSnapshot)
 }
 
+// SetSourceSnapshot sets the "source_snapshot" field.
+func (m *BOMItemMutation) SetSourceSnapshot(value map[string]interface{}) {
+	m.source_snapshot = &value
+}
+
+// SourceSnapshot returns the value of the "source_snapshot" field in the mutation.
+func (m *BOMItemMutation) SourceSnapshot() (r map[string]interface{}, exists bool) {
+	v := m.source_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceSnapshot returns the old "source_snapshot" field's value of the BOMItem entity.
+// If the BOMItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMItemMutation) OldSourceSnapshot(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceSnapshot: %w", err)
+	}
+	return oldValue.SourceSnapshot, nil
+}
+
+// ClearSourceSnapshot clears the value of the "source_snapshot" field.
+func (m *BOMItemMutation) ClearSourceSnapshot() {
+	m.source_snapshot = nil
+	m.clearedFields[bomitem.FieldSourceSnapshot] = struct{}{}
+}
+
+// SourceSnapshotCleared returns if the "source_snapshot" field was cleared in this mutation.
+func (m *BOMItemMutation) SourceSnapshotCleared() bool {
+	_, ok := m.clearedFields[bomitem.FieldSourceSnapshot]
+	return ok
+}
+
+// ResetSourceSnapshot resets all changes to the "source_snapshot" field.
+func (m *BOMItemMutation) ResetSourceSnapshot() {
+	m.source_snapshot = nil
+	delete(m.clearedFields, bomitem.FieldSourceSnapshot)
+}
+
 // SetProcessBase sets the "process_base" field.
 func (m *BOMItemMutation) SetProcessBase(s string) {
 	m.process_base = &s
@@ -6426,7 +6476,7 @@ func (m *BOMItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BOMItemMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.bom_header != nil {
 		fields = append(fields, bomitem.FieldBomHeaderID)
 	}
@@ -6450,6 +6500,9 @@ func (m *BOMItemMutation) Fields() []string {
 	}
 	if m.total_usage_snapshot != nil {
 		fields = append(fields, bomitem.FieldTotalUsageSnapshot)
+	}
+	if m.source_snapshot != nil {
+		fields = append(fields, bomitem.FieldSourceSnapshot)
 	}
 	if m.process_base != nil {
 		fields = append(fields, bomitem.FieldProcessBase)
@@ -6490,6 +6543,8 @@ func (m *BOMItemMutation) Field(name string) (ent.Value, bool) {
 		return m.PieceCount()
 	case bomitem.FieldTotalUsageSnapshot:
 		return m.TotalUsageSnapshot()
+	case bomitem.FieldSourceSnapshot:
+		return m.SourceSnapshot()
 	case bomitem.FieldProcessBase:
 		return m.ProcessBase()
 	case bomitem.FieldProcessMethod:
@@ -6525,6 +6580,8 @@ func (m *BOMItemMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldPieceCount(ctx)
 	case bomitem.FieldTotalUsageSnapshot:
 		return m.OldTotalUsageSnapshot(ctx)
+	case bomitem.FieldSourceSnapshot:
+		return m.OldSourceSnapshot(ctx)
 	case bomitem.FieldProcessBase:
 		return m.OldProcessBase(ctx)
 	case bomitem.FieldProcessMethod:
@@ -6599,6 +6656,13 @@ func (m *BOMItemMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTotalUsageSnapshot(v)
+		return nil
+	case bomitem.FieldSourceSnapshot:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceSnapshot(v)
 		return nil
 	case bomitem.FieldProcessBase:
 		v, ok := value.(string)
@@ -6677,6 +6741,9 @@ func (m *BOMItemMutation) ClearedFields() []string {
 	if m.FieldCleared(bomitem.FieldTotalUsageSnapshot) {
 		fields = append(fields, bomitem.FieldTotalUsageSnapshot)
 	}
+	if m.FieldCleared(bomitem.FieldSourceSnapshot) {
+		fields = append(fields, bomitem.FieldSourceSnapshot)
+	}
 	if m.FieldCleared(bomitem.FieldProcessBase) {
 		fields = append(fields, bomitem.FieldProcessBase)
 	}
@@ -6708,6 +6775,9 @@ func (m *BOMItemMutation) ClearField(name string) error {
 		return nil
 	case bomitem.FieldTotalUsageSnapshot:
 		m.ClearTotalUsageSnapshot()
+		return nil
+	case bomitem.FieldSourceSnapshot:
+		m.ClearSourceSnapshot()
 		return nil
 	case bomitem.FieldProcessBase:
 		m.ClearProcessBase()
@@ -6749,6 +6819,9 @@ func (m *BOMItemMutation) ResetField(name string) error {
 		return nil
 	case bomitem.FieldTotalUsageSnapshot:
 		m.ResetTotalUsageSnapshot()
+		return nil
+	case bomitem.FieldSourceSnapshot:
+		m.ResetSourceSnapshot()
 		return nil
 	case bomitem.FieldProcessBase:
 		m.ResetProcessBase()

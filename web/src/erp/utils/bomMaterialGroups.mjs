@@ -1,9 +1,4 @@
-import {
-  numeric20Scale6Units,
-  numeric20Scale6TextFromUnits,
-} from './numeric20Scale6.mjs'
-
-const SCALE = BigInt(1000000)
+import { normalizeBOMSourceNumber, parseBOMSourceNumber, multiplyBOMNumbers, sumBOMSourceNumbers } from './bomSourceValues.mjs'
 
 export function invalidateBOMUsageSnapshots(items, changes) {
   const productionChanged = Object.hasOwn(changes, 'quantity_text')
@@ -37,42 +32,41 @@ export function groupBOMMaterials(items = []) {
   return [...groups.values()]
 }
 
+export function bindBOMMaterialReference(item, material) {
+  const source = item?._import_source
+  const firstAssociation = source && !source.associatedMaterialID && item.source_snapshot && item.unit_id === material?.default_unit_id
+  return {
+    ...item,
+    material_id: material?.id,
+    unit_id: material?.default_unit_id,
+    total_usage_snapshot: firstAssociation ? item.total_usage_snapshot : undefined,
+    ...(source ? { _import_source: { ...source, associatedMaterialID: material?.id } } : {}),
+  }
+}
+
 export function calculateBOMUsage(quantity, lossRate, productionQuantity) {
-  const values = [quantity, lossRate ?? '0', productionQuantity].map(
-    numeric20Scale6Units
-  )
-  if (values.some((value) => value === null)) return ''
-  const [unit, loss, count] = values.map(BigInt)
-  const divisor = SCALE * SCALE
-  return (
-    numeric20Scale6TextFromUnits(
-      (
-        (unit * (SCALE + loss) * count + divisor / BigInt(2)) /
-        divisor
-      ).toString()
-    ) || ''
-  )
+  const factor = sumBOMSourceNumbers(['1', lossRate ?? '0'])
+  return factor ? multiplyBOMNumbers([quantity, factor, productionQuantity]) : ''
 }
 
 export function getBOMUsage(item = {}, productionQuantity = '') {
-  const snapshot = numeric20Scale6Units(item.total_usage_snapshot)
-  return snapshot !== null
-    ? numeric20Scale6TextFromUnits(snapshot)
-    : calculateBOMUsage(item.quantity, item.loss_rate, productionQuantity)
+  const calculated = calculateBOMUsage(item.quantity, item.loss_rate, productionQuantity)
+  if (item.source_snapshot && calculated) return calculated
+  const snapshot = normalizeBOMSourceNumber(item.total_usage_snapshot)
+  const sourceQuantity = normalizeBOMSourceNumber(item.source_snapshot?.order_quantity)
+  const currentOrder = !item.source_snapshot || (sourceQuantity && sourceQuantity !== '0' && sourceQuantity === normalizeBOMSourceNumber(productionQuantity))
+  return snapshot && currentOrder
+    ? snapshot
+    : calculated
 }
 
 export function bomLossRateToPercent(rate) {
-  const value = numeric20Scale6Units(rate)
-  return value === null
-    ? ''
-    : numeric20Scale6TextFromUnits((BigInt(value) * BigInt(100)).toString()) ||
-        ''
+  return multiplyBOMNumbers([rate, '100'])
 }
 
 export function bomPercentToLossRate(percent) {
-  const value = numeric20Scale6Units(percent)
-  if (value === null || BigInt(value) % BigInt(100) !== BigInt(0)) return null
-  return numeric20Scale6TextFromUnits((BigInt(value) / BigInt(100)).toString())
+  const value = multiplyBOMNumbers([percent, '0.01'])
+  return value && parseBOMSourceNumber(value) ? value : null
 }
 
 export const BOM_PART_FIELDS = [
@@ -106,7 +100,7 @@ export function parseBOMPartsPaste(text, startingColumn = 0) {
           throw new Error('损耗须为有效百分比，如 10 或 10%')
         }
       } else if (key === 'quantity') {
-        if (numeric20Scale6Units(value) === null || Number(value) <= 0) {
+        if (!parseBOMSourceNumber(value)?.units) {
           throw new Error('单位用量须为正数，请从 Excel 粘贴计算结果')
         }
         item[key] = value

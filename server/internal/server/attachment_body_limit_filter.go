@@ -2,11 +2,13 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	stdhttp "net/http"
 	"strings"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/errcode"
@@ -16,6 +18,26 @@ import (
 )
 
 const maxJSONRPCRequestBodyBytes int64 = 2 << 20
+
+// Attachment requests need time to receive a large file before the usecase runs.
+// Keep the configured deadline for all other requests and retain parent cancellation.
+func RequestTimeoutFilter(defaultTimeout time.Duration) httpx.FilterFunc {
+	return func(next stdhttp.Handler) stdhttp.Handler {
+		return stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+			timeout := defaultTimeout
+			if r.URL.Path == "/rpc/attachment" && timeout > 0 && timeout < biz.BusinessAttachmentRequestTimeoutSeconds*time.Second {
+				timeout = biz.BusinessAttachmentRequestTimeoutSeconds * time.Second
+			}
+			if timeout <= 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), timeout)
+			defer cancel()
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
 
 // JSONRPCBodyLimitFilter bounds request allocation before protobuf/JSON
 // decoding. The attachment route keeps its larger, business-defined budget.

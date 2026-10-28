@@ -125,7 +125,7 @@ HTTP 路由：
 
 销售、采购与委外整单保存的单头 `id`、明细 `id` 只在省略或 JSON 整数 `0` 时表示新建；已存在对象使用正整数，显式 `null`、小数、数值字符串、布尔值和不安全整数拒绝，不能被截断后选中另一张单或明细。客户 / 供应商引用、到货来源采购单使用 JSON 正整数；更新仍必须使用读取到的 `expected_version`。生产订单沿用其独立的 `production_order_id` 合同，不增加通用别名。
 
-数量与金额使用现有 `numeric(20,6)` 十进制字符串合同，最多 14 位整数和 6 位小数；接口拒绝 JSON number，单位精度和是否允许零仍由所属业务校验。共享时间解析支持正 Unix 秒、RFC3339 和 `YYYY-MM-DD`，其中列表 `date_from/date_to` 的日期字符串使用上海自然日边界，显式时间戳保留原瞬间；财务月结仍按 UTC 口径。其他日期字段按业务合同解释；跨系统时间交换优先携带时区的 RFC3339，不将毫秒当秒。列表继续使用各自的分页、排序和范围合同，普通 offset 分页不表示增量同步或变更游标。
+普通单据数量与金额使用现有 `numeric(20,6)` 十进制字符串合同（BOM 系数见下文独立合同），最多 14 位整数和 6 位小数；接口拒绝 JSON number，单位精度和是否允许零仍由所属业务校验。共享时间解析支持正 Unix 秒、RFC3339 和 `YYYY-MM-DD`，其中列表 `date_from/date_to` 的日期字符串使用上海自然日边界，显式时间戳保留原瞬间；财务月结仍按 UTC 口径。其他日期字段按业务合同解释；跨系统时间交换优先携带时区的 RFC3339，不将毫秒当秒。列表继续使用各自的分页、排序和范围合同，普通 offset 分页不表示增量同步或变更游标。
 
 例如取消订单的请求形状如下；示例 ID、版本与键仅说明格式，实际调用使用已授权对象和本次用户意图：
 
@@ -1176,7 +1176,9 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 
 其它附件挂到既有业务对象的 `owner_type + owner_id`；上传在同一事务内锁定 owner 行并创建附件，撤销在同一事务内重新锁定 owner 和附件行并以 `withdrawn_at IS NULL` 做一次性转换，读取内容前会再次确认 owner 存在且附件未撤销。debug 清理会先清理附件再清理 owner，避免孤儿记录。
 
-普通附件单文件上限为 100MB，HTTP `/rpc/attachment` 与 Web 代理在 JSON / protobuf 解析前限制 140MB 编码请求体，业务层还会在 base64 解码分配前检查编码长度，并在解码后复核 100MB 上限。当前 JSON-RPC 上传和下载仍会在内存中处理 base64，因此该调整只放宽现有链路，不代表流式大文件能力已经交付。
+普通附件单文件上限为 200MB（200 × 1024 × 1024 字节），Excel 导入复用同一大小合同。HTTP `/rpc/attachment` 与 Web 代理在 JSON / protobuf 解析前限制 280MB 编码请求体，边缘代理样例允许 300MB；附件请求单独允许至少 300 秒，其他请求保留原超时；业务层在 base64 解码分配前检查编码长度，解码后复核 200MB 上限。产品主图继续使用独立的 5MB 图片合同。
+
+手机附件入口提供选择文件、选照片和调用系统相机拍照，复用同一待上传、保存绑定、权限和审计链路，不开放视频格式或录像入口。选文件时以 1MB 分块计算内容摘要并保留原始 File，待上传时逐个转为 base64、串行提交；失败项保留文件供手动重试，网络中断等结果未确认项仍须先刷新核对，不能盲目重传。上传和下载沿用整文件 JSON-RPC，不提供断点续传；200MB 容量证据按单文件串行上传核验，不推定多客户端并发能力。
 
 `workflow_task` owner 额外执行行级边界：list / download 必须同时具备 `workflow.task.read` 且任务处于当前 active revision 的可见责任范围；upload 只接受 `workflow.task.update`，并要求当前账号是有效 owner scope 或指定处理人，终态任务拒绝继续追加附件。
 
@@ -1297,6 +1299,20 @@ SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_pro
 `bom` JSON-RPC 域承载 BOM Version / 工程资料主路径。BOM 表单只通过 `save_bom_with_items` 写入，在一个后端事务中完成草稿头创建 / 更新、明细新增 / 更新与缺失行删除；更新已有草稿必须提交当前正整数 `expected_version`，其值来自读模型的 `edit_version`。
 
 `edit_version` 由既有 `updated_at` 生成，数据层按 `id + DRAFT + updated_at` CAS 并单调推进，冲突不会留下半保存明细；业务字段 `version` 仍只表示 BOM 版次。
+
+`items[].quantity / loss_rate` 使用完整精度的十进制字符串，数据库为无固定小数位的 `numeric`，拒绝 JSON number。输入最多 14 位整数、324 位小数、384 个字符，允许有界的科学计数法；超出范围明确拒绝，不四舍五入后继续保存。单位用量必须为正数，损耗必须非负。导入、编辑、复制、保存与计算保留完整有效数值，显示位数独立遵循原表格式。原文件不被修改，完整原值和显示格式通过可选 `items[].source_snapshot` 随草稿保存、读回与复制；来源值不覆盖已编辑的业务系数。
+
+| 来源快照字段 | 用途与边界 |
+| --- | --- |
+| `file_name / sheet_name / row_number` | 文件、工作表和原始行号；仅为核对线索，不证明文件真实性 |
+| `quantity_value / quantity_format / quantity_label` | 原表单位用量、Excel 数字格式和列名；保存用量仍以 `quantity` 为准 |
+| `total_value / total_format / total_label / total_formula` | 原表总用量及计算依据；保留小数原值，不把显示位数当成计算位数 |
+| `loss_value / loss_format / loss_label / loss_rate / loss_source` | 区分原表损耗列、总用量表头、逐行反算和无法确认；跨层取值来自领域生成合同 |
+| `order_quantity / unit` | 原表订单数量和单位，用于核对原总量的适用范围 |
+
+当前总量按完整精度的单耗 ×（1＋损耗）× 生产数量计算。工程用料的 `sources[].unit_usage / loss_rate / total_usage` 保留完整精度，`unit_usage_format / total_usage_format` 仅供显示并不参与来源身份校验；材料汇总后才按单位精度生成 `required_quantity`。新下达生产单的 `unit_quantity_snapshot / loss_rate_snapshot` 保留完整系数，`planned_quantity` 在可执行数量边界按单位精度生成。迁移不回填或重算既有业务行；已提交／已批准用料申请、已下达生产快照和事实读取原记录。
+
+快照对象只接受登记字段和有界字符串，缺失或 `null` 表示清空；普通手工 BOM 可以不提供。原始数值最多保留 384 字符，无法解析的原始文本也可在人工修正业务值后保留，但不得用于计算；参与来源计算的数字最多 324 位小数、14 位整数。元数据不改变正式数量字段的精度。`total_usage_snapshot` 可保留同订单、未修改用量与损耗的原表数值；更换订单数量或修改计算输入后旧总量失效，完整来源快照仍可查。客户端保存后重新读取并核对来源快照，缺失或不一致时保留输入并提示恢复，重试沿已有草稿身份继续。
 
 旧 `create_bom_draft / update_bom_draft / add_bom_item / update_bom_item / delete_bom_item` 分拆写接口已退出公开路由。
 
@@ -8151,57 +8167,58 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:155`。 |
+| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:177`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:238`。 |
-| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:241`。 |
-| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:236`。 |
-| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:243`。 |
-| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:230`。 |
-| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:231`。 |
-| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:239`。 |
-| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:226`。 |
+| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
+| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
+| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
+| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
+| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:252`。 |
+| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
+| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:248`。 |
 | `result.data.bom_version.item_count` | integer | 后端返回映射。 |
 | `result.data.bom_version.items` | array | 后端返回映射。 |
-| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:275`。 |
 
 **`bom_version.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
-| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:268`。 |
-| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
-| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
-| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
-| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:267`。 |
-| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
-| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
-| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
-| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:266`。 |
-| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
-| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
-| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
-| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:269`。 |
+| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:279`。 |
+| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:291`。 |
+| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:278`。 |
+| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:283`。 |
+| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:280`。 |
+| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:290`。 |
+| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:285`。 |
+| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:284`。 |
+| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:288`。 |
+| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:289`。 |
+| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:281`。 |
+| `result.data.bom_version.items[].source_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:287`。 |
+| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:286`。 |
+| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:282`。 |
+| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:292`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:237`。 |
-| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:240`。 |
-| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:235`。 |
-| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:227`。 |
-| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:233`。 |
-| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:232`。 |
-| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:234`。 |
-| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:229`。 |
-| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:242`。 |
-| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:228`。 |
+| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
+| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
+| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
+| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:249`。 |
+| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:255`。 |
+| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:254`。 |
+| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
+| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:251`。 |
+| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
+| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:250`。 |
 
 ```json
 {
@@ -8298,30 +8315,30 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:238`。 |
-| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:241`。 |
-| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:236`。 |
-| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:243`。 |
-| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:230`。 |
-| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:231`。 |
-| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:239`。 |
-| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:226`。 |
+| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
+| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
+| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
+| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
+| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:252`。 |
+| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
+| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:248`。 |
 | `result.data.bom_version.item_count` | integer | 后端返回映射。 |
-| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:237`。 |
-| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:240`。 |
-| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:235`。 |
-| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:227`。 |
-| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:233`。 |
-| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:232`。 |
-| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:234`。 |
+| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
+| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
+| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
+| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:249`。 |
+| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:255`。 |
+| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:254`。 |
+| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
 
 **`bom_version`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:229`。 |
-| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:242`。 |
-| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:228`。 |
+| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:251`。 |
+| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
+| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:250`。 |
 
 ```json
 {
@@ -8410,57 +8427,58 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:155`。 |
+| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:177`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:238`。 |
-| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:241`。 |
-| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:236`。 |
-| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:243`。 |
-| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:230`。 |
-| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:231`。 |
-| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:239`。 |
-| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:226`。 |
+| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
+| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
+| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
+| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
+| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:252`。 |
+| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
+| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:248`。 |
 | `result.data.bom_version.item_count` | integer | 后端返回映射。 |
 | `result.data.bom_version.items` | array | 后端返回映射。 |
-| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:275`。 |
 
 **`bom_version.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
-| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:268`。 |
-| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
-| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
-| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
-| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:267`。 |
-| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
-| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
-| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
-| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:266`。 |
-| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
-| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
-| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
-| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:269`。 |
+| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:279`。 |
+| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:291`。 |
+| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:278`。 |
+| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:283`。 |
+| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:280`。 |
+| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:290`。 |
+| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:285`。 |
+| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:284`。 |
+| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:288`。 |
+| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:289`。 |
+| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:281`。 |
+| `result.data.bom_version.items[].source_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:287`。 |
+| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:286`。 |
+| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:282`。 |
+| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:292`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:237`。 |
-| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:240`。 |
-| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:235`。 |
-| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:227`。 |
-| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:233`。 |
-| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:232`。 |
-| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:234`。 |
-| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:229`。 |
-| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:242`。 |
-| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:228`。 |
+| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
+| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
+| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
+| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:249`。 |
+| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:255`。 |
+| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:254`。 |
+| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
+| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:251`。 |
+| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
+| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:250`。 |
 
 ```json
 {
@@ -8550,57 +8568,58 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:155`。 |
+| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:177`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:238`。 |
-| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:241`。 |
-| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:236`。 |
-| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:243`。 |
-| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:230`。 |
-| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:231`。 |
-| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:239`。 |
-| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:226`。 |
+| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
+| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
+| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
+| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
+| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:252`。 |
+| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
+| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:248`。 |
 | `result.data.bom_version.item_count` | integer | 后端返回映射。 |
 | `result.data.bom_version.items` | array | 后端返回映射。 |
-| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:275`。 |
 
 **`bom_version.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
-| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:268`。 |
-| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
-| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
-| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
-| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:267`。 |
-| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
-| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
-| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
-| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:266`。 |
-| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
-| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
-| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
-| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:269`。 |
+| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:279`。 |
+| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:291`。 |
+| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:278`。 |
+| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:283`。 |
+| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:280`。 |
+| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:290`。 |
+| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:285`。 |
+| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:284`。 |
+| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:288`。 |
+| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:289`。 |
+| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:281`。 |
+| `result.data.bom_version.items[].source_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:287`。 |
+| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:286`。 |
+| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:282`。 |
+| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:292`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:237`。 |
-| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:240`。 |
-| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:235`。 |
-| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:227`。 |
-| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:233`。 |
-| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:232`。 |
-| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:234`。 |
-| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:229`。 |
-| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:242`。 |
-| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:228`。 |
+| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
+| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
+| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
+| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:249`。 |
+| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:255`。 |
+| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:254`。 |
+| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
+| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:251`。 |
+| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
+| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:250`。 |
 
 ```json
 {
@@ -8664,12 +8683,12 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
 | `include_status_counts` | boolean &#124; null | 可选 | 解析器 `getOptionalJSONRPCBool`；调用 `getOptionalJSONRPCBool(params, "include_status_counts")`。 依据：`server/internal/service/jsonrpc_business_status_counts.go:7`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:145`。 |
-| `lifecycle_scope` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_scope")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:144`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:167`。 |
+| `lifecycle_scope` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_scope")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:166`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:278`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:290`。 |
-| `product_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:142`。 |
-| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:143`。 |
+| `product_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:164`。 |
+| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:165`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -8698,36 +8717,36 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.bom_versions` | array | 依据：`server/internal/service/jsonrpc_bom_version.go:32`。 |
-| `result.data.bom_versions[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:223`。 |
+| `result.data.bom_versions[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:245`。 |
 
 **`bom_versions[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_versions[].auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:238`。 |
-| `result.data.bom_versions[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:241`。 |
-| `result.data.bom_versions[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:236`。 |
-| `result.data.bom_versions[].edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:243`。 |
-| `result.data.bom_versions[].effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:230`。 |
-| `result.data.bom_versions[].effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:231`。 |
-| `result.data.bom_versions[].hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:239`。 |
-| `result.data.bom_versions[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:226`。 |
+| `result.data.bom_versions[].auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
+| `result.data.bom_versions[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
+| `result.data.bom_versions[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
+| `result.data.bom_versions[].edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
+| `result.data.bom_versions[].effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:252`。 |
+| `result.data.bom_versions[].effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_versions[].hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
+| `result.data.bom_versions[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:248`。 |
 | `result.data.bom_versions[].item_count` | integer | 后端返回映射。 |
-| `result.data.bom_versions[].maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:237`。 |
-| `result.data.bom_versions[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:240`。 |
-| `result.data.bom_versions[].print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:235`。 |
-| `result.data.bom_versions[].product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:227`。 |
-| `result.data.bom_versions[].quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:233`。 |
-| `result.data.bom_versions[].source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:232`。 |
-| `result.data.bom_versions[].spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:234`。 |
+| `result.data.bom_versions[].maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
+| `result.data.bom_versions[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
+| `result.data.bom_versions[].print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
+| `result.data.bom_versions[].product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:249`。 |
+| `result.data.bom_versions[].quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:255`。 |
+| `result.data.bom_versions[].source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:254`。 |
+| `result.data.bom_versions[].spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
 
 **`bom_versions[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_versions[].status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:229`。 |
-| `result.data.bom_versions[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:242`。 |
-| `result.data.bom_versions[].version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:228`。 |
+| `result.data.bom_versions[].status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:251`。 |
+| `result.data.bom_versions[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
+| `result.data.bom_versions[].version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:250`。 |
 
 **顶层字段**
 
@@ -8776,24 +8795,25 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `expected_version` | integer | 条件必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_bom_version.go:58`。 |
 | `hair_direction` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "hair_direction")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:74`。 |
 | `id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_version.go:44`。 |
-| `items` | array &#124; null | 可选 | 由后端实际解析读取；嵌套字段和数组按所属解析器校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:118`。 |
-| `items[]` | object | 条件必填（items 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_bom_shared.go:124`。 |
+| `items` | array &#124; null | 可选 | 由后端实际解析读取；嵌套字段和数组按所属解析器校验。 依据：`server/internal/service/jsonrpc_bom_shared.go:140`。 |
+| `items[]` | object | 条件必填（items 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_bom_shared.go:146`。 |
 
 **`items[]`**
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `items[].id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(itemMap, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:133`。 |
-| `items[].loss_rate` | string | 条件必填（items 有值） | 解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "loss_rate")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_bom_shared.go:95`。 |
-| `items[].material_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "material_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:100`。 |
-| `items[].note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "note")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:109`。 |
-| `items[].piece_count` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "piece_count")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:105`。 |
-| `items[].position` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "position")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:104`。 |
-| `items[].process_base` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "process_base")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:107`。 |
-| `items[].process_method` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "process_method")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:108`。 |
-| `items[].quantity` | string | 条件必填（items 有值） | 解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_bom_shared.go:91`。 |
-| `items[].total_usage_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "total_usage_snapshot")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:106`。 |
-| `items[].unit_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "unit_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:102`。 |
+| `items[].id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(itemMap, "id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:155`。 |
+| `items[].loss_rate` | string | 条件必填（items 有值） | 解析器 `ParseBOMDecimal`；调用 `biz.ParseBOMDecimal(lossText)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_bom_shared.go:116`。 |
+| `items[].material_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "material_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:121`。 |
+| `items[].note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "note")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:131`。 |
+| `items[].piece_count` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "piece_count")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:126`。 |
+| `items[].position` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "position")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:125`。 |
+| `items[].process_base` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "process_base")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:129`。 |
+| `items[].process_method` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "process_method")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:130`。 |
+| `items[].quantity` | string | 条件必填（items 有值） | 解析器 `ParseBOMDecimal`；调用 `biz.ParseBOMDecimal(quantityText)`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_bom_shared.go:108`。 |
+| `items[].source_snapshot` | object &#124; null | 可选 | 解析器 `getOptionalJSONRPCBOMSourceSnapshot`；调用 `getOptionalJSONRPCBOMSourceSnapshot(pm, "source_snapshot")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:100`。 |
+| `items[].total_usage_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "total_usage_snapshot")`。 依据：`server/internal/service/jsonrpc_bom_shared.go:127`。 |
+| `items[].unit_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "unit_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_bom_shared.go:123`。 |
 
 **顶层字段**
 
@@ -8819,11 +8839,28 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
       {
         "loss_rate": "0",
         "material_id": 1,
-        "quantity": "1",
+        "quantity": "1.000000000001",
+        "source_snapshot": {
+          "file_name": "教学材料.xlsx",
+          "loss_rate": "0",
+          "loss_source": "explicit",
+          "loss_value": "0",
+          "order_quantity": "100",
+          "quantity_format": "0.000",
+          "quantity_label": "单位用量",
+          "quantity_value": "1.000000000001",
+          "row_number": 6,
+          "sheet_name": "材料分析明细表",
+          "total_format": "0.00",
+          "total_label": "总用量",
+          "total_value": "100.0000000001"
+        },
+        "total_usage_snapshot": "100.0000000001",
         "unit_id": 1
       }
     ],
     "product_id": 1,
+    "quantity_text": "100",
     "version": "CAS-V1"
   },
   "id": "rpc-demo-bom.save_bom_with_items"
@@ -8842,57 +8879,58 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:155`。 |
+| `result.data.bom_version` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:177`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:238`。 |
-| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:241`。 |
-| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:236`。 |
-| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:243`。 |
-| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:230`。 |
-| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:231`。 |
-| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:239`。 |
-| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:226`。 |
+| `result.data.bom_version.auditor` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
+| `result.data.bom_version.created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
+| `result.data.bom_version.designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
+| `result.data.bom_version.edit_version` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
+| `result.data.bom_version.effective_from` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:252`。 |
+| `result.data.bom_version.effective_to` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.hair_direction` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
+| `result.data.bom_version.id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:248`。 |
 | `result.data.bom_version.item_count` | integer | 后端返回映射。 |
 | `result.data.bom_version.items` | array | 后端返回映射。 |
-| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:253`。 |
+| `result.data.bom_version.items[]` | object | 依据：`server/internal/service/jsonrpc_bom_shared.go:275`。 |
 
 **`bom_version.items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
-| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:268`。 |
-| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
-| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:261`。 |
-| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:258`。 |
-| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:267`。 |
-| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:263`。 |
-| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
-| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:265`。 |
-| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:266`。 |
-| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
-| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
-| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:260`。 |
-| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:269`。 |
+| `result.data.bom_version.items[].bom_header_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:279`。 |
+| `result.data.bom_version.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:291`。 |
+| `result.data.bom_version.items[].id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:278`。 |
+| `result.data.bom_version.items[].loss_rate` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:283`。 |
+| `result.data.bom_version.items[].material_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:280`。 |
+| `result.data.bom_version.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:290`。 |
+| `result.data.bom_version.items[].piece_count` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:285`。 |
+| `result.data.bom_version.items[].position` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:284`。 |
+| `result.data.bom_version.items[].process_base` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:288`。 |
+| `result.data.bom_version.items[].process_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:289`。 |
+| `result.data.bom_version.items[].quantity` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:281`。 |
+| `result.data.bom_version.items[].source_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:287`。 |
+| `result.data.bom_version.items[].total_usage_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:286`。 |
+| `result.data.bom_version.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:282`。 |
+| `result.data.bom_version.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:292`。 |
 
 **`bom_version`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:237`。 |
-| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:240`。 |
-| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:235`。 |
-| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:227`。 |
-| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:233`。 |
-| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:232`。 |
-| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:234`。 |
-| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:229`。 |
-| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:242`。 |
-| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:228`。 |
+| `result.data.bom_version.maker` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:259`。 |
+| `result.data.bom_version.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:262`。 |
+| `result.data.bom_version.print_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:257`。 |
+| `result.data.bom_version.product_id` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:249`。 |
+| `result.data.bom_version.quantity_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:255`。 |
+| `result.data.bom_version.source_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:254`。 |
+| `result.data.bom_version.spare_text` | string &#124; null | 依据：`server/internal/service/jsonrpc_bom_shared.go:256`。 |
+| `result.data.bom_version.status` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:251`。 |
+| `result.data.bom_version.updated_at` | integer | 依据：`server/internal/service/jsonrpc_bom_shared.go:264`。 |
+| `result.data.bom_version.version` | string | 依据：`server/internal/service/jsonrpc_bom_shared.go:250`。 |
 
 ```json
 {
@@ -8923,8 +8961,23 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
             "position": null,
             "process_base": null,
             "process_method": null,
-            "quantity": "1",
-            "total_usage_snapshot": null,
+            "quantity": "1.000000000001",
+            "source_snapshot": {
+              "file_name": "教学材料.xlsx",
+              "loss_rate": "0",
+              "loss_source": "explicit",
+              "loss_value": "0",
+              "order_quantity": "100",
+              "quantity_format": "0.000",
+              "quantity_label": "单位用量",
+              "quantity_value": "1.000000000001",
+              "row_number": 6,
+              "sheet_name": "材料分析明细表",
+              "total_format": "0.00",
+              "total_label": "总用量",
+              "total_value": "100.0000000001"
+            },
+            "total_usage_snapshot": "100.0000000001",
             "unit_id": 1,
             "updated_at": 1792394183
           }
@@ -8933,7 +8986,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "note": null,
         "print_date": null,
         "product_id": 1,
-        "quantity_text": null,
+        "quantity_text": "100",
         "source_order_no": null,
         "spare_text": null,
         "status": "DRAFT",

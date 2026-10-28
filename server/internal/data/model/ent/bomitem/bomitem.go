@@ -30,6 +30,8 @@ const (
 	FieldPieceCount = "piece_count"
 	// FieldTotalUsageSnapshot holds the string denoting the total_usage_snapshot field in the database.
 	FieldTotalUsageSnapshot = "total_usage_snapshot"
+	// FieldSourceSnapshot holds the string denoting the source_snapshot field in the database.
+	FieldSourceSnapshot = "source_snapshot"
 	// FieldProcessBase holds the string denoting the process_base field in the database.
 	FieldProcessBase = "process_base"
 	// FieldProcessMethod holds the string denoting the process_method field in the database.
@@ -91,6 +93,7 @@ var Columns = []string{
 	FieldPosition,
 	FieldPieceCount,
 	FieldTotalUsageSnapshot,
+	FieldSourceSnapshot,
 	FieldProcessBase,
 	FieldProcessMethod,
 	FieldNote,

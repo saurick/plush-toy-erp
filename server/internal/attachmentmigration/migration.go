@@ -16,10 +16,13 @@ import (
 	"time"
 
 	"server/internal/attachmentstore"
+	"server/internal/biz"
 )
 
 const Format = "plush.attachment-objects/v1"
-const MaxFileBytes = 100 * 1024 * 1024
+
+// Recovery accepts every file supported by the formal business upload path.
+const MaxFileBytes = biz.BusinessAttachmentMaxBytes
 
 type File struct {
 	ID     int64  `json:"id"`

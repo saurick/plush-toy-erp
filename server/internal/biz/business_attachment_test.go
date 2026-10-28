@@ -504,6 +504,25 @@ func TestBusinessAttachmentUploadRejectsUnsupportedMime(t *testing.T) {
 	}
 }
 
+func TestBusinessAttachmentUploadRejectsVideo(t *testing.T) {
+	for _, item := range []struct{ name, mime string }{
+		{"recording.mp4", "video/mp4"},
+		{"recording.mov", "video/quicktime"},
+		{"recording.jpg", "video/mp4"},
+	} {
+		t.Run(item.name+item.mime, func(t *testing.T) {
+			repo := &stubBusinessAttachmentRepo{ownerExists: true}
+			_, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(context.Background(), &BusinessAttachmentUploadInput{
+				OwnerType: "sales_order", OwnerID: 7, FileName: item.name, MimeType: item.mime,
+				ContentBase64: base64.StdEncoding.EncodeToString([]byte("video")),
+			})
+			if !errors.Is(err, ErrBusinessAttachmentMimeNotAllowed) || repo.created != nil {
+				t.Fatal("video must be rejected before repository write")
+			}
+		})
+	}
+}
+
 func TestBusinessAttachmentUploadRejectsMismatchedExtensionAndMime(t *testing.T) {
 	uc := NewBusinessAttachmentUsecase(&stubBusinessAttachmentRepo{ownerExists: true})
 
@@ -570,15 +589,15 @@ func TestBusinessAttachmentUploadKeepsProductImageSnapshotAtFiveMiB(t *testing.T
 	}
 }
 
-func TestBusinessAttachmentSizeBudgetsCoverHundredMiBBase64Envelope(t *testing.T) {
-	if BusinessAttachmentMaxBytes != 100*1024*1024 {
-		t.Fatalf("attachment max bytes = %d, want 100 MiB", BusinessAttachmentMaxBytes)
+func TestBusinessAttachmentSizeBudgetsCoverTwoHundredMiBBase64Envelope(t *testing.T) {
+	if BusinessAttachmentMaxBytes != 200*1024*1024 {
+		t.Fatalf("attachment max bytes = %d, want 200 MiB", BusinessAttachmentMaxBytes)
 	}
 	if BusinessAttachmentProductImageMaxBytes != 5*1024*1024 {
 		t.Fatalf("product image max bytes = %d, want 5 MiB", BusinessAttachmentProductImageMaxBytes)
 	}
 	encodedBytes := base64.StdEncoding.EncodedLen(BusinessAttachmentMaxBytes)
-	if BusinessAttachmentMaxJSONRPCBodyBytes != 140*1024*1024 || BusinessAttachmentMaxJSONRPCBodyBytes <= encodedBytes {
+	if BusinessAttachmentMaxJSONRPCBodyBytes != 280*1024*1024 || BusinessAttachmentMaxJSONRPCBodyBytes <= encodedBytes {
 		t.Fatalf("attachment body budget = %d, encoded payload = %d", BusinessAttachmentMaxJSONRPCBodyBytes, encodedBytes)
 	}
 }

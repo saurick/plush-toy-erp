@@ -97,6 +97,12 @@ func (_c *BOMItemCreate) SetNillableTotalUsageSnapshot(v *string) *BOMItemCreate
 	return _c
 }
 
+// SetSourceSnapshot sets the "source_snapshot" field.
+func (_c *BOMItemCreate) SetSourceSnapshot(v map[string]interface{}) *BOMItemCreate {
+	_c.mutation.SetSourceSnapshot(v)
+	return _c
+}
+
 // SetProcessBase sets the "process_base" field.
 func (_c *BOMItemCreate) SetProcessBase(v string) *BOMItemCreate {
 	_c.mutation.SetProcessBase(v)
@@ -364,6 +370,10 @@ func (_c *BOMItemCreate) createSpec() (*BOMItem, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TotalUsageSnapshot(); ok {
 		_spec.SetField(bomitem.FieldTotalUsageSnapshot, field.TypeString, value)
 		_node.TotalUsageSnapshot = &value
+	}
+	if value, ok := _c.mutation.SourceSnapshot(); ok {
+		_spec.SetField(bomitem.FieldSourceSnapshot, field.TypeJSON, value)
+		_node.SourceSnapshot = value
 	}
 	if value, ok := _c.mutation.ProcessBase(); ok {
 		_spec.SetField(bomitem.FieldProcessBase, field.TypeString, value)

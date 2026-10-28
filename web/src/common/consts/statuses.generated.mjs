@@ -1,5 +1,12 @@
 // 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。
 // 真源：server/internal/core/status 及 server/cmd/public-contracts 登记的 biz 领域声明。
+export const BOMLossSource = Object.freeze({
+  CALCULATED: 'calculated',
+  EXPLICIT: 'explicit',
+  HEADER: 'header',
+  UNRESOLVED: 'unresolved',
+})
+
 export const FinanceAllocationStatus = Object.freeze({
   POSTED: 'POSTED',
   REVERSED: 'REVERSED',

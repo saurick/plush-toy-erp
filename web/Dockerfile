@@ -61,6 +61,7 @@ WORKDIR /app
 
 COPY --from=builder /app/web/build ./build
 COPY --from=builder /app/web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp.mjs
+COPY --from=builder /app/web/src/common/consts/attachments.generated.mjs ./src/common/consts/attachments.generated.mjs
 
 USER node
 

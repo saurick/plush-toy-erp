@@ -1,5 +1,8 @@
+import { readFile, writeFile } from 'node:fs/promises'
 import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { BOM_IMPORT_EXAMPLE_CONTEXT, BOM_IMPORT_EXAMPLE_FILENAME, BOM_IMPORT_EXAMPLE_MATERIALS, BOM_IMPORT_EXAMPLE_ROWS } from '../../src/erp/data/bomImportFormat.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createMasterDataFieldScenarios(deps) {
   const {
@@ -270,22 +273,21 @@ export function createMasterDataFieldScenarios(deps) {
         })
 
         await expectHeading(page, '物料清单（BOM）')
-        const importButton = page.locator(
-          'button[data-business-action-key="import-bom-xlsx"]'
-        )
-        await importButton.waitFor({ state: 'visible' })
-        await page.waitForFunction(() => {
-          const button = document.querySelector(
-            'button[data-business-action-key="import-bom-xlsx"]'
-          )
-          return button instanceof HTMLButtonElement && !button.disabled
-        })
-        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        const [chooser] = await Promise.all([
+          page.waitForEvent('filechooser'),
+          page.getByRole('menuitem', { name: /从 Excel 新建/u }).click(),
+        ])
+        await chooser.setFiles({
           name: 'BOM-IMPORT-STYLE-L1.xlsx',
           mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           buffer: createBOMImportWorkbookFixture(),
         })
+        const preview = page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true })
+        await preview.waitFor({ state: 'visible' })
+        assert.equal(rpcMutations.length, 0, '文件预览不得写入业务数据')
+        await preview.getByRole('button', { name: '带入并核对', exact: true }).click()
 
         const modal = page
           .locator(
@@ -375,13 +377,15 @@ export function createMasterDataFieldScenarios(deps) {
           .first()
         await materialSelect.click()
         await materialSelect.locator('input').fill('MAT-STYLE-L1')
-        await page.keyboard.press('Enter')
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '样式材料' }).first().click()
         await modal
           .locator('.erp-bom-material-group')
           .first()
           .locator('.erp-bom-material-cell .ant-select-selection-item')
           .filter({ hasText: '样式材料' })
           .waitFor({ state: 'visible' })
+        await modal.locator('.erp-bom-import-review[data-bom-import-issue-count="0"]').waitFor({ state: 'visible' })
         assert.equal(
           await modal.locator('.erp-bom-material-group').count(),
           1,
@@ -455,13 +459,472 @@ export function createMasterDataFieldScenarios(deps) {
           '页面校对元数据不得进入正式 BOM 写入合同'
         )
         await modal.waitFor({ state: 'hidden' })
-        await expectText(page, 'BOM 导入草稿已创建')
+        await expectText(page, 'BOM 草稿已保存，尚未启用')
         assert.deepEqual(
           rpcMutations.map((item) => item.method),
           ['save_bom_with_items'],
           'BOM Excel 导入只能保存草稿，不得自动创建主数据或激活版本'
         )
         await assertNoHorizontalOverflow(page, 'bom-xlsx-import-draft-desktop')
+      },
+    },
+    {
+      name: 'bom-xlsx-import-editor-desktop',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        let saved
+        await page.route('**/rpc/bom', async (route) => {
+          const body = route.request().postDataJSON()
+          if (body.method === 'save_bom_with_items') {
+            saved = { ...body.params, id: 2, status: 'DRAFT', edit_version: 2 }
+            await route.fallback()
+            return
+          }
+          if (body.method !== 'get_bom_version' || !saved || Number(body.params.id) !== saved.id) { await route.fallback(); return }
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { code: 0, message: 'OK', data: { bom_version: saved } } }) })
+        })
+      },
+      verify: async (page) => {
+        const writes = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/bom')) return
+          const body = request.postDataJSON()
+          if (/^(save_|copy_|activate_)/u.test(body?.method || '')) writes.push(body)
+        })
+        await page.getByRole('row').filter({ hasText: 'BOM-STYLE-DRAFT' }).getByRole('checkbox').check()
+        await page.locator('button[data-business-action-key="edit"]').click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('heading', { name: '编辑 BOM 草稿 · 未生效', exact: true }).waitFor()
+        await editor.getByLabel('BOM 版本', { exact: true }).fill('人工核对版')
+        await editor.getByLabel('订单数量', { exact: true }).fill('50')
+        await editor.getByLabel('来源订单号', { exact: true }).fill('KEEP-ORDER-50')
+        await editor.getByLabel('制表人', { exact: true }).fill('保留制表人')
+        const parts = editor.locator('tr[data-bom-part-index]')
+        assert.equal(await parts.count(), 3)
+        const openPreview = async () => {
+          const [chooser] = await Promise.all([
+            page.waitForEvent('filechooser'),
+            editor.getByRole('button', { name: '从 Excel 导入', exact: true }).click(),
+          ])
+          await chooser.setFiles({ name: 'BOM-EDITOR-L1.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: createBOMImportWorkbookFixture() })
+          const preview = page.getByRole('dialog', { name: '导入材料明细', exact: true })
+          await preview.waitFor({ state: 'visible' })
+          return preview
+        }
+        const cancelled = await openPreview()
+        await cancelled.getByRole('button', { name: '取消', exact: true }).click()
+        assert.equal(await parts.count(), 3, '取消预览应保留原有明细')
+        const append = await openPreview()
+        await append.getByText('保留当前订单数量 50（原表 100），总用量按当前数量计算。', { exact: true }).waitFor()
+        for (const width of [1024, 390]) {
+          await page.setViewportSize({ width, height: 900 })
+          const metrics = await append.evaluate((node) => {
+            const box = node.getBoundingClientRect()
+            return { left: box.left, right: box.right, viewport: window.innerWidth }
+          })
+          assert(metrics.left >= 0 && metrics.right <= metrics.viewport, `导入预览应收口在 ${width}px 视口内：${JSON.stringify(metrics)}`)
+          await assertNoHorizontalOverflow(page, `bom-import-preview-${width}`)
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await append.getByRole('button', { name: '追加 2 个部位', exact: true }).click()
+        await page.waitForFunction(() => document.querySelectorAll('.erp-business-form-page:not([hidden]) tr[data-bom-part-index]').length === 5)
+        assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '50')
+        await editor.getByText('保留当前订单数量 50（原表 100），总用量按当前数量计算。', { exact: true }).waitFor()
+        assert.equal(await editor.getByLabel('来源订单号', { exact: true }).inputValue(), 'KEEP-ORDER-50')
+        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), '人工核对版')
+        assert.equal(await editor.getByLabel('制表人', { exact: true }).inputValue(), '保留制表人')
+        assert.equal(writes.length, 0, '预览和带入不得提前保存')
+        await editor.getByRole('button', { name: '撤销本次导入', exact: true }).click()
+        await page.waitForFunction(() => document.querySelectorAll('.erp-business-form-page:not([hidden]) tr[data-bom-part-index]').length === 3)
+        const replace = await openPreview()
+        await replace.getByRole('radio', { name: '替换现有 3 个部位', exact: true }).check()
+        await replace.getByText('确认后将替换当前草稿明细，保存前可撤销本次导入。', { exact: true }).waitFor()
+        await replace.getByRole('button', { name: '替换并带入 2 个部位', exact: true }).click()
+        await page.waitForFunction(() => document.querySelectorAll('.erp-business-form-page:not([hidden]) tr[data-bom-part-index]').length === 2)
+        await editor.getByRole('button', { name: '撤销本次导入', exact: true }).waitFor()
+        const material = parts.nth(1).locator('.erp-bom-material-cell .ant-select').first()
+        await material.click()
+        await material.locator('input').fill('MAT-STYLE-L1')
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式材料' }).first().click()
+        await editor.locator('.erp-bom-import-review[data-bom-import-issue-count="0"]').waitFor()
+        assert.equal(await editor.getByRole('button', { name: '撤销本次导入', exact: true }).count(), 0, '人工改动后不能用旧快照覆盖新修改')
+        await page.screenshot({ path: path.join(outputDir, 'bom-xlsx-import-editor-replaced.png'), fullPage: true })
+        const saveRequest = page.waitForRequest((request) => request.url().includes('/rpc/bom') && request.postDataJSON()?.method === 'save_bom_with_items')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        const saved = (await saveRequest).postDataJSON().params
+        assert.equal(saved.id, 2)
+        assert(saved.expected_version, '已有草稿导入必须沿用并发版本检查')
+        assert.equal(saved.product_id, 1)
+        assert.equal(saved.version, '人工核对版')
+        assert.equal(saved.quantity_text, '50')
+        assert.equal(saved.source_order_no, 'KEEP-ORDER-50')
+        assert.equal(saved.maker, '保留制表人')
+        assert.equal(saved.items.length, 2)
+        assert(saved.items.every((item) => !item.id && !item._import_source), '新导入行不能继承旧行身份或提交页面校对元数据')
+        assert(saved.items.every((item) => !item.total_usage_snapshot), '不同订单数量不能保留原表总用量快照')
+        assert.deepEqual(writes.map((write) => write.method), ['save_bom_with_items'])
+        await editor.waitFor({ state: 'hidden' })
+        await page.getByRole('row').filter({ hasText: saved.version }).getByRole('checkbox').uncheck()
+        await page.getByRole('row').filter({ hasText: 'BOM-STYLE-L1' }).getByRole('checkbox').check()
+        await page.locator('button[data-business-action-key="view"]').click()
+        await editor.getByRole('heading', { name: '查看 BOM 版本 · 已启用 · 只读', exact: true }).waitFor()
+        assert.equal(await editor.getByRole('button', { name: '从 Excel 导入', exact: true }).count(), 0)
+        await assertNoHorizontalOverflow(page, 'bom-xlsx-import-editor-desktop')
+      },
+    },
+    {
+      name: 'bom-excel-source-precision-roundtrip',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        let stored
+        let missingSourceOnce = true
+        await page.route('**/rpc/bom', async (route) => {
+          const body = route.request().postDataJSON()
+          if (body.method === 'list_bom_versions' && stored) {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { code: 0, message: 'OK', data: stylePaginatedRpcData([stored], 'bom_versions', body.params) } }) })
+            return
+          }
+          if (body.method === 'save_bom_with_items') {
+            stored = { ...body.params, id: 901, status: 'DRAFT', edit_version: (stored?.edit_version || 0) + 1, print_date: Date.parse('2026-01-19T00:00:00Z') / 1000, items: body.params.items.map((item, index) => ({ ...item, id: 910 + index })) }
+          } else if (body.method !== 'get_bom_version' || !stored || body.params.id !== stored.id) { await route.fallback(); return }
+          const readback = body.method === 'get_bom_version' && missingSourceOnce ? { ...stored, items: stored.items.map((item) => ({ ...item, source_snapshot: null })) } : stored
+          if (body.method === 'get_bom_version') missingSourceOnce = false
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { code: 0, message: 'OK', data: { bom_version: readback } } }) })
+        })
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON()
+          let data
+          if (body.method === 'list_units') data = stylePaginatedRpcData([{ id: 1, code: 'PCS', name: '个', is_active: true }], 'units', body.params)
+          else if (body.method === 'list_products') data = stylePaginatedRpcData([{ id: 1, code: 'PROD-STYLE-L1', name: '样式产品', is_active: true }], 'products', body.params)
+          else if (body.method === 'list_materials') data = stylePaginatedRpcData([{ id: 1, code: 'MAT-STYLE-L1', name: '样式材料', supplier_item_no: '示例织造AB-001#-02#米白', default_unit_id: 1, is_active: true }], 'materials', body.params)
+          else { await route.fallback(); return }
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { code: 0, message: 'OK', data } }) })
+        })
+      },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('menuitem', { name: /从 Excel 新建/u }).click()])
+        await chooser.setFiles({ name: '高精度示例.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: createBOMImportWorkbookFixture({ highPrecision: true }) })
+        const preview = page.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true })
+        await preview.getByRole('columnheader', { name: '总用量 含损耗10%', exact: true }).waitFor()
+        assert.equal(await preview.getByRole('columnheader', { name: '损耗 %', exact: true }).count(), 0)
+        await preview.getByText('0.012', { exact: true }).waitFor()
+        await preview.getByText('1.36', { exact: true }).waitFor()
+        assert.equal(await preview.getByText(/按六位小数/u).count(), 0)
+        await preview.getByRole('button', { name: '带入并核对', exact: true }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click({ trial: true })
+        await editor.getByLabel('BOM 版本', { exact: true }).fill('SOURCE-PRECISION')
+        await editor.getByText(/原表总用量表头 2 行/u).waitFor()
+        const quantity = editor.getByLabel('单位用量 1', { exact: true })
+        assert.equal(await quantity.inputValue(), '0.012')
+        await quantity.focus()
+        assert.equal(await quantity.inputValue(), '0.0123456789012345')
+        await quantity.press('Tab')
+        assert.equal(await quantity.inputValue(), '0.012')
+        await editor.getByRole('button', { name: '查看单位用量原值 1', exact: true }).click()
+        const popover = page.locator('.ant-popover:visible')
+        await popover.getByText('0.0123456789012345', { exact: true }).waitFor()
+        assert.equal(await popover.getByText('0.012346', { exact: true }).count(), 0)
+        await editor.getByRole('button', { name: '查看单位用量原值 1', exact: true }).click()
+        const total = editor.locator('tr[data-bom-part-index="0"] .erp-bom-number-cell')
+        await total.getByText('1.36', { exact: true }).waitFor()
+        const firstSave = page.waitForRequest((request) => request.url().endsWith('/rpc/bom') && request.postDataJSON()?.method === 'save_bom_with_items')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        assert.equal((await firstSave).postDataJSON().params.id, undefined)
+        await editor.getByText('草稿已保存，但原表数据尚未完整读回，请保留当前内容并重试。', { exact: true }).waitFor()
+        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'SOURCE-PRECISION')
+        const retrySave = page.waitForRequest((request) => request.url().endsWith('/rpc/bom') && request.postDataJSON()?.method === 'save_bom_with_items')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        const { params } = (await retrySave).postDataJSON()
+        assert.equal(params.id, 901, '回读失败重试必须更新已保存草稿，不能重复新建')
+        assert.equal(params.expected_version, 1)
+        assert.equal(params.items[0].quantity, '0.0123456789012345')
+        assert.equal(params.items[0].source_snapshot.quantity_value, '0.0123456789012345')
+        assert.equal(params.items[0].source_snapshot.quantity_format, '0.000')
+        assert.equal(params.items[0].source_snapshot.loss_source, 'header')
+        assert.equal(params.items[0].total_usage_snapshot, '1.358024679135795')
+        await editor.waitFor({ state: 'hidden' })
+        await writeFile(path.join(outputDir, 'bom-source-precision-save.json'), JSON.stringify(params, null, 2))
+        await page.getByRole('row').filter({ hasText: 'SOURCE-PRECISION' }).getByRole('checkbox').check()
+        await page.locator('button[data-business-action-key="view"]').click()
+        await editor.getByRole('heading', { name: /^查看 BOM 版本.*只读$/u }).waitFor()
+        assert.equal(await editor.getByRole('button', { name: '保存草稿', exact: true }).count(), 0)
+        const sourceInfo = editor.getByRole('button', { name: '查看单位用量原值 1', exact: true })
+        assert.equal(await sourceInfo.isEnabled(), true, '只读仍可核对来源数值')
+        await sourceInfo.click()
+        await page.locator('.ant-popover:visible').getByText('0.0123456789012345', { exact: true }).waitFor()
+        await sourceInfo.click()
+      },
+    },
+    {
+      name: 'bom-excel-format-example-roundtrip',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        let saved
+        await page.route('**/rpc/bom', async (route) => {
+          const body = route.request().postDataJSON()
+          if (body.method === 'save_bom_with_items') {
+            saved = { ...body.params, id: 2, status: 'DRAFT', edit_version: 2, items: body.params.items }
+            await route.fallback()
+            return
+          }
+          if (body.method !== 'get_bom_version' || !saved || Number(body.params.id) !== saved.id) { await route.fallback(); return }
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { code: 0, message: 'OK', data: { bom_version: saved } } }) })
+        })
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON()
+          let data
+          if (body.method === 'list_units') data = stylePaginatedRpcData([{ id: 7, code: 'YD', name: '码', is_active: true }, { id: 8, code: 'KG', name: '千克', is_active: true }], 'units', body.params)
+          else if (body.method === 'list_products') data = stylePaginatedRpcData([{ id: 1, code: BOM_IMPORT_EXAMPLE_CONTEXT.code, name: BOM_IMPORT_EXAMPLE_CONTEXT.name, is_active: true }], 'products', body.params)
+          else if (body.method === 'list_materials') {
+            const catalog = BOM_IMPORT_EXAMPLE_MATERIALS.map((row, index) => ({ id: 101 + index, code: `MAT-EXAMPLE-${index + 1}`, name: row.materialName, supplier_item_no: row.supplierItemNo, default_unit_id: 7 + index, is_active: true }))
+            const ids = body.params?.ids
+            const keyword = String(body.params?.keyword || '')
+            const rows = catalog.filter((row) => (!ids || ids.includes(row.id)) && (!keyword || `${row.code} ${row.name}`.includes(keyword)))
+            data = stylePaginatedRpcData(rows, 'materials', body.params)
+          }
+          else { await route.fallback(); return }
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { code: 0, message: 'OK', data } }) })
+        })
+      },
+      verify: async (page) => {
+        const writes = []
+        page.on('request', (request) => {
+          if (request.url().includes('/rpc/bom') && request.postDataJSON()?.method === 'save_bom_with_items') writes.push(request.postDataJSON())
+        })
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        await page.getByRole('menuitem', { name: '查看 Excel 格式', exact: true }).click()
+        await page.getByRole('dialog', { name: 'Excel 格式说明', exact: true }).getByRole('button', { name: '关闭', exact: true }).click()
+        await page.getByRole('button', { name: '新建 BOM' }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click({ trial: true })
+        await editor.getByLabel('BOM 版本', { exact: true }).fill('EXAMPLE-ROUNDTRIP')
+        assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '')
+        const product = editor.locator('input#product_id')
+        await product.click()
+        await product.fill(BOM_IMPORT_EXAMPLE_CONTEXT.code)
+        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: BOM_IMPORT_EXAMPLE_CONTEXT.name }).first().click()
+        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        await editor.getByRole('button', { name: '查看 Excel 格式', exact: true }).click()
+        const format = page.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
+        await format.getByRole('img', { name: 'Excel 材料分析明细表示意图', exact: true }).waitFor()
+        await page.waitForFunction(() => {
+          const image = document.querySelector('.erp-bom-excel-guide__preview > img')
+          return image?.complete && image.naturalWidth > 0
+        })
+        await format.getByText(/无需重排/u).waitFor()
+        await format.getByText(/可保留汇总/u).waitFor()
+        await format.getByText(/示例使用码／千克/u).waitFor()
+        await format.getByText(/图片需另行添加为附件/u).waitFor()
+        assert.equal(await format.getByRole('table').count(), 0, '图示应替代字段清单表')
+        assert.equal(await format.locator('.erp-document-guide__parts li').count(), 3)
+        for (const width of [1024, 390]) {
+          await page.setViewportSize({ width, height: 900 })
+          await waitForFiniteAnimations(page)
+          const box = await format.boundingBox()
+          assert(box && box.x >= 0 && box.x + box.width <= width, `格式说明应在 ${width}px 内完整显示`)
+          await assertNoHorizontalOverflow(page, `bom-excel-format-${width}`)
+          const metrics = await format.evaluate((node) => {
+            const figure = node.querySelector('.erp-document-guide__figure').getBoundingClientRect()
+            const parts = node.querySelector('.erp-document-guide__parts').getBoundingClientRect()
+            const image = node.querySelector('.erp-bom-excel-guide__preview').getBoundingClientRect()
+            const markers = [...node.querySelectorAll('.erp-bom-excel-guide__marker')].map((marker) => {
+              const rect = marker.getBoundingClientRect()
+              return { number: marker.textContent.trim(), fits: rect.left >= image.left - 1 && rect.right <= image.right + 1 && rect.top >= image.top - 1 && rect.bottom <= image.bottom + 1 }
+            })
+            const download = node.querySelector('a[download]').getBoundingClientRect()
+            return { sideBySide: parts.left >= figure.right, stacked: parts.top >= figure.bottom, markers, footerVisible: download.top >= 0 && download.bottom <= window.innerHeight }
+          })
+          assert.equal(width > 540 ? metrics.sideBySide : metrics.stacked, true, `图示与短说明应适应 ${width}px: ${JSON.stringify(metrics)}`)
+          assert.deepEqual(metrics.markers.map((marker) => marker.number), ['1', '2', '3'])
+          assert(metrics.markers.every((marker) => marker.fits), `区域编号应留在图示内: ${JSON.stringify(metrics)}`)
+          assert(metrics.footerVisible, '窄屏下载和关闭操作应留在可见区域')
+          if (width === 390) await page.screenshot({ path: path.join(outputDir, 'bom-excel-guide-390.png'), fullPage: true })
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: path.join(outputDir, 'bom-excel-format-help.png'), fullPage: true })
+        await format.screenshot({ path: path.join(outputDir, 'bom-excel-format-dialog.png') })
+        const [download] = await Promise.all([page.waitForEvent('download'), format.getByRole('link', { name: '下载示例 Excel', exact: true }).click()])
+        assert.equal(download.suggestedFilename(), BOM_IMPORT_EXAMPLE_FILENAME)
+        const file = await download.path()
+        assert(file, '示例应下载为实际文件')
+        const bytes = await readFile(file)
+        const bundled = await readFile(new URL('../../src/erp/data/bom-import-example.xlsx', import.meta.url))
+        assert(bytes.equals(bundled), '下载内容应与解析器回归验证的示例完全相同')
+        await format.press('Escape')
+        await format.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => document.activeElement?.textContent.includes('查看 Excel 格式'))
+        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'EXAMPLE-ROUNDTRIP')
+        const preview = page.getByRole('dialog', { name: '导入材料明细', exact: true })
+        const openDownloadedPreview = async () => {
+          const [chooser] = await Promise.all([page.waitForEvent('filechooser'), editor.getByRole('button', { name: '从 Excel 导入', exact: true }).click()])
+          await chooser.setFiles({ name: download.suggestedFilename(), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: bytes })
+          await preview.waitFor({ state: 'visible' })
+          await preview.getByText('同时带入原表订单数量 100。', { exact: true }).waitFor()
+        }
+        await openDownloadedPreview()
+        await preview.getByRole('button', { name: '取消', exact: true }).click()
+        assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '')
+        assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 0)
+        await openDownloadedPreview()
+        assert.equal(await preview.getByText('已匹配', { exact: true }).count(), 3)
+        await preview.getByRole('button', { name: '带入并核对', exact: true }).click()
+        await editor.locator('.erp-bom-import-review[data-bom-import-issue-count="0"]').waitFor()
+        assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '100')
+        await editor.locator('tr[data-bom-part-index="0"] .erp-bom-number-cell').getByText('44.10', { exact: true }).waitFor()
+        await editor.getByRole('button', { name: '撤销本次导入', exact: true }).click()
+        assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '')
+        assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 0)
+        assert.equal(await editor.getByLabel('BOM 版本', { exact: true }).inputValue(), 'EXAMPLE-ROUNDTRIP')
+        await openDownloadedPreview()
+        await preview.getByRole('button', { name: '带入并核对', exact: true }).click()
+        await editor.getByLabel('订单数量', { exact: true }).fill('')
+        await editor.getByText('请填写订单数量（原表 100），以计算总用量。', { exact: true }).waitFor()
+        assert.equal(await editor.getByRole('button', { name: '撤销本次导入', exact: true }).count(), 0)
+        await editor.locator('tr[data-bom-part-index="0"] .erp-bom-number-cell').getByText('—', { exact: true }).waitFor()
+        await editor.getByLabel('订单数量', { exact: true }).fill('100')
+        await editor.locator('tr[data-bom-part-index="0"] .erp-bom-number-cell').getByText('44.10', { exact: true }).waitFor()
+        assert.equal(await editor.getByText('请填写订单数量（原表 100），以计算总用量。', { exact: true }).count(), 0)
+        assert.equal(await editor.locator('tr[data-bom-part-index]').count(), 3)
+        assert.equal(await editor.locator('.erp-bom-material-group').count(), 2, '原表合并的材料应保留为两个分组、三个部位')
+        assert.equal(writes.length, 0, '格式说明、下载和带入不得写入草稿')
+        for (const [partIndex, code] of [[0, 'MAT-EXAMPLE-1'], [2, 'MAT-EXAMPLE-2']]) {
+          const control = editor.locator(`tr[data-bom-part-index="${partIndex}"] .erp-bom-material-cell .ant-select`).first()
+          await control.click()
+          const searched = page.waitForResponse((response) => {
+            if (!response.url().includes('/rpc/masterdata')) return false
+            const body = response.request().postDataJSON()
+            return body?.method === 'list_materials' && body.params?.keyword === code
+          })
+          await control.locator('input').fill(code)
+          await searched
+          await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: code }).click()
+          await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        }
+        await page.waitForFunction(() => {
+          const editor = document.querySelector('.erp-business-form-page:not([hidden])')
+          return ['示例短毛绒', '示例填充棉'].every((name, index) => editor?.querySelector(`tr[data-bom-part-index="${index ? 2 : 0}"] .erp-bom-material-cell .ant-select-selection-item`)?.textContent.includes(name))
+        })
+        const save = page.waitForRequest((request) => request.url().includes('/rpc/bom') && request.postDataJSON()?.method === 'save_bom_with_items')
+        await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
+        const { params } = (await save).postDataJSON()
+        assert.equal(params.product_id, 1)
+        assert.equal(params.version, 'EXAMPLE-ROUNDTRIP')
+        assert.equal(params.quantity_text, '100')
+        assert.deepEqual(params.items.map((item) => item.material_id), [101, 101, 102])
+        assert.deepEqual(params.items.map((item) => item.unit_id), [7, 7, 8])
+        assert.deepEqual(params.items.map((item) => item.quantity), BOM_IMPORT_EXAMPLE_ROWS.map((row) => String(row.quantity)))
+        assert.deepEqual(params.items.map((item) => item.loss_rate), ['0.05', '0.05', '0'])
+        assert(params.items.every((item) => !item.total_usage_snapshot), '人工改过订单数量后不恢复旧的适用总量快照')
+        assert.deepEqual(params.items.map((item) => item.source_snapshot.total_value), ['44.1', '8.4', '18'])
+        assert.deepEqual(params.items.map((item) => item.process_base || ''), ['贴衬', '贴衬', ''])
+        assert.deepEqual(params.items.map((item) => item.process_method), ['热裁', '热裁', '充棉'])
+        await writeFile(path.join(outputDir, 'bom-example-save-request.json'), JSON.stringify(params, null, 2))
+        await writeFile(path.join(outputDir, 'bom-example-downloaded.xlsx'), bytes)
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(writes.length, 1)
+        await page.getByRole('row').filter({ hasText: params.version }).getByRole('checkbox').check()
+        await page.locator('button[data-business-action-key="view"]').click()
+        await editor.getByRole('heading', { name: /^查看 BOM 版本.*只读$/u }).waitFor()
+        assert.equal(await editor.getByLabel('订单数量', { exact: true }).inputValue(), '100')
+        await editor.locator('tr[data-bom-part-index="0"] .erp-bom-number-cell').getByText('44.10', { exact: true }).waitFor()
+      },
+    },
+    {
+      name: 'bom-excel-format-guide-dark',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 1024, height: 900 },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        await page.getByRole('menuitem', { name: '查看 Excel 格式', exact: true }).click()
+        const format = page.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
+        await format.getByRole('img', { name: 'Excel 材料分析明细表示意图', exact: true }).waitFor()
+        await page.waitForFunction(() => document.querySelector('.erp-bom-excel-guide__preview > img')?.naturalWidth > 0)
+        await waitForFiniteAnimations(page)
+        assert.equal(await page.evaluate(() => document.documentElement.dataset.erpTheme), 'dark')
+        assert.equal(await format.locator('.erp-document-guide__parts li').count(), 3)
+        await assertNoHorizontalOverflow(page, 'bom-excel-format-guide-dark')
+        await format.screenshot({ path: path.join(outputDir, 'bom-excel-guide-dark.png') })
+        await format.getByRole('button', { name: '关闭', exact: true }).click()
+      },
+    },
+    {
+      name: 'bom-excel-format-guide-image-failure',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1024, height: 900 },
+      expectedConsoleErrorPatterns: [/Failed to load resource:.*net::ERR_FAILED.*bom-import-example-preview/u],
+      beforeNavigate: async (page) => {
+        await page.route('**/*bom-import-example-preview*', (route) => route.abort())
+      },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '更多新建方式', exact: true }).click()
+        await page.getByRole('menuitem', { name: '查看 Excel 格式', exact: true }).click()
+        const format = page.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
+        await format.getByText('图片加载失败', { exact: true }).waitFor()
+        assert.equal(await format.locator('.erp-bom-excel-guide__marker:visible').count(), 0, '图片失败时不保留失去对应区域的编号')
+        assert.equal(await format.locator('.erp-document-guide__parts li').count(), 3)
+        const [download] = await Promise.all([page.waitForEvent('download'), format.getByRole('link', { name: '下载示例 Excel', exact: true }).click()])
+        assert.equal(download.suggestedFilename(), BOM_IMPORT_EXAMPLE_FILENAME)
+        assert((await readFile(await download.path())).length > 0)
+        await assertNoHorizontalOverflow(page, 'bom-excel-format-guide-image-failure')
+        await format.getByRole('button', { name: '关闭', exact: true }).click()
+      },
+    },
+    {
+      name: 'dev-ui-design-bom-import-entry',
+      path: '/__dev/ui-design',
+      viewport: { width: 1440, height: 1000 },
+      verify: async (page) => {
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item[data-page="engineering-hub"]').click()
+        const choose = async () => {
+          await frame.getByLabel('更多新建方式', { exact: true }).click()
+          await frame.getByRole('button', { name: '从 Excel 新建', exact: true }).click()
+          return frame.getByRole('dialog', { name: '从 Excel 新建 BOM', exact: true })
+        }
+        const cancelled = await choose()
+        await cancelled.getByRole('button', { name: '取消', exact: true }).click()
+        assert.equal(await frame.locator('.form-view').count(), 0)
+        const preview = await choose()
+        await preview.getByRole('button', { name: '带入并核对', exact: true }).click()
+        const editor = frame.locator('.form-view')
+        const rows = editor.locator('#materials tbody tr')
+        assert.equal(await rows.count(), 2)
+        assert.equal(await editor.locator('.form-foot [data-action="bom-import"]').count(), 0)
+        await editor.getByRole('button', { name: '查看 Excel 格式', exact: true }).click()
+        const format = frame.getByRole('dialog', { name: 'Excel 格式说明', exact: true })
+        await format.getByRole('img', { name: 'Excel 材料分析明细表示意图', exact: true }).waitFor()
+        assert.equal(await format.locator('.bom-excel-guide-marker').count(), 3)
+        assert.equal(await format.getByRole('table').count(), 0)
+        const [download] = await Promise.all([page.waitForEvent('download'), format.getByRole('link', { name: '下载示例 Excel', exact: true }).click()])
+        const downloaded = await readFile(await download.path())
+        const expected = await readFile(new URL('../../src/erp/data/bom-import-example.xlsx', import.meta.url))
+        assert(downloaded.equals(expected), '原型下载必须与正式页面使用同一份示例')
+        await format.locator('.modal-foot').getByRole('button', { name: '关闭', exact: true }).click()
+        assert.equal(await rows.count(), 2)
+        await editor.getByRole('button', { name: '从 Excel 导入', exact: true }).click()
+        const details = frame.getByRole('dialog', { name: '导入材料明细', exact: true })
+        await details.getByRole('button', { name: '追加 2 个部位', exact: true }).click()
+        assert.equal(await rows.count(), 4)
+        await editor.getByRole('button', { name: '撤销本次导入', exact: true }).click()
+        assert.equal(await rows.count(), 2)
       },
     },
   ]

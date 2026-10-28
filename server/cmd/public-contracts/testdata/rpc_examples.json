@@ -1408,8 +1408,8 @@
       "bom_versions": [],
       "limit": 20,
       "offset": 0,
-      "total": 0,
-      "status_counts": {}
+      "status_counts": {},
+      "total": 0
     },
     "message": "OK",
     "params": {
@@ -1418,8 +1418,8 @@
     },
     "test": "TestRPCDocumentedBusinessQuickCounts",
     "verification": {
-      "test": "TestRPCDocumentedBusinessQuickCounts",
-      "case": "bom.list_bom_versions"
+      "case": "bom.list_bom_versions",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
     }
   },
   "bom.save_bom_with_items": {
@@ -1446,8 +1446,23 @@
             "position": null,
             "process_base": null,
             "process_method": null,
-            "quantity": "1",
-            "total_usage_snapshot": null,
+            "quantity": "1.000000000001",
+            "source_snapshot": {
+              "file_name": "教学材料.xlsx",
+              "loss_rate": "0",
+              "loss_source": "explicit",
+              "loss_value": "0",
+              "order_quantity": "100",
+              "quantity_format": "0.000",
+              "quantity_label": "单位用量",
+              "quantity_value": "1.000000000001",
+              "row_number": 6,
+              "sheet_name": "材料分析明细表",
+              "total_format": "0.00",
+              "total_label": "总用量",
+              "total_value": "100.0000000001"
+            },
+            "total_usage_snapshot": "100.0000000001",
             "unit_id": 1,
             "updated_at": 1792394183
           }
@@ -1456,7 +1471,7 @@
         "note": null,
         "print_date": null,
         "product_id": 1,
-        "quantity_text": null,
+        "quantity_text": "100",
         "source_order_no": null,
         "spare_text": null,
         "status": "DRAFT",
@@ -1470,11 +1485,28 @@
         {
           "loss_rate": "0",
           "material_id": 1,
-          "quantity": "1",
+          "quantity": "1.000000000001",
+          "source_snapshot": {
+            "file_name": "教学材料.xlsx",
+            "loss_rate": "0",
+            "loss_source": "explicit",
+            "loss_value": "0",
+            "order_quantity": "100",
+            "quantity_format": "0.000",
+            "quantity_label": "单位用量",
+            "quantity_value": "1.000000000001",
+            "row_number": 6,
+            "sheet_name": "材料分析明细表",
+            "total_format": "0.00",
+            "total_label": "总用量",
+            "total_value": "100.0000000001"
+          },
+          "total_usage_snapshot": "100.0000000001",
           "unit_id": 1
         }
       ],
       "product_id": 1,
+      "quantity_text": "100",
       "version": "CAS-V1"
     },
     "test": "TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflict"

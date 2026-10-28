@@ -163,6 +163,18 @@ func (_u *BOMItemUpdate) ClearTotalUsageSnapshot() *BOMItemUpdate {
 	return _u
 }
 
+// SetSourceSnapshot sets the "source_snapshot" field.
+func (_u *BOMItemUpdate) SetSourceSnapshot(v map[string]interface{}) *BOMItemUpdate {
+	_u.mutation.SetSourceSnapshot(v)
+	return _u
+}
+
+// ClearSourceSnapshot clears the value of the "source_snapshot" field.
+func (_u *BOMItemUpdate) ClearSourceSnapshot() *BOMItemUpdate {
+	_u.mutation.ClearSourceSnapshot()
+	return _u
+}
+
 // SetProcessBase sets the "process_base" field.
 func (_u *BOMItemUpdate) SetProcessBase(v string) *BOMItemUpdate {
 	_u.mutation.SetProcessBase(v)
@@ -433,6 +445,12 @@ func (_u *BOMItemUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.TotalUsageSnapshotCleared() {
 		_spec.ClearField(bomitem.FieldTotalUsageSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceSnapshot(); ok {
+		_spec.SetField(bomitem.FieldSourceSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.SourceSnapshotCleared() {
+		_spec.ClearField(bomitem.FieldSourceSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ProcessBase(); ok {
 		_spec.SetField(bomitem.FieldProcessBase, field.TypeString, value)
@@ -737,6 +755,18 @@ func (_u *BOMItemUpdateOne) ClearTotalUsageSnapshot() *BOMItemUpdateOne {
 	return _u
 }
 
+// SetSourceSnapshot sets the "source_snapshot" field.
+func (_u *BOMItemUpdateOne) SetSourceSnapshot(v map[string]interface{}) *BOMItemUpdateOne {
+	_u.mutation.SetSourceSnapshot(v)
+	return _u
+}
+
+// ClearSourceSnapshot clears the value of the "source_snapshot" field.
+func (_u *BOMItemUpdateOne) ClearSourceSnapshot() *BOMItemUpdateOne {
+	_u.mutation.ClearSourceSnapshot()
+	return _u
+}
+
 // SetProcessBase sets the "process_base" field.
 func (_u *BOMItemUpdateOne) SetProcessBase(v string) *BOMItemUpdateOne {
 	_u.mutation.SetProcessBase(v)
@@ -1037,6 +1067,12 @@ func (_u *BOMItemUpdateOne) sqlSave(ctx context.Context) (_node *BOMItem, err er
 	}
 	if _u.mutation.TotalUsageSnapshotCleared() {
 		_spec.ClearField(bomitem.FieldTotalUsageSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceSnapshot(); ok {
+		_spec.SetField(bomitem.FieldSourceSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.SourceSnapshotCleared() {
+		_spec.ClearField(bomitem.FieldSourceSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ProcessBase(); ok {
 		_spec.SetField(bomitem.FieldProcessBase, field.TypeString, value)

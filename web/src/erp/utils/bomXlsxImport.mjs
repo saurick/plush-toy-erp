@@ -1,10 +1,10 @@
 import { unitRecordMatchesLabel } from './unitQuantity.mjs'
+import { BOMLossSource } from '../../common/consts/statuses.generated.mjs'
+import { normalizeBOMSourceNumber, parseBOMSourceNumber, bomNumbersDiffer, inferBOMSourceLossRate } from './bomSourceValues.mjs'
 import {
-  isPositiveNumeric20Scale6Units,
-  numeric20Scale6Units,
-  numeric20Scale6TextFromUnits,
-} from './numeric20Scale6.mjs'
-import { groupBOMMaterials } from './bomMaterialGroups.mjs'
+  groupBOMMaterials,
+  invalidateBOMUsageSnapshots,
+} from './bomMaterialGroups.mjs'
 import {
   XlsxImportError as BOMXlsxImportError,
   columnIndex,
@@ -17,7 +17,7 @@ export {
   MAX_XLSX_FILE_BYTES as MAX_BOM_XLSX_FILE_BYTES,
 } from './xlsxWorkbook.mjs'
 
-const MAX_BOM_IMPORT_ROWS = 1000
+export const MAX_BOM_IMPORT_ROWS = 1000
 
 const HEADER_ALIASES = {
   materialCode: ['材料编号', '物料编号'],
@@ -227,28 +227,9 @@ function extractProductContext(sheet, header, uses1904Dates) {
   }
 }
 
-function parseFiniteNumber(value) {
-  const text = normalizeText(value).replace(/,/gu, '')
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/iu.test(text)) {
-    return null
-  }
-  const number = Number(text)
-  return Number.isFinite(number) ? number : null
-}
-
-function formatDecimal(value, { nonNegative = false } = {}) {
-  const number = parseFiniteNumber(value)
-  if (number === null || (nonNegative && number < 0)) return ''
-  if (Math.abs(number) >= 1e14) return ''
-  const rounded = number.toFixed(6).replace(/0+$/u, '').replace(/\.$/u, '')
-  return rounded === '-0' ? '0' : rounded
-}
-
 function quantityInputText(value) {
   const text = normalizeText(value)
-  const units = numeric20Scale6Units(text)
-  // Keep excess precision visible in the import draft for explicit correction.
-  return units === null ? text : numeric20Scale6TextFromUnits(units)
+  return normalizeBOMSourceNumber(text) || text
 }
 
 function normalizeLossRate(value, percentColumn = false) {
@@ -274,14 +255,7 @@ function normalizeLossRate(value, percentColumn = false) {
 }
 
 function inferLossRate({ orderQuantity, totalQuantity, unitQuantity }) {
-  const order = parseFiniteNumber(orderQuantity)
-  const total = parseFiniteNumber(totalQuantity)
-  const unit = parseFiniteNumber(unitQuantity)
-  if (!(order > 0) || !(total >= 0) || !(unit > 0)) return null
-  let inferred = total / (order * unit) - 1
-  if (inferred < 0 && inferred > -0.0005) inferred = 0
-  if (inferred < 0 || inferred > 1) return null
-  return formatDecimal(inferred, { nonNegative: true }) || null
+  return inferBOMSourceLossRate({ orderQuantity, totalQuantity, unitQuantity })
 }
 
 function lossRateFromHeader(header) {
@@ -296,7 +270,7 @@ function lossRateFromHeader(header) {
 
 function lossRatesDiffer(left, right) {
   if (left === null || right === null) return false
-  return Math.abs(Number(left) - Number(right)) > 0.0005
+  return bomNumbersDiffer(left, right)
 }
 
 function resolveLossRate({
@@ -320,36 +294,38 @@ function resolveLossRate({
   if (explicitText && explicit === null) {
     return {
       value: '',
-      source: 'unresolved',
+      source: BOMLossSource.UNRESOLVED,
       issue: `原表损耗率“${explicitText}”无法识别`,
     }
   }
-  if (explicit !== null && numeric20Scale6Units(explicit) === null) {
+  if (explicit !== null && !parseBOMSourceNumber(explicit)) {
     return {
       value: explicit,
-      source: 'unresolved',
-      issue: `原表损耗率“${explicitText}”转换后超出六位精度或范围，请核对原值`,
+      source: BOMLossSource.UNRESOLVED,
+      issue: `原表损耗率“${explicitText}”转换后超出有效范围，请核对原值`,
     }
   }
   if (explicit !== null && lossRatesDiffer(explicit, inferred)) {
     return {
       value: '',
-      source: 'unresolved',
+      source: BOMLossSource.UNRESOLVED,
       issue: '原表损耗率与单位用量、订单数量、总用量不一致',
     }
   }
   if (explicit !== null) {
-    return { value: explicit, source: 'explicit', issue: '' }
+    return { value: explicit, source: BOMLossSource.EXPLICIT, issue: '' }
   }
   if (inferred !== null) {
-    return { value: inferred, source: 'calculated', issue: '' }
+    return headerDefault !== null && !lossRatesDiffer(inferred, headerDefault)
+      ? { value: headerDefault, source: BOMLossSource.HEADER, issue: '' }
+      : { value: inferred, source: BOMLossSource.CALCULATED, issue: '' }
   }
   if (headerDefault !== null) {
-    return { value: headerDefault, source: 'header', issue: '' }
+    return { value: headerDefault, source: BOMLossSource.HEADER, issue: '' }
   }
   return {
     value: '',
-    source: 'unresolved',
+    source: BOMLossSource.UNRESOLVED,
     issue: '原表未给出可确认的损耗率',
   }
 }
@@ -536,6 +512,16 @@ function extractBOMRows(sheet, header, context) {
       header,
       sheet.mergeRanges
     )
+    const quantityDescriptor = descriptorsByAlias(header, 'unitQuantity')[0]
+    const totalDescriptor = descriptorsByAlias(header, 'totalQuantity')[0]
+    const columnValue = (descriptor) => ({
+      label: descriptor?.rawLabel || '',
+      format: descriptor ? row.numberFormats?.[descriptor.startColumn - 1] || '' : '',
+      formula: descriptor ? row.formulas?.[descriptor.startColumn - 1] || '' : '',
+    })
+    const quantitySource = columnValue(quantityDescriptor)
+    const totalSource = columnValue(totalDescriptor)
+    const lossSource = columnValue(lossDescriptor || descriptorsByAlias(header, 'lossRate')[0])
     rows.push({
       rowNumber: row.rowNumber,
       materialCode: carried.materialCode,
@@ -556,6 +542,30 @@ function extractBOMRows(sheet, header, context) {
       processBase: truncateText(processBase, 255),
       processMethod: truncateText(processMethod, 255),
       note: truncateText(note, 300),
+      sourceSnapshot: {
+        row_number: row.rowNumber,
+        sheet_name: sheet.name,
+        order_quantity: context.quantityText || '',
+        quantity_value: rawUnitQuantity,
+        quantity_label: quantitySource.label,
+        quantity_format: quantitySource.format,
+        total_value: totalQuantity,
+        total_label: totalSource.label,
+        total_format: totalSource.format,
+        total_formula: totalSource.formula,
+        loss_value: valueByAlias(row, header, 'lossRate'),
+        loss_label: lossSource.label,
+        loss_format: lossSource.format,
+        loss_rate: loss.value,
+        loss_source: loss.source,
+        unit: carried.unit,
+      },
+      sourceCells: header.descriptors.map((descriptor) => ({
+        column: descriptor.startColumn,
+        value: row.values.slice(descriptor.startColumn - 1, descriptor.endColumn).filter(Boolean).join(' / '),
+        numeric: descriptor.startColumn === descriptor.endColumn && row.cellTypes?.[descriptor.startColumn - 1] === 'n',
+        numberFormat: descriptor.startColumn === descriptor.endColumn ? row.numberFormats?.[descriptor.startColumn - 1] || '' : '',
+      })),
     })
     if (rows.length > MAX_BOM_IMPORT_ROWS) {
       fail('BOM 明细超过 1000 行，请拆分文件后再导入', 'too_many_bom_rows')
@@ -595,6 +605,7 @@ export async function parseBOMXlsx(input, options = {}) {
     fileName,
     sheetName: sheet.name,
     headerRowNumber: header.rowNumber,
+    columns: header.descriptors.map((descriptor) => ({ label: descriptor.rawLabel, column: descriptor.startColumn, endColumn: descriptor.endColumn })),
     context: {
       ...context,
       sourceNote: extractHeaderNote(header),
@@ -763,12 +774,13 @@ export function buildBOMImportDraft(
             )
           : undefined,
       material_id: positiveID(materialMatch.record?.id),
-      quantity: row.quantity || row.rawQuantity || '',
+      quantity: normalizeBOMSourceNumber(row.quantity || row.rawQuantity) || row.quantity || row.rawQuantity || '',
       unit_id: positiveID(unitMatch.record?.id),
       loss_rate: row.lossRate,
       position: row.position,
       piece_count: row.pieceCount,
       total_usage_snapshot: row.totalUsageSnapshot,
+      source_snapshot: row.sourceSnapshot ? { ...row.sourceSnapshot, file_name: parsed.fileName } : undefined,
       process_base: row.processBase,
       process_method: row.processMethod,
       note: row.note,
@@ -779,11 +791,13 @@ export function buildBOMImportDraft(
         materialSpec: row.materialSpec,
         color: row.color,
         unit: row.unit,
+        cells: row.sourceCells,
         rawQuantity: row.rawQuantity,
         rawTotalUsage: row.rawTotalUsage,
         lossSource: row.lossSource,
         lossIssue: row.lossIssue,
         materialMatchStatus: materialMatch.status,
+        associatedMaterialID: positiveID(materialMatch.record?.id),
         materialMatchLabel: matchStatusLabel(materialMatch),
         unitMatchStatus: unitMatch.status,
         unitMatchLabel: matchStatusLabel(unitMatch),
@@ -812,8 +826,10 @@ export function buildBOMImportDraft(
       fileName: parsed.fileName,
       sheetName: parsed.sheetName,
       rowCount: items.length,
+      columns: parsed.columns,
       productCode: parsed.context?.code || '',
       productName: parsed.context?.name || '',
+      quantityText: values.quantity_text,
       productMatchStatus: productMatch.status,
       productMatchLabel: matchStatusLabel(productMatch),
       lossEvidence: parsed.rows.reduce(
@@ -827,6 +843,57 @@ export function buildBOMImportDraft(
   }
 }
 
+export function resolveBOMImportQuantity(currentValue, sourceValue) {
+  const currentText = String(currentValue ?? '')
+  const sourceNumber = normalizeBOMSourceNumber(sourceValue)
+  const sourceQuantity = sourceNumber && sourceNumber !== '0' ? sourceNumber : ''
+  const filled = !currentText.trim() && Boolean(sourceQuantity)
+  const quantityText = filled ? sourceQuantity : currentText
+  const currentNumber = normalizeBOMSourceNumber(quantityText)
+  return {
+    quantityText,
+    sourceQuantity,
+    filled,
+    valid: Boolean(currentNumber && currentNumber !== '0'),
+    differs: Boolean(sourceQuantity && currentText.trim() && currentNumber !== sourceQuantity),
+  }
+}
+
+export function describeBOMImportQuantity(currentValue, sourceValue, { pending = false } = {}) {
+  const quantity = resolveBOMImportQuantity(currentValue, sourceValue)
+  if (quantity.filled) {
+    return pending
+      ? `同时带入原表订单数量 ${quantity.sourceQuantity}。`
+      : `请填写订单数量（原表 ${quantity.sourceQuantity}），以计算总用量。`
+  }
+  if (!quantity.valid) return '请填写有效订单数量，以计算总用量。'
+  return quantity.differs
+    ? `保留当前订单数量 ${quantity.quantityText}（原表 ${quantity.sourceQuantity}），总用量按当前数量计算。`
+    : ''
+}
+
+export function mergeBOMImportedValues(currentValues, draft, mode = 'append') {
+  const quantity = resolveBOMImportQuantity(currentValues?.quantity_text, draft.values.quantity_text)
+  let existing = Array.isArray(currentValues?.items) ? currentValues.items : []
+  if (quantity.filled) existing = invalidateBOMUsageSnapshots(existing, { quantity_text: quantity.quantityText })
+  const currentQuantity = normalizeBOMSourceNumber(quantity.quantityText)
+  let imported = draft.values.items.map((item) => {
+    const copy = { ...item }
+    delete copy.id
+    delete copy.bom_header_id
+    return copy
+  })
+  // A total from another order quantity cannot remain the current draft's total.
+  if (!quantity.sourceQuantity || currentQuantity !== quantity.sourceQuantity) {
+    imported = invalidateBOMUsageSnapshots(imported, { quantity_text: quantity.quantityText })
+  }
+  const items = mode === 'replace' ? imported : [...existing, ...imported]
+  if (items.length > MAX_BOM_IMPORT_ROWS) {
+    fail('BOM 明细合计超过 1000 行，请选择替换明细或拆分后再导入', 'too_many_bom_rows')
+  }
+  return { items, quantity_text: quantity.quantityText }
+}
+
 export function getBOMImportLineIssues(line = {}) {
   const issues = []
   if (!positiveID(line.material_id)) {
@@ -835,22 +902,21 @@ export function getBOMImportLineIssues(line = {}) {
   if (!positiveID(line.unit_id)) {
     issues.push({ field: 'unit_id', message: '请选择现有单位' })
   }
-  const quantityUnits = numeric20Scale6Units(line.quantity)
+  const quantityUnits = parseBOMSourceNumber(line.quantity)
   if (
-    quantityUnits === null ||
-    !isPositiveNumeric20Scale6Units(quantityUnits)
+    !quantityUnits?.units
   ) {
     issues.push({
       field: 'quantity',
-      message: '材料用量必须大于 0，且最多保留 6 位小数',
+      message: '材料用量必须为有效正数',
     })
   }
-  if (numeric20Scale6Units(line.loss_rate) === null) {
+  if (!parseBOMSourceNumber(line.loss_rate)) {
     issues.push({
       field: 'loss_rate',
       message:
         line?._import_source?.lossIssue ||
-        '损耗率必须为非负数，且最多保留 6 位小数',
+        '损耗率必须为有效非负数',
     })
   }
   return issues

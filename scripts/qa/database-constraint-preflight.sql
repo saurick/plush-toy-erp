@@ -228,7 +228,7 @@ BEGIN
       ELSE
         EXECUTE $sql$
           SELECT count(*) FROM public.business_attachments
-          WHERE file_size NOT BETWEEN 1 AND 104857600
+          WHERE file_size NOT BETWEEN 1 AND 209715200
              OR (attachment_type = 'product_image' AND file_size > 5242880)
              OR sha256 !~ '^[0-9a-f]{64}$'
              OR object_key IS NULL

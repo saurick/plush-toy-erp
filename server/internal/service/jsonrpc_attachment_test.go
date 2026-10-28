@@ -342,7 +342,7 @@ func TestJsonrpcDispatcher_ProductImageMessagesDoNotChangeOrdinaryAttachmentErro
 	}
 
 	ordinarySizeRes := dispatcher.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentTooLarge)
-	if ordinarySizeRes.Code != errcode.PayloadTooLarge.Code || ordinarySizeRes.Message != "附件超过 100MB，请压缩后再上传" {
+	if ordinarySizeRes.Code != errcode.PayloadTooLarge.Code || ordinarySizeRes.Message != "附件超过 200MB，请压缩后再上传" {
 		t.Fatalf("ordinary attachment size error mapped to %#v", ordinarySizeRes)
 	}
 	productImageSizeRes := dispatcher.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentProductImageTooLarge)

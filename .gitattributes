@@ -2,3 +2,6 @@ docs/customers export-ignore
 docs/customers/** export-ignore
 scripts/qa/yoyoosun-role-flow-handbook.test.mjs export-ignore
 config/customers/*/assets/** export-ignore
+
+# Atlas 校验绑定迁移原始字节，保留已应用脚本的尾部空行。
+server/internal/data/model/migrate/*.sql whitespace=-blank-at-eof

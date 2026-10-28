@@ -35,8 +35,13 @@ type productionOrderTestFixture struct {
 
 func openProductionOrderRepoTest(t *testing.T, name string, prepare ...func(context.Context, *ent.Client, int, int)) productionOrderTestFixture {
 	t.Helper()
-	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, name)
+	return prepareProductionOrderRepoTest(t, name, data, client, prepare...)
+}
+
+func prepareProductionOrderRepoTest(t *testing.T, name string, data *Data, client *ent.Client, prepare ...func(context.Context, *ent.Client, int, int)) productionOrderTestFixture {
+	t.Helper()
+	ctx := context.Background()
 	actor := client.AdminUser.Create().SetUsername(name + "-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	unitRow := createSalesOrderTestUnit(t, ctx, client, "POR-U", true)
 	productRow := createSalesOrderTestProduct(t, ctx, client, unitRow.ID, "POR-P", true)

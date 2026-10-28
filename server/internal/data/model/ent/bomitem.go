@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
@@ -37,6 +38,8 @@ type BOMItem struct {
 	PieceCount *string `json:"piece_count,omitempty"`
 	// TotalUsageSnapshot holds the value of the "total_usage_snapshot" field.
 	TotalUsageSnapshot *string `json:"total_usage_snapshot,omitempty"`
+	// SourceSnapshot holds the value of the "source_snapshot" field.
+	SourceSnapshot map[string]interface{} `json:"source_snapshot,omitempty"`
 	// ProcessBase holds the value of the "process_base" field.
 	ProcessBase *string `json:"process_base,omitempty"`
 	// ProcessMethod holds the value of the "process_method" field.
@@ -115,6 +118,8 @@ func (*BOMItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case bomitem.FieldSourceSnapshot:
+			values[i] = new([]byte)
 		case bomitem.FieldQuantity, bomitem.FieldLossRate:
 			values[i] = new(decimal.Decimal)
 		case bomitem.FieldID, bomitem.FieldBomHeaderID, bomitem.FieldMaterialID, bomitem.FieldUnitID:
@@ -194,6 +199,14 @@ func (_m *BOMItem) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.TotalUsageSnapshot = new(string)
 				*_m.TotalUsageSnapshot = value.String
+			}
+		case bomitem.FieldSourceSnapshot:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field source_snapshot", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.SourceSnapshot); err != nil {
+					return fmt.Errorf("unmarshal field source_snapshot: %w", err)
+				}
 			}
 		case bomitem.FieldProcessBase:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -313,6 +326,9 @@ func (_m *BOMItem) String() string {
 		builder.WriteString("total_usage_snapshot=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("source_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SourceSnapshot))
 	builder.WriteString(", ")
 	if v := _m.ProcessBase; v != nil {
 		builder.WriteString("process_base=")

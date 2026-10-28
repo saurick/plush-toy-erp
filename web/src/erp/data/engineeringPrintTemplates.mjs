@@ -8,6 +8,7 @@ import {
   bomLossRateToPercent,
   getBOMUsage,
 } from '../utils/bomMaterialGroups.mjs'
+import { formatBOMSourceNumber } from '../utils/bomSourceValues.mjs'
 
 export const MATERIAL_DETAIL_TEMPLATE_KEY = 'engineering-material-detail'
 export const COLOR_CARD_TEMPLATE_KEY = 'engineering-color-card'
@@ -1118,9 +1119,9 @@ export function buildMaterialDetailDraftFromBOMVersion(
         unit: unit.name || unit.code || '',
         position: item.position || '',
         pieces: item.piece_count || item.pieceCount || '',
-        unitUsage: item.quantity ?? '',
+        unitUsage: formatBOMSourceNumber(item.quantity, item.source_snapshot?.quantity_format),
         lossRate: bomLossRateToPercent(item.loss_rate),
-        totalUsage: getBOMUsage(item, version.quantity_text),
+        totalUsage: formatBOMSourceNumber(getBOMUsage(item, version.quantity_text), item.source_snapshot?.total_format),
         processBase: item.process_base || item.processBase || '',
         processMethod: item.process_method || item.processMethod || '',
         remark: item.note || '',

@@ -345,6 +345,15 @@ function aggregateFixture(patch = {}) {
   }
 }
 
+test('WIP preserves exact frozen BOM coefficients without widening executable quantity validation', () => {
+  const data = aggregateFixture()
+  data.material_requirements[0].unit_quantity_snapshot = '0.0123456789012345'
+  data.material_requirements[0].loss_rate_snapshot = '0.1234567890123456789'
+  assert.equal(validateProductionWipAggregate(data).materialRequirements[0].unit_quantity_snapshot, '0.0123456789012345')
+  data.material_requirements[0].planned_quantity = '60.0000001'
+  assert.throws(() => validateProductionWipAggregate(data))
+})
+
 test('production WIP aggregate validates canonical route snapshots, batches and formal quality facts', () => {
   const aggregate = validateProductionWipAggregate(aggregateFixture(), {
     productionOrderID: 7,

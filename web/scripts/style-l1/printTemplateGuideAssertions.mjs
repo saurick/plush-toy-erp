@@ -9,7 +9,7 @@ export async function assertPrintTemplateGuide(page) {
     const guide = document.querySelector('.erp-template-guide')
     const paper = guide.querySelector('.erp-template-guide__paper')
     const figureRect = guide.querySelector('figure').getBoundingClientRect()
-    const parts = [...guide.querySelectorAll('.erp-template-guide__parts li')]
+    const parts = [...guide.querySelectorAll('.erp-document-guide__parts li')]
     const markers = [...guide.querySelectorAll('.erp-template-guide__marker')]
     return {
       inert: paper.inert,

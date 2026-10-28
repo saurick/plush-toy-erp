@@ -36,6 +36,9 @@ func TestPublicPermissionCatalogMatchesRegisteredPermissions(t *testing.T) {
 	if got.Attachments["maxBytes"] != int64(biz.BusinessAttachmentMaxBytes) {
 		t.Fatal("attachment limit differs")
 	}
+	if got.Policies["BOMSourcePolicy"]["scale"] != biz.BOMSourceMaxScale || got.States["BOMLossSource"]["HEADER"] != biz.BOMLossSourceHeader {
+		t.Fatal("BOM source constraints or loss provenance differ from domain declarations")
+	}
 	for name, want := range map[string]map[string]string{
 		"FinancePaymentStatus":    {"DRAFT": biz.FinancePaymentStatusDraft, "APPROVED": biz.FinancePaymentStatusApproved, "REJECTED": biz.FinancePaymentStatusRejected, "POSTED": biz.FinancePaymentStatusPosted, "REVERSED": biz.FinancePaymentStatusReversed, "CANCELLED": biz.FinancePaymentStatusCancelled},
 		"FinanceAllocationStatus": {"POSTED": biz.FinanceAllocationStatusPosted, "REVERSED": biz.FinanceAllocationStatusReversed},

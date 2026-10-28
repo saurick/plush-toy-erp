@@ -154,7 +154,7 @@ export default function SalesOrderExcelImport({
     try {
       if (file.size > MAX_XLSX_FILE_BYTES) {
         throw new XlsxImportError(
-          'Excel 文件超过 20MB，请精简图片或拆分后再导入'
+          `Excel 文件超过 ${MAX_XLSX_FILE_BYTES / 1024 / 1024}MB，请精简图片或拆分后再导入`
         )
       }
       const parsed = await parseSalesOrderXlsx(await file.arrayBuffer(), {

@@ -30,8 +30,12 @@ func TestInventoryLotPostgresMigrationShape(t *testing.T) {
 
 	assertPostgresColumnExists(t, data.sqldb, "inventory_txns", "lot_id")
 	assertPostgresColumnExists(t, data.sqldb, "inventory_balances", "lot_id")
-	assertPostgresNumericColumn(t, data.sqldb, "bom_items", "quantity", 20, 6)
-	assertPostgresNumericColumn(t, data.sqldb, "bom_items", "loss_rate", 20, 6)
+	for _, column := range []string{"quantity", "loss_rate"} {
+		var actual string
+		if err := data.sqldb.QueryRowContext(ctx, `SELECT format_type(atttypid, atttypmod) FROM pg_attribute WHERE attrelid = 'bom_items'::regclass AND attname = $1`, column).Scan(&actual); err != nil || actual != "numeric" {
+			t.Fatalf("BOM %s must have no fixed storage scale: %s, %v", column, actual, err)
+		}
+	}
 	assertPostgresUniqueIndex(t, data.sqldb, "inventory_lots", "inventorylot_subject_type_subject_id_lot_no")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id", "lot_id IS NULL")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id_l", "lot_id IS NOT NULL")
@@ -259,6 +263,30 @@ func TestBOMPostgresConstraints(t *testing.T) {
 		SetLossRate(mustDecimal(t, "-0.01")).
 		Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected postgres DB check for loss_rate >= 0, got %v", err)
+	}
+}
+
+func TestBOMPostgresSourceValuesPersistCopyAndClear(t *testing.T) {
+	ctx := t.Context()
+	data, client := openInventoryLotPostgresTestData(t)
+	fixtures := createInventoryLotPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	assertBOMSourceValuesRoundTrip(t, uc, fixtures.productID, fixtures.materialID, fixtures.unitID)
+}
+
+func TestBOMPostgresCoefficientsHaveNoFixedStorageScale(t *testing.T) {
+	ctx := t.Context()
+	data, client := openInventoryLotPostgresTestData(t)
+	client.Use(unitQuantityGuard)
+	f := createInventoryLotPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	for index, raw := range []string{"0.12345678901234567890123456789", "0.00000049", "1e-324"} {
+		quantity, loss := decimal.RequireFromString(raw), decimal.RequireFromString("0.0000001234567890123456789")
+		draft := saveBOMDraftFixture(t, ctx, uc, f.productID, fmt.Sprintf("FULL-PRECISION-%d-%s", index, f.suffix), &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: quantity, LossRate: loss}})
+		read, err := uc.GetBOMVersion(ctx, draft.Header.ID)
+		if err != nil || len(read.Items) != 1 || !read.Items[0].Quantity.Equal(quantity) || !read.Items[0].LossRate.Equal(loss) {
+			t.Fatalf("PostgreSQL rounded BOM coefficients %s: %v, %#v", raw, err, read)
+		}
 	}
 }
 

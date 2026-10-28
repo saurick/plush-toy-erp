@@ -2592,7 +2592,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 145,
+          line: 167,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2603,7 +2603,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 144,
+          line: 166,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2636,7 +2636,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 142,
+          line: 164,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'integer',
@@ -2647,7 +2647,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 143,
+          line: 165,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2755,7 +2755,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 118,
+          line: 140,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'array',
@@ -2769,7 +2769,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 124,
+          line: 146,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'object',
@@ -2780,13 +2780,13 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 133,
+          line: 155,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'integer',
       }), Object.freeze({
-        description: '解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "loss_rate")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。',
-        expression: 'getRequiredJSONRPCNumeric20Scale6(pm, "loss_rate")',
+        description: '解析器 `ParseBOMDecimal`；调用 `biz.ParseBOMDecimal(lossText)`。 拒绝条件：“!ok”。',
+        expression: 'biz.ParseBOMDecimal(lossText)',
         name: 'items[].loss_rate',
         required: '条件必填（items 有值）',
         requiredWhen: Object.freeze([Object.freeze({
@@ -2794,7 +2794,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 95,
+          line: 116,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2805,7 +2805,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 100,
+          line: 121,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'integer',
@@ -2816,7 +2816,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 109,
+          line: 131,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2827,7 +2827,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 105,
+          line: 126,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2838,7 +2838,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 104,
+          line: 125,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2849,7 +2849,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 107,
+          line: 129,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2860,13 +2860,13 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 108,
+          line: 130,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。',
-        expression: 'getRequiredJSONRPCNumeric20Scale6(pm, "quantity")',
+        description: '解析器 `ParseBOMDecimal`；调用 `biz.ParseBOMDecimal(quantityText)`。 拒绝条件：“!ok”。',
+        expression: 'biz.ParseBOMDecimal(quantityText)',
         name: 'items[].quantity',
         required: '条件必填（items 有值）',
         requiredWhen: Object.freeze([Object.freeze({
@@ -2874,10 +2874,21 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 91,
+          line: 108,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
+      }), Object.freeze({
+        description: '解析器 `getOptionalJSONRPCBOMSourceSnapshot`；调用 `getOptionalJSONRPCBOMSourceSnapshot(pm, "source_snapshot")`。',
+        expression: 'getOptionalJSONRPCBOMSourceSnapshot(pm, "source_snapshot")',
+        name: 'items[].source_snapshot',
+        nullable: true,
+        required: '可选',
+        source: Object.freeze({
+          line: 100,
+          path: 'server/internal/service/jsonrpc_bom_shared.go',
+        }),
+        type: 'object',
       }), Object.freeze({
         description: '解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "total_usage_snapshot")`。',
         expression: 'getWorkflowStringPtr(pm, "total_usage_snapshot")',
@@ -2885,7 +2896,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 106,
+          line: 127,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'string',
@@ -2896,7 +2907,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 102,
+          line: 123,
           path: 'server/internal/service/jsonrpc_bom_shared.go',
         }),
         type: 'integer',

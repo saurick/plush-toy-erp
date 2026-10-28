@@ -231,6 +231,7 @@ export function createBusinessAttachmentScenarios({
               refreshCenter: refresh.top + refresh.height / 2,
               refreshHeight: refresh.height,
               selectionHeight: selection?.getBoundingClientRect().height || 0,
+              photoActions: [...node.querySelectorAll('.business-attachment-panel__mobile-action')].map((button) => { const box = button.getBoundingClientRect(); return { top: box.top, width: box.width, height: box.height } }),
               dragHintVisible:
                 node
                   .querySelector('.business-attachment-panel__drop-hint')
@@ -252,7 +253,7 @@ export function createBusinessAttachmentScenarios({
             assert(metrics.refreshHeight >= 44, JSON.stringify(metrics))
             if (!readonly) {
               assert(
-                metrics.selectionHeight >= 44 && !metrics.dragHintVisible,
+                metrics.selectionHeight >= 44 && !metrics.dragHintVisible && metrics.photoActions.length === 2 && metrics.photoActions.every((box) => box.height >= 44) && Math.abs(metrics.photoActions[0].top - metrics.photoActions[1].top) <= 1 && Math.abs(metrics.photoActions[0].width - metrics.photoActions[1].width) <= 1,
                 JSON.stringify(metrics)
               )
             }
@@ -344,6 +345,33 @@ export function createBusinessAttachmentScenarios({
         }
         if (key !== 'desktop') {
           if (width <= 640 && !readonly) {
+            const photoInput = modal.getByLabel('选择照片', { exact: true })
+            const cameraInput = modal.getByLabel('拍照', { exact: true })
+            assert.equal(await cameraInput.getAttribute('capture'), 'environment')
+            assert.equal(await photoInput.getAttribute('capture'), null)
+            assert((await photoInput.getAttribute('accept')).includes('image/heic'))
+            assert(!(await cameraInput.getAttribute('accept')).includes('video/'))
+            const [canceledPhoto] = await Promise.all([page.waitForEvent('filechooser'), modal.getByRole('button', { name: '选照片', exact: true }).click()])
+            await canceledPhoto.setFiles([])
+            assert.equal(await modal.locator('.business-attachment-panel__row').count(), 0, '取消照片选择不能新增附件')
+            for (const [button, name] of [['选照片', '手机相册.png'], ['拍照', '手机拍照.png']]) {
+              const [chooser] = await Promise.all([page.waitForEvent('filechooser'), modal.getByRole('button', { name: button, exact: true }).click()])
+              await chooser.setFiles({ name, mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') })
+              const row = modal.locator('.business-attachment-panel__row').filter({ hasText: name })
+              await row.getByRole('button', { name: '预览附件', exact: true }).click()
+              const preview = page.getByRole('dialog', { name: name, exact: true })
+              await preview.getByRole('img', { name, exact: true }).waitFor()
+              await preview.locator('img').evaluate((image) => image.decode())
+              await waitForFiniteAnimations(page)
+              await preview.getByRole('button', { name: 'Close', exact: true }).click()
+              await preview.waitFor({ state: 'hidden' })
+              await modal.getByRole('button', { name: '上传 1 个文件', exact: true }).click()
+              await modal.getByRole('button', { name: '上传 1 个文件', exact: true }).waitFor({ state: 'hidden' })
+              await row.getByRole('button', { name: '下载附件', exact: true }).waitFor()
+            }
+            assert.deepEqual(calls, ['手机相册.png', '手机拍照.png'])
+            await geometry()
+            await modal.screenshot({ path: path.join(outputDir, `attachment-manager-${key}-photos.png`) })
             await modal
               .locator('input[type="file"]')
               .first()
@@ -372,10 +400,10 @@ export function createBusinessAttachmentScenarios({
             await modal
               .getByRole('button', { name: '上传 1 个文件', exact: true })
               .waitFor({ state: 'hidden' })
-            await modal.getByText('手机上传凭证.txt', { exact: true }).waitFor()
+            await modal.locator('.business-attachment-panel__row').filter({ hasText: '手机上传凭证.txt' }).getByRole('button', { name: '下载附件', exact: true }).waitFor()
             assert.deepEqual(
               calls,
-              ['手机上传凭证.txt'],
+              ['手机相册.png', '手机拍照.png', '手机上传凭证.txt'],
               '关闭提醒后上传只提交一次'
             )
             await geometry()
@@ -768,7 +796,7 @@ export function createBusinessAttachmentScenarios({
         path: path.join(outputDir, `attachment-summary-${theme}-expanded.png`),
       })
       await editor
-        .getByText(/单个文件不超过\s*100 MB/u, { exact: false })
+        .getByText(/单个文件不超过\s*200MB/u, { exact: false })
         .waitFor()
       const input = editor
         .locator('.business-attachment-panel input[type="file"]')
@@ -783,7 +811,7 @@ export function createBusinessAttachmentScenarios({
           type: 'text/plain',
         })
         Object.defineProperty(oversized, 'size', {
-          value: 100 * 1024 * 1024 + 1,
+          value: 200 * 1024 * 1024 + 1,
         })
         const transfer = new DataTransfer()
         transfer.items.add(oversized)
@@ -791,7 +819,7 @@ export function createBusinessAttachmentScenarios({
         element.dispatchEvent(new Event('change', { bubbles: true }))
       })
       await page
-        .getByText('oversized.txt 超过 100MB，请压缩后再上传', {
+        .getByText('oversized.txt 超过 200MB，请压缩后再上传', {
           exact: true,
         })
         .waitFor()

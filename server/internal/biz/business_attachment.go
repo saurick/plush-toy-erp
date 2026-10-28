@@ -21,9 +21,10 @@ import (
 )
 
 const (
-	BusinessAttachmentMaxBytes             = 100 * 1024 * 1024
-	BusinessAttachmentProductImageMaxBytes = 5 * 1024 * 1024
-	BusinessAttachmentMaxJSONRPCBodyBytes  = 140 * 1024 * 1024
+	BusinessAttachmentMaxBytes              = 200 * 1024 * 1024
+	BusinessAttachmentProductImageMaxBytes  = 5 * 1024 * 1024
+	BusinessAttachmentMaxJSONRPCBodyBytes   = 280 * 1024 * 1024
+	BusinessAttachmentRequestTimeoutSeconds = 300
 
 	BusinessAttachmentProductImageMaxWidth  = 8192
 	BusinessAttachmentProductImageMaxHeight = 8192

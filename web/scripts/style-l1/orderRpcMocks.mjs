@@ -497,6 +497,7 @@ export async function installOrderRpcMocks(page, context) {
     })
   })
 
+  const savedBOMVersions = new Map()
   await page.route('**/rpc/bom', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method, params = {} } = body
@@ -558,18 +559,19 @@ export async function installOrderRpcMocks(page, context) {
     switch (method) {
       case 'list_bom_versions':
         data = stylePaginatedRpcData(
-          [bomVersion, bomDraft],
+          [bomVersion, savedBOMVersions.get(bomDraft.id) || bomDraft],
           'bom_versions',
           params
         )
         break
       case 'get_bom_version':
         data = {
-          bom_version:
+          bom_version: savedBOMVersions.get(Number(params.id || 0)) || (
             Number(params.id || 0) === 2
               ? { ...bomDraft, items: bomItems }
-              : { ...bomVersion, items: bomItems },
-          bom_items: bomItems,
+              : { ...bomVersion, items: bomItems }
+          ),
+          bom_items: savedBOMVersions.get(Number(params.id || 0))?.items || bomItems,
         }
         break
       case 'save_bom_with_items':
@@ -578,11 +580,12 @@ export async function installOrderRpcMocks(page, context) {
           bom_version: {
             ...bomDraft,
             ...params,
-            edit_version: bomDraft.edit_version + 1,
+            edit_version: Number(params.expected_version || bomDraft.edit_version) + 1,
             items: Array.isArray(params.items) ? params.items : bomItems,
           },
           bom_items: bomItems,
         }
+        if (method === 'save_bom_with_items') savedBOMVersions.set(data.bom_version.id, data.bom_version)
         break
       case 'activate_bom_version':
         data = {

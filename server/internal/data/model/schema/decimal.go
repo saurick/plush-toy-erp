@@ -8,6 +8,19 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// bomDecimalField preserves BOM coefficients before unit-specific demand rounding.
+// A fixed PostgreSQL scale would silently round values while saving.
+func bomDecimalField(name string) ent.Field {
+	return field.Other(name, decimal.Decimal{}).
+		SchemaType(map[string]string{dialect.Postgres: "numeric", dialect.SQLite: "numeric"})
+}
+
+func immutableBOMDecimalField(name string) ent.Field {
+	return field.Other(name, decimal.Decimal{}).
+		SchemaType(map[string]string{dialect.Postgres: "numeric", dialect.SQLite: "numeric"}).
+		Immutable()
+}
+
 // decimalQuantityField maps inventory quantities to PostgreSQL numeric to avoid float precision drift.
 func decimalQuantityField(name string) ent.Field {
 	return field.Other(name, decimal.Decimal{}).
@@ -36,7 +49,7 @@ func immutableDecimalQuantityField(name string) ent.Field {
 		Immutable()
 }
 
-// decimalRateField uses the same numeric precision as quantities for BOM loss rates and ratios.
+// decimalRateField maps rates whose owning contract fixes six decimal places.
 func decimalRateField(name string) ent.Field {
 	return field.Other(name, decimal.Decimal{}).
 		SchemaType(map[string]string{

@@ -915,3 +915,37 @@ test('结束动作降低强调，提交类动作保留主按钮', async (t) => {
     assert.equal(container.querySelector('button').classList.contains('ant-btn-primary'), ['submit', 'confirm'].includes(key))
   }
 })
+
+test('选中记录时新建降低强调，清空后恢复且保留原入口', async (t) => {
+  const [{ BusinessOperationPanel, SelectionActionBar, ToolbarButton, BusinessActionTooltip }, { Button, Dropdown, Space }] = await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove() })
+  let selected = false
+  let created = 0
+  const createAction = createElement(BusinessActionTooltip, null, createElement(ToolbarButton, { type: 'primary', onClick: () => { created += 1 } }, '新建订单'))
+  const importAction = createElement(Dropdown, { menu: { items: [{ key: 'import', label: '从 Excel 新建' }] }, trigger: ['click'] }, createElement(ToolbarButton, { type: 'primary', 'aria-label': '更多新建方式' }, '⌄'))
+  const render = () => act(async () => root.render(createElement(BusinessOperationPanel, {
+    primaryAction: createElement(Space.Compact, null, createAction, importAction),
+  }, createElement(SelectionActionBar, { selectedCount: Number(selected) }, createElement(Button, { type: 'primary', 'data-business-action-role': 'primary' }, '提交订单')))))
+  await render()
+  const create = () => [...container.querySelectorAll('button')].find((button) => button.textContent === '新建订单')
+  assert(create().classList.contains('ant-btn-primary'))
+  assert.equal(container.querySelector('.erp-business-selection-action-bar').hidden, false)
+  assert.equal(Boolean(container.querySelector('[data-business-selection-placeholder]')), false)
+  selected = true
+  await render()
+  assert.equal(create().classList.contains('ant-btn-primary'), false)
+  await act(async () => create().click())
+  assert.equal(created, 1)
+  const more = container.querySelector('[aria-label="更多新建方式"]')
+  assert.equal(more.classList.contains('ant-btn-primary'), false)
+  await act(async () => more.click())
+  assert(document.querySelector('.ant-dropdown-menu').textContent.includes('从 Excel 新建'))
+  await act(async () => more.click())
+  selected = false
+  await render()
+  assert(create().classList.contains('ant-btn-primary'))
+  assert(container.querySelector('[aria-label="更多新建方式"]').classList.contains('ant-btn-primary'))
+})

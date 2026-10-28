@@ -11,14 +11,6 @@ func TestSourceDocumentAndFactQuantityParamsUseStringNumeric20Scale6(t *testing.
 		name  string
 		parse func(any) bool
 	}{
-		{name: "bom-quantity", parse: func(value any) bool {
-			_, ok := bomItemUpdateFromParams(map[string]any{"quantity": value, "loss_rate": "0"})
-			return ok
-		}},
-		{name: "bom-loss-rate", parse: func(value any) bool {
-			_, ok := bomItemUpdateFromParams(map[string]any{"quantity": "1", "loss_rate": value})
-			return ok
-		}},
 		{name: "operational-fact", parse: func(value any) bool {
 			_, ok := operationalFactMutationFromParams(map[string]any{"quantity": value})
 			return ok

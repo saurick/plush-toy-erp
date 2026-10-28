@@ -120,11 +120,12 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 默认值 / 属性 | 说明 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `bigint` | `int` | 非空 | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| `quantity` | `numeric(20,6)` | `other` | 非空 | — | — |
-| `loss_rate` | `numeric(20,6)` | `other` | 非空 | — | — |
+| `quantity` | `numeric` | `other` | 非空 | — | — |
+| `loss_rate` | `numeric` | `other` | 非空 | — | — |
 | `position` | `varchar` | `string` | 可空 | — | — |
 | `piece_count` | `varchar` | `string` | 可空 | — | — |
 | `total_usage_snapshot` | `varchar` | `string` | 可空 | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
+| `source_snapshot` | `jsonb` | `json.RawMessage` | 可空 | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
 | `process_base` | `varchar` | `string` | 可空 | — | — |
 | `process_method` | `varchar` | `string` | 可空 | — | — |
 | `note` | `varchar` | `string` | 可空 | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |

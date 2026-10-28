@@ -5,6 +5,7 @@ import { MaterialDetailPaper } from './MaterialDetailPaper.jsx'
 import { ColorCardPaper } from './ColorCardPaper.jsx'
 import { WorkInstructionPaper } from './WorkInstructionPaper.jsx'
 import { computeMaterialPurchaseTotals } from '../../utils/materialPurchaseContractEditor.mjs'
+import DocumentGuide from '../DocumentGuide.jsx'
 
 const engineeringPapers = {
   'engineering-material-detail': MaterialDetailPaper,
@@ -92,59 +93,43 @@ export default function PrintTemplateGuide({ template }) {
     >
       <h3 className="erp-template-guide__title">{template.title}</h3>
       <p className="erp-template-guide__purpose">{template.summary}</p>
-      <div className="erp-template-guide__body">
-        <figure className="erp-template-guide__figure" ref={viewportRef}>
+      <DocumentGuide parts={template.guide} figureRef={viewportRef} caption="版式示意">
+        <div
+          className="erp-template-guide__thumbnail"
+          style={
+            layout
+              ? { width: layout.width, height: layout.height }
+              : undefined
+          }
+        >
+          {/* 复用正式纸面；inert 同时禁止鼠标、键盘和上传入口进入预览。 */}
           <div
-            className="erp-template-guide__thumbnail"
-            style={
-              layout
-                ? { width: layout.width, height: layout.height }
-                : undefined
-            }
+            ref={paperRef}
+            className="erp-template-guide__paper"
+            inert=""
+            aria-hidden="true"
+            style={{
+              transform: `scale(${layout?.scale ?? 1})`,
+              visibility: layout ? 'visible' : 'hidden',
+            }}
           >
-            {/* 复用正式纸面；inert 同时禁止鼠标、键盘和上传入口进入预览。 */}
-            <div
-              ref={paperRef}
-              className="erp-template-guide__paper"
-              inert=""
-              aria-hidden="true"
-              style={{
-                transform: `scale(${layout?.scale ?? 1})`,
-                visibility: layout ? 'visible' : 'hidden',
-              }}
-            >
-              <TemplatePaper template={template} />
-            </div>
-            {template.guide.map((part, index) =>
-              layout?.markers[index] != null ? (
-                <span
-                  className="erp-template-guide__marker"
-                  key={part.title}
-                  style={{ top: `${layout.markers[index]}%` }}
-                  aria-hidden="true"
-                  data-guide-target={part.selector}
-                >
-                  {index + 1}
-                </span>
-              ) : null
-            )}
+            <TemplatePaper template={template} />
           </div>
-          <figcaption>版式示意</figcaption>
-        </figure>
-        <ol className="erp-template-guide__parts">
-          {template.guide.map((part, index) => (
-            <li key={part.title}>
-              <span className="erp-template-guide__number" aria-hidden="true">
+          {template.guide.map((part, index) =>
+            layout?.markers[index] != null ? (
+              <span
+                className="erp-template-guide__marker erp-document-guide__number"
+                key={part.title}
+                style={{ top: `${layout.markers[index]}%` }}
+                aria-hidden="true"
+                data-guide-target={part.selector}
+              >
                 {index + 1}
               </span>
-              <div>
-                <h4>{part.title}</h4>
-                <p>{part.description}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
+            ) : null
+          )}
+        </div>
+      </DocumentGuide>
     </section>
   )
 }

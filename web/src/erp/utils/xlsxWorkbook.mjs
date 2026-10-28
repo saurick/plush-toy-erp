@@ -1,5 +1,7 @@
 /* eslint-disable no-bitwise -- ZIP flags and CRC32 require bit operations. */
-export const MAX_XLSX_FILE_BYTES = 20 * 1024 * 1024
+import { AttachmentPolicy } from '../../common/consts/attachments.generated.mjs'
+
+export const MAX_XLSX_FILE_BYTES = AttachmentPolicy.maxBytes
 
 const MAX_ZIP_ENTRIES = 1024
 const MAX_ZIP_ENTRY_BYTES = 16 * 1024 * 1024
@@ -93,7 +95,7 @@ function parseZip(input) {
     fail('所选 Excel 文件为空', 'empty_file')
   }
   if (bytes.byteLength > MAX_XLSX_FILE_BYTES) {
-    fail('Excel 文件超过 20MB，请精简图片或拆分后再导入', 'file_too_large')
+    fail(`Excel 文件超过 ${MAX_XLSX_FILE_BYTES / 1024 / 1024}MB，请精简图片或拆分后再导入`, 'file_too_large')
   }
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -128,7 +130,6 @@ function parseZip(input) {
 
   const entries = new Map()
   const centralEnd = centralOffset + centralSize
-  let totalUncompressedBytes = 0
   let offset = centralOffset
 
   for (let index = 0; index < entryCount; index += 1) {
@@ -160,20 +161,17 @@ function parseZip(input) {
     if (method !== 0 && method !== 8) {
       fail('该 Excel 使用了暂不支持的压缩方式', 'unsupported_zip')
     }
-    if (
-      compressedSize > MAX_XLSX_FILE_BYTES ||
-      uncompressedSize > MAX_ZIP_ENTRY_BYTES
-    ) {
-      fail('Excel 内部数据过大，请精简文件后再导入', 'xlsx_too_large')
-    }
-    totalUncompressedBytes += uncompressedSize
-    if (totalUncompressedBytes > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES) {
-      fail('Excel 解压后的内容过大，请精简文件后再导入', 'xlsx_too_large')
+    if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff) {
+      fail('该 Excel 使用了暂不支持的压缩结构', 'unsupported_zip')
     }
     if (entries.has(name)) {
       fail('Excel 文件包含重复的内部条目', 'invalid_zip')
     }
     assertRange(bytes, localHeaderOffset, 30, 'Excel 文件数据项不完整')
+    const dataStart = localHeaderOffset + 30 + readUint16(view, localHeaderOffset + 26) + readUint16(view, localHeaderOffset + 28)
+    if (readUint32(view, localHeaderOffset) !== ZIP_LOCAL_SIGNATURE || dataStart + compressedSize > centralOffset) {
+      fail('Excel 文件数据项范围无效', 'invalid_zip')
+    }
     entries.set(name, {
       name,
       flags,
@@ -241,6 +239,16 @@ async function inflateRawLimited(compressed, expectedSize) {
 async function extractZipEntry(zip, name) {
   const entry = zip.entries.get(name)
   if (!entry) fail('Excel 缺少必要的工作簿数据', 'missing_xlsx_entry')
+
+  // Only data actually read consumes the parsing budget; BOM skips embedded media.
+  if (entry.uncompressedSize > MAX_ZIP_ENTRY_BYTES) {
+    fail('Excel 待读取的单项内容过大，请精简后再导入', 'xlsx_too_large')
+  }
+  const extractedBytes = (zip.extractedBytes || 0) + entry.uncompressedSize
+  if (extractedBytes > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES) {
+    fail('Excel 待读取的内容过大，请拆分后再导入', 'xlsx_too_large')
+  }
+  zip.extractedBytes = extractedBytes
 
   const offset = entry.localHeaderOffset
   if (readUint32(zip.view, offset) !== ZIP_LOCAL_SIGNATURE) {
@@ -448,8 +456,13 @@ export function normalizeText(value) {
   return text || ''
 }
 
-function percentageStyles(xml) {
+function numberFormatStyles(xml) {
   const formats = new Map([
+    ['0', 'General'],
+    ['1', '0'],
+    ['2', '0.00'],
+    ['3', '#,##0'],
+    ['4', '#,##0.00'],
     ['9', '0%'],
     ['10', '0.00%'],
   ])
@@ -462,11 +475,11 @@ function percentageStyles(xml) {
   return [...cellFormats.matchAll(/<xf\b([^>]*)>/gu)].map((match) => {
     const format = formats.get(parseXmlAttributes(match[1]).numFmtId) || ''
     // Quoted and escaped percent characters are literal text, not scaling.
-    return format.replace(/"[^"]*"|\\./gu, '').includes('%')
+    return { format, percentage: format.replace(/"[^"]*"|\\./gu, '').includes('%') }
   })
 }
 
-function parseSheetRows(xml, sharedStrings, percentFormats) {
+function parseSheetRows(xml, sharedStrings, numberFormats) {
   const rows = []
   let cellCount = 0
   for (const rowMatch of xml.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/gu)) {
@@ -479,6 +492,7 @@ function parseSheetRows(xml, sharedStrings, percentFormats) {
     const formulas = []
     const cellTypes = []
     const percentStyles = []
+    const cellNumberFormats = []
     for (const cellMatch of rowMatch[2].matchAll(
       /<c\b([^>]*)\/>|<c\b([^>]*)>([\s\S]*?)<\/c>/gu
     )) {
@@ -494,7 +508,8 @@ function parseSheetRows(xml, sharedStrings, percentFormats) {
       cellTypes[column - 1] = attributes.t || 'n'
       percentStyles[column - 1] =
         cellTypes[column - 1] === 'n' &&
-        Boolean(percentFormats[Number(attributes.s || 0)])
+        Boolean(numberFormats[Number(attributes.s || 0)]?.percentage)
+      cellNumberFormats[column - 1] = numberFormats[Number(attributes.s || 0)]?.format || ''
       values[column - 1] = normalizeText(
         extractCellValue(cellMatch[3] ?? '', attributes, sharedStrings)
       )
@@ -510,6 +525,7 @@ function parseSheetRows(xml, sharedStrings, percentFormats) {
       formulas,
       cellTypes,
       percentStyles,
+      numberFormats: cellNumberFormats,
     }
     if (values.some(Boolean) || formulas.some(Boolean)) rows.push(normalizedRow)
   }
@@ -547,8 +563,8 @@ export async function readXlsxWorkbook(
   const sharedStrings = zip.entries.has('xl/sharedStrings.xml')
     ? parseSharedStrings(await readZipText(zip, 'xl/sharedStrings.xml'))
     : []
-  const percentFormats = zip.entries.has('xl/styles.xml')
-    ? percentageStyles(await readZipText(zip, 'xl/styles.xml'))
+  const numberFormats = zip.entries.has('xl/styles.xml')
+    ? numberFormatStyles(await readZipText(zip, 'xl/styles.xml'))
     : []
   const sheets = []
   const imagesByID = new Map()
@@ -635,7 +651,7 @@ export async function readXlsxWorkbook(
     }
     sheets.push({
       name: normalizeText(info.name),
-      rows: parseSheetRows(xml, sharedStrings, percentFormats),
+      rows: parseSheetRows(xml, sharedStrings, numberFormats),
       mergeRanges: parseMergeRanges(xml),
       imagesByCell,
     })

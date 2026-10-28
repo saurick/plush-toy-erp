@@ -1371,7 +1371,7 @@ func freezeProductionOrderMaterialRequirements(ctx context.Context, client *ent.
 				return err
 			}
 			planned, err := biz.RoundRequiredUnitQuantity(
-				orderItem.PlannedQuantity.Mul(bomRow.Quantity).Mul(decimal.NewFromInt(1).Add(bomRow.LossRate)),
+				biz.MaterialPartUsage(orderItem.PlannedQuantity, bomRow.Quantity, bomRow.LossRate),
 				unitRow.Precision,
 			)
 			if err != nil {

@@ -2,33 +2,26 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CopyOutlined,
+  DownOutlined,
   EditOutlined,
   InboxOutlined,
+  InfoCircleOutlined,
   PlusOutlined,
   PrinterOutlined,
   UnorderedListOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Form, Popconfirm, Space } from 'antd'
-import {
-  useLocation,
-  useOutletContext,
-  useSearchParams,
-} from 'react-router-dom'
+import { Button, Dropdown, Popconfirm, Space } from 'antd'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
-import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
+import { useReferenceRecords } from '../hooks/useReferenceRecords.js'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
-import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
-import {
-  engineeringBOMReturnState,
-  readBOMPreparation,
-} from '../utils/bomPreparationNavigation.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -37,11 +30,9 @@ import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js
 import {
   activateBOMVersion,
   archiveBOMVersion,
-  copyBOMVersion,
   getBOMVersion,
   listAllBOMVersions,
   listBOMVersions,
-  saveBOMWithItems,
 } from '../api/bomApi.mjs'
 import {
   downloadBusinessAttachment,
@@ -68,16 +59,14 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
-import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
-import BusinessFormSection from '../components/business-list/BusinessFormSection.jsx'
-import { invalidateBOMUsageSnapshots } from '../utils/bomMaterialGroups.mjs'
+import BOMEditor from '../components/bom/BOMEditor.jsx'
 import { loadBOMPrintSnapshot } from '../utils/bomPrintSnapshot.mjs'
-import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
-import BOMMaterialGroupsForm from '../components/bom/BOMMaterialGroupsForm.jsx'
+import BOMExcelImportFormat from '../components/bom/BOMExcelImportFormat.jsx'
+import BOMExcelImportPreview, {
+} from '../components/bom/BOMExcelImportPreview.jsx'
 import BOMTaskPanel from '../components/bom/BOMTaskPanel.jsx'
 import BOMRevisionAction from '../components/bom/BOMRevisionAction.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
-import { useLineItemAppendScroll } from '../components/business-list/useLineItemAppendScroll.mjs'
 import {
   LIFECYCLE_SCOPE,
   filterLifecycleStatusOptions,
@@ -100,14 +89,7 @@ import {
   canRequestBOMArchive,
   runBOMArchiveBatch,
 } from '../components/bom/bomLifecycle.mjs'
-import {
-  BOMHeaderFormFields,
-  buildHeaderParams,
-  buildItemParams,
-  unixToDateInputValue,
-} from '../components/bom/BOMVersionForms.jsx'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
-import { suggestNextBOMVersion } from '../utils/bomVersionSuggestion.mjs'
 import {
   DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
@@ -125,8 +107,6 @@ import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   MAX_BOM_XLSX_FILE_BYTES,
   buildBOMImportDraft,
-  describeBOMImportIssues,
-  getBOMImportDraftIssues,
   parseBOMXlsx,
 } from '../utils/bomXlsxImport.mjs'
 import {
@@ -144,92 +124,8 @@ import {
   buildWorkInstructionDraftFromBOMVersion,
 } from '../data/engineeringPrintTemplates.mjs'
 
-function normalizeBOMLineForForm(headerID, item = {}) {
-  return {
-    id: item.id,
-    bom_header_id: item.bom_header_id || headerID,
-    material_id: item.material_id || undefined,
-    quantity: item.quantity ?? '',
-    unit_id: item.unit_id || undefined,
-    loss_rate: item.loss_rate ?? '0',
-    position: item.position || '',
-    piece_count: item.piece_count || '',
-    total_usage_snapshot: item.total_usage_snapshot || '',
-    process_base: item.process_base || '',
-    process_method: item.process_method || '',
-    note: item.note || '',
-  }
-}
-
-function normalizeBOMLinesForForm(headerID, items = []) {
-  return (Array.isArray(items) ? items : []).map((item) =>
-    normalizeBOMLineForForm(headerID, item)
-  )
-}
-
-function BOMImportReviewSummary({ form, review, productOptions }) {
-  const issues =
-    Form.useWatch(getBOMImportDraftIssues, {
-      form,
-      preserve: true,
-    }) || []
-  const productID = Form.useWatch('product_id', { form, preserve: true })
-  if (!review) return null
-  const affectedRows = new Set(
-    issues
-      .filter((issue) => issue.scope === 'item')
-      .flatMap((issue) => issue.itemIndexes)
-  ).size
-  const lossEvidence = review.lossEvidence || {}
-  const issueText =
-    issues.length > 0
-      ? `请先${describeBOMImportIssues(issues)}${
-          affectedRows > 0 ? `（涉及 ${affectedRows} 个部位）` : ''
-        }`
-      : '明细已全部关联，可继续核对并保存'
-
-  return (
-    <Alert
-      className="erp-business-source-summary erp-bom-import-review"
-      data-bom-import-issue-count={issues.length}
-      data-bom-import-product-status={productID ? 'matched' : 'unresolved'}
-      description={
-        <div className="erp-bom-import-review__details">
-          <span>
-            来源：{review.fileName} / {review.sheetName}
-          </span>
-          <span>
-            原表产品：{review.productCode || review.productName || '原表未填写'}
-            ；
-            {productID
-              ? `已关联：${referenceLabel(productOptions, productID, '产品')}`
-              : '尚未关联，请在上方选择对应产品档案'}
-          </span>
-          <span>
-            原表名称用于核对，保存需关联产品、材料和单位档案；同种物料选择一次即可应用到全部部位。
-          </span>
-          <span>
-            损耗核对：原表明确 {Number(lossEvidence.explicit || 0)}{' '}
-            行，按单位用量、 订单数量和总用量反算{' '}
-            {Number(lossEvidence.calculated || 0)} 行
-          </span>
-          <span>
-            文件仅在当前浏览器解析；保存时只创建 BOM
-            草稿，并把来源文件名写入备注， 不会自动上传原文件或创建主数据。
-          </span>
-        </div>
-      }
-      message={`已读取 ${review.rowCount} 条 BOM 明细；${issueText}`}
-      showIcon
-      type={issues.length > 0 ? 'warning' : 'success'}
-    />
-  )
-}
-
 export default function BOMVersionsPage() {
   const outletContext = useOutletContext()
-  const location = useLocation()
-  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const adminProfile = useMemo(
@@ -240,14 +136,6 @@ export default function BOMVersionsPage() {
     () => adminProfile?.effective_session?.customer?.key || '',
     [adminProfile]
   )
-  const preparation = useMemo(
-    () => readBOMPreparation(location.state, adminProfile?.id),
-    [location.state, adminProfile?.id]
-  )
-  const preparedEntry = useRef(null)
-  const [preparedBOMID, setPreparedBOMID] = useState(null)
-  const [preparationError, setPreparationError] = useState('')
-  const [preparationRetry, setPreparationRetry] = useState(0)
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -309,14 +197,16 @@ export default function BOMVersionsPage() {
   )
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
-  const headerAttachmentRef = useRef(null)
   const importFileInputRef = useRef(null)
+  const importTargetRef = useRef('new')
+  const importContextRef = useRef(0)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
   const [revisionEditing, setRevisionEditing] = useState(false)
   const [savedRevision, setSavedRevision] = useState(null)
   const [importing, setImporting] = useState(false)
-  const [importReview, setImportReview] = useState(null)
+  const [pendingImport, setPendingImport] = useState(null)
+  const [importFormatOpen, setImportFormatOpen] = useState(false)
   const [products, setProducts, mergeProducts] = useReferenceRecords(adminProfile)
   const [materials, setMaterials, mergeMaterials] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
@@ -324,17 +214,9 @@ export default function BOMVersionsPage() {
     loading: true,
     loaded: false,
   })
-  const [headerForm] = Form.useForm()
-  const { registerLineItemRow, requestLineItemScroll } =
-    useLineItemAppendScroll()
-  const [headerProductIDForSuggestion, setHeaderProductIDForSuggestion] =
-    useState()
-  const [headerVersionCandidates, setHeaderVersionCandidates] = useState({
-    productID: undefined,
-    versions: [],
-    loading: false,
-    loaded: false,
-  })
+  const [editorInitialValues, setEditorInitialValues] = useState({})
+  const [editorImportDraft, setEditorImportDraft] = useState(null)
+  useEffect(() => { importContextRef.current += 1; setPendingImport(null) }, [headerModalOpen, headerMode, selectedVersion?.id, adminProfile?.id])
 
   const canRead = hasActionPermission(adminProfile, PermissionCode.BOM_READ)
   const canReadTasks = hasActionPermission(
@@ -377,32 +259,10 @@ export default function BOMVersionsPage() {
       })),
     [materials]
   )
-  const materialByID = useMemo(() => {
-    const entries = (Array.isArray(materials) ? materials : [])
-      .map((material) => [Number(material?.id || 0), material])
-      .filter(([id]) => Number.isFinite(id) && id > 0)
-    return new Map(entries)
-  }, [materials])
   const unitOptions = useMemo(
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
-  const headerVersionSuggestion = useMemo(() => {
-    if (!headerVersionCandidates.loaded) return ''
-    return suggestNextBOMVersion(
-      headerVersionCandidates.versions,
-      headerProductIDForSuggestion
-    )
-  }, [
-    headerVersionCandidates.loaded,
-    headerVersionCandidates.versions,
-    headerProductIDForSuggestion,
-  ])
-  const useHeaderVersionSuggestion = useCallback(() => {
-    if (!headerVersionSuggestion) return
-    headerForm.setFieldsValue({ version: headerVersionSuggestion })
-  }, [headerForm, headerVersionSuggestion])
-
   const applySelectedRowKeys = useCallback((nextKeys = []) => {
     const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
     selectedRowKeysRef.current = normalizedKeys
@@ -546,77 +406,6 @@ export default function BOMVersionsPage() {
   }, [loadReferenceOptions])
 
   useEffect(() => {
-    const nextProductID = Number(headerProductIDForSuggestion || 0)
-    const shouldLoadSuggestions =
-      headerModalOpen &&
-      ['copy', 'create', 'import'].includes(headerMode) &&
-      Number.isFinite(nextProductID) &&
-      nextProductID > 0
-
-    if (!shouldLoadSuggestions) {
-      setHeaderVersionCandidates((current) =>
-        current.productID ||
-        current.versions.length > 0 ||
-        current.loading ||
-        current.loaded
-          ? {
-              productID: undefined,
-              versions: [],
-              loading: false,
-              loaded: false,
-            }
-          : current
-      )
-      return undefined
-    }
-
-    let cancelled = false
-    setHeaderVersionCandidates({
-      productID: nextProductID,
-      versions: [],
-      loading: true,
-      loaded: false,
-    })
-    listAllBOMVersions({ product_id: nextProductID })
-      .then((result) => {
-        if (cancelled) return
-        if (
-          headerMode === 'copy' &&
-          !String(headerForm.getFieldValue('version') || '').trim()
-        ) {
-          headerForm.setFieldsValue({
-            version: suggestNextBOMVersion(
-              result?.bom_versions || [],
-              nextProductID
-            ),
-          })
-        }
-        setHeaderVersionCandidates({
-          productID: nextProductID,
-          versions: Array.isArray(result?.bom_versions)
-            ? result.bom_versions
-            : [],
-          loading: false,
-          loaded: true,
-        })
-      })
-      .catch((error) => {
-        if (cancelled) return
-        setHeaderVersionCandidates({
-          productID: nextProductID,
-          versions: [],
-          loading: false,
-          loaded: false,
-        })
-        message.warning(getActionErrorMessage(error, '读取同产品 BOM 版本建议'))
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [headerForm, headerModalOpen, headerMode, headerProductIDForSuggestion])
-
-  useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadVersions)
   }, [loadVersions, outletContext])
 
@@ -628,9 +417,6 @@ export default function BOMVersionsPage() {
     selectedRowKeys.length === 1 ? selectedVersions[0] || selectedVersion : null
   const activeActionVersion = singleSelectedVersion
   const activeActionCanEdit = canEditBOM(activeActionVersion) && canUpdate
-  const modalActionVersion = selectedVersion || activeActionVersion
-  const modalActionCanEdit =
-    headerMode === 'edit' && canEditBOM(modalActionVersion) && canUpdate
   const archivableSelectedVersions = selectedVersions.filter((record) =>
     canArchiveBOM(record)
   )
@@ -712,8 +498,8 @@ export default function BOMVersionsPage() {
     [applySelectedRowKeys, loadDetail]
   )
 
-  const openImportedDraft = async (file) => {
-    if (!file) return
+  const openImportedDraft = async (file, target) => {
+    if (!file || importing || saving || !canCreate) return
     if (!referenceOptionsState.loaded) {
       message.warning('产品、材料和单位尚未加载完成，请稍后重试')
       return
@@ -723,23 +509,24 @@ export default function BOMVersionsPage() {
       return
     }
     if (Number(file.size || 0) > MAX_BOM_XLSX_FILE_BYTES) {
-      message.warning('Excel 文件超过 20MB，请精简图片或拆分后再导入')
+      message.warning(`Excel 文件超过 ${MAX_BOM_XLSX_FILE_BYTES / 1024 / 1024}MB，请精简图片或拆分后再导入`)
       return
     }
 
     const request = beginLatestRequest('import-references')
+    const context = importContextRef.current
     setImporting(true)
     try {
       const parsed = await parseBOMXlsx(await file.arrayBuffer(), {
         fileName: file.name,
       })
-      if (!request.isCurrent()) return
+      if (!request.isCurrent() || context !== importContextRef.current) return
       // Import matching needs complete names/aliases, including historical references.
       const [productData, materialData] = await Promise.all([
         listAllProducts({ active_only: false }, { signal: request.signal }),
         listAllMaterials({ active_only: false }, { signal: request.signal }),
       ])
-      if (!request.isCurrent()) return
+      if (!request.isCurrent() || context !== importContextRef.current) return
       mergeProducts(productData.products)
       mergeMaterials(materialData.materials)
       const draft = buildBOMImportDraft(parsed, {
@@ -747,21 +534,9 @@ export default function BOMVersionsPage() {
         materials: materialData.materials,
         units,
       })
-      headerAttachmentRef.current?.clearPendingAttachments()
-      setHeaderMode('import')
-      headerForm.resetFields()
-      headerForm.setFieldsValue(draft.values)
-      setHeaderProductIDForSuggestion(draft.values.product_id)
-      setImportReview(draft.review)
-      setHeaderModalOpen(true)
-      const issues = getBOMImportDraftIssues(draft.values)
-      message.success(
-        issues.length > 0
-          ? `已读取 ${draft.review.rowCount} 条明细，请先${describeBOMImportIssues(issues)}`
-          : `已读取 ${draft.review.rowCount} 条明细，请核对后保存草稿`
-      )
+      setPendingImport({ draft, target })
     } catch (error) {
-      if (isRpcAbortError(error) || !request.isCurrent()) return
+      if (isRpcAbortError(error) || !request.isCurrent() || context !== importContextRef.current) return
       message.error(
         getActionErrorMessage(
           error,
@@ -779,314 +554,55 @@ export default function BOMVersionsPage() {
   const handleImportFileChange = (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (file) openImportedDraft(file)
+    if (file) openImportedDraft(file, importTargetRef.current)
   }
 
-  const openCreate = useCallback(
-    (prefill = {}) => {
-      headerAttachmentRef.current?.clearPendingAttachments()
-      setImportReview(null)
-      setHeaderMode('create')
-      headerForm.resetFields()
-      headerForm.setFieldsValue({
-        effective_from: '',
-        effective_to: '',
-        source_order_no: '',
-        quantity_text: '',
-        spare_text: '',
-        print_date: '',
-        designer: '',
-        maker: '',
-        auditor: '',
-        hair_direction: '',
-        items: [],
-        product_id: prefill.productID,
-        ...(prefill.orderNo
-          ? {
-              source_order_no: prefill.orderNo,
-              quantity_text: prefill.quantityText,
-            }
-          : {}),
-      })
-      setHeaderProductIDForSuggestion(prefill.productID)
-      setHeaderModalOpen(true)
-    },
-    [headerForm]
-  )
-
-  const fillHeaderForm = useCallback(
-    (record) => {
-      headerForm.resetFields()
-      headerForm.setFieldsValue({
-        product_id: record.product_id,
-        version: record.version,
-        effective_from: unixToDateInputValue(record.effective_from),
-        effective_to: unixToDateInputValue(record.effective_to),
-        source_order_no: record.source_order_no || '',
-        quantity_text: record.quantity_text || '',
-        spare_text: record.spare_text || '',
-        print_date: unixToDateInputValue(record.print_date),
-        designer: record.designer || '',
-        maker: record.maker || '',
-        auditor: record.auditor || '',
-        hair_direction: record.hair_direction || '',
-        note: record.note || '',
-        items: normalizeBOMLinesForForm(record.id, record.items),
-      })
-    },
-    [headerForm]
-  )
-
-  useEffect(() => {
-    if (
-      !preparation ||
-      preparedEntry.current === location.key ||
-      !canRead ||
-      loading ||
-      !referenceOptionsState.loaded
-    ) {
-      return undefined
-    }
-    const controller = new AbortController()
-    setPreparationError('')
-    setPreparedBOMID(null)
-    setRevisionEditing(false)
-    if (preparation.mode === 'create') {
-      if (!canCreate) {
-        setPreparationError('当前账号没有新建 BOM 的权限，请返回工程资料核对。')
-      } else {
-        preparedEntry.current = location.key
-        openCreate(preparation)
-      }
-      return undefined
-    }
-    setDetailLoading(true)
-    getBOMVersion({ id: preparation.bomID }, { signal: controller.signal })
-      .then((detail) => {
-        if (controller.signal.aborted) return
-        if (
-          detail.product_id !== preparation.productID ||
-          !Array.isArray(detail.items)
-        ) {
-          setPreparationError(
-            '此 BOM 与所选产品不一致，请返回工程资料重新选择。'
-          )
-          return
-        }
-        preparedEntry.current = location.key
-        setPreparedBOMID(detail.id)
-        setSelectedVersion(detail)
-        applySelectedRowKeys([detail.id])
-        setHeaderMode(
-          preparation.mode === 'edit' && canUpdate && canEditBOM(detail)
-            ? 'edit'
-            : 'view'
-        )
-        fillHeaderForm(detail)
-        setHeaderProductIDForSuggestion(undefined)
-        setHeaderModalOpen(true)
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted) {
-          setPreparationError(getActionErrorMessage(error, '打开订单关联 BOM'))
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setDetailLoading(false)
-      })
-    return () => controller.abort()
-  }, [
-    preparation,
-    location.key,
-    canRead,
-    canCreate,
-    canUpdate,
-    openCreate,
-    fillHeaderForm,
-    applySelectedRowKeys,
-    preparationRetry,
-    loading,
-    referenceOptionsState.loaded,
-  ])
-
-  const returnToEngineering = () => {
-    if (saving || !preparation) return
-    navigate(preparation.returnPath, {
-      replace: true,
-      state: engineeringBOMReturnState(
-        preparation,
-        preparedBOMID || preparation.bomID
-      ),
-    })
+  const chooseImportFile = (target) => {
+    importTargetRef.current = target
+    importFileInputRef.current?.click()
   }
 
+  const applyImportedDraft = () => {
+    if (!pendingImport || !canCreate || saving) return
+    setEditorImportDraft(pendingImport.draft)
+    setEditorInitialValues(pendingImport.draft.values)
+    setHeaderMode('import')
+    setHeaderModalOpen(true)
+    setPendingImport(null)
+  }
+  const openCreate = (prefill = {}) => {
+    setEditorInitialValues({ product_id: prefill.productID, source_order_no: prefill.orderNo || '', quantity_text: prefill.quantityText || '' })
+    setEditorImportDraft(null)
+    setSelectedVersion(null)
+    setHeaderMode('create')
+    setHeaderModalOpen(true)
+  }
   const openView = async (record = selectedVersion) => {
     if (!record?.id) return
-    headerAttachmentRef.current?.clearPendingAttachments()
-    setImportReview(null)
     applySelectedRowKeys([record.id])
-    const detail = (await loadDetail(record.id)) || record
+    await loadDetail(record.id)
+    setEditorImportDraft(null)
     setHeaderMode('view')
-    fillHeaderForm(detail)
-    setHeaderProductIDForSuggestion(undefined)
     setHeaderModalOpen(true)
   }
-
-  const openEdit = async (
-    record = selectedVersion,
-    revision = false,
-    prepared = false
-  ) => {
-    if (!record?.id || !canEditBOM(record)) return
-    headerAttachmentRef.current?.clearPendingAttachments()
-    setImportReview(null)
-    applySelectedRowKeys([record.id])
+  const openEdit = async (record = selectedVersion, revision = false, prepared = false) => {
+    if (!record?.id || !canUpdate || !canEditBOM(record)) return
     const detail = prepared ? record : await loadDetail(record.id)
-    if (!detail?.id || !Array.isArray(detail.items)) {
-      return
-    }
-    if (!canEditBOM(detail)) {
-      message.warning('此版本已不能直接编辑，请刷新后选择可修改的版本')
-      return
-    }
+    if (!detail?.id || !canEditBOM(detail)) return
+    applySelectedRowKeys([detail.id])
     setSelectedVersion(detail)
     setRevisionEditing(revision)
+    setEditorImportDraft(null)
     setHeaderMode('edit')
-    fillHeaderForm(detail)
-    setHeaderProductIDForSuggestion(undefined)
     setHeaderModalOpen(true)
   }
-
   const openCopy = (record = selectedVersion) => {
     if (!record?.id || !canCopyBOM(record)) return
-    headerAttachmentRef.current?.clearPendingAttachments()
-    setImportReview(null)
     applySelectedRowKeys([record.id])
+    setSelectedVersion(record)
+    setEditorImportDraft(null)
     setHeaderMode('copy')
-    headerForm.resetFields()
-    headerForm.setFieldsValue({
-      product_id: record.product_id,
-      version: '',
-      effective_from: '',
-      effective_to: '',
-      source_order_no: record.source_order_no || '',
-      quantity_text: record.quantity_text || '',
-      spare_text: record.spare_text || '',
-      print_date: unixToDateInputValue(record.print_date),
-      designer: record.designer || '',
-      maker: record.maker || '',
-      auditor: record.auditor || '',
-      hair_direction: record.hair_direction || '',
-      note: '',
-      items: [],
-    })
-    setHeaderProductIDForSuggestion(record.product_id)
     setHeaderModalOpen(true)
-  }
-
-  const saveHeader = async () => {
-    if (saving || headerMode === 'view') return
-    if (headerMode === 'import') {
-      const issues = getBOMImportDraftIssues(headerForm.getFieldsValue(true))
-      if (issues.length > 0) {
-        const fields = issues.map((issue) => ({
-          name:
-            issue.scope === 'item'
-              ? ['items', issue.itemIndex, issue.field]
-              : [issue.field],
-          errors: [issue.message],
-        }))
-        headerForm.setFields(fields)
-        window.requestAnimationFrame(() => {
-          headerForm.scrollToField(fields[0].name, {
-            focus: true,
-            block: 'center',
-          })
-        })
-        message.warning(`暂未保存：请先${describeBOMImportIssues(issues)}`)
-        return
-      }
-    }
-
-    let values
-    try {
-      values = await headerForm.validateFields()
-    } catch (error) {
-      window.requestAnimationFrame(() => {
-        const firstField = error?.errorFields?.[0]?.name
-        if (firstField) {
-          headerForm.scrollToField(firstField, { focus: true, block: 'center' })
-        }
-      })
-      message.warning('请先补全表单中的必填项')
-      return
-    }
-    const isCreatingVersion = headerMode !== 'edit'
-    setSaving(true)
-    try {
-      let savedVersion = null
-      if (headerMode === 'copy') {
-        savedVersion = await copyBOMVersion(
-          buildHeaderParams(values, { source_id: modalActionVersion?.id })
-        )
-      } else if (headerMode === 'edit') {
-        savedVersion = await saveBOMWithItems({
-          ...buildHeaderParams(values, {
-            id: modalActionVersion?.id,
-            product_id: modalActionVersion?.product_id,
-          }),
-          expected_version: modalActionVersion?.edit_version,
-          items: (Array.isArray(values.items) ? values.items : []).map(
-            (item) => ({
-              ...buildItemParams(item),
-              id: item?.id || undefined,
-            })
-          ),
-        })
-      } else {
-        savedVersion = await saveBOMWithItems({
-          ...buildHeaderParams(values),
-          items: (Array.isArray(values.items) ? values.items : []).map((item) =>
-            buildItemParams(item)
-          ),
-        })
-      }
-      const attachmentSaved =
-        (await headerAttachmentRef.current?.flushPendingAttachments(
-          savedVersion?.id
-        )) !== false
-      message.success(
-        attachmentSaved
-          ? headerMode === 'copy'
-            ? 'BOM 新版本已复制为草稿'
-            : headerMode === 'edit'
-              ? 'BOM 草稿已保存，尚未启用'
-              : headerMode === 'import'
-                ? 'BOM 导入草稿已创建'
-                : 'BOM 草稿已创建'
-          : 'BOM 草稿已保存，未上传的附件请重新选择'
-      )
-      headerAttachmentRef.current?.clearPendingAttachments()
-      setImportReview(null)
-      setHeaderModalOpen(false)
-      if (preparation && savedVersion?.product_id === preparation.productID) {
-        setPreparedBOMID(savedVersion.id)
-        setSelectedVersion(savedVersion)
-        applySelectedRowKeys([savedVersion.id])
-      }
-      if (headerMode === 'edit' && revisionEditing && savedVersion?.id) {
-        setSavedRevision(savedVersion)
-      }
-      if (isCreatingVersion) {
-        resetBusinessPaginationCurrent(setPagination)
-      } else {
-        await loadVersions()
-      }
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '保存 BOM 版本'))
-    } finally {
-      setSaving(false)
-    }
   }
 
   const activateSelected = async (record = activeActionVersion) => {
@@ -1191,53 +707,9 @@ export default function BOMVersionsPage() {
     resetBusinessPaginationCurrent(setPagination)
   }, [setProductID, setLifecycleScope, setStatus, setSearchParams, setPagination, status])
 
-  const preparationLoadError =
-    preparationError ||
-    (preparation &&
-    !referenceOptionsState.loading &&
-    !referenceOptionsState.loaded
-      ? 'BOM 相关资料未读取成功，请重新读取后继续编制。'
-      : '')
-
-  const draftMaterialIDs = Form.useWatch(
-    (values) => (values.items || []).map((row) => row?.material_id),
-    headerForm
-  ) || []
-  useReferenceHydration({
-    products: { ids: [...versions.map((row) => row.product_id), selectedVersion?.product_id, productID, headerProductIDForSuggestion], records: products, onRecords: mergeProducts, enabled: canReadReference(adminProfile, 'products') },
-    materials: { ids: [...(selectedVersion?.items || []).map((row) => row.material_id), ...draftMaterialIDs], records: materials, onRecords: mergeMaterials, enabled: canReadReference(adminProfile, 'materials') },
-  }, adminProfile, versions)
-
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ products: mergeProducts, materials: mergeMaterials }}>
       <PageHeaderCard compact helpKey="material-bom" title="物料清单（BOM）" />
-
-      {preparation ? (
-        <Space wrap className="erp-business-inline-note">
-          <span>工程与打样 · {preparation.orderNo}</span>
-          <Button size="small" disabled={saving} onClick={returnToEngineering}>
-            返回工程与打样
-          </Button>
-        </Space>
-      ) : null}
-      {preparationLoadError ? (
-        <Alert
-          type="error"
-          showIcon
-          message={preparationLoadError}
-          action={
-            <Button
-              size="small"
-              onClick={() => {
-                if (!referenceOptionsState.loaded) loadReferenceOptions()
-                setPreparationRetry((value) => value + 1)
-              }}
-            >
-              重新读取
-            </Button>
-          }
-        />
-      ) : null}
 
       <BusinessOperationPanel
         compact
@@ -1302,36 +774,6 @@ export default function BOMVersionsPage() {
         }
         actions={
           <Space wrap>
-            {canCreate ? (
-              <>
-                <ToolbarButton
-                  data-business-action-key="import-bom-xlsx"
-                  icon={<UploadOutlined />}
-                  loading={importing}
-                  disabled={
-                    importing ||
-                    referenceOptionsState.loading ||
-                    !referenceOptionsState.loaded
-                  }
-                  title={
-                    referenceOptionsState.loaded
-                      ? '按现有材料分析明细表导入并生成待核对草稿'
-                      : '产品、材料和单位加载完成后可导入'
-                  }
-                  onClick={() => importFileInputRef.current?.click()}
-                >
-                  导入 Excel
-                </ToolbarButton>
-                <input
-                  ref={importFileInputRef}
-                  aria-label="选择 BOM Excel 文件"
-                  hidden
-                  type="file"
-                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  onChange={handleImportFileChange}
-                />
-              </>
-            ) : null}
             <BusinessListToolbarActions
               onExport={exportVersions}
               exportDisabled={loading || exporting || total === 0}
@@ -1342,14 +784,33 @@ export default function BOMVersionsPage() {
         }
         primaryAction={
           canCreate ? (
-            <ToolbarButton
-              type="primary"
-              className="erp-business-list-toolbar__primary-action"
-              icon={<PlusOutlined />}
-              onClick={openCreate}
-            >
-              新建 BOM
-            </ToolbarButton>
+            <Space.Compact>
+              <ToolbarButton
+                type="primary"
+                className="erp-business-list-toolbar__primary-action"
+                icon={<PlusOutlined />}
+                onClick={() => openCreate()}
+              >
+                新建 BOM
+              </ToolbarButton>
+              <Dropdown
+                trigger={['click']}
+                menu={{ items: [{
+                  key: 'import-bom-xlsx',
+                  label: '从 Excel 新建',
+                  icon: <UploadOutlined aria-hidden="true" />,
+                  disabled: importing || !referenceOptionsState.loaded,
+                  onClick: () => chooseImportFile('new'),
+                }, {
+                  key: 'bom-excel-format',
+                  label: '查看 Excel 格式',
+                  icon: <InfoCircleOutlined aria-hidden="true" />,
+                  onClick: () => setImportFormatOpen(true),
+                }] }}
+              >
+                <ToolbarButton type="primary" icon={<DownOutlined />} loading={importing} aria-label="更多新建方式" aria-haspopup="menu" />
+              </Dropdown>
+            </Space.Compact>
           ) : null
         }
       >
@@ -1720,182 +1181,39 @@ export default function BOMVersionsPage() {
         {!canActivate ? <p>请有启用权限的同事确认并启用新版本。</p> : null}
       </BusinessModal>
 
-      <BusinessFormPage
+      <BOMEditor
         open={headerModalOpen}
-        form={headerForm}
-        className="erp-bom-editor"
-        readOnly={headerMode === 'view'}
-        initialDirty={headerMode === 'import'}
-        title={
-          headerMode === 'copy'
-            ? '复制 BOM 新版本'
-            : headerMode === 'edit'
-              ? '编辑 BOM 草稿 · 未生效'
-              : headerMode === 'view'
-                ? `查看 BOM 版本 · ${bomStatusText(modalActionVersion?.status)} · 只读`
-                : headerMode === 'import'
-                  ? '检查并保存导入草稿'
-                  : '新建 BOM 草稿'
-        }
-        okText="保存草稿"
-        confirmLoading={saving}
-        loading={detailLoading}
-        onOk={saveHeader}
-        onCancel={() => {
-          headerAttachmentRef.current?.clearPendingAttachments()
-          setImportReview(null)
-          setHeaderModalOpen(false)
-          if (headerMode === 'edit' && revisionEditing) loadVersions()
+        mode={headerMode}
+        record={['edit', 'view', 'copy'].includes(headerMode) ? selectedVersion : null}
+        initialValues={editorInitialValues}
+        importDraft={editorImportDraft}
+        onClose={() => setHeaderModalOpen(false)}
+        onSaved={async (saved) => {
+          setSelectedVersion(saved)
+          applySelectedRowKeys([saved.id])
+          if (headerMode === 'edit' && revisionEditing) setSavedRevision(saved)
+          await loadVersions()
         }}
-      >
-        {preparation ? (
-          <Space wrap className="erp-business-inline-note">
-            <span>
-              {preparation.orderNo} ·
-              保存草稿后返回工程资料关联，启用与任务提交仍需分别办理。
-            </span>
-            <Button
-              size="small"
-              disabled={saving}
-              onClick={returnToEngineering}
-            >
-              返回工程与打样
-            </Button>
-          </Space>
-        ) : null}
-        <Form
-          form={headerForm}
-          layout="vertical"
-          className="erp-business-action-form"
-          onValuesChange={(changedValues) => {
-            if (
-              Object.hasOwn(changedValues, 'quantity_text') ||
-              changedValues.items
-            ) {
-              const items = headerForm.getFieldValue('items') || []
-              invalidateBOMUsageSnapshots(items, changedValues).forEach(
-                (item, index) => {
-                  if (
-                    item.total_usage_snapshot !==
-                    items[index].total_usage_snapshot
-                  ) {
-                    headerForm.setFieldValue(
-                      ['items', index, 'total_usage_snapshot'],
-                      item.total_usage_snapshot
-                    )
-                  }
-                }
-              )
-            }
-            if (
-              Object.prototype.hasOwnProperty.call(changedValues, 'product_id')
-            ) {
-              setHeaderProductIDForSuggestion(changedValues.product_id)
-            }
-          }}
-        >
-          {headerMode === 'edit' ? (
-            <p className="erp-business-source-summary erp-business-inline-note">
-              正在修改草稿，尚未生效。保存后需启用，已有订单仍使用原 BOM。
-            </p>
-          ) : null}
-          {headerMode === 'view' && canUpdate ? (
-            <BOMRevisionAction
-              key={`detail:${adminProfile?.id}`}
-              record={modalActionVersion}
-              canCreate={canCreate}
-              disabled={detailLoading || saving}
-              onEdit={(detail) => openEdit(detail, true, true)}
-            />
-          ) : null}
-          {headerMode === 'view' && canReadTasks ? (
-            <Button
-              icon={<UnorderedListOutlined />}
-              onClick={() =>
-                setTaskContext({ bomID: modalActionVersion.id, page: 1 })
-              }
-            >
-              任务协作
-            </Button>
-          ) : null}
-          <BOMHeaderFormFields
-            form={headerForm}
-            includeProduct
-            disabled={headerMode === 'view'}
-            productDisabled={headerMode === 'edit'}
-            productOptions={productOptions}
-            versionSuggestion={headerVersionSuggestion}
-            versionSuggestionLoading={headerVersionCandidates.loading}
-            onUseVersionSuggestion={useHeaderVersionSuggestion}
-            attachmentPanel={
-              <BusinessAttachmentPanel
-                ref={headerAttachmentRef}
-                ownerType="bom_header"
-                ownerId={
-                  headerMode === 'edit' || headerMode === 'view'
-                    ? activeActionVersion?.id || selectedVersion?.id
-                    : undefined
-                }
-                title="BOM 附件"
-                description="色卡、工艺图、作业说明和原始材料清单"
-                canUpload={
-                  headerMode !== 'view' &&
-                  (headerMode === 'edit' ? modalActionCanEdit : canCreate)
-                }
-                canWithdraw={
-                  headerMode !== 'view' &&
-                  canUpdate &&
-                  (headerMode !== 'edit' || modalActionCanEdit)
-                }
-                variant="inline"
-                compact
-              />
-            }
-          >
-            {headerMode === 'import' ? (
-              <BOMImportReviewSummary
-                form={headerForm}
-                review={importReview}
-                productOptions={productOptions}
-              />
-            ) : null}
+        actions={headerMode === 'view' && canReadTasks ? <Button icon={<UnorderedListOutlined />} onClick={() => setTaskContext({ bomID: selectedVersion.id, page: 1 })}>任务协作</Button> : null}
+      />
 
-            <BusinessFormSection title="材料分析明细表" showHeading={false}>
-              {headerMode === 'copy' ? (
-                <p className="erp-business-selection-action-bar__hint">
-                  保存复制草稿后，可打开新版本继续维护物料和部位。
-                </p>
-              ) : (
-                <BOMMaterialGroupsForm
-                  canEdit={
-                    headerMode === 'create' || headerMode === 'import'
-                      ? canCreate
-                      : modalActionCanEdit
-                  }
-                  form={headerForm}
-                  materialByID={materialByID}
-                  canCreateMaterial={hasActionPermission(
-                    adminProfile,
-                    PermissionCode.MATERIAL_CREATE
-                  )}
-                  onMaterialCreated={(material) =>
-                    setMaterials((current) => [material, ...current])
-                  }
-                  materialOptions={materialOptions}
-                  registerLineItemRow={registerLineItemRow}
-                  requestLineItemScroll={requestLineItemScroll}
-                  selectedVersionID={
-                    headerMode === 'create' || headerMode === 'import'
-                      ? undefined
-                      : modalActionVersion?.id
-                  }
-                  unitOptions={unitOptions}
-                />
-              )}
-            </BusinessFormSection>
-          </BOMHeaderFormFields>
-        </Form>
-      </BusinessFormPage>
+      <input
+        ref={importFileInputRef}
+        aria-label="选择 BOM Excel 文件"
+        hidden
+        type="file"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        onChange={handleImportFileChange}
+      />
+      <BOMExcelImportPreview
+        pending={pendingImport}
+        existingCount={0}
+        materialOptions={materialOptions}
+        unitOptions={unitOptions}
+        onCancel={() => setPendingImport(null)}
+        onConfirm={applyImportedDraft}
+      />
+      <BOMExcelImportFormat open={importFormatOpen} onClose={() => setImportFormatOpen(false)} />
 
       {columnOrderModal}
     </ReferenceRecordsProvider>

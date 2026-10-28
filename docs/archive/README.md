@@ -8,6 +8,8 @@
 
 | 路径                                                                                    | 用途                                                                                            |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `docs/archive/progress-2026-10-28-bom-attachment-history.md` | 2026-10-27～28 BOM 来源核对、完整精度与附件 200MB 阶段过程原文 |
+| `docs/archive/progress-2026-10-27-data-model-history.md` | 2026-10-17 已完成的数据模型治理与开发库恢复过程原文，200MB 迁移记录前显式归档 |
 | `docs/archive/progress-2026-10-24-workbench-followup-history.md` | 工作台复核前已完成的业务一致性、工具治理与发布过程原文，保留活跃事项与风险 |
 | `docs/archive/progress-2026-10-23-external-backup-history.md` | 2026-10-16 GitLab 升级恢复及 10-17 外接盘副本接入原文；新备份合同更新时归档 |
 | `docs/archive/architecture-history/`                                                    | 已退出活跃 `docs/architecture/` 的旧阶段实现评审文档                                            |

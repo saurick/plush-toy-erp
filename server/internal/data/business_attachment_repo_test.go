@@ -486,7 +486,7 @@ func TestBusinessAttachmentSchemaDefinesProductImageContract(t *testing.T) {
 	if !strings.Contains(ownerCheck, "'product'") {
 		t.Fatalf("owner type check must include product: %q", ownerCheck)
 	}
-	if got := checks["business_attachments_file_size_max"]; got != "file_size <= 104857600" {
+	if got := checks["business_attachments_file_size_max"]; got != fmt.Sprintf("file_size <= %d", biz.BusinessAttachmentMaxBytes) {
 		t.Fatalf("file size check changed unexpectedly: %q", got)
 	}
 	if got := checks["business_attachments_product_image_size_max"]; got != "attachment_type <> 'product_image' OR file_size <= 5242880" {

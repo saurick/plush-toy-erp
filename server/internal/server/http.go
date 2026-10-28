@@ -3,6 +3,7 @@ package server
 
 import (
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
+	"time"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -27,8 +28,13 @@ func NewHTTPServer(
 	// Data 配置提供 JWT secret 等运行时依赖。
 	dc *conf.Data,
 ) *httpx.Server {
+	requestTimeout := time.Second
+	if c.Http != nil && c.Http.Timeout != nil {
+		requestTimeout = c.Http.Timeout.AsDuration()
+	}
 	var opts = []httpx.ServerOption{
-		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), JSONRPCFailureLoggingFilter(logger), JSONRPCBodyLimitFilter()),
+		httpx.Timeout(0),
+		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), JSONRPCFailureLoggingFilter(logger), RequestTimeoutFilter(requestTimeout), JSONRPCBodyLimitFilter()),
 		httpx.RequestDecoder(BoundedRequestDecoder),
 		httpx.Middleware(
 			safeServerTracing(tp),
@@ -47,9 +53,6 @@ func NewHTTPServer(
 		}
 		if c.Http.Addr != "" {
 			opts = append(opts, httpx.Address(c.Http.Addr))
-		}
-		if c.Http.Timeout != nil {
-			opts = append(opts, httpx.Timeout(c.Http.Timeout.AsDuration()))
 		}
 	}
 

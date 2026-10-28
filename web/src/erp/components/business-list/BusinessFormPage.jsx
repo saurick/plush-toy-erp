@@ -407,6 +407,7 @@ export default function BusinessFormPage({
         </Button>
         {!readOnly && onOk ? (
           <Button
+            aria-label={typeof okText === 'string' ? okText : undefined}
             {...okButtonProps}
             type="primary"
             loading={confirmLoading}

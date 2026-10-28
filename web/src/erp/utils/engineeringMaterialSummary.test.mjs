@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   formatMaterialQuantity,
+  formatMaterialSourceQuantity,
   materialSummaryProducts,
   materialSummaryRows,
   materialSummaryTotals,
@@ -60,6 +61,10 @@ test('quantities preserve null versus zero, precision and large exact decimal va
     '99,999,999,999,999.999999'
   )
   assert.equal(formatMaterialQuantity('12.100010', true), '12.10001')
+  assert.equal(formatMaterialQuantity('0.0123456789012345', true), '0.0123456789012345')
+  assert.equal(formatMaterialQuantity('0.99999999999999', true), '0.99999999999999')
+  assert.equal(formatMaterialSourceQuantity('0.0123456789012345', '0.000'), '0.012')
+  assert.equal(formatMaterialSourceQuantity('0.99999999999999', '0.00'), '1.00')
 })
 
 test('totals preserve all demand and keep different units separate', () => {

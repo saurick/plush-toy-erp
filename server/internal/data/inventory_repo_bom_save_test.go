@@ -18,6 +18,48 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestInventoryRepo_BOMSourceValuesPersistCopyAndClear(t *testing.T) {
+	ctx := t.Context()
+	data, client := openInventoryRepoTestData(t, "bom_source_values")
+	f := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	assertBOMSourceValuesRoundTrip(t, uc, f.productID, f.materialID, f.unitID)
+}
+
+func assertBOMSourceValuesRoundTrip(t *testing.T, uc *biz.InventoryUsecase, productID, materialID, unitID int) {
+	t.Helper()
+	ctx := t.Context()
+	source := map[string]any{"file_name": "教学材料.xlsx", "sheet_name": "材料分析明细表", "row_number": 6,
+		"quantity_value": "0.0123456789012345", "quantity_label": "单位用量", "quantity_format": "0.000",
+		"total_value": "1.358024679135795", "total_label": "总用量 含损耗10%", "total_format": "0.00",
+		"loss_source": biz.BOMLossSourceHeader, "loss_rate": "0.1", "order_quantity": "100"}
+	part := biz.BOMItemUpdate{MaterialID: materialID, UnitID: unitID, Quantity: decimal.RequireFromString("0.0123456789012345"), LossRate: decimal.RequireFromString("0.1"), TotalUsageSnapshot: stringPtr("1.358024679135795"), SourceSnapshot: source}
+	header := biz.BOMHeaderUpdate{Version: "来源精度", QuantityText: stringPtr("100")}
+	created, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: productID, BOMHeaderUpdate: header}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: part}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, err := uc.GetBOMVersion(ctx, created.Header.ID)
+	if err != nil || len(read.Items) != 1 || read.Items[0].SourceSnapshot["quantity_value"] != source["quantity_value"] || read.Items[0].SourceSnapshot["quantity_format"] != "0.000" || read.Items[0].TotalUsageSnapshot == nil || *read.Items[0].TotalUsageSnapshot != "1.358024679135795" {
+		t.Fatalf("source values did not persist: %v", err)
+	}
+	assertDecimalEqual(t, read.Items[0].Quantity, "0.0123456789012345")
+	copied, err := uc.CopyBOMVersion(ctx, created.Header.ID, &biz.BOMHeaderCreate{ProductID: productID, Version: "来源复制"})
+	if err != nil || len(copied.Items) != 1 || copied.Items[0].SourceSnapshot["total_value"] != source["total_value"] {
+		t.Fatalf("source values were not copied: %v", err)
+	}
+	header.QuantityText = stringPtr("200")
+	updated, err := uc.SaveBOMWithItems(ctx, read.Header.ID, &biz.BOMVersionMutation{ProductID: productID, ExpectedVersion: read.Header.EditVersion, BOMHeaderUpdate: header}, []*biz.BOMItemSaveMutation{{ID: read.Items[0].ID, BOMItemUpdate: part}})
+	if err != nil || updated.Items[0].TotalUsageSnapshot != nil || updated.Items[0].SourceSnapshot["total_value"] != source["total_value"] {
+		t.Fatalf("changed order retained stale total or lost source: %v", err)
+	}
+	part.SourceSnapshot, part.TotalUsageSnapshot = nil, nil
+	cleared, err := uc.SaveBOMWithItems(ctx, updated.Header.ID, &biz.BOMVersionMutation{ProductID: productID, ExpectedVersion: updated.Header.EditVersion, BOMHeaderUpdate: header}, []*biz.BOMItemSaveMutation{{ID: updated.Items[0].ID, BOMItemUpdate: part}})
+	if err != nil || len(cleared.Items[0].SourceSnapshot) != 0 {
+		t.Fatalf("source snapshot did not clear: %v", err)
+	}
+}
+
 func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom_atomic_save")

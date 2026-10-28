@@ -154,5 +154,5 @@ func validMaterialTaskVersion(taskID, version int) bool {
 // MaterialPartUsage matches the engineering sheet: usage already includes the
 // piece count for that position. Multiplying piece_count again would double count.
 func MaterialPartUsage(productionQuantity, unitUsage, lossRate decimal.Decimal) decimal.Decimal {
-	return productionQuantity.Mul(unitUsage).Mul(decimal.NewFromInt(1).Add(lossRate)).Round(6)
+	return productionQuantity.Mul(unitUsage).Mul(decimal.NewFromInt(1).Add(lossRate))
 }

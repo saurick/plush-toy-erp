@@ -486,6 +486,16 @@ func TotalUsageSnapshotContainsFold(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldContainsFold(FieldTotalUsageSnapshot, v))
 }
 
+// SourceSnapshotIsNil applies the IsNil predicate on the "source_snapshot" field.
+func SourceSnapshotIsNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIsNull(FieldSourceSnapshot))
+}
+
+// SourceSnapshotNotNil applies the NotNil predicate on the "source_snapshot" field.
+func SourceSnapshotNotNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotNull(FieldSourceSnapshot))
+}
+
 // ProcessBaseEQ applies the EQ predicate on the "process_base" field.
 func ProcessBaseEQ(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldEQ(FieldProcessBase, v))

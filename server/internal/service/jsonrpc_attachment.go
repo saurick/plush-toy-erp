@@ -590,7 +590,7 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	case errors.Is(err, biz.ErrBusinessAttachmentProductImageTooLarge):
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "产品图片超过 5MB，请更换或压缩后重试"}
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
-		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 100MB，请压缩后再上传"}
+		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: fmt.Sprintf("附件超过 %dMB，请压缩后再上传", biz.BusinessAttachmentMaxBytes/(1024*1024))}
 	case errors.Is(err, biz.ErrBusinessAttachmentReferenced):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "图片已用于订单样品记录，不能替换或清空；请保留原图"}
 	case errors.Is(err, biz.ErrBusinessAttachmentIntegrity):

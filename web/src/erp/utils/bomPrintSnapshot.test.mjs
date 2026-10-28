@@ -162,6 +162,14 @@ test('BOM print uses saved usage including zero, and recalculates only after inv
   assert.equal(build(cleared, ''), '')
 })
 
+test('BOM print preserves original number formats while the business coefficients stay exact', () => {
+  const item = { quantity: '0.0123456789012345', loss_rate: '0.1', total_usage_snapshot: '1.36', source_snapshot: { quantity_format: '0.000', total_format: '0.00' } }
+  const draft = buildMaterialDetailDraftFromBOMVersion({ items: [item], quantity_text: '100' })
+  assert.equal(draft.lines[0].unitUsage, '0.012')
+  assert.equal(draft.lines[0].totalUsage, '1.36')
+  assert.equal(item.quantity, '0.0123456789012345')
+})
+
 test('BOM business drafts do not invent order numbers, dates, materials or sample references', () => {
   const version = { version: 'V1', items: [{ quantity: '1' }] }
   const material = buildMaterialDetailDraftFromBOMVersion(version)

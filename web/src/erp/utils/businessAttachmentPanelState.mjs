@@ -69,7 +69,8 @@ export function mergeBusinessAttachmentSelection(currentItems, selectedItems) {
     const exists = items.some(
       (item) =>
         item.file_name === selected.file_name &&
-        item.content_base64 === selected.content_base64 &&
+        Boolean(item.file_digest) &&
+        item.file_digest === selected.file_digest &&
         item.attachment_type === selected.attachment_type
     )
     if (exists) duplicates.push(selected)

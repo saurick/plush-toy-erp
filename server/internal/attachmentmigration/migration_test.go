@@ -11,6 +11,23 @@ import (
 	"server/internal/attachmentstore"
 )
 
+func TestManifestAcceptsBusinessUploadLimitAndRejectsOneByteMore(t *testing.T) {
+	m, _ := fixtureManifest()
+	for _, size := range []int64{MaxFileBytes, MaxFileBytes + 1} {
+		m.Files[0].Size = size
+		m.Bytes = size
+		m.Fingerprint = Fingerprint(m.Database, m.Files)
+		file := filepath.Join(t.TempDir(), "manifest.json")
+		if err := WriteManifest(file, m); err != nil {
+			t.Fatal(err)
+		}
+		_, err := ReadManifest(file)
+		if (err == nil) != (size == MaxFileBytes) {
+			t.Fatalf("manifest boundary size=%d accepted=%t", size, err == nil)
+		}
+	}
+}
+
 type memoryStore map[string][]byte
 
 func (s memoryStore) Put(_ context.Context, k string, b []byte) error {

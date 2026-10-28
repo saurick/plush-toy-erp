@@ -21,12 +21,12 @@ export default function BusinessAttachmentThumbnail({ item }) {
   const [source, setSource] = useState('')
   const [failed, setFailed] = useState(false)
   const withdrawn = isBusinessAttachmentWithdrawn(item)
-  const { id, mime_type: mimeType, content_base64: content } = item
+  const { id, mime_type: mimeType, content_base64: content, file: localFile } = item
 
   useEffect(() => {
     setSource('')
     setFailed(false)
-    if (withdrawn || !THUMBNAIL_TYPES.has(mimeType) || (!content && !id)) {
+    if (withdrawn || !THUMBNAIL_TYPES.has(mimeType) || (!localFile && !content && !id)) {
       return undefined
     }
     let active = true
@@ -35,6 +35,11 @@ export default function BusinessAttachmentThumbnail({ item }) {
       if (!entries.some((entry) => entry.isIntersecting)) return
       observer.disconnect()
       try {
+        if (localFile) {
+          objectURL = URL.createObjectURL(localFile)
+          setSource(objectURL)
+          return
+        }
         // Protected file content is read only when its row enters the viewport.
         const file = content
           ? { content_base64: content }
@@ -56,7 +61,7 @@ export default function BusinessAttachmentThumbnail({ item }) {
       observer.disconnect()
       if (objectURL) URL.revokeObjectURL(objectURL)
     }
-  }, [content, id, mimeType, withdrawn])
+  }, [content, id, localFile, mimeType, withdrawn])
 
   return (
     <div

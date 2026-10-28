@@ -223,11 +223,12 @@ var (
 	// BomItemsColumns holds the columns for the "bom_items" table.
 	BomItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "loss_rate", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric", "sqlite3": "numeric"}},
+		{Name: "loss_rate", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric", "sqlite3": "numeric"}},
 		{Name: "position", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "piece_count", Type: field.TypeString, Nullable: true, Size: 64},
-		{Name: "total_usage_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "total_usage_snapshot", Type: field.TypeString, Nullable: true, Size: 384},
+		{Name: "source_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "process_base", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "process_method", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
@@ -245,19 +246,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "bom_items_bom_headers_items",
-				Columns:    []*schema.Column{BomItemsColumns[11]},
+				Columns:    []*schema.Column{BomItemsColumns[12]},
 				RefColumns: []*schema.Column{BomHeadersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "bom_items_materials_bom_items",
-				Columns:    []*schema.Column{BomItemsColumns[12]},
+				Columns:    []*schema.Column{BomItemsColumns[13]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "bom_items_units_bom_items",
-				Columns:    []*schema.Column{BomItemsColumns[13]},
+				Columns:    []*schema.Column{BomItemsColumns[14]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -266,7 +267,7 @@ var (
 			{
 				Name:    "bomitem_bom_header_id_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{BomItemsColumns[11], BomItemsColumns[12]},
+				Columns: []*schema.Column{BomItemsColumns[12], BomItemsColumns[13]},
 			},
 		},
 	}
@@ -2674,8 +2675,8 @@ var (
 	// ProductionOrderMaterialRequirementsColumns holds the columns for the "production_order_material_requirements" table.
 	ProductionOrderMaterialRequirementsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "unit_quantity_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "loss_rate_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_quantity_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric", "sqlite3": "numeric"}},
+		{Name: "loss_rate_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric", "sqlite3": "numeric"}},
 		{Name: "planned_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "material_code_snapshot", Type: field.TypeString, Size: 64},
 		{Name: "material_name_snapshot", Type: field.TypeString, Size: 255},
@@ -5247,7 +5248,7 @@ func init() {
 	}
 	BusinessAttachmentsTable.Annotation = &entsql.Annotation{}
 	BusinessAttachmentsTable.Annotation.Checks = map[string]string{
-		"business_attachments_file_size_max":          "file_size <= 104857600",
+		"business_attachments_file_size_max":          "file_size <= 209715200",
 		"business_attachments_file_size_positive":     "file_size > 0",
 		"business_attachments_object_key_shape":       "length(object_key) IN (44, 76) AND substr(object_key, 1, 12) = 'attachments/' AND object_key = lower(object_key)",
 		"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
