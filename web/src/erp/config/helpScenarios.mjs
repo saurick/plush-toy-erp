@@ -252,8 +252,8 @@ const masterScenarios = {
   ),
   '/erp/engineering/processes': masterScenario(
     'processes',
-    '工程',
-    'engineering'
+    'PMC',
+    'pmc'
   ),
 }
 

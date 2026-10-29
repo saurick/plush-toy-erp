@@ -324,7 +324,7 @@ const BASE_GO_BUSINESS_SCENARIOS = Object.freeze({
     goScenario(
       "production-material-freeze",
       "server/internal/data",
-      "TestProductionOrderReleaseFreezesMaterialRequirementsAndKeepsNoBOMExplicit",
+      "TestProductionOrderReleaseFreezesMaterialRequirementsAndRejectsMissingBOM",
     ),
     goScenario(
       "production-completion-source-truth",

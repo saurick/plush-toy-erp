@@ -7476,15 +7476,16 @@ return {orders,financeCustomers};})();
     const catalog = {
   "meta": {
     "created": "2026-09-27",
-    "baseCommit": "a8eb8e5a6c5cf0bf7a48d5a59c6ecee625489a9f",
-    "updated": "2026-10-10",
-    "source": "当前工作区帮助目录快照，含未提交内容；独立图解不证明目标环境行为",
+    "baseCommit": "d5754d161f7166f075adce44562358e9058f2a49",
+    "updated": "2026-10-29",
+    "source": "正式帮助目录快照；独立图解不证明目标环境行为",
     "files": [
       "web/src/erp/config/roleHelpContent.mjs",
       "web/src/erp/config/helpScenarios.mjs",
       "web/src/erp/config/businessUsabilityCatalog.mjs",
       "web/src/erp/config/helpManualCatalog.mjs",
-      "web/src/erp/config/engineeringMaterialHelp.mjs"
+      "web/src/erp/config/engineeringMaterialHelp.mjs",
+      "web/src/erp/config/businessHandbook.mjs"
     ]
   },
   "roles": [
@@ -9148,6 +9149,47 @@ return {orders,financeCustomers};})();
             "trigger": "资料、物料或产能不能支持当前交期时，记录缺口并找对应岗位协调，不把有风险的订单标为可执行。",
             "action": "保留来源单号和页面提示，联系对应责任岗位核对；条件满足后回到同一记录继续办理。结果不确定时先刷新核对，避免重复提交。"
           }
+        },
+        {
+          "title": "维护加工环节",
+          "description": "维护标准路线、可厂内或委外的加工能力及启停。",
+          "path": "/erp/engineering/processes",
+          "actionLabel": "打开加工环节",
+          "available": true,
+          "key": "processes",
+          "pageKey": "processes",
+          "steps": [
+            {
+              "title": "查找已有资料",
+              "owner": "PMC",
+              "roles": [
+                "pmc"
+              ],
+              "description": "先搜索环节名称和编号，确认是否已有可用资料。"
+            },
+            {
+              "title": "核对并保存资料",
+              "owner": "PMC",
+              "roles": [
+                "pmc"
+              ],
+              "description": "核对内制、委外适用范围及对应生产环节，填写必要质检参考。"
+            },
+            {
+              "title": "交给业务引用",
+              "owner": "PMC",
+              "roles": [
+                "pmc"
+              ],
+              "description": "保存后在生产路线或委外合同中核对引用结果。"
+            }
+          ],
+          "completion": "环节名称、适用方式、对应生产环节和启用状态已核对并保存。",
+          "handoff": "工程或委外经办岗位引用；实际加工顺序回生产路线或合同核对。",
+          "exception": {
+            "trigger": "内制或委外适用范围、对应生产环节不明确时，先找 PMC 核对，不靠名称猜测路线。",
+            "action": "保留来源单号和页面提示，联系对应责任岗位核对；条件满足后回到同一记录继续办理。结果不确定时先刷新核对，避免重复提交。"
+          }
         }
       ]
     },
@@ -9397,43 +9439,43 @@ return {orders,financeCustomers};})();
           }
         },
         {
-          "title": "维护加工环节",
-          "description": "维护委外和质检可以引用的标准加工环节。",
-          "path": "/erp/engineering/processes",
-          "actionLabel": "打开加工环节",
+          "title": "维护材料资料",
+          "description": "核对材料规格、单位、厂商和料号色号，供物料清单引用。",
+          "path": "/erp/master/materials",
+          "actionLabel": "打开材料档案",
           "available": true,
-          "key": "processes",
-          "pageKey": "processes",
+          "key": "materials",
+          "pageKey": "materials",
           "steps": [
             {
               "title": "查找已有资料",
-              "owner": "工程",
+              "owner": "工程 / 采购 / 仓库",
               "roles": [
                 "engineering"
               ],
-              "description": "先搜索环节名称和编号，确认是否已有可用资料。"
+              "description": "先搜索名称、编号和规格，避免同料重复建档。"
             },
             {
               "title": "核对并保存资料",
-              "owner": "工程",
+              "owner": "工程 / 采购 / 仓库",
               "roles": [
                 "engineering"
               ],
-              "description": "核对内制、委外适用范围及对应生产环节，填写必要质检参考。"
+              "description": "核对分类、规格、颜色、默认单位及供应商资料。"
             },
             {
               "title": "交给业务引用",
-              "owner": "工程",
+              "owner": "工程 / 采购 / 仓库",
               "roles": [
                 "engineering"
               ],
-              "description": "保存后在生产路线或委外合同中核对引用结果。"
+              "description": "保存后重新查看；采购、用料和库存数量到对应页面办理。"
             }
           ],
-          "completion": "环节名称、适用方式、对应生产环节和启用状态已核对并保存。",
-          "handoff": "工程或委外经办岗位引用；实际加工顺序回生产路线或合同核对。",
+          "completion": "材料资料已保存，规格、默认单位和启用状态可查。",
+          "handoff": "工程、采购和仓库引用同一材料；规格或单位有疑问先核对再使用。",
           "exception": {
-            "trigger": "内制或委外适用范围、对应生产环节不明确时，先找工程核对，不靠名称猜测路线。",
+            "trigger": "材料规格、单位或同料重复资料不明确时，先由工程、采购和仓库核对，再决定使用哪份资料。",
             "action": "保留来源单号和页面提示，联系对应责任岗位核对；条件满足后回到同一记录继续办理。结果不确定时先刷新核对，避免重复提交。"
           }
         },
@@ -9484,47 +9526,6 @@ return {orders,financeCustomers};})();
           "exception": {
             "trigger": "先核对订单已生效、工程资料已完成、材料厂商与单位等用料依据完整，以及当前申请状态、办理责任和账号权限。已关闭订单或已办结任务不能继续原动作。",
             "action": "老板或财务退回必须填写原因。工程从修改任务中核对退回原因，直接修订原工程资料；点击“完成工程资料”并通过校验后，系统自动开始新审批轮次。先刷新或重新读取同一订单的用料申请，核对当前状态、轮次、审批记录和生成的采购单。已有成功结果就继续下一步；仍不能核实时保留来源单号和页面提示，交对应责任岗位核对。不要因页面没有及时提示就连续提交或重新建单，也不要根据任务名称推测业务结果。"
-          }
-        },
-        {
-          "title": "材料档案",
-          "description": "维护材料名称、规格和计量单位。",
-          "path": "/erp/master/materials",
-          "actionLabel": "打开材料档案",
-          "available": true,
-          "key": "materials",
-          "pageKey": "materials",
-          "steps": [
-            {
-              "title": "查找已有资料",
-              "owner": "工程 / 采购 / 仓库",
-              "roles": [
-                "engineering"
-              ],
-              "description": "先搜索名称、编号和规格，避免同料重复建档。"
-            },
-            {
-              "title": "核对并保存资料",
-              "owner": "工程 / 采购 / 仓库",
-              "roles": [
-                "engineering"
-              ],
-              "description": "核对分类、规格、颜色、默认单位及供应商资料。"
-            },
-            {
-              "title": "交给业务引用",
-              "owner": "工程 / 采购 / 仓库",
-              "roles": [
-                "engineering"
-              ],
-              "description": "保存后重新查看；采购、用料和库存数量到对应页面办理。"
-            }
-          ],
-          "completion": "材料资料已保存，规格、默认单位和启用状态可查。",
-          "handoff": "工程、采购和仓库引用同一材料；规格或单位有疑问先核对再使用。",
-          "exception": {
-            "trigger": "材料规格、单位或同料重复资料不明确时，先由工程、采购和仓库核对，再决定使用哪份资料。",
-            "action": "保留来源单号和页面提示，联系对应责任岗位核对；条件满足后回到同一记录继续办理。结果不确定时先刷新核对，避免重复提交。"
           }
         }
       ]
@@ -10485,7 +10486,7 @@ return {orders,financeCustomers};})();
     "key": "processes",
     "title": "加工环节",
     "sectionTitle": "产品工程",
-    "task": "维护生产和委外可选择的加工环节。",
+    "task": "由 PMC 维护生产和委外可选择的加工环节。",
     "path": "/erp/engineering/processes",
     "flowSteps": [
       "先搜索环节名称和编号，确认是否已有可用资料。",
@@ -10493,7 +10494,7 @@ return {orders,financeCustomers};})();
       "保存后在生产路线或委外合同中核对引用结果。"
     ],
     "roleHelpKeys": [
-      "engineering"
+      "pmc"
     ],
     "completion": "环节名称、适用方式、对应生产环节和启用状态已核对并保存。",
     "handoff": "工程或委外经办岗位引用；实际加工顺序回生产路线或合同核对。",
@@ -10523,7 +10524,7 @@ return {orders,financeCustomers};})();
         "type": "disabled",
         "key": "process-blocked",
         "title": "什么情况要先核实",
-        "explanation": "内制或委外适用范围、对应生产环节不明确时，先找工程核对，不靠名称猜测路线。",
+        "explanation": "内制或委外适用范围、对应生产环节不明确时，先找 PMC 核对，不靠名称猜测路线。",
         "source": "",
         "example": "",
         "effect": "",
@@ -12076,6 +12077,7 @@ return {orders,financeCustomers};})();
         "steps": [
           "从销售订单和交期判断当前优先级。",
           "核对物料清单、库存可用量和采购到料进度。",
+          "维护加工环节与标准路线；具体订单由生产决定加工方及厂内或委外安排。",
           "维护计划并完成生产订单发布后生成的排产确认待办。",
           "持续跟进生产、委外、质检、仓库和出货异常。"
         ],
@@ -12153,8 +12155,8 @@ return {orders,financeCustomers};})();
         "title": "工程",
         "paragraphs": [
           "从客户订单需求开始，在原 BOM 编辑器编制或导入材料明细；完成工程资料后自动送审。",
-          "产品、规格、材料、加工环节和当前生效的物料清单版本可查，采购、PMC 和生产能够读取。",
-          "产品和物料清单交给业务、采购与 PMC 使用；加工环节交给委外、生产和品质引用。",
+          "产品、规格、材料和当前生效的物料清单版本可查，采购、PMC 和生产能够读取。",
+          "产品和物料清单交给业务、采购与 PMC 使用；生产负责人决定由谁加工及厂内或委外安排。",
           "物料清单生效不会自动生成采购需求、生产任务或库存。"
         ],
         "steps": [
@@ -13226,7 +13228,7 @@ return {orders,financeCustomers};})();
       "key": "task",
       "title": "用途与准备",
       "paragraphs": [
-        "维护生产和委外可选择的加工环节。",
+        "由 PMC 维护生产和委外可选择的加工环节。",
         "先确认要维护的是工序能力资料，还是某笔订单的实际路线与内外发安排；实际安排在生产或委外订单中处理。"
       ]
     },
@@ -13318,7 +13320,7 @@ return {orders,financeCustomers};})();
       "key": "process-blocked",
       "title": "什么情况要先核实",
       "paragraphs": [
-        "内制或委外适用范围、对应生产环节不明确时，先找工程核对，不靠名称猜测路线。"
+        "内制或委外适用范围、对应生产环节不明确时，先找 PMC 核对，不靠名称猜测路线。"
       ],
       "rows": []
     },

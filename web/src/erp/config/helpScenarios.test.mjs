@@ -101,6 +101,16 @@ test('通用业务场景直接复用页内说明，避免办理文字产生两�
   }
 })
 
+test('加工环节图解由 PMC 负责维护，工程仅保留资料引用', () => {
+  const scenario = getRoleHelpScenarios(getRoleHelpGuide('pmc')).find((entry) => entry.key === 'processes')
+  assert(scenario)
+  assert(scenario.steps.every((entry) => entry.owner === 'PMC'))
+  assert.deepEqual(scenario.steps.map((entry) => entry.roles), [['pmc'], ['pmc'], ['pmc']])
+  assert.match(scenario.exception.trigger, /先找 PMC 核对/u)
+  assert.equal(getRoleHelpScenarios(getRoleHelpGuide('engineering')).some((entry) => entry.key === 'processes'), false)
+  assert.deepEqual(getBusinessPageHelpScenario('processes').steps, scenario.steps)
+})
+
 test('仓库的材料入库、成品入库、库存查询和出货互相独立', () => {
   const scenes = getRoleHelpScenarios(getRoleHelpGuide('warehouse'))
   assert.deepEqual(

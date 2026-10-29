@@ -70,9 +70,9 @@ test('矩阵筛选及重置保留工作台入口，展开后选择动作不会�
   )
   await v.choose('办理类型', '单据与明细编辑')
   assert.equal(v.params().get('kind'), 'authoring')
-  assert(v.root.querySelectorAll('.ant-table-row').length < 53)
-  await v.click(v.button('工程资料与 BOM'))
-  assert.equal(v.params().get('stage'), 'engineering_data')
+  assert(v.root.querySelectorAll('.ant-table-row').length < TASK_HANDLING_ROWS.length)
+  await v.click(v.root.querySelector('[data-row-key="sewing_execute"] button'))
+  assert.equal(v.params().get('stage'), 'sewing_execute')
   const actions = v.root.querySelector(
     '[aria-label="关联动作"][role="combobox"]'
   )
@@ -92,7 +92,7 @@ test('矩阵筛选及重置保留工作台入口，展开后选择动作不会�
     ),
   ]
   await v.click(options.at(-1))
-  assert.equal(v.params().get('stage'), 'engineering_data')
+  assert.equal(v.params().get('stage'), 'sewing_execute')
   assert(v.params().has('action'))
   assert(v.root.querySelector('[data-relation-action]'))
   await v.click(v.button('重置'))
@@ -113,10 +113,11 @@ test('工程筛选直接说明编制、自动送审与审批交接，不出现�
   assert.match(v.root.textContent, /本次办理.*审批与交接/u)
   assert(rows.every((row) => row.children[1]?.textContent === '工程'))
   assert.match(rows.find((row) => row.textContent.includes('工程资料修订与自动送审')).textContent,
-    /修改原工程资料并保存.*自动送审.*退回后继续修订原资料.*老板审核.*另一位财务复核/u)
+    /修改原工程资料并点击“完成工程资料”.*自动送审.*退回后继续修订原资料.*老板审核.*另一位财务复核/u)
   assert.equal(v.button('销售订单编制与提交'), undefined)
   assert.equal(v.button('老板审核用料'), undefined)
   await v.click(v.button('工程资料与 BOM'))
+  assert.equal(v.root.querySelector('[aria-label="关联动作"][role="combobox"]'), null, '单一工程动作直接显示')
   assert.match(v.root.querySelector('[data-relation-action]').textContent, /工程/)
   assert.doesNotMatch(v.root.querySelector('[data-relation-action]').textContent, /老板|财务/u)
 })

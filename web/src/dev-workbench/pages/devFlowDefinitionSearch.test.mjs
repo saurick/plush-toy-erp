@@ -11,7 +11,7 @@ import {
 test('状态对象可用具体业务动作名搜索，质检纠正继续使用既有规则索引', () => {
   const filter = createDevFlowDefinitionOptionFilter(DEV_FLOW_STATE_CATALOG, 'stateOptions')
   for (const [query, value] of [
-    ['退回准备', 'source.sales_order_engineering'],
+    ['启用 BOM', 'master.lifecycle'],
     ['财务退回用料', 'source.engineering_material_request'],
     ['纠正原判定并重新检验', 'fact.quality_inspection'],
   ]) assert.equal(filter(query, { value }), true, query)

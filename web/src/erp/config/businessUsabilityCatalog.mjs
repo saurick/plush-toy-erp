@@ -215,7 +215,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     ],
   }),
   processes: guide({
-    task: '维护生产和委外可选择的加工环节。',
+    task: '由 PMC 维护生产和委外可选择的加工环节。',
     completion: '环节名称、适用方式、对应生产环节和启用状态已核对并保存。',
     handoff: '工程或委外经办岗位引用；实际加工顺序回生产路线或合同核对。',
     requiredHelpTypes: [
@@ -245,7 +245,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
         BUSINESS_HELP_TYPES.DISABLED,
         'process-blocked',
         '什么情况要先核实',
-        '内制或委外适用范围、对应生产环节不明确时，先找工程核对，不靠名称猜测路线。'
+        '内制或委外适用范围、对应生产环节不明确时，先找 PMC 核对，不靠名称猜测路线。'
       ),
     ],
   }),

@@ -22,7 +22,7 @@ test('手机提交流程使用任务回执，已有结果不重复报告，桌�
   const record = { id: 7, payment_no: 'PAY-7' }
   await render(true)
   await act(async () => showReceipt({ title: '收付款已提交审批', record, result: { process_instance: { id: 10 } } }))
-  assert.deepEqual(results, [['收付款已提交审批', record]])
+  assert.deepEqual(results, [['收付款已提交审批', record, { actorLabel: '当前账号' }]])
   assert.equal(notices.length, 0)
   await act(async () => showReceipt({ title: '业务结果已由调用方记录', result: { process_instance: { id: 10 } } }))
   assert.equal(results.length, 1)

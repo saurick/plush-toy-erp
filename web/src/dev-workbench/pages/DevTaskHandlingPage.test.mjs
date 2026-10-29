@@ -129,11 +129,11 @@ test('任务办理直接显示清单，筛选清空和历史导航恢复时保�
 test('有筛选的独立深链直接打开，动作清空不回选且保留环节', async (t) => {
   const v = await mount(
     t,
-    '/__dev/task-handling?role=engineering&kind=authoring&mobile=desktop'
+    '/__dev/task-handling?role=production&kind=authoring&mobile=desktop'
   )
   assert.equal(v.container.querySelector('[role="alert"]'), null)
-  await v.click(v.button('工程资料与 BOM'))
-  assert.equal(v.params().get('stage'), 'engineering_data')
+  await v.click(v.container.querySelector('[data-row-key="sewing_execute"] button'))
+  assert.equal(v.params().get('stage'), 'sewing_execute')
   await v.clear('关联动作')
   assert.equal(v.params().get('action'), '')
   assert.equal(v.container.querySelector('[data-relation-action]'), null)

@@ -270,9 +270,9 @@ const allowedERPImportsByFile = new Map([
   ["web/src/dev-workbench/components/flow-state/FinanceRelationshipsView.jsx", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/components/flow-state/FinanceTraceView.jsx", new Set(["api/operationalFactApi.mjs", "components/finance/financePaymentPresentation.jsx"])],
   ["web/src/dev-workbench/config/devFulfillmentRelations.mjs", new Set(["utils/roleKeys.mjs"])],
-  ["web/src/dev-workbench/config/devTaskHandling.mjs", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs"])],
+  ["web/src/dev-workbench/config/devTaskHandling.mjs", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionPresentation.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandlingResponsibilities.test.mjs", new Set(["utils/roleKeys.mjs"])],
-  ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs"])],
+  ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionFlow.mjs"])],
   ["web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
   ["web/src/dev-workbench/config/devRoleResponsibilities.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
   [
@@ -406,6 +406,10 @@ const allowedERPImportsByFile = new Map([
     new Set(["config/businessModules.mjs", "config/seedData.mjs"]),
   ],
   [
+    "web/src/dev-workbench/config/devPermissionNavigation.test.mjs",
+    new Set(["config/seedData.mjs"]),
+  ],
+  [
     "web/src/dev-workbench/config/devPermissionNavigation.mjs",
     new Set([
       "config/seedData.mjs",
@@ -469,6 +473,8 @@ test("finance role labels reuse a pure display helper with an explicit consumer 
 test("history navigation reuses source projection only in the permission navigation model", () => {
   const file = "web/src/dev-workbench/config/devPermissionNavigation.mjs";
   assert.equal(isAllowedERPImport(file, "../../erp/utils/historyRecordCatalog.mjs"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/config/devPermissionNavigation.test.mjs", "../../erp/config/seedData.mjs"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/config/seedData.mjs"), false);
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/historyRecordCatalog.mjs"), false);
   assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
   assert.doesNotMatch(read("web/src/erp/utils/historyRecordCatalog.mjs"), /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
@@ -503,7 +509,11 @@ test("task handling projections keep pure classification helpers consumer scoped
     assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
   }
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/taskHandlingPolicy.mjs"), false);
-  const pending = ["web/src/erp/utils/taskHandlingPolicy.mjs"];
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", "@/erp/utils/workflowTaskActionFlow.mjs"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/workflowTaskActionFlow.mjs"), false);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/config/devTaskHandling.mjs", "@/erp/utils/workflowTaskActionPresentation.mjs"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/workflowTaskActionPresentation.mjs"), false);
+  const pending = ["web/src/erp/utils/taskHandlingPolicy.mjs", "web/src/erp/utils/workflowTaskActionFlow.mjs", "web/src/erp/utils/workflowTaskActionPresentation.mjs"];
   const visited = new Set();
   while (pending.length) {
     const file = pending.pop();

@@ -138,7 +138,7 @@ test('已开放页面补入阅读目录，岗位常用推荐与未开放说明�
   }
   const expected = {
     warehouse: ['materials', 'inventory', 'inbound', 'production-orders', 'production-progress', 'shipments', 'outbound'],
-    engineering: ['products', 'materials', 'material-bom', 'processes', 'engineering-material-request'],
+    engineering: ['products', 'materials', 'material-bom', 'engineering-material-request'],
     finance: ['shipments', 'receivables', 'payables', 'finance-payments', 'reconciliation', 'invoices', 'engineering-material-request'],
     admin: [],
   }

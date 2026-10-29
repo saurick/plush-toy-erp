@@ -100,6 +100,7 @@ test("customer-package-lint: production exception page and decision reads stay l
     "pmc.risk.read",
     "production.fact.read",
     "production.exception.submit",
+    "production.over_issue.submit",
     "production.exception.approve",
   ]);
   assert.equal(
