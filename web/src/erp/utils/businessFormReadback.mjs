@@ -1,12 +1,12 @@
 // Canonical readback clears validation metadata without resetting mounted editors.
-// Separate error and warning arrays avoid shared metadata in rc-field-form comparisons.
+// Keep existing empty metadata: rc-field-form can share its empty error/warning arrays.
 export function applyBusinessFormReadback(form, values) {
   form.setFields(Object.entries(values).map(([name, value]) => ({
     name,
     value,
     touched: false,
     validating: false,
-    errors: [],
-    warnings: [],
+    ...(form.getFieldError(name).length ? { errors: [] } : {}),
+    ...(form.getFieldWarning(name).length ? { warnings: [] } : {}),
   })))
 }

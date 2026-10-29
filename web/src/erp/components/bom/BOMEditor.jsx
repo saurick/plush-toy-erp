@@ -150,7 +150,7 @@ export default function BOMEditor({ open, mode = 'view', record, initialValues, 
       listAllBOMVersions({ product_id: productID }, { signal: controller.signal }).then((data) => {
         if (controller.signal.aborted) return
         setCandidates(data.bom_versions || [])
-        if (editorMode === 'copy' && !String(form.getFieldValue('version') || '').trim()) form.setFieldValue('version', suggestNextBOMVersion(data.bom_versions || [], productID))
+        if (editorMode === 'copy' && !String(form.getFieldValue('version') || '').trim()) applyBusinessFormReadback(form, { version: suggestNextBOMVersion(data.bom_versions || [], productID) })
       }).catch((err) => { if (!controller.signal.aborted && !isRpcAbortError(err)) message.warning(getActionErrorMessage(err, '读取 BOM 版本建议')) })
     }
     return () => controller.abort()
