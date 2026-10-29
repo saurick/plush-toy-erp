@@ -99,7 +99,7 @@ GIT_OPTIONAL_LOCKS=0 pnpm test:workbench
    ```
 
 2. 执行器校验固定 SSH 主机身份、上传内容与 Node，再取得本次维护锁。锁期间拒绝新工具 POST，保留只读访问；有在途写请求、未结束或未知操作、执行锁、外部 store override、未知 `output/` 时不停止服务。只传输代码和依赖，不传输本机运行状态。
-3. 校验候选后停止本工作台服务，逐文件保全当前 `output/dev-workbench`、`output/qa`、`output/playwright`，核对内容、权限与清单完全一致，再原子切换 `current`。成功须读回 exact artifact / source SHA、固定 Node、空闲状态、HTTPS 登录页和未登录 API 拒绝；历史记录与原回执继续保留。
+3. 校验候选后停止本工作台服务，逐文件保全当前 `output/dev-workbench`、`output/dev-customer-config-operations`、`output/qa`、`output/playwright`，核对内容、权限与清单完全一致，再原子切换 `current`。客户配置操作与交付操作均须处于终态。成功须读回 exact artifact / source SHA、固定 Node、空闲状态、HTTPS 登录页和未登录 API 拒绝；历史记录与原回执继续保留。
 4. 停服结果不确定或新版本读回失败时，保留候选和旧版本，主动恢复旧服务并核对旧制品身份和公网边界。恢复未证明时保留维护锁；不自动重复发布、删除历史或重新启动数据操作。结果、第一失败阶段及恢复失败原因写入私有 `runtime/release-<operation-id>.json`，失败按该回执人工处理，不能仅因服务进程存在就宣称恢复。
 5. 显式回滚使用已保留的精确 release key；先执行只读计划，获得授权后再加 `--execute`：
 

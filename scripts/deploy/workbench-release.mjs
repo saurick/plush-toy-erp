@@ -37,7 +37,7 @@ export async function inspectWorkbenchState(releaseRoot) {
   if (!existsSync(output)) return []
   await assertPlainDirectory(output)
   const top = await readdir(output)
-  if (top.some((name) => !['dev-workbench', 'qa', 'playwright'].includes(name))) throw new Error('存在未确认归属的 output，保留现场')
+  if (top.some((name) => !['dev-workbench', 'dev-customer-config-operations', 'qa', 'playwright'].includes(name))) throw new Error('存在未确认归属的 output，保留现场')
   const entries = await inventoryWorkbench(output, { state: true })
   for (const entry of entries) {
     if (/(?:^|\/)(?:[^/]*[.-])?lock(?:[./-]|$)/iu.test(entry.path)) throw new Error('存在执行锁，工作台不能切换')
