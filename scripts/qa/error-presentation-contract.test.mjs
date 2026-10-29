@@ -8,13 +8,23 @@ import { getActionErrorMessage } from '../../web/src/common/utils/errorMessage.j
 import { isAuthFailureCode } from '../../web/src/common/consts/errorCodes.js'
 
 test('actual Go errors retain business guidance through the RPC envelope and frontend presentation', async (t) => {
+  const cwd = path.resolve(import.meta.dirname, '../../server')
+  const env = { ...process.env, GIT_OPTIONAL_LOCKS: '0' }
+  const listed = spawnSync('go', ['list', '-json', './internal/service'], {
+    cwd, env, encoding: 'utf8', timeout: 30_000, maxBuffer: 4 * 1024 * 1024,
+  })
+  assert.equal(listed.error, undefined)
+  assert.equal(listed.status, 0, listed.stderr)
+  const productionFiles = JSON.parse(listed.stdout).GoFiles
+  assert(productionFiles.length > 0 && productionFiles.every((file) => file.endsWith('.go') && !file.endsWith('_test.go') && path.basename(file) === file))
+  // Compile the same production package with this contract test. Unrelated
+  // service integration tests pull in Ent and belong to the full Go CI lane.
+  const files = [...productionFiles, 'jsonrpc_error_presentation_contract_test.go'].map((file) => `./internal/service/${file}`)
   const run = spawnSync('go', [
-    'test', '-json', '-count=1', '-p=2', './internal/service',
+    'test', '-json', '-count=1', '-p=2', ...files,
     '-run', '^TestJSONRPCErrorPresentationContract$',
   ], {
-    cwd: path.resolve(import.meta.dirname, '../../server'),
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
-    encoding: 'utf8', timeout: 120_000, maxBuffer: 4 * 1024 * 1024,
+    cwd, env, encoding: 'utf8', timeout: 120_000, maxBuffer: 4 * 1024 * 1024,
   })
   assert.equal(run.error, undefined)
   assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`)

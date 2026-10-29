@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { Linter } from 'eslint'
 
 const erpSourceRoot = resolve(new URL('../', import.meta.url).pathname)
 
@@ -19,31 +20,29 @@ function listSourceFiles(directory) {
 }
 
 function collectComponentOpenings(source, componentName) {
+  if (!source.includes(`<${componentName}`)) return []
   const blocks = []
-  const lines = source.split('\n')
-  let current = null
-
-  for (const line of lines) {
-    if (!current && line.includes(`<${componentName}`)) {
-      current = [line]
-      if (/\/>\s*$/u.test(line)) {
-        blocks.push(current.join('\n'))
-        current = null
-      }
-      continue
-    }
-
-    if (current) {
-      current.push(line)
-      if (/^\s*\/?>\s*$/u.test(line)) {
-        blocks.push(current.join('\n'))
-        current = null
-      }
-    }
-  }
-
+  const messages = new Linter().verify(source, [{
+    files: ['**/*.jsx'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', parserOptions: { ecmaFeatures: { jsx: true } } },
+    plugins: { headers: { rules: { collect: { create() { return {
+      JSXOpeningElement(node) {
+        if (node.name.type === 'JSXIdentifier' && node.name.name === componentName) {
+          blocks.push(node.attributes.filter((attribute) => attribute.type === 'JSXAttribute').map((attribute) => `${attribute.name.name}=`).join(' '))
+        }
+      },
+    } } } } } },
+    rules: { 'headers/collect': 'error' },
+  }], { filename: 'component.jsx', allowInlineConfig: false })
+  assert.deepEqual(messages, [], 'header contract must parse actual JSX')
   return blocks
 }
+
+test('header props are checked independently of child descriptions and inline JSX', () => {
+  const source = '<BusinessFormPage title="表单" headerActions={<Button description="操作提示" />}><Attachment description="附件说明" /></BusinessFormPage>'
+  assert.deepEqual(collectComponentOpenings(source, 'BusinessFormPage'), ['title= headerActions='])
+  assert.deepEqual(collectComponentOpenings('<BusinessFormPage description="常驻介绍" />', 'BusinessFormPage'), ['description='])
+})
 
 test('businessPageHeader: 业务页头不提供常驻介绍、标签或底部 summary 区域', () => {
   const layoutPath = resolve(

@@ -1376,7 +1376,7 @@ test("mobile workflow runtime browser smoke does not contain real import or fact
     /cross-role task should expose one non-interactive urge summary/u,
   );
   assert.match(source, /selectMobileTaskFilter\(page, 'risk'\)/u);
-  assert.match(source, /mobile-role-task-filter__count/u);
+  assert.match(source, /erp-filter-chip__count/u);
   assert.match(source, /mobile-role-task-list-loading/u);
   assert.match(source, /actionLabel: '催办'/u);
   assert.match(source, /requiredError: '催办原因为必填项'/u);

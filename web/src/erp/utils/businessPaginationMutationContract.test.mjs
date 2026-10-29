@@ -61,6 +61,7 @@ const outsourcingOrderEditor = readSource(
 )
 const bomSource = readSource('../pages/BOMVersionsPage.jsx')
 const shipmentSource = readSource('../pages/ShipmentsPage.jsx')
+const shipmentSubmitSource = readSource('../components/shipments/submitShipmentDraft.mjs')
 const productionOrderSource = readSource('../pages/ProductionOrdersPage.jsx')
 const purchaseReceiptSource = readSource('../pages/PurchaseReceiptsPage.jsx')
 const qualitySource = readSource('../pages/QualityInspectionsPage.jsx')
@@ -215,11 +216,8 @@ test('BOM create and copy reset page one while editing refreshes the current pag
 })
 
 test('shipment edits reload the current page while create-only flows return their list to page one', () => {
-  const shipmentMutation = sourceSlice(
-    shipmentSource,
-    'const submitShipmentModal = async (',
-    'const runShipmentAction'
-  )
+  const shipmentMutation = shipmentSubmitSource
+  assert.match(shipmentSource, /submitShipmentDraft\(\{/u)
 
   const shipmentSaveBranches = conditionalBranches(
     shipmentMutation,

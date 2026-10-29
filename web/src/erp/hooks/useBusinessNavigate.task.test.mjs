@@ -12,7 +12,23 @@ test('task-contained related navigation preserves list state and ignores the lat
   const original = JsonRpc.prototype.call
   const pending = new Map()
   const calls = []
-  const sourceTask = { id: 31, version: 1, source_type: 'outsourcing_order', source_id: 8, owner_role_key: 'quality', task_group: 'business_followup', task_status_key: 'ready' }
+  const sourceTask = {
+    id: 31,
+    version: 1,
+    source_type: 'quality_inspection',
+    source_id: 8,
+    owner_role_key: 'quality',
+    task_group: 'handoff_outsourcing_quality',
+    task_code: 'source-handoff-outsourcing-quality-8',
+    task_status_key: 'ready',
+    payload: {
+      source_task_contract: 'workflow.source-task/v1',
+      source_task_producer: 'fulfillment.source',
+      source_record_id: 8,
+      source_task_intent_hash: 'a'.repeat(64),
+      entry_path: '/erp/production/quality-inspections?quality_inspection_id=8',
+    },
+  }
   JsonRpc.prototype.call = async function call(method, params) {
     if (method === 'get_task') return { data: { task: sourceTask } }
     if (method === 'explain_action_access') return { data: { source_access: { applicable: true, resolved: true, allowed: true }, actions: ['complete', 'block', 'reject', 'resume', 'urge'].map((action_key) => ({ action_key, allowed: false })) } }
@@ -44,7 +60,11 @@ onReceipt() {},
   const root = createRoot(container)
   t.after(async () => { await act(async () => root.unmount()); container.remove(); JsonRpc.prototype.call = original; dom.restore() })
   await act(async () => root.render(createElement(router.MemoryRouter, { initialEntries: [{ pathname: '/m/quality/tasks', state: originalState }], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(router.Routes, null, createElement(router.Route, { element: createElement(Frame) }, createElement(router.Route, { path: '/m/quality/tasks', element: createElement(Layout) }, createElement(router.Route, { index: true, element: createElement(Page) })))))))
-  const click = async (label) => act(async () => [...container.querySelectorAll('button')].find((button) => button.textContent === label).click())
+  const click = async (label) => act(async () => {
+    const button = [...container.querySelectorAll('button')].find((item) => item.textContent === label)
+    assert.equal(Boolean(button), true, `task workspace must expose ${label}`)
+    button.click()
+  })
   const result = (id, taskID) => ({ data: { total: 1,
     tasks: [{ id: taskID,
 version: 1,

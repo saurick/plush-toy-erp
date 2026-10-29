@@ -1,6 +1,57 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+
+function sameInstalledNodeBootstrap(candidate, current) {
+  const versions = path.dirname(path.dirname(current));
+  const version = (file) => path.basename(path.dirname(file));
+  if (
+    path.basename(versions) !== "versions" ||
+    path.dirname(path.dirname(candidate)) !== versions ||
+    !/^[a-f0-9]{20}-[a-f0-9]{8}$/u.test(version(current)) ||
+    !/^[a-f0-9]{20}-[a-f0-9]{8}$/u.test(version(candidate)) ||
+    version(current).slice(0, 20) !== version(candidate).slice(0, 20)
+  ) return false;
+  try {
+    const files = [current, candidate];
+    const directories = [path.dirname(current), path.dirname(candidate), versions, path.dirname(versions)];
+    for (const file of [...files, ...directories]) {
+      const stat = fs.lstatSync(file);
+      if (stat.uid !== 0 || (stat.mode & 0o022) !== 0 || stat.isSymbolicLink()) return false;
+      if (files.includes(file) ? !stat.isFile() : !stat.isDirectory()) return false;
+      if (fs.realpathSync(file) !== file) return false;
+    }
+    return fs.readFileSync(candidate).equals(fs.readFileSync(current));
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeNodeRuntimeCommand(
+  command,
+  { executable = process.argv0, execArgv = process.execArgv } = {},
+) {
+  const value = command.trim();
+  const bootstrap =
+    execArgv[0] === "--require" &&
+    path.basename(execArgv[1] || "") === "node-test-bootstrap.cjs"
+      ? execArgv[1]
+      : null;
+  if (!bootstrap) return value;
+  const prefix = `${executable} --require `;
+  if (!value.startsWith(prefix)) return value;
+  const marker = "node-test-bootstrap.cjs ";
+  const end = value.indexOf(marker, prefix.length);
+  if (end < prefix.length) return value;
+  const boundary = end + marker.length;
+  const candidate = value.slice(prefix.length, boundary - 1);
+  // A reinstall can move an identical guard while existing Vite processes
+  // keep running. Accept only protected sibling installations of this source.
+  return candidate === bootstrap || sameInstalledNodeBootstrap(candidate, bootstrap)
+    ? `node ${value.slice(boundary)}`
+    : value;
+}
 
 // A child blocked in a kernel call may keep its pipes open after SIGKILL.
 // Bound our wait as well as the command, so inspection always fails closed.

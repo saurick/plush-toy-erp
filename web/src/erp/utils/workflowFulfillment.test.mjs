@@ -32,7 +32,7 @@ test('合并环节为每一种任务提供有效查询入口，避免只查到�
   assert.ok(fulfillmentTaskLinks(first).some((link) => link.key === 'engineering'))
   assert.ok(fulfillmentTaskLinks(first).some((link) => link.key === 'engineering_data'))
   assert.equal(first.approvals.length, 2)
-  assert.match(first.approvals[1].condition, /工程.*老板.*财务/u)
+  assert.match(first.approvals[1].condition, /自动送审.*老板.*另一位财务/u)
   assert.match(catalog.fulfillment_flow.find((step) => step.stage === 'purchasing').approvals[0].condition, /不重复审批/u)
   const shipment = catalog.fulfillment_flow.find((step) => step.stage === 'shipment')
   assert.deepEqual(shipment.role_keys, ['sales', 'finance'])

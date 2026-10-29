@@ -13,6 +13,7 @@ import {
   showRuntimeConsole,
   presentRuntimeConsole,
   takeOverRuntimeDesktopViewers,
+  findRuntimeDesktopViewers,
   formatRuntimeLogLine,
   readRuntimeLogPlan,
   followRuntimeConsole,
@@ -700,6 +701,21 @@ test("failed log takeover still follows in the current terminal without touching
   assert.equal(spawned, true);
   assert(lines.some((line) => line.includes("当前终端继续显示日志")));
   assert.doesNotThrow(() => process.kill(process.pid, 0));
+});
+
+test("desktop viewer discovery excludes native guardians but keeps independent Node viewers", async (t) => {
+  const root = fixture(t);
+  const invocation = `${path.join(root, "scripts/local-runtime-console.mjs")} --follow --desktop`;
+  const executable = "/runtime/bin/node";
+  const bootstrap = "/Library/Application Support/Plush/node-test-bootstrap.cjs";
+  const guarded = `${executable} --require ${bootstrap} ${invocation}`;
+  const plain = `node ${invocation}`;
+  const viewers = await findRuntimeDesktopViewers(root, async (_, args) => ({
+    stdout: args.includes("-axo")
+      ? `321 ${guarded}\n322 ${plain}\n323 ${plain}\n324 ${executable} --require /unknown.cjs ${invocation}\n`
+      : "321 100\n322 321\n323 100\n",
+  }), { executable, execArgv: ["--require", bootstrap] });
+  assert.deepEqual(viewers, [{ pid: 321, command: guarded }, { pid: 323, command: plain }]);
 });
 
 test("log takeover verifies exact project command and start time before SIGTERM", async (t) => {

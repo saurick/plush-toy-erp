@@ -4,6 +4,7 @@ import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import {
   findListenerPids,
+  normalizeNodeRuntimeCommand,
   readProcessCwd,
   runProcessInspection as runInspection,
 } from '../../scripts/dev-process-inspection.mjs'
@@ -31,6 +32,7 @@ const RUNTIME_SOURCE_PATHS = [
   'scripts/local-runtime-start.mjs',
   'scripts/local-runtime-rehearsal.mjs',
   'scripts/local-runtime-console.mjs',
+  'scripts/dev-process-inspection.mjs',
   'scripts/terminal-log.mjs',
   'scripts/local-runtime-preflight.mjs',
   'scripts/local-runtime-preflight-core.mjs',
@@ -126,6 +128,11 @@ export async function readWebInstance(port) {
   }
 }
 
+export function isViteProcessCommand(command, runtime = {}) {
+  const value = normalizeNodeRuntimeCommand(command, runtime)
+  return /^(?:\S*\/)?node\s+(?:--import\s+\S*\/viteParentLifetime\.mjs\s+)?\S*\/(?:vite\/bin\/vite\.js|\.bin\/vite)(?:\s|$)/u.test(value)
+}
+
 export async function inspectWebListeners(port, webRoot) {
   const pids = await findListenerPids(port)
   if (!pids.length) return []
@@ -140,10 +147,7 @@ export async function inspectWebListeners(port, webRoot) {
         ]
       )
       // cwd 相同还不够：同目录内的任意 Node/Python 服务不能被当作 Vite 停掉。
-      const viteCommand =
-        /^(?:\S*\/)?node\s+(?:--import\s+\S*\/viteParentLifetime\.mjs\s+)?\S*\/(?:vite\/bin\/vite\.js|\.bin\/vite)(?:\s|$)/u.test(
-          command.trim()
-        )
+      const viteCommand = isViteProcessCommand(command)
       return {
         pid,
         cwd,

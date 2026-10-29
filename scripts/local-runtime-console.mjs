@@ -7,7 +7,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 import { loadDevPorts } from "./dev-ports.mjs";
-import { runProcessInspection } from "./dev-process-inspection.mjs";
+import {
+  normalizeNodeRuntimeCommand,
+  runProcessInspection,
+} from "./dev-process-inspection.mjs";
 import {
   formatTerminalMessage,
   highlightTerminalText,
@@ -465,22 +468,51 @@ function shellQuote(value) {
 export async function findRuntimeDesktopViewers(
   root,
   inspect = runProcessInspection,
+  runtime = {},
 ) {
   const script = path.join(root, "scripts/local-runtime-console.mjs");
   const marker = ` ${script} `;
   const suffix = " --follow --desktop";
   const { stdout } = await inspect("ps", ["-axo", "pid=,command="]);
-  return stdout.split("\n").flatMap((line) => {
+  const candidates = stdout.split("\n").flatMap((line) => {
     const match = line.match(/^\s*(\d+)\s+(.+)$/u);
     if (!match || !match[2].endsWith(suffix)) return [];
-    const scriptOffset = match[2].indexOf(marker);
+    const command = normalizeNodeRuntimeCommand(match[2], runtime);
+    const scriptOffset = command.indexOf(marker);
     if (scriptOffset < 1) return [];
-    const executable = match[2].slice(0, scriptOffset);
+    const executable = command.slice(0, scriptOffset);
     const pid = Number(match[1]);
-    return pid > 1 && path.basename(executable) === "node"
-      ? [{ pid, command: match[2] }]
+    return pid > 1 && /^(?:\S*\/)?node$/u.test(executable)
+      ? [{
+          pid,
+          command: match[2],
+          invocation: command.slice(scriptOffset),
+          guarded: command !== match[2],
+        }]
       : [];
   });
+  const guarded = new Map(
+    candidates.filter((entry) => entry.guarded).map((entry) => [entry.pid, entry]),
+  );
+  const guardians = new Set();
+  if (guarded.size && candidates.some((entry) => !entry.guarded)) {
+    const parents = await inspect("ps", [
+      "-p", candidates.map((entry) => entry.pid).join(","), "-o", "pid=,ppid=",
+    ]);
+    for (const line of parents.stdout.trim().split("\n")) {
+      const match = line.match(/^\s*(\d+)\s+(\d+)\s*$/u);
+      if (!match) throw new Error("无法确认日志查看进程的父子关系，未结束任何进程");
+      const candidate = candidates.find((entry) => entry.pid === Number(match[1]));
+      const parent = guarded.get(Number(match[2]));
+      // The native guard forks a watcher before exec. It retains the launch
+      // command but exits by itself when its verified Node parent terminates.
+      if (candidate && !candidate.guarded && parent?.invocation === candidate.invocation)
+        guardians.add(candidate.pid);
+    }
+  }
+  return candidates
+    .filter((entry) => !guardians.has(entry.pid))
+    .map(({ pid, command }) => ({ pid, command }));
 }
 
 export async function hasRuntimeDesktopViewer(

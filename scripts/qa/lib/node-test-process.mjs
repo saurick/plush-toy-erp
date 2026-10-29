@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { readlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -131,6 +132,7 @@ export async function runNodeTestProcess(args, {
   let exitCleanup = Promise.resolve();
   let peakProcessRssMiB = 0;
   let peakTotalRssMiB = 0;
+  let limitProcess = null;
   const stop = (cause) => {
     if (reason) return;
     reason = cause;
@@ -153,8 +155,19 @@ export async function runNodeTestProcess(args, {
       peakTotalRssMiB = Math.max(peakTotalRssMiB, total);
       for (const row of owned) {
         peakProcessRssMiB = Math.max(peakProcessRssMiB, row.rssMiB);
-        if (row.rssMiB > policy.processRssMiB) return stop("process-rss-limit");
-        if (row.ppid === child.pid && row.executable === nodeExecutable) {
+        if (row.rssMiB > policy.processRssMiB) {
+          limitProcess = { pid: row.pid, executable: row.executable, rssMiB: Math.ceil(row.rssMiB) };
+          return stop("process-rss-limit");
+        }
+        if (row.ppid !== child.pid) continue;
+        // Linux comm is a mutable thread name (Node uses MainThread). Resolve
+        // the executable instead so file deadlines cannot silently disappear.
+        let executable = row.executable;
+        if (process.platform === "linux") {
+          try { executable = path.basename(await readlink(`/proc/${row.pid}/exe`)); }
+          catch (error) { if (error.code === "ENOENT" || error.code === "ESRCH") continue; throw error; }
+        }
+        if (executable === nodeExecutable) {
           if (!workers.has(row.pid)) workers.set(row.pid, Date.now());
           if (Date.now() - workers.get(row.pid) > policy.workerTimeoutMs) return stop("worker-timeout");
         }
@@ -202,7 +215,7 @@ export async function runNodeTestProcess(args, {
   process.removeListener("SIGINT", interrupted);
   process.removeListener("SIGTERM", interrupted);
   return {
-    ...result, reason, cleanupError, kernelGuard, durationMs: Date.now() - started,
+    ...result, reason, cleanupError, kernelGuard, limitProcess, durationMs: Date.now() - started,
     peakProcessRssMiB: Math.ceil(peakProcessRssMiB),
     peakTotalRssMiB: Math.ceil(peakTotalRssMiB),
     stdout: Buffer.concat(output.stdout).toString("utf8"),
@@ -218,7 +231,7 @@ async function main(argv) {
   process.stdout.write(result.stdout);
   process.stderr.write(result.stderr);
   if (result.reason) {
-    console.error(`[qa:node-process] status=incomplete reason=${result.reason} cleanupError=${result.cleanupError || "none"} durationMs=${result.durationMs} peakProcessRssMiB=${result.peakProcessRssMiB} peakTotalRssMiB=${result.peakTotalRssMiB}`);
+    console.error(`[qa:node-process] status=incomplete reason=${result.reason} cleanupError=${result.cleanupError || "none"} durationMs=${result.durationMs} peakProcessRssMiB=${result.peakProcessRssMiB} peakTotalRssMiB=${result.peakTotalRssMiB} limitProcess=${JSON.stringify(result.limitProcess)}`);
   }
   process.exitCode = result.reason ? 1 : result.status ?? 1;
 }

@@ -28,7 +28,20 @@ function invokeTargetHelper(args) {
   });
 }
 
-test("quality and deployment tools stay on the existing toolchain outside the authorized Git closeout entry", () => {
+test("quality and deployment tools stay on the existing toolchain outside Git closeout and native guard tooling", () => {
+  const nativeGuardTools = new Set([
+    "scripts/qa/native/install-node-test-guard.py",
+    "scripts/qa/native/install-node-tool-guard.py",
+    "scripts/qa/native/verify_installed_guard.py",
+    "scripts/qa/native/verify_node_tool_guard.py",
+    "scripts/qa/native/test_node_test_guard.py",
+    "scripts/qa/native/test_node_tool_guard.py",
+  ]);
+  const nativeStandardLibrary = new Set([
+    "argparse", "contextlib", "copy", "fcntl", "hashlib", "importlib", "json",
+    "os", "pathlib", "platform", "re", "selectors", "shutil", "signal",
+    "subprocess", "sys", "tempfile", "time", "tomllib", "unittest", "uuid",
+  ]);
   const sources = ["server/Makefile"];
   for (const directory of [
     "scripts",
@@ -44,6 +57,16 @@ test("quality and deployment tools stay on the existing toolchain outside the au
     );
   }
   for (const file of sources) {
+    if (nativeGuardTools.has(file)) {
+      assert.match(read(file), /^#!\/usr\/bin\/env python3\n/u);
+      const imports = [...read(file).matchAll(/^(?:from ([a-z_]+)(?:\.[\w.]+)? import [\w ,*]+|import ([a-z_]+)(?:\.[\w.]+)?(?: as \w+)?)$/gmu)];
+      assert(imports.length > 0, `${file} must retain its reviewed imports`);
+      for (const match of imports) {
+        const name = match[1] || match[2];
+        assert(nativeStandardLibrary.has(name), `Native guard tooling must use only its reviewed standard-library dependencies: ${name}`);
+      }
+      continue;
+    }
     if (file === "scripts/git-hooks/commit-scope.py") {
       assert.match(read(file), /^#!\/usr\/bin\/env python3\n/u);
       const standardLibrary = new Set([

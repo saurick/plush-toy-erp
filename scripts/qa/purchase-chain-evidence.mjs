@@ -138,7 +138,7 @@ export function buildPurchaseChainExecutionReport({
         ]
           .filter(Boolean)
           .join("；")
-      : "用料自动生成和审批拒绝属于其他路径，本轮未执行，不沿用主链结果。";
+      : `本批次未执行“${step.label}”，不沿用其他步骤结果。`;
     return {
       key: step.key,
       number: index + 1,

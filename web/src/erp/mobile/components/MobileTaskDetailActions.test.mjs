@@ -158,7 +158,7 @@ test('mobile task keeps source context as text and offers only authorized task a
     )
     assert.deepEqual(
       buttons().map((node) => node.textContent.trim()),
-      ['查看附件', '选择处理方式']
+      ['任务附件', '选择处理方式']
     )
     const before = actions.length
     await act(async () => button('选择处理方式').click())
@@ -182,7 +182,7 @@ test('mobile task keeps source context as text and offers only authorized task a
   assert.equal(container.querySelectorAll('.workflow-task-current__guidance').length, 0, '催办按钮已表达可用动作，不重复普通操作说明')
   assert.deepEqual(
     buttons().map((node) => node.textContent.trim()),
-    ['查看附件', '催办任务']
+    ['任务附件', '催办任务']
   )
   await act(async () => button('催办任务').click())
   assert.equal(actions.at(-1), 'urge')

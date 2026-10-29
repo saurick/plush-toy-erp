@@ -422,7 +422,7 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
     /resolveShipmentSubmittedTotalNetWeight\(\{[\s\S]*manualItemsSignature/u
   )
   assert.match(
-    shipmentsPageSource,
+    readFileSync(new URL('../components/shipments/submitShipmentDraft.mjs', import.meta.url), 'utf8'),
     /buildShipmentWithItemsParams\(\s*values,\s*\{\s*products,\s*productSKUs,\s*sourceCurrency:\s*selectedSalesOrder\?\.currency,?\s*\}\s*\)/u
   )
   assert.match(

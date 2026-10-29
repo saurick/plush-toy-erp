@@ -48,7 +48,7 @@ export function ContextStrip({
         ]}
         />
         {flat && !blocked ? (
-          <Popover content={notice} trigger="click" placement="bottomLeft" overlayClassName="erp-dev-quality-context-help">
+          <Popover content={notice} trigger="click" placement="bottomLeft" classNames={{ root: 'erp-dev-quality-context-help' }}>
             <Button type="text" size="small" icon={<InfoCircleOutlined aria-hidden="true" />} aria-label="工作区判断依据" />
           </Popover>
         ) : null}

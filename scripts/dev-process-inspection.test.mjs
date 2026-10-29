@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
 import {
@@ -14,6 +15,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 import {
   findListenerPids,
+  normalizeNodeRuntimeCommand,
   parseDarwinListenerPids,
   readProcessCwd,
   runProcessInspection,
@@ -27,6 +29,38 @@ const row = (
   pid,
   { protocol = "tcp4", state = "Listen", name = "node" } = {},
 ) => `${name}.${pid},,\n${protocol} ${address}<->*.*,${state},`;
+
+test("Node identity accepts an identical protected guard reinstall and rejects changed or writable preloads", (t) => {
+  const base = "/Library/Application Support/Guard/versions";
+  const current = `${base}/01234567890123456789-11111111/node-test-bootstrap.cjs`;
+  const prior = `${base}/01234567890123456789-22222222/node-test-bootstrap.cjs`;
+  const executable = "/Library/Application Support/Guard/node.original";
+  const runtime = { executable, execArgv: ["--require", current] };
+  let changed = false;
+  let writable = false;
+  let symlink = false;
+  t.mock.method(fs, "lstatSync", (file) => ({
+    uid: 0, mode: writable ? 0o666 : 0o644,
+    isSymbolicLink: () => symlink,
+    isFile: () => file.endsWith(".cjs"),
+    isDirectory: () => !file.endsWith(".cjs"),
+  }));
+  t.mock.method(fs, "realpathSync", (file) => file);
+  t.mock.method(fs, "readFileSync", (file) => Buffer.from(changed && file === prior ? "changed" : "same-guard"));
+  const command = `${executable} --require ${prior} /repo/viewer.mjs --follow`;
+  assert.equal(normalizeNodeRuntimeCommand(command, runtime), "node /repo/viewer.mjs --follow");
+  changed = true;
+  assert.equal(normalizeNodeRuntimeCommand(command, runtime), command);
+  changed = false; writable = true;
+  assert.equal(normalizeNodeRuntimeCommand(command, runtime), command);
+  writable = false; symlink = true;
+  assert.equal(normalizeNodeRuntimeCommand(command, runtime), command);
+  symlink = false;
+  for (const preload of ["/other/node-test-bootstrap.cjs", prior.replace("01234567890123456789", "aaaaaaaaaaaaaaaaaaaa")]) {
+    const foreign = `${executable} --require ${preload} /repo/viewer.mjs --follow`;
+    assert.equal(normalizeNodeRuntimeCommand(foreign, runtime), foreign);
+  }
+});
 
 test("macOS socket table finds exact listening ports across IPv4/IPv6 and spaced process names", () => {
   const output = [

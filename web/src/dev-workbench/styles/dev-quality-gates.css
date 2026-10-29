@@ -679,7 +679,7 @@
 }
 
 .erp-dev-quality-actions__ready.ant-typography {
-  color: var(--erp-success, #389e0d);
+  color: var(--erp-primary);
 }
 
 .erp-dev-quality-operation .erp-dev-quality-operation__facts {

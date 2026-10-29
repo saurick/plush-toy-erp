@@ -136,7 +136,14 @@ function input() {
 test("采购主链及四条关联导入证据逐步发布，后续未执行动作保持未执行", () => {
   const { report, rules } = buildPurchaseChainExecutionReport(input());
   assert.equal(report.metrics.stepStates.passed, 12);
-  assert.equal(report.chains[0].steps.filter((step) => step.status === 'not_run').length, 2);
+  const unexecuted = report.chains[0].steps.filter((step) => step.status === "not_run");
+  assert.deepEqual(unexecuted.map((step) => step.key), [
+    "purchase_order:creates_fact_draft:purchase_receipt",
+    "purchase_quality:creates_fact_draft:purchase_quality_correction",
+    "purchase_quality_correction:posts_fact:purchase_accepted",
+    "purchase_task:returns:purchase_rejected",
+  ]);
+  assert(unexecuted.every((step) => step.evidence.length === 0 && step.observed.includes(step.label)));
   assert.equal(report.chains.length, 3);
   assert(report.chains.slice(1).every((chain) => chain.steps.some((step) => step.status === 'not_run')));
   assert.equal(report.chains[0].status, "not_run");

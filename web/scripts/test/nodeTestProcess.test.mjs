@@ -124,6 +124,8 @@ test('raw DOM assertion', () => {
   assert.equal(result.reason, 'process-rss-limit')
   assert.notEqual(result.status, 0)
   assert(result.peakProcessRssMiB > 192)
+  assert(result.limitProcess.rssMiB > 192)
+  assert.equal(typeof result.limitProcess.executable, 'string')
   const source = await readFile(path.join(root, 'fixture.test.mjs'), 'utf8')
   await writeFile(path.join(root, 'fixture.test.mjs'), source.replace(
     "assert.equal(container.querySelector('button'), null);",

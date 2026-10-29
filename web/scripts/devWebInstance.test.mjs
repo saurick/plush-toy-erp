@@ -10,12 +10,24 @@ import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import {
   DEV_WEB_INSTANCE_PATH,
+  isViteProcessCommand,
   prepareWebInstance,
   readWebInstance,
   stopWebInstance,
   webInstanceSignature,
 } from './devWebInstance.mjs'
 import { canListenOnPort } from './localPort.mjs'
+
+test('Vite ownership recognizes only this runtime guard and rejects arbitrary preloads', () => {
+  const executable = '/runtime/node'
+  const bootstrap = '/Library/Application Support/Guard/node-test-bootstrap.cjs'
+  const runtime = { executable, execArgv: ['--require', bootstrap] }
+  assert.equal(isViteProcessCommand(`${executable} --require ${bootstrap} /repo/web/node_modules/vite/bin/vite.js`, runtime), true)
+  assert.equal(isViteProcessCommand(`${executable} --require ${bootstrap} --import /repo/web/scripts/viteParentLifetime.mjs /repo/web/node_modules/vite/bin/vite.js`, runtime), true)
+  assert.equal(isViteProcessCommand(`${executable} --require /other/node-test-bootstrap.cjs /repo/web/node_modules/vite/bin/vite.js`, runtime), false)
+  assert.equal(isViteProcessCommand(`${executable} --require ${bootstrap} -e server /repo/web/node_modules/vite/bin/vite.js`, runtime), false)
+  assert.equal(isViteProcessCommand(`${executable} --require ${bootstrap} /repo/web/server.js`, runtime), false)
+})
 
 test('已有前端必须匹配真实工作区、后端、客户、模式和 Vite 参数', (t) => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'plush-web-instance-'))
@@ -273,8 +285,9 @@ test('客户自动替换真实 Vite 后固定端口可重新监听，同目录�
   const children = []
   t.after(async () => {
     for (const { child, closed } of children) {
-      if (child.exitCode === null && child.signalCode === null)
+      if (child.exitCode === null && child.signalCode === null) {
         child.kill('SIGTERM')
+      }
       await closed
     }
     rmSync(root, { recursive: true, force: true })
