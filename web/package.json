@@ -49,7 +49,7 @@
     "happy-dom": "20.14.5",
     "playwright": "^1.63.0",
     "postcss": "^8.5.28",
-    "postcss-selector-parser": "7.1.5",
+    "postcss-selector-parser": "7.1.6",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "stylelint": "^16.26.1",
