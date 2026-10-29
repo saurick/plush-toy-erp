@@ -65,7 +65,7 @@ test('routine task and help guidance use compact content instead of alerts', () 
   assert.match(drawer, /<WorkflowTaskHandlingChain/u)
   assert.match(handlingChain, /role="alert"/u)
   assert.match(handlingChain, /暂时无法读取任务处理链，请重新读取。/u)
-  assert.match(drawer, /canChooseActions \? '选择处理方式' : '办理资料'/u)
+  assert.match(drawer, /visibleActionModes\.length \? '选择处理方式' : secondaryActions\.length \? '请在底部选择任务协作操作' : '办理资料'/u)
   assert.match(drawer, /readonlyReason \|\| '当前账号不能直接处理该任务。'/u)
 })
 
@@ -121,8 +121,8 @@ test('DEV passive guidance is collapsed while warnings and errors stay prominent
     'web/src/dev-workbench/components/DevStaticGuidance.jsx'
   )
   const disclosureCSS = read('web/src/dev-workbench/styles/dev-disclosure.css')
-  assert.match(guidance, /<details className="erp-dev-disclosure erp-dev-static-guidance">/u)
-  assert.doesNotMatch(guidance, /<details\b[^>]*\bopen\b/u)
+  assert.match(guidance, /defaultOpen = false/u)
+  assert.match(guidance, /<details className="erp-dev-disclosure erp-dev-static-guidance" open=\{defaultOpen\}>/u)
   assert.doesNotMatch(guidance, /<Alert\b/u)
   assert.match(
     disclosureCSS,

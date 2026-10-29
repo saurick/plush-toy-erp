@@ -152,7 +152,8 @@ test('production order release explains the atomic scheduling handoff', () => {
 })
 
 test('production order forms remain connected before initialization', () => {
-  assert.equal(page.match(/form\.setFieldsValue/gu)?.length, 1)
+  assert.equal(page.match(/applyBusinessFormReadback\(form, formValues\)/gu)?.length, 1)
+  assert.doesNotMatch(page, /form\.setFieldsValue/u)
   assert.equal(page.match(/reasonForm\.resetFields/gu)?.length, 1)
   assert.match(page, /if \(!formMode \|\| !formValues\) return/u)
   assert.match(page, /if \(!reasonAction\) return/u)
