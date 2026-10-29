@@ -136,7 +136,7 @@ test('报告只读且独立失败；普通证据失败不隐藏有效数据库�
     fetchImpl: async (url, options) => {
       requests.push({ url, options })
       if (url.endsWith('/coverage'))
-        throw new Error('private diagnostic must not leak')
+        { throw new Error('private diagnostic must not leak') }
       return { ok: true, json: async () => database() }
     },
   })

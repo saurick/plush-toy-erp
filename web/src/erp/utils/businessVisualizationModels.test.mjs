@@ -70,9 +70,6 @@ test('sales delivery keeps unknown shipment facts explicit and sorts risks first
   assert.equal(model.counts.delivered, 1)
 })
 
-
-
-
 test('finance due uses outstanding facts without combining currencies', () => {
   const model = buildFinanceDueModel(
     [
@@ -348,9 +345,6 @@ test('finance missing amounts or currency never become zero, settled or overdue'
   assert.equal(model.counts.settled, 0)
   assert.equal(model.rows[0].outstanding, null)
 })
-
-
-
 
 test('business calendar date movement crosses months and years without local timezone drift', () => {
   assert.equal(moveBusinessDate('2026-12-25', 14), '2027-01-08')

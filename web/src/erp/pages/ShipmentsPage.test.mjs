@@ -7,6 +7,7 @@ const source = readFileSync(
   new URL('./ShipmentsPage.jsx', import.meta.url),
   'utf8'
 )
+const draftSubmit = readFileSync(new URL('../components/shipments/submitShipmentDraft.mjs', import.meta.url), 'utf8')
 const qualityModal = readFileSync(
   new URL(
     '../components/quality-inspections/ShipmentQualityInspectionModal.jsx',
@@ -171,7 +172,7 @@ test('shipment freight currency is derived from the selected sales order', () =>
     source,
     /freight_currency:\s*freightAmount\s*\?\s*trimOptional\(sourceCurrency\)\?\.toUpperCase\(\)\s*:\s*undefined/u
   )
-  assert.match(source, /sourceCurrency:\s*selectedSalesOrder\?\.currency/u)
+  assert.match(draftSubmit, /sourceCurrency:\s*selectedSalesOrder\?\.currency/u)
   assert.doesNotMatch(source, /trimOptional\(values\.freight_currency\)/u)
 })
 
@@ -240,10 +241,10 @@ test('sales delivery drafts use fail-closed load-before-edit and optimistic save
     source,
     /setShipmentModal\(\{ mode: 'edit', shipment: detail \}\)/u
   )
-  assert.match(source, /const draftParams = \{ \.\.\.params \}/u)
-  assert.match(source, /delete draftParams\.idempotency_key/u)
+  assert.match(draftSubmit, /const draftParams = \{ \.\.\.params \}/u)
+  assert.match(draftSubmit, /delete draftParams\.idempotency_key/u)
   assert.match(
-    source,
+    draftSubmit,
     /saveShipmentDraft\(\{[\s\S]*expected_version: editingShipment\.version/u
   )
   assert.match(source, /data-business-action-key="shipment-edit"/u)

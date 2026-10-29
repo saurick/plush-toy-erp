@@ -232,6 +232,7 @@ func TestWorkflowTaskDisplayContextFulfillmentSourceSearch(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "display_fulfillment")
 	f.client.Product.UpdateOneID(f.productID).SetName("发货小熊").SaveX(ctx)
+	primary := f.client.BusinessAttachment.Create().SetOwnerType("product").SetOwnerID(f.productID).SetAttachmentType("product_image").SetSlotKey("primary").SetFileName("shipment-product.png").SetMimeType("image/png").SetFileSize(1).SetSha256("4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a").SetObjectKey(attachmentstore.NewKey()).SaveX(ctx)
 	warehouse := createTestProductWarehouse(t, ctx, f.client, "DISPLAY-SHIP-WH")
 	shipment := f.client.Shipment.Create().SetShipmentNo("SHIP-DISPLAY-FULFILLMENT").SetIdempotencyKey("display-fulfillment").SaveX(ctx)
 	f.client.ShipmentItem.Create().SetShipmentID(shipment.ID).SetProductID(f.productID).SetWarehouseID(warehouse.ID).SetUnitID(f.unitID).SetQuantity(decimal.NewFromInt(1)).SaveX(ctx)
@@ -245,7 +246,7 @@ func TestWorkflowTaskDisplayContextFulfillmentSourceSearch(t *testing.T) {
 		t.Fatalf("fulfillment search lacks source identity: items=%#v total=%d err=%v", items, total, err)
 	}
 	item := items[0].DisplayContext.Items[0]
-	if item.ProductID != f.productID || item.Name != "发货小熊" || item.ImageAttachmentID == 0 {
+	if item.ProductID != f.productID || item.Name != "发货小熊" || item.ImageAttachmentID != primary.ID {
 		t.Fatalf("fulfillment product and image must follow source: %#v", item)
 	}
 	forged := entWorkflowTaskToBiz(row)

@@ -131,14 +131,13 @@ test('OperationalFactForms formats fact decimals without Number rounding', () =>
   assert.doesNotMatch(source, /decimalNumber|toFixed|Number\(value/u)
 })
 
-
 test('领料仅由出库能力确认和取消，成品与返工保持各自权限', () => {
   for (const status of ['DRAFT', 'POSTED']) {
-    assert.deepEqual(productionFactPostPermissions({fact_type: 'MATERIAL_ISSUE', status}), ['warehouse.outbound.confirm'])
-    assert.deepEqual(productionFactCancelPermissions({fact_type: 'MATERIAL_ISSUE', status}), ['warehouse.outbound.confirm'])
-    assert.deepEqual(productionFactPostPermissions({fact_type: 'REWORK', status}), ['production.fact.post'])
-    assert.deepEqual(productionFactCancelPermissions({fact_type: 'REWORK', status}), ['production.fact.cancel'])
+    assert.deepEqual(productionFactPostPermissions({ fact_type: 'MATERIAL_ISSUE', status }), ['warehouse.outbound.confirm'])
+    assert.deepEqual(productionFactCancelPermissions({ fact_type: 'MATERIAL_ISSUE', status }), ['warehouse.outbound.confirm'])
+    assert.deepEqual(productionFactPostPermissions({ fact_type: 'REWORK', status }), ['production.fact.post'])
+    assert.deepEqual(productionFactCancelPermissions({ fact_type: 'REWORK', status }), ['production.fact.cancel'])
   }
-  assert.deepEqual(productionFactPostPermissions({fact_type: 'FINISHED_GOODS_RECEIPT', status: 'DRAFT'}), ['warehouse.inbound.confirm'])
-  assert.deepEqual(productionFactCancelPermissions({fact_type: 'FINISHED_GOODS_RECEIPT', status: 'POSTED'}), ['warehouse.inbound.confirm'])
+  assert.deepEqual(productionFactPostPermissions({ fact_type: 'FINISHED_GOODS_RECEIPT', status: 'DRAFT' }), ['warehouse.inbound.confirm'])
+  assert.deepEqual(productionFactCancelPermissions({ fact_type: 'FINISHED_GOODS_RECEIPT', status: 'POSTED' }), ['warehouse.inbound.confirm'])
 })

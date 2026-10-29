@@ -68,6 +68,7 @@ SECRETS_STRICT=1 SECRETS_STAGED_ONLY=1 bash "$INDEX_ROOT/scripts/qa/secrets.sh"
 SHELL_TARGETS=()
 YAML_TARGETS=()
 GO_TARGETS=()
+WEB_TARGETS=()
 RUN_GO_ALL=0
 RUN_DEV_PAGE_GOVERNANCE=0
 
@@ -81,6 +82,12 @@ add_go_target() {
 }
 
 for file in "${STAGED_FILES[@]}"; do
+  case "$file" in
+  web/src/*.js | web/src/*.jsx | web/src/*.mjs)
+    [[ -f "$file" ]] && WEB_TARGETS+=("${file#web/}")
+    ;;
+  esac
+
   case "$file" in
   web/src/dev-workbench/DevWorkbenchRoutes.jsx | \
     web/src/dev-workbench/pages/* | \
@@ -128,6 +135,23 @@ done
 if [[ "$RUN_DEV_PAGE_GOVERNANCE" -eq 1 ]]; then
   echo "[pre-commit] 检查 DEV 菜单与页面治理合同"
   node "$INDEX_ROOT/scripts/qa/lib/node-test-process.mjs" --timeout-ms 120000 -- --test "$INDEX_ROOT/scripts/qa/dev-page-governance.test.mjs"
+fi
+
+if [[ "${#WEB_TARGETS[@]}" -gt 0 ]]; then
+  echo "[pre-commit] 检查暂存前端代码与测试（零 warning）"
+  if [[ ! -f "$ROOT_DIR/web/node_modules/eslint/bin/eslint.js" ]]; then
+    echo "[pre-commit] 缺少前端依赖，请先执行 pnpm --dir web install --frozen-lockfile" >&2
+    exit 1
+  fi
+  if [[ -e "$INDEX_ROOT/web/node_modules" || -L "$INDEX_ROOT/web/node_modules" ]]; then
+    echo "[pre-commit] 前端依赖必须来自工作区安装，不能进入暂存快照" >&2
+    exit 1
+  fi
+  ln -s "$ROOT_DIR/web/node_modules" "$INDEX_ROOT/web/node_modules"
+  (
+    cd "$INDEX_ROOT/web"
+    node node_modules/eslint/bin/eslint.js --max-warnings=0 "${WEB_TARGETS[@]}"
+  )
 fi
 
 if [[ "${#SHELL_TARGETS[@]}" -gt 0 ]]; then

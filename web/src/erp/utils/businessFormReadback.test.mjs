@@ -11,10 +11,8 @@ test('表单回读保留控件并清除校验，不因未校验字段的共享�
   t.mock.method(console, 'error', (...args) => errors.push(args.join(' ')))
   let form
   function Editor() {
-    ;[form] = Form.useForm()
-    return h(Form, { form, initialValues: { note: '原说明' } },
-      h(Form.Item, { name: 'name', label: '名称', rules: [{ required: true, message: '名称必填' }] }, h(Input)),
-      h(Form.Item, { name: 'note', label: '说明' }, h(Input)),
+    [form] = Form.useForm()
+    return h(Form, { form, initialValues: { note: '原说明' } }, h(Form.Item, { name: 'name', label: '名称', rules: [{ required: true, message: '名称必填' }] }, h(Input)), h(Form.Item, { name: 'note', label: '说明' }, h(Input)),
     )
   }
   await ui.render(h(Editor))
@@ -28,6 +26,8 @@ test('表单回读保留控件并清除校验，不因未校验字段的共享�
   assert.deepEqual(form.getFieldError('name'), [])
   assert.deepEqual(form.getFieldWarning('name'), [])
   assert.equal(form.isFieldsTouched(), false)
-  assert.deepEqual([...ui.container.querySelectorAll('input')], controls)
+  const currentControls = [...ui.container.querySelectorAll('input')]
+  assert.equal(currentControls.length, controls.length)
+  assert.equal(currentControls.every((control, index) => control === controls[index]), true)
   assert.deepEqual(errors, [])
 })

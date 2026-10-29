@@ -113,7 +113,7 @@ pre-commit 与 commit-msg 检查持锁身份、分支、HEAD、完整候选和�
 
 | Hook | 脚本与职责 |
 | --- | --- |
-| pre-commit | 先后核对提交互斥与候选；`git-hooks/pre-commit.sh` 只读 staged 快照并执行 db-guard，不生成、不 apply、不重新暂存 |
+| pre-commit | 先后核对提交互斥与候选；`git-hooks/pre-commit.sh` 只读 staged 快照，执行 db-guard，并对改动的前端代码与测试执行零 warning ESLint；不生成、不 apply、不重新暂存 |
 | commit-msg | 先后核对提交互斥与候选；`git-hooks/commit-msg.sh` 校验项目提交格式 |
 | pre-push | `git-hooks/pre-push.sh`，核对真实 push 范围、签名回执、TTL 与最新 secrets；不现场回退到 full |
 

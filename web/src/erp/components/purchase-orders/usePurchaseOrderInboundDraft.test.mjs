@@ -7,10 +7,13 @@ import { PurchaseSourceActions } from '../../../common/consts/purchaseSourceActi
 import { RpcErrorCode } from '../../../common/consts/errorCodes.generated.js'
 
 const source = { id: 7, purchase_order_no: 'PO-PERMISSION' }
-const progress = { code: 0, data: { purchase_order_receipt_progress: {
+const progress = { code: 0,
+data: { purchase_order_receipt_progress: {
   purchase_order_id: source.id, purchase_order_no: source.purchase_order_no, lifecycle_status: 'approved', items: [],
 } } }
-const draft = { receipt_no: 'IN-PERMISSION', received_at: '2026-10-25', arrival_items: [
+const draft = { receipt_no: 'IN-PERMISSION',
+received_at: '2026-10-25',
+arrival_items: [
   { purchase_order_item_id: 10, warehouse_id: 20, quantity: '2', declared_quantity: '2' },
 ] }
 
@@ -22,7 +25,8 @@ async function harness(t, respond) {
   const action = PurchaseSourceActions.receipt
   const permissions = [action.permission, ...action.sourcePermissions, ...action.preparationPermissions]
   let profile = { permissions, effective_session: { actions: permissions } }
-  let values = {}, current
+  let values = {}; let
+current
   const calls = []
   installRpcCallHarness((cleanup) => t.after(cleanup))(async (method, params, context) => {
     calls.push({ method, params, signal: context.init.signal })
@@ -40,11 +44,14 @@ async function harness(t, respond) {
     return null
   }
   function Frame() { return h(Outlet, { context: { adminProfile: profile } }) }
-  const render = () => view.render(h(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } },
-    h(Routes, null, h(Route, { element: h(Frame) }, h(Route, { path: '*', element: h(Consumer) })))))
+  const render = () => view.render(h(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Routes, null, h(Route, { element: h(Frame) }, h(Route, { path: '*', element: h(Consumer) })))))
   await render()
-  return { ...view, calls, form, render,
-    get current() { return current }, get values() { return values },
+  return { ...view,
+calls,
+form,
+render,
+    get current() { return current },
+get values() { return values },
     revoke: () => { profile = { ...profile, effective_session: { actions: [action.permission] } }; return render() },
   }
 }

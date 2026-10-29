@@ -13,7 +13,7 @@ test('only material reviewers have a read-only summary; engineering tasks do not
   const calls = []
   let escaped = 0
   const original = JsonRpc.prototype.call
-  JsonRpc.prototype.call = async function (method, params, options) {
+  JsonRpc.prototype.call = async function callRpc(method, params, options) {
     calls.push({ method, params, options })
     assert.equal(method, 'get_engineering_material_request')
     return { data: { order_no: `ORDER-${params.sales_order_id}`, status: 'BOSS_APPROVED', sources: [], items: [{ id: 1, material_id: 1, unit_id: 1, material_name: '测试布料', unit_name: '码', required_quantity: '3.125' }], issues: [], purchase_orders: [] } }
@@ -22,7 +22,14 @@ test('only material reviewers have a read-only summary; engineering tasks do not
   const root = createRoot(node)
   t.after(async () => { await act(async () => root.unmount()); node.remove(); JsonRpc.prototype.call = original; dom.restore() })
   const task = {
-    id: 15, source_id: 3, source_type: 'engineering_material_request', task_group: 'engineering_material_finance_review', task_code: 'source-material-finance-review-3', task_status_key: 'ready', owner_role_key: 'finance', required_capability_key: 'engineering.material.finance_approve',
+    id: 15,
+source_id: 3,
+source_type: 'engineering_material_request',
+task_group: 'engineering_material_finance_review',
+task_code: 'source-material-finance-review-3',
+task_status_key: 'ready',
+owner_role_key: 'finance',
+required_capability_key: 'engineering.material.finance_approve',
     payload: { sales_order_id: 8, engineering_material_request_id: 3, source_task_contract: 'workflow.source-task/v1', source_task_producer: 'engineering_material_request.approval', source_task_intent_hash: 'a'.repeat(64) },
   }
   const profile = { is_super_admin: true, effective_session: { actions: ['sales_order.read', 'engineering.material.read', 'engineering.material.finance_approve', 'field.procurement_commercial.read'] } }

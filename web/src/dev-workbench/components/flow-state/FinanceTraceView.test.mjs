@@ -64,9 +64,9 @@ test('财务关联分页读取，局部失败不掩盖其他结果，退款只�
     const rpc = JSON.parse(options.body)
     requests.push(rpc)
     if (rpc.method === 'list_finance_facts')
-      return ok(rpc, { finance_facts: [fact(9)], total: 1 })
+      { return ok(rpc, { finance_facts: [fact(9)], total: 1 }) }
     if (rpc.method === 'get_finance_fact')
-      return ok(rpc, { finance_fact: fact(9) })
+      { return ok(rpc, { finance_fact: fact(9) }) }
     if (rpc.method === 'list_finance_credit_notes') {
       if (failCredits) throw new Error('offline')
       return ok(rpc, { credit_notes: [], total: 0 })
@@ -75,9 +75,9 @@ test('财务关联分页读取，局部失败不掩盖其他结果，退款只�
       rpc.method === 'list_finance_payments' &&
       rpc.params.refund_of_payment_id
     )
-      return ok(rpc, { payments: [], total: 0 })
+      { return ok(rpc, { payments: [], total: 0 }) }
     if (rpc.method === 'list_finance_payments')
-      return ok(rpc, {
+      { return ok(rpc, {
         payments: [
           {
             id: 2,
@@ -99,7 +99,7 @@ test('财务关联分页读取，局部失败不掩盖其他结果，退款只�
           },
         ],
         total: 21,
-      })
+      }) }
     throw new Error(`Unexpected read: ${rpc.method}`)
   })
   await harness.render(
@@ -153,7 +153,7 @@ test('切换账款与卸载会中止旧读取，迟到数据不能覆盖新账�
   t.mock.method(globalThis, 'fetch', async (_url, options) => {
     const rpc = JSON.parse(options.body)
     if (rpc.method === 'list_finance_facts')
-      return ok(rpc, { finance_facts: [], total: 0 })
+      { return ok(rpc, { finance_facts: [], total: 0 }) }
     if (rpc.method === 'get_finance_fact' && rpc.params.id === 9) {
       oldSignal = options.signal
       return new Promise((resolve) => {
@@ -161,7 +161,7 @@ test('切换账款与卸载会中止旧读取，迟到数据不能覆盖新账�
       })
     }
     if (rpc.method === 'get_finance_fact')
-      return ok(rpc, { finance_fact: fact(10) })
+      { return ok(rpc, { finance_fact: fact(10) }) }
     return ok(
       rpc,
       rpc.method === 'list_finance_payments'

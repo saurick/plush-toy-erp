@@ -1611,6 +1611,8 @@ make purchase_return_pg_test
 
 ## 推送准备与回执
 
+前端源码与测试在 pre-commit 中按实际暂存内容执行零 warning ESLint，未暂存修正不能掩盖提交中的错误。短门禁对 Markdown 改动保留文档链接检查，对共享帮助、手册源码和生成物改动保留手册同步检查；重型发布、数据库和浏览器测试继续由同一 SHA 的完整 CI 证明。
+
 - 准备阶段在 Git 建立 receive-pack 连接前查询远端 ref，计算每个目标 range 和 aggregate range，并按目标与选项选择 `server-ci`、`affected` 或 `full`。默认单一 `origin/main` 只执行上文约定的签名短门禁；非标准目标和显式 `--full` 按当次计划执行保守本地门禁。
 
   首次把同名分支镜像到空远端时，aggregate range 和严格 secrets 仍覆盖 `empty-tree..HEAD`；只有目标恰为单个缺失同名分支、另一个已配置 upstream tracking ref 存在且为 HEAD 祖先时，数据库守卫和实时 `git log --check` 才使用该 upstream SHA 到 HEAD 的范围。

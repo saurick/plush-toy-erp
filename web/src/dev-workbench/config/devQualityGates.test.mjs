@@ -947,7 +947,8 @@ test('server Job timestamp contract accepts missing records and rejects reversed
 
 test('quality reads and session acquisition have bounded deadlines, and a stalled session cannot launch a run', async () => {
   const calls = []
-  const client = createDevQualityGateClient({ timeoutMs: 5, fetchImpl: (url, options) => {
+  const client = createDevQualityGateClient({ timeoutMs: 5,
+fetchImpl: (url, options) => {
     calls.push({ url, method: options.method })
     return new Promise(() => {})
   } })

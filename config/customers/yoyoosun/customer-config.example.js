@@ -71,8 +71,8 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         items: Object.freeze(["production-orders", "production-progress"]),
       }),
       Object.freeze({
-        title: "库存管理",
-        items: Object.freeze(["inbound", "inventory"]),
+        title: "仓储管理",
+        items: Object.freeze(["inventory", "inbound", "outbound"]),
       }),
       Object.freeze({
         title: "质检管理",
@@ -80,7 +80,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
       }),
       Object.freeze({
         title: "出货管理",
-        items: Object.freeze(["shipments", "outbound"]),
+        items: Object.freeze(["shipments"]),
       }),
       Object.freeze({
         title: "财务管理",

@@ -260,13 +260,11 @@ test('conflict refresh preserves an actual draft until the user discards it', as
   assert.equal(view.state.roleConfigurationDirty, false)
 })
 
-
 test('role deep link survives asynchronous option loading', async (t) => {
   const view = await mountSettings(t, { initialRoleKey: 'finance' })
   await view.render({ permissions, roles })
   assert.deepEqual(checklist(view).value, ['sales_order.read'])
 })
-
 
 test('missing server responsibility policy keeps permissions and data scopes read-only', async (t) => {
   const view = await mountSettings(t)

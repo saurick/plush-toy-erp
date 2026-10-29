@@ -28,7 +28,9 @@ test('状态选择保留完整流转图并只展示适用的办理规则，清�
   const flow = catalog.flows.find((flow) => flow.key === 'source.sales_order')
   const selected = []
   const render = (key) => harness.render(h(StateRulesView, {
-    catalog, flow, state: flow.states.find((state) => state.key === key),
+    catalog,
+flow,
+state: flow.states.find((state) => state.key === key),
     onSelectState: (key) => selected.push(key),
   }))
   await render('active')

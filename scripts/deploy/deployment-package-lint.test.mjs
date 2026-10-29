@@ -433,7 +433,7 @@ test("deployment package lint retains inspection coverage after checklist consol
   );
 });
 
-test("deployment package lint keeps the 100 MiB attachment upload envelope", (t) => {
+test("deployment package lint keeps the 200 MiB attachment upload envelope", (t) => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-attachment-limit-lint-"),
   );
@@ -444,12 +444,13 @@ test("deployment package lint keeps the 100 MiB attachment upload envelope", (t)
   const configPath = path.join(targetPackage, "compose/nginx.example.conf");
   const config = fs
     .readFileSync(configPath, "utf8")
-    .replace("client_max_body_size 150m;", "client_max_body_size 20m;");
+    .replace("client_max_body_size 300m;", "client_max_body_size 150m;");
+  assert.notEqual(config, fs.readFileSync(configPath, "utf8"));
   fs.writeFileSync(configPath, config);
 
   assert.throws(
     () => validateDeploymentPackage({ repoRoot: root, customer: "yoyoosun" }),
-    /must allow the 100 MiB attachment upload envelope/,
+    /must allow the 200 MiB attachment upload envelope/,
   );
 });
 

@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -154,6 +155,42 @@ function installDbGuardFixture(root) {
   chmodSync(path.join(root, "scripts/qa/db-guard.sh"), 0o755);
   installDbModelFixture(root);
 }
+
+test("pre-commit lints indexed Web tests and preserves both index and unstaged content", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-web-lint-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  git(root, ["init", "-q"]);
+  installHookFixture(root);
+  writeFileSync(path.join(root, ".gitignore"), "web/node_modules\n");
+  writeFileSync(path.join(root, "web/package.json"), '{"type":"module","scripts":{"test":"node --test"}}\n');
+  copyFileSync(path.join(ROOT, "web/eslint.config.js"), path.join(root, "web/eslint.config.js"));
+  symlinkSync(path.join(ROOT, "web/node_modules"), path.join(root, "web/node_modules"));
+  mkdirSync(path.join(root, "web/src"), { recursive: true });
+  const relative = "web/src/indexed.test.mjs";
+  const file = path.join(root, relative);
+  const valid = "export const value = 1\n";
+  const invalid = "export const value = (\n";
+  writeFileSync(file, valid);
+  commit(root, "base");
+
+  writeFileSync(file, invalid);
+  git(root, ["add", relative]);
+  writeFileSync(file, valid);
+  const run = () => spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], { cwd: root, encoding: "utf8" });
+  const rejected = run();
+  assert.notEqual(rejected.status, 0, rejected.stderr || rejected.stdout);
+  assert.match(`${rejected.stdout}\n${rejected.stderr}`, /Parsing error/u);
+  assert.equal(git(root, ["show", `:${relative}`]), invalid.trim());
+  assert.equal(readFileSync(file, "utf8"), valid);
+
+  writeFileSync(file, "export const value = 2\n");
+  git(root, ["add", relative]);
+  writeFileSync(file, invalid);
+  const passed = run();
+  assert.equal(passed.status, 0, passed.stderr || passed.stdout);
+  assert.equal(git(root, ["show", `:${relative}`]), "export const value = 2");
+  assert.equal(readFileSync(file, "utf8"), invalid);
+});
 
 test("pre-commit is check-only and preserves partial staging", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-"));

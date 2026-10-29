@@ -11,9 +11,10 @@ test('task BOM save associates only the selected order line and safely recovers 
   t.after(() => { JsonRpc.prototype.call = original })
   const source = { id: 11, product_id: 7, product_sku_id: 8, bom_id: null, line_status: 'open' }
   const bom = { id: 73, product_id: 7, edit_version: 100000001 }
-  let line, version, writes, lost, ignored
+  let line; let version; let writes; let lost; let
+ignored
   const reset = () => { line = { ...source }; version = 3; writes = []; lost = false; ignored = false }
-  JsonRpc.prototype.call = async function (method, params) {
+  JsonRpc.prototype.call = async function callRpc(method, params) {
     if (method === 'get_sales_order') return { data: { sales_order: { id: 1, version } } }
     if (method === 'list_sales_order_items') return { data: { sales_order_items: [line], total: 1, offset: params.offset, limit: params.limit } }
     assert.equal(method, 'save_sales_order_engineering')
@@ -71,7 +72,7 @@ test('completion preserves all order sources and recovers an automatic-review re
   let line = { ...source }
   let order = { id: 1, version: 3 }
   let writes = 0
-  JsonRpc.prototype.call = async function (method, params) {
+  JsonRpc.prototype.call = async function callRpc(method, params) {
     if (method === 'get_sales_order') return { data: { sales_order: order } }
     if (method === 'list_sales_order_items') return { data: { sales_order_items: [line], total: 1, offset: params.offset, limit: params.limit } }
     if (method === 'get_bom_version') return { data: { bom_version: { id: 73, edit_version: 101 } } }
@@ -98,7 +99,7 @@ test('completion refuses a new or unfinished order line before writing', async (
   t.after(() => { JsonRpc.prototype.call = original })
   const source = { id: 11, line_no: 1, product_id: 7, bom_id: null, line_status: 'open' }
   let lines = [source]
-  JsonRpc.prototype.call = async function (method, params) {
+  JsonRpc.prototype.call = async function callRpc(method, params) {
     if (method === 'get_sales_order') return { data: { sales_order: { id: 1, version: 3 } } }
     if (method === 'list_sales_order_items') return { data: { sales_order_items: lines, total: lines.length, offset: params.offset, limit: params.limit } }
     assert.fail(`unexpected write ${method}`)
@@ -114,7 +115,7 @@ test('review success retries only task completion and reads an already completed
   const source = { id: 11, product_id: 7, bom_id: 73, line_status: 'open' }
   let task = { id: 41, version: 2, task_status_key: 'ready' }
   let calls = 0
-  JsonRpc.prototype.call = async function (method, params) {
+  JsonRpc.prototype.call = async function callRpc(method, params) {
     if (method === 'get_sales_order') return { data: { sales_order: { id: 1, version: 4, engineering_material_status: 'SUBMITTED' } } }
     if (method === 'list_sales_order_items') return { data: { sales_order_items: [source], total: 1, offset: params.offset, limit: params.limit } }
     if (method === 'get_task') return { data: { task } }

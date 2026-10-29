@@ -446,8 +446,8 @@ function validateNginxRouting(packageDir, errors) {
     errors,
   );
   assert(
-    /client_max_body_size\s+150m;/u.test(content),
-    "nginx example must allow the 100 MiB attachment upload envelope",
+    /client_max_body_size\s+300m;/u.test(content),
+    "nginx example must allow the 200 MiB attachment upload envelope",
     errors,
   );
   assert(

@@ -575,6 +575,17 @@ function selectPrePushNodeTests(changedFiles, commands, directTests) {
         (file.startsWith("web/src/") && namedTests.has(file)),
     ),
   );
+  if (changedFiles.some((file) => file.endsWith(".md"))) {
+    selected.add("scripts/qa/docs-inventory.test.mjs");
+  }
+  if (changedFiles.some((file) =>
+    /^web\/src\/erp\/(?:config\/(?:businessHandbook|projectManuals|businessUsabilityCatalog|businessModules|engineeringMaterialHelp|roleHelpContent)|utils\/businessHandbookExport)/u.test(file) ||
+    file.startsWith("docs/manuals/") ||
+    file.startsWith("server/internal/projectmanuals/") ||
+    file.startsWith("scripts/docs/project-manuals")
+  )) {
+    selected.add("scripts/docs/project-manuals.test.mjs");
+  }
   if (
     changedFiles.some(
       (file) =>

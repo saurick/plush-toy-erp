@@ -1,14 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import vm from 'node:vm'
-import { transformWithEsbuild } from 'vite'
+import { submitShipmentDraft } from '../components/shipments/submitShipmentDraft.mjs'
 import { isSourceBusinessActionResultUnknown } from '../utils/sourceBusinessAction.mjs'
-
-const source = readFileSync(new URL('./ShipmentsPage.jsx', import.meta.url), 'utf8')
-const handler = source.slice(source.indexOf('  const submitShipmentModal ='), source.indexOf('  const runShipmentAction ='))
-assert.ok(handler.length > 0, 'load the actual page submit handler')
-const { code } = await transformWithEsbuild(`${handler}\nsubmitShipmentModal`, 'ShipmentsTaskHandling.jsx', { loader: 'jsx', jsx: 'transform', target: 'esnext' })
 
 function setup(overrides = {}) {
   const calls = []
@@ -50,7 +43,8 @@ function setup(overrides = {}) {
     ...overrides,
   }
   Object.defineProperty(context, 'shipmentModal', { get: () => state.modal })
-  const submit = vm.runInNewContext(code, context)
+  context.confirmSubmission = () => new Promise((resolve) => context.modal.confirm({ onOk: () => resolve(true), onCancel: () => resolve(false) }))
+  const submit = (options) => submitShipmentDraft(context, options)
   return { submit, calls, state, saved, canonical, context }
 }
 

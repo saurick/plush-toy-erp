@@ -373,7 +373,7 @@ test('UI design keeps persistent page headings concise like the formal ERP', () 
   )
   const viewer = read('web/src/dev-workbench/pages/DevUIDesignPage.jsx')
   const viewerHeading = viewer.match(
-    /<DevPageHeader\b([\s\S]*?)\n      \/>/u
+    /<DevPageHeader\b([\s\S]*?)\n {6}\/>/u
   )
 
   assert.ok(formHeaders.length >= 9)

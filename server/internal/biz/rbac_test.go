@@ -140,7 +140,6 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionMaterialUpdate,
 				PermissionMaterialDisable,
 				PermissionProcessRead,
-				PermissionProcessCreate,
 				PermissionProductRead,
 				PermissionBOMRead,
 				PermissionBOMUpdate,
@@ -151,7 +150,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskReject,
 				PermissionMobileEngineeringAccess,
 			},
-			omits: []string{PermissionWorkflowTaskCreate, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskCreate, PermissionDebugBusinessClear, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable},
 		},
 		{
 			roleKey: PurchaseRoleKey,

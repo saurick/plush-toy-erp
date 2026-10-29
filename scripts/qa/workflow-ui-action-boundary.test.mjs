@@ -1091,9 +1091,9 @@ test("purchase order page keeps write buttons behind projected actions", () => {
         "const canUpdate = hasActionPermission(adminProfile, 'purchase.order.update')",
       ) &&
       pageSource.includes(
-        "const canCreatePurchaseReceipt = hasActionPermission(",
+        "const canCreatePurchaseReceipt = receiptSourceAccess.allowed",
       ) &&
-      pageSource.includes("'purchase.receipt.create'"),
+      pageSource.includes("sourceActionAccess(adminProfile, PurchaseSourceActions.receipt)"),
     "purchase order page must derive write permissions through projected action helper",
   );
   assert(
@@ -1212,9 +1212,9 @@ test("fact pages keep write buttons behind projected actions and status guards",
       relativePath: "web/src/erp/pages/ShipmentsPage.jsx",
       name: "shipment page",
       tokens: [
-        "const canCreate = hasActionPermission(\n    adminProfile,\n    'shipment.create'\n  )",
+        "const canCreate = !mobileTaskExecution && hasActionPermission(\n    adminProfile,\n    'shipment.create'\n  )",
         "const canShip = hasActionPermission(\n    adminProfile,\n    'shipment.ship'\n  )",
-        "const canCancel = hasActionPermission(\n    adminProfile,\n    'shipment.cancel'\n  )",
+        "const canCancel = !mobileTaskExecution && hasActionPermission(\n    adminProfile,\n    'shipment.cancel'\n  )",
         "primaryAction={\n          canCreate ? (",
         "disabled={!selectedRow || saving}",
         "onClick={() => openShipmentDetails(selectedRow)}",
@@ -1268,7 +1268,8 @@ test("fact pages keep write buttons behind projected actions and status guards",
       relativePath: "web/src/erp/pages/QualityInspectionsPage.jsx",
       name: "quality inspection page",
       tokens: [
-        "const canCreate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.create'\n  )",
+        "const qualitySourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.quality)",
+        "const canCreate = qualitySourceAccess.allowed",
         "const canUpdate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.update'\n  )",
         "const canHandleQualityException = hasActionPermission(\n    adminProfile,\n    'quality.exception.handle'\n  )",
         "const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()",

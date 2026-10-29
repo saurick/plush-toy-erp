@@ -93,7 +93,6 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "sales-orders",
     "products",
     "materials",
-    "processes",
     "material-bom",
     "task-board",
     "print-center",
@@ -1952,6 +1951,7 @@ test("yoyoosun engineering print source pages expose every business-owned print 
     "utf8",
   );
   const bomPage = readFileSync("web/src/erp/pages/BOMVersionsPage.jsx", "utf8");
+  const bomEditor = readFileSync("web/src/erp/components/bom/BOMEditor.jsx", "utf8");
   const bomColumns = readFileSync(
     "web/src/erp/components/bom/BOMVersionColumns.jsx",
     "utf8",
@@ -1975,11 +1975,14 @@ test("yoyoosun engineering print source pages expose every business-owned print 
     ],
     "bom version form",
   );
+  assertSourceContainsAll(bomEditor, [
+      "<BOMMaterialGroupsForm",
+      "['items', index, 'total_usage_snapshot']",
+    ], "shared BOM editor");
   assertSourceContainsAll(
     bomPage,
     [
-      "<BOMMaterialGroupsForm",
-      "['items', index, 'total_usage_snapshot']",
+      "<BOMEditor",
       "openPrintWorkspaceWindow",
       "buildMaterialDetailDraftFromBOMVersion",
       "buildColorCardDraftFromBOMVersion",

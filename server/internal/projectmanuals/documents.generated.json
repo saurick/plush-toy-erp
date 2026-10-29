@@ -21,7 +21,7 @@
     "id": "handbook:roles",
     "book": "business",
     "title": "岗位责任与交接",
-    "source_hash": "87c99fbafd130e9c082aee8ce025cda1549925c1a54dc86351d4126805ba8191",
+    "source_hash": "b84d529cc8137d55d5a8401899ac8108e2babb67732e3c702cb391b2548c003e",
     "path": "",
     "roles": [],
     "supplement": true
@@ -316,10 +316,10 @@
     "id": "processes",
     "book": "business",
     "title": "加工环节怎么用",
-    "source_hash": "d55af197407b49a5a47856207b34fb7d7f3d890c8f00dec6b1f548b7881f991b",
+    "source_hash": "7e7aaba5e89dff981249c37c7ea616ca401619feb08677638d6bf0605247136e",
     "path": "/erp/engineering/processes",
     "roles": [
-      "engineering"
+      "pmc"
     ],
     "supplement": true
   },
@@ -327,10 +327,10 @@
     "id": "processes:process-reference",
     "book": "business",
     "title": "质检参考会自动发起检验吗",
-    "source_hash": "377570bfcc9d7c327abdef2f4ea35dbff28eb7ee8ffc88582d4c686a1493e112",
+    "source_hash": "b7649c8e06e1464e054bd5976323d9c6a4ea149ee6d4b4f1e0b819f8e3acc4e0",
     "path": "/erp/engineering/processes",
     "roles": [
-      "engineering"
+      "pmc"
     ],
     "supplement": false
   },
@@ -338,10 +338,10 @@
     "id": "processes:process-order",
     "book": "business",
     "title": "列表排序就是加工顺序吗",
-    "source_hash": "583e775ec1c4017ddca2f90d12f44274259603336d54c2dff38528d4ca9af5a4",
+    "source_hash": "53ecc31ff50575ea5311901d0973c343a2e74ef69733f043dc6ba8ea788b9c29",
     "path": "/erp/engineering/processes",
     "roles": [
-      "engineering"
+      "pmc"
     ],
     "supplement": false
   },
@@ -349,10 +349,10 @@
     "id": "processes:process-blocked",
     "book": "business",
     "title": "什么情况要先核实",
-    "source_hash": "c49f93fec986c9f4921f98570611ec61c49f02ea75498655aecf101213a1cdb5",
+    "source_hash": "ec22e9ab3a92cd69fc0c70506982696fddf9482d7dc8c6eef43a71fd346174e1",
     "path": "/erp/engineering/processes",
     "roles": [
-      "engineering"
+      "pmc"
     ],
     "supplement": false
   },
@@ -1560,6 +1560,17 @@
     "supplement": false
   },
   {
+    "id": "guide:processes",
+    "book": "business",
+    "title": "维护加工环节",
+    "source_hash": "2da347db9fdac8a8910a5abaa8cbe9a04484c7798f754ec2fc74b2cd7bcead3b",
+    "path": "/erp/engineering/processes",
+    "roles": [
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
     "id": "guide:quality-inspections",
     "book": "business",
     "title": "办理质量检验",
@@ -1587,17 +1598,6 @@
     "title": "维护物料清单",
     "source_hash": "4e3a5f553062ac42d14846b7416cb2d5f220dfc0a9ab806386aab9d6cd3930a4",
     "path": "/erp/purchase/material-bom",
-    "roles": [
-      "engineering"
-    ],
-    "supplement": false
-  },
-  {
-    "id": "guide:processes",
-    "book": "business",
-    "title": "维护加工环节",
-    "source_hash": "aa21eacff77e4fea8308fa50b5ed4de625babbfece9c5d57f4043426e1d6a87d",
-    "path": "/erp/engineering/processes",
     "roles": [
       "engineering"
     ],

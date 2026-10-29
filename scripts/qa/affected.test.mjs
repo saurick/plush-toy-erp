@@ -278,7 +278,6 @@ test("affected: short push checks reuse fast classification and exclude costly g
     "scripts/qa/manual-acceptance-browser.test.mjs",
     "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
     "scripts/qa/pre-push-receipt.test.mjs",
-    "docs/product/产品完成路线图.md",
   ]) {
     assert.deepEqual(buildAffectedPlan([file], { root: ROOT }).prePushNodeTests, [], file);
   }
@@ -286,6 +285,14 @@ test("affected: short push checks reuse fast classification and exclude costly g
   assert.deepEqual(buildAffectedPlan([file], { root: ROOT }).prePushNodeTests, [file]);
   const ciTest = "scripts/qa/gitlab-ci.test.mjs";
   assert.deepEqual(buildAffectedPlan([ciTest], { root: ROOT }).prePushNodeTests, [ciTest]);
+});
+
+test("affected: short push checks retain document links and generated manuals", () => {
+  const docs = buildAffectedPlan(["docs/product/产品完成路线图.md"], { root: ROOT });
+  assert(docs.prePushNodeTests.includes("scripts/qa/docs-inventory.test.mjs"));
+  for (const file of ["web/src/erp/config/roleHelpContent.mjs", "web/src/erp/config/engineeringMaterialHelp.mjs", "docs/manuals/业务使用手册.md"]) {
+    assert(buildAffectedPlan([file], { root: ROOT }).prePushNodeTests.includes("scripts/docs/project-manuals.test.mjs"), file);
+  }
 });
 
 test("affected: help explains the server-CI trust boundary", () => {
