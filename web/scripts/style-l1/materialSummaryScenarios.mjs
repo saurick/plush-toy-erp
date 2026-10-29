@@ -46,6 +46,7 @@ export function summaryFixture(inventoryStatus = 'AVAILABLE', empty = false) {
     order_no: 'SO-MATERIAL-UI',
     order_status: 'active',
     status: 'SUBMITTED',
+    submitted_at: '2026-09-26T01:00:00Z',
     version: 1,
     issues: [],
     purchase_orders: [],
@@ -73,6 +74,7 @@ export function createMaterialSummaryScenarios({
     let inventoryStatus = 'AVAILABLE'
     let empty = false
     let reads = 0
+    const readRequests = []
     const writes = []
     return {
       name: `material-summary-task-${themeMode}`,
@@ -90,40 +92,50 @@ export function createMaterialSummaryScenarios({
           'engineering.material.read',
         ],
         workflow_visible_owner_role_keys_by_capability: {
-          'workflow.task.read': ['engineering'],
-          'workflow.task.update': ['engineering'],
-          'workflow.task.complete': ['engineering'],
+          'workflow.task.read': ['boss'],
+          'workflow.task.update': ['boss'],
+          'workflow.task.complete': ['boss'],
         },
       },
       workflowTaskFixtures: [
         {
           id: 9451,
-          task_code: 'STYLE-L1-MATERIAL-SUMMARY',
-          task_group: 'engineering_data',
-          task_name: '核对工程用料依据',
-          source_type: 'sales_order',
-          source_id: 101,
+          task_code: 'source-material-boss-review-51',
+          task_group: 'engineering_material_boss_review',
+          task_name: '审核工程用料',
+          source_type: 'engineering_material_request',
+          source_id: 51,
           source_no: 'SO-MATERIAL-UI',
           task_status_key: 'ready',
-          owner_role_key: 'engineering',
+          owner_role_key: 'boss',
+          required_capability_key: 'engineering.material.boss_approve',
           created_at: 1790085600,
           version: 1,
-          payload: { product_name: '节庆毛绒礼盒', sales_order_id: 101 },
+          payload: {
+            product_name: '节庆毛绒礼盒',
+            sales_order_id: 101,
+            engineering_material_request_id: 51,
+            source_task_contract: 'workflow.source-task/v1',
+            source_task_producer: 'engineering_material_request.approval',
+            source_task_intent_hash: 'a'.repeat(64),
+          },
         },
       ],
       beforeNavigate: async (page) => {
         inventoryStatus = 'AVAILABLE'
         empty = false
         reads = 0
+        readRequests.length = 0
         writes.length = 0
         await page.route('**/rpc/sales_order', async (route) => {
-          const { id, method } = route.request().postDataJSON()
+          const { id, method, params } = route.request().postDataJSON()
           if (method !== 'get_engineering_material_request') {
             if (/submit|review|update|create|delete/.test(method)) {
               writes.push(method)
             }
             return route.fallback()
           }
+          readRequests.push(params)
           reads += 1
           return route.fulfill({
             status: 200,
@@ -139,7 +151,7 @@ export function createMaterialSummaryScenarios({
       verify: async (page) => {
         await page
           .getByRole('button', {
-            name: '查看核对工程用料依据详情',
+            name: '查看审核工程用料详情',
             exact: true,
           })
           .click()
@@ -149,7 +161,8 @@ export function createMaterialSummaryScenarios({
           exact: true,
         })
         await trigger.waitFor()
-        assert.equal(reads, 0, '只有打开汇总时才读取材料')
+        await drawer.locator('[data-testid="workflow-task-handling-chain"][data-process-state="ready"]').waitFor()
+        assert.equal(reads, 1, '任务处理链核对本轮审批，汇总弹窗尚未读取')
         await trigger.scrollIntoViewIfNeeded()
         const taskScroll = await drawer
           .locator('.ant-drawer-body')
@@ -160,6 +173,10 @@ export function createMaterialSummaryScenarios({
         await trigger.click()
         const dialog = page.locator('.erp-material-summary-modal')
         await dialog.getByText('米白短毛绒', { exact: true }).waitFor()
+        assert.deepEqual(readRequests, [
+          { sales_order_id: 101, request_id: 51 },
+          { sales_order_id: 101, request_id: 51, preview: false },
+        ])
         await waitForFiniteAnimations(page)
         const products = dialog.locator('.erp-material-product')
         assert.equal(await products.count(), 2)
