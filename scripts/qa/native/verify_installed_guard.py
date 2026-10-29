@@ -62,6 +62,9 @@ def verify(output):
     node = record['publicNode']
     if installer.digest(node) != record['installedSha'] or installer.source_digest() != record['source']:
         raise RuntimeError('installed guard identity does not match the current source')
+    if not record.get('signing'):
+        raise RuntimeError('installed guard needs a persistent signing identity')
+    installer.verify_signing_update(node, record['signing'])
     status(node)
     policy = record['policy']
     env = {key: value for key, value in os.environ.items()
@@ -70,6 +73,8 @@ def verify(output):
                     source=record['source'], installedSha=record['installedSha'],
                     originalRuntimeSha=record['runtimeSha'], runtime=record['runtimeVersion'],
                     kernel=record['kernel'], physicalMiB=record['physicalMiB'], policy=policy,
+                    signingIdentifier=record['signing']['identifier'],
+                    signingIdentitySha1=record['signing']['identitySha1'],
                     cases={})
     with tempfile.TemporaryDirectory(prefix='plush-installed-node-verification-') as temporary:
         root = Path(temporary)

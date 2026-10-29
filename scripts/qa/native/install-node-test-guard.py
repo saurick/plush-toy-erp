@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import signal
 import subprocess
@@ -18,6 +19,7 @@ import uuid
 SOURCE = Path(__file__).resolve().parent
 DEFAULT_PREFIX = Path('/Library/Application Support/PlushNodeTestGuard')
 DEFAULT_NODE = Path('/usr/local/bin/node')
+SIGNING_IDENTIFIER = 'local.plush.node-test-guard'
 DEFAULT_POLICY = dict(budget=6144, unit=128, driver=256, runner=512, worker=1024, queue=900,
                       job_seconds=120, suite_seconds=1800)
 
@@ -35,7 +37,46 @@ def source_digest():
                                   ['node-test-guard.c', 'node-test-bootstrap.cjs'])).hexdigest()
 
 
-def build_guard(prefix, runtime, public_node=None, state=None, owner=None, policy=None, installed_prefix=None, kernel_release=None):
+def signing_identity(requested=None, previous=None):
+    """Keep the installed identity; never silently fall back to an ad hoc signature."""
+    identities = re.findall(r'^\s*\d+\) ([0-9A-F]{40}) ',
+                            run(['security', 'find-identity', '-v', '-p', 'codesigning']).stdout, re.M)
+    selected = requested or (previous or {}).get('signing', {}).get('identitySha1')
+    if selected:
+        selected = selected.upper()
+        if selected not in identities:
+            raise RuntimeError('the requested or installed signing identity is unavailable; preserve the installed guard')
+        return selected
+    if len(identities) != 1:
+        raise RuntimeError('select one valid code-signing certificate with --sign-identity SHA1')
+    return identities[0]
+
+
+def signature(path):
+    run(['codesign', '--verify', '--strict', path])
+    details = run(['codesign', '-d', '--verbose=4', path]).stderr
+    fields = dict(line.split('=', 1) for line in details.splitlines() if '=' in line)
+    requirement = run(['codesign', '-d', '-r', '-', path])
+    match = re.search(r'^(?:# )?designated => (.+)$', requirement.stdout + requirement.stderr, re.M)
+    if not match:
+        raise RuntimeError('the guard has no designated code requirement')
+    return dict(identifier=fields.get('Identifier'), teamIdentifier=fields.get('TeamIdentifier'),
+                adHoc=fields.get('Signature') == 'adhoc', designatedRequirement=match[1])
+
+
+def verify_signing_update(path, previous_signing):
+    current = signature(path)
+    if current['adHoc'] or current['identifier'] != SIGNING_IDENTIFIER:
+        raise RuntimeError('installed guards require the stable certificate-backed signing identity')
+    if previous_signing:
+        if current['teamIdentifier'] != previous_signing['teamIdentifier']:
+            raise RuntimeError('signing team changed; preserve the installed guard and its authorization')
+        run(['codesign', '--verify', '--strict', '-R', '=' + previous_signing['designatedRequirement'], path])
+    return current
+
+
+def build_guard(prefix, runtime, public_node=None, state=None, owner=None, policy=None, installed_prefix=None,
+                kernel_release=None, sign_identity=None):
     prefix, runtime = Path(prefix).resolve(), Path(runtime).resolve()
     installed_prefix = Path(installed_prefix or prefix).absolute()
     public_node = Path(public_node or prefix / 'node').absolute()
@@ -63,13 +104,17 @@ def build_guard(prefix, runtime, public_node=None, state=None, owner=None, polic
         include.write_text(''.join(f'#define {key} {json.dumps(value)}\n' for key, value in config.items()))
         run(['clang', '-O2', '-Wall', '-Wextra', '-Werror', '-I', temporary,
              SOURCE / 'node-test-guard.c', '-o', prefix / 'launcher', '-lproc'])
-    run(['codesign', '--force', '--sign', '-', prefix / 'launcher'])
+    run(['codesign', '--force', '--sign', sign_identity or '-', '--identifier', SIGNING_IDENTIFIER,
+         '--timestamp=none', prefix / 'launcher'], timeout=30)
     shutil.copy2(SOURCE / 'node-test-bootstrap.cjs', prefix / 'node-test-bootstrap.cjs')
     manifest = dict(schema='plush.node-kernel-guard-install/v1', source=source_digest(),
                     realNode=str(runtime), publicNode=str(public_node), helper=str(installed_prefix / 'launcher'),
                     kernel=platform.release(), runtimeSha=digest(runtime),
                     runtimeVersion=run([runtime, '--version']).stdout.strip(), policy=policy,
                     launcherSha=digest(prefix / 'launcher'), prefix=str(installed_prefix), state=str(state))
+    if sign_identity:
+        manifest['signing'] = dict(identitySha1=sign_identity,
+                                   **verify_signing_update(prefix / 'launcher', None))
     (prefix / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
     if public_node.parent == prefix:
         shutil.copy2(prefix / 'launcher', public_node)
@@ -121,7 +166,7 @@ def installation_lock(state):
             signal.signal(signal.SIGALRM, previous)
 
 
-def install(prefix=DEFAULT_PREFIX, node=DEFAULT_NODE, policy_override=None):
+def install(prefix=DEFAULT_PREFIX, node=DEFAULT_NODE, policy_override=None, sign_identity=None):
     prefix, node = Path(prefix), Path(node)
     record = prefix / 'installation.json'
     previous = json.loads(record.read_text()) if record.exists() else None
@@ -140,6 +185,13 @@ def install(prefix=DEFAULT_PREFIX, node=DEFAULT_NODE, policy_override=None):
         expected_sha = previous['runtimeSha'] if previous.get('status') == 'rolled_back' else previous['installedSha']
     if current_sha != expected_sha:
         raise RuntimeError('Node changed outside this guard; preserve it and inspect before installing')
+    identity = signing_identity(sign_identity, previous)
+    previous_signing = (previous or {}).get('signing')
+    if previous and previous.get('status') != 'rolled_back':
+        if previous_signing:
+            verify_signing_update(node, previous_signing)
+        elif not signature(node)['adHoc']:
+            raise RuntimeError('the existing guard has an unrecorded signing identity; preserve it for inspection')
     original = prefix / 'node.original'
     run(['sudo', '-n', 'mkdir', '-p', prefix / 'versions', prefix / 'state'])
     if not original.exists():
@@ -156,7 +208,9 @@ def install(prefix=DEFAULT_PREFIX, node=DEFAULT_NODE, policy_override=None):
         if digest(node) != current_sha:
             raise RuntimeError('Node changed while installation was waiting')
         stage = Path(temporary) / 'version'
-        manifest = build_guard(stage, original, node, prefix / 'state', 0, policy=policy, installed_prefix=version)
+        manifest = build_guard(stage, original, node, prefix / 'state', 0, policy=policy,
+                               installed_prefix=version, sign_identity=identity)
+        verify_signing_update(stage / 'launcher', previous_signing)
         if previous and previous.get('status') != 'rolled_back':
             live = json.loads(run([stage / 'launcher', '--plush-guard-status']).stdout)
             if live['reservedMiB']:
@@ -173,6 +227,7 @@ def install(prefix=DEFAULT_PREFIX, node=DEFAULT_NODE, policy_override=None):
         shutil.copy2(node, backup)
         try:
             atomic_install(version / 'launcher', node)
+            verify_signing_update(node, manifest['signing'])
             smoke(node)
             atomic_install(candidate, record, mode='644')
         except BaseException:
@@ -214,15 +269,17 @@ def main():
     mode.add_argument('--rollback', action='store_true')
     mode.add_argument('--build-prefix', type=Path)
     parser.add_argument('--runtime', type=Path, default=DEFAULT_NODE)
+    parser.add_argument('--sign-identity', help='SHA1 of an existing code-signing certificate; installs retain the recorded identity')
     args = parser.parse_args()
     if platform.system() != 'Darwin':
         raise RuntimeError('native kernel guard requires macOS')
     if args.install:
-        result = install()
+        result = install(sign_identity=args.sign_identity)
     elif args.rollback:
         result = rollback()
     else:
-        result = build_guard(args.build_prefix, args.runtime)
+        result = build_guard(args.build_prefix, args.runtime,
+                             sign_identity=signing_identity(args.sign_identity) if args.sign_identity else None)
     print(json.dumps(result, ensure_ascii=False))
 
 

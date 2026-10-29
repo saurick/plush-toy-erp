@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 sys.dont_write_bytecode = True
 SOURCE = Path(__file__).resolve().parent
@@ -140,6 +141,17 @@ test('budget is held outside test JavaScript',()=>{{
             self.assertEqual(installed['status'], 'installed')
             self.assertEqual(installed['runtimeSha'], original)
             self.assertEqual(installer.digest(node), installed['installedSha'])
+            updated = installer.install(prefix, node, policy_override=policy)
+            self.assertNotEqual(updated['installedSha'], installed['installedSha'])
+            self.assertEqual(updated['signing'], installed['signing'])
+            installer.verify_signing_update(node, installed['signing'])
+            saved_record = (prefix / 'installation.json').read_bytes()
+            with mock.patch.object(installer, 'smoke', side_effect=RuntimeError('injected smoke failure')):
+                with self.assertRaisesRegex(RuntimeError, 'injected smoke failure'):
+                    installer.install(prefix, node, policy_override=policy)
+            self.assertEqual(installer.digest(node), updated['installedSha'])
+            self.assertEqual((prefix / 'installation.json').read_bytes(), saved_record)
+            installer.verify_signing_update(node, updated['signing'])
             result = installer.rollback(prefix, node)
             self.assertEqual(result['status'], 'rolled_back')
             self.assertEqual(installer.digest(node), original)
@@ -149,7 +161,8 @@ test('budget is held outside test JavaScript',()=>{{
             installer.smoke(node)
             stale = self.root / 'stale-kernel'
             installer.build_guard(stale, prefix / 'node.original', node, prefix / 'state', 0,
-                                  policy=policy, kernel_release='unavailable-kernel-release')
+                                  policy=policy, kernel_release='unavailable-kernel-release',
+                                  sign_identity=installed_again['signing']['identitySha1'])
             installer.atomic_install(stale / 'launcher', node)
             stale_record = json.loads((prefix / 'installation.json').read_text())
             stale_record['installedSha'] = installer.digest(node)
@@ -372,6 +385,60 @@ test('detached worker',async()=>{{
             if detached:
                 try: os.kill(detached, signal.SIGKILL)
                 except ProcessLookupError: pass
+
+
+class NativeNodeGuardSigning(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='plush-native-signing-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.identity = installer.signing_identity()
+        record = installer.DEFAULT_PREFIX / 'installation.json'
+        self.runtime = Path(json.loads(record.read_text())['realNode']) if record.exists() else installer.DEFAULT_NODE
+
+    def build(self, name, identity=None):
+        return installer.build_guard(self.root / name, self.runtime, sign_identity=identity)
+
+    def test_different_binaries_satisfy_each_others_persistent_identity(self):
+        first = self.build('first', self.identity)
+        second = self.build('second', self.identity)
+        self.assertNotEqual(first['launcherSha'], second['launcherSha'])
+        self.assertEqual(first['signing'], second['signing'])
+        self.assertFalse(first['signing']['adHoc'])
+        self.assertNotIn('cdhash', first['signing']['designatedRequirement'])
+        installer.verify_signing_update(second['helper'], first['signing'])
+        installer.verify_signing_update(first['helper'], second['signing'])
+
+    def test_same_identifier_with_ad_hoc_signature_cannot_reuse_authorization(self):
+        signed = self.build('signed', self.identity)
+        adhoc = self.build('adhoc')
+        self.assertEqual(installer.signature(adhoc['helper'])['identifier'], installer.SIGNING_IDENTIFIER)
+        result = subprocess.run(['codesign', '--verify', '--strict', '-R',
+            '=' + signed['signing']['designatedRequirement'], adhoc['helper']], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        with self.assertRaisesRegex(RuntimeError, 'certificate-backed'):
+            installer.verify_signing_update(adhoc['helper'], signed['signing'])
+
+    def test_unavailable_recorded_identity_does_not_fall_back_to_another_certificate(self):
+        previous = dict(signing=dict(identitySha1='0' * 40))
+        with self.assertRaisesRegex(RuntimeError, 'identity is unavailable'):
+            installer.signing_identity(previous=previous)
+        self.assertEqual(installer.signing_identity(self.identity, previous), self.identity)
+
+    def test_missing_or_ambiguous_identity_stops_before_installation_mutates_files(self):
+        for identities in ['', f'  1) {self.identity} "first"\n  2) {"0" * 40} "second"\n']:
+            with self.subTest(identities=bool(identities)):
+                with mock.patch.object(installer, 'run', return_value=subprocess.CompletedProcess([], 0, identities, '')):
+                    with self.assertRaisesRegex(RuntimeError, 'select one valid'):
+                        installer.signing_identity()
+        node = self.root / 'original-node'
+        shutil.copy2(self.runtime, node)
+        original = installer.digest(node)
+        prefix = self.root / 'not-installed'
+        with self.assertRaisesRegex(RuntimeError, 'identity is unavailable'):
+            installer.install(prefix, node, sign_identity='0' * 40)
+        self.assertFalse(prefix.exists())
+        self.assertEqual(installer.digest(node), original)
 
 
 if __name__ == '__main__':

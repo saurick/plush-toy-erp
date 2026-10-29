@@ -20,6 +20,17 @@ if (process.platform === 'darwin') { test('native macOS entry, shared budget and
   assert.match(result.stderr, /\nOK\s*$/u)
 }) }
 
+if (process.platform === 'darwin') { test('embedded tool heap limits, MCP and documented bypasses are verified', async () => {
+  const script = fileURLToPath(new URL('../../../scripts/qa/native/test_node_tool_guard.py', import.meta.url))
+  const result = await promisify(execFile)('python3', [script], {
+    env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+    timeout: 60000,
+    maxBuffer: 32 * 1024,
+  })
+  assert.match(result.stderr, /Ran [1-9]\d* tests/u)
+  assert.match(result.stderr, /\nOK\s*$/u)
+}) }
+
 async function fixture(t, source) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'plush-node-resource-'))
   t.after(() => rm(root, { recursive: true, force: true }))

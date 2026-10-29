@@ -48,7 +48,11 @@ macOS 原生启动器的编译、退出、凭据清理和信号转发用例仅�
 
 ## Node 测试资源保护 / Node Test Resource Limits
 
-Node 分组、Web 源码测试、按需测试门禁、CI Node / resource lane、原生覆盖采集和提交 hook 共用 [进程保护器](lib/node-test-process.mjs)。macOS 还必须经过已安装且源码匹配的[原生启动保护](native/README.md)：裸命令、绝对路径启动、`process.execPath` 及清空环境变量后的 Node 后代均进入同一单机预算。
+Node 分组、Web 源码测试、按需测试门禁、CI Node / resource lane、原生覆盖采集和提交 hook 共用 [进程保护器](lib/node-test-process.mjs)。macOS 当前系统 Node 测试入口还必须经过已安装且源码匹配的[原生启动保护](native/README.md)：该入口的裸命令、绝对路径启动、`process.execPath` 及清空环境变量后的 Node 后代均进入同一单机预算。
+
+正式安装的 macOS 保护器使用固定程序标识与持久证书签名，更新前后校验授权身份；证书不可用时停止安装。首次切换签名及真实文件夹授权的验证边界见[更新后的文件夹授权](native/README.md#更新后的文件夹授权)。
+
+工具内置 Node 另有[堆上限保护](native/README.md#embedded-tool-heap-guard)。它不纳入下述 6 GiB 账本，不能限制堆外内存或所有会话合计；原始内置路径、旧连接、桌面宿主覆盖配置和未来私有 runtime generation 仍可能绕过。覆盖结论必须以对应实际内核回读为准。
 
 | 保护 | 默认边界 |
 | --- | --- |
