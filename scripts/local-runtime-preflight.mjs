@@ -88,7 +88,11 @@ async function runCommand(
   options,
   runtime,
   failureMessage,
-  { includeOutput = false, code = "local_runtime_preflight_failed" } = {},
+  {
+    includeOutput = false,
+    code = "local_runtime_preflight_failed",
+    stage = "本地运行预检",
+  } = {},
 ) {
   const execFile = runtime.execFile || execFileAsync;
   try {
@@ -98,8 +102,23 @@ async function runCommand(
       signal: runtime.signal,
     });
   } catch (error) {
+    const deadlineReached =
+      runtime.signal?.aborted && runtime.signal.reason?.name === "TimeoutError";
+    if (runtime.signal?.aborted && !deadlineReached)
+      runtime.signal.throwIfAborted();
+    // The runtime executor and Node execFile report timeouts differently.
+    const timedOut =
+      deadlineReached ||
+      error?.code === "migration_command_timeout" ||
+      error?.code === "ETIMEDOUT" ||
+      (error?.killed === true && error?.signal === "SIGTERM" && error?.code == null);
     const details = includeOutput ? commandFailureDetails(error) : "";
-    const failure = new LocalRuntimePreflightError(code, failureMessage);
+    const failure = new LocalRuntimePreflightError(
+      timedOut ? "local_runtime_preflight_timeout" : code,
+      timedOut
+        ? `${stage}超时（预检限时 ${LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS / 1000} 秒）；检查未完成，本次启动已停止，可在恢复页重新检查`
+        : failureMessage,
+    );
     failure.diagnostic = details;
     throw failure;
   }
@@ -145,7 +164,11 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "工作区数据库规则检查未通过；请先修复下方 db-guard 报告的问题",
-    { includeOutput: true, code: "workspace_migration_invalid" },
+    {
+      includeOutput: true,
+      code: "workspace_migration_invalid",
+      stage: "工作区数据库规则检查",
+    },
   );
   writeLine(runtime, "[local-preflight] 工作区数据库规则检查通过");
 
@@ -159,7 +182,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "无法解析本地开发数据库配置；请检查 config.local.yaml 或 POSTGRES_DSN",
-    { code: "database_config_unavailable" },
+    { code: "database_config_unavailable", stage: "开发数据库配置读取" },
   );
   const databaseURL = String(dbURLResult.stdout || "").trim();
   if (!databaseURL) {
@@ -188,7 +211,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "无法读取本地开发数据库 migration 状态；未执行任何 migration",
-    { code: "database_status_unavailable" },
+    { code: "database_status_unavailable", stage: "开发数据库迁移状态读取" },
   );
 
   let status;
@@ -226,7 +249,11 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     },
     runtime,
     "开发数据库仍含自定义 Function、Procedure 或非内部 Trigger；请先完成受控 migration 清理",
-    { includeOutput: true, code: "database_programmability_blocked" },
+    {
+      includeOutput: true,
+      code: "database_programmability_blocked",
+      stage: "开发数据库自定义对象检查",
+    },
   );
 
   writeLine(

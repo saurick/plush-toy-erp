@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
+
+import { executeCommand } from "../web/dev-server/devDatabaseMigrationRuntime.mjs";
 
 import {
   LOCAL_RUNTIME_RECOVERY_MODE,
@@ -22,6 +26,100 @@ function currentMigrationStatus() {
     Applied: [{ Version: "20260714080000" }, { Version: "20260714081153" }],
   };
 }
+
+test("local runtime preflight: 命令超时报告未完成的检查阶段，不误报规则违规", async () => {
+  for (const [failedCommand, stage] of [
+    ["bash", "工作区数据库规则检查"],
+    ["go", "开发数据库配置读取"],
+    ["atlas", "开发数据库迁移状态读取"],
+    ["node", "开发数据库自定义对象检查"],
+  ]) {
+    for (const cause of [
+      { code: "migration_command_timeout" },
+      { code: "ETIMEDOUT" },
+      { killed: true, signal: "SIGTERM" },
+    ]) {
+      const calls = [];
+      await assert.rejects(
+        checkLocalDatabaseMigrations({
+          writeLine: () => {},
+          execFile: async (command) => {
+            calls.push(command);
+            if (command === failedCommand)
+              throw Object.assign(new Error("postgres://user:secret@host/db"), cause);
+            return {
+              stdout: command === "go" ? "postgres://user:secret@host/db"
+                : command === "atlas" ? JSON.stringify(currentMigrationStatus()) : "",
+            };
+          },
+        }),
+        (error) => {
+          assert.equal(error.code, "local_runtime_preflight_timeout");
+          assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+          assert(error.message.includes(stage));
+          assert.match(error.message, /超时.*15 秒/u);
+          assert.doesNotMatch(error.message, /规则检查未通过|迁移未到最新|secret|postgres:\/\//u);
+          return true;
+        },
+      );
+      assert.equal(calls.at(-1), failedCommand);
+    }
+  }
+});
+
+test("local runtime preflight: 外层超时保留恢复语义，用户取消保持取消", async () => {
+  for (const reason of [
+    new DOMException("deadline reached", "TimeoutError"),
+    new DOMException("user cancelled", "AbortError"),
+  ]) {
+    const controller = new AbortController();
+    await assert.rejects(
+      checkLocalDatabaseMigrations({
+        signal: controller.signal,
+        writeLine: () => {},
+        execFile: async () => {
+          controller.abort(reason);
+          throw Object.assign(new Error("aborted"), { code: "ABORT_ERR" });
+        },
+      }),
+      (error) => {
+        if (reason.name === "TimeoutError") {
+          assert.equal(error.code, "local_runtime_preflight_timeout");
+          assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+        } else {
+          assert.equal(error, reason);
+        }
+        return true;
+      },
+    );
+  }
+});
+
+test("local runtime preflight: 两个真实执行器的超时均进入恢复状态", async () => {
+  for (const execute of [promisify(execFile), executeCommand]) {
+    let calls = 0;
+    await assert.rejects(
+      checkLocalDatabaseMigrations({
+        writeLine: () => {},
+        execFile: async (_command, _args, options) => {
+          calls += 1;
+          return execute(process.execPath, ["-e", "setTimeout(() => {}, 2000)"], {
+            ...options,
+            timeout: 30,
+            killGraceMs: 20,
+          });
+        },
+      }),
+      (error) => {
+        assert.equal(error.code, "local_runtime_preflight_timeout");
+        assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+        assert.match(error.message, /工作区数据库规则检查超时/u);
+        return true;
+      },
+    );
+    assert.equal(calls, 1);
+  }
+});
 
 test("local runtime preflight: 每个外部命令有超时与取消信号，错误分层且不回显凭据", async () => {
   for (const [failedCommand, expectedCode] of [
