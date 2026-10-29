@@ -12,13 +12,13 @@
 
 ## 工程加工权限（2026-10-29）
 
-PMC 维护、工程只读已验证，待迁移和配置生效；见 `output/qa/engineering-access-20261029/handoff.md`。
+PMC 维护、工程只读已验证；权限迁移已执行，客户配置尚未激活。见 `output/qa/engineering-access-20261029/handoff.md`。
 
 ## 工程任务删除打样处理（2026-10-29）
 
 任务直接使用完整 BOM 编辑器，保留 Excel 导入、任务与 BOM 附件；业务动作收为保存草稿、完成工程资料。删除打样状态、确认及复用字段，保留老板和财务审核。代码、定向测试与浏览器验证已通过。
 
-三条迁移已完成现库备份恢复、32,856 行存量升级及候选服务预演；共享库尚未 apply，等待负责人确认。操作 ID、验证和精确 Git handoff 见 `output/qa/engineering-task-no-sampling-20261028/验证与交接.md`。本轮未暂存、提交或推送。
+经负责人确认，四条迁移已执行，读回 173/173、待执行 0；32,856 行存量与附件恢复通过，新后端 health/ready 及实际任务页已验证。操作、备份与 Git handoff 见 `output/qa/engineering-task-no-sampling-20261028/验证与交接.md`。本轮未暂存、提交或推送。
 
 ## BOM 编辑页导入数量与总用量（2026-10-28）
 
