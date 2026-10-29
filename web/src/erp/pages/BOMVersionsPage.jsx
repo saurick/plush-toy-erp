@@ -1194,11 +1194,16 @@ export default function BOMVersionsPage() {
         importDraft={editorImportDraft}
         onClose={() => setHeaderModalOpen(false)}
         onSaved={async (saved) => {
+          const isCreatingVersion = headerMode !== 'edit'
           setSelectedVersion(saved)
           applySelectedRowKeys([saved.id])
           reportBusinessResult('BOM 草稿已保存', saved)
           if (headerMode === 'edit' && revisionEditing) setSavedRevision(saved)
-          await loadVersions()
+          if (isCreatingVersion) {
+            resetBusinessPaginationCurrent(setPagination)
+          } else {
+            await loadVersions()
+          }
         }}
         actions={headerMode === 'view' && canReadTasks ? <Button icon={<UnorderedListOutlined />} onClick={() => setTaskContext({ bomID: selectedVersion.id, page: 1 })}>任务协作</Button> : null}
       />

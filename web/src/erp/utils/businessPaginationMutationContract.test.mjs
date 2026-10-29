@@ -90,30 +90,15 @@ test('newest-first master-data creates return to page one while edits and ordere
     /const shouldShowCreatedRecordOnFirstPage =\s*isCreatingRecord && effectiveType !== 'processes'/u
   )
 
-  let nextIndex = 0
-  for (const saveOutcome of ['partial image save', 'complete save']) {
-    const branches = conditionalBranches(
-      mutation,
-      'shouldShowCreatedRecordOnFirstPage',
-      nextIndex
-    )
-    assert.match(
-      branches.truthy,
-      /resetBusinessPaginationCurrent\(setPagination\)/u,
-      `${saveOutcome} must reset a newly created record to page one`
-    )
-    assert.doesNotMatch(branches.truthy, /loadRecords\(\)/u)
-    assert.match(
-      branches.falsy,
-      /await loadRecords\(\)/u,
-      `${saveOutcome} must refresh edits and ordered process records in place`
-    )
-    assert.doesNotMatch(
-      branches.falsy,
-      /resetBusinessPaginationCurrent\(setPagination\)/u
-    )
-    nextIndex = branches.nextIndex
-  }
+  const branches = conditionalBranches(mutation, 'shouldShowCreatedRecordOnFirstPage')
+  assert.match(branches.truthy, /resetBusinessPaginationCurrent\(setPagination\)/u)
+  assert.doesNotMatch(branches.truthy, /loadRecords\(\)/u)
+  assert.match(branches.falsy, /await loadRecords\(\)/u)
+  assert.doesNotMatch(branches.falsy, /resetBusinessPaginationCurrent\(setPagination\)/u)
+
+  const productEditor = sourceSlice(masterDataSource, '<ProductRecordEditor', '<BusinessFormPage')
+  assert.match(productEditor, /onSaved=\{async \(saved\) =>/u)
+  assert.match(productEditor, /if \(!editingRecord\?\.id\) resetBusinessPaginationCurrent\(setPagination\)\s*else await loadRecords\(\)/u)
 })
 
 for (const pageCase of [
@@ -210,9 +195,10 @@ test('production order create writes page one while edit refreshes the current q
 test('BOM create and copy reset page one while editing refreshes the current page', () => {
   const mutation = sourceSlice(
     bomSource,
-    'const saveHeader = async () => {',
-    'const activateSelected'
+    '<BOMEditor',
+    'actions={headerMode'
   )
+  assert.match(mutation, /onSaved=\{async \(saved\) =>/u)
   assert.match(mutation, /const isCreatingVersion = headerMode !== 'edit'/u)
 
   const branches = conditionalBranches(mutation, 'isCreatingVersion')

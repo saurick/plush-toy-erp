@@ -97,6 +97,7 @@ import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 import { createPurchaseFlowRepairScenarios } from './purchaseFlowRepairScenarios.mjs'
 import { createPurchaseFollowupScenarios } from './purchaseFollowupScenarios.mjs'
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
+import { createBOMPaginationScenarios } from './bomPaginationScenarios.mjs'
 import { createSalesOrderImportScenarios } from './salesOrderImportScenarios.mjs'
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
 import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios.mjs'
@@ -861,6 +862,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
+    ...createBOMPaginationScenarios({ assert, customerRuntimeEffectiveSession, assertNoHorizontalOverflow }),
     ...createProductIdentityScenarios({
       customerRuntimeEffectiveSession,
       outputDir,
