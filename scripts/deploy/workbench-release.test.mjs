@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readFile, readlink, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, readlink, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -16,7 +16,7 @@ async function put(root, file, content, mode = 0o600) {
 }
 
 async function fixture(t) {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'plush-workbench-release-'))
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'plush-workbench-release-')))
   t.after(() => rm(root, { recursive: true, force: true }))
   const input = path.join(root, 'prepared')
   await mkdir(input)
@@ -36,7 +36,8 @@ async function fixture(t) {
   git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'fixture')
   await put(input, 'web/build-workbench/workbench.html', '<h1>workbench fixture</h1>')
   await put(input, 'web/build-workbench/favicon-dev.svg', '<svg/>')
-  await put(input, 'web/node_modules/stub/index.js', 'export default true')
+  await put(input, 'web/node_modules/.pnpm/stub@1.0.0/node_modules/stub/index.js', 'export default true')
+  await symlink('.pnpm/stub@1.0.0/node_modules/stub', path.join(input, 'web/node_modules/stub'))
   const elf = Buffer.alloc(64)
   elf.write('7f454c46', 0, 'hex')
   elf[4] = 2
@@ -111,7 +112,7 @@ async function deploymentFixture(t) {
   const oldKey = 'aaaaaaaaaaaaaaaa-11111111-1111-4111-8111-111111111111'
   const previous = path.join(deployment, 'releases', oldKey)
   await mkdir(path.join(deployment, 'releases'), { recursive: true })
-  await cp(input, previous, { recursive: true })
+  await cp(input, previous, { recursive: true, verbatimSymlinks: true })
   await put(deployment, 'runtime/workbench.env', 'PLUSH_WORKBENCH_ORIGIN=https://workbench.example.test\n')
   await put(previous, 'output/dev-workbench/delivery-operations/operations/receipt.json', '{"status":"passed","id":"historical-fixture"}')
   await put(previous, 'output/dev-customer-config-operations/operations/config.json', '{"status":"passed","id":"customer-config-fixture"}')
@@ -134,11 +135,13 @@ test('activation preserves byte-identical history and rollback carries the lates
   assert.equal(first.stateFiles, 2)
   assert.deepEqual(f.calls, ['stop', 'start', 'public'])
   const active = path.join(f.deployment, await readlink(path.join(f.deployment, 'current')))
+  assert.equal(await readlink(path.join(active, 'web/node_modules/stub')), '.pnpm/stub@1.0.0/node_modules/stub')
   await put(active, 'output/qa/retained-report.json', '{"historical":true}')
   const second = await activateWorkbench({ input: f.previous, root: f.deployment, services: f.services })
   assert.equal(second.status, 'passed')
   assert.equal(second.stateFiles, 3)
   const restored = path.join(f.deployment, await readlink(path.join(f.deployment, 'current')))
+  assert.equal(await readlink(path.join(restored, 'web/node_modules/stub')), '.pnpm/stub@1.0.0/node_modules/stub')
   assert.equal(await readFile(path.join(restored, 'output/qa/retained-report.json'), 'utf8'), '{"historical":true}')
   assert.equal(await readFile(path.join(restored, 'output/dev-customer-config-operations/operations/config.json'), 'utf8'), '{"status":"passed","id":"customer-config-fixture"}')
   assert.equal(existsSync(path.join(f.deployment, 'runtime/release.lock')), false)

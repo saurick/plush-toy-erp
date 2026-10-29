@@ -136,7 +136,7 @@ export async function activateWorkbench({ input: requestedInput, root: requested
     await inspectWorkbenchState(previous)
     // Pre-copy and verify immutable inputs while reads stay available.
     stage = 'candidate-copy'
-    await cp(input, candidate, { recursive: true, force: false, errorOnExist: true,
+    await cp(input, candidate, { recursive: true, force: false, errorOnExist: true, verbatimSymlinks: true,
       filter: (source) => source !== path.join(input, 'output') })
     await verifyWorkbenchArtifact(candidate)
     // A failed stop response can still mean the service was stopped.
